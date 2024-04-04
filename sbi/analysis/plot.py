@@ -99,7 +99,7 @@ def plt_kde_1d(
     limits: torch.Tensor,
     kwargs: Dict,
 ) -> None:
-    """ "1D Kernel Density Estimation."""
+    """Run 1D kernel density estimation on samples and plot it on a given axes."""
     density = gaussian_kde(samples, bw_method=kwargs["bw_method"])
     xs = np.linspace(limits[0], limits[1], kwargs["bins"])
     ys = density(xs)
@@ -112,7 +112,7 @@ def plt_scatter_1d(
     limits: torch.Tensor,
     kwargs: Dict,
 ) -> None:
-    """Scatter plot 1D."""
+    """Scatter plot in 1D: plot vertical lines for each sample."""
     for single_sample in samples:
         ax.axvline(single_sample, **kwargs['mpl_kwargs'])
 
@@ -169,8 +169,7 @@ def plt_kde_2d(
     limits_row: torch.Tensor,
     kwargs: Dict,
 ) -> None:
-    """2D Kernel Density Estimation."""
-
+    """Run 2D Kernel Density Estimation and plot it on given axis."""
     X, Y, Z = get_kde(samples_col, samples_row, limits_col, limits_row, kwargs)
 
     ax.imshow(
@@ -476,16 +475,13 @@ def probs2contours(
     """Takes an array of probabilities and produces an array of contours at specified
     percentile levels.
     Args:
-        probs : array
-            Probability array. doesn't have to sum to 1, but it is assumed it contains
+        probs: Probability array. doesn't have to sum to 1, but it is assumed it contains
             all the mass
-        levels : list
-            Percentile levels, have to be in [0.0, 1.0]. Specifies contour levels that
+        levels: Percentile levels, have to be in [0.0, 1.0]. Specifies contour levels that
             include a given proportion of samples, i.e., 0.1 specifies where the top
             10% of the density is.
     Returns:
-        contors: array
-            Array of same shape as probs with percentile labels. Values in output array
+        contours: Array of same shape as probs with percentile labels. Values in output array
             denote labels which percentile bin the probability mass belongs to.
 
     Example: for levels = [0.1, 0.5], output array will take on values [1.0, 0.5, 0.1],
