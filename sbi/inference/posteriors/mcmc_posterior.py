@@ -21,7 +21,7 @@ from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.samplers.mcmc import (
     IterateParameters,
-    Slice,
+    PyMCSampler,
     SliceSamplerSerial,
     SliceSamplerVectorized,
     proposal_init,
@@ -46,13 +46,14 @@ class MCMCPosterior(NeuralPosterior):
         proposal: Any,
         theta_transform: Optional[TorchTransform] = None,
         method: str = "slice_np",
-        thin: int = 10,
-        warmup_steps: int = 10,
+        thin: int = -1,
+        warmup_steps: int = 200,
         num_chains: int = 1,
         init_strategy: str = "resample",
         init_strategy_parameters: Optional[Dict[str, Any]] = None,
         init_strategy_num_candidates: Optional[int] = None,
         num_workers: int = 1,
+        mp_context: str = "spawn",
         device: Optional[str] = None,
         x_shape: Optional[torch.Size] = None,
     ):
@@ -64,14 +65,17 @@ class MCMCPosterior(NeuralPosterior):
             theta_transform: Transformation that will be applied during sampling.
                 Allows to perform MCMC in unconstrained space.
             method: Method used for MCMC sampling, one of `slice_np`,
-                `slice_np_vectorized`, `slice`, `hmc`, `nuts`. `slice_np` is a custom
+                `slice_np_vectorized`, `hmc_pyro`, `nuts_pyro`, `slice_pymc`,
+                `hmc_pymc`, `nuts_pymc`. `slice_np` is a custom
                 numpy implementation of slice sampling. `slice_np_vectorized` is
                 identical to `slice_np`, but if `num_chains>1`, the chains are
                 vectorized for `slice_np_vectorized` whereas they are run sequentially
-                for `slice_np`. The samplers `hmc`, `nuts` or `slice` sample with Pyro.
-            thin: The thinning factor for the chain.
+                for `slice_np`. The samplers ending on `_pyro` are using Pyro, and
+                likewise the samplers ending on `_pymc` are using PyMC.
+            thin: The thinning factor for the chain, default 1 (no thinning).
             warmup_steps: The initial number of samples to discard.
-            num_chains: The number of chains.
+            num_chains: The number of chains. Should generally be at most
+                `num_workers - 1`.
             init_strategy: The initialisation strategy for chains; `proposal` will draw
                 init locations from `proposal`, whereas `sir` will use Sequential-
                 Importance-Resampling (SIR). SIR initially samples
@@ -82,17 +86,32 @@ class MCMCPosterior(NeuralPosterior):
                 uses `exp(potential_fn)` as weights.
             init_strategy_parameters: Dictionary of keyword arguments passed to the
                 init strategy, e.g., for `init_strategy=sir` this could be
-                `num_candidate_samples`, i.e., the number of candidates to to find init
+                `num_candidate_samples`, i.e., the number of candidates to find init
                 locations (internal default is `1000`), or `device`.
-            init_strategy_num_candidates: Number of candidates to to find init
+            init_strategy_num_candidates: Number of candidates to find init
                  locations in `init_strategy=sir` (deprecated, use
                  init_strategy_parameters instead).
             num_workers: number of cpu cores used to parallelize mcmc
+            mp_context: Multiprocessing start method, either `"fork"` or `"spawn"`
+                (default), used by Pyro and PyMC samplers. `"fork"` can be significantly
+                faster than `"spawn"` but is only supported on POSIX-based systems
+                (e.g. Linux and macOS, not Windows).
             device: Training device, e.g., "cpu", "cuda" or "cuda:0". If None,
                 `potential_fn.device` is used.
             x_shape: Shape of a single simulator output. If passed, it is used to check
                 the shape of the observed data and give a descriptive error.
         """
+        if method == "slice":
+            warn(
+                "The Pyro-based slice sampler is deprecated, and the method `slice` "
+                "has been changed to `slice_np`, i.e., the custom "
+                "numpy-based slice sampler.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            method = "slice_np"
+
+        thin = _process_thin_default(thin)
 
         super().__init__(
             potential_fn,
@@ -109,6 +128,7 @@ class MCMCPosterior(NeuralPosterior):
         self.init_strategy = init_strategy
         self.init_strategy_parameters = init_strategy_parameters or {}
         self.num_workers = num_workers
+        self.mp_context = mp_context
         self._posterior_sampler = None
         # Hardcode parameter name to reduce clutter kwargs.
         self.param_name = "theta"
@@ -202,6 +222,7 @@ class MCMCPosterior(NeuralPosterior):
         mcmc_method: Optional[str] = None,
         sample_with: Optional[str] = None,
         num_workers: Optional[int] = None,
+        mp_context: Optional[str] = None,
         show_progress_bars: bool = True,
     ) -> Tensor:
         r"""Return samples from posterior distribution $p(\theta|x)$ with MCMC.
@@ -233,6 +254,7 @@ class MCMCPosterior(NeuralPosterior):
         num_chains = self.num_chains if num_chains is None else num_chains
         init_strategy = self.init_strategy if init_strategy is None else init_strategy
         num_workers = self.num_workers if num_workers is None else num_workers
+        mp_context = self.mp_context if mp_context is None else mp_context
         init_strategy_parameters = (
             self.init_strategy_parameters
             if init_strategy_parameters is None
@@ -289,7 +311,7 @@ class MCMCPosterior(NeuralPosterior):
         )
         num_samples = torch.Size(sample_shape).numel()
 
-        track_gradients = method in ("hmc", "nuts")
+        track_gradients = method in ("hmc_pyro", "nuts_pyro", "hmc_pymc", "nuts_pymc")
         with torch.set_grad_enabled(track_gradients):
             if method in ("slice_np", "slice_np_vectorized"):
                 transformed_samples = self._slice_np_mcmc(
@@ -302,7 +324,7 @@ class MCMCPosterior(NeuralPosterior):
                     num_workers=num_workers,
                     show_progress_bars=show_progress_bars,
                 )
-            elif method in ("hmc", "nuts", "slice"):
+            elif method in ("hmc_pyro", "nuts_pyro"):
                 transformed_samples = self._pyro_mcmc(
                     num_samples=num_samples,
                     potential_function=self.potential_,
@@ -312,9 +334,22 @@ class MCMCPosterior(NeuralPosterior):
                     warmup_steps=warmup_steps,  # type: ignore
                     num_chains=num_chains,
                     show_progress_bars=show_progress_bars,
+                    mp_context=mp_context,
+                )
+            elif method in ("hmc_pymc", "nuts_pymc", "slice_pymc"):
+                transformed_samples = self._pymc_mcmc(
+                    num_samples=num_samples,
+                    potential_function=self.potential_,
+                    initial_params=initial_params,
+                    mcmc_method=method,  # type: ignore
+                    thin=thin,  # type: ignore
+                    warmup_steps=warmup_steps,  # type: ignore
+                    num_chains=num_chains,
+                    show_progress_bars=show_progress_bars,
+                    mp_context=mp_context,
                 )
             else:
-                raise NameError
+                raise NameError(f"The sampling method {method} is not implemented!")
 
         samples = self.theta_transform.inv(transformed_samples)
 
@@ -452,9 +487,10 @@ class MCMCPosterior(NeuralPosterior):
             num_samples: Desired number of samples.
             potential_function: A callable **class**.
             initial_params: Initial parameters for MCMC chain.
-            thin: Thinning (subsampling) factor.
+            thin: Thinning (subsampling) factor, default 1 (no thinning).
             warmup_steps: Initial number of samples to discard.
-            vectorized: Whether to use a vectorized implementation of the Slice sampler.
+            vectorized: Whether to use a vectorized implementation of the
+                `SliceSampler`.
             num_workers: Number of CPU cores to use.
             init_width: Inital width of brackets.
             show_progress_bars: Whether to show a progressbar during sampling;
@@ -494,8 +530,7 @@ class MCMCPosterior(NeuralPosterior):
         self._mcmc_init_params = samples[:, -1, :].reshape(num_chains, dim_samples)
 
         # Collect samples from all chains.
-        samples = samples.reshape(-1, dim_samples)[:num_samples, :]
-        assert samples.shape[0] == num_samples
+        samples = samples.reshape(-1, dim_samples)[:num_samples]
 
         return samples.type(torch.float32).to(self._device)
 
@@ -504,21 +539,24 @@ class MCMCPosterior(NeuralPosterior):
         num_samples: int,
         potential_function: Callable,
         initial_params: Tensor,
-        mcmc_method: str = "slice",
-        thin: int = 10,
+        mcmc_method: str = "nuts_pyro",
+        thin: int = -1,
         warmup_steps: int = 200,
         num_chains: Optional[int] = 1,
         show_progress_bars: bool = True,
+        mp_context: str = "spawn",
     ) -> Tensor:
-        r"""Return samples obtained using Pyro HMC, NUTS for slice kernels.
+        r"""Return samples obtained using Pyro's HMC or NUTS sampler.
 
         Args:
             num_samples: Desired number of samples.
             potential_function: A callable **class**. A class, but not a function,
                 is picklable for Pyro MCMC to use it across chains in parallel,
                 even when the potential function requires evaluating a neural network.
-            mcmc_method: One of `hmc`, `nuts` or `slice`.
-            thin: Thinning (subsampling) factor.
+            initial_params: Initial parameters for MCMC chain.
+            mcmc_method: Pyro MCMC method to use, either `"hmc_pyro"` or
+                `"nuts_pyro"` (default).
+            thin: Thinning (subsampling) factor, default 1 (no thinning).
             warmup_steps: Initial number of samples to discard.
             num_chains: Whether to sample in parallel. If None, use all but one CPU.
             show_progress_bars: Whether to show a progressbar during sampling.
@@ -526,17 +564,17 @@ class MCMCPosterior(NeuralPosterior):
         Returns:
             Tensor of shape (num_samples, shape_of_single_theta).
         """
+        thin = _process_thin_default(thin)
         num_chains = mp.cpu_count() - 1 if num_chains is None else num_chains
-
-        kernels = dict(slice=Slice, hmc=HMC, nuts=NUTS)
+        kernels = dict(hmc_pyro=HMC, nuts_pyro=NUTS)
 
         sampler = MCMC(
             kernel=kernels[mcmc_method](potential_fn=potential_function),
-            num_samples=(thin * num_samples) // num_chains + num_chains,
+            num_samples=ceil((thin * num_samples) / num_chains),
             warmup_steps=warmup_steps,
             initial_params={self.param_name: initial_params},
             num_chains=num_chains,
-            mp_context="spawn",
+            mp_context=mp_context,
             disable_progbar=not show_progress_bars,
             transforms={},
         )
@@ -550,9 +588,65 @@ class MCMCPosterior(NeuralPosterior):
         self._posterior_sampler = sampler
 
         samples = samples[::thin][:num_samples]
-        assert samples.shape[0] == num_samples
 
         return samples.detach()
+
+    def _pymc_mcmc(
+        self,
+        num_samples: int,
+        potential_function: Callable,
+        initial_params: Tensor,
+        mcmc_method: str = "nuts_pymc",
+        thin: int = -1,
+        warmup_steps: int = 200,
+        num_chains: Optional[int] = 1,
+        show_progress_bars: bool = True,
+        mp_context: str = "spawn",
+    ) -> Tensor:
+        r"""Return samples obtained using PyMC's HMC, NUTS or slice samplers.
+
+        Args:
+            num_samples: Desired number of samples.
+            potential_function: A callable **class**. A class, but not a function,
+                is picklable for PyMC MCMC to use it across chains in parallel,
+                even when the potential function requires evaluating a neural network.
+            initial_params: Initial parameters for MCMC chain.
+            mcmc_method: mcmc_method: Pyro MCMC method to use, either `"hmc_pymc"` or
+                `"slice_pymc"`, or `"nuts_pymc"` (default).
+            thin: Thinning (subsampling) factor, default 1 (no thinning).
+            warmup_steps: Initial number of samples to discard.
+            num_chains: Whether to sample in parallel. If None, use all but one CPU.
+            show_progress_bars: Whether to show a progressbar during sampling.
+
+        Returns:
+            Tensor of shape (num_samples, shape_of_single_theta).
+        """
+        thin = _process_thin_default(thin)
+        num_chains = mp.cpu_count() - 1 if num_chains is None else num_chains
+        steps = dict(slice_pymc="slice", hmc_pymc="hmc", nuts_pymc="nuts")
+
+        sampler = PyMCSampler(
+            potential_fn=potential_function,
+            step=steps[mcmc_method],
+            initvals=tensor2numpy(initial_params),
+            draws=ceil((thin * num_samples) / num_chains),
+            tune=warmup_steps,
+            chains=num_chains,
+            mp_ctx=mp_context,
+            progressbar=show_progress_bars,
+            param_name=self.param_name,
+            device=self._device,
+        )
+        samples = sampler.run()
+        samples = torch.from_numpy(samples).to(dtype=torch.float32, device=self._device)
+        samples = samples.reshape(-1, initial_params.shape[1])
+
+        # Save posterior sampler.
+        self._posterior_sampler = sampler
+
+        samples = samples[::thin][:num_samples]
+
+        return samples
 
     def _prepare_potential(self, method: str) -> Callable:
         """Combines potential and transform and takes care of gradients and pyro.
@@ -563,13 +657,13 @@ class MCMCPosterior(NeuralPosterior):
         Returns:
             A potential function that is ready to be used in MCMC.
         """
-        if method == "slice":
-            track_gradients = False
-            pyro = True
-        elif method in ("hmc", "nuts"):
+        if method in ("hmc_pyro", "nuts_pyro"):
             track_gradients = True
             pyro = True
-        elif "slice_np" in method:
+        elif method in ("hmc_pymc", "nuts_pymc"):
+            track_gradients = True
+            pyro = False
+        elif method in ("slice_np", "slice_np_vectorized", "slice_pymc"):
             track_gradients = False
             pyro = False
         else:
@@ -662,8 +756,8 @@ class MCMCPosterior(NeuralPosterior):
         Note: the InferenceData is constructed using the posterior samples generated in
         most recent call to `.sample(...)`.
 
-        For Pyro HMC and NUTS kernels InferenceData will contain diagnostics, for Pyro
-        Slice or sbi slice sampling samples, only the samples are added.
+        For Pyro and PyMC samplers, InferenceData will contain diagnostics, but for
+        sbi slice samplers, only the samples are added.
 
         Returns:
             inference_data: Arviz InferenceData object.
@@ -672,16 +766,20 @@ class MCMCPosterior(NeuralPosterior):
             self._posterior_sampler is not None
         ), """No samples have been generated, call .sample() first."""
 
-        sampler: Union[MCMC, SliceSamplerSerial, SliceSamplerVectorized] = (
-            self._posterior_sampler
-        )
+        sampler: Union[
+            MCMC, SliceSamplerSerial, SliceSamplerVectorized, PyMCSampler
+        ] = self._posterior_sampler
 
         # If Pyro sampler and samples not transformed, use arviz' from_pyro.
-        # Exclude 'slice' kernel as it lacks the 'divergence' diagnostics key.
-        if isinstance(self._posterior_sampler, (HMC, NUTS)) and isinstance(
+        if isinstance(sampler, (HMC, NUTS)) and isinstance(
             self.theta_transform, torch_tf.IndependentTransform
         ):
             inference_data = az.from_pyro(sampler)
+        # If PyMC sampler and samples not transformed, get cached InferenceData.
+        elif isinstance(sampler, PyMCSampler) and isinstance(
+            self.theta_transform, torch_tf.IndependentTransform
+        ):
+            inference_data = sampler.get_inference_data()
 
         # otherwise get samples from sampler and transform to original space.
         else:
@@ -709,6 +807,28 @@ class MCMCPosterior(NeuralPosterior):
             })
 
         return inference_data
+
+
+def _process_thin_default(thin: int) -> int:
+    """
+    Check if the user did use the default thinning value and raise a warning if so.
+
+    Args:
+        thin: Thinning (subsampling) factor, setting 1 disables thinning.
+
+    Returns:
+        The corrected thinning factor.
+    """
+    if thin == -1:
+        thin = 1
+        warn(
+            "The default value for thinning in MCMC sampling has been changed from "
+            "10 to 1. This might cause the results differ from the last benchmark.",
+            UserWarning,
+            stacklevel=2,
+        )
+
+    return thin
 
 
 def _maybe_use_dict_entry(default: Any, key: str, dict_to_check: Dict) -> Any:

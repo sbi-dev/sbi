@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import arviz as az
 import numpy as np
 import pytest
 import torch
@@ -17,6 +16,7 @@ from sbi.inference import (
     simulate_for_sbi,
 )
 from sbi.neural_nets import likelihood_nn
+from sbi.samplers.mcmc.pymc_wrapper import PyMCSampler
 from sbi.samplers.mcmc.slice_numpy import (
     SliceSampler,
     SliceSamplerSerial,
@@ -26,24 +26,20 @@ from sbi.simulators.linear_gaussian import (
     diagonal_linear_gaussian,
     true_posterior_linear_gaussian_mvn_prior,
 )
-from sbi.utils.user_input_checks import (
-    process_prior,
-)
+from sbi.utils.user_input_checks import process_prior
 from tests.test_utils import check_c2st
 
 
 @pytest.mark.mcmc
 @pytest.mark.parametrize("num_dim", (1, 2))
-def test_c2st_slice_np_on_Gaussian(num_dim: int):
+def test_c2st_slice_np_on_Gaussian(
+    num_dim: int, warmup: int = 100, num_samples: int = 500
+):
     """Test MCMC on Gaussian, comparing to ground truth target via c2st.
 
     Args:
         num_dim: parameter dimension of the gaussian model
-
     """
-    warmup = 100
-    num_samples = 500
-
     likelihood_shift = -1.0 * ones(num_dim)
     likelihood_cov = 0.3 * eye(num_dim)
     prior_mean = zeros(num_dim)
@@ -84,7 +80,6 @@ def test_c2st_slice_np_vectorized_parallelized_on_Gaussian(
 
     Args:
         num_dim: parameter dimension of the gaussian model
-
     """
     num_samples = 500
     warmup = mcmc_params_accurate["warmup_steps"]
@@ -136,12 +131,62 @@ def test_c2st_slice_np_vectorized_parallelized_on_Gaussian(
 
 
 @pytest.mark.mcmc
+@pytest.mark.slow
+@pytest.mark.parametrize("step", ("nuts", "hmc", "slice"))
+@pytest.mark.parametrize("num_chains", (1, 3))
+def test_c2st_pymc_sampler_on_Gaussian(
+    step: str,
+    num_chains: int,
+    num_dim: int = 2,
+    num_samples: int = 1000,
+    warmup: int = 100,
+):
+    """Test PyMC on Gaussian, comparing to ground truth target via c2st."""
+    likelihood_shift = -1.0 * ones(num_dim)
+    likelihood_cov = 0.3 * eye(num_dim)
+    prior_mean = zeros(num_dim)
+    prior_cov = eye(num_dim)
+    x_o = zeros((1, num_dim))
+    target_distribution = true_posterior_linear_gaussian_mvn_prior(
+        x_o[0], likelihood_shift, likelihood_cov, prior_mean, prior_cov
+    )
+    target_samples = target_distribution.sample((num_samples,))
+
+    def lp_f(x, track_gradients=True):
+        with torch.set_grad_enabled(track_gradients):
+            return target_distribution.log_prob(x)
+
+    sampler = PyMCSampler(
+        potential_fn=lp_f,
+        initvals=np.zeros((num_chains, num_dim)).astype(np.float32),
+        step=step,
+        draws=(int(num_samples / num_chains)),  # PyMC does not use thinning
+        tune=warmup,
+        chains=num_chains,
+    )
+    samples = sampler.run()
+    assert samples.shape == (
+        num_chains,
+        int(num_samples / num_chains),
+        num_dim,
+    )
+    samples = samples.reshape(-1, num_dim)
+
+    samples = torch.as_tensor(samples, dtype=torch.float32)
+    alg = f"pymc_{step}"
+
+    check_c2st(samples, target_samples, alg=alg)
+
+
+@pytest.mark.mcmc
 @pytest.mark.parametrize(
     "method",
     (
-        "nuts",
-        "hmc",
-        "slice",
+        "nuts_pyro",
+        "hmc_pyro",
+        "nuts_pymc",
+        "hmc_pymc",
+        "slice_pymc",
         "slice_np",
         "slice_np_vectorized",
     ),
@@ -185,4 +230,19 @@ def test_getting_inference_diagnostics(method, mcmc_params_fast: dict):
     )
     idata = posterior.get_arviz_inference_data()
 
-    az.plot_trace(idata)
+    assert hasattr(idata, "posterior"), (
+        f"`MCMCPosterior.get_arviz_inference_data()` for method {method} "
+        f"returned invalid InferenceData. Must contain key 'posterior', "
+        f"but found only {list(idata.keys())}"
+    )
+    samples = getattr(idata.posterior, posterior.param_name).data
+    samples = samples.reshape(-1, samples.shape[-1])[:: mcmc_params_fast["thin"]][
+        :num_samples
+    ]
+    assert samples.shape == (
+        num_samples,
+        num_dim,
+    ), (
+        f"MCMC samples for method {method} have incorrect shape (n_samples, n_dims). "
+        f"Expected {(num_samples, num_dim)}, got {samples.shape}"
+    )
