@@ -112,7 +112,7 @@ def plt_scatter_1d(
     limits: torch.Tensor,
     kwargs: Dict,
 ) -> None:
-    """Scatter plot 1D."""
+    """Scatter plot in 1D: plot vertical lines for each sample."""
     for single_sample in samples:
         ax.axvline(single_sample, **kwargs['mpl_kwargs'])
 
