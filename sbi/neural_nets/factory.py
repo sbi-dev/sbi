@@ -189,7 +189,7 @@ def likelihood_nn(
 
     def build_fn(batch_theta, batch_x):
         if model not in model_builders:
-            raise NotImplementedError("Model {model} in not implemented")
+            raise NotImplementedError(f"Model {model} in not implemented")
 
         return model_builders[model](batch_x=batch_x, batch_y=batch_theta, **kwargs)
 
