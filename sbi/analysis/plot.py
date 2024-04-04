@@ -55,8 +55,8 @@ def to_list_kwargs(
 
 
 def _update(d: Dict, u: Optional[Dict]) -> Dict:
+    """update dictionary with user input, see: https://stackoverflow.com/a/3233356"""
     if u is not None:
-        """update dictionary with user input, see: https://stackoverflow.com/a/3233356"""
         for k, v in six.iteritems(u):
             dv = d.get(k, {})
             if not isinstance(dv, collectionsAbc.Mapping):  # type: ignore
@@ -170,24 +170,8 @@ def plt_kde_2d(
     kwargs: Dict,
 ) -> None:
     """2D Kernel Density Estimation."""
-    density = gaussian_kde(
-        np.array([samples_col, samples_row]),
-        bw_method=kwargs["bw_method"],
-    )
-    X, Y = np.meshgrid(
-        np.linspace(
-            limits_col[0],
-            limits_col[1],
-            kwargs["bins"],
-        ),
-        np.linspace(
-            limits_row[0],
-            limits_row[1],
-            kwargs["bins"],
-        ),
-    )
-    positions = np.vstack([X.ravel(), Y.ravel()])
-    Z = np.reshape(density(positions).T, X.shape)
+
+    X, Y, Z = get_kde(samples_col, samples_row, limits_col, limits_row, kwargs)
 
     ax.imshow(
         Z,
@@ -210,28 +194,8 @@ def plt_contour_2d(
     kwargs: Dict,
 ) -> None:
     """2D Contour based on Kernel Density Estimation."""
-    density = gaussian_kde(
-        np.array([samples_col, samples_row]),
-        bw_method=kwargs["bw_method"],
-    )
-    X, Y = np.meshgrid(
-        np.linspace(
-            limits_col[0],
-            limits_col[1],
-            kwargs["bins"],
-        ),
-        np.linspace(
-            limits_row[0],
-            limits_row[1],
-            kwargs["bins"],
-        ),
-    )
-    positions = np.vstack([X.ravel(), Y.ravel()])
-    Z = np.reshape(density(positions).T, X.shape)
-    if kwargs["percentile"]:
-        Z = probs2contours(Z, kwargs["levels"])
-    else:
-        Z = (Z - Z.min()) / (Z.max() - Z.min())
+
+    X, Y, Z = get_kde(samples_col, samples_row, limits_col, limits_row, kwargs)
 
     ax.contour(
         X,
@@ -278,6 +242,40 @@ def plt_plot_2d(
         samples_row,
         **kwargs['mpl_kwargs'],
     )
+
+
+def get_kde(
+    samples_col: np.ndarray,
+    samples_row: np.ndarray,
+    limits_col: torch.Tensor,
+    limits_row: torch.Tensor,
+    kwargs: dict,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """2D Kernel Density Estimation."""
+
+    density = gaussian_kde(
+        np.array([samples_col, samples_row]),
+        bw_method=kwargs["bw_method"],
+    )
+    X, Y = np.meshgrid(
+        np.linspace(
+            limits_col[0],
+            limits_col[1],
+            kwargs["bins"],
+        ),
+        np.linspace(
+            limits_row[0],
+            limits_row[1],
+            kwargs["bins"],
+        ),
+    )
+    positions = np.vstack([X.ravel(), Y.ravel()])
+    Z = np.reshape(density(positions).T, X.shape)
+    if "percentile" in kwargs and "levels" in kwargs:
+        Z = probs2contours(Z, kwargs["levels"])
+    else:
+        Z = (Z - Z.min()) / (Z.max() - Z.min())
+    return X, Y, Z
 
 
 def get_diag_funcs(
