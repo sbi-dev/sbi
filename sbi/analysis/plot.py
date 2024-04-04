@@ -484,8 +484,7 @@ def probs2contours(
             include a given proportion of samples, i.e., 0.1 specifies where the top
             10% of the density is.
     Returns:
-        contors: array
-            Array of same shape as probs with percentile labels. Values in output array
+        contours: Array of same shape as probs with percentile labels. Values in output array
             denote labels which percentile bin the probability mass belongs to.
 
     Example: for levels = [0.1, 0.5], output array will take on values [1.0, 0.5, 0.1],
