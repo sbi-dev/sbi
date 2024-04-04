@@ -58,7 +58,7 @@ from sbi.utils.user_input_checks import (
         pytest.param(SNRE_B, "resnet", "slice", marks=pytest.mark.mcmc),
         (SNRE_C, "resnet", "rejection"),
         (SNRE_C, "resnet", "importance"),
-        pytest.param(SNRE_C, "resnet", "nuts", marks=pytest.mark.mcmc),
+        pytest.param(SNRE_C, "resnet", "nuts_pymc", marks=pytest.mark.mcmc),
     ],
 )
 @pytest.mark.parametrize(
