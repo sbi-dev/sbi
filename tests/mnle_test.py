@@ -43,7 +43,7 @@ def test_mnle_on_device(
     device,
     mcmc_params_fast: dict,
     num_simulations: int = 100,
-    mcmc_method: str = "slice",
+    mcmc_method: str = "slice_np",
 ):
     """Test MNLE API on device."""
 

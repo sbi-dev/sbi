@@ -326,8 +326,6 @@ def test_c2st_multi_round_snr_on_linearGaussian_vi(
         pytest.param("slice_np", "uniform", marks=pytest.mark.mcmc),
         pytest.param("slice_np_vectorized", "gaussian", marks=pytest.mark.mcmc),
         pytest.param("slice_np_vectorized", "uniform", marks=pytest.mark.mcmc),
-        pytest.param("slice", "gaussian", marks=pytest.mark.mcmc),
-        pytest.param("slice", "uniform", marks=pytest.mark.mcmc),
         pytest.param("nuts_pymc", "gaussian", marks=pytest.mark.mcmc),
         pytest.param("nuts_pyro", "uniform", marks=pytest.mark.mcmc),
         pytest.param("hmc_pyro", "gaussian", marks=pytest.mark.mcmc),
