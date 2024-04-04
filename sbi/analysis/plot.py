@@ -169,7 +169,7 @@ def plt_kde_2d(
     limits_row: torch.Tensor,
     kwargs: Dict,
 ) -> None:
-    """2D Kernel Density Estimation."""
+    """Run 2D Kernel Density Estimation and plot it on given axis."""
     density = gaussian_kde(
         np.array([samples_col, samples_row]),
         bw_method=kwargs["bw_method"],
