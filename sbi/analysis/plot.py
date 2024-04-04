@@ -480,8 +480,7 @@ def probs2contours(
     Args:
         probs: Probability array. doesn't have to sum to 1, but it is assumed it contains
             all the mass
-        levels : list
-            Percentile levels, have to be in [0.0, 1.0]. Specifies contour levels that
+        levels: Percentile levels, have to be in [0.0, 1.0]. Specifies contour levels that
             include a given proportion of samples, i.e., 0.1 specifies where the top
             10% of the density is.
     Returns:
