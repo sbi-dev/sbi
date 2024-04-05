@@ -18,7 +18,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.5.14">
+      <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.5.9">
     
     
       
@@ -26,12 +26,20 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.10ba22f1.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.f2e4d321.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
       
       
+  
+  
+    
+    
+  
+  
+  <style>:root{--md-admonition-icon--note:url('data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M1 7.775V2.75C1 1.784 1.784 1 2.75 1h5.025c.464 0 .91.184 1.238.513l6.25 6.25a1.75 1.75 0 0 1 0 2.474l-5.026 5.026a1.75 1.75 0 0 1-2.474 0l-6.25-6.25A1.752 1.752 0 0 1 1 7.775Zm1.5 0c0 .066.026.13.073.177l6.25 6.25a.25.25 0 0 0 .354 0l5.025-5.025a.25.25 0 0 0 0-.354l-6.25-6.25a.25.25 0 0 0-.177-.073H2.75a.25.25 0 0 0-.25.25ZM6 5a1 1 0 1 1 0 2 1 1 0 0 1 0-2Z"/></svg>');}</style>
+
 
 
     
@@ -337,7 +345,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tutorial/00_getting_started/" class="md-nav__link">
+      <a href="../../tutorial/00_getting_started_flexible/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -531,7 +539,7 @@
         
   
   <span class="md-ellipsis">
-    Learning summary statistics
+    Embedding nets for observations
   </span>
   
 
@@ -1520,7 +1528,7 @@
         
   
   <span class="md-ellipsis">
-    Guide
+    How to contribute
   </span>
   
 
@@ -4559,7 +4567,7 @@ sampling-importance-resampling (SIR) (with <code>.sir_sample()</code>)</p>
             <span class="bp">self</span><span class="o">.</span><span class="n">potential_fn</span><span class="p">,</span>
             <span class="n">proposal</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">proposal</span><span class="p">,</span>
             <span class="n">num_samples</span><span class="o">=</span><span class="n">num_samples</span><span class="p">,</span>
-            <span class="n">oversampling_factor</span><span class="o">=</span><span class="n">oversampling_factor</span><span class="p">,</span>
+            <span class="n">num_candidate_samples</span><span class="o">=</span><span class="n">oversampling_factor</span><span class="p">,</span>
             <span class="n">show_progress_bars</span><span class="o">=</span><span class="n">show_progress_bars</span><span class="p">,</span>
             <span class="n">max_sampling_batch_size</span><span class="o">=</span><span class="n">max_sampling_batch_size</span><span class="p">,</span>
             <span class="n">device</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">,</span>
@@ -6429,7 +6437,105 @@ SNLE or SNRE train neural networks to approximate the likelihood(-ratios).
 <span class="normal">708</span>
 <span class="normal">709</span>
 <span class="normal">710</span>
-<span class="normal">711</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span> <span class="nc">MCMCPosterior</span><span class="p">(</span><span class="n">NeuralPosterior</span><span class="p">):</span>
+<span class="normal">711</span>
+<span class="normal">712</span>
+<span class="normal">713</span>
+<span class="normal">714</span>
+<span class="normal">715</span>
+<span class="normal">716</span>
+<span class="normal">717</span>
+<span class="normal">718</span>
+<span class="normal">719</span>
+<span class="normal">720</span>
+<span class="normal">721</span>
+<span class="normal">722</span>
+<span class="normal">723</span>
+<span class="normal">724</span>
+<span class="normal">725</span>
+<span class="normal">726</span>
+<span class="normal">727</span>
+<span class="normal">728</span>
+<span class="normal">729</span>
+<span class="normal">730</span>
+<span class="normal">731</span>
+<span class="normal">732</span>
+<span class="normal">733</span>
+<span class="normal">734</span>
+<span class="normal">735</span>
+<span class="normal">736</span>
+<span class="normal">737</span>
+<span class="normal">738</span>
+<span class="normal">739</span>
+<span class="normal">740</span>
+<span class="normal">741</span>
+<span class="normal">742</span>
+<span class="normal">743</span>
+<span class="normal">744</span>
+<span class="normal">745</span>
+<span class="normal">746</span>
+<span class="normal">747</span>
+<span class="normal">748</span>
+<span class="normal">749</span>
+<span class="normal">750</span>
+<span class="normal">751</span>
+<span class="normal">752</span>
+<span class="normal">753</span>
+<span class="normal">754</span>
+<span class="normal">755</span>
+<span class="normal">756</span>
+<span class="normal">757</span>
+<span class="normal">758</span>
+<span class="normal">759</span>
+<span class="normal">760</span>
+<span class="normal">761</span>
+<span class="normal">762</span>
+<span class="normal">763</span>
+<span class="normal">764</span>
+<span class="normal">765</span>
+<span class="normal">766</span>
+<span class="normal">767</span>
+<span class="normal">768</span>
+<span class="normal">769</span>
+<span class="normal">770</span>
+<span class="normal">771</span>
+<span class="normal">772</span>
+<span class="normal">773</span>
+<span class="normal">774</span>
+<span class="normal">775</span>
+<span class="normal">776</span>
+<span class="normal">777</span>
+<span class="normal">778</span>
+<span class="normal">779</span>
+<span class="normal">780</span>
+<span class="normal">781</span>
+<span class="normal">782</span>
+<span class="normal">783</span>
+<span class="normal">784</span>
+<span class="normal">785</span>
+<span class="normal">786</span>
+<span class="normal">787</span>
+<span class="normal">788</span>
+<span class="normal">789</span>
+<span class="normal">790</span>
+<span class="normal">791</span>
+<span class="normal">792</span>
+<span class="normal">793</span>
+<span class="normal">794</span>
+<span class="normal">795</span>
+<span class="normal">796</span>
+<span class="normal">797</span>
+<span class="normal">798</span>
+<span class="normal">799</span>
+<span class="normal">800</span>
+<span class="normal">801</span>
+<span class="normal">802</span>
+<span class="normal">803</span>
+<span class="normal">804</span>
+<span class="normal">805</span>
+<span class="normal">806</span>
+<span class="normal">807</span>
+<span class="normal">808</span>
+<span class="normal">809</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span> <span class="nc">MCMCPosterior</span><span class="p">(</span><span class="n">NeuralPosterior</span><span class="p">):</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Provides MCMC to sample from the posterior.&lt;br/&gt;&lt;br/&gt;</span>
 <span class="sd">    SNLE or SNRE train neural networks to approximate the likelihood(-ratios).</span>
 <span class="sd">    `MCMCPosterior` allows to sample from the posterior with MCMC.</span>
@@ -6441,13 +6547,14 @@ SNLE or SNRE train neural networks to approximate the likelihood(-ratios).
         <span class="n">proposal</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
         <span class="n">theta_transform</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TorchTransform</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;slice_np&quot;</span><span class="p">,</span>
-        <span class="n">thin</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span>
-        <span class="n">warmup_steps</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span>
+        <span class="n">thin</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span>
+        <span class="n">warmup_steps</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">200</span><span class="p">,</span>
         <span class="n">num_chains</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
         <span class="n">init_strategy</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;resample&quot;</span><span class="p">,</span>
         <span class="n">init_strategy_parameters</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">init_strategy_num_candidates</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">num_workers</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
+        <span class="n">mp_context</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;spawn&quot;</span><span class="p">,</span>
         <span class="n">device</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">x_shape</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">):</span>
@@ -6459,14 +6566,17 @@ SNLE or SNRE train neural networks to approximate the likelihood(-ratios).
 <span class="sd">            theta_transform: Transformation that will be applied during sampling.</span>
 <span class="sd">                Allows to perform MCMC in unconstrained space.</span>
 <span class="sd">            method: Method used for MCMC sampling, one of `slice_np`,</span>
-<span class="sd">                `slice_np_vectorized`, `slice`, `hmc`, `nuts`. `slice_np` is a custom</span>
+<span class="sd">                `slice_np_vectorized`, `hmc_pyro`, `nuts_pyro`, `slice_pymc`,</span>
+<span class="sd">                `hmc_pymc`, `nuts_pymc`. `slice_np` is a custom</span>
 <span class="sd">                numpy implementation of slice sampling. `slice_np_vectorized` is</span>
 <span class="sd">                identical to `slice_np`, but if `num_chains&gt;1`, the chains are</span>
 <span class="sd">                vectorized for `slice_np_vectorized` whereas they are run sequentially</span>
-<span class="sd">                for `slice_np`. The samplers `hmc`, `nuts` or `slice` sample with Pyro.</span>
-<span class="sd">            thin: The thinning factor for the chain.</span>
+<span class="sd">                for `slice_np`. The samplers ending on `_pyro` are using Pyro, and</span>
+<span class="sd">                likewise the samplers ending on `_pymc` are using PyMC.</span>
+<span class="sd">            thin: The thinning factor for the chain, default 1 (no thinning).</span>
 <span class="sd">            warmup_steps: The initial number of samples to discard.</span>
-<span class="sd">            num_chains: The number of chains.</span>
+<span class="sd">            num_chains: The number of chains. Should generally be at most</span>
+<span class="sd">                `num_workers - 1`.</span>
 <span class="sd">            init_strategy: The initialisation strategy for chains; `proposal` will draw</span>
 <span class="sd">                init locations from `proposal`, whereas `sir` will use Sequential-</span>
 <span class="sd">                Importance-Resampling (SIR). SIR initially samples</span>
@@ -6477,17 +6587,32 @@ SNLE or SNRE train neural networks to approximate the likelihood(-ratios).
 <span class="sd">                uses `exp(potential_fn)` as weights.</span>
 <span class="sd">            init_strategy_parameters: Dictionary of keyword arguments passed to the</span>
 <span class="sd">                init strategy, e.g., for `init_strategy=sir` this could be</span>
-<span class="sd">                `num_candidate_samples`, i.e., the number of candidates to to find init</span>
+<span class="sd">                `num_candidate_samples`, i.e., the number of candidates to find init</span>
 <span class="sd">                locations (internal default is `1000`), or `device`.</span>
-<span class="sd">            init_strategy_num_candidates: Number of candidates to to find init</span>
+<span class="sd">            init_strategy_num_candidates: Number of candidates to find init</span>
 <span class="sd">                 locations in `init_strategy=sir` (deprecated, use</span>
 <span class="sd">                 init_strategy_parameters instead).</span>
 <span class="sd">            num_workers: number of cpu cores used to parallelize mcmc</span>
+<span class="sd">            mp_context: Multiprocessing start method, either `&quot;fork&quot;` or `&quot;spawn&quot;`</span>
+<span class="sd">                (default), used by Pyro and PyMC samplers. `&quot;fork&quot;` can be significantly</span>
+<span class="sd">                faster than `&quot;spawn&quot;` but is only supported on POSIX-based systems</span>
+<span class="sd">                (e.g. Linux and macOS, not Windows).</span>
 <span class="sd">            device: Training device, e.g., &quot;cpu&quot;, &quot;cuda&quot; or &quot;cuda:0&quot;. If None,</span>
 <span class="sd">                `potential_fn.device` is used.</span>
 <span class="sd">            x_shape: Shape of a single simulator output. If passed, it is used to check</span>
 <span class="sd">                the shape of the observed data and give a descriptive error.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">method</span> <span class="o">==</span> <span class="s2">&quot;slice&quot;</span><span class="p">:</span>
+            <span class="n">warn</span><span class="p">(</span>
+                <span class="s2">&quot;The Pyro-based slice sampler is deprecated, and the method `slice` &quot;</span>
+                <span class="s2">&quot;has been changed to `slice_np`, i.e., the custom &quot;</span>
+                <span class="s2">&quot;numpy-based slice sampler.&quot;</span><span class="p">,</span>
+                <span class="ne">DeprecationWarning</span><span class="p">,</span>
+                <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">method</span> <span class="o">=</span> <span class="s2">&quot;slice_np&quot;</span>
+
+        <span class="n">thin</span> <span class="o">=</span> <span class="n">_process_thin_default</span><span class="p">(</span><span class="n">thin</span><span class="p">)</span>
 
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span>
             <span class="n">potential_fn</span><span class="p">,</span>
@@ -6504,6 +6629,7 @@ SNLE or SNRE train neural networks to approximate the likelihood(-ratios).
         <span class="bp">self</span><span class="o">.</span><span class="n">init_strategy</span> <span class="o">=</span> <span class="n">init_strategy</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">init_strategy_parameters</span> <span class="o">=</span> <span class="n">init_strategy_parameters</span> <span class="ow">or</span> <span class="p">{}</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">num_workers</span> <span class="o">=</span> <span class="n">num_workers</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">mp_context</span> <span class="o">=</span> <span class="n">mp_context</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_posterior_sampler</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="c1"># Hardcode parameter name to reduce clutter kwargs.</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">param_name</span> <span class="o">=</span> <span class="s2">&quot;theta&quot;</span>
@@ -6597,6 +6723,7 @@ SNLE or SNRE train neural networks to approximate the likelihood(-ratios).
         <span class="n">mcmc_method</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">sample_with</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">num_workers</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">mp_context</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">show_progress_bars</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
 <span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Return samples from posterior distribution $p(\theta|x)$ with MCMC.</span>
@@ -6628,6 +6755,7 @@ SNLE or SNRE train neural networks to approximate the likelihood(-ratios).
         <span class="n">num_chains</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_chains</span> <span class="k">if</span> <span class="n">num_chains</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">num_chains</span>
         <span class="n">init_strategy</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">init_strategy</span> <span class="k">if</span> <span class="n">init_strategy</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">init_strategy</span>
         <span class="n">num_workers</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_workers</span> <span class="k">if</span> <span class="n">num_workers</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">num_workers</span>
+        <span class="n">mp_context</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mp_context</span> <span class="k">if</span> <span class="n">mp_context</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">mp_context</span>
         <span class="n">init_strategy_parameters</span> <span class="o">=</span> <span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">init_strategy_parameters</span>
             <span class="k">if</span> <span class="n">init_strategy_parameters</span> <span class="ow">is</span> <span class="kc">None</span>
@@ -6684,7 +6812,7 @@ SNLE or SNRE train neural networks to approximate the likelihood(-ratios).
         <span class="p">)</span>
         <span class="n">num_samples</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">(</span><span class="n">sample_shape</span><span class="p">)</span><span class="o">.</span><span class="n">numel</span><span class="p">()</span>
 
-        <span class="n">track_gradients</span> <span class="o">=</span> <span class="n">method</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;hmc&quot;</span><span class="p">,</span> <span class="s2">&quot;nuts&quot;</span><span class="p">)</span>
+        <span class="n">track_gradients</span> <span class="o">=</span> <span class="n">method</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;hmc_pyro&quot;</span><span class="p">,</span> <span class="s2">&quot;nuts_pyro&quot;</span><span class="p">,</span> <span class="s2">&quot;hmc_pymc&quot;</span><span class="p">,</span> <span class="s2">&quot;nuts_pymc&quot;</span><span class="p">)</span>
         <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">set_grad_enabled</span><span class="p">(</span><span class="n">track_gradients</span><span class="p">):</span>
             <span class="k">if</span> <span class="n">method</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;slice_np&quot;</span><span class="p">,</span> <span class="s2">&quot;slice_np_vectorized&quot;</span><span class="p">):</span>
                 <span class="n">transformed_samples</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_slice_np_mcmc</span><span class="p">(</span>
@@ -6697,7 +6825,7 @@ SNLE or SNRE train neural networks to approximate the likelihood(-ratios).
                     <span class="n">num_workers</span><span class="o">=</span><span class="n">num_workers</span><span class="p">,</span>
                     <span class="n">show_progress_bars</span><span class="o">=</span><span class="n">show_progress_bars</span><span class="p">,</span>
                 <span class="p">)</span>
-            <span class="k">elif</span> <span class="n">method</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;hmc&quot;</span><span class="p">,</span> <span class="s2">&quot;nuts&quot;</span><span class="p">,</span> <span class="s2">&quot;slice&quot;</span><span class="p">):</span>
+            <span class="k">elif</span> <span class="n">method</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;hmc_pyro&quot;</span><span class="p">,</span> <span class="s2">&quot;nuts_pyro&quot;</span><span class="p">):</span>
                 <span class="n">transformed_samples</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_pyro_mcmc</span><span class="p">(</span>
                     <span class="n">num_samples</span><span class="o">=</span><span class="n">num_samples</span><span class="p">,</span>
                     <span class="n">potential_function</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">potential_</span><span class="p">,</span>
@@ -6707,9 +6835,22 @@ SNLE or SNRE train neural networks to approximate the likelihood(-ratios).
                     <span class="n">warmup_steps</span><span class="o">=</span><span class="n">warmup_steps</span><span class="p">,</span>  <span class="c1"># type: ignore</span>
                     <span class="n">num_chains</span><span class="o">=</span><span class="n">num_chains</span><span class="p">,</span>
                     <span class="n">show_progress_bars</span><span class="o">=</span><span class="n">show_progress_bars</span><span class="p">,</span>
+                    <span class="n">mp_context</span><span class="o">=</span><span class="n">mp_context</span><span class="p">,</span>
+                <span class="p">)</span>
+            <span class="k">elif</span> <span class="n">method</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;hmc_pymc&quot;</span><span class="p">,</span> <span class="s2">&quot;nuts_pymc&quot;</span><span class="p">,</span> <span class="s2">&quot;slice_pymc&quot;</span><span class="p">):</span>
+                <span class="n">transformed_samples</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_pymc_mcmc</span><span class="p">(</span>
+                    <span class="n">num_samples</span><span class="o">=</span><span class="n">num_samples</span><span class="p">,</span>
+                    <span class="n">potential_function</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">potential_</span><span class="p">,</span>
+                    <span class="n">initial_params</span><span class="o">=</span><span class="n">initial_params</span><span class="p">,</span>
+                    <span class="n">mcmc_method</span><span class="o">=</span><span class="n">method</span><span class="p">,</span>  <span class="c1"># type: ignore</span>
+                    <span class="n">thin</span><span class="o">=</span><span class="n">thin</span><span class="p">,</span>  <span class="c1"># type: ignore</span>
+                    <span class="n">warmup_steps</span><span class="o">=</span><span class="n">warmup_steps</span><span class="p">,</span>  <span class="c1"># type: ignore</span>
+                    <span class="n">num_chains</span><span class="o">=</span><span class="n">num_chains</span><span class="p">,</span>
+                    <span class="n">show_progress_bars</span><span class="o">=</span><span class="n">show_progress_bars</span><span class="p">,</span>
+                    <span class="n">mp_context</span><span class="o">=</span><span class="n">mp_context</span><span class="p">,</span>
                 <span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="ne">NameError</span>
+                <span class="k">raise</span> <span class="ne">NameError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;The sampling method </span><span class="si">{</span><span class="n">method</span><span class="si">}</span><span class="s2"> is not implemented!&quot;</span><span class="p">)</span>
 
         <span class="n">samples</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">theta_transform</span><span class="o">.</span><span class="n">inv</span><span class="p">(</span><span class="n">transformed_samples</span><span class="p">)</span>
 
@@ -6847,9 +6988,10 @@ SNLE or SNRE train neural networks to approximate the likelihood(-ratios).
 <span class="sd">            num_samples: Desired number of samples.</span>
 <span class="sd">            potential_function: A callable **class**.</span>
 <span class="sd">            initial_params: Initial parameters for MCMC chain.</span>
-<span class="sd">            thin: Thinning (subsampling) factor.</span>
+<span class="sd">            thin: Thinning (subsampling) factor, default 1 (no thinning).</span>
 <span class="sd">            warmup_steps: Initial number of samples to discard.</span>
-<span class="sd">            vectorized: Whether to use a vectorized implementation of the Slice sampler.</span>
+<span class="sd">            vectorized: Whether to use a vectorized implementation of the</span>
+<span class="sd">                `SliceSampler`.</span>
 <span class="sd">            num_workers: Number of CPU cores to use.</span>
 <span class="sd">            init_width: Inital width of brackets.</span>
 <span class="sd">            show_progress_bars: Whether to show a progressbar during sampling;</span>
@@ -6889,8 +7031,7 @@ SNLE or SNRE train neural networks to approximate the likelihood(-ratios).
         <span class="bp">self</span><span class="o">.</span><span class="n">_mcmc_init_params</span> <span class="o">=</span> <span class="n">samples</span><span class="p">[:,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="p">:]</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">num_chains</span><span class="p">,</span> <span class="n">dim_samples</span><span class="p">)</span>
 
         <span class="c1"># Collect samples from all chains.</span>
-        <span class="n">samples</span> <span class="o">=</span> <span class="n">samples</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">dim_samples</span><span class="p">)[:</span><span class="n">num_samples</span><span class="p">,</span> <span class="p">:]</span>
-        <span class="k">assert</span> <span class="n">samples</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="n">num_samples</span>
+        <span class="n">samples</span> <span class="o">=</span> <span class="n">samples</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">dim_samples</span><span class="p">)[:</span><span class="n">num_samples</span><span class="p">]</span>
 
         <span class="k">return</span> <span class="n">samples</span><span class="o">.</span><span class="n">type</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">)</span>
 
@@ -6899,21 +7040,24 @@ SNLE or SNRE train neural networks to approximate the likelihood(-ratios).
         <span class="n">num_samples</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
         <span class="n">potential_function</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span>
         <span class="n">initial_params</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
-        <span class="n">mcmc_method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;slice&quot;</span><span class="p">,</span>
-        <span class="n">thin</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span>
+        <span class="n">mcmc_method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;nuts_pyro&quot;</span><span class="p">,</span>
+        <span class="n">thin</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span>
         <span class="n">warmup_steps</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">200</span><span class="p">,</span>
         <span class="n">num_chains</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
         <span class="n">show_progress_bars</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="n">mp_context</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;spawn&quot;</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
-<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Return samples obtained using Pyro HMC, NUTS for slice kernels.</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Return samples obtained using Pyro&#39;s HMC or NUTS sampler.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            num_samples: Desired number of samples.</span>
 <span class="sd">            potential_function: A callable **class**. A class, but not a function,</span>
 <span class="sd">                is picklable for Pyro MCMC to use it across chains in parallel,</span>
 <span class="sd">                even when the potential function requires evaluating a neural network.</span>
-<span class="sd">            mcmc_method: One of `hmc`, `nuts` or `slice`.</span>
-<span class="sd">            thin: Thinning (subsampling) factor.</span>
+<span class="sd">            initial_params: Initial parameters for MCMC chain.</span>
+<span class="sd">            mcmc_method: Pyro MCMC method to use, either `&quot;hmc_pyro&quot;` or</span>
+<span class="sd">                `&quot;nuts_pyro&quot;` (default).</span>
+<span class="sd">            thin: Thinning (subsampling) factor, default 1 (no thinning).</span>
 <span class="sd">            warmup_steps: Initial number of samples to discard.</span>
 <span class="sd">            num_chains: Whether to sample in parallel. If None, use all but one CPU.</span>
 <span class="sd">            show_progress_bars: Whether to show a progressbar during sampling.</span>
@@ -6921,17 +7065,17 @@ SNLE or SNRE train neural networks to approximate the likelihood(-ratios).
 <span class="sd">        Returns:</span>
 <span class="sd">            Tensor of shape (num_samples, shape_of_single_theta).</span>
 <span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">thin</span> <span class="o">=</span> <span class="n">_process_thin_default</span><span class="p">(</span><span class="n">thin</span><span class="p">)</span>
         <span class="n">num_chains</span> <span class="o">=</span> <span class="n">mp</span><span class="o">.</span><span class="n">cpu_count</span><span class="p">()</span> <span class="o">-</span> <span class="mi">1</span> <span class="k">if</span> <span class="n">num_chains</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">num_chains</span>
-
-        <span class="n">kernels</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="nb">slice</span><span class="o">=</span><span class="n">Slice</span><span class="p">,</span> <span class="n">hmc</span><span class="o">=</span><span class="n">HMC</span><span class="p">,</span> <span class="n">nuts</span><span class="o">=</span><span class="n">NUTS</span><span class="p">)</span>
+        <span class="n">kernels</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">hmc_pyro</span><span class="o">=</span><span class="n">HMC</span><span class="p">,</span> <span class="n">nuts_pyro</span><span class="o">=</span><span class="n">NUTS</span><span class="p">)</span>
 
         <span class="n">sampler</span> <span class="o">=</span> <span class="n">MCMC</span><span class="p">(</span>
             <span class="n">kernel</span><span class="o">=</span><span class="n">kernels</span><span class="p">[</span><span class="n">mcmc_method</span><span class="p">](</span><span class="n">potential_fn</span><span class="o">=</span><span class="n">potential_function</span><span class="p">),</span>
-            <span class="n">num_samples</span><span class="o">=</span><span class="p">(</span><span class="n">thin</span> <span class="o">*</span> <span class="n">num_samples</span><span class="p">)</span> <span class="o">//</span> <span class="n">num_chains</span> <span class="o">+</span> <span class="n">num_chains</span><span class="p">,</span>
+            <span class="n">num_samples</span><span class="o">=</span><span class="n">ceil</span><span class="p">((</span><span class="n">thin</span> <span class="o">*</span> <span class="n">num_samples</span><span class="p">)</span> <span class="o">/</span> <span class="n">num_chains</span><span class="p">),</span>
             <span class="n">warmup_steps</span><span class="o">=</span><span class="n">warmup_steps</span><span class="p">,</span>
             <span class="n">initial_params</span><span class="o">=</span><span class="p">{</span><span class="bp">self</span><span class="o">.</span><span class="n">param_name</span><span class="p">:</span> <span class="n">initial_params</span><span class="p">},</span>
             <span class="n">num_chains</span><span class="o">=</span><span class="n">num_chains</span><span class="p">,</span>
-            <span class="n">mp_context</span><span class="o">=</span><span class="s2">&quot;spawn&quot;</span><span class="p">,</span>
+            <span class="n">mp_context</span><span class="o">=</span><span class="n">mp_context</span><span class="p">,</span>
             <span class="n">disable_progbar</span><span class="o">=</span><span class="ow">not</span> <span class="n">show_progress_bars</span><span class="p">,</span>
             <span class="n">transforms</span><span class="o">=</span><span class="p">{},</span>
         <span class="p">)</span>
@@ -6945,9 +7089,65 @@ SNLE or SNRE train neural networks to approximate the likelihood(-ratios).
         <span class="bp">self</span><span class="o">.</span><span class="n">_posterior_sampler</span> <span class="o">=</span> <span class="n">sampler</span>
 
         <span class="n">samples</span> <span class="o">=</span> <span class="n">samples</span><span class="p">[::</span><span class="n">thin</span><span class="p">][:</span><span class="n">num_samples</span><span class="p">]</span>
-        <span class="k">assert</span> <span class="n">samples</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="n">num_samples</span>
 
         <span class="k">return</span> <span class="n">samples</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">_pymc_mcmc</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">num_samples</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">potential_function</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span>
+        <span class="n">initial_params</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
+        <span class="n">mcmc_method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;nuts_pymc&quot;</span><span class="p">,</span>
+        <span class="n">thin</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span>
+        <span class="n">warmup_steps</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">200</span><span class="p">,</span>
+        <span class="n">num_chains</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
+        <span class="n">show_progress_bars</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="n">mp_context</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;spawn&quot;</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Return samples obtained using PyMC&#39;s HMC, NUTS or slice samplers.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            num_samples: Desired number of samples.</span>
+<span class="sd">            potential_function: A callable **class**. A class, but not a function,</span>
+<span class="sd">                is picklable for PyMC MCMC to use it across chains in parallel,</span>
+<span class="sd">                even when the potential function requires evaluating a neural network.</span>
+<span class="sd">            initial_params: Initial parameters for MCMC chain.</span>
+<span class="sd">            mcmc_method: mcmc_method: Pyro MCMC method to use, either `&quot;hmc_pymc&quot;` or</span>
+<span class="sd">                `&quot;slice_pymc&quot;`, or `&quot;nuts_pymc&quot;` (default).</span>
+<span class="sd">            thin: Thinning (subsampling) factor, default 1 (no thinning).</span>
+<span class="sd">            warmup_steps: Initial number of samples to discard.</span>
+<span class="sd">            num_chains: Whether to sample in parallel. If None, use all but one CPU.</span>
+<span class="sd">            show_progress_bars: Whether to show a progressbar during sampling.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Tensor of shape (num_samples, shape_of_single_theta).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">thin</span> <span class="o">=</span> <span class="n">_process_thin_default</span><span class="p">(</span><span class="n">thin</span><span class="p">)</span>
+        <span class="n">num_chains</span> <span class="o">=</span> <span class="n">mp</span><span class="o">.</span><span class="n">cpu_count</span><span class="p">()</span> <span class="o">-</span> <span class="mi">1</span> <span class="k">if</span> <span class="n">num_chains</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">num_chains</span>
+        <span class="n">steps</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">slice_pymc</span><span class="o">=</span><span class="s2">&quot;slice&quot;</span><span class="p">,</span> <span class="n">hmc_pymc</span><span class="o">=</span><span class="s2">&quot;hmc&quot;</span><span class="p">,</span> <span class="n">nuts_pymc</span><span class="o">=</span><span class="s2">&quot;nuts&quot;</span><span class="p">)</span>
+
+        <span class="n">sampler</span> <span class="o">=</span> <span class="n">PyMCSampler</span><span class="p">(</span>
+            <span class="n">potential_fn</span><span class="o">=</span><span class="n">potential_function</span><span class="p">,</span>
+            <span class="n">step</span><span class="o">=</span><span class="n">steps</span><span class="p">[</span><span class="n">mcmc_method</span><span class="p">],</span>
+            <span class="n">initvals</span><span class="o">=</span><span class="n">tensor2numpy</span><span class="p">(</span><span class="n">initial_params</span><span class="p">),</span>
+            <span class="n">draws</span><span class="o">=</span><span class="n">ceil</span><span class="p">((</span><span class="n">thin</span> <span class="o">*</span> <span class="n">num_samples</span><span class="p">)</span> <span class="o">/</span> <span class="n">num_chains</span><span class="p">),</span>
+            <span class="n">tune</span><span class="o">=</span><span class="n">warmup_steps</span><span class="p">,</span>
+            <span class="n">chains</span><span class="o">=</span><span class="n">num_chains</span><span class="p">,</span>
+            <span class="n">mp_ctx</span><span class="o">=</span><span class="n">mp_context</span><span class="p">,</span>
+            <span class="n">progressbar</span><span class="o">=</span><span class="n">show_progress_bars</span><span class="p">,</span>
+            <span class="n">param_name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">param_name</span><span class="p">,</span>
+            <span class="n">device</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">samples</span> <span class="o">=</span> <span class="n">sampler</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+        <span class="n">samples</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">samples</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">)</span>
+        <span class="n">samples</span> <span class="o">=</span> <span class="n">samples</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">initial_params</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+
+        <span class="c1"># Save posterior sampler.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_posterior_sampler</span> <span class="o">=</span> <span class="n">sampler</span>
+
+        <span class="n">samples</span> <span class="o">=</span> <span class="n">samples</span><span class="p">[::</span><span class="n">thin</span><span class="p">][:</span><span class="n">num_samples</span><span class="p">]</span>
+
+        <span class="k">return</span> <span class="n">samples</span>
 
     <span class="k">def</span> <span class="nf">_prepare_potential</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">method</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Callable</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Combines potential and transform and takes care of gradients and pyro.</span>
@@ -6958,13 +7158,13 @@ SNLE or SNRE train neural networks to approximate the likelihood(-ratios).
 <span class="sd">        Returns:</span>
 <span class="sd">            A potential function that is ready to be used in MCMC.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="n">method</span> <span class="o">==</span> <span class="s2">&quot;slice&quot;</span><span class="p">:</span>
-            <span class="n">track_gradients</span> <span class="o">=</span> <span class="kc">False</span>
-            <span class="n">pyro</span> <span class="o">=</span> <span class="kc">True</span>
-        <span class="k">elif</span> <span class="n">method</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;hmc&quot;</span><span class="p">,</span> <span class="s2">&quot;nuts&quot;</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">method</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;hmc_pyro&quot;</span><span class="p">,</span> <span class="s2">&quot;nuts_pyro&quot;</span><span class="p">):</span>
             <span class="n">track_gradients</span> <span class="o">=</span> <span class="kc">True</span>
             <span class="n">pyro</span> <span class="o">=</span> <span class="kc">True</span>
-        <span class="k">elif</span> <span class="s2">&quot;slice_np&quot;</span> <span class="ow">in</span> <span class="n">method</span><span class="p">:</span>
+        <span class="k">elif</span> <span class="n">method</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;hmc_pymc&quot;</span><span class="p">,</span> <span class="s2">&quot;nuts_pymc&quot;</span><span class="p">):</span>
+            <span class="n">track_gradients</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="n">pyro</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="k">elif</span> <span class="n">method</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;slice_np&quot;</span><span class="p">,</span> <span class="s2">&quot;slice_np_vectorized&quot;</span><span class="p">,</span> <span class="s2">&quot;slice_pymc&quot;</span><span class="p">):</span>
             <span class="n">track_gradients</span> <span class="o">=</span> <span class="kc">False</span>
             <span class="n">pyro</span> <span class="o">=</span> <span class="kc">False</span>
         <span class="k">else</span><span class="p">:</span>
@@ -7057,8 +7257,8 @@ SNLE or SNRE train neural networks to approximate the likelihood(-ratios).
 <span class="sd">        Note: the InferenceData is constructed using the posterior samples generated in</span>
 <span class="sd">        most recent call to `.sample(...)`.</span>
 
-<span class="sd">        For Pyro HMC and NUTS kernels InferenceData will contain diagnostics, for Pyro</span>
-<span class="sd">        Slice or sbi slice sampling samples, only the samples are added.</span>
+<span class="sd">        For Pyro and PyMC samplers, InferenceData will contain diagnostics, but for</span>
+<span class="sd">        sbi slice samplers, only the samples are added.</span>
 
 <span class="sd">        Returns:</span>
 <span class="sd">            inference_data: Arviz InferenceData object.</span>
@@ -7067,16 +7267,20 @@ SNLE or SNRE train neural networks to approximate the likelihood(-ratios).
             <span class="bp">self</span><span class="o">.</span><span class="n">_posterior_sampler</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
         <span class="p">),</span> <span class="s2">&quot;&quot;&quot;No samples have been generated, call .sample() first.&quot;&quot;&quot;</span>
 
-        <span class="n">sampler</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">MCMC</span><span class="p">,</span> <span class="n">SliceSamplerSerial</span><span class="p">,</span> <span class="n">SliceSamplerVectorized</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_posterior_sampler</span>
-        <span class="p">)</span>
+        <span class="n">sampler</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span>
+            <span class="n">MCMC</span><span class="p">,</span> <span class="n">SliceSamplerSerial</span><span class="p">,</span> <span class="n">SliceSamplerVectorized</span><span class="p">,</span> <span class="n">PyMCSampler</span>
+        <span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_posterior_sampler</span>
 
         <span class="c1"># If Pyro sampler and samples not transformed, use arviz&#39; from_pyro.</span>
-        <span class="c1"># Exclude &#39;slice&#39; kernel as it lacks the &#39;divergence&#39; diagnostics key.</span>
-        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_posterior_sampler</span><span class="p">,</span> <span class="p">(</span><span class="n">HMC</span><span class="p">,</span> <span class="n">NUTS</span><span class="p">))</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">sampler</span><span class="p">,</span> <span class="p">(</span><span class="n">HMC</span><span class="p">,</span> <span class="n">NUTS</span><span class="p">))</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">theta_transform</span><span class="p">,</span> <span class="n">torch_tf</span><span class="o">.</span><span class="n">IndependentTransform</span>
         <span class="p">):</span>
             <span class="n">inference_data</span> <span class="o">=</span> <span class="n">az</span><span class="o">.</span><span class="n">from_pyro</span><span class="p">(</span><span class="n">sampler</span><span class="p">)</span>
+        <span class="c1"># If PyMC sampler and samples not transformed, get cached InferenceData.</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">sampler</span><span class="p">,</span> <span class="n">PyMCSampler</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">theta_transform</span><span class="p">,</span> <span class="n">torch_tf</span><span class="o">.</span><span class="n">IndependentTransform</span>
+        <span class="p">):</span>
+            <span class="n">inference_data</span> <span class="o">=</span> <span class="n">sampler</span><span class="o">.</span><span class="n">get_inference_data</span><span class="p">()</span>
 
         <span class="c1"># otherwise get samples from sampler and transform to original space.</span>
         <span class="k">else</span><span class="p">:</span>
@@ -7168,7 +7372,7 @@ SNLE or SNRE train neural networks to approximate the likelihood(-ratios).
 
 
 <h3 id="sbi.inference.posteriors.mcmc_posterior.MCMCPosterior.__init__" class="doc doc-heading">
-          <code class=" language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">potential_fn</span><span class="p">,</span> <span class="n">proposal</span><span class="p">,</span> <span class="n">theta_transform</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s1">&#39;slice_np&#39;</span><span class="p">,</span> <span class="n">thin</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">warmup_steps</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">num_chains</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">init_strategy</span><span class="o">=</span><span class="s1">&#39;resample&#39;</span><span class="p">,</span> <span class="n">init_strategy_parameters</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">init_strategy_num_candidates</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_workers</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">x_shape</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+          <code class=" language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">potential_fn</span><span class="p">,</span> <span class="n">proposal</span><span class="p">,</span> <span class="n">theta_transform</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s1">&#39;slice_np&#39;</span><span class="p">,</span> <span class="n">thin</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span> <span class="n">warmup_steps</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">num_chains</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">init_strategy</span><span class="o">=</span><span class="s1">&#39;resample&#39;</span><span class="p">,</span> <span class="n">init_strategy_parameters</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">init_strategy_num_candidates</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_workers</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">mp_context</span><span class="o">=</span><span class="s1">&#39;spawn&#39;</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">x_shape</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 <a href="#sbi.inference.posteriors.mcmc_posterior.MCMCPosterior.__init__" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -7241,11 +7445,13 @@ Allows to perform MCMC in unconstrained space.</p>
           <td>
             <div class="doc-md-description">
               <p>Method used for MCMC sampling, one of <code>slice_np</code>,
-<code>slice_np_vectorized</code>, <code>slice</code>, <code>hmc</code>, <code>nuts</code>. <code>slice_np</code> is a custom
+<code>slice_np_vectorized</code>, <code>hmc_pyro</code>, <code>nuts_pyro</code>, <code>slice_pymc</code>,
+<code>hmc_pymc</code>, <code>nuts_pymc</code>. <code>slice_np</code> is a custom
 numpy implementation of slice sampling. <code>slice_np_vectorized</code> is
 identical to <code>slice_np</code>, but if <code>num_chains&gt;1</code>, the chains are
 vectorized for <code>slice_np_vectorized</code> whereas they are run sequentially
-for <code>slice_np</code>. The samplers <code>hmc</code>, <code>nuts</code> or <code>slice</code> sample with Pyro.</p>
+for <code>slice_np</code>. The samplers ending on <code>_pyro</code> are using Pyro, and
+likewise the samplers ending on <code>_pymc</code> are using PyMC.</p>
             </div>
           </td>
           <td>
@@ -7259,11 +7465,11 @@ for <code>slice_np</code>. The samplers <code>hmc</code>, <code>nuts</code> or <
           </td>
           <td>
             <div class="doc-md-description">
-              <p>The thinning factor for the chain.</p>
+              <p>The thinning factor for the chain, default 1 (no thinning).</p>
             </div>
           </td>
           <td>
-                <code>10</code>
+                <code>-1</code>
           </td>
         </tr>
         <tr>
@@ -7277,7 +7483,7 @@ for <code>slice_np</code>. The samplers <code>hmc</code>, <code>nuts</code> or <
             </div>
           </td>
           <td>
-                <code>10</code>
+                <code>200</code>
           </td>
         </tr>
         <tr>
@@ -7287,7 +7493,8 @@ for <code>slice_np</code>. The samplers <code>hmc</code>, <code>nuts</code> or <
           </td>
           <td>
             <div class="doc-md-description">
-              <p>The number of chains.</p>
+              <p>The number of chains. Should generally be at most
+<code>num_workers - 1</code>.</p>
             </div>
           </td>
           <td>
@@ -7324,7 +7531,7 @@ uses <code>exp(potential_fn)</code> as weights.</p>
             <div class="doc-md-description">
               <p>Dictionary of keyword arguments passed to the
 init strategy, e.g., for <code>init_strategy=sir</code> this could be
-<code>num_candidate_samples</code>, i.e., the number of candidates to to find init
+<code>num_candidate_samples</code>, i.e., the number of candidates to find init
 locations (internal default is <code>1000</code>), or <code>device</code>.</p>
             </div>
           </td>
@@ -7339,7 +7546,7 @@ locations (internal default is <code>1000</code>), or <code>device</code>.</p>
           </td>
           <td>
             <div class="doc-md-description">
-              <p>Number of candidates to to find init
+              <p>Number of candidates to find init
  locations in <code>init_strategy=sir</code> (deprecated, use
  init_strategy_parameters instead).</p>
             </div>
@@ -7360,6 +7567,23 @@ locations (internal default is <code>1000</code>), or <code>device</code>.</p>
           </td>
           <td>
                 <code>1</code>
+          </td>
+        </tr>
+        <tr>
+          <td><code>mp_context</code></td>
+          <td>
+                <code>str</code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p>Multiprocessing start method, either <code>"fork"</code> or <code>"spawn"</code>
+(default), used by Pyro and PyMC samplers. <code>"fork"</code> can be significantly
+faster than <code>"spawn"</code> but is only supported on POSIX-based systems
+(e.g. Linux and macOS, not Windows).</p>
+            </div>
+          </td>
+          <td>
+                <code>&#39;spawn&#39;</code>
           </td>
         </tr>
         <tr>
@@ -7486,19 +7710,40 @@ the shape of the observed data and give a descriptive error.</p>
 <span class="normal">129</span>
 <span class="normal">130</span>
 <span class="normal">131</span>
-<span class="normal">132</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span>
+<span class="normal">137</span>
+<span class="normal">138</span>
+<span class="normal">139</span>
+<span class="normal">140</span>
+<span class="normal">141</span>
+<span class="normal">142</span>
+<span class="normal">143</span>
+<span class="normal">144</span>
+<span class="normal">145</span>
+<span class="normal">146</span>
+<span class="normal">147</span>
+<span class="normal">148</span>
+<span class="normal">149</span>
+<span class="normal">150</span>
+<span class="normal">151</span>
+<span class="normal">152</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">potential_fn</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Callable</span><span class="p">,</span> <span class="n">BasePotential</span><span class="p">],</span>
     <span class="n">proposal</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
     <span class="n">theta_transform</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TorchTransform</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;slice_np&quot;</span><span class="p">,</span>
-    <span class="n">thin</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span>
-    <span class="n">warmup_steps</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span>
+    <span class="n">thin</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span>
+    <span class="n">warmup_steps</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">200</span><span class="p">,</span>
     <span class="n">num_chains</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
     <span class="n">init_strategy</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;resample&quot;</span><span class="p">,</span>
     <span class="n">init_strategy_parameters</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">init_strategy_num_candidates</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">num_workers</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
+    <span class="n">mp_context</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;spawn&quot;</span><span class="p">,</span>
     <span class="n">device</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">x_shape</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">):</span>
@@ -7510,14 +7755,17 @@ the shape of the observed data and give a descriptive error.</p>
 <span class="sd">        theta_transform: Transformation that will be applied during sampling.</span>
 <span class="sd">            Allows to perform MCMC in unconstrained space.</span>
 <span class="sd">        method: Method used for MCMC sampling, one of `slice_np`,</span>
-<span class="sd">            `slice_np_vectorized`, `slice`, `hmc`, `nuts`. `slice_np` is a custom</span>
+<span class="sd">            `slice_np_vectorized`, `hmc_pyro`, `nuts_pyro`, `slice_pymc`,</span>
+<span class="sd">            `hmc_pymc`, `nuts_pymc`. `slice_np` is a custom</span>
 <span class="sd">            numpy implementation of slice sampling. `slice_np_vectorized` is</span>
 <span class="sd">            identical to `slice_np`, but if `num_chains&gt;1`, the chains are</span>
 <span class="sd">            vectorized for `slice_np_vectorized` whereas they are run sequentially</span>
-<span class="sd">            for `slice_np`. The samplers `hmc`, `nuts` or `slice` sample with Pyro.</span>
-<span class="sd">        thin: The thinning factor for the chain.</span>
+<span class="sd">            for `slice_np`. The samplers ending on `_pyro` are using Pyro, and</span>
+<span class="sd">            likewise the samplers ending on `_pymc` are using PyMC.</span>
+<span class="sd">        thin: The thinning factor for the chain, default 1 (no thinning).</span>
 <span class="sd">        warmup_steps: The initial number of samples to discard.</span>
-<span class="sd">        num_chains: The number of chains.</span>
+<span class="sd">        num_chains: The number of chains. Should generally be at most</span>
+<span class="sd">            `num_workers - 1`.</span>
 <span class="sd">        init_strategy: The initialisation strategy for chains; `proposal` will draw</span>
 <span class="sd">            init locations from `proposal`, whereas `sir` will use Sequential-</span>
 <span class="sd">            Importance-Resampling (SIR). SIR initially samples</span>
@@ -7528,17 +7776,32 @@ the shape of the observed data and give a descriptive error.</p>
 <span class="sd">            uses `exp(potential_fn)` as weights.</span>
 <span class="sd">        init_strategy_parameters: Dictionary of keyword arguments passed to the</span>
 <span class="sd">            init strategy, e.g., for `init_strategy=sir` this could be</span>
-<span class="sd">            `num_candidate_samples`, i.e., the number of candidates to to find init</span>
+<span class="sd">            `num_candidate_samples`, i.e., the number of candidates to find init</span>
 <span class="sd">            locations (internal default is `1000`), or `device`.</span>
-<span class="sd">        init_strategy_num_candidates: Number of candidates to to find init</span>
+<span class="sd">        init_strategy_num_candidates: Number of candidates to find init</span>
 <span class="sd">             locations in `init_strategy=sir` (deprecated, use</span>
 <span class="sd">             init_strategy_parameters instead).</span>
 <span class="sd">        num_workers: number of cpu cores used to parallelize mcmc</span>
+<span class="sd">        mp_context: Multiprocessing start method, either `&quot;fork&quot;` or `&quot;spawn&quot;`</span>
+<span class="sd">            (default), used by Pyro and PyMC samplers. `&quot;fork&quot;` can be significantly</span>
+<span class="sd">            faster than `&quot;spawn&quot;` but is only supported on POSIX-based systems</span>
+<span class="sd">            (e.g. Linux and macOS, not Windows).</span>
 <span class="sd">        device: Training device, e.g., &quot;cpu&quot;, &quot;cuda&quot; or &quot;cuda:0&quot;. If None,</span>
 <span class="sd">            `potential_fn.device` is used.</span>
 <span class="sd">        x_shape: Shape of a single simulator output. If passed, it is used to check</span>
 <span class="sd">            the shape of the observed data and give a descriptive error.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">method</span> <span class="o">==</span> <span class="s2">&quot;slice&quot;</span><span class="p">:</span>
+        <span class="n">warn</span><span class="p">(</span>
+            <span class="s2">&quot;The Pyro-based slice sampler is deprecated, and the method `slice` &quot;</span>
+            <span class="s2">&quot;has been changed to `slice_np`, i.e., the custom &quot;</span>
+            <span class="s2">&quot;numpy-based slice sampler.&quot;</span><span class="p">,</span>
+            <span class="ne">DeprecationWarning</span><span class="p">,</span>
+            <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">method</span> <span class="o">=</span> <span class="s2">&quot;slice_np&quot;</span>
+
+    <span class="n">thin</span> <span class="o">=</span> <span class="n">_process_thin_default</span><span class="p">(</span><span class="n">thin</span><span class="p">)</span>
 
     <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span>
         <span class="n">potential_fn</span><span class="p">,</span>
@@ -7555,6 +7818,7 @@ the shape of the observed data and give a descriptive error.</p>
     <span class="bp">self</span><span class="o">.</span><span class="n">init_strategy</span> <span class="o">=</span> <span class="n">init_strategy</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">init_strategy_parameters</span> <span class="o">=</span> <span class="n">init_strategy_parameters</span> <span class="ow">or</span> <span class="p">{}</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">num_workers</span> <span class="o">=</span> <span class="n">num_workers</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">mp_context</span> <span class="o">=</span> <span class="n">mp_context</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_posterior_sampler</span> <span class="o">=</span> <span class="kc">None</span>
     <span class="c1"># Hardcode parameter name to reduce clutter kwargs.</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">param_name</span> <span class="o">=</span> <span class="s2">&quot;theta&quot;</span>
@@ -7598,8 +7862,8 @@ the shape of the observed data and give a descriptive error.</p>
       <p>Returns arviz InferenceData object constructed most recent samples.</p>
 <p>Note: the InferenceData is constructed using the posterior samples generated in
 most recent call to <code>.sample(...)</code>.</p>
-<p>For Pyro HMC and NUTS kernels InferenceData will contain diagnostics, for Pyro
-Slice or sbi slice sampling samples, only the samples are added.</p>
+<p>For Pyro and PyMC samplers, InferenceData will contain diagnostics, but for
+sbi slice samplers, only the samples are added.</p>
 
 
 
@@ -7627,66 +7891,70 @@ Slice or sbi slice sampling samples, only the samples are added.</p>
 
           <details class="quote">
             <summary>Source code in <code>sbi/inference/posteriors/mcmc_posterior.py</code></summary>
-            <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">659</span>
-<span class="normal">660</span>
-<span class="normal">661</span>
-<span class="normal">662</span>
-<span class="normal">663</span>
-<span class="normal">664</span>
-<span class="normal">665</span>
-<span class="normal">666</span>
-<span class="normal">667</span>
-<span class="normal">668</span>
-<span class="normal">669</span>
-<span class="normal">670</span>
-<span class="normal">671</span>
-<span class="normal">672</span>
-<span class="normal">673</span>
-<span class="normal">674</span>
-<span class="normal">675</span>
-<span class="normal">676</span>
-<span class="normal">677</span>
-<span class="normal">678</span>
-<span class="normal">679</span>
-<span class="normal">680</span>
-<span class="normal">681</span>
-<span class="normal">682</span>
-<span class="normal">683</span>
-<span class="normal">684</span>
-<span class="normal">685</span>
-<span class="normal">686</span>
-<span class="normal">687</span>
-<span class="normal">688</span>
-<span class="normal">689</span>
-<span class="normal">690</span>
-<span class="normal">691</span>
-<span class="normal">692</span>
-<span class="normal">693</span>
-<span class="normal">694</span>
-<span class="normal">695</span>
-<span class="normal">696</span>
-<span class="normal">697</span>
-<span class="normal">698</span>
-<span class="normal">699</span>
-<span class="normal">700</span>
-<span class="normal">701</span>
-<span class="normal">702</span>
-<span class="normal">703</span>
-<span class="normal">704</span>
-<span class="normal">705</span>
-<span class="normal">706</span>
-<span class="normal">707</span>
-<span class="normal">708</span>
-<span class="normal">709</span>
-<span class="normal">710</span>
-<span class="normal">711</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">get_arviz_inference_data</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">InferenceData</span><span class="p">:</span>
+            <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">753</span>
+<span class="normal">754</span>
+<span class="normal">755</span>
+<span class="normal">756</span>
+<span class="normal">757</span>
+<span class="normal">758</span>
+<span class="normal">759</span>
+<span class="normal">760</span>
+<span class="normal">761</span>
+<span class="normal">762</span>
+<span class="normal">763</span>
+<span class="normal">764</span>
+<span class="normal">765</span>
+<span class="normal">766</span>
+<span class="normal">767</span>
+<span class="normal">768</span>
+<span class="normal">769</span>
+<span class="normal">770</span>
+<span class="normal">771</span>
+<span class="normal">772</span>
+<span class="normal">773</span>
+<span class="normal">774</span>
+<span class="normal">775</span>
+<span class="normal">776</span>
+<span class="normal">777</span>
+<span class="normal">778</span>
+<span class="normal">779</span>
+<span class="normal">780</span>
+<span class="normal">781</span>
+<span class="normal">782</span>
+<span class="normal">783</span>
+<span class="normal">784</span>
+<span class="normal">785</span>
+<span class="normal">786</span>
+<span class="normal">787</span>
+<span class="normal">788</span>
+<span class="normal">789</span>
+<span class="normal">790</span>
+<span class="normal">791</span>
+<span class="normal">792</span>
+<span class="normal">793</span>
+<span class="normal">794</span>
+<span class="normal">795</span>
+<span class="normal">796</span>
+<span class="normal">797</span>
+<span class="normal">798</span>
+<span class="normal">799</span>
+<span class="normal">800</span>
+<span class="normal">801</span>
+<span class="normal">802</span>
+<span class="normal">803</span>
+<span class="normal">804</span>
+<span class="normal">805</span>
+<span class="normal">806</span>
+<span class="normal">807</span>
+<span class="normal">808</span>
+<span class="normal">809</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">get_arviz_inference_data</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">InferenceData</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Returns arviz InferenceData object constructed most recent samples.</span>
 
 <span class="sd">    Note: the InferenceData is constructed using the posterior samples generated in</span>
 <span class="sd">    most recent call to `.sample(...)`.</span>
 
-<span class="sd">    For Pyro HMC and NUTS kernels InferenceData will contain diagnostics, for Pyro</span>
-<span class="sd">    Slice or sbi slice sampling samples, only the samples are added.</span>
+<span class="sd">    For Pyro and PyMC samplers, InferenceData will contain diagnostics, but for</span>
+<span class="sd">    sbi slice samplers, only the samples are added.</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        inference_data: Arviz InferenceData object.</span>
@@ -7695,16 +7963,20 @@ Slice or sbi slice sampling samples, only the samples are added.</p>
         <span class="bp">self</span><span class="o">.</span><span class="n">_posterior_sampler</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
     <span class="p">),</span> <span class="s2">&quot;&quot;&quot;No samples have been generated, call .sample() first.&quot;&quot;&quot;</span>
 
-    <span class="n">sampler</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">MCMC</span><span class="p">,</span> <span class="n">SliceSamplerSerial</span><span class="p">,</span> <span class="n">SliceSamplerVectorized</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_posterior_sampler</span>
-    <span class="p">)</span>
+    <span class="n">sampler</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span>
+        <span class="n">MCMC</span><span class="p">,</span> <span class="n">SliceSamplerSerial</span><span class="p">,</span> <span class="n">SliceSamplerVectorized</span><span class="p">,</span> <span class="n">PyMCSampler</span>
+    <span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_posterior_sampler</span>
 
     <span class="c1"># If Pyro sampler and samples not transformed, use arviz&#39; from_pyro.</span>
-    <span class="c1"># Exclude &#39;slice&#39; kernel as it lacks the &#39;divergence&#39; diagnostics key.</span>
-    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_posterior_sampler</span><span class="p">,</span> <span class="p">(</span><span class="n">HMC</span><span class="p">,</span> <span class="n">NUTS</span><span class="p">))</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">sampler</span><span class="p">,</span> <span class="p">(</span><span class="n">HMC</span><span class="p">,</span> <span class="n">NUTS</span><span class="p">))</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">theta_transform</span><span class="p">,</span> <span class="n">torch_tf</span><span class="o">.</span><span class="n">IndependentTransform</span>
     <span class="p">):</span>
         <span class="n">inference_data</span> <span class="o">=</span> <span class="n">az</span><span class="o">.</span><span class="n">from_pyro</span><span class="p">(</span><span class="n">sampler</span><span class="p">)</span>
+    <span class="c1"># If PyMC sampler and samples not transformed, get cached InferenceData.</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">sampler</span><span class="p">,</span> <span class="n">PyMCSampler</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">theta_transform</span><span class="p">,</span> <span class="n">torch_tf</span><span class="o">.</span><span class="n">IndependentTransform</span>
+    <span class="p">):</span>
+        <span class="n">inference_data</span> <span class="o">=</span> <span class="n">sampler</span><span class="o">.</span><span class="n">get_inference_data</span><span class="p">()</span>
 
     <span class="c1"># otherwise get samples from sampler and transform to original space.</span>
     <span class="k">else</span><span class="p">:</span>
@@ -7825,34 +8097,34 @@ consumption.</p>
 
           <details class="quote">
             <summary>Source code in <code>sbi/inference/posteriors/mcmc_posterior.py</code></summary>
-            <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">161</span>
-<span class="normal">162</span>
-<span class="normal">163</span>
-<span class="normal">164</span>
-<span class="normal">165</span>
-<span class="normal">166</span>
-<span class="normal">167</span>
-<span class="normal">168</span>
-<span class="normal">169</span>
-<span class="normal">170</span>
-<span class="normal">171</span>
-<span class="normal">172</span>
-<span class="normal">173</span>
-<span class="normal">174</span>
-<span class="normal">175</span>
-<span class="normal">176</span>
-<span class="normal">177</span>
-<span class="normal">178</span>
-<span class="normal">179</span>
-<span class="normal">180</span>
-<span class="normal">181</span>
+            <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">181</span>
 <span class="normal">182</span>
 <span class="normal">183</span>
 <span class="normal">184</span>
 <span class="normal">185</span>
 <span class="normal">186</span>
 <span class="normal">187</span>
-<span class="normal">188</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">log_prob</span><span class="p">(</span>
+<span class="normal">188</span>
+<span class="normal">189</span>
+<span class="normal">190</span>
+<span class="normal">191</span>
+<span class="normal">192</span>
+<span class="normal">193</span>
+<span class="normal">194</span>
+<span class="normal">195</span>
+<span class="normal">196</span>
+<span class="normal">197</span>
+<span class="normal">198</span>
+<span class="normal">199</span>
+<span class="normal">200</span>
+<span class="normal">201</span>
+<span class="normal">202</span>
+<span class="normal">203</span>
+<span class="normal">204</span>
+<span class="normal">205</span>
+<span class="normal">206</span>
+<span class="normal">207</span>
+<span class="normal">208</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">log_prob</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span> <span class="n">theta</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">track_gradients</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Returns the log-probability of theta under the posterior.</span>
@@ -8105,72 +8377,72 @@ have a cached value.</p>
 
           <details class="quote">
             <summary>Source code in <code>sbi/inference/posteriors/mcmc_posterior.py</code></summary>
-            <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">592</span>
-<span class="normal">593</span>
-<span class="normal">594</span>
-<span class="normal">595</span>
-<span class="normal">596</span>
-<span class="normal">597</span>
-<span class="normal">598</span>
-<span class="normal">599</span>
-<span class="normal">600</span>
-<span class="normal">601</span>
-<span class="normal">602</span>
-<span class="normal">603</span>
-<span class="normal">604</span>
-<span class="normal">605</span>
-<span class="normal">606</span>
-<span class="normal">607</span>
-<span class="normal">608</span>
-<span class="normal">609</span>
-<span class="normal">610</span>
-<span class="normal">611</span>
-<span class="normal">612</span>
-<span class="normal">613</span>
-<span class="normal">614</span>
-<span class="normal">615</span>
-<span class="normal">616</span>
-<span class="normal">617</span>
-<span class="normal">618</span>
-<span class="normal">619</span>
-<span class="normal">620</span>
-<span class="normal">621</span>
-<span class="normal">622</span>
-<span class="normal">623</span>
-<span class="normal">624</span>
-<span class="normal">625</span>
-<span class="normal">626</span>
-<span class="normal">627</span>
-<span class="normal">628</span>
-<span class="normal">629</span>
-<span class="normal">630</span>
-<span class="normal">631</span>
-<span class="normal">632</span>
-<span class="normal">633</span>
-<span class="normal">634</span>
-<span class="normal">635</span>
-<span class="normal">636</span>
-<span class="normal">637</span>
-<span class="normal">638</span>
-<span class="normal">639</span>
-<span class="normal">640</span>
-<span class="normal">641</span>
-<span class="normal">642</span>
-<span class="normal">643</span>
-<span class="normal">644</span>
-<span class="normal">645</span>
-<span class="normal">646</span>
-<span class="normal">647</span>
-<span class="normal">648</span>
-<span class="normal">649</span>
-<span class="normal">650</span>
-<span class="normal">651</span>
-<span class="normal">652</span>
-<span class="normal">653</span>
-<span class="normal">654</span>
-<span class="normal">655</span>
-<span class="normal">656</span>
-<span class="normal">657</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">map</span><span class="p">(</span>
+            <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">686</span>
+<span class="normal">687</span>
+<span class="normal">688</span>
+<span class="normal">689</span>
+<span class="normal">690</span>
+<span class="normal">691</span>
+<span class="normal">692</span>
+<span class="normal">693</span>
+<span class="normal">694</span>
+<span class="normal">695</span>
+<span class="normal">696</span>
+<span class="normal">697</span>
+<span class="normal">698</span>
+<span class="normal">699</span>
+<span class="normal">700</span>
+<span class="normal">701</span>
+<span class="normal">702</span>
+<span class="normal">703</span>
+<span class="normal">704</span>
+<span class="normal">705</span>
+<span class="normal">706</span>
+<span class="normal">707</span>
+<span class="normal">708</span>
+<span class="normal">709</span>
+<span class="normal">710</span>
+<span class="normal">711</span>
+<span class="normal">712</span>
+<span class="normal">713</span>
+<span class="normal">714</span>
+<span class="normal">715</span>
+<span class="normal">716</span>
+<span class="normal">717</span>
+<span class="normal">718</span>
+<span class="normal">719</span>
+<span class="normal">720</span>
+<span class="normal">721</span>
+<span class="normal">722</span>
+<span class="normal">723</span>
+<span class="normal">724</span>
+<span class="normal">725</span>
+<span class="normal">726</span>
+<span class="normal">727</span>
+<span class="normal">728</span>
+<span class="normal">729</span>
+<span class="normal">730</span>
+<span class="normal">731</span>
+<span class="normal">732</span>
+<span class="normal">733</span>
+<span class="normal">734</span>
+<span class="normal">735</span>
+<span class="normal">736</span>
+<span class="normal">737</span>
+<span class="normal">738</span>
+<span class="normal">739</span>
+<span class="normal">740</span>
+<span class="normal">741</span>
+<span class="normal">742</span>
+<span class="normal">743</span>
+<span class="normal">744</span>
+<span class="normal">745</span>
+<span class="normal">746</span>
+<span class="normal">747</span>
+<span class="normal">748</span>
+<span class="normal">749</span>
+<span class="normal">750</span>
+<span class="normal">751</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">map</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">num_iter</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1_000</span><span class="p">,</span>
@@ -8248,7 +8520,7 @@ have a cached value.</p>
 
 
 <h3 id="sbi.inference.posteriors.mcmc_posterior.MCMCPosterior.sample" class="doc doc-heading">
-          <code class=" language-python"><span class="n">sample</span><span class="p">(</span><span class="n">sample_shape</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">(),</span> <span class="n">x</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">thin</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">warmup_steps</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_chains</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">init_strategy</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">init_strategy_parameters</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">init_strategy_num_candidates</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">mcmc_parameters</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">mcmc_method</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">sample_with</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_workers</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></code>
+          <code class=" language-python"><span class="n">sample</span><span class="p">(</span><span class="n">sample_shape</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">(),</span> <span class="n">x</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">thin</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">warmup_steps</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_chains</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">init_strategy</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">init_strategy_parameters</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">init_strategy_num_candidates</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">mcmc_parameters</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">mcmc_method</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">sample_with</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_workers</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">mp_context</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></code>
 
 <a href="#sbi.inference.posteriors.mcmc_posterior.MCMCPosterior.sample" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -8376,27 +8648,7 @@ samples and then reshape into the desired shape.</p>
 
           <details class="quote">
             <summary>Source code in <code>sbi/inference/posteriors/mcmc_posterior.py</code></summary>
-            <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">190</span>
-<span class="normal">191</span>
-<span class="normal">192</span>
-<span class="normal">193</span>
-<span class="normal">194</span>
-<span class="normal">195</span>
-<span class="normal">196</span>
-<span class="normal">197</span>
-<span class="normal">198</span>
-<span class="normal">199</span>
-<span class="normal">200</span>
-<span class="normal">201</span>
-<span class="normal">202</span>
-<span class="normal">203</span>
-<span class="normal">204</span>
-<span class="normal">205</span>
-<span class="normal">206</span>
-<span class="normal">207</span>
-<span class="normal">208</span>
-<span class="normal">209</span>
-<span class="normal">210</span>
+            <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">210</span>
 <span class="normal">211</span>
 <span class="normal">212</span>
 <span class="normal">213</span>
@@ -8507,7 +8759,42 @@ samples and then reshape into the desired shape.</p>
 <span class="normal">318</span>
 <span class="normal">319</span>
 <span class="normal">320</span>
-<span class="normal">321</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">sample</span><span class="p">(</span>
+<span class="normal">321</span>
+<span class="normal">322</span>
+<span class="normal">323</span>
+<span class="normal">324</span>
+<span class="normal">325</span>
+<span class="normal">326</span>
+<span class="normal">327</span>
+<span class="normal">328</span>
+<span class="normal">329</span>
+<span class="normal">330</span>
+<span class="normal">331</span>
+<span class="normal">332</span>
+<span class="normal">333</span>
+<span class="normal">334</span>
+<span class="normal">335</span>
+<span class="normal">336</span>
+<span class="normal">337</span>
+<span class="normal">338</span>
+<span class="normal">339</span>
+<span class="normal">340</span>
+<span class="normal">341</span>
+<span class="normal">342</span>
+<span class="normal">343</span>
+<span class="normal">344</span>
+<span class="normal">345</span>
+<span class="normal">346</span>
+<span class="normal">347</span>
+<span class="normal">348</span>
+<span class="normal">349</span>
+<span class="normal">350</span>
+<span class="normal">351</span>
+<span class="normal">352</span>
+<span class="normal">353</span>
+<span class="normal">354</span>
+<span class="normal">355</span>
+<span class="normal">356</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">sample</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">sample_shape</span><span class="p">:</span> <span class="n">Shape</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">(),</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -8522,6 +8809,7 @@ samples and then reshape into the desired shape.</p>
     <span class="n">mcmc_method</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">sample_with</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">num_workers</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">mp_context</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">show_progress_bars</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Return samples from posterior distribution $p(\theta|x)$ with MCMC.</span>
@@ -8553,6 +8841,7 @@ samples and then reshape into the desired shape.</p>
     <span class="n">num_chains</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_chains</span> <span class="k">if</span> <span class="n">num_chains</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">num_chains</span>
     <span class="n">init_strategy</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">init_strategy</span> <span class="k">if</span> <span class="n">init_strategy</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">init_strategy</span>
     <span class="n">num_workers</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_workers</span> <span class="k">if</span> <span class="n">num_workers</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">num_workers</span>
+    <span class="n">mp_context</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mp_context</span> <span class="k">if</span> <span class="n">mp_context</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">mp_context</span>
     <span class="n">init_strategy_parameters</span> <span class="o">=</span> <span class="p">(</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">init_strategy_parameters</span>
         <span class="k">if</span> <span class="n">init_strategy_parameters</span> <span class="ow">is</span> <span class="kc">None</span>
@@ -8609,7 +8898,7 @@ samples and then reshape into the desired shape.</p>
     <span class="p">)</span>
     <span class="n">num_samples</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">(</span><span class="n">sample_shape</span><span class="p">)</span><span class="o">.</span><span class="n">numel</span><span class="p">()</span>
 
-    <span class="n">track_gradients</span> <span class="o">=</span> <span class="n">method</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;hmc&quot;</span><span class="p">,</span> <span class="s2">&quot;nuts&quot;</span><span class="p">)</span>
+    <span class="n">track_gradients</span> <span class="o">=</span> <span class="n">method</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;hmc_pyro&quot;</span><span class="p">,</span> <span class="s2">&quot;nuts_pyro&quot;</span><span class="p">,</span> <span class="s2">&quot;hmc_pymc&quot;</span><span class="p">,</span> <span class="s2">&quot;nuts_pymc&quot;</span><span class="p">)</span>
     <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">set_grad_enabled</span><span class="p">(</span><span class="n">track_gradients</span><span class="p">):</span>
         <span class="k">if</span> <span class="n">method</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;slice_np&quot;</span><span class="p">,</span> <span class="s2">&quot;slice_np_vectorized&quot;</span><span class="p">):</span>
             <span class="n">transformed_samples</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_slice_np_mcmc</span><span class="p">(</span>
@@ -8622,7 +8911,7 @@ samples and then reshape into the desired shape.</p>
                 <span class="n">num_workers</span><span class="o">=</span><span class="n">num_workers</span><span class="p">,</span>
                 <span class="n">show_progress_bars</span><span class="o">=</span><span class="n">show_progress_bars</span><span class="p">,</span>
             <span class="p">)</span>
-        <span class="k">elif</span> <span class="n">method</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;hmc&quot;</span><span class="p">,</span> <span class="s2">&quot;nuts&quot;</span><span class="p">,</span> <span class="s2">&quot;slice&quot;</span><span class="p">):</span>
+        <span class="k">elif</span> <span class="n">method</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;hmc_pyro&quot;</span><span class="p">,</span> <span class="s2">&quot;nuts_pyro&quot;</span><span class="p">):</span>
             <span class="n">transformed_samples</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_pyro_mcmc</span><span class="p">(</span>
                 <span class="n">num_samples</span><span class="o">=</span><span class="n">num_samples</span><span class="p">,</span>
                 <span class="n">potential_function</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">potential_</span><span class="p">,</span>
@@ -8632,9 +8921,22 @@ samples and then reshape into the desired shape.</p>
                 <span class="n">warmup_steps</span><span class="o">=</span><span class="n">warmup_steps</span><span class="p">,</span>  <span class="c1"># type: ignore</span>
                 <span class="n">num_chains</span><span class="o">=</span><span class="n">num_chains</span><span class="p">,</span>
                 <span class="n">show_progress_bars</span><span class="o">=</span><span class="n">show_progress_bars</span><span class="p">,</span>
+                <span class="n">mp_context</span><span class="o">=</span><span class="n">mp_context</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="k">elif</span> <span class="n">method</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;hmc_pymc&quot;</span><span class="p">,</span> <span class="s2">&quot;nuts_pymc&quot;</span><span class="p">,</span> <span class="s2">&quot;slice_pymc&quot;</span><span class="p">):</span>
+            <span class="n">transformed_samples</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_pymc_mcmc</span><span class="p">(</span>
+                <span class="n">num_samples</span><span class="o">=</span><span class="n">num_samples</span><span class="p">,</span>
+                <span class="n">potential_function</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">potential_</span><span class="p">,</span>
+                <span class="n">initial_params</span><span class="o">=</span><span class="n">initial_params</span><span class="p">,</span>
+                <span class="n">mcmc_method</span><span class="o">=</span><span class="n">method</span><span class="p">,</span>  <span class="c1"># type: ignore</span>
+                <span class="n">thin</span><span class="o">=</span><span class="n">thin</span><span class="p">,</span>  <span class="c1"># type: ignore</span>
+                <span class="n">warmup_steps</span><span class="o">=</span><span class="n">warmup_steps</span><span class="p">,</span>  <span class="c1"># type: ignore</span>
+                <span class="n">num_chains</span><span class="o">=</span><span class="n">num_chains</span><span class="p">,</span>
+                <span class="n">show_progress_bars</span><span class="o">=</span><span class="n">show_progress_bars</span><span class="p">,</span>
+                <span class="n">mp_context</span><span class="o">=</span><span class="n">mp_context</span><span class="p">,</span>
             <span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">NameError</span>
+            <span class="k">raise</span> <span class="ne">NameError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;The sampling method </span><span class="si">{</span><span class="n">method</span><span class="si">}</span><span class="s2"> is not implemented!&quot;</span><span class="p">)</span>
 
     <span class="n">samples</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">theta_transform</span><span class="o">.</span><span class="n">inv</span><span class="p">(</span><span class="n">transformed_samples</span><span class="p">)</span>
 
@@ -8716,17 +9018,17 @@ samples and then reshape into the desired shape.</p>
 
           <details class="quote">
             <summary>Source code in <code>sbi/inference/posteriors/mcmc_posterior.py</code></summary>
-            <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">149</span>
-<span class="normal">150</span>
-<span class="normal">151</span>
-<span class="normal">152</span>
-<span class="normal">153</span>
-<span class="normal">154</span>
-<span class="normal">155</span>
-<span class="normal">156</span>
-<span class="normal">157</span>
-<span class="normal">158</span>
-<span class="normal">159</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">set_mcmc_method</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">method</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;NeuralPosterior&quot;</span><span class="p">:</span>
+            <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">169</span>
+<span class="normal">170</span>
+<span class="normal">171</span>
+<span class="normal">172</span>
+<span class="normal">173</span>
+<span class="normal">174</span>
+<span class="normal">175</span>
+<span class="normal">176</span>
+<span class="normal">177</span>
+<span class="normal">178</span>
+<span class="normal">179</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">set_mcmc_method</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">method</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;NeuralPosterior&quot;</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Sets sampling method to for MCMC and returns `NeuralPosterior`.</span>
 
 <span class="sd">    Args:</span>
@@ -13892,10 +14194,10 @@ weight_transform: Callable applied to importance weights (only for fKL)</p>
     </div>
     
     
-    <script id="__config" type="application/json">{"base": "../..", "features": [], "search": "../../assets/javascripts/workers/search.b8dbb3d2.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    <script id="__config" type="application/json">{"base": "../..", "features": ["content.code.copy"], "search": "../../assets/javascripts/workers/search.b8dbb3d2.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.bd41221c.min.js"></script>
+      <script src="../../assets/javascripts/bundle.8fd75fb4.min.js"></script>
       
         <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-MML-AM_CHTML"></script>
       
