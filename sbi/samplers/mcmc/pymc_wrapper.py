@@ -138,7 +138,7 @@ class PyMCSampler:
         self._device = device
 
         # create PyMC model object
-        track_gradients = step in (pymc.NUTS, pymc.HamiltonianMC)
+        track_gradients = step in ("nuts", "hmc")
         self._model = pymc.Model()
         potential = PyMCPotential(
             potential_fn, track_gradients=track_gradients, device=device
