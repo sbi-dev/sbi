@@ -2,7 +2,7 @@ from typing import Tuple
 
 import torch
 from torch import Tensor, nn
-from zuko.flows import Flow
+from zuko.flows.core import Flow
 
 from sbi.neural_nets.density_estimators.base import DensityEstimator
 from sbi.sbi_types import Shape
@@ -125,6 +125,7 @@ class ZukoFlow(DensityEstimator):
         emb_cond = emb_cond.expand(batch_shape + (emb_cond.shape[-1],))
 
         dists = self.net(emb_cond)
+
         log_probs = dists.log_prob(input)
 
         return log_probs
@@ -166,7 +167,7 @@ class ZukoFlow(DensityEstimator):
 
         emb_cond = self._embedding_net(condition)
         dists = self.net(emb_cond)
-        # zuko.sample() returns (*sample_shape, *batch_shape, input_size).
+
         samples = dists.sample(sample_shape).reshape(*batch_shape, *sample_shape, -1)
 
         return samples
@@ -190,9 +191,8 @@ class ZukoFlow(DensityEstimator):
 
         emb_cond = self._embedding_net(condition)
         dists = self.net(emb_cond)
-        samples, log_probs = dists.rsample_and_log_prob(sample_shape)
-        # zuko.sample_and_log_prob() returns (*sample_shape, *batch_shape, ...).
 
+        samples, log_probs = dists.rsample_and_log_prob(sample_shape)
         samples = samples.reshape(*batch_shape, *sample_shape, -1)
         log_probs = log_probs.reshape(*batch_shape, *sample_shape)
 
