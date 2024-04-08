@@ -25,6 +25,8 @@ from sbi.utils.sbiutils import (
 from sbi.utils.torchutils import create_alternating_binary_mask
 from sbi.utils.user_input_checks import check_data_device, check_embedding_net_device
 
+nflow_specific_kwargs = ["num_bins", "num_components"]
+
 
 def get_numel(batch_x: Tensor, batch_y: Tensor, embedding_net) -> Tuple[int, int]:
     """
@@ -1039,6 +1041,9 @@ def build_zuko_flow(
     """
 
     x_numel, y_numel = get_numel(batch_x, batch_y, embedding_net)
+
+    # keep only zuko kwargs
+    kwargs = {k: v for k, v in kwargs.items() if k not in nflow_specific_kwargs}
 
     if isinstance(hidden_features, int):
         hidden_features = [hidden_features] * num_transforms
