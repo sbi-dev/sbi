@@ -81,7 +81,7 @@ def test_c2st_slice_np_vectorized_parallelized_on_Gaussian(
     Args:
         num_dim: parameter dimension of the gaussian model
     """
-    num_samples = 500
+    num_samples = 1000
     warmup = mcmc_params_accurate["warmup_steps"]
     num_chains = (
         mcmc_params_accurate["num_chains"]
@@ -90,7 +90,7 @@ def test_c2st_slice_np_vectorized_parallelized_on_Gaussian(
     )
     thin = mcmc_params_accurate["thin"]
 
-    likelihood_shift = -1.0 * ones(num_dim)
+    likelihood_shift = -5.0 * ones(num_dim)
     likelihood_cov = 0.3 * eye(num_dim)
     prior_mean = zeros(num_dim)
     prior_cov = eye(num_dim)
@@ -142,7 +142,7 @@ def test_c2st_pymc_sampler_on_Gaussian(
     warmup: int = 100,
 ):
     """Test PyMC on Gaussian, comparing to ground truth target via c2st."""
-    likelihood_shift = -1.0 * ones(num_dim)
+    likelihood_shift = -5.0 * ones(num_dim)
     likelihood_cov = 0.3 * eye(num_dim)
     prior_mean = zeros(num_dim)
     prior_cov = eye(num_dim)

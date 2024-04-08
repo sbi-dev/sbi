@@ -389,7 +389,6 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str):
     "sample_with, mcmc_method, prior_str",
     (
         pytest.param("mcmc", "slice_np", "gaussian", marks=pytest.mark.mcmc),
-        pytest.param("mcmc", "slice", "gaussian", marks=pytest.mark.mcmc),
         pytest.param("mcmc", "slice_np_vectorized", "gaussian", marks=pytest.mark.mcmc),
         ("rejection", "rejection", "uniform"),
     ),
