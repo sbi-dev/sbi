@@ -9,7 +9,10 @@ from sklearn.neural_network import MLPClassifier
 
 from sbi.diagnostics.lc2st import LC2ST, LC2ST_NF
 from sbi.inference import SNPE
-from sbi.simulators.gaussian_mixture import GaussianMixture
+from sbi.simulators.gaussian_mixture import (
+    gaussian_mixture,
+    uniform_prior_gaussian_mixture,
+)
 
 
 @pytest.mark.parametrize("method", (LC2ST, LC2ST_NF))
@@ -24,9 +27,9 @@ def test_running_lc2st(method, classifier, cv_folds):
     n_trials_null = 2
 
     # task
-    gmm = GaussianMixture()
-    prior = gmm.prior_dist
-    simulator = gmm.get_simulator()
+    dim = 2
+    prior = uniform_prior_gaussian_mixture(dim=dim)
+    simulator = gaussian_mixture
 
     # training data for the density estimator
     theta_train = prior.sample((n_train,))
@@ -101,9 +104,9 @@ def test_lc2st_tnr(method):
     n_eval = 10_000
 
     # task
-    gmm = GaussianMixture()
-    prior = gmm.prior_dist
-    simulator = gmm.get_simulator()
+    dim = 2
+    prior = uniform_prior_gaussian_mixture(dim=dim)
+    simulator = gaussian_mixture
 
     # training data for the density estimator
     theta_train = prior.sample((n_train,))
@@ -165,9 +168,9 @@ def test_lc2st_tpr(method):
     n_eval = 10_000
 
     # task
-    gmm = GaussianMixture()
-    prior = gmm.prior_dist
-    simulator = gmm.get_simulator()
+    dim = 2
+    prior = uniform_prior_gaussian_mixture(dim=dim)
+    simulator = gaussian_mixture
 
     # training data for the density estimator
     theta_train = prior.sample((n_train,))

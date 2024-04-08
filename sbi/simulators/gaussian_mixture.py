@@ -1,121 +1,167 @@
 import logging
-from typing import Callable
 
 import pyro
 import torch
 from pyro import distributions as pdist
+from torch import Tensor
+
+SIM_PARAMS = {
+    "mixture_locs_factor": [1.0, 1.0],
+    "mixture_scales": [1.0, 0.1],
+    "mixture_weights": [0.5, 0.5],
+}
+
+PRIOR_PARAMS = {
+    "bound": 10.0,
+}
 
 
-class GaussianMixture:
-    def __init__(
-        self,
-        dim: int = 2,
-        prior_bound: float = 10.0,
-    ):
-        """Gaussian Mixture as implemented in `sbim` [1].
+def uniform_prior_gaussian_mixture(dim: int, bound: float = 10.0) -> pdist.Uniform:
+    """
+    Prior distribution for Gaussian Mixture, as implemented in [1].
 
-        Inference of mean under uniform prior.
+    Args:
+        dim: Dimensionality of parameters and data.
+        bound: Prior is uniform in [-bound, +bound], defaults to 10.0.
 
-        Args:
-            dim: Dimensionality of parameters and data.
-            prior_bound: Prior is uniform in [-prior_bound, +prior_bound].
+    Returns: Prior distribution.
+    """
+    return pdist.Uniform(
+        low=-bound * torch.ones((dim,)),
+        high=+bound * torch.ones((dim,)),
+    ).to_event(1)
 
-        References:
-        [1]: https://github.com/sbi-benchmark/sbibm/blob/main/sbibm/tasks/gaussian_mixture/task.py
-        """
-        self.dim_parameters = dim
-        self.prior_params = {
-            "low": -prior_bound * torch.ones((self.dim_parameters,)),
-            "high": +prior_bound * torch.ones((self.dim_parameters,)),
-        }
 
-        self.prior_dist = pdist.Uniform(**self.prior_params).to_event(1)
-        self.prior_dist.set_default_validate_args(False)
+def gaussian_mixture(
+    theta: Tensor,
+    mixture_locs_factor: list = SIM_PARAMS["mixture_locs_factor"],
+    mixture_scales: list = SIM_PARAMS["mixture_scales"],
+    mixture_weights: list = SIM_PARAMS["mixture_weights"],
+) -> Tensor:
+    """
+    Simulator for Gaussian Mixture, as implemented in [1].
 
-        self.simulator_params = {
-            "mixture_locs_factor": torch.tensor([1.0, 1.0]),
-            "mixture_scales": torch.tensor([1.0, 0.1]),
-            "mixture_weights": torch.tensor([0.5, 0.5]),
-        }
+    The mixture components are Gaussians with scaled theta as mean and fixed scale:
+    `num_components = dim_theta`, default is 2.
 
-    def get_simulator(self) -> Callable:
-        """Get function returning samples from simulator given parameters
+    The dimensionality of the data can be changed, but the mixture parameters
+    (locs, scales, weights) need to be adjusted accordingly.
 
-        Args:
-            max_calls: Maximum number of function calls. Additional calls will
-                result in SimulationBudgetExceeded exceptions. Defaults to None
-                for infinite budget
+    References:
+    [1]: https://github.com/sbi-benchmark/sbibm/blob/main/sbibm/tasks/gaussian_mixture/task.py
 
-        Return:
-            Simulator callable
-        """
+    Args:
+        theta: Parameter sets to be simulated, of shape (num_samples, dim_theta).
+        mixture_locs_factor: Factor for the mean of the Gaussian mixture components,
+            of length (dim_theta).
+        mixture_scales: Scales of the Gaussian mixture components,
+            of length (dim_theta).
+        mixture_weights: Weights of the Gaussian mixture components,
+            of length (dim_theta).
 
-        def simulator(parameters):
-            # Sample mixture index for each parameter in batch
-            idx = pyro.sample(
-                "mixture_idx",
-                pdist.Categorical(
-                    probs=self.simulator_params["mixture_weights"]
-                ).expand_by([parameters.shape[0]]),
-            ).unsqueeze(1)
+    Returns: Simulated data, of shape (num_samples, dim_theta).
+    """
 
-            # Select loc and scales according to mixture index
-            loc = self.simulator_params["mixture_locs_factor"][idx] * parameters
-            scale = self.simulator_params["mixture_scales"][idx]
+    # Check dimensions
+    assert (
+        theta.shape[-1]
+        == len(mixture_locs_factor)
+        == len(mixture_scales)
+        == len(mixture_weights)
+    ), "Mismatch in dimensions."
 
-            return pyro.sample("data", pdist.Normal(loc=loc, scale=scale).to_event(1))
+    # Sample mixture index for each parameter in batch
+    idx = pyro.sample(
+        "mixture_idx",
+        pdist.Categorical(probs=torch.tensor(mixture_weights)).expand_by([
+            theta.shape[0]
+        ]),
+    ).unsqueeze(1)
 
-        return simulator
+    # Select loc and scales according to mixture index
+    loc = torch.tensor(mixture_locs_factor)[idx] * theta
+    scale = torch.tensor(mixture_scales)[idx]
 
-    def _sample_reference_posterior(
-        self,
-        num_samples: int,
-        observation: torch.Tensor,
-    ) -> torch.Tensor:
-        """Sample reference posterior for given observation
+    return pyro.sample("data", pdist.Normal(loc=loc, scale=scale).to_event(1))
 
-        Uses closed form solution with rejection sampling
 
-        Args:
-            num_samples: Number of samples to generate
-            observation: Observation.
+def samples_true_posterior_gaussian_mixture_uniform_prior(
+    x_o: Tensor,
+    mixture_locs_factor: list = SIM_PARAMS["mixture_locs_factor"],
+    mixture_scales: list = SIM_PARAMS["mixture_scales"],
+    mixture_weights: list = SIM_PARAMS["mixture_weights"],
+    prior_bound: float = 10.0,
+    num_samples: int = 1,
+) -> torch.Tensor:
+    """Samples the true posterior for a given observation x_o when
+    the likelihood is a Gaussian Mixture and the prior is uniform.
 
-        Returns:
-            Samples from reference posterior
-        """
+    The dimensionality of the data is 2 by default, but can be changed if
+    the mixture parameters (locs, scales, weights) are adjusted accordingly.
 
-        log = logging.getLogger(__name__)
+    Uses closed form solution with rejection sampling, as implemented in [1].
 
-        reference_posterior_samples = []
+    References:
+    [1]: https://github.com/sbi-benchmark/sbibm/blob/main/sbibm/tasks/gaussian_mixture/task.py
 
-        # Reject samples outside of prior bounds
-        counter = 0
-        while len(reference_posterior_samples) < num_samples:
-            counter += 1
-            idx = pyro.sample(
-                "mixture_idx",
-                pdist.Categorical(self.simulator_params["mixture_weights"]),
-            )
-            sample = pyro.sample(
-                "posterior_sample",
-                pdist.Normal(
-                    loc=self.simulator_params["mixture_locs_factor"][idx] * observation,
-                    scale=self.simulator_params["mixture_scales"][idx],
-                ),
-            )
-            is_outside_prior = torch.isinf(self.prior_dist.log_prob(sample).sum())
+    Args:
+        x_o: The observation, of shape (,dim_x).
+        mixture_locs_factor: Factor for the mean of the Gaussian mixture components,
+            of length (dim_x).
+        mixture_scales: Scales of the Gaussian mixture components,
+            of length (dim_x).
+        mixture_weights: Weights of the Gaussian mixture components,
+            of length (dim_x).
+        prior_bound: Prior is uniform in [-prior_bound, +prior_bound],
+            defaults to 10.0, as in [1].
+        num_samples: Desired number of samples, defaults to 1.
 
-            if len(reference_posterior_samples) > 0:
-                is_duplicate = sample in torch.cat(reference_posterior_samples)
-            else:
-                is_duplicate = False
+    Returns:
+        Samples from the true posterior, of shape (num_samples, dim_x).
+    """
 
-            if not is_outside_prior and not is_duplicate:
-                reference_posterior_samples.append(sample)
+    log = logging.getLogger(__name__)
 
-        reference_posterior_samples = torch.cat(reference_posterior_samples)
-        acceptance_rate = float(num_samples / counter)
+    dim = x_o.shape[-1]
 
-        log.info(f"Acceptance rate: {acceptance_rate}")
+    # Check dimensions
+    assert (
+        dim == len(mixture_locs_factor) == len(mixture_scales) == len(mixture_weights)
+    ), "Mismatch in dimensions."
 
-        return reference_posterior_samples
+    # Define prior distribution
+    prior_dist = uniform_prior_gaussian_mixture(dim, prior_bound)
+
+    posterior_samples = []
+
+    # Reject samples outside of prior bounds
+    counter = 0
+    while len(posterior_samples) < num_samples:
+        counter += 1
+        idx = pyro.sample(
+            "mixture_idx",
+            pdist.Categorical(torch.tensor(mixture_weights)),
+        )
+        sample = pyro.sample(
+            "posterior_sample",
+            pdist.Normal(
+                loc=torch.tensor(mixture_locs_factor)[idx] * x_o,
+                scale=torch.tensor(mixture_scales)[idx],
+            ),
+        )
+        is_outside_prior = torch.isinf(prior_dist.log_prob(sample).sum())
+
+        if len(posterior_samples) > 0:
+            is_duplicate = sample in torch.cat(posterior_samples)
+        else:
+            is_duplicate = False
+
+        if not is_outside_prior and not is_duplicate:
+            posterior_samples.append(sample)
+
+    posterior_samples = torch.cat(posterior_samples)
+    acceptance_rate = float(num_samples / counter)
+
+    log.info(f"Acceptance rate: {acceptance_rate}")
+
+    return posterior_samples
