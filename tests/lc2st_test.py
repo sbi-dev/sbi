@@ -79,17 +79,21 @@ def test_running_lc2st(method, classifier, cv_folds):
         num_trials_null=num_trials_null,
         **kwargs_test,
     )
-    _ = lc2st.train_null()
-    _ = lc2st.train_data()
+    _ = lc2st.train_under_null_hypothesis()
+    _ = lc2st.train_on_observed_data()
 
-    _ = lc2st.scores_data(x_o=xs[0], return_probs=True, **kwargs_eval)
-    _ = lc2st.scores_data(x_o=xs[0], return_probs=False, **kwargs_eval)
-    _ = lc2st.statistic_data(x_o=xs[0], **kwargs_eval)
+    _ = lc2st.get_scores_on_observed_data(x_o=xs[0], return_probs=True, **kwargs_eval)
+    _ = lc2st.get_scores_on_observed_data(x_o=xs[0], return_probs=False, **kwargs_eval)
+    _ = lc2st.get_statistic_on_observed_data(x_o=xs[0], **kwargs_eval)
 
-    _ = lc2st.statistics_null(x_o=xs[0], return_probs=True, **kwargs_eval)
-    _ = lc2st.statistics_null(x_o=xs[0], return_probs=False, **kwargs_eval)
+    _ = lc2st.get_statistics_under_null_hypothesis(
+        x_o=xs[0], return_probs=True, **kwargs_eval
+    )
+    _ = lc2st.get_statistics_under_null_hypothesis(
+        x_o=xs[0], return_probs=False, **kwargs_eval
+    )
     _ = lc2st.p_value(x_o=xs[0], **kwargs_eval)
-    _ = lc2st.reject(x_o=xs[0], **kwargs_eval)
+    _ = lc2st.reject_test(x_o=xs[0], **kwargs_eval)
 
 
 @pytest.mark.parametrize("method", (LC2ST, LC2ST_NF))
@@ -138,8 +142,8 @@ def test_lc2st_tnr(method):
 
     lc2st = method(thetas, xs, posterior_samples, **kwargs_test)
 
-    _ = lc2st.train_null()
-    _ = lc2st.train_data()
+    _ = lc2st.train_under_null_hypothesis()
+    _ = lc2st.train_on_observed_data()
 
     results = []
     for _ in range(num_runs):
@@ -149,7 +153,7 @@ def test_lc2st_tnr(method):
             kwargs_eval = {"theta_o": theta_o}
         else:
             kwargs_eval = {}
-        results.append(lc2st.reject(x_o=x, **kwargs_eval))
+        results.append(lc2st.reject_test(x_o=x, **kwargs_eval))
 
     assert (
         torch.tensor(results).sum() == num_runs
@@ -202,8 +206,8 @@ def test_lc2st_tpr(method):
 
     lc2st = method(thetas, xs, posterior_samples, **kwargs_test)
 
-    _ = lc2st.train_null()
-    _ = lc2st.train_data()
+    _ = lc2st.train_under_null_hypothesis()
+    _ = lc2st.train_on_observed_data()
 
     results = []
     for _ in range(num_runs):
@@ -213,7 +217,7 @@ def test_lc2st_tpr(method):
             kwargs_eval = {"theta_o": theta_o}
         else:
             kwargs_eval = {}
-        results.append(lc2st.reject(x_o=x, **kwargs_eval))
+        results.append(lc2st.reject_test(x_o=x, **kwargs_eval))
 
     assert (
         torch.tensor(results).sum() == 0

@@ -91,19 +91,21 @@ class LC2ST:
         if "mlp" in classifier.lower():
             ndim = thetas.shape[-1]
             self.clf_class = MLPClassifier
-            self.clf_kwargs = {
-                "activation": "relu",
-                "hidden_layer_sizes": (10 * ndim, 10 * ndim),
-                "max_iter": 1000,
-                "solver": "adam",
-                "early_stopping": True,
-                "n_iter_no_change": 50,
-            }
+            if clf_kwargs is None:
+                self.clf_kwargs = {
+                    "activation": "relu",
+                    "hidden_layer_sizes": (10 * ndim, 10 * ndim),
+                    "max_iter": 1000,
+                    "solver": "adam",
+                    "early_stopping": True,
+                    "n_iter_no_change": 50,
+                }
         elif "random_forest" in classifier.lower():
             self.clf_class = RandomForestClassifier
-            self.clf_kwargs = {}
+            if clf_kwargs is None:
+                self.clf_kwargs = {}
         elif "custom":
-            if clf_class is None:
+            if clf_class is None or clf_kwargs is None:
                 raise ValueError(
                     "Please provide a valid sklearn classifier class and kwargs."
                 )
@@ -219,14 +221,14 @@ class LC2ST:
         else:
             return scores
 
-    def train_data(self) -> None:
+    def train_on_observed_data(self) -> None:
         """Train the classifiers on the observed data.
         Saves the trained classifiers.
         """
         trained_clfs = self._train(self.theta_p, self.theta_q, self.x_p, self.x_q)
         self.trained_clfs = trained_clfs
 
-    def scores_data(
+    def get_scores_on_observed_data(
         self, theta_o: Tensor, x_o: Tensor, return_probs: bool = False
     ) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
         """Compute the L-C2ST scores for the observed data.
@@ -244,7 +246,7 @@ class LC2ST:
         """
         assert (
             self.trained_clfs is not None
-        ), "No trained classifiers found. Run `train_data` first."
+        ), "No trained classifiers found. Run `train_on_observed_data` first."
         return self._scores(
             theta_o=theta_o,
             x_o=x_o,
@@ -252,7 +254,7 @@ class LC2ST:
             return_probs=return_probs,
         )
 
-    def statistic_data(
+    def get_statistic_on_observed_data(
         self,
         theta_o: Tensor,
         x_o: Tensor,
@@ -270,7 +272,9 @@ class LC2ST:
         Returns:
             L-C2ST statistic at `x_o`.
         """
-        probs, scores = self.scores_data(theta_o=theta_o, x_o=x_o, return_probs=True)
+        probs, scores = self.get_scores_on_observed_data(
+            theta_o=theta_o, x_o=x_o, return_probs=True
+        )
         if return_probs:
             return probs, scores.mean()
         else:
@@ -283,6 +287,11 @@ class LC2ST:
     ) -> float:
         """Computes the p-value for L-C2ST.
 
+        The p-value is the proportion of times the L-C2ST statistic under the null
+        hypothesis is greater than the L-C2ST statistic at the observation `x_o`.
+        It is computed by taking the empirical mean over statistics computed on
+        several trials under the null hypothesis: 1/H * sum_{h=1}^{H} I(T_h < T_o).
+
         Args:
             theta_o: Samples from the posterior conditioned on the observation `x_o`,
                 of dhape (sample_size, dim).
@@ -291,13 +300,15 @@ class LC2ST:
         Returns:
             p-value for L-C2ST at `x_o`.
         """
-        _, stat_data = self.statistic_data(theta_o=theta_o, x_o=x_o, return_probs=True)
-        _, stats_null = self.statistics_null(
+        _, stat_data = self.get_statistic_on_observed_data(
+            theta_o=theta_o, x_o=x_o, return_probs=True
+        )
+        _, stats_null = self.get_statistics_under_null_hypothesis(
             theta_o=theta_o, x_o=x_o, return_probs=True, verbosity=0
         )
         return (stat_data < stats_null).mean()
 
-    def reject(
+    def reject_test(
         self,
         theta_o: Tensor,
         x_o: Tensor,
@@ -316,7 +327,7 @@ class LC2ST:
         """
         return self.p_value(theta_o=theta_o, x_o=x_o) < alpha
 
-    def train_null(
+    def train_under_null_hypothesis(
         self,
         verbosity: int = 1,
     ) -> None:
@@ -368,7 +379,7 @@ class LC2ST:
 
         self.trained_clfs_null = trained_clfs_null
 
-    def statistics_null(
+    def get_statistics_under_null_hypothesis(
         self,
         theta_o: Tensor,
         x_o: Tensor,
@@ -392,7 +403,8 @@ class LC2ST:
 
         if self.trained_clfs_null is None:
             raise ValueError(
-                "You need to train the classifiers under (H0). Run `train_null`."
+                "You need to train the classifiers under (H0). \
+                    Run `train_under_null_hypothesis`."
             )
         else:
             assert (
@@ -459,7 +471,7 @@ class LC2ST_NF(LC2ST):
             - no `theta_o` is passed to the evaluation functions (e.g. `_scores`),
                 as the base distribution is known, samples are drawn at initialization.
             - no permutation method is used, as the null distribution is known,
-                samples are drawn during `train_null`.
+                samples are drawn during `train_under_null_hypothesis`.
             - the classifiers can be pre-trained under the null and `trained_clfs_null`
                 passed as an argument at initialization. They do not depend on the
                 observed data (i.e. `posterior_samples` and `xs`).
@@ -521,7 +533,7 @@ class LC2ST_NF(LC2ST):
             return_probs=return_probs,
         )
 
-    def scores_data(
+    def get_scores_on_observed_data(
         self,
         x_o: Tensor,
         return_probs: bool = False,
@@ -539,11 +551,11 @@ class LC2ST_NF(LC2ST):
             scores: L-C2ST scores at `x_o`.
             (probs, scores): Predicted probabilities and L-C2ST scores at `x_o`.
         """
-        return super().scores_data(
+        return super().get_scores_on_observed_data(
             theta_o=self.theta_o, x_o=x_o, return_probs=return_probs
         )
 
-    def statistic_data(
+    def get_statistic_on_observed_data(
         self,
         x_o: Tensor,
         return_probs: bool = False,
@@ -559,7 +571,7 @@ class LC2ST_NF(LC2ST):
         Returns:
             L-C2ST statistic at `x_o`.
         """
-        return super().statistic_data(
+        return super().get_statistic_on_observed_data(
             theta_o=self.theta_o, x_o=x_o, return_probs=return_probs
         )
 
@@ -570,6 +582,8 @@ class LC2ST_NF(LC2ST):
     ) -> float:
         """Computes the p-value for L-C2ST.
 
+
+
         Args:
             x_o: The observation, of shape (, dim_x).
             kwargs: Additional arguments used in the parent class.
@@ -579,7 +593,7 @@ class LC2ST_NF(LC2ST):
         """
         return super().p_value(theta_o=self.theta_o, x_o=x_o)
 
-    def reject(
+    def reject_test(
         self,
         x_o: Tensor,
         alpha: float = 0.05,
@@ -595,9 +609,9 @@ class LC2ST_NF(LC2ST):
         Returns:
             L-C2ST result: True if rejected, False otherwise.
         """
-        return super().reject(theta_o=self.theta_o, x_o=x_o, alpha=alpha)
+        return super().reject_test(theta_o=self.theta_o, x_o=x_o, alpha=alpha)
 
-    def train_null(
+    def train_under_null_hypothesis(
         self,
         verbosity: int = 1,
     ) -> None:
@@ -612,9 +626,9 @@ class LC2ST_NF(LC2ST):
                 "Classifiers have already been trained under the null \
                     and can be used to evaluate any new estimator."
             )
-        return super().train_null(verbosity=verbosity)
+        return super().train_under_null_hypothesis(verbosity=verbosity)
 
-    def statistics_null(
+    def get_statistics_under_null_hypothesis(
         self,
         x_o: Tensor,
         return_probs: bool = False,
@@ -631,7 +645,7 @@ class LC2ST_NF(LC2ST):
             verbosity: Verbosity level, defaults to 1.
             kwargs: Additional arguments used in the parent class.
         """
-        return super().statistics_null(
+        return super().get_statistics_under_null_hypothesis(
             theta_o=self.theta_o,
             x_o=x_o,
             return_probs=return_probs,
