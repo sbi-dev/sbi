@@ -144,10 +144,9 @@ class PyMCSampler:
             potential_fn, track_gradients=track_gradients, device=device
         )
         with self._model:
-            params = pymc.Normal(
-                self.param_name, mu=initvals.mean(axis=0)
-            )  # dummy prior
-            pymc.Potential("likelihood", potential(params))  # type: ignore
+            pymc.DensityDist(
+                self.param_name, logp=potential, size=(initvals.shape[-1],)
+            )
 
     def run(self) -> np.ndarray:
         """Run MCMC with PyMC
