@@ -19,7 +19,7 @@ from scipy.stats import binom, gaussian_kde
 from torch import Tensor
 
 from sbi.analysis import eval_conditional_density
-from sbi.analysis.test_utils import PP_vals
+from sbi.analysis.test_utils import pp_vals
 
 try:
     collectionsAbc = collections.abc  # type: ignore
@@ -1450,13 +1450,13 @@ def pp_plot(
     alphas = np.linspace(0, 1, n_alphas)
 
     # pp_vals for the true null hypothesis
-    pp_vals_true = PP_vals(true_scores_null, alphas)
+    pp_vals_true = pp_vals(true_scores_null, alphas)
     ax_.plot(alphas, pp_vals_true, "--", color="black", label="True Null (H0)")
 
     # pp_vals for the estimated null hypothesis over the multiple trials
     pp_vals_null = []
     for t in range(len(scores_null)):
-        pp_vals_null.append(PP_vals(scores_null[t], alphas))
+        pp_vals_null.append(pp_vals(scores_null[t], alphas))
     pp_vals_null = np.array(pp_vals_null)
 
     # confidence region
@@ -1472,17 +1472,17 @@ def pp_plot(
 
     # pp_vals for the observed data
     for i, p_ in enumerate(scores):
-        pp_vals = PP_vals(p_, alphas)
+        pp_vals_o = pp_vals(p_, alphas)
         if labels is not None:
             kwargs["label"] = labels[i]
         if colors is not None:
             kwargs["color"] = colors[i]
-        ax_.plot(alphas, pp_vals, **kwargs)
+        ax_.plot(alphas, pp_vals_o, **kwargs)
     return ax_
 
 
-def marginal_plot_with_proba_intensity(
-    probas_per_marginal: dict,
+def marginal_plot_with_probs_intensity(
+    probs_per_marginal: dict,
     marginal_dim: int,
     n_bins: int = 20,
     vmin: float = 0.0,
@@ -1496,8 +1496,8 @@ def marginal_plot_with_proba_intensity(
     with probabilities as color intensity.
 
     Args:
-        probas_per_marginal: dataframe with predicted class probabilities
-            as obtained from `sbi.analysis.test_utils.get_probas_per_marginal`.
+        probs_per_marginal: dataframe with predicted class probabilities
+            as obtained from `sbi.analysis.test_utils.get_probs_per_marginal`.
         marginal_dim: dimension of the marginal histogram to plot.
         n_bins: number of bins for the histogram, defaults to 20.
         vmin: minimum value for the color intensity, defaults to 0.
@@ -1523,17 +1523,17 @@ def marginal_plot_with_proba_intensity(
     cmap = cm.get_cmap(cmap_name)
 
     # convert to pandas dataframe
-    df_probas = pd.DataFrame(probas_per_marginal)
+    df_probs = pd.DataFrame(probs_per_marginal)
 
     # case of 1d marginal
     if marginal_dim == 1:
         # extract bins and patches
-        _, bins, patches = ax_.hist(df_probas.s, n_bins, density=True, color="green")
-        # get mean proba for each bin
-        df_probas["bins"] = np.searchsorted(bins, df_probas.s) - 1
-        weights = df_probas.groupby(["bins"]).mean().probas
+        _, bins, patches = ax_.hist(df_probs.s, n_bins, density=True, color="green")
+        # get mean prob for each bin
+        df_probs["bins"] = np.searchsorted(bins, df_probs.s) - 1
+        weights = df_probs.groupby(["bins"]).mean().probs
         # remove empty bins
-        id = list(set(range(n_bins)) - set(df_probas.bins))
+        id = list(set(range(n_bins)) - set(df_probs.bins))
         patches = np.delete(patches, id)
         bins = np.delete(bins, id)
 
@@ -1546,11 +1546,11 @@ def marginal_plot_with_proba_intensity(
             plt.colorbar(cm.ScalarMappable(norm=norm, cmap=cmap), ax=ax_, label=label)
 
     if marginal_dim == 2:
-        _, x, y = np.histogram2d(df_probas.s_1, df_probas.s_2, bins=n_bins)
-        # get mean predicted proba for each bin
-        df_probas["bins_x"] = np.searchsorted(x, df_probas.s_1) - 1
-        df_probas["bins_y"] = np.searchsorted(y, df_probas.s_2) - 1
-        prob_mean = df_probas.groupby(["bins_x", "bins_y"]).mean().probas
+        _, x, y = np.histogram2d(df_probs.s_1, df_probs.s_2, bins=n_bins)
+        # get mean predicted prob for each bin
+        df_probs["bins_x"] = np.searchsorted(x, df_probs.s_1) - 1
+        df_probs["bins_y"] = np.searchsorted(y, df_probs.s_2) - 1
+        prob_mean = df_probs.groupby(["bins_x", "bins_y"]).mean().probs
 
         # create weights matrix
         weights = np.zeros((n_bins, n_bins))
@@ -1588,17 +1588,17 @@ def marginal_plot_with_proba_intensity(
 
 
 def pp_plot_lc2st(
-    probas: Union[List[np.ndarray], Dict[Any, np.ndarray]],
-    probas_null: Union[List[np.ndarray], Dict[Any, np.ndarray]],
+    probs: Union[List[np.ndarray], Dict[Any, np.ndarray]],
+    probs_null: Union[List[np.ndarray], Dict[Any, np.ndarray]],
     conf_alpha: float,
     **kwargs: Any,
 ) -> Axes:
     """Probability - Probability (P-P) plot for LC2ST.
 
     Args:
-        probas: predicted probability on observed data and evaluated on the test set,
+        probs: predicted probability on observed data and evaluated on the test set,
             of shape (n_eval,). One array per estimator.
-        probas_null: predicted probability under the null hypothesis and evaluated on
+        probs_null: predicted probability under the null hypothesis and evaluated on
             the test set, of shape (n_eval,). One array per null trial.
         conf_alpha: significanecee level of the hypothesis test.
         kwargs: additional arguments for `pp_plot`.
@@ -1607,11 +1607,11 @@ def pp_plot_lc2st(
         ax: axes with the P-P plot.
     """
     # probability at chance level (under the null) is 0.5
-    true_probas_null = np.array([0.5] * len(probas))
+    true_probs_null = np.array([0.5] * len(probs))
     return pp_plot(
-        scores=probas,
-        scores_null=probas_null,
-        true_scores_null=true_probas_null,
+        scores=probs,
+        scores_null=probs_null,
+        true_scores_null=true_probs_null,
         conf_alpha=conf_alpha,
         **kwargs,
     )

@@ -16,15 +16,15 @@ from sbi.simulators.gaussian_mixture import (
 
 
 @pytest.mark.parametrize("method", (LC2ST, LC2ST_NF))
-@pytest.mark.parametrize("classifier", ('mlp', 'rf', 'custom'))
+@pytest.mark.parametrize("classifier", ('mlp', 'random_forest', 'custom'))
 @pytest.mark.parametrize("cv_folds", (1, 2))
 def test_running_lc2st(method, classifier, cv_folds):
     """Tests running inference and then LC2ST-(NF) and then getting test quantities."""
 
-    n_train = 100
-    n_cal = 100
-    n_eval = 100
-    n_trials_null = 2
+    num_train = 100
+    num_cal = 100
+    num_eval = 100
+    num_trials_null = 2
 
     # task
     dim = 2
@@ -32,7 +32,7 @@ def test_running_lc2st(method, classifier, cv_folds):
     simulator = gaussian_mixture
 
     # training data for the density estimator
-    theta_train = prior.sample((n_train,))
+    theta_train = prior.sample((num_train,))
     x_train = simulator(theta_train)
 
     # Train the neural posterior estimators
@@ -41,7 +41,7 @@ def test_running_lc2st(method, classifier, cv_folds):
     npe = inference.train(training_batch_size=100, max_num_epochs=1)
 
     # calibration data for the test
-    thetas = prior.sample((n_cal,))
+    thetas = prior.sample((num_cal,))
     xs = simulator(thetas)
     posterior_samples = (
         npe.sample((1,), condition=xs).reshape(-1, thetas.shape[-1]).detach()
@@ -49,10 +49,10 @@ def test_running_lc2st(method, classifier, cv_folds):
     assert posterior_samples.shape == thetas.shape
 
     if method == LC2ST:
-        P_eval = npe.sample((n_eval,), condition=xs[0]).detach()
-        assert P_eval.shape == thetas.shape
+        theta_o = npe.sample((num_eval,), condition=xs[0]).detach()
+        assert theta_o.shape == thetas.shape
         kwargs_test = {}
-        kwargs_eval = {"P_eval": P_eval}
+        kwargs_eval = {"theta_o": theta_o}
     else:
         flow_inverse_transform = lambda theta, x: npe.net._transform(theta, context=x)[
             0
@@ -63,7 +63,7 @@ def test_running_lc2st(method, classifier, cv_folds):
         kwargs_test = {
             "flow_inverse_transform": flow_inverse_transform,
             "flow_base_dist": flow_base_dist,
-            "n_eval": n_eval,
+            "num_eval": num_eval,
         }
         kwargs_eval = {}
     if classifier == "custom":
@@ -75,33 +75,33 @@ def test_running_lc2st(method, classifier, cv_folds):
         thetas,
         xs,
         posterior_samples,
-        n_folds=cv_folds,
-        n_trials_null=n_trials_null,
+        num_folds=cv_folds,
+        num_trials_null=num_trials_null,
         **kwargs_test,
     )
     _ = lc2st.train_null()
     _ = lc2st.train_data()
 
-    _ = lc2st.scores_data(x_eval=xs[0], return_probas=True, **kwargs_eval)
-    _ = lc2st.scores_data(x_eval=xs[0], return_probas=False, **kwargs_eval)
-    _ = lc2st.statistic_data(x_eval=xs[0], **kwargs_eval)
+    _ = lc2st.scores_data(x_o=xs[0], return_probs=True, **kwargs_eval)
+    _ = lc2st.scores_data(x_o=xs[0], return_probs=False, **kwargs_eval)
+    _ = lc2st.statistic_data(x_o=xs[0], **kwargs_eval)
 
-    _ = lc2st.statistics_null(x_eval=xs[0], return_probas=True, **kwargs_eval)
-    _ = lc2st.statistics_null(x_eval=xs[0], return_probas=False, **kwargs_eval)
-    _ = lc2st.p_value(x_eval=xs[0], **kwargs_eval)
-    _ = lc2st.reject(x_eval=xs[0], **kwargs_eval)
+    _ = lc2st.statistics_null(x_o=xs[0], return_probs=True, **kwargs_eval)
+    _ = lc2st.statistics_null(x_o=xs[0], return_probs=False, **kwargs_eval)
+    _ = lc2st.p_value(x_o=xs[0], **kwargs_eval)
+    _ = lc2st.reject(x_o=xs[0], **kwargs_eval)
 
 
 @pytest.mark.parametrize("method", (LC2ST, LC2ST_NF))
 def test_lc2st_tnr(method):
-    n_runs = 10
+    num_runs = 10
 
-    # small training and n_epochs = reject (no convergence of the estimator)
-    n_train = 1_000
-    n_epochs = 5
+    # small training and num_epochs = reject (no convergence of the estimator)
+    num_train = 1_000
+    num_epochs = 5
 
-    n_cal = 1_000
-    n_eval = 10_000
+    num_cal = 1_000
+    num_eval = 10_000
 
     # task
     dim = 2
@@ -109,15 +109,15 @@ def test_lc2st_tnr(method):
     simulator = gaussian_mixture
 
     # training data for the density estimator
-    theta_train = prior.sample((n_train,))
+    theta_train = prior.sample((num_train,))
     x_train = simulator(theta_train)
 
     # Train the neural posterior estimators
     inference = SNPE(prior, density_estimator='maf')
     inference = inference.append_simulations(theta=theta_train, x=x_train)
-    npe = inference.train(training_batch_size=100, max_num_epochs=n_epochs)
+    npe = inference.train(training_batch_size=100, max_num_epochs=num_epochs)
 
-    thetas = prior.sample((n_cal,))
+    thetas = prior.sample((num_cal,))
     xs = simulator(thetas)
     posterior_samples = npe.sample((1,), xs)[:, 0, :].detach()
 
@@ -133,7 +133,7 @@ def test_lc2st_tnr(method):
         kwargs_test = {
             "flow_inverse_transform": flow_inverse_transform,
             "flow_base_dist": flow_base_dist,
-            "n_eval": n_eval,
+            "num_eval": num_eval,
         }
 
     lc2st = method(thetas, xs, posterior_samples, **kwargs_test)
@@ -142,30 +142,30 @@ def test_lc2st_tnr(method):
     _ = lc2st.train_data()
 
     results = []
-    for _ in range(n_runs):
+    for _ in range(num_runs):
         x = simulator(prior.sample((1,)))[0]
         if method == LC2ST:
-            P_eval = npe.sample((n_eval,), condition=x).detach()
-            kwargs_eval = {"P_eval": P_eval}
+            theta_o = npe.sample((num_eval,), condition=x).detach()
+            kwargs_eval = {"theta_o": theta_o}
         else:
             kwargs_eval = {}
-        results.append(lc2st.reject(x_eval=x, **kwargs_eval))
+        results.append(lc2st.reject(x_o=x, **kwargs_eval))
 
     assert (
-        torch.tensor(results).sum() == n_runs
+        torch.tensor(results).sum() == num_runs
     ), "LC2ST p-values too big, test should be rejected."
 
 
 @pytest.mark.slow
 @pytest.mark.parametrize("method", (LC2ST, LC2ST_NF))
 def test_lc2st_tpr(method):
-    n_runs = 10
-    # big training and n_epochs = accept (convergence of the estimator)
-    n_train = 10_000
-    n_epochs = 200
+    num_runs = 10
+    # big training and num_epochs = accept (convergence of the estimator)
+    num_train = 10_000
+    num_epochs = 200
 
-    n_cal = 1_000
-    n_eval = 10_000
+    num_cal = 1_000
+    num_eval = 10_000
 
     # task
     dim = 2
@@ -173,15 +173,15 @@ def test_lc2st_tpr(method):
     simulator = gaussian_mixture
 
     # training data for the density estimator
-    theta_train = prior.sample((n_train,))
+    theta_train = prior.sample((num_train,))
     x_train = simulator(theta_train)
 
     # Train the neural posterior estimators
     inference = SNPE(prior, density_estimator='maf')
     inference = inference.append_simulations(theta=theta_train, x=x_train)
-    npe = inference.train(training_batch_size=100, max_num_epochs=n_epochs)
+    npe = inference.train(training_batch_size=100, max_num_epochs=num_epochs)
 
-    thetas = prior.sample((n_cal,))
+    thetas = prior.sample((num_cal,))
     xs = simulator(thetas)
     posterior_samples = npe.sample((1,), xs)[:, 0, :].detach()
 
@@ -197,7 +197,7 @@ def test_lc2st_tpr(method):
         kwargs_test = {
             "flow_inverse_transform": flow_inverse_transform,
             "flow_base_dist": flow_base_dist,
-            "n_eval": n_eval,
+            "num_eval": num_eval,
         }
 
     lc2st = method(thetas, xs, posterior_samples, **kwargs_test)
@@ -206,14 +206,14 @@ def test_lc2st_tpr(method):
     _ = lc2st.train_data()
 
     results = []
-    for _ in range(n_runs):
+    for _ in range(num_runs):
         x = simulator(prior.sample((1,)))[0]
         if method == LC2ST:
-            P_eval = npe.sample((n_eval,), condition=x).detach()
-            kwargs_eval = {"P_eval": P_eval}
+            theta_o = npe.sample((num_eval,), condition=x).detach()
+            kwargs_eval = {"theta_o": theta_o}
         else:
             kwargs_eval = {}
-        results.append(lc2st.reject(x_eval=x, **kwargs_eval))
+        results.append(lc2st.reject(x_o=x, **kwargs_eval))
 
     assert (
         torch.tensor(results).sum() == 0
