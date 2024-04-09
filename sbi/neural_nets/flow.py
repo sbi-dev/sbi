@@ -117,7 +117,9 @@ def build_made(
     )
 
     neural_net = flows.Flow(transform, distribution, embedding_net)
-    flow = NFlowsFlow(neural_net, condition_shape=batch_y[0].shape)
+    flow = NFlowsFlow(
+        neural_net, input_shape=batch_x[0].shape, condition_shape=batch_y[0].shape
+    )
 
     return flow
 
@@ -197,7 +199,9 @@ def build_maf(
 
     distribution = get_base_dist(x_numel, **kwargs)
     neural_net = flows.Flow(transform, distribution, embedding_net)
-    flow = NFlowsFlow(neural_net, condition_shape=batch_y[0].shape)
+    flow = NFlowsFlow(
+        neural_net, input_shape=batch_x[0].shape, condition_shape=batch_y[0].shape
+    )
 
     return flow
 
@@ -301,7 +305,9 @@ def build_maf_rqs(
 
     distribution = get_base_dist(x_numel, **kwargs)
     neural_net = flows.Flow(transform, distribution, embedding_net)
-    flow = NFlowsFlow(neural_net, condition_shape=batch_y[0].shape)
+    flow = NFlowsFlow(
+        neural_net, input_shape=batch_x[0].shape, condition_shape=batch_y[0].shape
+    )
 
     return flow
 
@@ -419,7 +425,9 @@ def build_nsf(
     # Combine transforms.
     transform = transforms.CompositeTransform(transform_list)
     neural_net = flows.Flow(transform, distribution, embedding_net)
-    flow = NFlowsFlow(neural_net, condition_shape=batch_y[0].shape)
+    flow = NFlowsFlow(
+        neural_net, input_shape=batch_x[0].shape, condition_shape=batch_y[0].shape
+    )
 
     return flow
 
@@ -1104,7 +1112,12 @@ def build_zuko_flow(
         # Combine transforms.
         neural_net = zuko.flows.Flow(transforms, flow_built.base)
 
-    flow = ZukoFlow(neural_net, embedding_net, condition_shape=batch_y[0].shape)
+    flow = ZukoFlow(
+        neural_net,
+        embedding_net,
+        input_shape=batch_x[0].shape,
+        condition_shape=batch_y[0].shape,
+    )
 
     return flow
 

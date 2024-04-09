@@ -399,7 +399,7 @@ class SNPE_A_MDN(DensityEstimator):
         """
         # Call nn.Module's constructor.
 
-        super().__init__(flow, flow._condition_shape)
+        super().__init__(flow, flow.input_shape, flow.condition_shape)
 
         self._neural_net = flow
         self._prior = prior
@@ -480,7 +480,7 @@ class SNPE_A_MDN(DensityEstimator):
             # \tilde{p} has already been observed. To analytically calculate the
             # log-prob of the Gaussian, we first need to compute the mixture components.
             num_samples = torch.Size(sample_shape).numel()
-            condition_ndim = len(self._condition_shape)
+            condition_ndim = len(self.condition_shape)
             batch_size = condition.shape[:-condition_ndim]
             batch_size = torch.Size(batch_size).numel()
             return self._sample_approx_posterior_mog(num_samples, condition, batch_size)

@@ -52,8 +52,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
                 proposal at every iteration.
             device: Device on which to sample, e.g., "cpu", "cuda" or "cuda:0". If
                 None, `potential_fn.device` is used.
-            x_shape: Shape of a single simulator output. If passed, it is used to check
-                the shape of the observed data and give a descriptive error.
+            x_shape: Deprecated, should not be passed.
         """
         super().__init__(
             potential_fn,

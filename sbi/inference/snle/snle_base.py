@@ -176,11 +176,10 @@ class LikelihoodEstimator(NeuralInference, ABC):
                 theta[self.train_indices].to("cpu"),
                 x[self.train_indices].to("cpu"),
             )
-            self._x_shape = x_shape_from_simulation(x.to("cpu"))
-            del theta, x
             assert (
-                len(self._x_shape) < 3
+                len(x_shape_from_simulation(x.to("cpu"))) < 3
             ), "SNLE cannot handle multi-dimensional simulator output."
+            del theta, x
 
         self._neural_net.to(self._device)
         if not resume_training:
@@ -335,7 +334,6 @@ class LikelihoodEstimator(NeuralInference, ABC):
                 proposal=prior,
                 method=mcmc_method,
                 device=device,
-                x_shape=self._x_shape,
                 **mcmc_parameters or {},
             )
         elif sample_with == "rejection":
@@ -343,7 +341,6 @@ class LikelihoodEstimator(NeuralInference, ABC):
                 potential_fn=potential_fn,
                 proposal=prior,
                 device=device,
-                x_shape=self._x_shape,
                 **rejection_sampling_parameters or {},
             )
         elif sample_with == "vi":
@@ -353,7 +350,6 @@ class LikelihoodEstimator(NeuralInference, ABC):
                 prior=prior,  # type: ignore
                 vi_method=vi_method,
                 device=device,
-                x_shape=self._x_shape,
                 **vi_parameters or {},
             )
         else:
@@ -370,8 +366,10 @@ class LikelihoodEstimator(NeuralInference, ABC):
         Returns:
             Negative log prob.
         """
-        theta = reshape_to_batch_event(theta, event_shape=theta.shape[1:])
+        theta = reshape_to_batch_event(
+            theta, event_shape=self._neural_net.condition_shape
+        )
         x = reshape_to_sample_batch_event(
-            x, event_shape=self._x_shape[1:], leading_is_sample=False
+            x, event_shape=self._neural_net.input_shape, leading_is_sample=False
         )
         return self._neural_net.loss(x, condition=theta)

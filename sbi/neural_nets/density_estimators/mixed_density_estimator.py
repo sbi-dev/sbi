@@ -26,6 +26,7 @@ class MixedDensityEstimator(DensityEstimator):
         self,
         discrete_net: CategoricalMassEstimator,
         continuous_net: NFlowsFlow,
+        input_shape: torch.Size,
         condition_shape: torch.Size,
         log_transform_input: bool = False,
     ):
@@ -34,12 +35,16 @@ class MixedDensityEstimator(DensityEstimator):
         Args:
             discrete_net: neural net to model discrete part of the data.
             continuous_net: neural net to model the continuous data.
+            input_shape: Event shape of the input at which the density is being
+                evaluated (and which is also the event_shape of samples).
+            condition_shape: Shape of the condition. If not provided, it will assume a
+                1D input.
             log_transform_input: whether to transform the continous part of the data
                 into logarithmic domain before training. This is helpful for bounded
                 data, e.g.,for reaction times.
         """
         super(MixedDensityEstimator, self).__init__(
-            net=continuous_net, condition_shape=condition_shape
+            net=continuous_net, input_shape=input_shape, condition_shape=condition_shape
         )
 
         self.discrete_net = discrete_net

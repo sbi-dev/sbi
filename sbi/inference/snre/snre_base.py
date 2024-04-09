@@ -384,7 +384,6 @@ class RatioEstimator(NeuralInference, ABC):
                 proposal=prior,
                 method=mcmc_method,
                 device=device,
-                x_shape=self._x_shape,
                 **mcmc_parameters or {},
             )
         elif sample_with == "rejection":
@@ -392,7 +391,6 @@ class RatioEstimator(NeuralInference, ABC):
                 potential_fn=potential_fn,
                 proposal=prior,
                 device=device,
-                x_shape=self._x_shape,
                 **rejection_sampling_parameters or {},
             )
         elif sample_with == "vi":
@@ -402,7 +400,6 @@ class RatioEstimator(NeuralInference, ABC):
                 prior=prior,  # type: ignore
                 vi_method=vi_method,
                 device=device,
-                x_shape=self._x_shape,
                 **vi_parameters or {},
             )
         else:
