@@ -7,7 +7,6 @@ nav:
   - Tutorials and Examples:
       - Introduction:
         - Getting started: tutorial/00_getting_started_flexible.md
-        - Flexible interface: tutorial/02_flexible_interface.md
         - Amortized inference: tutorial/01_gaussian_amortized.md
         - Implemented algorithms: tutorial/16_implemented_methods.md
       - Advanced:
