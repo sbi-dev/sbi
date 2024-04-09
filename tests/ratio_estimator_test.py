@@ -58,6 +58,7 @@ def test_api_ratio_estimator(ratio_estimator, theta_shape, x_shape):
     # forward computes the unnormalized_log_ratio
     # calling all other methods in the process
     unnormalized_log_ratio = estimator(batch_theta, batch_x)
-    assert (
-        unnormalized_log_ratio.shape == (nsamples,)
-    ), f"unnormalized_log_ratio shape is not correct. It is of shape {unnormalized_log_ratio.shape}, but should be {(nsamples,)}"
+    assert unnormalized_log_ratio.shape == (
+        nsamples,
+    ), f"""unnormalized_log_ratio shape is not correct. It is of shape
+    {unnormalized_log_ratio.shape}, but should be {(nsamples,)}"""
