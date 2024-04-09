@@ -90,5 +90,6 @@ def build_mnle(
         discrete_net=disc_nle,
         continuous_net=cont_nle,
         log_transform_input=log_transform_x,
-        condition_shape=torch.Size([]),
+        input_shape=batch_x[0].shape,
+        condition_shape=batch_y[0].shape,
     )

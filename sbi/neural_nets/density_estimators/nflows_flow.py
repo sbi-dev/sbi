@@ -15,8 +15,19 @@ class NFlowsFlow(DensityEstimator):
     wrap them and add the .loss() method.
     """
 
-    def __init__(self, net: Flow, condition_shape: torch.Size) -> None:
-        super().__init__(net, condition_shape)
+    def __init__(
+        self, net: Flow, input_shape: torch.Size, condition_shape: torch.Size
+    ) -> None:
+        """Initialize density estimator which wraps flows from the `nflows` library.
+
+        Args:
+            net: The raw `nflows` flow.
+            input_shape: Event shape of the input at which the density is being
+                evaluated (and which is also the event_shape of samples).
+            condition_shape: Shape of the condition. If not provided, it will assume a
+                1D input.
+        """
+        super().__init__(net, input_shape=input_shape, condition_shape=condition_shape)
         # TODO: Remove as soon as DensityEstimator becomes abstract
         self.net: Flow
 
@@ -57,7 +68,7 @@ class NFlowsFlow(DensityEstimator):
                                                   -> (batch_size2,batch_size1)
         """
         self._check_condition_shape(condition)
-        condition_dims = len(self._condition_shape)
+        condition_dims = len(self.condition_shape)
 
         # PyTorch's automatic broadcasting
         batch_shape_in = input.shape[:-1]
@@ -65,10 +76,10 @@ class NFlowsFlow(DensityEstimator):
         batch_shape = torch.broadcast_shapes(batch_shape_in, batch_shape_cond)
         # Expand the input and condition to the same batch shape
         input = input.expand(batch_shape + (input.shape[-1],))
-        condition = condition.expand(batch_shape + self._condition_shape)
+        condition = condition.expand(batch_shape + self.condition_shape)
         # Flatten required by nflows, but now both have the same batch shape
         input = input.reshape(-1, input.shape[-1])
-        condition = condition.reshape(-1, *self._condition_shape)
+        condition = condition.reshape(-1, *self.condition_shape)
 
         noise, _ = self.net._transorm(input, context=condition)
         noise = noise.reshape(batch_shape)

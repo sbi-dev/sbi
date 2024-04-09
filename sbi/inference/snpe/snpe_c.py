@@ -355,7 +355,9 @@ class SNPE_C(PosteriorEstimator):
         atomic_theta = reshape_to_sample_batch_event(
             atomic_theta, atomic_theta.shape[1:]
         )
-        repeated_x = reshape_to_batch_event(repeated_x, self._x_shape[1:])
+        repeated_x = reshape_to_batch_event(
+            repeated_x, self._neural_net.condition_shape
+        )
         log_prob_posterior = self._neural_net.log_prob(atomic_theta, repeated_x)
         utils.assert_all_finite(log_prob_posterior, "posterior eval")
         log_prob_posterior = log_prob_posterior.reshape(batch_size, num_atoms)
@@ -371,8 +373,8 @@ class SNPE_C(PosteriorEstimator):
 
         # XXX This evaluates the posterior on _all_ prior samples
         if self._use_combined_loss:
-            theta = reshape_to_sample_batch_event(theta, theta.shape[1:])
-            x = reshape_to_batch_event(x, self._x_shape[1:])
+            theta = reshape_to_sample_batch_event(theta, self._neural_net.input_shape)
+            x = reshape_to_batch_event(x, self._neural_net.condition_shape)
             log_prob_posterior_non_atomic = self._neural_net.log_prob(theta, x)
             # squeeze to remove sample dimension, which is always one during the loss
             # evaluation of `SNPE_C` (because we have one theta vector per x vector).

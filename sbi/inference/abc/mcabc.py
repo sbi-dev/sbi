@@ -142,7 +142,7 @@ class MCABC(ABCBASE):
         x = simulator(theta)
 
         # Infer shape of x to test and set x_o.
-        self.x_shape = x[0].unsqueeze(0).shape
+        self.x_shape = x[0].shape
         self.x_o = process_x(x_o, self.x_shape)
 
         distances = self.distance(self.x_o, x)

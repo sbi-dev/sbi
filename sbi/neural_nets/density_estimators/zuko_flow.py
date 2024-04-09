@@ -16,17 +16,25 @@ class ZukoFlow(DensityEstimator):
     """
 
     def __init__(
-        self, net: Flow, embedding_net: nn.Module, condition_shape: torch.Size
+        self,
+        net: Flow,
+        embedding_net: nn.Module,
+        input_shape: torch.Size,
+        condition_shape: torch.Size,
     ):
         r"""Initialize the density estimator.
 
         Args:
             flow: Flow object.
-            condition_shape: Shape of the condition.
+            input_shape: Event shape of the input at which the density is being
+                evaluated (and which is also the event_shape of samples).
+            condition_shape: Event shape of the condition.
         """
 
         # assert len(condition_shape) == 1, "Zuko Flows require 1D conditions."
-        super().__init__(net=net, condition_shape=condition_shape)
+        super().__init__(
+            net=net, input_shape=input_shape, condition_shape=condition_shape
+        )
         self._embedding_net = embedding_net
 
     @property
@@ -67,7 +75,7 @@ class ZukoFlow(DensityEstimator):
         """
 
         self._check_condition_shape(condition)
-        condition_dims = len(self._condition_shape)
+        condition_dims = len(self.condition_shape)
 
         # PyTorch's automatic broadcasting
         batch_shape_in = input.shape[:-1]

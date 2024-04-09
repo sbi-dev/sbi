@@ -52,8 +52,7 @@ class DirectPosterior(NeuralPosterior):
                 the proposal at every iteration.
             device: Training device, e.g., "cpu", "cuda" or "cuda:0". If None,
                 `potential_fn.device` is used.
-            x_shape: Shape of a single simulator output. If passed, it is used to check
-                the shape of the observed data and give a descriptive error.
+            x_shape: Deprecated, should not be passed.
             enable_transform: Whether to transform parameters to unconstrained space
                 during MAP optimization. When False, an identity transform will be
                 returned for `theta_transform`.
@@ -106,12 +105,9 @@ class DirectPosterior(NeuralPosterior):
 
         num_samples = torch.Size(sample_shape).numel()
         x = self._x_else_default_x(x)
-
-        # [1:] because we remove batch dimension for `reshape_to_batch_event`.
-        # Note: This line will break if `x_shape` is `None` and if `x` is passed without
-        # batch dimension.
-        x_shape = self._x_shape[1:] if self._x_shape is not None else x.shape[1:]
-        x = reshape_to_batch_event(x, event_shape=x_shape)
+        x = reshape_to_batch_event(
+            x, event_shape=self.posterior_estimator.condition_shape
+        )
 
         max_sampling_batch_size = (
             self.max_sampling_batch_size
@@ -172,14 +168,13 @@ class DirectPosterior(NeuralPosterior):
         """
         x = self._x_else_default_x(x)
 
-        # [1:] to remove batch dimension for `reshape_to_sample_batch_event`.
-        x_shape = self._x_shape[1:] if self._x_shape is not None else x.shape[1:]
-
         theta = ensure_theta_batched(torch.as_tensor(theta))
         theta_density_estimator = reshape_to_sample_batch_event(
             theta, theta.shape[1:], leading_is_sample=True
         )
-        x_density_estimator = reshape_to_batch_event(x, x_shape)
+        x_density_estimator = reshape_to_batch_event(
+            x, event_shape=self.posterior_estimator.condition_shape
+        )
         assert (
             x_density_estimator.shape[0] == 1
         ), ".log_prob() supports only `batchsize == 1`."
@@ -244,7 +239,6 @@ class DirectPosterior(NeuralPosterior):
 
         def acceptance_at(x: Tensor) -> Tensor:
             # [1:] to remove batch-dimension for `reshape_to_batch_event`.
-            x_shape = self._x_shape[1:] if self._x_shape is not None else x.shape[1:]
             return accept_reject_sample(
                 proposal=self.posterior_estimator,
                 accept_reject_fn=lambda theta: within_support(self.prior, theta),
@@ -253,7 +247,9 @@ class DirectPosterior(NeuralPosterior):
                 sample_for_correction_factor=True,
                 max_sampling_batch_size=rejection_sampling_batch_size,
                 proposal_sampling_kwargs={
-                    "condition": reshape_to_batch_event(x, x_shape)
+                    "condition": reshape_to_batch_event(
+                        x, event_shape=self.posterior_estimator.condition_shape
+                    )
                 },
             )[1]
 

@@ -19,17 +19,22 @@ class DensityEstimator(nn.Module):
 
     """
 
-    def __init__(self, net: nn.Module, condition_shape: torch.Size) -> None:
+    def __init__(
+        self, net: nn.Module, input_shape: torch.Size, condition_shape: torch.Size
+    ) -> None:
         r"""Base class for density estimators.
 
         Args:
             net: Neural network.
+            input_shape: Event shape of the input at which the density is being
+                evaluated (and which is also the event_shape of samples).
             condition_shape: Shape of the condition. If not provided, it will assume a
-                            1D input.
+                1D input.
         """
         super().__init__()
         self.net = net
-        self._condition_shape = condition_shape
+        self.input_shape = input_shape
+        self.condition_shape = condition_shape
 
     @property
     def embedding_net(self) -> Optional[nn.Module]:
@@ -136,17 +141,17 @@ class DensityEstimator(nn.Module):
             ValueError: If the shape of the condition does not match the expected
                         input dimensionality.
         """
-        if len(condition.shape) < len(self._condition_shape):
+        if len(condition.shape) < len(self.condition_shape):
             raise ValueError(
                 f"Dimensionality of condition is to small and does not match the\
-                expected input dimensionality {len(self._condition_shape)}, as provided\
+                expected input dimensionality {len(self.condition_shape)}, as provided\
                 by condition_shape."
             )
         else:
-            condition_shape = condition.shape[-len(self._condition_shape) :]
-            if tuple(condition_shape) != tuple(self._condition_shape):
+            condition_shape = condition.shape[-len(self.condition_shape) :]
+            if tuple(condition_shape) != tuple(self.condition_shape):
                 raise ValueError(
                     f"Shape of condition {tuple(condition_shape)} does not match the \
-                    expected input dimensionality {tuple(self._condition_shape)}, as \
+                    expected input dimensionality {tuple(self.condition_shape)}, as \
                     provided by condition_shape. Please reshape it accordingly."
                 )

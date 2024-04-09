@@ -566,16 +566,19 @@ def get_batch_loop_simulator(simulator: Callable) -> Callable:
 
 
 def process_x(
-    x: Array, x_shape: Optional[torch.Size] = None, allow_iid_x: bool = False
+    x: Array, x_event_shape: Optional[torch.Size] = None, allow_iid_x: bool = False
 ) -> Tensor:
     """Return observed data adapted to match sbi's shape and type requirements.
+
+    This means that `x` is returned with a `batch_dim`.
 
     If `x_shape` is `None`, the shape is not checked.
 
     Args:
         x: Observed data as provided by the user.
-        x_shape: Prescribed shape - either directly provided by the user at init or
-            inferred by sbi by running a simulation and checking the output.
+        x_event_shape: Prescribed shape - either directly provided by the user at init
+            or inferred by sbi by running a simulation and checking the output. Does not
+            contain a batch dimension.
         allow_iid_x: Whether multiple trials in x are allowed.
 
     Returns:
@@ -584,24 +587,29 @@ def process_x(
 
     x = atleast_2d(torch.as_tensor(x, dtype=float32))
 
+    if x_event_shape is not None and len(x_event_shape) > len(x.shape):
+        raise ValueError(
+            f"You passed an `x` of shape {x.shape} but the `x_event_shape` (inferred "
+            f"from simulations) is {x_event_shape}. We are raising this error because "
+            f"len(x_event_shape) > len(x.shape)"
+        )
+
     # If x_shape is provided, we can fix a missing batch dim for >1D data.
-    if x_shape is not None and len(x_shape) > len(x.shape):
+    if x_event_shape is not None and len(x_event_shape) == len(x.shape):
         x = x.unsqueeze(0)
 
     input_x_shape = x.shape
     if not allow_iid_x:
         check_for_possibly_batched_x_shape(input_x_shape)
-        start_idx = 0
     else:
         warn_on_iid_x(num_trials=input_x_shape[0])
-        start_idx = 1
 
-    if x_shape is not None:
+    if x_event_shape is not None:
         # Number of trials can change for every new x, but single trial x shape must
         # match.
-        assert input_x_shape[start_idx:] == x_shape[start_idx:], (
-            f"Observed data shape ({input_x_shape[start_idx:]}) must match "
-            f"the shape of simulated data x ({x_shape[start_idx:]})."
+        assert input_x_shape[1:] == x_event_shape, (
+            f"Observed data shape ({input_x_shape[1:]}) must match "
+            f"the shape of simulated data x ({x_event_shape})."
         )
     return x
 

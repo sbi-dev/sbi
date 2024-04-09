@@ -113,8 +113,12 @@ class CategoricalMassEstimator(DensityEstimator):
     The event_shape of this class is `()`.
     """
 
-    def __init__(self, net: CategoricalNet) -> None:
-        super().__init__(net=net, condition_shape=torch.Size([]))
+    def __init__(
+        self, net: CategoricalNet, input_shape: torch.Size, condition_shape: torch.Size
+    ) -> None:
+        super().__init__(
+            net=net, input_shape=input_shape, condition_shape=condition_shape
+        )
         self.net = net
         self.num_categories = net.num_categories
 
