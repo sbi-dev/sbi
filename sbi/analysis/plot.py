@@ -7,7 +7,6 @@ from typing import Any, Dict, List, Optional, Tuple, Union, cast
 
 import matplotlib as mpl
 import numpy as np
-import pandas as pd
 import six
 import torch
 from matplotlib import cm
@@ -1522,18 +1521,27 @@ def marginal_plot_with_probs_intensity(
     # get colormap
     cmap = cm.get_cmap(cmap_name)
 
-    # convert to pandas dataframe
-    df_probs = pd.DataFrame(probs_per_marginal)
-
     # case of 1d marginal
     if marginal_dim == 1:
         # extract bins and patches
-        _, bins, patches = ax_.hist(df_probs.s, n_bins, density=True, color="green")
-        # get mean prob for each bin
-        df_probs["bins"] = np.searchsorted(bins, df_probs.s) - 1
-        weights = df_probs.groupby(["bins"]).mean().probs
+        _, bins, patches = ax_.hist(
+            probs_per_marginal['s'], n_bins, density=True, color="green"
+        )
+        # create bins: all samples between bin edges are assigned to the same bin
+        probs_per_marginal["bins"] = np.searchsorted(bins, probs_per_marginal['s']) - 1
+        probs_per_marginal["bins"][probs_per_marginal["bins"] < 0] = 0
+        # get mean prob for each bin (same as pandas groupy method)
+        array_probs = np.concatenate(
+            [probs_per_marginal['bins'][:, None], probs_per_marginal['probs'][:, None]],
+            axis=1,
+        )
+        array_probs = array_probs[array_probs[:, 0].argsort()]
+        weights = np.split(
+            array_probs[:, 1], np.unique(array_probs[:, 0], return_index=True)[1][1:]
+        )
+        weights = np.array([np.mean(w) for w in weights])
         # remove empty bins
-        id = list(set(range(n_bins)) - set(df_probs.bins))
+        id = list(set(range(n_bins)) - set(probs_per_marginal['bins']))
         patches = np.delete(patches, id)
         bins = np.delete(bins, id)
 
@@ -1546,21 +1554,36 @@ def marginal_plot_with_probs_intensity(
             plt.colorbar(cm.ScalarMappable(norm=norm, cmap=cmap), ax=ax_, label=label)
 
     if marginal_dim == 2:
-        _, x, y = np.histogram2d(df_probs.s_1, df_probs.s_2, bins=n_bins)
-        # get mean predicted prob for each bin
-        df_probs["bins_x"] = np.searchsorted(x, df_probs.s_1) - 1
-        df_probs["bins_y"] = np.searchsorted(y, df_probs.s_2) - 1
-        prob_mean = df_probs.groupby(["bins_x", "bins_y"]).mean().probs
+        # extract bin edges
+        _, x, y = np.histogram2d(
+            probs_per_marginal['s_1'], probs_per_marginal['s_2'], bins=n_bins
+        )
+        # create bins: all samples between bin edges are assigned to the same bin
+        probs_per_marginal["bins_x"] = np.searchsorted(x, probs_per_marginal['s_1']) - 1
+        probs_per_marginal["bins_y"] = np.searchsorted(y, probs_per_marginal['s_2']) - 1
+        probs_per_marginal["bins_x"][probs_per_marginal["bins_x"] < 0] = 0
+        probs_per_marginal["bins_y"][probs_per_marginal["bins_y"] < 0] = 0
 
-        # create weights matrix
+        # extract unique bin pairs
+        group_idx = np.concatenate(
+            [
+                probs_per_marginal['bins_x'][:, None],
+                probs_per_marginal['bins_y'][:, None],
+            ],
+            axis=1,
+        )
+        unique_bins = np.unique(group_idx, return_counts=True, axis=0)[0]
+
+        # get mean prob for each bin (same as pandas groupy method)
+        mean_probs = np.zeros((len(unique_bins),))
+        for i in range(len(unique_bins)):
+            idx = np.where((group_idx == unique_bins[i]).all(axis=1))
+            mean_probs[i] = np.mean(probs_per_marginal['probs'][idx])
+
+        # create weight matrix with nan values for non-existing bins
         weights = np.zeros((n_bins, n_bins))
-        for i in range(n_bins):
-            for j in range(n_bins):
-                try:
-                    weights[i, j] = prob_mean.loc[i].loc[j]
-                except KeyError:
-                    # if no sample in bin, set color to white
-                    weights[i, j] = np.nan
+        weights[:] = np.nan
+        weights[unique_bins[:, 0], unique_bins[:, 1]] = mean_probs
 
         # set color intensity
         norm = Normalize(vmin=vmin, vmax=vmax)
