@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 from sbi.diagnostics.tarp import TARP, l1, l2
+from scipy.stats import norm, uniform
 from torch import Tensor, allclose, exp, eye, normal, ones, sqrt, sum, zeros
 from torch.distributions import MultivariateNormal as mvn
 from torch.distributions import Normal, Uniform
@@ -15,6 +16,26 @@ def generate_toy_gaussian(nsamples=100, nsims=100, ndims=5, covfactor=1.0):
 
     locs = base_mean.sample((nsims, ndims))
     scales = exp(base_log_var.sample((nsims, ndims)))
+
+    spdf = Normal(loc=locs, scale=covfactor * scales)
+    tpdf = Normal(loc=locs, scale=scales)
+
+    samples = spdf.sample((nsamples,))
+    theta_prime = tpdf.sample()
+
+    return theta_prime, samples
+
+
+def biased_toy_gaussian(nsamples=100, nsims=100, ndims=5, covfactor=1.0):
+    """adopted from the tarp paper page 7, section 4.1 Gaussian Toy Model correct case"""
+
+    base_mean = Uniform(-5, 5)
+    base_mean_ = uniform(-5, 5)
+    base_log_var = Uniform(-5, -1)
+
+    locs_ = base_mean.sample((nsims, ndims))
+    scales = exp(base_log_var.sample((nsims, ndims)))
+    locs = locs_ - locs_.sign() * base_mean_.isf(locs_) * scales
 
     spdf = Normal(loc=locs, scale=covfactor * scales)
     tpdf = Normal(loc=locs, scale=scales)
@@ -57,6 +78,16 @@ def oversamples():
     return generate_toy_gaussian(nsamples, nsims, ndims, covfactor=2.0)
 
 
+@pytest.fixture
+def biased():
+
+    nsamples = 100  # samples per simulation
+    nsims = 100
+    ndims = 5
+
+    return biased_toy_gaussian(nsamples, nsims, ndims, covfactor=2.0)
+
+
 def test_onsamples(onsamples):
 
     theta, samples = onsamples
@@ -97,6 +128,13 @@ def test_distances(onsamples):
     obs_ = l1(theta_, samples)
 
     assert allclose(obs, obs_)
+
+
+def test_biased(biased):
+    theta, samples = biased
+
+    assert theta.shape == (100, 5) or theta.shape == (1, 100, 5)
+    assert samples.shape == (100, 100, 5)
 
 
 def test_tarp_constructs():
@@ -171,6 +209,24 @@ def test_tarp_detect_overdispersed(oversamples):
 def test_tarp_detect_underdispersed(undersamples):
 
     theta, samples = undersamples
+
+    tarp = TARP(num_alpha_bins=30, norm=True)
+    ecp, alpha = tarp.run(samples, theta)
+
+    assert not allclose((ecp - alpha).abs().max(), Tensor([0.0]), atol=1e-1)
+    assert (ecp - alpha).abs().sum() > 3.0  # integral is nonzero, fig.2 in paper
+
+    tarp_ = TARP(num_alpha_bins=30, norm=True, metric="l1")
+    ecp, alpha = tarp_.run(samples, theta)
+
+    # TARP detects that this is NOT a correct representation of the posterior
+    # hence we test for not allclose
+    assert not allclose((ecp - alpha).abs().max(), Tensor([0.0]), atol=1e-1)
+
+
+def test_tarp_detect_bias(biased):
+
+    theta, samples = biased
 
     tarp = TARP(num_alpha_bins=30, norm=True)
     ecp, alpha = tarp.run(samples, theta)
