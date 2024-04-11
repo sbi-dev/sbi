@@ -1,7 +1,10 @@
 import numpy as np
 import pytest
 from sbi.diagnostics.tarp import TARP, l1, l2
-from scipy.stats import norm, uniform
+from sbi.inference import SNPE, simulate_for_sbi
+from sbi.simulators import linear_gaussian
+from sbi.utils import BoxUniform, MultipleIndependent
+from scipy.stats import uniform
 from torch import Tensor, allclose, exp, eye, normal, ones, sqrt, sum, zeros
 from torch.distributions import MultivariateNormal as mvn
 from torch.distributions import Normal, Uniform
@@ -252,3 +255,43 @@ def test_tarp_detect_bias(biased):
 
 ######################################################################
 ## Check TARP with SBI
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("method", [SNPE])
+def test_consistent_sbc_results(method, model="mdn"):
+    """Tests running inference and checking samples with tarp."""
+
+    num_dim = 2
+    prior = BoxUniform(-ones(num_dim), ones(num_dim))
+
+    num_simulations = 1000
+    max_num_epochs = 20
+    num_sbc_runs = 100
+
+    likelihood_shift = -1.0 * ones(num_dim)
+    likelihood_cov = 0.3 * eye(num_dim)
+
+    def simulator(theta):
+        return linear_gaussian(theta, likelihood_shift, likelihood_cov)
+
+    inferer = method(prior, show_progress_bars=False, density_estimator=model)
+
+    theta, x = simulate_for_sbi(simulator, prior, num_simulations)
+
+    _ = inferer.append_simulations(theta, x).train(
+        training_batch_size=100, max_num_epochs=max_num_epochs
+    )
+
+    posterior = inferer.build_posterior()
+    num_posterior_samples = 1000
+    thetas = prior.sample((num_sbc_runs,))
+    xs = simulator(thetas)
+
+    tarp = TARP(num_alpha_bins=30, norm=True, metric="l2")
+
+    samples = posterior.sample(num_posterior_samples, x_o=xs[0, ...])
+    ecp, alpha = tarp.run(samples, thetas[0, ...])
+
+    assert allclose((ecp - alpha).abs().max(), Tensor([0.0]), atol=1e-1)
+    assert (ecp - alpha).abs().sum() < 1.0
