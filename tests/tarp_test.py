@@ -139,10 +139,14 @@ def test_tarp_correct_using_norm(onsamples):
     ecp, alpha = tarp.run(samples, theta)
 
     assert allclose((ecp - alpha).abs().max(), Tensor([0.0]), atol=1e-1)
+    assert (
+        ecp - alpha
+    ).abs().sum() < 1.0  # integral of residuals should vanish, fig.2 in paper
 
     tarp_ = TARP(num_alpha_bins=30, norm=True, metric="l1")
     ecp, alpha = tarp_.run(samples, theta)
 
+    # TARP detects that this is a correct representation of the posterior
     assert allclose((ecp - alpha).abs().max(), Tensor([0.0]), atol=1e-1)
 
 
@@ -154,10 +158,13 @@ def test_tarp_detect_overdispersed(oversamples):
     ecp, alpha = tarp.run(samples, theta)
 
     assert not allclose((ecp - alpha).abs().max(), Tensor([0.0]), atol=1e-1)
+    assert (ecp - alpha).abs().sum() > 3.0  # integral is nonzero, fig.2 in paper
 
     tarp_ = TARP(num_alpha_bins=30, norm=True, metric="l1")
     ecp, alpha = tarp_.run(samples, theta)
 
+    # TARP detects that this is NOT a correct representation of the posterior
+    # hence we test for not allclose
     assert not allclose((ecp - alpha).abs().max(), Tensor([0.0]), atol=1e-1)
 
 
@@ -169,8 +176,11 @@ def test_tarp_detect_underdispersed(undersamples):
     ecp, alpha = tarp.run(samples, theta)
 
     assert not allclose((ecp - alpha).abs().max(), Tensor([0.0]), atol=1e-1)
+    assert (ecp - alpha).abs().sum() > 3.0  # integral is nonzero, fig.2 in paper
 
     tarp_ = TARP(num_alpha_bins=30, norm=True, metric="l1")
     ecp, alpha = tarp_.run(samples, theta)
 
+    # TARP detects that this is NOT a correct representation of the posterior
+    # hence we test for not allclose
     assert not allclose((ecp - alpha).abs().max(), Tensor([0.0]), atol=1e-1)
