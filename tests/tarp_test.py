@@ -104,6 +104,17 @@ def test_undersamples(undersamples):
     assert samples.shape == (100, 100, 5)
 
 
+def test_biased(biased):
+    theta, samples = biased
+
+    assert theta.shape == (100, 5) or theta.shape == (1, 100, 5)
+    assert samples.shape == (100, 100, 5)
+
+
+######################################################################
+## test TARP library
+
+
 def test_distances(onsamples):
 
     theta, samples = onsamples
@@ -130,13 +141,6 @@ def test_distances(onsamples):
     assert allclose(obs, obs_)
 
 
-def test_biased(biased):
-    theta, samples = biased
-
-    assert theta.shape == (100, 5) or theta.shape == (1, 100, 5)
-    assert samples.shape == (100, 100, 5)
-
-
 def test_tarp_constructs():
 
     tarp_ = TARP()
@@ -152,6 +156,10 @@ def test_tarp_runs(onsamples):
 
     ecp, alpha = tarp_.run(samples, theta)
     assert ecp.shape == alpha.shape
+
+
+######################################################################
+## Reproduce Toy Examples in paper, see Section 4.1
 
 
 def test_tarp_correct(onsamples):
@@ -240,3 +248,7 @@ def test_tarp_detect_bias(biased):
     # TARP detects that this is NOT a correct representation of the posterior
     # hence we test for not allclose
     assert not allclose((ecp - alpha).abs().max(), Tensor([0.0]), atol=1e-1)
+
+
+######################################################################
+## Check TARP with SBI
