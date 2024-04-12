@@ -1,18 +1,18 @@
-import numpy as np
 import pytest
-from sbi.diagnostics.tarp import TARP, infer_posterior_on_batch, l1, l2
-from sbi.inference import SNPE, simulate_for_sbi
-from sbi.simulators import linear_gaussian
-from sbi.utils import BoxUniform, MultipleIndependent
 from scipy.stats import uniform
-from torch import Tensor, allclose, exp, eye, normal, ones, sqrt, sum, zeros
-from torch.distributions import MultivariateNormal as mvn
+from torch import Tensor, allclose, exp, eye, ones
 from torch.distributions import Normal, Uniform
 from torch.nn import L1Loss
 
+from sbi.diagnostics.tarp import TARP, infer_posterior_on_batch, l1, l2
+from sbi.inference import SNPE, simulate_for_sbi
+from sbi.simulators import linear_gaussian
+from sbi.utils import BoxUniform
+
 
 def generate_toy_gaussian(nsamples=100, nsims=100, ndims=5, covfactor=1.0):
-    """adopted from the tarp paper page 7, section 4.1 Gaussian Toy Model correct case"""
+    """adopted from the tarp paper page 7, section 4.1 Gaussian Toy Model
+    correct case"""
 
     base_mean = Uniform(-5, 5)
     base_log_var = Uniform(-5, -1)
@@ -30,7 +30,8 @@ def generate_toy_gaussian(nsamples=100, nsims=100, ndims=5, covfactor=1.0):
 
 
 def biased_toy_gaussian(nsamples=100, nsims=100, ndims=5, covfactor=1.0):
-    """adopted from the tarp paper page 7, section 4.1 Gaussian Toy Model correct case"""
+    """adopted from the tarp paper page 7, section 4.1 Gaussian Toy Model
+    correct case"""
 
     base_mean = Uniform(-5, 5)
     base_mean_ = uniform(-5, 5)
@@ -51,7 +52,6 @@ def biased_toy_gaussian(nsamples=100, nsims=100, ndims=5, covfactor=1.0):
 
 @pytest.fixture
 def onsamples():
-
     nsamples = 100  # samples per simulation
     nsims = 100
     ndims = 5
@@ -83,7 +83,6 @@ def oversamples():
 
 @pytest.fixture
 def biased():
-
     nsamples = 100  # samples per simulation
     nsims = 100
     ndims = 5
@@ -92,7 +91,6 @@ def biased():
 
 
 def test_onsamples(onsamples):
-
     theta, samples = onsamples
 
     assert theta.shape == (100, 5) or theta.shape == (1, 100, 5)
@@ -100,7 +98,6 @@ def test_onsamples(onsamples):
 
 
 def test_undersamples(undersamples):
-
     theta, samples = undersamples
 
     assert theta.shape == (100, 5) or theta.shape == (1, 100, 5)
@@ -119,7 +116,6 @@ def test_biased(biased):
 
 
 def test_distances(onsamples):
-
     theta, samples = onsamples
 
     obs = l2(theta, samples)
@@ -145,13 +141,11 @@ def test_distances(onsamples):
 
 
 def test_tarp_constructs():
-
     tarp_ = TARP()
     assert isinstance(tarp_, TARP)
 
 
 def test_tarp_runs(onsamples):
-
     theta, samples = onsamples
     tarp_ = TARP()
 
@@ -166,7 +160,6 @@ def test_tarp_runs(onsamples):
 
 
 def test_tarp_correct(onsamples):
-
     theta, samples = onsamples
 
     tarp = TARP(num_alpha_bins=30)
@@ -181,7 +174,6 @@ def test_tarp_correct(onsamples):
 
 
 def test_tarp_correct_using_norm(onsamples):
-
     theta, samples = onsamples
 
     tarp = TARP(num_alpha_bins=30, norm=True)
@@ -200,7 +192,6 @@ def test_tarp_correct_using_norm(onsamples):
 
 
 def test_tarp_detect_overdispersed(oversamples):
-
     theta, samples = oversamples
 
     tarp = TARP(num_alpha_bins=30, norm=True)
@@ -218,7 +209,6 @@ def test_tarp_detect_overdispersed(oversamples):
 
 
 def test_tarp_detect_underdispersed(undersamples):
-
     theta, samples = undersamples
 
     tarp = TARP(num_alpha_bins=30, norm=True)
@@ -236,7 +226,6 @@ def test_tarp_detect_underdispersed(undersamples):
 
 
 def test_tarp_detect_bias(biased):
-
     theta, samples = biased
     print(theta.shape, samples.shape)
     tarp = TARP(num_alpha_bins=30, norm=True)

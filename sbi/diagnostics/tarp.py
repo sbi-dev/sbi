@@ -1,14 +1,15 @@
 import warnings
-from typing import Sequence, Tuple, Union
+from typing import Tuple, Union
 
 # import numpy as np
 import torch
 from joblib import Parallel, delayed
+from torch import Tensor
+from tqdm.auto import tqdm
+
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.posteriors.vi_posterior import VIPosterior
 from sbi.simulators.simutils import tqdm_joblib
-from torch import Tensor
-from tqdm.auto import tqdm
 
 
 def l2(x: Tensor, y: Tensor, axis=-1) -> Tensor:
@@ -17,9 +18,11 @@ def l2(x: Tensor, y: Tensor, axis=-1) -> Tensor:
     Args:
         x (Tensor): The first tensor.
         y (Tensor): The second tensor.
-        axis (int, optional): The axis along which to calculate the L2 distance. Defaults to -1.
+        axis (int, optional): The axis along which to calculate the L2 distance.
+                Defaults to -1.
     Returns:
-        Tensor: A tensor containing the L2 distance between x and y along the specified axis.
+        Tensor: A tensor containing the L2 distance between x and y along the
+                specified axis.
     """
     return torch.sqrt(torch.sum((x - y) ** 2, axis=axis))
 
@@ -30,9 +33,11 @@ def l1(x: Tensor, y: Tensor, axis=-1) -> Tensor:
     Args:
         x (Tensor): The first tensor.
         y (Tensor): The second tensor.
-        axis (int, optional): The axis along which to calculate the L1 distance. Defaults to -1.
+        axis (int, optional): The axis along which to calculate the L1 distance.
+                Defaults to -1.
     Returns:
-        Tensor: A tensor containing the L1 distance between x and y along the specified axis.
+        Tensor: A tensor containing the L1 distance between x and y along the
+                specified axis.
     """
     return torch.sum(torch.abs(x - y), axis=axis)
 
@@ -82,9 +87,11 @@ def infer_posterior_on_batch(
 
 class TARP:
     """
-    Implementation taken from Lemos et al, 'Sampling-Based Accuracy Testing of Posterior Estimators for General Inference' https://arxiv.org/abs/2302.03026
+    Implementation taken from Lemos et al, 'Sampling-Based Accuracy Testing of
+    Posterior Estimators for General Inference' https://arxiv.org/abs/2302.03026
 
-    This class implements the distance to random point as a diagnostic method for samples of posterior estimators.
+    This class implements the distance to random point as a diagnostic method
+    for samples of posterior estimators.
 
     """
 
@@ -102,19 +109,28 @@ class TARP:
         Reference: `Lemos, Coogan et al 2023 <https://arxiv.org/abs/2302.03026>`_
 
         Args:
-          references: the reference points to use for the DRP regions, with shape ``(n_references, n_sims)``, or ``None``. If the latter, then the reference points are chosen randomly from the unit hypercube over the parameter space.
-          metric: the metric to use when computing the distance. Can be ``"euclidean"`` or ``"manhattan"``.
-          norm : whether to normalize parameters before coverage test (Default = True)
-          num_alpha_bins: number of bins to use for the credibility values. If ``None``, then ``n_sims // 10`` bins are used.
+          references: the reference points to use for the DRP regions, with
+                shape ``(n_references, n_sims)``, or ``None``. If the latter,
+                then the reference points are chosen randomly from the unit
+                hypercube over the parameter space.
+          metric: the metric to use when computing the distance. Can be
+                ``"euclidean"`` or ``"manhattan"``.
+          norm : whether to normalize parameters before coverage test
+                (Default = True)
+          num_alpha_bins: number of bins to use for the credibility values.
+                If ``None``, then ``n_sims // 10`` bins are used.
           bootstrap: perform bootstrapped TARP analysis (not implemented yet)
-          seed: the seed to use for the random number generator. If ``None``, then no seed
+          seed: the seed to use for the random number generator. If ``None``,
+                then no seed
         """
         self.references = references
         self.metric_name = metric
         self.n_bins = num_alpha_bins
         if self.n_bins and self.n_bins < 10:
             warnings.warn(
-                f"""Number of bins to assess TARP coverage should be between 20 to 50. {self.n_bins} is low. TARP will work, but the statistical assessment might fluctuate.""",
+                f"""Number of bins to assess TARP coverage should be between
+                20 to 50. {self.n_bins} is low. TARP will work, but the
+                statistical assessment might fluctuate.""",
                 stacklevel=2,
             )
 
@@ -144,14 +160,16 @@ class TARP:
         Args:
             xs: observed data for tarp, simulated from thetas.
             posterior: a posterior obtained from sbi.
-            num_posterior_samples: number of approximate posterior samples used for ranking.
-            num_workers: number of CPU cores to use in parallel for running infer_batch_size
-                inferences.
+            num_posterior_samples: number of approximate posterior samples used
+                for ranking.
+            num_workers: number of CPU cores to use in parallel for running
+                infer_batch_size inferences.
             infer_batch_size: batch size for workers.
             show_progress_bar: whether to display a progress bar
 
         Returns:
-            samples: posterior samples obtained by performing inference on xs given the posterior
+            samples: posterior samples obtained by performing inference on xs
+                given the posterior
 
         """
         num_sim_samples = xs.shape[0]
@@ -165,15 +183,13 @@ class TARP:
                 tqdm(
                     xs_batches,
                     disable=not show_progress_bar,
-                    desc=f"""Performing {num_sim_samples} posterior runs in {len(xs_batches)}
-                        batches.""",
+                    desc=f"Performing {num_sim_samples} posterior runs in"
+                    f"{len(xs_batches)} batches.",
                     total=len(xs_batches),
                 )
             ) as _:
                 samples: Tensor
-                samples = Parallel(
-                    n_jobs=num_workers
-                )(  # pyright: ignore[reportAssignmentType]
+                samples = Parallel(n_jobs=num_workers)(  # pyright: ignore[reportAssignmentType]
                     delayed(infer_posterior_on_batch)(
                         xs_batch, posterior, num_posterior_samples
                     )
@@ -220,10 +236,9 @@ class TARP:
             alpha: credibility values
 
         """
-        # DRP assumes that the predicted thetas are sampled from the "true" PDF num_samples times
-        theta = (
-            theta.detach() if not len(theta.shape) == 2 else theta.detach().unsqueeze(0)
-        )
+        # TARP assumes that the predicted thetas are sampled from the "true"
+        # PDF num_samples times
+        theta = theta.detach() if len(theta.shape) != 2 else theta.detach().unsqueeze(0)
         samples = samples.detach()
 
         num_samples = samples.shape[0]  # samples per simulation
@@ -264,17 +279,21 @@ class TARP:
 
             if len(self.references.shape) == 3 and self.references.shape[0] != 1:
                 raise ValueError(
-                    f"references must be a 2D array with a singular first dimension, received {self.references.shape}"
+                    f"""references must be a 2D array with a singular first
+                    dimension, received {self.references.shape}"""
                 )
 
             if self.references.shape[-2] != num_sims:
                 raise ValueError(
-                    f"references must have the same number samples as samples, received {self.references.shape[-2]} != {num_sims}"
+                    f"references must have the same number samples as samples,"
+                    f"received {self.references.shape[-2]} != {num_sims}"
                 )
 
             if self.references.shape[-1] != num_dims:
                 raise ValueError(
-                    f"references must have the same number of dimensions as samples or theta, received {self.references.shape[-1]} != {num_dims}"
+                    "references must have the same number of dimensions as "
+                    f"samples or theta, received {self.references.shape[-1]}"
+                    f"!= {num_dims}"
                 )
 
         assert len(self.references.shape) == len(
@@ -287,7 +306,8 @@ class TARP:
             distance = l1
         else:
             raise ValueError(
-                f"metric must be either 'euclidean' or 'manhattan', received {metric}"
+                "metric must be either 'euclidean' or 'manhattan',"
+                f"received {self.metric_name}"
             )
 
         sample_dists = distance(self.references.expand(num_samples, -1, -1), samples)
