@@ -26,6 +26,7 @@ jobs:
   ci:
     name: CI
     runs-on: ubuntu-latest
+    # this fixes #1054.
     if: |
       github.event_name == 'push' ||
       (github.event_name == 'pull_request' && github.event.pull_request.draft == false)
