@@ -97,7 +97,7 @@ def test_running_lc2st(method, classifier, cv_folds):
 
 
 @pytest.mark.parametrize("method", (LC2ST, LC2ST_NF))
-def test_lc2st_true_negatif_rate(method):
+def test_lc2st_true_negativ_rate(method):
     """Tests the true negative rate of the LC2ST-(NF) test:
     for a "bad" estimator, the LC2ST-(NF) should reject the null hypothesis."""
     num_runs = 100
