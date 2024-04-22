@@ -32,15 +32,15 @@ class LC2ST:
         metric [2], using scikit-learn classifiers.
 
         L-C2ST tests the local consistency of a posterior estimator q w.r.t. to the true
-        posterior p, at fixed observation `x_o`, i.e. whether the following null hypothesis
-        holds: $H_0(x_o) := q(\theta | x_o) = p(\theta | x_o)$.
+        posterior p, at fixed observation `x_o`, i.e. whether the following null
+        hypothesis holds: $H_0(x_o) := q(\theta | x_o) = p(\theta | x_o)$.
 
-        1. It trains a classifier to distinguish between samples from two joint distributions
-        [theta_p, x_p] and [theta_q, x_q] and evaluates the L-C2ST statistic at a given
-        observation `x_o`.
-        2. The L-C2ST statistic is the mean squared error between the predicted probabilities
-        of being in p (class 0) and a Dirac at 0.5, which corresponds to the chance level of the
-        classifier, unable to distinguish between p and q.
+        1. Trains a classifier to distinguish between samples from two joint
+        distributions [theta_p, x_p] and [theta_q, x_q] and evaluates the L-C2ST
+        statistic at a given observation `x_o`.
+        2. The L-C2ST statistic is the mean squared error between the predicted
+        probabilities of being in p (class 0) and a Dirac at 0.5, which corresponds to
+        the chance level of the classifier, unable to distinguish between p and q.
 
         To evaluate the test, the classifier is trained over multiple trials under the
         null hypothesis. If the null distribution is not known, it is estimated using
@@ -468,21 +468,21 @@ class LC2ST_NF(LC2ST):
 
         LC2ST_NF is a subclass of LC2ST that performs the test in the space of the
         base distribution of a normalizing flow. It uses the inverse transform of the
-        normalizing flow $T_\\phi^{-1}$ to map the samples from the prior and the posterior
-        to the base distribution space. Following Theorem 4, Eq. 17 from [1], the new null
-        hypothesis for a Gaussian base distribution is:
+        normalizing flow $T_\\phi^{-1}$ to map the samples from the prior and the
+        posterior to the base distribution space. Following Theorem 4, Eq. 17 from [1],
+        the new null hypothesis for a Gaussian base distribution is:
         $H_0(x_o) := p(T_\\phi^{-1}(\theta ; x_o) | x_o) = N(0, I_m)$.
 
         Important features are:
-            - the null distribution is the base distribution (e.g. Gaussian) of the flow,
-                independent of the observation `x_o` and the estimator q.
-            - no `theta_o` is passed to the evaluation functions (e.g. `_scores`),
-                as the base distribution is known, samples are drawn at initialization.
-            - no permutation method is used, as the null distribution is known,
-                samples are drawn during `train_under_null_hypothesis`.
-            - the classifiers can be pre-trained under the null and `trained_clfs_null`
-                passed as an argument at initialization. They do not depend on the
-                observed data (i.e. `posterior_samples` and `xs`).
+        - the null distribution is the base distribution (e.g. Gaussian) of the flow,
+            independent of the observation `x_o` and the estimator q.
+        - no `theta_o` is passed to the evaluation functions (e.g. `_scores`),
+            as the base distribution is known, samples are drawn at initialization.
+        - no permutation method is used, as the null distribution is known,
+            samples are drawn during `train_under_null_hypothesis`.
+        - the classifiers can be pre-trained under the null and `trained_clfs_null`
+            passed as an argument at initialization. They do not depend on the
+            observed data (i.e. `posterior_samples` and `xs`).
 
         Args:
             thetas: Samples from the prior, of shape (sample_size, dim).
