@@ -216,4 +216,3 @@ mkdocs serve
 and open a browser on the page proposed by `mkdocs`. Now, whenever you
 make changes to the markdown files of the documentation, you can see the results
 almost immediately in the browser.
-

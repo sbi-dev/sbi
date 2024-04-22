@@ -32,7 +32,7 @@ Then, checkout our material:
 -  :book: [__Citation__]()
    <br/><br/>
    *References for the implemented methods.*
- 
+
 </div>
 
 
