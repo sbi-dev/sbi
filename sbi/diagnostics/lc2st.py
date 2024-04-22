@@ -31,12 +31,16 @@ class LC2ST:
         Implementation based on the official code from [1] and the exisiting C2ST
         metric [2], using scikit-learn classifiers.
 
-        Trains a classifier to distinguish between samples from two joint distributions
+        L-C2ST tests the local consistency of a posterior estimator q w.r.t. to the true
+        posterior p, at fixed observation `x_o`, i.e. whether the following null hypothesis
+        holds: $H_0(x_o) := q(\theta | x_o) = p(\theta | x_o)$.
+
+        1. It trains a classifier to distinguish between samples from two joint distributions
         [theta_p, x_p] and [theta_q, x_q] and evaluates the L-C2ST statistic at a given
-        observation `x_o`. The L-C2ST statistic is the mean squared error between the
-        predicted probabilities of being in P (class 0) and a Dirac at 0.5, which
-        corresponds to the chance level of the classifier unable to distinguish between
-        P and Q.
+        observation `x_o`.
+        2. The L-C2ST statistic is the mean squared error between the predicted probabilities
+        of being in p (class 0) and a Dirac at 0.5, which corresponds to the chance level of the
+        classifier, unable to distinguish between p and q.
 
         To evaluate the test, the classifier is trained over multiple trials under the
         null hypothesis. If the null distribution is not known, it is estimated using
@@ -464,10 +468,14 @@ class LC2ST_NF(LC2ST):
 
         LC2ST_NF is a subclass of LC2ST that performs the test in the space of the
         base distribution of a normalizing flow. It uses the inverse transform of the
-        normalizing flow to map the samples from the prior and the posterior to the
-        base distribution space. Important features are:
+        normalizing flow $T_\\phi^{-1}$ to map the samples from the prior and the posterior
+        to the base distribution space. Following Theorem 4, Eq. 17 from [1], the new null
+        hypothesis for a Gaussian base distribution is:
+        $H_0(x_o) := p(T_\\phi^{-1}(\theta ; x_o) | x_o) = N(0, I_m)$.
 
-            - the null distribution is the base distribution of the normalizing flow.
+        Important features are:
+            - the null distribution is the base distribution (e.g. Gaussian) of the flow,
+                independent of the observation `x_o` and the estimator q.
             - no `theta_o` is passed to the evaluation functions (e.g. `_scores`),
                 as the base distribution is known, samples are drawn at initialization.
             - no permutation method is used, as the null distribution is known,
@@ -487,6 +495,9 @@ class LC2ST_NF(LC2ST):
             num_eval: Number of samples to evaluate the L-C2ST.
             trained_clfs_null: Pre-trained classifiers under the null.
             kwargs: Additional arguments for the LC2ST class.
+
+        References:
+        [1] : https://arxiv.org/abs/2306.03580, https://github.com/JuliaLinhart/lc2st
         """
         # Aplly the inverse transform to the thetas and the posterior samples
         self.flow_inverse_transform = flow_inverse_transform
