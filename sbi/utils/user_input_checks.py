@@ -7,7 +7,6 @@ from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union, cast
 
 import torch
 from numpy import ndarray
-from pyknos.nflows import flows
 from scipy.stats._distn_infrastructure import rv_frozen
 from scipy.stats._multivariate import multi_rv_frozen
 from torch import Tensor, float32, nn
@@ -610,7 +609,9 @@ def process_x(
 def prepare_for_sbi(simulator: Callable, prior) -> Tuple[Callable, Distribution]:
     """Prepare simulator and prior for usage in sbi.
 
-    NOTE: This is a wrapper around `process_prior` and `process_simulator` which can be
+    NOTE: This method is deprecated as of sbi version v0.23.0. and will be removed in a
+    future release. Please use `process_prior` and `process_simulator` in the future.
+    This is a wrapper around `process_prior` and `process_simulator` which can be
     used in isolation as well.
 
     Attempts to meet the following requirements by reshaping and type-casting:
@@ -629,6 +630,14 @@ def prepare_for_sbi(simulator: Callable, prior) -> Tuple[Callable, Distribution]
     Returns:
         Tuple (simulator, prior) checked and matching the requirements of sbi.
     """
+
+    warnings.warn(
+        "This method is deprecated as of sbi version v0.23.0. and will be removed in a \
+        future release."
+        "Please use `process_prior` and `process_simulator` in the future.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
 
     # Check prior, return PyTorch prior.
     prior, _, prior_returns_numpy = process_prior(prior)
@@ -739,49 +748,19 @@ def validate_theta_and_x(
     return theta, x
 
 
-def check_condition_shape(condition, condition_shape=None):
-    r"""This method checks whether the condition has the correct shape.
-
-    Args:
-        condition: Conditions of shape (*batch_shape, *condition_shape).
-        condition_shape: Shape of the condition.
-            If not provided, it will assume a 1D input.
-
-    Raises:
-        ValueError: If the condition has a dimensionality that does not match
-                    the expected input dimensionality.
-        ValueError: If the shape of the condition does not match the expected
-                    input dimensionality.
-    """
-    if condition_shape is None:
-        condition_shape = (1,)
-    if condition.ndim < len(condition_shape):
-        raise ValueError(
-            "Dimensionality of condition is to small and does not match the "
-            f"expected input dimensionality {len(condition_shape)}, as provided "
-            "by condition_shape."
-        )
-    else:
-        condition_shape = condition.shape[-len(condition_shape) :]
-        if tuple(condition_shape) != tuple(condition_shape):
-            raise ValueError(
-                f"Shape of condition {tuple(condition_shape)} does not match the "
-                f"expected input dimensionality {tuple(condition_shape)}, as "
-                "provided by condition_shape. Please reshape it accordingly."
-            )
-
-
-def test_posterior_net_for_multi_d_x(net: flows.Flow, theta: Tensor, x: Tensor) -> None:
+def test_posterior_net_for_multi_d_x(net, theta: Tensor, x: Tensor) -> None:
     """Test log prob method of the net.
 
     This is done to make sure the net can handle multidimensional inputs via an
     embedding net. If not, it usually fails with a RuntimeError. Here we catch the
     error, append a debug hint and raise it again.
-    """
 
+    Args:
+        net: A `DensityEstimator`.
+    """
     try:
         # torch.nn.functional needs at least two inputs here.
-        net.log_prob(theta[:2], x[:2])
+        net.log_prob(theta[:, :2], condition=x[:2])
     except RuntimeError as rte:
         ndims = x.ndim
         if ndims > 2:

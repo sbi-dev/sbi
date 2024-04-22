@@ -10,6 +10,8 @@ import numpy as np
 import torch
 from joblib import Parallel, delayed
 from matplotlib import pyplot as plt
+from matplotlib.axes import Axes
+from matplotlib.figure import FigureBase
 from tqdm.auto import tqdm, trange
 
 from sbi.simulators.simutils import tqdm_joblib
@@ -20,20 +22,20 @@ class MCMCSampler:
     Superclass for MCMC samplers.
     """
 
-    def __init__(self, x, lp_f: Callable, thin: Optional[int], verbose: bool = False):
+    def __init__(self, x, lp_f: Callable, thin: int, verbose: bool = False):
         """
 
         Args:
             x: initial state
             lp_f: Function that returns the log prob.
-            thin: amount of thinning; if None, no thinning.
+            thin: Thinning (subsampling) factor, default 1 (no thinning).
             verbose: Whether to show progress bars (False).
         """
 
         self.x = np.array(x, dtype=float)
         self.lp_f = lp_f
         self.L = lp_f(self.x)
-        self.thin = 1 if thin is None else thin
+        self.thin = thin
         self.n_dims = self.x.size if self.x.ndim == 1 else self.x.shape[1]
         self.verbose = verbose
 
@@ -59,7 +61,7 @@ class SliceSampler(MCMCSampler):
         lp_f,
         max_width=float("inf"),
         init_width: Union[float, np.ndarray] = 0.01,
-        thin=None,
+        thin=1,
         tuning: int = 50,
         verbose: bool = False,
     ):
@@ -134,8 +136,8 @@ class SliceSampler(MCMCSampler):
 
         # show trace plot
         if show_info:
-            fig: plt.FigureBase
-            ax: plt.Axes
+            fig: FigureBase
+            ax: Axes
             fig, ax = plt.subplots(1, 1)  # pyright: ignore[reportAssignmentType]
             ax.plot(L_trace)
             ax.set_ylabel("log probability")
@@ -220,7 +222,7 @@ class SliceSamplerSerial:
         log_prob_fn: Callable,
         init_params: np.ndarray,
         num_chains: int = 1,
-        thin: Optional[int] = None,
+        thin: int = 1,
         tuning: int = 50,
         verbose: bool = True,
         init_width: Union[float, np.ndarray] = 0.01,
@@ -235,7 +237,7 @@ class SliceSamplerSerial:
             log_prob_fn: Log prob function.
             init_params: Initial parameters.
             num_chains: Number of MCMC chains to run in parallel
-            thin: amount of thinning; if None, no thinning.
+            thin: Thinning (subsampling) factor, default 1 (no thinning).
             tuning: Number of tuning steps for brackets.
             verbose: Show/hide additional info such as progress bars.
             init_width: Inital width of brackets.
@@ -354,7 +356,7 @@ class SliceSamplerVectorized:
         log_prob_fn: Callable,
         init_params: np.ndarray,
         num_chains: int = 1,
-        thin: Optional[int] = None,
+        thin: int = 1,
         tuning: int = 50,
         verbose: bool = True,
         init_width: Union[float, np.ndarray] = 0.01,
@@ -367,7 +369,7 @@ class SliceSamplerVectorized:
             log_prob_fn: Log prob function.
             init_params: Initial parameters.
             num_chains: Number of MCMC chains to run in parallel
-            thin: amount of thinning; if None, no thinning.
+            thin: Thinning (subsampling) factor, default 1 (no thinning).
             tuning: Number of tuning steps for brackets.
             verbose: Show/hide additional info such as progress bars.
             init_width: Inital width of brackets.

@@ -1,7 +1,11 @@
 import torch
 
-from sbi.inference import SNPE, infer, prepare_for_sbi, simulate_for_sbi
+from sbi.inference import SNPE, infer, simulate_for_sbi
 from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
+from sbi.utils.user_input_checks import (
+    process_prior,
+    process_simulator,
+)
 
 
 def simple():
@@ -33,7 +37,9 @@ def flexible():
     prior = torch.distributions.MultivariateNormal(
         loc=prior_mean, covariance_matrix=prior_cov
     )
-    simulator, prior = prepare_for_sbi(simulator, prior)
+    prior, _, prior_returns_numpy = process_prior(prior)
+    simulator = process_simulator(simulator, prior, prior_returns_numpy)
+
     inference = SNPE(prior)
 
     theta, x = simulate_for_sbi(simulator, proposal=prior, num_simulations=500)

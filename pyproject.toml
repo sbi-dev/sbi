@@ -42,7 +42,8 @@ dependencies = [
     "tensorboard",
     "torch>=1.8.0",
     "tqdm",
-    "zuko>=1.0.0",
+    "pymc>=5.0.0",
+    "zuko>=1.1.0",
 ]
 
 [project.optional-dependencies]
@@ -62,6 +63,7 @@ dev = [
     "ruff>=0.3.3",
     # Test
     "pytest",
+    "pytest-cov",
     "pytest-xdist",
     "torchtestcase",
 ]
@@ -118,7 +120,8 @@ testpaths = [
 ]
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
-    "gpu: marks tests that require a gpu (deselect with '-m \"not gpu\"')"
+    "gpu: marks tests that require a gpu (deselect with '-m \"not gpu\"')",
+    "mcmc: marks tests that require MCMC sampling (deselect with '-m \"not mcmc\"')"
 ]
 
 # Pyright configuration

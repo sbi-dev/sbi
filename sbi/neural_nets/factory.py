@@ -16,10 +16,36 @@ from sbi.neural_nets.flow import (
     build_maf,
     build_maf_rqs,
     build_nsf,
+    build_zuko_bpf,
+    build_zuko_gf,
     build_zuko_maf,
+    build_zuko_naf,
+    build_zuko_ncsf,
+    build_zuko_nice,
+    build_zuko_nsf,
+    build_zuko_sospf,
+    build_zuko_unaf,
 )
 from sbi.neural_nets.mdn import build_mdn
 from sbi.neural_nets.mnle import build_mnle
+
+model_builders = {
+    "mdn": build_mdn,
+    "made": build_made,
+    "maf": build_maf,
+    "maf_rqs": build_maf_rqs,
+    "nsf": build_nsf,
+    "mnle": build_mnle,
+    "zuko_nice": build_zuko_nice,
+    "zuko_maf": build_zuko_maf,
+    "zuko_nsf": build_zuko_nsf,
+    "zuko_ncsf": build_zuko_ncsf,
+    "zuko_sospf": build_zuko_sospf,
+    "zuko_naf": build_zuko_naf,
+    "zuko_unaf": build_zuko_unaf,
+    "zuko_gf": build_zuko_gf,
+    "zuko_bpf": build_zuko_bpf,
+}
 
 
 def classifier_nn(
@@ -162,22 +188,10 @@ def likelihood_nn(
     )
 
     def build_fn(batch_theta, batch_x):
-        if model == "mdn":
-            return build_mdn(batch_x=batch_x, batch_y=batch_theta, **kwargs)
-        elif model == "made":
-            return build_made(batch_x=batch_x, batch_y=batch_theta, **kwargs)
-        elif model == "maf":
-            return build_maf(batch_x=batch_x, batch_y=batch_theta, **kwargs)
-        elif model == "maf_rqs":
-            return build_maf_rqs(batch_x=batch_x, batch_y=batch_theta, **kwargs)
-        elif model == "nsf":
-            return build_nsf(batch_x=batch_x, batch_y=batch_theta, **kwargs)
-        elif model == "mnle":
-            return build_mnle(batch_x=batch_x, batch_y=batch_theta, **kwargs)
-        elif model == "zuko_maf":
-            return build_zuko_maf(batch_x=batch_x, batch_y=batch_theta, **kwargs)
-        else:
-            raise NotImplementedError
+        if model not in model_builders:
+            raise NotImplementedError(f"Model {model} in not implemented")
+
+        return model_builders[model](batch_x=batch_x, batch_y=batch_theta, **kwargs)
 
     return build_fn
 
@@ -265,20 +279,13 @@ def posterior_nn(
         )
 
     def build_fn(batch_theta, batch_x):
-        if model == "mdn":
-            return build_mdn(batch_x=batch_theta, batch_y=batch_x, **kwargs)
-        elif model == "made":
-            return build_made(batch_x=batch_theta, batch_y=batch_x, **kwargs)
-        elif model == "maf":
-            return build_maf(batch_x=batch_theta, batch_y=batch_x, **kwargs)
-        elif model == "maf_rqs":
-            return build_maf_rqs(batch_x=batch_theta, batch_y=batch_x, **kwargs)
-        elif model == "nsf":
-            return build_nsf(batch_x=batch_theta, batch_y=batch_x, **kwargs)
-        elif model == "zuko_maf":
-            return build_zuko_maf(batch_x=batch_theta, batch_y=batch_x, **kwargs)
-        else:
-            raise NotImplementedError
+        if model not in model_builders:
+            raise NotImplementedError(f"Model {model} in not implemented")
+
+        # The naming might be a bit confusing.
+        # batch_x are the latent variables, batch_y the conditioned variables.
+        # batch_theta are the parameters and batch_x the observable variables.
+        return model_builders[model](batch_x=batch_theta, batch_y=batch_x, **kwargs)
 
     if model == "mdn_snpe_a":
         if num_components != 10:

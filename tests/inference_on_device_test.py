@@ -34,7 +34,6 @@ from sbi.simulators import diagonal_linear_gaussian, linear_gaussian
 from sbi.utils.torchutils import BoxUniform, gpu_available, process_device
 from sbi.utils.user_input_checks import (
     check_embedding_net_device,
-    prepare_for_sbi,
     validate_theta_and_x,
 )
 
@@ -46,20 +45,20 @@ from sbi.utils.user_input_checks import (
     [
         (SNPE_C, "maf", "direct"),
         (SNPE_C, "mdn", "rejection"),
-        (SNPE_C, "maf", "slice_np_vectorized"),
-        (SNPE_C, "mdn", "slice"),
-        (SNLE, "nsf", "slice_np_vectorized"),
-        (SNLE, "mdn", "slice"),
+        pytest.param(SNPE_C, "maf", "slice_np_vectorized", marks=pytest.mark.mcmc),
+        pytest.param(SNPE_C, "mdn", "slice_np", marks=pytest.mark.mcmc),
+        pytest.param(SNLE, "nsf", "slice_np_vectorized", marks=pytest.mark.mcmc),
+        pytest.param(SNLE, "mdn", "slice_np", marks=pytest.mark.mcmc),
         (SNLE, "nsf", "rejection"),
         (SNLE, "maf", "importance"),
-        (SNRE_A, "mlp", "slice_np_vectorized"),
-        (SNRE_A, "mlp", "slice"),
+        pytest.param(SNRE_A, "mlp", "slice_np_vectorized", marks=pytest.mark.mcmc),
+        pytest.param(SNRE_A, "mlp", "slice_np", marks=pytest.mark.mcmc),
         (SNRE_B, "resnet", "rejection"),
         (SNRE_B, "resnet", "importance"),
-        (SNRE_B, "resnet", "slice"),
+        pytest.param(SNRE_B, "resnet", "slice_np", marks=pytest.mark.mcmc),
         (SNRE_C, "resnet", "rejection"),
         (SNRE_C, "resnet", "importance"),
-        (SNRE_C, "resnet", "nuts"),
+        pytest.param(SNRE_C, "resnet", "nuts_pymc", marks=pytest.mark.mcmc),
     ],
 )
 @pytest.mark.parametrize(
@@ -72,7 +71,13 @@ from sbi.utils.user_input_checks import (
 )
 @pytest.mark.parametrize("prior_type", ["gaussian", "uniform"])
 def test_training_and_mcmc_on_device(
-    method, model, sampling_method, training_device, prior_device, prior_type
+    method,
+    model,
+    sampling_method,
+    training_device,
+    prior_device,
+    prior_type,
+    mcmc_params_fast: dict,
 ):
     """Test training on devices.
 
@@ -86,9 +91,11 @@ def test_training_and_mcmc_on_device(
 
     num_dim = 2
     num_samples = 10
-    num_simulations = 100
-    max_num_epochs = 2
+    max_num_epochs = 10
     num_rounds = 2  # test proposal sampling in round 2.
+    num_simulations_per_round = [200, num_samples]
+    # use more warmup steps to avoid Infs during MCMC in round two.
+    mcmc_params_fast["warmup_steps"] = 20
 
     x_o = zeros(1, num_dim).to(data_device)
     likelihood_shift = -1.0 * ones(num_dim).to(prior_device)
@@ -135,7 +142,7 @@ def test_training_and_mcmc_on_device(
     proposals = [prior]
 
     for _ in range(num_rounds):
-        theta = proposals[-1].sample((num_simulations,))
+        theta = proposals[-1].sample((num_simulations_per_round[_],))
         x = simulator(theta).to(data_device)
         theta = theta.to(data_device)
 
@@ -144,14 +151,11 @@ def test_training_and_mcmc_on_device(
         )
 
         # mcmc cases
-        if sampling_method in ["slice", "slice_np", "slice_np_vectorized", "nuts"]:
+        if sampling_method in ["slice_np", "slice_np_vectorized", "nuts_pymc"]:
             posterior = inferer.build_posterior(
                 sample_with="mcmc",
                 mcmc_method=sampling_method,
-                mcmc_parameters=dict(
-                    thin=10 if sampling_method == "slice_np_vectorized" else 1,
-                    num_chains=10 if sampling_method == "slice_np_vectorized" else 1,
-                ),
+                mcmc_parameters=mcmc_params_fast,
             )
         elif sampling_method in ["rejection", "direct"]:
             # all other cases: rejection, direct
@@ -280,10 +284,11 @@ def test_train_with_different_data_and_training_device(
     training_device = process_device(training_device)
 
     num_dim = 2
-    prior_ = BoxUniform(
+    num_simulations = 32
+    prior = BoxUniform(
         -torch.ones(num_dim), torch.ones(num_dim), device=training_device
     )
-    simulator, prior = prepare_for_sbi(diagonal_linear_gaussian, prior_)
+    simulator = diagonal_linear_gaussian
 
     inference = inference_method(
         prior,
@@ -300,8 +305,9 @@ def test_train_with_different_data_and_training_device(
         device=training_device,
     )
 
-    theta, x = simulate_for_sbi(simulator, prior, 32)
-    theta, x = theta.to(data_device), x.to(data_device)
+    theta = prior.sample((num_simulations,))
+    x = simulator(theta).to(data_device)
+    theta = theta.to(data_device)
     x_o = torch.zeros(x.shape[1])
     inference = inference.append_simulations(theta, x, data_device=data_device)
 
@@ -330,6 +336,7 @@ def test_embedding_nets_integration_training_device(
     embedding_net_device: str,
     data_device: str,
     training_device: str,
+    mcmc_params_fast: dict,
 ) -> None:
     """Test embedding nets integration with different devices, priors and methods."""
     # add other methods
@@ -435,7 +442,7 @@ def test_embedding_nets_integration_training_device(
                 if inference_method == SNPE_A
                 else dict(
                     mcmc_method="slice_np_vectorized",
-                    mcmc_parameters=dict(thin=10, num_chains=20, warmup_steps=10),
+                    mcmc_parameters=mcmc_params_fast,
                 )
             ),
         )
@@ -448,8 +455,8 @@ def test_embedding_nets_integration_training_device(
 def test_nograd_after_inference_train(inference_method) -> None:
     """Test that no gradients are present after training."""
     num_dim = 2
-    prior_ = BoxUniform(-torch.ones(num_dim), torch.ones(num_dim))
-    simulator, prior = prepare_for_sbi(diagonal_linear_gaussian, prior_)
+    prior = BoxUniform(-torch.ones(num_dim), torch.ones(num_dim))
+    simulator = diagonal_linear_gaussian
 
     inference = inference_method(
         prior,

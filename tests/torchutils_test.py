@@ -215,10 +215,8 @@ def test_process_device(device_input: str) -> None:
             elif torch.backends.mps.is_available():
                 assert device_output == "mps:0"
 
-        if device_input == "cuda" and torch.cuda.is_available():
-            assert device_output == "cuda:0"
-        if device_input == "cuda:0" and torch.cuda.is_available():
-            assert device_output == "cuda:0"
+        if device_input.startswith("cuda") and torch.cuda.is_available():
+            assert device_output == device_input
         if device_input == "mps" and torch.backends.mps.is_available():
             assert device_output == "mps"
 

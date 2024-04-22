@@ -361,7 +361,8 @@ def check_uniformity_c2st(
     ])
 
     # Use variance over repetitions to estimate robustness of c2st.
-    if (c2st_scores.std(0) > 0.05).any():
+    c2st_std = c2st_scores.std(0, correction=0 if num_repetitions == 1 else 1)
+    if (c2st_std > 0.05).any():
         warnings.warn(
             f"""C2ST score variability is larger than {0.05}: std={c2st_scores.std(0)},
             result may be unreliable. Consider increasing the number of samples.

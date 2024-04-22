@@ -11,6 +11,10 @@ from torch.distributions import Distribution
 from sbi.inference.posteriors import MCMCPosterior, RejectionPosterior, VIPosterior
 from sbi.inference.potentials import mixed_likelihood_estimator_based_potential
 from sbi.inference.snle.snle_base import LikelihoodEstimator
+from sbi.neural_nets.density_estimators.shape_handling import (
+    reshape_to_batch_event,
+    reshape_to_sample_batch_event,
+)
 from sbi.neural_nets.mnle import MixedDensityEstimator
 from sbi.sbi_types import TensorboardSummaryWriter, TorchModule
 from sbi.utils import check_prior, del_entries
@@ -205,4 +209,6 @@ class MNLE(LikelihoodEstimator):
         Returns:
             Negative log prob.
         """
-        return -self._neural_net.log_prob(x, context=theta)
+        theta = reshape_to_batch_event(theta, event_shape=theta.shape[1:])
+        x = reshape_to_sample_batch_event(x, event_shape=self._x_shape[1:])
+        return -self._neural_net.log_prob(x, condition=theta)
