@@ -112,6 +112,7 @@ class ZukoFlow(DensityEstimator):
         log_probs = distributions.log_prob(input)
 
         return log_probs
+
     def sample(self, sample_shape: Shape, condition: Tensor) -> Tensor:
         r"""Return samples from the density estimator.
 

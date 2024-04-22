@@ -114,7 +114,7 @@ class CategoricalMassEstimator(DensityEstimator):
     """
 
     def __init__(self, net: CategoricalNet) -> None:
-        super().__init__(net=net, condition_shape=torch.Size([]))
+        super().__init__()
         self.net = net
         self.num_categories = net.num_categories
 
