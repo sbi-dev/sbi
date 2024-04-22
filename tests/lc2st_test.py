@@ -100,7 +100,7 @@ def test_running_lc2st(method, classifier, cv_folds):
 def test_lc2st_true_negatif_rate(method):
     """Tests the true negative rate of the LC2ST-(NF) test:
     for a "bad" estimator, the LC2ST-(NF) should reject the null hypothesis."""
-    num_runs = 10
+    num_runs = 100
     confidence_level = 0.95
 
     # bad estimator :small training and num_epochs
@@ -175,7 +175,7 @@ def test_lc2st_true_negatif_rate(method):
 def test_lc2st_true_positiv_rate(method):
     """Tests the true negative rate of the LC2ST-(NF) test:
     for a "good" estimator, the LC2ST-(NF) should accept the null hypothesis."""
-    num_runs = 10
+    num_runs = 100
     confidence_level = 0.95
 
     # good estimator: big training and num_epochs = accept
