@@ -19,7 +19,7 @@ from sbi.simulators.gaussian_mixture import (
 @pytest.mark.parametrize("classifier", ('mlp', 'random_forest', 'custom'))
 @pytest.mark.parametrize("cv_folds", (1, 2))
 def test_running_lc2st(method, classifier, cv_folds):
-    """Tests running inference and then LC2ST-(NF) and then getting test quantities."""
+    """Tests running inference, LC2ST-(NF) and then getting test quantities."""
 
     num_train = 100
     num_cal = 100
@@ -97,10 +97,14 @@ def test_running_lc2st(method, classifier, cv_folds):
 
 
 @pytest.mark.parametrize("method", (LC2ST, LC2ST_NF))
-def test_lc2st_tnr(method):
-    num_runs = 10
+def test_lc2st_true_negatif_rate(method):
+    """Tests the true negative rate of the LC2ST-(NF) test:
+    for a "bad" estimator, the LC2ST-(NF) should reject the null hypothesis."""
+    num_runs = 100
+    confidence_level = 0.95
 
-    # small training and num_epochs = reject (no convergence of the estimator)
+    # bad estimator :small training and num_epochs
+    # (no convergence to the true posterior)
     num_train = 1_000
     num_epochs = 5
 
@@ -153,18 +157,29 @@ def test_lc2st_tnr(method):
             kwargs_eval = {"theta_o": theta_o}
         else:
             kwargs_eval = {}
-        results.append(lc2st.reject_test(x_o=x, **kwargs_eval))
+        results.append(
+            lc2st.reject_test(x_o=x, alpha=1 - confidence_level, **kwargs_eval)
+        )
+
+    proportion_rejected = torch.tensor(results).float().mean()
 
     assert (
-        torch.tensor(results).sum() == num_runs
-    ), "LC2ST p-values too big, test should be rejected."
+        proportion_rejected > confidence_level
+    ), f"LC2ST p-values too big, test should be rejected \
+        at least {confidence_level * 100}% of the time, but was rejected \
+        only {proportion_rejected * 100}% of the time."
 
 
 @pytest.mark.slow
 @pytest.mark.parametrize("method", (LC2ST, LC2ST_NF))
-def test_lc2st_tpr(method):
-    num_runs = 10
-    # big training and num_epochs = accept (convergence of the estimator)
+def test_lc2st_true_positif_rate(method):
+    """Tests the true negative rate of the LC2ST-(NF) test:
+    for a "good" estimator, the LC2ST-(NF) should accept the null hypothesis."""
+    num_runs = 100
+    confidence_level = 0.95
+
+    # good estimator: big training and num_epochs = accept
+    # (convergence of the estimator)
     num_train = 10_000
     num_epochs = 200
 
@@ -217,8 +232,14 @@ def test_lc2st_tpr(method):
             kwargs_eval = {"theta_o": theta_o}
         else:
             kwargs_eval = {}
-        results.append(lc2st.reject_test(x_o=x, **kwargs_eval))
+        results.append(
+            lc2st.reject_test(x_o=x, alpha=1 - confidence_level, **kwargs_eval)
+        )
+
+    proportion_rejected = torch.tensor(results).float().mean()
 
     assert (
-        torch.tensor(results).sum() == 0
-    ), "LC2ST p-values too small, test should be accepted."
+        proportion_rejected < 1 - confidence_level
+    ), f"LC2ST p-values too small, test should be accepted \
+        at least {confidence_level * 100}% of the time, but was accepted \
+        only {(1 - proportion_rejected) * 100}% of the time."

@@ -18,7 +18,7 @@ from scipy.stats import binom, gaussian_kde
 from torch import Tensor
 
 from sbi.analysis import eval_conditional_density
-from sbi.analysis.test_utils import pp_vals
+from sbi.utils.analysis_utils import pp_vals
 
 try:
     collectionsAbc = collections.abc  # type: ignore
@@ -1496,7 +1496,7 @@ def marginal_plot_with_probs_intensity(
 
     Args:
         probs_per_marginal: dataframe with predicted class probabilities
-            as obtained from `sbi.analysis.test_utils.get_probs_per_marginal`.
+            as obtained from `sbi.utils.analysis_utils.get_probs_per_marginal`.
         marginal_dim: dimension of the marginal histogram to plot.
         n_bins: number of bins for the histogram, defaults to 20.
         vmin: minimum value for the color intensity, defaults to 0.

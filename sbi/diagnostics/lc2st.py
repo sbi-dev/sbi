@@ -285,12 +285,12 @@ class LC2ST:
         theta_o: Tensor,
         x_o: Tensor,
     ) -> float:
-        """Computes the p-value for L-C2ST.
+        r"""Computes the p-value for L-C2ST.
 
         The p-value is the proportion of times the L-C2ST statistic under the null
         hypothesis is greater than the L-C2ST statistic at the observation `x_o`.
         It is computed by taking the empirical mean over statistics computed on
-        several trials under the null hypothesis: 1/H * sum_{h=1}^{H} I(T_h < T_o).
+        several trials under the null hypothesis: $1/H \sum_{h=1}^{H} I(T_h < T_o)$.
 
         Args:
             theta_o: Samples from the posterior conditioned on the observation `x_o`,
@@ -580,9 +580,12 @@ class LC2ST_NF(LC2ST):
         x_o: Tensor,
         **kwargs: Any,
     ) -> float:
-        """Computes the p-value for L-C2ST.
+        r"""Computes the p-value for L-C2ST.
 
-
+        The p-value is the proportion of times the L-C2ST statistic under the null
+        hypothesis is greater than the L-C2ST statistic at the observation `x_o`.
+        It is computed by taking the empirical mean over statistics computed on
+        several trials under the null hypothesis: $1/H \sum_{h=1}^{H} I(T_h < T_o)$.
 
         Args:
             x_o: The observation, of shape (, dim_x).
