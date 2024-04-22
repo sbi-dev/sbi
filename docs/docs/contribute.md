@@ -217,9 +217,3 @@ and open a browser on the page proposed by `mkdocs`. Now, whenever you
 make changes to the markdown files of the documentation, you can see the results
 almost immediately in the browser.
 
-Note that the tutorials and examples are initially written in jupyter notebooks
-and then converted to markdown programatically. To do so locally, you should run
-```
-jupyter nbconvert --to markdown ../tutorials/*.ipynb --output-dir docs/tutorial/
-jupyter nbconvert --to markdown ../examples/*.ipynb --output-dir docs/examples/
-```
