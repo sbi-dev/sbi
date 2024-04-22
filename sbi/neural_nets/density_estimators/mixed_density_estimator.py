@@ -38,13 +38,12 @@ class MixedDensityEstimator(DensityEstimator):
                 into logarithmic domain before training. This is helpful for bounded
                 data, e.g.,for reaction times.
         """
-        super(MixedDensityEstimator, self).__init__(
-            net=continuous_net, condition_shape=condition_shape
-        )
+        super(MixedDensityEstimator, self).__init__()
 
         self.discrete_net = discrete_net
         self.continuous_net = continuous_net
         self.log_transform_input = log_transform_input
+        self._condition_shape = condition_shape
 
     def forward(self, input: Tensor):
         raise NotImplementedError(
