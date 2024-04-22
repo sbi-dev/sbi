@@ -748,6 +748,38 @@ def validate_theta_and_x(
     return theta, x
 
 
+def check_condition_shape(condition, condition_shape=None):
+    r"""This method checks whether the condition has the correct shape.
+
+    Args:
+        condition: Conditions of shape (*batch_shape, *condition_shape).
+        condition_shape: Shape of the condition.
+            If not provided, it will assume a 1D input.
+
+    Raises:
+        ValueError: If the condition has a dimensionality that does not match
+                    the expected input dimensionality.
+        ValueError: If the shape of the condition does not match the expected
+                    input dimensionality.
+    """
+    if condition_shape is None:
+        condition_shape = (1,)
+    if condition.ndim < len(condition_shape):
+        raise ValueError(
+            "Dimensionality of condition is to small and does not match the "
+            f"expected input dimensionality {len(condition_shape)}, as provided "
+            "by condition_shape."
+        )
+    else:
+        condition_shape = condition.shape[-len(condition_shape) :]
+        if tuple(condition_shape) != tuple(condition_shape):
+            raise ValueError(
+                f"Shape of condition {tuple(condition_shape)} does not match the "
+                f"expected input dimensionality {tuple(condition_shape)}, as "
+                "provided by condition_shape. Please reshape it accordingly."
+            )
+
+
 def test_posterior_net_for_multi_d_x(net, theta: Tensor, x: Tensor) -> None:
     """Test log prob method of the net.
 
