@@ -18,7 +18,6 @@ from sbi.inference.potentials import likelihood_estimator_based_potential
 from sbi.neural_nets import DensityEstimator, likelihood_nn
 from sbi.neural_nets.density_estimators.shape_handling import (
     reshape_to_batch_event,
-    reshape_to_sample_batch_event,
 )
 from sbi.utils import check_estimator_arg, check_prior, x_shape_from_simulation
 
@@ -369,7 +368,5 @@ class LikelihoodEstimator(NeuralInference, ABC):
         theta = reshape_to_batch_event(
             theta, event_shape=self._neural_net.condition_shape
         )
-        x = reshape_to_sample_batch_event(
-            x, event_shape=self._neural_net.input_shape, leading_is_sample=False
-        )
+        x = reshape_to_batch_event(x, event_shape=self._neural_net.input_shape)
         return self._neural_net.loss(x, condition=theta)

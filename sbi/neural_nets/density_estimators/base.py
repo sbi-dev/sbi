@@ -47,28 +47,15 @@ class DensityEstimator(nn.Module):
 
         Args:
             input: Inputs to evaluate the log probability on of shape
-                    (*batch_shape1, input_size).
-            condition: Conditions of shape (*batch_shape2, *condition_shape).
+                    `(sample_dim_input, batch_dim_input, *event_shape_input)`.
+            condition: Conditions of shape
+                `(batch_dim_condition, *event_shape_condition)`.
 
         Raises:
-            RuntimeError: If batch_shape1 and batch_shape2 are not broadcastable.
+            RuntimeError: If batch_dim_input and batch_dim_condition do not match.
 
         Returns:
             Sample-wise log probabilities.
-
-        Note:
-            This function should support PyTorch's automatic broadcasting. This means
-            the function should behave as follows for different input and condition
-            shapes:
-            - (input_size,) + (batch_size,*condition_shape) -> (batch_size,)
-            - (batch_size, input_size) + (*condition_shape) -> (batch_size,)
-            - (batch_size, input_size) + (batch_size, *condition_shape) -> (batch_size,)
-            - (batch_size1, input_size) + (batch_size2, *condition_shape)
-                                                  -> RuntimeError i.e. not broadcastable
-            - (batch_size1,1, input_size) + (batch_size2, *condition_shape)
-                                                  -> (batch_size1,batch_size2)
-            - (batch_size1, input_size) + (batch_size2,1, *condition_shape)
-                                                  -> (batch_size2,batch_size1)
         """
 
         raise NotImplementedError
@@ -77,11 +64,12 @@ class DensityEstimator(nn.Module):
         r"""Return the loss for training the density estimator.
 
         Args:
-            input: Inputs to evaluate the loss on of shape (batch_size, input_size).
-            condition: Conditions of shape (batch_size, *condition_shape).
+            input: Inputs to evaluate the loss on of shape
+                `(batch_dim, *input_event_shape)`.
+            condition: Conditions of shape `(batch_dim, *event_shape_condition)`.
 
         Returns:
-            Loss of shape (batch_size,)
+            Loss of shape (batch_dim,)
         """
 
         raise NotImplementedError
@@ -91,17 +79,10 @@ class DensityEstimator(nn.Module):
 
         Args:
             sample_shape: Shape of the samples to return.
-            condition: Conditions of shape (*batch_shape, *condition_shape).
+            condition: Conditions of shape `(batch_dim, *event_shape_condition)`.
 
         Returns:
-            Samples of shape (*batch_shape, *sample_shape, input_size).
-
-        Note:
-            This function should support batched conditions and should admit the
-            following behavior for different condition shapes:
-            - (*condition_shape) -> (*sample_shape, input_size)
-            - (*batch_shape, *condition_shape)
-                                        -> (*batch_shape, *sample_shape, input_size)
+            Samples of shape (*sample_shape, batch_dim, *event_shape_input).
         """
 
         raise NotImplementedError
@@ -113,11 +94,10 @@ class DensityEstimator(nn.Module):
 
         Args:
             sample_shape: Shape of the samples to return.
-            condition: Conditions of shape (*batch_shape, *condition_shape).
+            condition: Conditions of shape `(batch_dim, *event_shape_condition)`.
 
         Returns:
             Samples and associated log probabilities.
-
 
         Note:
             For some density estimators, computing log_probs for samples is
@@ -133,7 +113,7 @@ class DensityEstimator(nn.Module):
         r"""This method checks whether the condition has the correct shape.
 
         Args:
-            condition: Conditions of shape (*batch_shape, *condition_shape).
+            condition: Conditions of shape `(batch_dim, *event_shape_condition)`.
 
         Raises:
             ValueError: If the condition has a dimensionality that does not match

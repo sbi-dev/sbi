@@ -578,7 +578,7 @@ class PosteriorEstimator(NeuralInference, ABC):
                 distribution different from the prior.
         """
         if self._round == 0 or force_first_round_loss:
-            theta = reshape_to_sample_batch_event(
+            theta = reshape_to_batch_event(
                 theta, event_shape=self._neural_net.input_shape
             )
             x = reshape_to_batch_event(x, event_shape=self._neural_net.condition_shape)

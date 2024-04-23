@@ -56,54 +56,54 @@ class CategoricalNet(nn.Module):
 
         self.output_layer = nn.Linear(num_hidden, num_categories)
 
-    def forward(self, context: Tensor) -> Tensor:
+    def forward(self, condition: Tensor) -> Tensor:
         """Return categorical probability predicted from a batch of inputs.
 
         Args:
-            context: batch of context parameters for the net.
+            condition: batch of context parameters for the net.
 
         Returns:
             Tensor: batch of predicted categorical probabilities.
         """
         # forward path
-        context = self.activation(self.input_layer(context))
+        condition = self.activation(self.input_layer(condition))
 
-        # iterate n hidden layers, input context and calculate tanh activation
+        # iterate n hidden layers, input condition and calculate tanh activation
         for layer in self.hidden_layers:
-            context = self.activation(layer(context))
+            condition = self.activation(layer(condition))
 
-        return self.softmax(self.output_layer(context))
+        return self.softmax(self.output_layer(condition))
 
-    def log_prob(self, input: Tensor, context: Tensor) -> Tensor:
-        """Return categorical log probability of categories input, given context.
+    def log_prob(self, input: Tensor, condition: Tensor) -> Tensor:
+        """Return categorical log probability of categories input, given condition.
 
         Args:
             input: categories to evaluate.
-            context: parameters.
+            condition: parameters.
 
         Returns:
             Tensor: log probs with shape (input.shape[0],)
         """
         # Predict categorical ps and evaluate.
-        ps = self.forward(context)
+        ps = self.forward(condition)
         # Squeeze dim=1 because `Categorical` has `event_shape=()` but our data usually
         # has an event_shape of `(1,)`.
         return Categorical(probs=ps).log_prob(input.squeeze(dim=1))
 
-    def sample(self, sample_shape: torch.Size, context: Tensor) -> Tensor:
+    def sample(self, sample_shape: torch.Size, condition: Tensor) -> Tensor:
         """Returns samples from categorical random variable with probs predicted from
         the neural net.
 
         Args:
             sample_shape: number of samples to obtain.
-            context: batch of parameters for prediction.
+            condition: batch of parameters for prediction.
 
         Returns:
             Tensor: Samples with shape (num_samples, 1)
         """
 
         # Predict Categorical ps and sample.
-        ps = self.forward(context)
+        ps = self.forward(condition)
         return Categorical(probs=ps).sample(sample_shape=sample_shape)
 
 
@@ -176,11 +176,11 @@ class CategoricalMassEstimator(DensityEstimator):
         r"""Return the loss for training the density estimator.
 
         Args:
-            input: Inputs of shape `(sample_dim, batch_dim, *input_event_shape)`.
+            input: Inputs of shape `(batch_dim, *input_event_shape)`.
             condition: Conditions of shape `(batch_dim, *condition_event_shape)`.
 
         Returns:
             Loss of shape `(batch_dim,)`
         """
 
-        return -self.log_prob(input, condition)
+        return -self.log_prob(input.unsqueeze(0), condition)[0]
