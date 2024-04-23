@@ -49,7 +49,11 @@ def test_running_lc2st(method, classifier, cv_folds):
     assert posterior_samples.shape == thetas.shape
 
     if method == LC2ST:
-        theta_o = npe.sample((num_eval,), condition=xs[0]).detach()
+        theta_o = (
+            npe.sample((num_eval,), condition=xs[0][None, :])
+            .reshape(-1, thetas.shape[-1])
+            .detach()
+        )
         assert theta_o.shape == thetas.shape
         kwargs_test = {}
         kwargs_eval = {"theta_o": theta_o}
@@ -96,6 +100,7 @@ def test_running_lc2st(method, classifier, cv_folds):
     _ = lc2st.reject_test(x_o=xs[0], **kwargs_eval)
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("method", (LC2ST, LC2ST_NF))
 def test_lc2st_true_negativ_rate(method):
     """Tests the true negative rate of the LC2ST-(NF) test:
@@ -127,7 +132,7 @@ def test_lc2st_true_negativ_rate(method):
 
     thetas = prior.sample((num_cal,))
     xs = simulator(thetas)
-    posterior_samples = npe.sample((1,), xs)[:, 0, :].detach()
+    posterior_samples = npe.sample((1,), xs).reshape(-1, thetas.shape[-1]).detach()
 
     if method == LC2ST:
         kwargs_test = {}
@@ -151,9 +156,13 @@ def test_lc2st_true_negativ_rate(method):
 
     results = []
     for _ in range(num_runs):
-        x = simulator(prior.sample((1,)))[0]
+        x = simulator(prior.sample((1,)))
         if method == LC2ST:
-            theta_o = npe.sample((num_eval,), condition=x).detach()
+            theta_o = (
+                npe.sample((num_eval,), condition=x)
+                .reshape(-1, thetas.shape[-1])
+                .detach()
+            )
             kwargs_eval = {"theta_o": theta_o}
         else:
             kwargs_eval = {}
@@ -202,7 +211,7 @@ def test_lc2st_true_positiv_rate(method):
 
     thetas = prior.sample((num_cal,))
     xs = simulator(thetas)
-    posterior_samples = npe.sample((1,), xs)[:, 0, :].detach()
+    posterior_samples = npe.sample((1,), xs).reshape(-1, thetas.shape[-1]).detach()
 
     if method == LC2ST:
         kwargs_test = {}
@@ -226,9 +235,13 @@ def test_lc2st_true_positiv_rate(method):
 
     results = []
     for _ in range(num_runs):
-        x = simulator(prior.sample((1,)))[0]
+        x = simulator(prior.sample((1,)))
         if method == LC2ST:
-            theta_o = npe.sample((num_eval,), condition=x).detach()
+            theta_o = (
+                npe.sample((num_eval,), condition=x)
+                .reshape(-1, thetas.shape[-1])
+                .detach()
+            )
             kwargs_eval = {"theta_o": theta_o}
         else:
             kwargs_eval = {}
