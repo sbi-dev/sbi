@@ -150,8 +150,8 @@ def test_density_estimator_loss_shapes(
         input_sample_dim,
     )
 
-    losses = density_estimator.loss(inputs, condition=conditions)
-    assert losses.shape == (input_sample_dim, batch_dim)
+    losses = density_estimator.loss(inputs[0], condition=conditions)
+    assert losses.shape == (batch_dim,)
 
 
 @pytest.mark.parametrize(
@@ -193,8 +193,8 @@ def test_density_estimator_log_prob_shapes_with_embedding(
         input_sample_dim,
     )
 
-    losses = density_estimator.log_prob(inputs, condition=conditions)
-    assert losses.shape == (input_sample_dim, batch_dim)
+    log_probs = density_estimator.log_prob(inputs, condition=conditions)
+    assert log_probs.shape == (input_sample_dim, batch_dim)
 
 
 @pytest.mark.parametrize(
@@ -228,7 +228,7 @@ def test_density_estimator_sample_shapes(
     condition_event_shape,
     batch_dim,
 ):
-    """Test whether `loss` of DensityEstimators follow the shape convention."""
+    """Test whether `sample` of DensityEstimators follow the shape convention."""
     density_estimator, _, conditions = _build_density_estimator_and_tensors(
         density_estimator_build_fn, input_event_shape, condition_event_shape, batch_dim
     )
@@ -264,13 +264,13 @@ def test_density_estimator_sample_shapes(
 @pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
 @pytest.mark.parametrize("condition_event_shape", ((1,), (7,)))
 @pytest.mark.parametrize("batch_dim", (1, 10))
-def test_correctness_of_density_estimator_loss(
+def test_correctness_of_density_estimator_log_prob(
     density_estimator_build_fn,
     input_event_shape,
     condition_event_shape,
     batch_dim,
 ):
-    """Test whether identical inputs lead to identical loss values."""
+    """Test whether identical inputs lead to identical log_prob values."""
     input_sample_dim = 2
     density_estimator, inputs, condition = _build_density_estimator_and_tensors(
         density_estimator_build_fn,
@@ -279,8 +279,8 @@ def test_correctness_of_density_estimator_loss(
         batch_dim,
         input_sample_dim,
     )
-    losses = density_estimator.loss(inputs, condition=condition)
-    assert torch.allclose(losses[0, :], losses[1, :])
+    log_probs = density_estimator.log_prob(inputs, condition=condition)
+    assert torch.allclose(log_probs[0, :], log_probs[1, :])
 
 
 def _build_density_estimator_and_tensors(

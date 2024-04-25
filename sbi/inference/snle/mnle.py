@@ -5,16 +5,11 @@
 from copy import deepcopy
 from typing import Any, Callable, Dict, Optional, Union
 
-from torch import Tensor
 from torch.distributions import Distribution
 
 from sbi.inference.posteriors import MCMCPosterior, RejectionPosterior, VIPosterior
 from sbi.inference.potentials import mixed_likelihood_estimator_based_potential
 from sbi.inference.snle.snle_base import LikelihoodEstimator
-from sbi.neural_nets.density_estimators.shape_handling import (
-    reshape_to_batch_event,
-    reshape_to_sample_batch_event,
-)
 from sbi.neural_nets.mnle import MixedDensityEstimator
 from sbi.sbi_types import TensorboardSummaryWriter, TorchModule
 from sbi.utils import check_prior, del_entries
@@ -196,18 +191,3 @@ class MNLE(LikelihoodEstimator):
         self._model_bank.append(deepcopy(self._posterior))
 
         return deepcopy(self._posterior)
-
-    # Temporary: need to rewrite mixed likelihood estimators as DensityEstimator
-    # objects.
-    # TODO: Fix and merge issue #968
-    def _loss(self, theta: Tensor, x: Tensor) -> Tensor:
-        r"""Return loss for SNLE, which is the likelihood of $-\log q(x_i | \theta_i)$.
-
-        Returns:
-            Negative log prob.
-        """
-        theta = reshape_to_batch_event(
-            theta, event_shape=self._neural_net.condition_shape
-        )
-        x = reshape_to_sample_batch_event(x, event_shape=self._neural_net.input_shape)
-        return -self._neural_net.log_prob(x, condition=theta)
