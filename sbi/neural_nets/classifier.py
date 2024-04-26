@@ -8,7 +8,7 @@ from typing import Optional
 from pyknos.nflows.nn import nets
 from torch import Tensor, nn, relu
 
-from sbi.neural_nets.ratio_estimators import TensorRatioEstimator
+from sbi.neural_nets.ratio_estimators import RatioEstimator
 from sbi.utils.sbiutils import standardizing_net, z_score_parser
 from sbi.utils.user_input_checks import check_data_device, check_embedding_net_device
 
@@ -49,7 +49,7 @@ def build_linear_classifier(
     embedding_net_x: nn.Module = nn.Identity(),
     embedding_net_y: nn.Module = nn.Identity(),
     **kwargs,
-) -> TensorRatioEstimator:
+) -> RatioEstimator:
     """Builds linear classifier.
 
     In SNRE, the classifier will receive batches of thetas and xs.
@@ -77,6 +77,10 @@ def build_linear_classifier(
     check_embedding_net_device(embedding_net=embedding_net_x, datum=batch_y)
     check_embedding_net_device(embedding_net=embedding_net_y, datum=batch_y)
 
+    # Infer the shapes
+    x_shape = batch_x[:1].shape
+    y_shape = batch_y[:1].shape
+
     # Infer the output dimensionalities of the embedding_net by making a forward pass.
     x_numel = embedding_net_x(batch_x[:1]).size(-1)
     y_numel = embedding_net_y(batch_y[:1]).size(-1)
@@ -86,8 +90,10 @@ def build_linear_classifier(
     embedding_net_x = build_z_scored_embedding_net(batch_x, z_score_x, embedding_net_x)
     embedding_net_y = build_z_scored_embedding_net(batch_y, z_score_y, embedding_net_y)
 
-    return TensorRatioEstimator(
+    return RatioEstimator(
         net=neural_net,
+        theta_shape=x_shape,
+        x_shape=y_shape,
         embedding_net_theta=embedding_net_x,
         embedding_net_x=embedding_net_y,
     )
@@ -101,7 +107,7 @@ def build_mlp_classifier(
     hidden_features: int = 50,
     embedding_net_x: nn.Module = nn.Identity(),
     embedding_net_y: nn.Module = nn.Identity(),
-) -> TensorRatioEstimator:
+) -> RatioEstimator:
     """Builds MLP classifier.
 
     Args:
@@ -125,6 +131,10 @@ def build_mlp_classifier(
     check_embedding_net_device(embedding_net=embedding_net_x, datum=batch_y)
     check_embedding_net_device(embedding_net=embedding_net_y, datum=batch_y)
 
+    # Infer the shapes
+    x_shape = batch_x[:1].shape
+    y_shape = batch_y[:1].shape
+
     # Infer the output dimensionalities of the embedding_net by making a forward pass.
     x_numel = embedding_net_x(batch_x[:1]).size(-1)
     y_numel = embedding_net_y(batch_y[:1]).size(-1)
@@ -142,8 +152,10 @@ def build_mlp_classifier(
     embedding_net_x = build_z_scored_embedding_net(batch_x, z_score_x, embedding_net_x)
     embedding_net_y = build_z_scored_embedding_net(batch_y, z_score_y, embedding_net_y)
 
-    return TensorRatioEstimator(
+    return RatioEstimator(
         net=neural_net,
+        theta_shape=x_shape,
+        x_shape=y_shape,
         embedding_net_theta=embedding_net_x,
         embedding_net_x=embedding_net_y,
     )
@@ -160,7 +172,7 @@ def build_resnet_classifier(
     num_blocks: int = 2,
     dropout_probability: float = 0.0,
     use_batch_norm: bool = False,
-) -> TensorRatioEstimator:
+) -> RatioEstimator:
     """Builds ResNet classifier.
 
     In SNRE, the classifier will receive batches of thetas and xs.
@@ -186,6 +198,10 @@ def build_resnet_classifier(
     check_embedding_net_device(embedding_net=embedding_net_x, datum=batch_y)
     check_embedding_net_device(embedding_net=embedding_net_y, datum=batch_y)
 
+    # Infer the shapes
+    x_shape = batch_x[:1].shape
+    y_shape = batch_y[:1].shape
+
     # Infer the output dimensionalities of the embedding_net by making a forward pass.
     x_numel = embedding_net_x(batch_x[:1]).size(-1)
     y_numel = embedding_net_y(batch_y[:1]).size(-1)
@@ -204,8 +220,10 @@ def build_resnet_classifier(
     embedding_net_x = build_z_scored_embedding_net(batch_x, z_score_x, embedding_net_x)
     embedding_net_y = build_z_scored_embedding_net(batch_y, z_score_y, embedding_net_y)
 
-    return TensorRatioEstimator(
+    return RatioEstimator(
         net=neural_net,
+        theta_shape=x_shape,
+        x_shape=y_shape,
         embedding_net_theta=embedding_net_x,
         embedding_net_x=embedding_net_y,
     )

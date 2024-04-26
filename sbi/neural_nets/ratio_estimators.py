@@ -1,65 +1,25 @@
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
-
 import torch
 from torch import Tensor, nn
 
 
-class RatioEstimator(nn.Module, ABC):
+class RatioEstimator(nn.Module):
     r"""Base class for ratio estimators.
 
     The ratio estimator class is a wrapper around neural networks that enables
     evaluation of `unnormalized_log_ratio` for `theta`, `x` pairs. It also
     provides a method for combining `theta` and `x` into a single tensor.
-    """
-
-    def __init__(self) -> None:
-        r"""Base class for ratio estimators."""
-        super().__init__()
-
-    @abstractmethod
-    def combine_theta_and_x(self, theta: Tensor, x: Tensor) -> Tensor:
-        r"""Combine theta and x sensibly for the data type.
-
-        Args:
-            theta
-            x
-
-        Returns:
-            Single object containing both theta and x
-        """
-        pass
-
-    @abstractmethod
-    def unnormalized_log_ratio(self, theta: Tensor, x: Tensor, **kwargs) -> Tensor:
-        r"""Return the unnormalized log ratios of the thetas given an x, or multiple
-        (batched) xs.
-
-        Args:
-            theta
-            x
-
-        Returns:
-            Sample-wise unnormalized log ratios. Just like log_prob, the last dimension
-            should be squeezed.
-        """
-        pass
-
-    def forward(self, *args, **kwargs) -> Tensor:
-        r"""Wraps `unnormalized_log_ratio`"""
-        return self.unnormalized_log_ratio(*args, **kwargs)
-
-
-# TODO: following class does not yet actually use the shapes it claims to use!
-class TensorRatioEstimator(RatioEstimator):
-    """Base class for ratio estimators that take tensors as input.
 
     Note:
         We assume that the input to the ratio estimator is a tensor of shape
-        (sample_dim, batch_dim, *event_shape) where sample_dim are iid draws,
-        batch_dim are independent (not necessarily identically distributed)
-        draws, and event_shape can be totally dependent.
+        `(sample_dim, batch_dim, *event_shape)` where `sample_dim` are iid draws,
+        `batch_dim` are independent (not necessarily identically distributed)
+        draws, and `event_shape` can be totally dependent.
+
+        It is also possible that `sample_dim` and `batch_dim` are not present.
+        Note: `dim` implies 1 dim, `shape` could be more than 1 dim.
+
         See: https://bochang.me/blog/posts/pytorch-distributions/
     """
 
@@ -71,12 +31,12 @@ class TensorRatioEstimator(RatioEstimator):
         embedding_net_theta: nn.Module = nn.Identity(),
         embedding_net_x: nn.Module = nn.Identity(),
     ) -> None:
-        r"""Wrapper class for ratio estimators concatenating theta and x embeddings.
+        r"""Class for ratio estimators that concatenate theta and x embeddings.
 
         Args:
             net: neural network taking in combined, embedded `theta` and `x`
-            theta_shape
-            x_shape
+            theta_shape: event_shape for theta
+            x_shape: event_shape for x
             embedding_net_theta
             embedding_net_x
         """
@@ -88,36 +48,42 @@ class TensorRatioEstimator(RatioEstimator):
         self.embedding_net_x = embedding_net_x
 
     @staticmethod
-    def _check_shape(y: Tensor, shape: torch.Size | tuple[int, ...]) -> None:
+    def _check_shape_suffix(
+        y: Tensor,
+        shape: torch.Size | tuple[int, ...],
+        tensor_name: str,
+        shape_name: str,
+    ) -> None:
         r"""This method checks whether y has the correct shape.
 
         Args:
-            y: Tensor of shape (*batch_shape, *y_shape).
+            y: Tensor of shape `(*batch_shape, *y_shape)`.
+            shape: expected shape for `y_shape`
+            tensor_name: for errors
+            shape_name: for errors
 
-        Returns:
-            False:
-                1. If the y has a dimensionality that does not match
-                the expected input dimensionality.
-                2. If the shape of the y does not match the expected
-                input dimensionality.
-            True: otherwise
+        Raises:
+            ValueError: If `y` has a dimensionality that does not match
+                        the expected input dimensionality.
+            ValueError: If the shape of `y` does not match the expected
+                        input dimensionality.
         """
         if len(y.shape) < len(shape):
             raise ValueError(
-                f"Dimensionality of tensor is to small and does not match the\
-                expected input dimensionality {len(shape)}, as provided\
-                by tensor_shape."
+                f"Dimensionality of {tensor_name} is to small and does not match the \
+                expected input dimensionality {len(shape)}, as provided \
+                by {shape_name}."
             )
         else:
             tensor_shape = y.shape[-len(shape) :]
             if tuple(tensor_shape) != tuple(shape):
                 raise ValueError(
-                    f"Shape of tensor {tuple(tensor_shape)} does not match the \
-                    expected input dimensionality {tuple(shape)}, as \
-                    provided by tensor_shape. Please reshape it accordingly."
+                    f"Shape of tensor {tensor_name}={tuple(tensor_shape)} does not \
+                    match the expected input dimensionality {tuple(shape)}, as \
+                    provided by {shape_name}. Please reshape it accordingly."
                 )
 
-    def _check_x_shape(self, x: Tensor) -> None:
+    def _check_x_shape_suffix(self, x: Tensor) -> None:
         r"""This method checks whether x has the correct shape.
 
         Args:
@@ -129,9 +95,9 @@ class TensorRatioEstimator(RatioEstimator):
             ValueError: If the shape of the x does not match the expected
                         input dimensionality.
         """
-        return self._check_shape(x, self.x_shape)
+        return self._check_shape_suffix(x, self.x_shape, "x", "x_shape")
 
-    def _check_theta_shape(self, theta: Tensor) -> None:
+    def _check_theta_shape_suffix(self, theta: Tensor) -> None:
         r"""This method checks whether theta has the correct shape.
 
         Args:
@@ -143,7 +109,23 @@ class TensorRatioEstimator(RatioEstimator):
             ValueError: If the shape of the theta does not match the expected
                         input dimensionality.
         """
-        return self._check_shape(theta, self.theta_shape)
+        return self._check_shape_suffix(theta, self.theta_shape, "theta", "theta_shape")
+
+    def _check_shape_prefix(self, theta: Tensor, x: Tensor) -> None:
+        r"""This method checks whether theta and x agree on the prefix of their shape.
+
+        Args:
+            theta: Tensor of shape (*batch_shape, *theta_shape).
+            x: Tensor of shape (*batch_shape, *x_shape).
+
+        Raises:
+            ValueError: If the `batch_shape`s do not agree.
+        """
+        theta_prefix = theta.shape[-len(self.theta_shape) :]
+        x_prefix = x.shape[-len(self.x_shape) :]
+        if theta_prefix != x_prefix:
+            raise ValueError(f"{tuple(theta_prefix)=} != {tuple(x_prefix)}. \
+                             Make them agree, since we do not broadcast for you.")
 
     def combine_theta_and_x(self, theta: Tensor, x: Tensor, dim: int = -1) -> Tensor:
         """After embedding them, concatenate embedded_theta and embedded_x
@@ -155,8 +137,9 @@ class TensorRatioEstimator(RatioEstimator):
         Returns:
             combined: shape (sample_dim, batch_dim, combined_event_dim)
         """
-        self._check_theta_shape(theta)
-        self._check_x_shape(x)
+        self._check_theta_shape_suffix(theta)
+        self._check_x_shape_suffix(x)
+        self._check_shape_prefix(theta, x)
         embedded_theta = self.embedding_net_theta(theta)
         embedded_x = self.embedding_net_x(x)
         return torch.cat([embedded_theta, embedded_x], dim=dim)
@@ -176,3 +159,7 @@ class TensorRatioEstimator(RatioEstimator):
 
         z = self.combine_theta_and_x(theta, x)
         return self.net(z).squeeze(-1)
+
+    def forward(self, *args, **kwargs) -> Tensor:
+        r"""Wraps `unnormalized_log_ratio`"""
+        return self.unnormalized_log_ratio(*args, **kwargs)

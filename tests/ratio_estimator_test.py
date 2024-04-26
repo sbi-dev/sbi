@@ -9,7 +9,7 @@ from torch import eye, zeros
 from torch.distributions import MultivariateNormal
 
 from sbi.neural_nets.classifier import build_linear_classifier
-from sbi.neural_nets.ratio_estimators import TensorRatioEstimator
+from sbi.neural_nets.ratio_estimators import RatioEstimator
 
 
 class EmbeddingNet(torch.nn.Module):
@@ -23,7 +23,7 @@ class EmbeddingNet(torch.nn.Module):
         return x
 
 
-@pytest.mark.parametrize("ratio_estimator", (TensorRatioEstimator,))
+@pytest.mark.parametrize("ratio_estimator", (RatioEstimator,))
 @pytest.mark.parametrize(
     "theta_shape", ((1,), (2,), (1, 1), (2, 2), (1, 1, 1), (2, 2, 2))
 )
@@ -45,7 +45,7 @@ def test_api_ratio_estimator(ratio_estimator, theta_shape, x_shape):
     x_mvn = MultivariateNormal(loc=zeros(*x_shape), covariance_matrix=eye(x_shape[-1]))
     batch_x = x_mvn.sample((nsamples,))
 
-    if ratio_estimator == TensorRatioEstimator:
+    if ratio_estimator == RatioEstimator:
         estimator = build_linear_classifier(
             batch_x=batch_theta,
             batch_y=batch_x,
