@@ -162,7 +162,16 @@ class MixedDensityEstimator(DensityEstimator):
         return log_probs_combined
 
     def loss(self, input: Tensor, condition: Tensor, **kwargs) -> Tensor:
-        return self.log_prob(input, condition)
+        r"""Return the loss for training the density estimator.
+
+        Args:
+            input: Inputs of shape `(batch_dim, *input_event_shape)`.
+            condition: Conditions of shape `(batch_dim, *condition_event_shape)`.
+
+        Returns:
+            Loss of shape `(batch_dim,)`
+        """
+        return -self.log_prob(input.unsqueeze(0), condition)[0]
 
     def log_prob_iid(self, input: Tensor, condition: Tensor) -> Tensor:
         """Return logprob given a batch of iid input and a different batch of condition.

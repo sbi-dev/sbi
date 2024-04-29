@@ -1,3 +1,6 @@
+# This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+
 from typing import Tuple
 
 import torch
@@ -52,20 +55,6 @@ class NFlowsFlow(DensityEstimator):
 
         Returns:
             noise: Transformed inputs.
-
-        Note:
-            This function should support PyTorch's automatic broadcasting. This means
-            the function should behave as follows for different input and condition
-            shapes:
-            - (input_size,) + (batch_size,*condition_shape) -> (batch_size,)
-            - (batch_size, input_size) + (*condition_shape) -> (batch_size,)
-            - (batch_size, input_size) + (batch_size, *condition_shape) -> (batch_size,)
-            - (batch_size1, input_size) + (batch_size2, *condition_shape)
-                                                  -> RuntimeError i.e. not broadcastable
-            - (batch_size1,1, input_size) + (batch_size2, *condition_shape)
-                                                  -> (batch_size1,batch_size2)
-            - (batch_size1, input_size) + (batch_size2,1, *condition_shape)
-                                                  -> (batch_size2,batch_size1)
         """
         self._check_condition_shape(condition)
         condition_dims = len(self.condition_shape)
@@ -121,17 +110,16 @@ class NFlowsFlow(DensityEstimator):
         return log_probs.reshape((input_sample_dim, input_batch_dim))
 
     def loss(self, input: Tensor, condition: Tensor) -> Tensor:
-        r"""Return the loss for training the density estimator.
+        r"""Return the negative log-probability for training the density estimator.
 
         Args:
-            input: Inputs to evaluate the loss on of shape
-                `(sample_dim, batch_dim, *event_shape)`.
-            condition: Conditions of shape `(sample_dim, batch_dim, *event_dim)`.
+            input: Inputs of shape `(batch_dim, *input_event_shape)`.
+            condition: Conditions of shape `(batch_dim, *condition_event_shape)`.
 
         Returns:
-            Negative log_probability of shape `(input_sample_dim, condition_batch_dim)`.
+            Negative log-probability of shape `(batch_dim,)`.
         """
-        return -self.log_prob(input, condition)
+        return -self.log_prob(input.unsqueeze(0), condition)[0]
 
     def sample(self, sample_shape: Shape, condition: Tensor) -> Tensor:
         r"""Return samples from the density estimator.

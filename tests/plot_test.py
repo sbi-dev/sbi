@@ -1,12 +1,12 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import numpy as np
 import pytest
 import torch
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
-from matplotlib.pyplot import subplots
+from matplotlib.pyplot import close, subplots
 from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi.analysis import pairplot, plot_summary, sbc_rank_plot
@@ -24,7 +24,12 @@ from sbi.utils import BoxUniform
 def test_pairplot(
     samples, labels, legend, offdiag, samples_labels, points_labels, points
 ):
-    pairplot(**{k: v for k, v in locals().items() if v is not None})
+    fig, axs = pairplot(**{k: v for k, v in locals().items() if v is not None})
+
+    assert isinstance(fig, Figure)
+    assert isinstance(axs, np.ndarray)
+    assert isinstance(axs[0, 0], Axes)
+    close()
 
 
 @pytest.mark.parametrize("method", (SNPE, SNLE, SNRE))

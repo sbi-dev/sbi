@@ -1,5 +1,6 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+
 import time
 from abc import ABC, abstractmethod
 from copy import deepcopy
@@ -578,7 +579,7 @@ class PosteriorEstimator(NeuralInference, ABC):
                 distribution different from the prior.
         """
         if self._round == 0 or force_first_round_loss:
-            theta = reshape_to_sample_batch_event(
+            theta = reshape_to_batch_event(
                 theta, event_shape=self._neural_net.input_shape
             )
             x = reshape_to_batch_event(x, event_shape=self._neural_net.condition_shape)
