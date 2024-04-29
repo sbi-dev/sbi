@@ -2,7 +2,6 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import collections
-from logging import warn
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union, cast
 from warnings import warn
 
@@ -1839,6 +1838,7 @@ def _plot_hist_region_expected_under_uniformity(
 
 # Diagnostics for hypothesis tests
 
+
 def pp_plot(
     scores: Union[List[np.ndarray], Dict[Any, np.ndarray]],
     scores_null: Union[List[np.ndarray], Dict[Any, np.ndarray]],
@@ -2066,6 +2066,7 @@ def pp_plot_lc2st(
         conf_alpha=conf_alpha,
         **kwargs,
     )
+
 
 # TO BE DEPRECATED
 # ----------------
