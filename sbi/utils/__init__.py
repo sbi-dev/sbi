@@ -71,3 +71,5 @@ from sbi.utils.user_input_checks import (
 )
 from sbi.utils.user_input_checks_utils import MultipleIndependent
 from sbi.utils.get_nn_models import posterior_nn, likelihood_nn, classifier_nn
+
+from sbi.utils.sbmi_utils import get_parameter_mask
