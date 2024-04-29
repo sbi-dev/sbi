@@ -73,48 +73,51 @@ def plt_hist_1d(
     ax: Axes,
     samples: np.ndarray,
     limits: torch.Tensor,
-    kwargs: Dict,
+    diag_kwargs: Dict,
 ) -> None:
     """Plot 1D histogram."""
-    if "bins" not in kwargs['mpl_kwargs'] or kwargs['mpl_kwargs']["bins"] is None:
-        if kwargs["bin_heuristic"] == "Freedman-Diaconis":
+    if (
+        "bins" not in diag_kwargs['mpl_kwargs']
+        or diag_kwargs['mpl_kwargs']["bins"] is None
+    ):
+        if diag_kwargs["bin_heuristic"] == "Freedman-Diaconis":
             # The Freedman-Diaconis heuristic
             binsize = 2 * iqr(samples) * len(samples) ** (-1 / 3)
-            kwargs['mpl_kwargs']["bins"] = np.arange(
+            diag_kwargs['mpl_kwargs']["bins"] = np.arange(
                 limits[0], limits[1] + binsize, binsize
             )
         else:
             # TODO: add more bin heuristics
             pass
-    if isinstance(kwargs['mpl_kwargs']["bins"], int):
-        kwargs['mpl_kwargs']["bins"] = np.linspace(
-            limits[0], limits[1], kwargs['mpl_kwargs']["bins"]
+    if isinstance(diag_kwargs['mpl_kwargs']["bins"], int):
+        diag_kwargs['mpl_kwargs']["bins"] = np.linspace(
+            limits[0], limits[1], diag_kwargs['mpl_kwargs']["bins"]
         )
-    ax.hist(samples, **kwargs['mpl_kwargs'])
+    ax.hist(samples, **diag_kwargs['mpl_kwargs'])
 
 
 def plt_kde_1d(
     ax: Axes,
     samples: np.ndarray,
     limits: torch.Tensor,
-    kwargs: Dict,
+    diag_kwargs: Dict,
 ) -> None:
     """Run 1D kernel density estimation on samples and plot it on a given axes."""
-    density = gaussian_kde(samples, bw_method=kwargs["bw_method"])
-    xs = np.linspace(limits[0], limits[1], kwargs["bins"])
+    density = gaussian_kde(samples, bw_method=diag_kwargs["bw_method"])
+    xs = np.linspace(limits[0], limits[1], diag_kwargs["bins"])
     ys = density(xs)
-    ax.plot(xs, ys, **kwargs['mpl_kwargs'])
+    ax.plot(xs, ys, **diag_kwargs['mpl_kwargs'])
 
 
 def plt_scatter_1d(
     ax: Axes,
     samples: np.ndarray,
     limits: torch.Tensor,
-    kwargs: Dict,
+    diag_kwargs: Dict,
 ) -> None:
-    """Scatter plot in 1D: plot vertical lines for each sample."""
+    """Plot vertical lines for each sample. Note: limits are not used."""
     for single_sample in samples:
-        ax.axvline(single_sample, **kwargs['mpl_kwargs'])
+        ax.axvline(single_sample, **diag_kwargs['mpl_kwargs'])
 
 
 def plt_hist_2d(
@@ -123,20 +126,20 @@ def plt_hist_2d(
     samples_row: np.ndarray,
     limits_col: torch.Tensor,
     limits_row: torch.Tensor,
-    kwargs: Dict,
+    offdiag_kwargs: Dict,
 ):
     """Plot 2D histogram."""
     if (
-        "bins" not in kwargs['np_hist_kwargs']
-        or kwargs['np_hist_kwargs']["bins"] is None
+        "bins" not in offdiag_kwargs['np_hist_kwargs']
+        or offdiag_kwargs['np_hist_kwargs']["bins"] is None
     ):
-        if kwargs["bin_heuristic"] == "Freedman-Diaconis":
+        if offdiag_kwargs["bin_heuristic"] == "Freedman-Diaconis":
             # The Freedman-Diaconis heuristic applied to each direction
             binsize_col = 2 * iqr(samples_col) * len(samples_col) ** (-1 / 3)
             n_bins_col = int((limits_col[1] - limits_col[0]) / binsize_col)
             binsize_row = 2 * iqr(samples_row) * len(samples_row) ** (-1 / 3)
             n_bins_row = int((limits_row[1] - limits_row[0]) / binsize_row)
-            kwargs['np_hist_kwargs']["bins"] = [n_bins_col, n_bins_row]
+            offdiag_kwargs['np_hist_kwargs']["bins"] = [n_bins_col, n_bins_row]
         else:
             # TODO: add more bin heuristics
             pass
@@ -147,7 +150,7 @@ def plt_hist_2d(
             [limits_col[0], limits_col[1]],
             [limits_row[0], limits_row[1]],
         ],
-        **kwargs['np_hist_kwargs'],
+        **offdiag_kwargs['np_hist_kwargs'],
     )
     ax.imshow(
         hist.T,
@@ -157,7 +160,7 @@ def plt_hist_2d(
             yedges[0],
             yedges[-1],
         ),
-        **kwargs['mpl_kwargs'],
+        **offdiag_kwargs['mpl_kwargs'],
     )
 
 
@@ -167,10 +170,10 @@ def plt_kde_2d(
     samples_row: np.ndarray,
     limits_col: torch.Tensor,
     limits_row: torch.Tensor,
-    kwargs: Dict,
+    offdiag_kwargs: Dict,
 ) -> None:
     """Run 2D Kernel Density Estimation and plot it on given axis."""
-    X, Y, Z = get_kde(samples_col, samples_row, limits_col, limits_row, kwargs)
+    X, Y, Z = get_kde(samples_col, samples_row, limits_col, limits_row, offdiag_kwargs)
 
     ax.imshow(
         Z,
@@ -180,7 +183,7 @@ def plt_kde_2d(
             limits_row[0],
             limits_row[1],
         ),
-        **kwargs['mpl_kwargs'],
+        **offdiag_kwargs['mpl_kwargs'],
     )
 
 
@@ -190,11 +193,11 @@ def plt_contour_2d(
     samples_row: np.ndarray,
     limits_col: torch.Tensor,
     limits_row: torch.Tensor,
-    kwargs: Dict,
+    offdiag_kwargs: Dict,
 ) -> None:
     """2D Contour based on Kernel Density Estimation."""
 
-    X, Y, Z = get_kde(samples_col, samples_row, limits_col, limits_row, kwargs)
+    X, Y, Z = get_kde(samples_col, samples_row, limits_col, limits_row, offdiag_kwargs)
 
     ax.contour(
         X,
@@ -206,8 +209,8 @@ def plt_contour_2d(
             limits_row[0],
             limits_row[1],
         ),
-        levels=kwargs["levels"],
-        **kwargs['mpl_kwargs'],
+        levels=offdiag_kwargs["levels"],
+        **offdiag_kwargs['mpl_kwargs'],
     )
 
 
@@ -217,13 +220,13 @@ def plt_scatter_2d(
     samples_row: np.ndarray,
     limits_col: torch.Tensor,
     limits_row: torch.Tensor,
-    kwargs: Dict,
+    offdiag_kwargs: Dict,
 ) -> None:
-    """Scatter plot 2D."""
+    """Scatter plot 2D. Note: limits are not used"""
     ax.scatter(
         samples_col,
         samples_row,
-        **kwargs['mpl_kwargs'],
+        **offdiag_kwargs['mpl_kwargs'],
     )
 
 
@@ -233,13 +236,14 @@ def plt_plot_2d(
     samples_row: np.ndarray,
     limits_col: torch.Tensor,
     limits_row: torch.Tensor,
-    kwargs: Dict,
+    offdiag_kwargs: Dict,
 ) -> None:
-    """Plot 2D trajectory"""
+    """Plot 2D trajectory. Note: limits are not used."""
+
     ax.plot(
         samples_col,
         samples_row,
-        **kwargs['mpl_kwargs'],
+        **offdiag_kwargs['mpl_kwargs'],
     )
 
 
@@ -248,30 +252,30 @@ def get_kde(
     samples_row: np.ndarray,
     limits_col: torch.Tensor,
     limits_row: torch.Tensor,
-    kwargs: dict,
+    offdiag_kwargs: dict,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """2D Kernel Density Estimation."""
 
     density = gaussian_kde(
         np.array([samples_col, samples_row]),
-        bw_method=kwargs["bw_method"],
+        bw_method=offdiag_kwargs["bw_method"],
     )
     X, Y = np.meshgrid(
         np.linspace(
             limits_col[0],
             limits_col[1],
-            kwargs["bins"],
+            offdiag_kwargs["bins"],
         ),
         np.linspace(
             limits_row[0],
             limits_row[1],
-            kwargs["bins"],
+            offdiag_kwargs["bins"],
         ),
     )
     positions = np.vstack([X.ravel(), Y.ravel()])
     Z = np.reshape(density(positions).T, X.shape)
-    if "percentile" in kwargs and "levels" in kwargs:
-        Z = probs2contours(Z, kwargs["levels"])
+    if "percentile" in offdiag_kwargs and "levels" in offdiag_kwargs:
+        Z = probs2contours(Z, offdiag_kwargs["levels"])
     else:
         Z = (Z - Z.min()) / (Z.max() - Z.min())
     return X, Y, Z
