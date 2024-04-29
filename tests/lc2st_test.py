@@ -18,7 +18,9 @@ from sbi.simulators.gaussian_mixture import (
 @pytest.mark.parametrize("method", (LC2ST, LC2ST_NF))
 @pytest.mark.parametrize("classifier", ('mlp', 'random_forest', 'custom'))
 @pytest.mark.parametrize("cv_folds", (1, 2))
-def test_running_lc2st(method, classifier, cv_folds):
+@pytest.mark.parametrize("n_ensemble", (1, 3))
+@pytest.mark.parametrize("z_score", (True, False))
+def test_running_lc2st(method, classifier, cv_folds, n_ensemble, z_score):
     """Tests running inference, LC2ST-(NF) and then getting test quantities."""
 
     num_train = 100
@@ -81,6 +83,8 @@ def test_running_lc2st(method, classifier, cv_folds):
         posterior_samples,
         num_folds=cv_folds,
         num_trials_null=num_trials_null,
+        n_ensemble=n_ensemble,
+        z_score=z_score,
         **kwargs_test,
     )
     _ = lc2st.train_under_null_hypothesis()
@@ -102,7 +106,8 @@ def test_running_lc2st(method, classifier, cv_folds):
 
 @pytest.mark.slow
 @pytest.mark.parametrize("method", (LC2ST, LC2ST_NF))
-def test_lc2st_true_negativ_rate(method):
+@pytest.mark.parametrize("n_ensemble", (1, 3))
+def test_lc2st_true_negativ_rate(method, n_ensemble):
     """Tests the true negative rate of the LC2ST-(NF) test:
     for a "bad" estimator, the LC2ST-(NF) should reject the null hypothesis."""
     num_runs = 100
@@ -149,7 +154,7 @@ def test_lc2st_true_negativ_rate(method):
             "num_eval": num_eval,
         }
 
-    lc2st = method(thetas, xs, posterior_samples, **kwargs_test)
+    lc2st = method(thetas, xs, posterior_samples, n_ensemble=n_ensemble, **kwargs_test)
 
     _ = lc2st.train_under_null_hypothesis()
     _ = lc2st.train_on_observed_data()
@@ -181,7 +186,8 @@ def test_lc2st_true_negativ_rate(method):
 
 @pytest.mark.slow
 @pytest.mark.parametrize("method", (LC2ST, LC2ST_NF))
-def test_lc2st_true_positiv_rate(method):
+@pytest.mark.parametrize("n_ensemble", (1, 3))
+def test_lc2st_true_positiv_rate(method, n_ensemble):
     """Tests the true negative rate of the LC2ST-(NF) test:
     for a "good" estimator, the LC2ST-(NF) should accept the null hypothesis."""
     num_runs = 100
@@ -228,7 +234,7 @@ def test_lc2st_true_positiv_rate(method):
             "num_eval": num_eval,
         }
 
-    lc2st = method(thetas, xs, posterior_samples, **kwargs_test)
+    lc2st = method(thetas, xs, posterior_samples, n_ensemble=n_ensemble, **kwargs_test)
 
     _ = lc2st.train_under_null_hypothesis()
     _ = lc2st.train_on_observed_data()

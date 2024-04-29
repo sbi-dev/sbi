@@ -18,6 +18,7 @@ class LC2ST:
         posterior_samples: Tensor,
         seed: int = 1,
         num_folds: int = 1,
+        n_ensemble: int = 5,
         classifier: str = "mlp",
         z_score: bool = False,
         clf_class: Optional[Any] = None,
@@ -90,6 +91,7 @@ class LC2ST:
         # set parameters for classifier training
         self.seed = seed
         self.num_folds = num_folds
+        self.n_ensemble = n_ensemble
 
         # initialize classifier
         if "mlp" in classifier.lower():
@@ -178,6 +180,23 @@ class LC2ST:
                 )
 
                 trained_clfs.append(clf_n)
+
+        # ensembling
+        if self.n_ensemble > 1:
+            trained_clfs = []
+            for n in tqdm(
+                range(self.n_ensemble), desc="Ensembling", disable=verbosity < 1
+            ):
+                # set random state and initialize classifier
+                if "random_state" in self.clf_kwargs:
+                    self.clf_kwargs["random_state"] += n
+                    clf = self.clf_class(**self.clf_kwargs)
+                else:
+                    clf = self.clf_class(**self.clf_kwargs, random_state=n + 1)
+                # train single classifier
+                clf_n = train_lc2st(theta_p, theta_q, x_p, x_q, clf)
+                trained_clfs.append(clf_n)
+
         else:
             # train single classifier
             clf = train_lc2st(theta_p, theta_q, x_p, x_q, clf)
