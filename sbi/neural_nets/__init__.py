@@ -8,8 +8,11 @@ from sbi.neural_nets.classifier import (
 from sbi.neural_nets.density_estimators import DensityEstimator, NFlowsFlow
 from sbi.neural_nets.embedding_nets import (
     CNNEmbedding,
+    CNNEmbeddingMasked,
     FCEmbedding,
+    FCEmbeddingMasked,
     PermutationInvariantEmbedding,
+    PermutationInvariantEmbeddingMasked,
 )
 from sbi.neural_nets.factory import classifier_nn, likelihood_nn, posterior_nn
 from sbi.neural_nets.flow import (

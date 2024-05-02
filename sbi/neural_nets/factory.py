@@ -27,10 +27,12 @@ from sbi.neural_nets.flow import (
     build_zuko_unaf,
 )
 from sbi.neural_nets.mdn import build_mdn
+from sbi.neural_nets.mdn_flex import build_mdn_flex
 from sbi.neural_nets.mnle import build_mnle
 
 model_builders = {
     "mdn": build_mdn,
+    "mdn_flex": build_mdn_flex,
     "made": build_made,
     "maf": build_maf,
     "maf_rqs": build_maf_rqs,
@@ -215,7 +217,7 @@ def posterior_nn(
 
     Args:
         model: The type of density estimator that will be created. One of [`mdn`,
-            `made`, `maf`, `maf_rqs`, `nsf`].
+            `mdn_flex`, `made`, `maf`, `maf_rqs`, `nsf`].
         z_score_theta: Whether to z-score parameters $\theta$ before passing them into
             the network, can take one of the following:
             - `none`, or None: do not z-score.
@@ -235,7 +237,7 @@ def posterior_nn(
             embedding net allows to learn features from potentially high-dimensional
             simulation outputs.
         num_components: Number of mixture components for a mixture of Gaussians.
-            Ignored if density estimator is not an mdn.
+            Ignored if density estimator is not an mdn or mdn_flex.
         kwargs: additional custom arguments passed to downstream build functions.
     """
 
