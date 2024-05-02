@@ -309,3 +309,243 @@ class PermutationInvariantEmbedding(nn.Module):
 
         # add number of trials as additional input
         return self.fc_subnet(torch.cat([combined_embedding, trial_counts], dim=1))
+
+
+# Embedding networks for SBMI
+
+
+class CNNEmbeddingMasked(nn.Module):
+    def __init__(
+        self,
+        input_dim: int,
+        output_dim: int,
+        unchanged_dim: int,
+        num_fc: int = 2,
+        num_hiddens: int = 120,
+        non_linearity="relu",
+        skip_connection_conv=False,
+    ):
+        """multi-layer NN for 1d and 1 channel input.
+            first 2 layers are convolutional, followed by fully connected layers.
+            leave the last dimensions of the input unchanged
+            adds an additional channel dimension.
+        Args:
+            input_dim: Dimensionality of input.
+            output_dim:
+            unchanged_dim: last unchanged_dim are not passed through the network
+                and are unchanged.
+            num_conv: Number of con layers.
+            num_fc: Number fully connected layer, min of 2
+            num_hiddens: number of hidden dims in fc
+            non_linearity: non linearity to use in conv and fc layers,
+                either 'relu' or 'leaky_relu'
+            skip_connection_conv: if to add a skip connection to pass the conv module
+        """
+        super().__init__()
+        self.input_dim = input_dim
+        self.output_dim = output_dim
+        self.num_hiddens = num_hiddens
+        self.unchanged_dim = unchanged_dim
+        self.skip_connection_conv = skip_connection_conv
+
+        if non_linearity == "relu":
+            nl = nn.ReLU()
+        elif non_linearity == "leaky_relu":
+            nl = nn.LeakyReLU()
+
+        # construct conv-pool subnet
+        pool = nn.MaxPool1d(4)
+        conv_layers = [nn.Conv1d(1, 10, 5, padding="same"), nl, pool]
+        conv_layers.append(nn.Conv1d(10, 16, 5, padding="same"))
+        conv_layers.append(nl)
+        conv_layers.append(pool)
+        self.conv_subnet = nn.Sequential(*conv_layers)
+
+        # construct fully connected layers
+        dim_input_linear = 16 * (int((self.input_dim - unchanged_dim) / 16))
+        if skip_connection_conv:
+            dim_input_linear += self.input_dim - unchanged_dim
+        fc_layers = [
+            nn.Linear(dim_input_linear, num_hiddens),
+            nl,
+        ]
+        for _ in range(num_fc - 2):
+            fc_layers.append(nn.Linear(num_hiddens, num_hiddens))
+            fc_layers.append(nl)
+        fc_layers.append(nn.Linear(num_hiddens, output_dim - unchanged_dim))
+        fc_layers.append(nl)
+
+        self.fc_subnet = nn.Sequential(*fc_layers)
+
+    def forward(self, x):
+        """Network forward pass.
+        Args:
+            x: Input tensor (batch_size, num_features)
+        Returns:
+            Network output (batch_size, num_features).
+        """
+
+        # add channel dimension
+        e = x.unsqueeze(1)
+        # print("x shape of input",x[:,:,:-self.unchanged_dim].shape)
+
+        # apply conv net
+        e = self.conv_subnet(e[:, :, : -self.unchanged_dim])
+
+        e = torch.flatten(e, 1)  # flatten all dimensions except batch
+        # print("x shape after flatten",x.shape)
+        if self.skip_connection_conv:
+            e = torch.cat([e.T, x[:, : -self.unchanged_dim].T]).T
+
+        # apply fc net
+        embedding = self.fc_subnet(e)
+
+        return torch.cat((embedding, x[:, -self.unchanged_dim :]), 1)
+
+
+class FCEmbeddingMasked(nn.Module):
+    def __init__(
+        self,
+        input_dim: int,
+        output_dim: int,
+        unchanged_dim: int,
+        num_layers: int = 2,
+        num_hiddens: int = 50,
+    ):
+        """multi-layer NN
+            fully connected layers.
+            leave the last dimensions of the input unchanged
+        Args:
+            input_dim: Dimensionality of input. (including unchanged dim)
+            output_dim:
+            unchanged_dim: last unchanged_dim are not passed through the network
+                and are unchanged.
+            num_layers: Number fully connected layer, min of 2
+            num_hiddens (int or list of ints): number of hidden dimensions.
+                if int: all hidden layers will have the same dim,
+                if list: length num_layers-1:
+                    every layer can have a different dimension.
+        """
+        super().__init__()
+        self.input_dim = input_dim
+        self.output_dim = output_dim
+
+        if isinstance(num_hiddens, int):
+            self.num_hiddens = [num_hiddens] * (num_layers - 1)
+        else:
+            assert len(num_hiddens) == num_layers - 1
+            self.num_hiddens = num_hiddens
+
+        self.unchanged_dim = unchanged_dim
+
+        # construct fully connected layers
+        fc_layers = [
+            nn.Linear(input_dim - unchanged_dim, self.num_hiddens[0]),
+            nn.ReLU(),
+        ]
+        for i in range(num_layers - 2):
+            fc_layers.append(nn.Linear(self.num_hiddens[i], self.num_hiddens[i + 1]))
+            fc_layers.append(nn.ReLU())
+        fc_layers.append(nn.Linear(self.num_hiddens[-1], output_dim - unchanged_dim))
+        fc_layers.append(nn.ReLU())
+
+        self.fc_subnet = nn.Sequential(*fc_layers)
+
+    def forward(self, x):
+        """Network forward pass.
+        Args:
+            x: Input tensor (batch_size, num_features)
+        Returns:
+            Network output (batch_size, num_features).
+        """
+
+        embedding = self.fc_subnet(x[:, : -self.unchanged_dim])
+
+        return torch.cat((embedding, x[:, -self.unchanged_dim :]), 1)
+
+
+class PermutationInvariantEmbeddingMasked(nn.Module):
+    """Permutation invariant embedding network,
+    which passes through the "unchanged" dimensions.
+    Takes as input a tensor with (batch, permutation_dim, input_dim)
+    and outputs (batch, output_dim + unchanged_dim).
+    """
+
+    def __init__(
+        self,
+        trial_net: nn.Module,
+        trial_net_output_dim: int,
+        unchanged_dim: int,
+        combining_operation: str = "mean",
+        num_layers: int = 2,
+        num_hiddens: int = 40,
+        output_dim: int = 20,
+    ):
+        """Permutation invariant multi-layer NN.
+        The trial_net is applied to each "trial" of the input
+        and is combined by the combining_operation (mean or sum) to construct a
+        permutation invariant embedding across iid trials.
+        This embedding is embedded again using an additional fully connected net.
+        Args:
+            trial_net: Network to process one trial. The combining_operation is
+                applied to its output. Takes as input (batch, input_dim), where
+                input_dim is the dimensionality of a single trial. Produces output
+                (batch, latent_dim). The unchanged dimensions are NOT passed
+                to the trial_net.
+                Remark: This network should be large enough as it acts on all (iid)
+                inputs seperatley and needs enough capacity to process the information
+                of all inputs.
+            trial_net_output_dim: Dimensionality of the output of the trial_net / input
+                to the fully connected layers.
+            unchanged_dim: dimensions of the input to mask out and pass through.
+            combining_operation: How to combine the permutational dimensions, one of
+                'mean' or 'sum'.
+            num_layers: Number of fully connected layer, minimum of 2.
+            num_hiddens: Number of hidden dimensions in fully-connected layers.
+            output_dim: Dimensionality of the output
+                (unchanged_dim is added to get the final output_dim).
+        """
+        super().__init__()
+        self.trial_net = trial_net
+        self.combining_operation = combining_operation
+        self.unchanged_dim = unchanged_dim
+
+        if combining_operation not in ["sum", "mean"]:
+            raise ValueError("combining_operation must be in ['sum', 'mean'].")
+
+        # construct fully connected layers
+        self.fc_subnet = FCEmbedding(
+            input_dim=trial_net_output_dim,
+            output_dim=output_dim - unchanged_dim,
+            num_layers=num_layers,
+            num_hiddens=num_hiddens,
+        )
+
+    def forward(self, x: Tensor):
+        """Network forward pass.
+
+        The unchanged_tensor (batch, unchanged_dim, input_dim) is cut to [:,:,0].
+        All information in other dimensions than 0 will be lost.
+        Args:
+            x: Input tensor (batch_size, permutation_dim+unchanged_dim, input_dim)
+        Returns:
+            Network output (batch_size, output_dim+unchanged_dim).
+        """
+
+        batch, permutation_dim_raw, _ = x.shape
+        permutation_dim = permutation_dim_raw - self.unchanged_dim
+
+        iid_embeddings = self.trial_net(
+            x[:, :permutation_dim].reshape(batch * permutation_dim, -1)
+        ).view(batch, permutation_dim, -1)
+
+        if self.combining_operation == "mean":
+            e = iid_embeddings.mean(dim=1)
+        elif self.combining_operation == "sum":
+            e = iid_embeddings.sum(dim=1)
+        else:
+            raise ValueError("combining_operation must be in ['sum', 'mean'].")
+
+        embedding = self.fc_subnet(e)
+
+        return torch.cat((embedding, x[:, -self.unchanged_dim :, 0]), 1)
