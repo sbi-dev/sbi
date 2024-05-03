@@ -121,6 +121,18 @@ class NeuralPosterior(ABC):
         """See child classes for docstring."""
         pass
 
+    @abstractmethod
+    def amortized_sample(
+        self,
+        sample_shape: Shape = torch.Size(),
+        x: Optional[Tensor] = None,
+        show_progress_bars: bool = True,
+        mcmc_method: Optional[str] = None,
+        mcmc_parameters: Optional[Dict[str, Any]] = None,
+    ) -> Tensor:
+        """See child classes for docstring."""
+        pass
+
     @property
     def default_x(self) -> Optional[Tensor]:
         """Return default x used by `.sample(), .log_prob` as conditioning context."""
