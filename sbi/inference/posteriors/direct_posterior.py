@@ -186,6 +186,57 @@ class DirectPosterior(NeuralPosterior):
 
         return samples
 
+    def amortized_sample(
+        self,
+        sample_shape: Shape = torch.Size(),
+        x: Optional[Tensor] = None,
+        max_sampling_batch_size: int = 10_000,
+        sample_with: Optional[str] = None,
+        show_progress_bars: bool = True,
+    ) -> Tensor:
+        r"""Return samples from posterior $p(\theta|x)$ given multiple observations.
+
+        Args:
+            sample_shape: Desired shape of samples that are drawn from the posterior
+                given every observation.
+            x: A batch of observations, of shape `(batch_dim, event_shape_x)`.
+                `batch_dim` corresponds to the number of observations to be drawn.
+            sample_with: This argument only exists to keep backward-compatibility with
+                `sbi` v0.17.2 or older. If it is set, we instantly raise an error.
+            show_progress_bars: Whether to show sampling progress monitor.
+        """
+
+        num_samples = torch.Size(sample_shape).numel()
+        # x = self._x_else_default_x(x)
+        x = reshape_to_batch_event(
+            x, event_shape=self.posterior_estimator.condition_shape
+        )
+
+        max_sampling_batch_size = (
+            self.max_sampling_batch_size
+            if max_sampling_batch_size is None
+            else max_sampling_batch_size
+        )
+
+        if sample_with is not None:
+            raise ValueError(
+                f"You set `sample_with={sample_with}`. As of sbi v0.18.0, setting "
+                f"`sample_with` is no longer supported. You have to rerun "
+                f"`.build_posterior(sample_with={sample_with}).`"
+            )
+
+        samples = accept_reject_sample(
+            proposal=self.posterior_estimator,
+            accept_reject_fn=lambda theta: within_support(self.prior, theta),
+            num_samples=num_samples,
+            show_progress_bars=show_progress_bars,
+            max_sampling_batch_size=max_sampling_batch_size,
+            proposal_sampling_kwargs={"condition": x},
+            alternative_method="build_posterior(..., sample_with='mcmc')",
+        )[0]
+
+        return samples
+
     def log_prob(
         self,
         theta: Tensor,
