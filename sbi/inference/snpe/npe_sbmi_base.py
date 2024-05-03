@@ -529,6 +529,7 @@ class PosteriorEstimatorSBMI(NeuralInference, ABC):
             posterior_estimator=posterior_estimator,
             prior=prior,
             x_o=None,
+            enable_transform=False,
         )
 
         if sample_with == "direct":
@@ -536,6 +537,7 @@ class PosteriorEstimatorSBMI(NeuralInference, ABC):
                 posterior_estimator=posterior_estimator,  # type: ignore
                 prior=prior,
                 device=device,
+                enable_transform=False,
                 **direct_sampling_parameters or {},
             )
         elif sample_with == "rejection":
