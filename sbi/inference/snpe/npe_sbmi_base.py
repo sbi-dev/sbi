@@ -52,7 +52,7 @@ class PosteriorEstimatorSBMI(NeuralInference, ABC):
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
         show_progress_bars: bool = True,
-        loss_kwargs: dict = None,  # dict = {"model_net": "grassmann"},
+        loss_kwargs: dict = None,  # dict = {"model_net": "prob"},
     ):
         """Base class for Sequential Neural Posterior Estimation methods.
 
@@ -69,6 +69,11 @@ class PosteriorEstimatorSBMI(NeuralInference, ABC):
                 needs to return a PyTorch `nn.Module` implementing the density
                 estimator. The density estimator needs to provide the methods
                 `.log_prob` and `.sample()`.
+            loss_kwargs: dict with additional kwargs for the model_net. The
+                'model_net' key is mandatory. The value should be a string, either
+                'prob' or 'log_prob'. 'prob' is used for the probability output of the
+                model_net, 'log_prob' for the log probability output.
+
 
         See docstring of `NeuralInference` class for all other arguments.
         """
@@ -629,8 +634,10 @@ class PosteriorEstimatorSBMI(NeuralInference, ABC):
         # compute model_loss
         if self.model_net_type == "prob":
             model_loss = -torch.log(p_m_hat * (1 - 1e-6) + 1e-6)
-        if self.model_net_type == "log_prob":
+        elif self.model_net_type == "log_prob":
             model_loss = -p_m_hat  # already log prob in CategoricalNet
+        else:
+            raise ValueError("model_net_type must be 'prob' or 'log_prob'")
 
         if self._round == 0 or force_first_round_loss:
             theta = reshape_to_batch_event(
