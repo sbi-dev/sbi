@@ -237,8 +237,8 @@ class NPE_SBMI(PosteriorEstimatorSBMI):
         """
 
         if self.z_score_theta:
-            scale = self._neural_net._transform._transforms[0]._scale
-            shift = self._neural_net._transform._transforms[0]._shift
+            scale = self._neural_net.net._transform._transforms[0]._scale
+            shift = self._neural_net.net._transform._transforms[0]._shift
 
             # Following the definintion of the linear transform in
             # `standardizing_transform` in `sbiutils.py`:
@@ -414,16 +414,16 @@ class NPE_SBMI(PosteriorEstimatorSBMI):
         # Evaluate the proposal. MDNs do not have functionality to run the embedding_net
         # and then get the mixture_components (**without** calling log_prob()). Hence,
         # we call them separately here.
-        encoded_x = proposal.posterior_estimator._embedding_net(proposal.default_x)
+        encoded_x = proposal.posterior_estimator.net._embedding_net(proposal.default_x)
         dist = (
-            proposal.posterior_estimator._distribution
+            proposal.posterior_estimator.net._distribution
         )  # defined to avoid ugly black formatting.
         logits_p, m_p, prec_p, _, _ = dist.get_mixture_components(encoded_x)
         norm_logits_p = logits_p - torch.logsumexp(logits_p, dim=-1, keepdim=True)
 
         # Evaluate the density estimator.
-        encoded_x = self._neural_net._embedding_net(x)
-        dist = self._neural_net._distribution  # defined to avoid black formatting.
+        encoded_x = self._neural_net.net._embedding_net(x)
+        dist = self._neural_net.net._distribution  # defined to avoid black formatting.
         logits_d, m_d, prec_d, _, _ = dist.get_mixture_components(encoded_x)
         norm_logits_d = logits_d - torch.logsumexp(logits_d, dim=-1, keepdim=True)
 
@@ -653,6 +653,6 @@ class NPE_SBMI(PosteriorEstimatorSBMI):
         """Return potentially standardized theta if z-scoring was requested."""
 
         if self.z_score_theta:
-            theta, _ = self._neural_net._transform(theta)
+            theta, _ = self._neural_net.net._transform(theta)
 
         return theta

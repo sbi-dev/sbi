@@ -1,9 +1,12 @@
+# This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 from typing import Optional
 
 from pyknos.nflows import flows, transforms
 from torch import Tensor, nn
 
 import sbi.utils as utils
+from sbi.neural_nets.density_estimators import NFlowsFlow
 from sbi.neural_nets.density_estimators.mdn_net_flex import MultivariateGaussianMDNFlex
 from sbi.utils.user_input_checks import check_data_device, check_embedding_net_device
 
@@ -18,7 +21,7 @@ def build_mdn_flex(
     num_components: int = 10,
     embedding_net: nn.Module = nn.Identity(),
     **kwargs,
-) -> nn.Module:
+) -> NFlowsFlow:
     """Builds MDN_Flex p(x|y).
 
     Args:
@@ -49,6 +52,7 @@ def build_mdn_flex(
     # Infer the output dimensionality of the embedding_net by making a forward pass.
     check_data_device(batch_x, batch_y)
     check_embedding_net_device(embedding_net=embedding_net, datum=batch_y)
+    embedding_net.eval()
     y_numel = embedding_net(batch_y[:1]).numel()
 
     transform = transforms.IdentityTransform()
@@ -86,5 +90,8 @@ def build_mdn_flex(
     )
 
     neural_net = flows.Flow(transform, distribution, embedding_net)
+    flow = NFlowsFlow(
+        neural_net, input_shape=batch_x[0].shape, condition_shape=batch_y[0].shape
+    )
 
-    return neural_net
+    return flow

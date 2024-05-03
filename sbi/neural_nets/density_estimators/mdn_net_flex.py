@@ -7,6 +7,8 @@ from nflows.utils import torchutils
 from torch import Tensor, nn
 from torch.nn import functional as F
 
+from sbi.neural_nets.density_estimators.base import DensityEstimator
+
 """
 Implementation of models based on
 C. M. Bishop, "Mixture Density Networks", NCRG Report (1994)
@@ -19,7 +21,7 @@ read this: https://scottroy.github.io/to-precision-or-to-variance.html
 """
 
 
-class MultivariateGaussianMDNFlex(nn.Module):
+class MultivariateGaussianMDNFlex(DensityEstimator):
     """
     Conditional density mixture of multivariate Gaussians, after Bishop [1].
 
@@ -56,7 +58,11 @@ class MultivariateGaussianMDNFlex(nn.Module):
             custom_initialization: XXX
         """
 
-        super().__init__()
+        super().__init__(
+            net=hidden_net,
+            input_shape=torch.Size([features]),
+            condition_shape=torch.Size([context_features]),
+        )
 
         # check if partition is matching the full param space
         assert features == partition.sum()

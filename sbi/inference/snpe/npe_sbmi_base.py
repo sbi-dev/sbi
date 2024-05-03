@@ -614,7 +614,7 @@ class PosteriorEstimatorSBMI(NeuralInference, ABC):
         """
         n_model_components = len(self._partition)
         # get embedding from sbi_net and embed x which is used for the model_net
-        encoded_x = self._neural_net._embedding_net(x)  # [:, :-n_model_components]
+        encoded_x = self._neural_net.net._embedding_net(x)  # [:, :-n_model_components]
 
         # made p(m|context)
         # remove model_mask for the proper context
