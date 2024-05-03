@@ -253,8 +253,11 @@ def accept_reject_sample(
         total=num_samples,
         desc=f"Drawing {num_samples} posterior samples",
     )
+    print("Bullas;fjkdsafj;dlsjfldsaj")
 
     num_sampled_total, num_remaining = 0, num_samples
+    num_xo = proposal_sampling_kwargs["condition"].shape[0]
+    accepted_every_obs = [torch.tensor((0, 2)) for _ in range(num_xo)]
     accepted, acceptance_rate = [], float("Nan")
     leakage_warning_raised = False
     # Ruff suggestion
@@ -272,15 +275,23 @@ def accept_reject_sample(
 
         # SNPE-style rejection-sampling when the proposal is the neural net.
         are_accepted = accept_reject_fn(candidates)
-        samples = candidates[are_accepted]
-        accepted.append(samples)
+        print("are_accepted", are_accepted.shape)
+        for obs_index in range(num_xo):
+            accepted = candidates[are_accepted[:, obs_index], obs_index]
+            print("accepted", accepted.shape)
+            print("accepted_every_obs[obs_index]", accepted_every_obs[obs_index].shape)
+            here = accepted_every_obs[obs_index]
+            print("here", here.shape)
+            print("acc", accepted.shape)
+            accepted_every_obs[obs_index] = torch.cat([accepted_every_obs[obs_index], accepted], dim=0)
+        lowest_num_accepted = min(len(s) for s in accepted_every_obs)
+        num_remaining = num_samples - lowest_num_accepted
 
         # Update.
         # Note: For any condition of shape (*batch_shape, *condition_shape), the
         # samples will be of shape(*batch_shape, sampling_batch_size, d) and hence work
         # in dim = -2.
         num_sampled_total += sampling_batch_size
-        num_remaining -= samples.shape[-2]
         pbar.update(samples.shape[-2])
 
         # To avoid endless sampling when leakage is high, we raise a warning if the
@@ -331,7 +342,7 @@ def accept_reject_sample(
     pbar.close()
 
     # When in case of leakage a batch size was used there could be too many samples.
-    samples = torch.cat(accepted, dim=-2)[..., :num_samples, :]
+    samples = samples[..., :num_samples, :]
     assert (
         samples.shape[-2] == num_samples
     ), "Number of accepted samples must match required samples."
