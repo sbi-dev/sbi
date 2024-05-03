@@ -254,9 +254,17 @@ def accept_reject_sample(
         total=num_samples,
         desc=f"Drawing {num_samples} posterior samples",
     )
+    
     # Ruff suggestion
     if proposal_sampling_kwargs is None:
         proposal_sampling_kwargs = {}
+
+    num_sampled_total, num_remaining = 0, num_samples
+    num_xo = proposal_sampling_kwargs["condition"].shape[0]
+    accepted_every_obs = [torch.tensor((0, 2)) for _ in range(num_xo)]
+    accepted, acceptance_rate = [], float("Nan")
+    leakage_warning_raised = False
+
 
 
     num_sampled_total, num_remaining = 0, num_samples
