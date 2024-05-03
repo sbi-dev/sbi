@@ -253,7 +253,6 @@ def accept_reject_sample(
         total=num_samples,
         desc=f"Drawing {num_samples} posterior samples",
     )
-    print("Bullas;fjkdsafj;dlsjfldsaj")
 
     num_sampled_total, num_remaining = 0, num_samples
     num_xo = proposal_sampling_kwargs["condition"].shape[0]
