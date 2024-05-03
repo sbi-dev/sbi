@@ -625,9 +625,9 @@ class PosteriorEstimatorSBMI(NeuralInference, ABC):
         )
 
         # compute model_loss
-        if self.model_net_type == "grassmann":
+        if self.model_net_type == "prob":
             model_loss = -torch.log(p_m_hat * (1 - 1e-6) + 1e-6)
-        if self.model_net_type == "categorical":
+        if self.model_net_type == "log_prob":
             model_loss = -p_m_hat  # already log prob in CategoricalNet
 
         if self._round == 0 or force_first_round_loss:
