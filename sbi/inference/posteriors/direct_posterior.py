@@ -16,7 +16,7 @@ from sbi.neural_nets.density_estimators.shape_handling import (
     reshape_to_batch_event,
     reshape_to_sample_batch_event,
 )
-from sbi.samplers.rejection.rejection import accept_reject_sample
+from sbi.samplers.rejection import rejection
 from sbi.sbi_types import Shape
 from sbi.utils import check_prior, within_support
 from sbi.utils.torchutils import ensure_theta_batched
@@ -123,7 +123,7 @@ class DirectPosterior(NeuralPosterior):
                 f"`.build_posterior(sample_with={sample_with}).`"
             )
 
-        samples = accept_reject_sample(
+        samples = rejection.accept_reject_sample(
             proposal=self.posterior_estimator,
             accept_reject_fn=lambda theta: within_support(self.prior, theta),
             num_samples=num_samples,
