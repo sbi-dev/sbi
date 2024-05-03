@@ -158,6 +158,10 @@ class NeuralInference(ABC):
         self._neural_net = None
         self._x_shape = None
 
+        # for model learning
+        self._embedding = None
+        self._model_net = None
+
         self._show_progress_bars = show_progress_bars
 
         # Initialize roundwise (theta, x, prior_masks) for storage of parameters,

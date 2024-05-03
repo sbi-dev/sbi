@@ -21,6 +21,7 @@ from sbi.inference.base import (
 )
 from sbi.inference.snle.mnle import MNLE
 from sbi.inference.snle.snle_a import SNLE_A
+from sbi.inference.snpe.npe_sbmi import NPE_SBMI
 from sbi.inference.snpe.snpe_a import SNPE_A
 from sbi.inference.snpe.snpe_b import SNPE_B
 from sbi.inference.snpe.snpe_c import SNPE_C  # noqa: F401
