@@ -645,7 +645,7 @@ class PosteriorEstimatorSBMI(NeuralInference, ABC):
             )
             x = reshape_to_batch_event(x, event_shape=self._neural_net.condition_shape)
             # Use posterior log prob (without proposal correction) for first round.
-            log_prob = self._neural_net.loss(theta, x)
+            log_prob = self._neural_net.net.log_prob(theta, x)
         else:
             # Currently only works for `DensityEstimator` objects.
             # Must be extended ones other Estimators are implemented. See #966,
