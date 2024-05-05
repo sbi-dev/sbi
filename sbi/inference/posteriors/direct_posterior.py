@@ -133,7 +133,7 @@ class DirectPosterior(NeuralPosterior):
             alternative_method="build_posterior(..., sample_with='mcmc')",
         )[0]
 
-        return samples
+        return samples[:, 0]  # Remove batch dimension.
 
     def amortized_sample(
         self,
@@ -174,7 +174,7 @@ class DirectPosterior(NeuralPosterior):
                 f"`.build_posterior(sample_with={sample_with}).`"
             )
 
-        samples = accept_reject_sample(
+        samples = rejection.accept_reject_sample(
             proposal=self.posterior_estimator,
             accept_reject_fn=lambda theta: within_support(self.prior, theta),
             num_samples=num_samples,
