@@ -611,7 +611,9 @@ class MCMCPosterior(NeuralPosterior):
         warmup_ = warmup_steps * thin
         num_samples_ = ceil((num_samples * thin) / num_chains)
         # Run mcmc including warmup
+        print("Start run")
         samples = posterior_sampler.run(warmup_ + num_samples_)
+        print("Finish run")
         samples = samples[:, warmup_steps:, :]  # discard warmup steps
         samples = torch.from_numpy(samples)  # chains x samples x dim
 
@@ -619,10 +621,10 @@ class MCMCPosterior(NeuralPosterior):
         self._posterior_sampler = posterior_sampler
 
         # Save sample as potential next init (if init_strategy == 'latest_sample').
-        self._mcmc_init_params = samples[:, -1, :].reshape(num_chains, dim_samples)
+        self._mcmc_init_params = samples[:, -1, :].reshape(num_chains, num_obs, dim_samples)
 
         # Collect samples from all chains.
-        samples = samples.reshape(-1, dim_samples)[:num_samples]
+        samples = samples.reshape(-1, num_obs, dim_samples)[:num_samples]
 
         return samples.type(torch.float32).to(self._device)
 
