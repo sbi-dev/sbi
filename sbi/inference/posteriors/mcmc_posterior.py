@@ -17,6 +17,7 @@ from pyro.infer.mcmc.api import MCMC
 from torch import Tensor
 from torch import multiprocessing as mp
 from tqdm.auto import tqdm
+import numpy as np
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials.base_potential import BasePotential
@@ -355,6 +356,83 @@ class MCMCPosterior(NeuralPosterior):
 
         return samples.reshape((*sample_shape, -1))  # type: ignore
 
+
+    def amortized_sample(
+        self,
+        sample_shape: Shape = torch.Size(),
+        x: Optional[Tensor] = None,
+        method: Optional[str] = None,
+        thin: Optional[int] = None,
+        warmup_steps: Optional[int] = None,
+        num_chains: Optional[int] = None,
+        init_strategy: Optional[str] = None,
+        init_strategy_parameters: Optional[Dict[str, Any]] = None,
+        num_workers: Optional[int] = None,
+        mp_context: Optional[str] = None,
+        show_progress_bars: bool = True,
+    ) -> Tensor:
+        r"""Return samples from posterior distribution $p(\theta|x)$ with MCMC.
+
+        Check the `__init__()` method for a description of all arguments as well as
+        their default values.
+
+        Args:
+            sample_shape: Desired shape of samples that are drawn from posterior. If
+                sample_shape is multidimensional we simply draw `sample_shape.numel()`
+                samples and then reshape into the desired shape.
+            show_progress_bars: Whether to show sampling progress monitor.
+
+        Returns:
+            Samples from posterior.
+        """
+        self.potential_fn.set_x(self._x_else_default_x(x))
+
+        # Replace arguments that were not passed with their default.
+        method = self.method if method is None else method
+        thin = self.thin if thin is None else thin
+        warmup_steps = self.warmup_steps if warmup_steps is None else warmup_steps
+        num_chains = self.num_chains if num_chains is None else num_chains
+        init_strategy = self.init_strategy if init_strategy is None else init_strategy
+        num_workers = self.num_workers if num_workers is None else num_workers
+        mp_context = self.mp_context if mp_context is None else mp_context
+        init_strategy_parameters = (
+            self.init_strategy_parameters
+            if init_strategy_parameters is None
+            else init_strategy_parameters
+        )
+        self.potential_ = self._prepare_potential(method)  # type: ignore
+
+        print("Getting initial params")
+        initial_params = self._get_initial_params(
+            init_strategy,  # type: ignore
+            num_chains,  # type: ignore
+            num_workers,
+            show_progress_bars,
+            **init_strategy_parameters,
+        )
+        print("Finished init")
+        num_samples = torch.Size(sample_shape).numel()
+
+        assert method == "slice_np_vectorized"
+        with torch.set_grad_enabled(False):
+            transformed_samples = self._slice_np_mcmc(
+                num_samples=num_samples,
+                potential_function=self.potential_,
+                initial_params=initial_params,
+                thin=thin,  # type: ignore
+                warmup_steps=warmup_steps,  # type: ignore
+                vectorized=(method == "slice_np_vectorized"),
+                num_workers=num_workers,
+                show_progress_bars=show_progress_bars,
+            )
+            print("transformed_samples", transformed_samples.shape)
+        samples = self.theta_transform.inv(transformed_samples)
+        print("samples", samples.shape)
+        num_obs = 5
+
+        return samples.reshape((*sample_shape, num_obs, -1))  # type: ignore
+
+
     def _build_mcmc_init_fn(
         self,
         proposal: Any,
@@ -507,10 +585,24 @@ class MCMCPosterior(NeuralPosterior):
         else:
             SliceSamplerMultiChain = SliceSamplerVectorized
 
+        def multi_obs_potential(params):
+            # Params are of shape (num_chains * num_obs, event).
+            # We now reshape them to (num_chains, num_obs, event).
+            # params = np.reshape(params, (num_chains, num_obs, -1))
+            # print("params", params.shape)
+            # print("potential_function", potential_function)
+
+            # `all_potentials` is of shape (num_chains, num_obs).
+            all_potentials = potential_function(params)
+            return all_potentials.flatten()
+        
+        num_obs = 5
+        initial_params = torch.concatenate([initial_params] * num_obs)
+
         posterior_sampler = SliceSamplerMultiChain(
             init_params=tensor2numpy(initial_params),
-            log_prob_fn=potential_function,
-            num_chains=num_chains,
+            log_prob_fn=multi_obs_potential,
+            num_chains=num_chains * num_obs,
             thin=thin,
             verbose=show_progress_bars,
             num_workers=num_workers,
@@ -519,7 +611,9 @@ class MCMCPosterior(NeuralPosterior):
         warmup_ = warmup_steps * thin
         num_samples_ = ceil((num_samples * thin) / num_chains)
         # Run mcmc including warmup
+        print("Start run")
         samples = posterior_sampler.run(warmup_ + num_samples_)
+        print("Finish run")
         samples = samples[:, warmup_steps:, :]  # discard warmup steps
         samples = torch.from_numpy(samples)  # chains x samples x dim
 
@@ -527,10 +621,10 @@ class MCMCPosterior(NeuralPosterior):
         self._posterior_sampler = posterior_sampler
 
         # Save sample as potential next init (if init_strategy == 'latest_sample').
-        self._mcmc_init_params = samples[:, -1, :].reshape(num_chains, dim_samples)
+        self._mcmc_init_params = samples[:, -1, :].reshape(num_chains, num_obs, dim_samples)
 
         # Collect samples from all chains.
-        samples = samples.reshape(-1, dim_samples)[:num_samples]
+        samples = samples.reshape(-1, num_obs, dim_samples)[:num_samples]
 
         return samples.type(torch.float32).to(self._device)
 
