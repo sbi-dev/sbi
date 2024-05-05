@@ -260,8 +260,12 @@ def accept_reject_sample(
         proposal_sampling_kwargs = {}
 
     num_sampled_total, num_remaining = 0, num_samples
-    num_xo = proposal_sampling_kwargs["condition"].shape[0]
-    accepted_every_obs = [torch.tensor((0, 2)) for _ in range(num_xo)]
+    if "condition" in list(proposal_sampling_kwargs.keys()):
+        num_xo = proposal_sampling_kwargs["condition"].shape[0]
+    else:
+        num_xo = 1
+
+    accepted_every_obs = [torch.tensor(()) for _ in range(num_xo)]
     accepted, acceptance_rate = [], float("Nan")
     leakage_warning_raised = False
 

@@ -133,7 +133,7 @@ class DirectPosterior(NeuralPosterior):
             alternative_method="build_posterior(..., sample_with='mcmc')",
         )[0]
 
-        return samples
+        return samples[:, 0]  # Remove batch dimension.
 
     def amortized_sample(
         self,
