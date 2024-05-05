@@ -236,7 +236,8 @@ def accept_reject_sample(
             `rejection_sample()`. Warn if not empty.
 
     Returns:
-        Accepted samples and acceptance rate as scalar Tensor.
+        Accepted samples of shape `(sample_dim, batch_dim, *event_shape)`, and
+        worst-case acceptance rate as scalar Tensor.
     """
 
     if kwargs:
@@ -255,8 +256,12 @@ def accept_reject_sample(
     )
 
     num_sampled_total, num_remaining = 0, num_samples
-    num_xo = proposal_sampling_kwargs["condition"].shape[0]
-    accepted_every_obs = [torch.tensor((0, 2)) for _ in range(num_xo)]
+    if "condition" in list(proposal_sampling_kwargs.keys()):
+        num_xo = proposal_sampling_kwargs["condition"].shape[0]
+    else:
+        num_xo = 1
+
+    accepted_every_obs = [torch.tensor(()) for _ in range(num_xo)]
     accepted, acceptance_rate = [], float("Nan")
     leakage_warning_raised = False
     # Ruff suggestion
@@ -274,14 +279,8 @@ def accept_reject_sample(
 
         # SNPE-style rejection-sampling when the proposal is the neural net.
         are_accepted = accept_reject_fn(candidates)
-        print("are_accepted", are_accepted.shape)
         for obs_index in range(num_xo):
             accepted = candidates[are_accepted[:, obs_index], obs_index]
-            print("accepted", accepted.shape)
-            print("accepted_every_obs[obs_index]", accepted_every_obs[obs_index].shape)
-            here = accepted_every_obs[obs_index]
-            print("here", here.shape)
-            print("acc", accepted.shape)
             accepted_every_obs[obs_index] = torch.cat([accepted_every_obs[obs_index], accepted], dim=0)
         lowest_num_accepted = min(len(s) for s in accepted_every_obs)
         num_remaining = num_samples - lowest_num_accepted
@@ -291,7 +290,7 @@ def accept_reject_sample(
         # samples will be of shape(*batch_shape, sampling_batch_size, d) and hence work
         # in dim = -2.
         num_sampled_total += sampling_batch_size
-        pbar.update(samples.shape[-2])
+        pbar.update(num_samples - num_remaining)
 
         # To avoid endless sampling when leakage is high, we raise a warning if the
         # acceptance rate is too low after the first 1_000 samples.
@@ -340,10 +339,13 @@ def accept_reject_sample(
 
     pbar.close()
 
+    for obs_index in range(num_xo):
+        accepted_every_obs[obs_index] = accepted_every_obs[obs_index][:num_samples]
+
+    accepted_every_obs = torch.stack(accepted_every_obs)
     # When in case of leakage a batch size was used there could be too many samples.
-    samples = samples[..., :num_samples, :]
     assert (
-        samples.shape[-2] == num_samples
+        accepted_every_obs.shape[-2] == num_samples
     ), "Number of accepted samples must match required samples."
 
-    return samples, as_tensor(acceptance_rate)
+    return torch.permute(accepted_every_obs, (1, 0, -1)), as_tensor(acceptance_rate)
