@@ -106,7 +106,7 @@ class NPE_SBMI(PosteriorEstimatorSBMI):
         clip_max_norm: Optional[float] = 5.0,
         calibration_kernel: Optional[Callable] = None,
         resume_training: bool = False,
-        force_first_round_loss: bool = False,
+        force_first_round_loss: bool = True,
         discard_prior_samples: bool = False,
         use_combined_loss: bool = False,
         retrain_from_scratch: bool = False,

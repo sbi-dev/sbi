@@ -232,7 +232,7 @@ class PosteriorEstimatorSBMI(NeuralInference, ABC):
         clip_max_norm: Optional[float] = 5.0,
         calibration_kernel: Optional[Callable] = None,
         resume_training: bool = False,
-        force_first_round_loss: bool = False,
+        force_first_round_loss: bool = True,
         discard_prior_samples: bool = False,
         retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
@@ -603,7 +603,7 @@ class PosteriorEstimatorSBMI(NeuralInference, ABC):
         masks: Tensor,
         proposal: Optional[Any],
         calibration_kernel: Callable,
-        force_first_round_loss: bool = False,
+        force_first_round_loss: bool = True,
         model_loss_weight: float = 1.0,
     ) -> Tensor:
         """returns the combined sbi and model_learning loss.
@@ -647,6 +647,9 @@ class PosteriorEstimatorSBMI(NeuralInference, ABC):
             # Use posterior log prob (without proposal correction) for first round.
             log_prob = self._neural_net.net.log_prob(theta, x)
         else:
+            raise NotImplementedError(
+                "This method is not yet implemented for rounds > 0."
+            )
             # Currently only works for `DensityEstimator` objects.
             # Must be extended ones other Estimators are implemented. See #966,
             log_prob = -self._log_prob_proposal_posterior(theta, x, masks, proposal)

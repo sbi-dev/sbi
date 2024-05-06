@@ -161,9 +161,12 @@ class SBMISamplingObject:
         Args:
             x_i (_type_): x without model mask
             model_mask (_type_): the model mask
-            theta (_type_): theta with active paramters in the first positions
+            theta (_type_): theta with nans in the non active components
         returns: log_prob
         """
+        # replace nan with 0 st sbi posterior does not give infs
+        theta = deepcopy(theta)
+        theta[torch.isnan(theta)] = 0
 
         if self.data_dim == 1:
             x_m = torch.cat([x_i, model_mask])
@@ -217,7 +220,7 @@ class SBMISamplingObject:
             theta = self.inflate_theta(torch.tensor(theta_small), model_mask)
             return -sbi_posterior.log_prob(theta.type(torch.FloatTensor))
 
-        optimum = 1e-10
+        optimum = 1e10
 
         for _ in range(runs):
             # theta_init = torch.zeros(self.partition.sum(), dtype=torch.float32)
