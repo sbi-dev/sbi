@@ -384,6 +384,7 @@ class CNNEmbeddingMasked(nn.Module):
         Returns:
             Network output (batch_size, num_features).
         """
+        assert x.shape[1] == self.input_dim, "Input dimension does not match."
 
         # add channel dimension
         e = x.unsqueeze(1)

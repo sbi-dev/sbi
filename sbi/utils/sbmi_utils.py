@@ -1,3 +1,4 @@
+from copy import deepcopy
 from itertools import product
 
 import scipy as scp
@@ -31,6 +32,39 @@ def get_parameter_mask(model_mask: Tensor, partition: Tensor):
     return parameter_mask
 
 
+def evaluate_model_performance(x, sampler, dim, n_samples=100, data_dim=1):
+    """samples model predictions, and returns the mean distance to true model.
+        per context.
+
+    Args:
+        x (tensor): contexts with model mask (batch, x_shape)
+        sampler (SBMISAmplingObject): sbmi sampler
+        dim (int, optional): dimension of model space.
+        n_samples (int, optional): number of samples per context. Defaults to 100.
+        data_dim (int, optional): shape of the simulator output (2 for DDM).
+            Defaults to 1.
+
+    Returns:
+        Tensor
+    """
+    _sampler = deepcopy(sampler)
+
+    batch = x.shape[0]
+
+    y = torch.zeros(batch, n_samples, dim)
+
+    for i, x_i in enumerate(x):
+        for j in range(n_samples):
+            if data_dim == 1:
+                y[i, j] = abs(_sampler.sample_model(1, x_i[:-dim]) - x_i[-dim:])
+            elif data_dim == 2:
+                y[i, j] = abs(_sampler.sample_model(1, x_i[:-dim]) - x_i[-dim:, 0])
+
+    out = 1 - y
+    overall_performance = ((out.sum(2) == dim).sum(1) / n_samples).mean()
+    return out.mean(1), overall_performance
+
+
 class SBMISamplingObject:
     def __init__(
         self,
@@ -41,7 +75,9 @@ class SBMISamplingObject:
         data_dim=1,
         model_posterior_type="grassmann",
     ):
-        """_summary_
+        """wrapper for sbmi posterior
+        makes it easier to sample from the sbmi posterior,
+        automatically adds/removes parameter masks etc.
 
         Args:
             inference (_type_): sbi inference object or DirectPosterior object
@@ -64,7 +100,7 @@ class SBMISamplingObject:
         embedding_net.eval()
 
     def sample_model(self, n: int, x: Tensor):
-        """_summary_
+        """samples models from the model posterior give x
 
         Args:
             n (int): number of models to sample
@@ -98,11 +134,13 @@ class SBMISamplingObject:
             partition (_type_): _description_
 
         Returns:
-            _type_: full theta with prior_bounds_mean for non active components
+            tensor: full theta with nan/0 for non active components
         """
 
         if mode == "nan":
             theta = torch.ones(self.partition.sum()) * torch.nan
+        elif mode == "zero":
+            theta = torch.zeros(self.partition.sum())
         else:
             theta = torch.ones(self.partition.sum())
 
@@ -118,11 +156,11 @@ class SBMISamplingObject:
         return theta
 
     def theta_log_prob(self, x_i, model_mask, theta, **kwargs):
-        """_summary_
+        """calculates the log_prob of theta given a specific model mask
 
         Args:
             x_i (_type_): x without model mask
-            model_mask (_type_): _description_
+            model_mask (_type_): the model mask
             theta (_type_): theta with active paramters in the first positions
         returns: log_prob
         """
@@ -242,14 +280,14 @@ class SBMISamplingObject:
 
         return p.detach().clone()
 
-    def map_model_mask(self, x: Tensor, n=10, verbose=False, return_all=False):
+    def map_model_mask(self, x: Tensor, verbose=False, return_all=False):
         """evaluates the model posterior of ALL possible models
+        Attention: this is only feasible for small models
 
         Args:
             x (Tensor): (context_shape), context without model mask
-            n (int): number of internal MADE masks to sample
-
-            returns: map and p(map) OR map, p(map), masks_all, p(masks)
+            verbose (bool, optional): print intermediate results. Defaults to False.
+        returns: map and p(map) OR map, p(map), masks_all, p(masks)
 
         """
 
@@ -305,7 +343,7 @@ class SBMISamplingObject:
             return map_model["mask"], map_model["p"]
 
     def sample_theta(self, n: int, x: Tensor, model_mask: Tensor, verbose=True):
-        """_summary_
+        """samples theta from the sbi_posterior
 
         Args:
             n (int): number of samples to draw from sbi_posterior
