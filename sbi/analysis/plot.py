@@ -1852,7 +1852,7 @@ def pp_plot(
 ) -> Axes:
     """Probability - Probability (P-P) plot for hypothesis tests
     to assess the validity of one (or several) estimator(s).
-    
+
     See [here](https://en.wikipedia.org/wiki/P%E2%80%93P_plot) for more details.
 
     Args:
