@@ -18,7 +18,7 @@ class LC2ST:
         posterior_samples: Tensor,
         seed: int = 1,
         num_folds: int = 1,
-        n_ensemble: int = 5,
+        n_ensemble: int = 1,
         classifier: str = "mlp",
         z_score: bool = False,
         clf_class: Optional[Any] = None,
