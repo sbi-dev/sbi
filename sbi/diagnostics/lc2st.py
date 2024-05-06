@@ -18,7 +18,7 @@ class LC2ST:
         posterior_samples: Tensor,
         seed: int = 1,
         num_folds: int = 1,
-        n_ensemble: int = 1,
+        num_ensemble: int = 1,
         classifier: str = "mlp",
         z_score: bool = False,
         clf_class: Optional[Any] = None,
@@ -56,6 +56,9 @@ class LC2ST:
                 defaults to 1.
             num_folds: Number of folds for the cross-validation,
                 defaults to 1 (no cross-validation).
+                This is useful to reduce variance coming from the data.
+            num_ensemble: Number of classifiers for ensembling, defaults to 1.
+                This is useful to reduce variance coming from the classifier.
             z_score: Whether to z-score to normalize the data, defaults to False.
             classifier: Classification architecture to use,
                 possible values: "random_forest" or "mlp", defaults to "mlp".
@@ -91,7 +94,7 @@ class LC2ST:
         # set parameters for classifier training
         self.seed = seed
         self.num_folds = num_folds
-        self.n_ensemble = n_ensemble
+        self.num_ensemble = num_ensemble
 
         # initialize classifier
         if "mlp" in classifier.lower():
@@ -182,10 +185,10 @@ class LC2ST:
                 trained_clfs.append(clf_n)
 
         # ensembling
-        if self.n_ensemble > 1:
+        if self.num_ensemble > 1:
             trained_clfs = []
             for n in tqdm(
-                range(self.n_ensemble), desc="Ensembling", disable=verbosity < 1
+                range(self.num_ensemble), desc="Ensembling", disable=verbosity < 1
             ):
                 # set random state and initialize classifier
                 if "random_state" in self.clf_kwargs:
