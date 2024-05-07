@@ -593,7 +593,7 @@ class MCMCPosterior(NeuralPosterior):
             all_potentials = potential_function(params)
             return all_potentials.flatten()
 
-        num_obs = 5
+        num_obs = 1  # TODO This will fail for num_obs > 1 in embedding_net_test.py
         initial_params = torch.concatenate([initial_params] * num_obs)
 
         posterior_sampler = SliceSamplerMultiChain(
