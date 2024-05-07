@@ -628,7 +628,7 @@ def within_support(distribution: Any, samples: Tensor) -> Tensor:
         sample_check = distribution.support.check(samples)
         if sample_check.shape == samples.shape:
             # With new shapeing conventions we need dim=-2
-            sample_check = torch.all(sample_check, dim=-2)
+            sample_check = torch.all(sample_check, dim=-1)
         return sample_check
 
     # Falling back to log prob method of either the NeuralPosterior's net, or of a

@@ -181,10 +181,9 @@ class DirectPosterior(NeuralPosterior):
 
     def amortized_sample(
         self,
-        sample_shape: Shape = torch.Size(),
-        x: Optional[Tensor] = None,
+        sample_shape: Shape,
+        x: Tensor,
         max_sampling_batch_size: int = 10_000,
-        sample_with: Optional[str] = None,
         show_progress_bars: bool = True,
     ) -> Tensor:
         r"""Return samples from posterior $p(\theta|x)$ given multiple observations.
@@ -194,8 +193,7 @@ class DirectPosterior(NeuralPosterior):
                 given every observation.
             x: A batch of observations, of shape `(batch_dim, event_shape_x)`.
                 `batch_dim` corresponds to the number of observations to be drawn.
-            sample_with: This argument only exists to keep backward-compatibility with
-                `sbi` v0.17.2 or older. If it is set, we instantly raise an error.
+            max_sampling_batch_size: Maximum batch size for rejection sampling.
             show_progress_bars: Whether to show sampling progress monitor.
         """
 
