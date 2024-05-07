@@ -258,13 +258,15 @@ class DirectPosterior(NeuralPosterior):
         leakage_correction_params: Optional[dict] = None,
     ) -> Tensor:
         theta = ensure_theta_batched(torch.as_tensor(theta))
+        event_shape = self.posterior_estimator.input_shape
         theta_density_estimator = reshape_to_sample_batch_event(
-            theta, theta.shape[1:], leading_is_sample=True
+            theta, event_shape, leading_is_sample=True
         )
         x_density_estimator = reshape_to_batch_event(
             x, event_shape=self.posterior_estimator.condition_shape
         )
 
+        print(theta_density_estimator.shape, x_density_estimator.shape)
         self.posterior_estimator.eval()
 
         with torch.set_grad_enabled(track_gradients):
