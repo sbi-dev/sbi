@@ -246,6 +246,17 @@ class TractablePosterior(NeuralPosterior):
 
         return self.potential_fn.posterior.sample(sample_shape)
 
+    def sample_batched(
+        self,
+        sample_shape: Shape,
+        x: Tensor,
+        max_sampling_batch_size: int = 10000,
+        show_progress_bars: bool = True,
+    ) -> Tensor:
+        raise NotImplementedError(
+            "Batched sampling is not supported for TractablePosterior."
+        )
+
     def log_prob(
         self,
         theta: Tensor,
