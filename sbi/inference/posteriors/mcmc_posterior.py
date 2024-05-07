@@ -356,8 +356,7 @@ class MCMCPosterior(NeuralPosterior):
 
         return samples.reshape((*sample_shape, -1))  # type: ignore
 
-
-    def amortized_sample(
+    def sample_batched(
         self,
         sample_shape: Shape = torch.Size(),
         x: Optional[Tensor] = None,
@@ -427,7 +426,7 @@ class MCMCPosterior(NeuralPosterior):
             )
             print("transformed_samples", transformed_samples.shape)
         samples = self.theta_transform.inv(transformed_samples)
-        print("samples", samples.shape)
+
         num_obs = 5
 
         return samples.reshape((*sample_shape, num_obs, -1))  # type: ignore

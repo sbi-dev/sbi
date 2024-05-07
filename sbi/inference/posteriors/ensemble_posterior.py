@@ -179,6 +179,15 @@ class EnsemblePosterior(NeuralPosterior):
             )
         return torch.vstack(samples).reshape(*sample_shape, -1)
 
+    def sample_batched(
+        self,
+        sample_shape: Shape,
+        x: Tensor,
+        max_sampling_batch_size: int = 10000,
+        show_progress_bars: bool = True,
+    ) -> Tensor:
+        raise NotImplementedError("This method is not implemented yet.")
+
     def log_prob(
         self,
         theta: Tensor,
