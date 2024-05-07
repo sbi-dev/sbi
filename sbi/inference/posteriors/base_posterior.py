@@ -122,13 +122,12 @@ class NeuralPosterior(ABC):
         pass
 
     @abstractmethod
-    def amortized_sample(
+    def sample_batched(
         self,
-        sample_shape: Shape = torch.Size(),
-        x: Optional[Tensor] = None,
+        sample_shape: Shape,
+        x: Tensor,
+        max_sampling_batch_size: int = 10_000,
         show_progress_bars: bool = True,
-        mcmc_method: Optional[str] = None,
-        mcmc_parameters: Optional[Dict[str, Any]] = None,
     ) -> Tensor:
         """See child classes for docstring."""
         pass
