@@ -17,7 +17,6 @@ from pyro.infer.mcmc.api import MCMC
 from torch import Tensor
 from torch import multiprocessing as mp
 from tqdm.auto import tqdm
-import numpy as np
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials.base_potential import BasePotential
@@ -356,7 +355,6 @@ class MCMCPosterior(NeuralPosterior):
 
         return samples.reshape((*sample_shape, -1))  # type: ignore
 
-
     def amortized_sample(
         self,
         sample_shape: Shape = torch.Size(),
@@ -431,7 +429,6 @@ class MCMCPosterior(NeuralPosterior):
         num_obs = 5
 
         return samples.reshape((*sample_shape, num_obs, -1))  # type: ignore
-
 
     def _build_mcmc_init_fn(
         self,
@@ -595,7 +592,7 @@ class MCMCPosterior(NeuralPosterior):
             # `all_potentials` is of shape (num_chains, num_obs).
             all_potentials = potential_function(params)
             return all_potentials.flatten()
-        
+
         num_obs = 5
         initial_params = torch.concatenate([initial_params] * num_obs)
 
@@ -621,7 +618,9 @@ class MCMCPosterior(NeuralPosterior):
         self._posterior_sampler = posterior_sampler
 
         # Save sample as potential next init (if init_strategy == 'latest_sample').
-        self._mcmc_init_params = samples[:, -1, :].reshape(num_chains, num_obs, dim_samples)
+        self._mcmc_init_params = samples[:, -1, :].reshape(
+            num_chains, num_obs, dim_samples
+        )
 
         # Collect samples from all chains.
         samples = samples.reshape(-1, num_obs, dim_samples)[:num_samples]

@@ -186,6 +186,35 @@ class DirectPosterior(NeuralPosterior):
 
         return samples
 
+    def sample_batched(
+        self,
+        sample_shape: Shape,
+        x: Tensor,
+        max_sampling_batch_size: int = 10_000,
+        show_progress_bars: bool = True,
+    ) -> Tensor:
+        num_samples = torch.Size(sample_shape).numel()
+        condition_shape = self.posterior_estimator.condition_shape
+        x = reshape_to_batch_event(x, event_shape=condition_shape)
+        print(x.shape)
+        max_sampling_batch_size = (
+            self.max_sampling_batch_size
+            if max_sampling_batch_size is None
+            else max_sampling_batch_size
+        )
+
+        samples = rejection.accept_reject_sample(
+            proposal=self.posterior_estimator,
+            accept_reject_fn=lambda theta: within_support(self.prior, theta),
+            num_samples=num_samples,
+            show_progress_bars=show_progress_bars,
+            max_sampling_batch_size=max_sampling_batch_size,
+            proposal_sampling_kwargs={"condition": x},
+            alternative_method="build_posterior(..., sample_with='mcmc')",
+        )[0]
+
+        return samples
+
     def log_prob(
         self,
         theta: Tensor,
@@ -291,7 +320,7 @@ class DirectPosterior(NeuralPosterior):
 
         def acceptance_at(x: Tensor) -> Tensor:
             # [1:] to remove batch-dimension for `reshape_to_batch_event`.
-            return accept_reject_sample(
+            return rejection.accept_reject_sample(
                 proposal=self.posterior_estimator,
                 accept_reject_fn=lambda theta: within_support(self.prior, theta),
                 num_samples=num_rejection_samples,
