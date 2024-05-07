@@ -135,12 +135,11 @@ class DirectPosterior(NeuralPosterior):
 
         return samples[:, 0]  # Remove batch dimension.
 
-    def amortized_sample(
+    def sample_batched(
         self,
-        sample_shape: Shape = torch.Size(),
-        x: Optional[Tensor] = None,
+        sample_shape: Shape,
+        x: Tensor,
         max_sampling_batch_size: int = 10_000,
-        sample_with: Optional[str] = None,
         show_progress_bars: bool = True,
     ) -> Tensor:
         r"""Return samples from posterior $p(\theta|x)$ given multiple observations.
@@ -150,53 +149,13 @@ class DirectPosterior(NeuralPosterior):
                 given every observation.
             x: A batch of observations, of shape `(batch_dim, event_shape_x)`.
                 `batch_dim` corresponds to the number of observations to be drawn.
-            sample_with: This argument only exists to keep backward-compatibility with
-                `sbi` v0.17.2 or older. If it is set, we instantly raise an error.
+            max_sampling_batch_size: Maximum batch size for rejection sampling.
             show_progress_bars: Whether to show sampling progress monitor.
         """
-
-        num_samples = torch.Size(sample_shape).numel()
-        # x = self._x_else_default_x(x)
-        x = reshape_to_batch_event(
-            x, event_shape=self.posterior_estimator.condition_shape
-        )
-
-        max_sampling_batch_size = (
-            self.max_sampling_batch_size
-            if max_sampling_batch_size is None
-            else max_sampling_batch_size
-        )
-
-        if sample_with is not None:
-            raise ValueError(
-                f"You set `sample_with={sample_with}`. As of sbi v0.18.0, setting "
-                f"`sample_with` is no longer supported. You have to rerun "
-                f"`.build_posterior(sample_with={sample_with}).`"
-            )
-
-        samples = rejection.accept_reject_sample(
-            proposal=self.posterior_estimator,
-            accept_reject_fn=lambda theta: within_support(self.prior, theta),
-            num_samples=num_samples,
-            show_progress_bars=show_progress_bars,
-            max_sampling_batch_size=max_sampling_batch_size,
-            proposal_sampling_kwargs={"condition": x},
-            alternative_method="build_posterior(..., sample_with='mcmc')",
-        )[0]
-
-        return samples
-
-    def sample_batched(
-        self,
-        sample_shape: Shape,
-        x: Tensor,
-        max_sampling_batch_size: int = 10_000,
-        show_progress_bars: bool = True,
-    ) -> Tensor:
         num_samples = torch.Size(sample_shape).numel()
         condition_shape = self.posterior_estimator.condition_shape
         x = reshape_to_batch_event(x, event_shape=condition_shape)
-        print(x.shape)
+
         max_sampling_batch_size = (
             self.max_sampling_batch_size
             if max_sampling_batch_size is None
@@ -259,6 +218,52 @@ class DirectPosterior(NeuralPosterior):
         assert (
             x_density_estimator.shape[0] == 1
         ), ".log_prob() supports only `batchsize == 1`."
+
+        self.posterior_estimator.eval()
+
+        with torch.set_grad_enabled(track_gradients):
+            # Evaluate on device, move back to cpu for comparison with prior.
+            unnorm_log_prob = self.posterior_estimator.log_prob(
+                theta_density_estimator, condition=x_density_estimator
+            )
+            # `log_prob` supports only a single observation (i.e. `batchsize==1`).
+            # We now remove this additional dimension.
+            unnorm_log_prob = unnorm_log_prob.squeeze(dim=1)
+
+            # Force probability to be zero outside prior support.
+            in_prior_support = within_support(self.prior, theta)
+
+            masked_log_prob = torch.where(
+                in_prior_support,
+                unnorm_log_prob,
+                torch.tensor(float("-inf"), dtype=torch.float32, device=self._device),
+            )
+
+            if leakage_correction_params is None:
+                leakage_correction_params = dict()  # use defaults
+            log_factor = (
+                log(self.leakage_correction(x=x, **leakage_correction_params))
+                if norm_posterior
+                else 0
+            )
+
+            return masked_log_prob - log_factor
+
+    def log_prob_batched(
+        self,
+        theta: Tensor,
+        x: Tensor,
+        norm_posterior: bool = True,
+        track_gradients: bool = False,
+        leakage_correction_params: Optional[dict] = None,
+    ) -> Tensor:
+        theta = ensure_theta_batched(torch.as_tensor(theta))
+        theta_density_estimator = reshape_to_sample_batch_event(
+            theta, theta.shape[1:], leading_is_sample=True
+        )
+        x_density_estimator = reshape_to_batch_event(
+            x, event_shape=self.posterior_estimator.condition_shape
+        )
 
         self.posterior_estimator.eval()
 
