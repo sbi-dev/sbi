@@ -136,13 +136,7 @@ class NFlowsFlow(DensityEstimator):
 
         samples = self.net.sample(num_samples, context=condition)
         samples = samples.transpose(0, 1)
-        return samples.reshape(
-            (
-                *sample_shape,
-                condition_batch_dim,
-            )
-            + self.input_shape
-        )
+        return samples.reshape((*sample_shape, condition_batch_dim, *self.input_shape))
 
     def sample_and_log_prob(
         self, sample_shape: torch.Size, condition: Tensor, **kwargs
