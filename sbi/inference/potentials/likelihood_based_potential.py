@@ -123,8 +123,6 @@ def _log_likelihoods_over_trials(
         log_likelihood_trial_sum: log likelihood for each parameter, summed over all
             batch entries (iid trials) in `x`.
     """
-    # print("x", x.shape)
-    # print("theta", theta.shape)
     # Shape of `x` is (iid_dim, *event_shape).
     x = reshape_to_sample_batch_event(
         x, event_shape=x.shape[1:], leading_is_sample=True
@@ -147,9 +145,6 @@ def _log_likelihoods_over_trials(
     # not change anything, and we just have it as "best practice" before calling
     # `DensityEstimator.log_prob`.
     theta = reshape_to_batch_event(theta, event_shape=theta.shape[1:])
-
-    # print("After reshape theta: ", theta.shape)
-    # print("After reshape x: ", x.shape)
 
     # Calculate likelihood in one batch.
     with torch.set_grad_enabled(track_gradients):
