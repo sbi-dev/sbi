@@ -257,6 +257,35 @@ class DirectPosterior(NeuralPosterior):
         track_gradients: bool = False,
         leakage_correction_params: Optional[dict] = None,
     ) -> Tensor:
+        """Returns the log-probabilities of the posteriors $p(\theta_1|x_1),..., \
+            p(\theta_B|x_B)$.
+
+        Args:
+            theta: Batch of parameters $\theta$ of shape \
+                `(*sample_shape, batch_dim, *theta_shape)`.
+            x: Batch of observations $x$ of shape \
+                `(batch_dim, *condition_shape)`.
+            norm_posterior: Whether to enforce a normalized posterior density.
+                Renormalization of the posterior is useful when some
+                probability falls out or leaks out of the prescribed prior support.
+                The normalizing factor is calculated via rejection sampling, so if you
+                need speedier but unnormalized log posterior estimates set here
+                `norm_posterior=False`. The returned log posterior is set to
+                -∞ outside of the prior support regardless of this setting.
+            track_gradients: Whether the returned tensor supports tracking gradients.
+                This can be helpful for e.g. sensitivity analysis, but increases memory
+                consumption.
+            leakage_correction_params: A `dict` of keyword arguments to override the
+                default values of `leakage_correction()`. Possible options are:
+                `num_rejection_samples`, `force_update`, `show_progress_bars`, and
+                `rejection_sampling_batch_size`.
+                These parameters only have an effect if `norm_posterior=True`.
+
+        Returns:
+            `(len(θ), B)`-shaped log posterior probability $\\log p(\theta|x)$\\ for θ \
+            in the support of the prior, -∞ (corresponding to 0 probability) outside.
+        """
+
         theta = ensure_theta_batched(torch.as_tensor(theta))
         event_shape = self.posterior_estimator.input_shape
         theta_density_estimator = reshape_to_sample_batch_event(
@@ -266,7 +295,6 @@ class DirectPosterior(NeuralPosterior):
             x, event_shape=self.posterior_estimator.condition_shape
         )
 
-        print(theta_density_estimator.shape, x_density_estimator.shape)
         self.posterior_estimator.eval()
 
         with torch.set_grad_enabled(track_gradients):
@@ -274,9 +302,6 @@ class DirectPosterior(NeuralPosterior):
             unnorm_log_prob = self.posterior_estimator.log_prob(
                 theta_density_estimator, condition=x_density_estimator
             )
-            # `log_prob` supports only a single observation (i.e. `batchsize==1`).
-            # We now remove this additional dimension.
-            unnorm_log_prob = unnorm_log_prob.squeeze(dim=1)
 
             # Force probability to be zero outside prior support.
             in_prior_support = within_support(self.prior, theta)

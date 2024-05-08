@@ -294,8 +294,9 @@ def accept_reject_sample(
         # of the "DensityEstimator" class.
         are_accepted = are_accepted.reshape(sampling_batch_size, num_xos)
         candidates_to_reject = candidates.reshape(
-            sampling_batch_size, num_xos, *candidates.shape[1:]
+            sampling_batch_size, num_xos, *candidates.shape[candidates.ndim - 1 :]
         )
+
         num_accepted = are_accepted.sum(dim=0).min().item()
         for i in range(num_xos):
             accepted[i].append(candidates_to_reject[are_accepted[:, i], i])
