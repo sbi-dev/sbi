@@ -351,7 +351,6 @@ class DirectPosterior(NeuralPosterior):
             x, event_shape=self.posterior_estimator.condition_shape
         )
 
-        print(theta_density_estimator.shape, x_density_estimator.shape)
         self.posterior_estimator.eval()
 
         with torch.set_grad_enabled(track_gradients):
