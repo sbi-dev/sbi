@@ -179,7 +179,7 @@ def rejection_sample(
 
         # When in case of leakage a batch size was used there could be too many samples.
         samples = torch.cat(accepted)[:num_samples]
-        # print(samples.shape)
+
         assert (
             samples.shape[0] == num_samples
         ), "Number of accepted samples must match required samples."
@@ -290,12 +290,13 @@ def accept_reject_sample(
         )
         # SNPE-style rejection-sampling when the proposal is the neural net.
         are_accepted = accept_reject_fn(candidates)
+        # Reshape necessary in certain cases which do not follow the shape conventions
+        # of the "DensityEstimator" class.
         are_accepted = are_accepted.reshape(sampling_batch_size, num_xos)
         candidates_to_reject = candidates.reshape(
             sampling_batch_size, num_xos, *candidates.shape[1:]
         )
         num_accepted = are_accepted.sum(dim=0).min().item()
-        # print(are_accepted.shape)
         for i in range(num_xos):
             accepted[i].append(candidates_to_reject[are_accepted[:, i], i])
 
