@@ -627,7 +627,6 @@ def within_support(distribution: Any, samples: Tensor) -> Tensor:
     try:
         sample_check = distribution.support.check(samples)
         if sample_check.shape == samples.shape:
-            # With new shapeing conventions we need dim=-2
             sample_check = torch.all(sample_check, dim=-1)
         return sample_check
 
