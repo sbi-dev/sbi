@@ -49,3 +49,34 @@ def test_log_prob_with_different_x(snpe_method: type, x_o_batch_dim: bool):
     ).set_default_x(x_o)
     samples = posterior.sample((10,))
     _ = posterior.log_prob(samples)
+
+
+@pytest.mark.parametrize("snpe_method", [SNPE_A, SNPE_C])
+@pytest.mark.parametrize(
+    "x_o_batch_dim",
+    (
+        0,
+        1,
+        2,
+    ),
+)
+def test_batched_sample_log_prob_with_different_x(
+    snpe_method: type, x_o_batch_dim: bool
+):
+    num_dim = 2
+
+    prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
+    simulator = diagonal_linear_gaussian
+
+    inference = snpe_method(prior=prior)
+    theta, x = simulate_for_sbi(simulator, prior, 1000)
+    posterior_estimator = inference.append_simulations(theta, x).train(max_num_epochs=3)
+
+    x_o = ones(num_dim) if x_o_batch_dim == 0 else ones(x_o_batch_dim, num_dim)
+
+    posterior = DirectPosterior(posterior_estimator=posterior_estimator, prior=prior)
+
+    samples = posterior.sample_batched((10,), x_o)
+    batched_log_probs = posterior.log_prob_batched(samples, x_o)
+
+    assert batched_log_probs.shape == (10, max(x_o_batch_dim, 1))
