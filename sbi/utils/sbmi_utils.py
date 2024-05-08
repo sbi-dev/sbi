@@ -217,7 +217,9 @@ class SBMISamplingObject:
         sbi_posterior.set_default_x(x_m)
 
         def optim_f(theta_small):
-            theta = self.inflate_theta(torch.tensor(theta_small), model_mask)
+            theta = self.inflate_theta(
+                torch.tensor(theta_small), model_mask, mode="zero"
+            )
             return -sbi_posterior.log_prob(theta.type(torch.FloatTensor))
 
         optimum = 1e10
