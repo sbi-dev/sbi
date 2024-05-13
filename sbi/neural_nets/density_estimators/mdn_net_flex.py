@@ -197,6 +197,7 @@ class MultivariateGaussianMDNFlex(DensityEstimator):
         for i in range(batch_size):
             dimyy = max_parameter_dim - parameter_dim[i]
             # P = Pxx - Pxy * Pyy^-1 * Pyx
+            # linalg.solve(A, B) == linalg.inv(A) @ B  # When B is a matrix
             P.append(
                 precisions[i][maskxx[i]].view(
                     n_components, parameter_dim[i], parameter_dim[i]
