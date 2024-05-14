@@ -142,7 +142,9 @@ class DirectPosterior(NeuralPosterior):
         max_sampling_batch_size: int = 10_000,
         show_progress_bars: bool = True,
     ) -> Tensor:
-        r"""Return samples from posterior $p(\theta|x)$ given multiple observations.
+        r"""Given a batch of observations [x_1, ..., x_B] this function samples from
+        posteriors $p(\theta|x_1)$, ... ,$p(\theta|x_B)$, in a batched (i.e. vectorized)
+        manner.
 
         Args:
             sample_shape: Desired shape of samples that are drawn from the posterior
@@ -151,6 +153,9 @@ class DirectPosterior(NeuralPosterior):
                 `batch_dim` corresponds to the number of observations to be drawn.
             max_sampling_batch_size: Maximum batch size for rejection sampling.
             show_progress_bars: Whether to show sampling progress monitor.
+
+        Returns:
+            Samples from the posteriors of shape (*sample_shape, B, *input_shape)
         """
         num_samples = torch.Size(sample_shape).numel()
         condition_shape = self.posterior_estimator.condition_shape
@@ -257,8 +262,10 @@ class DirectPosterior(NeuralPosterior):
         track_gradients: bool = False,
         leakage_correction_params: Optional[dict] = None,
     ) -> Tensor:
-        """Returns the log-probabilities of the posteriors $p(\theta_1|x_1),..., \
-            p(\theta_B|x_B)$.
+        """Given a batch of observations [x_1, ..., x_B] and a batch of parameters \
+            [$\theta_1$,..., $\theta_B$] this function evalautes the log-probabilities \
+            of the posterior $p(\theta_1|x_1)$, ..., $p(\theta_B|x_B)$ in a batched \
+            (i.e. vectorized) manner.
 
         Args:
             theta: Batch of parameters $\theta$ of shape \

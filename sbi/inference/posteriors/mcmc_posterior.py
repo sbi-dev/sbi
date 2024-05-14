@@ -207,38 +207,6 @@ class MCMCPosterior(NeuralPosterior):
             theta.to(self._device), track_gradients=track_gradients
         )
 
-    def log_prob_batched(
-        self, theta: Tensor, x: Tensor, track_gradients: bool = False
-    ) -> Tensor:
-        r"""Returns the log-probability of theta under the multiple posteriors.
-
-        Args:
-            theta: Parameters $\theta$.
-            track_gradients: Whether the returned tensor supports tracking gradients.
-                This can be helpful for e.g. sensitivity analysis, but increases memory
-                consumption.
-
-        Returns:
-            `len($\theta$)`-shaped log-probability.
-        """
-        warn(
-            """`.log_prob()` is deprecated for methods that can only evaluate the
-            log-probability up to a normalizing constant. Use `.potential()`
-            instead.""",
-            stacklevel=2,
-        )
-        warn("The log-probability is unnormalized!", stacklevel=2)
-
-        self.potential_fn.set_x(x)
-        print(x.shape)
-        theta = ensure_theta_batched(torch.as_tensor(theta))
-        print(theta.shape)
-        potential = self.potential_fn(
-            theta.to(self._device), track_gradients=track_gradients
-        )
-        print(potential)
-        return potential
-
     def sample(
         self,
         sample_shape: Shape = torch.Size(),
@@ -382,7 +350,7 @@ class MCMCPosterior(NeuralPosterior):
                 )
             else:
                 raise NameError(f"The sampling method {method} is not implemented!")
-        print(transformed_samples.shape)
+
         samples = self.theta_transform.inv(transformed_samples)
         samples = samples.reshape((*sample_shape, -1))  # type: ignore
 
@@ -402,19 +370,22 @@ class MCMCPosterior(NeuralPosterior):
         mp_context: Optional[str] = None,
         show_progress_bars: bool = True,
     ) -> Tensor:
-        r"""Return samples from posterior distribution $p(\theta|x)$ with MCMC.
+        r"""Given a batch of observations [x_1, ..., x_B] this function samples from
+        posteriors $p(\theta|x_1)$, ... ,$p(\theta|x_B)$, in a batched (i.e. vectorized)
+        manner.
 
         Check the `__init__()` method for a description of all arguments as well as
         their default values.
 
         Args:
-            sample_shape: Desired shape of samples that are drawn from posterior. If
-                sample_shape is multidimensional we simply draw `sample_shape.numel()`
-                samples and then reshape into the desired shape.
+            sample_shape: Desired shape of samples that are drawn from the posterior
+                given every observation.
+            x: A batch of observations, of shape `(batch_dim, event_shape_x)`.
+                `batch_dim` corresponds to the number of observations to be drawn.
             show_progress_bars: Whether to show sampling progress monitor.
 
         Returns:
-            Samples from posterior.
+            Samples from the posteriors of shape (*sample_shape, B, *input_shape)
         """
         batch_size = x.shape[0]
         self.potential_fn.set_x(x)
@@ -638,9 +609,7 @@ class MCMCPosterior(NeuralPosterior):
         warmup_ = warmup_steps * thin
         num_samples_ = ceil((num_samples * thin) / num_chains)
         # Run mcmc including warmup
-        print("Start run")
         samples = posterior_sampler.run(warmup_ + num_samples_)
-        print("Finish run")
         samples = samples[:, warmup_steps:, :]  # discard warmup steps
         samples = torch.from_numpy(samples)  # chains x samples x dim
 

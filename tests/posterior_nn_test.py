@@ -117,7 +117,10 @@ def test_batched_mcmc_sample_log_prob_with_different_x(
     )
 
     samples = posterior.sample_batched((10,), x_o)
-    # batched_log_probs = posterior.log_prob_batched(samples, x_o)
+    print(x_o.shape)
+    print(samples.shape)
+    batched_log_probs = posterior.log_prob_batched(samples, x_o)
+    print(batched_log_probs.shape)
 
     assert (
         samples.shape == (10, x_o_batch_dim, num_dim)

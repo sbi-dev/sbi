@@ -175,7 +175,9 @@ class RejectionPosterior(NeuralPosterior):
         show_progress_bars: bool = True,
     ) -> Tensor:
         raise NotImplementedError(
-            "Batched sampling is not supported for rejection sampling."
+            "Batched sampling is not implemented for RejectionPosterior. \
+            Alternatively you can use `sample` in a loop \
+            [posterior.sample(theta, x_o) for x_o in x]."
         )
 
     def map(

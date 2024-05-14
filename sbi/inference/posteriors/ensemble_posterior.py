@@ -186,9 +186,12 @@ class EnsemblePosterior(NeuralPosterior):
         max_sampling_batch_size: int = 10000,
         show_progress_bars: bool = True,
     ) -> Tensor:
+        # TODO Can be implemented in the future, for all base posterior that support
+        # batched sampling.
         raise NotImplementedError(
-            "Batched sampling is not implemented for \
-            EnsemblePosterior."
+            "Batched sampling is not implemented for EnsemblePosterior. \
+            Alternatively you can use `sample` in a loop \
+            [posterior.sample(theta, x_o) for x_o in x]."
         )
 
     def log_prob(
