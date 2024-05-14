@@ -201,8 +201,11 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         max_sampling_batch_size: int = 10000,
         show_progress_bars: bool = True,
     ) -> Tensor:
+        # TODO Can be implemented in the future.
         raise NotImplementedError(
-            "Batched sampling is not implemented for ImportanceSamplingPosterior."
+            "Batched sampling is not implemented for ImportanceSamplingPosterior. \
+            Alternatively you can use `sample` in a loop \
+            [posterior.sample(theta, x_o) for x_o in x]."
         )
 
     def _importance_sample(
