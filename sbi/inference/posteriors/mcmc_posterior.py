@@ -208,6 +208,38 @@ class MCMCPosterior(NeuralPosterior):
             theta.to(self._device), track_gradients=track_gradients
         )
 
+    def log_prob_batched(
+        self, theta: Tensor, x: Tensor, track_gradients: bool = False
+    ) -> Tensor:
+        r"""Returns the log-probability of theta under the multiple posteriors.
+
+        Args:
+            theta: Parameters $\theta$.
+            track_gradients: Whether the returned tensor supports tracking gradients.
+                This can be helpful for e.g. sensitivity analysis, but increases memory
+                consumption.
+
+        Returns:
+            `len($\theta$)`-shaped log-probability.
+        """
+        warn(
+            """`.log_prob()` is deprecated for methods that can only evaluate the
+            log-probability up to a normalizing constant. Use `.potential()`
+            instead.""",
+            stacklevel=2,
+        )
+        warn("The log-probability is unnormalized!", stacklevel=2)
+
+        self.potential_fn.set_x(x)
+        print(x.shape)
+        theta = ensure_theta_batched(torch.as_tensor(theta))
+        print(theta.shape)
+        potential = self.potential_fn(
+            theta.to(self._device), track_gradients=track_gradients
+        )
+        print(potential)
+        return potential
+
     def sample(
         self,
         sample_shape: Shape = torch.Size(),
@@ -351,15 +383,16 @@ class MCMCPosterior(NeuralPosterior):
                 )
             else:
                 raise NameError(f"The sampling method {method} is not implemented!")
-
+        print(transformed_samples.shape)
         samples = self.theta_transform.inv(transformed_samples)
+        samples = samples.reshape((*sample_shape, -1))  # type: ignore
 
         return samples.reshape((*sample_shape, -1))  # type: ignore
 
     def sample_batched(
         self,
-        sample_shape: Shape = torch.Size(),
-        x: Optional[Tensor] = None,
+        sample_shape: Shape,
+        x: Tensor,
         method: Optional[str] = None,
         thin: Optional[int] = None,
         warmup_steps: Optional[int] = None,
@@ -384,7 +417,8 @@ class MCMCPosterior(NeuralPosterior):
         Returns:
             Samples from posterior.
         """
-        self.potential_fn.set_x(self._x_else_default_x(x))
+        batch_size = x.shape[0]
+        self.potential_fn.set_x(x)
 
         # Replace arguments that were not passed with their default.
         method = self.method if method is None else method
@@ -401,18 +435,21 @@ class MCMCPosterior(NeuralPosterior):
         )
         self.potential_ = self._prepare_potential(method)  # type: ignore
 
-        print("Getting initial params")
+        num_chains_extended = batch_size * num_chains
         initial_params = self._get_initial_params(
             init_strategy,  # type: ignore
-            num_chains,  # type: ignore
+            num_chains_extended,  # type: ignore
             num_workers,
             show_progress_bars,
             **init_strategy_parameters,
         )
-        print("Finished init")
-        num_samples = torch.Size(sample_shape).numel()
 
-        assert method == "slice_np_vectorized"
+        num_samples = torch.Size(sample_shape).numel() * batch_size
+
+        assert (
+            method == "slice_np_vectorized"
+        ), "Batched sampling only supported for vectorized samplers!"
+
         with torch.set_grad_enabled(False):
             transformed_samples = self._slice_np_mcmc(
                 num_samples=num_samples,
@@ -424,12 +461,10 @@ class MCMCPosterior(NeuralPosterior):
                 num_workers=num_workers,
                 show_progress_bars=show_progress_bars,
             )
-            print("transformed_samples", transformed_samples.shape)
+
         samples = self.theta_transform.inv(transformed_samples)
 
-        num_obs = 5
-
-        return samples.reshape((*sample_shape, num_obs, -1))  # type: ignore
+        return samples.reshape((*sample_shape, batch_size, -1))  # type: ignore
 
 
     def _build_mcmc_init_fn(
@@ -588,20 +623,15 @@ class MCMCPosterior(NeuralPosterior):
             # Params are of shape (num_chains * num_obs, event).
             # We now reshape them to (num_chains, num_obs, event).
             # params = np.reshape(params, (num_chains, num_obs, -1))
-            # print("params", params.shape)
-            # print("potential_function", potential_function)
 
             # `all_potentials` is of shape (num_chains, num_obs).
             all_potentials = potential_function(params)
             return all_potentials.flatten()
 
-        num_obs = 1  # TODO This will fail for num_obs > 1 in embedding_net_test.py
-        initial_params = torch.concatenate([initial_params] * num_obs)
-
         posterior_sampler = SliceSamplerMultiChain(
             init_params=tensor2numpy(initial_params),
             log_prob_fn=multi_obs_potential,
-            num_chains=num_chains * num_obs,
+            num_chains=num_chains,
             thin=thin,
             verbose=show_progress_bars,
             num_workers=num_workers,
@@ -620,10 +650,10 @@ class MCMCPosterior(NeuralPosterior):
         self._posterior_sampler = posterior_sampler
 
         # Save sample as potential next init (if init_strategy == 'latest_sample').
-        self._mcmc_init_params = samples[:, -1, :].reshape(num_chains, num_obs, dim_samples)
+        self._mcmc_init_params = samples[:, -1, :].reshape(num_chains, dim_samples)
 
         # Collect samples from all chains.
-        samples = samples.reshape(-1, num_obs, dim_samples)[:num_samples]
+        samples = samples.reshape(-1, dim_samples)[:num_samples]
 
         return samples.type(torch.float32).to(self._device)
 

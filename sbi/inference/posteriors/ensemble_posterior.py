@@ -186,7 +186,10 @@ class EnsemblePosterior(NeuralPosterior):
         max_sampling_batch_size: int = 10000,
         show_progress_bars: bool = True,
     ) -> Tensor:
-        raise NotImplementedError("This method is not implemented yet.")
+        raise NotImplementedError(
+            "Batched sampling is not implemented for \
+            EnsemblePosterior."
+        )
 
     def log_prob(
         self,
