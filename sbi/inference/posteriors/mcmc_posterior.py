@@ -208,38 +208,6 @@ class MCMCPosterior(NeuralPosterior):
             theta.to(self._device), track_gradients=track_gradients
         )
 
-    def log_prob_batched(
-        self, theta: Tensor, x: Tensor, track_gradients: bool = False
-    ) -> Tensor:
-        r"""Returns the log-probability of theta under the multiple posteriors.
-
-        Args:
-            theta: Parameters $\theta$.
-            track_gradients: Whether the returned tensor supports tracking gradients.
-                This can be helpful for e.g. sensitivity analysis, but increases memory
-                consumption.
-
-        Returns:
-            `len($\theta$)`-shaped log-probability.
-        """
-        warn(
-            """`.log_prob()` is deprecated for methods that can only evaluate the
-            log-probability up to a normalizing constant. Use `.potential()`
-            instead.""",
-            stacklevel=2,
-        )
-        warn("The log-probability is unnormalized!", stacklevel=2)
-
-        self.potential_fn.set_x(x)
-        print(x.shape)
-        theta = ensure_theta_batched(torch.as_tensor(theta))
-        print(theta.shape)
-        potential = self.potential_fn(
-            theta.to(self._device), track_gradients=track_gradients
-        )
-        print(potential)
-        return potential
-
     def sample(
         self,
         sample_shape: Shape = torch.Size(),
@@ -383,7 +351,7 @@ class MCMCPosterior(NeuralPosterior):
                 )
             else:
                 raise NameError(f"The sampling method {method} is not implemented!")
-        print(transformed_samples.shape)
+
         samples = self.theta_transform.inv(transformed_samples)
         samples = samples.reshape((*sample_shape, -1))  # type: ignore
 
@@ -643,9 +611,7 @@ class MCMCPosterior(NeuralPosterior):
         warmup_ = warmup_steps * thin
         num_samples_ = ceil((num_samples * thin) / num_chains)
         # Run mcmc including warmup
-        print("Start run")
         samples = posterior_sampler.run(warmup_ + num_samples_)
-        print("Finish run")
         samples = samples[:, warmup_steps:, :]  # discard warmup steps
         samples = torch.from_numpy(samples)  # chains x samples x dim
 
