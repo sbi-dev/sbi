@@ -84,8 +84,8 @@ def test_batched_sample_log_prob_with_different_x(
         samples.shape == (10, x_o_batch_dim, num_dim)
         if x_o_batch_dim > 0
         else (10, num_dim)
-    )
-    assert batched_log_probs.shape == (10, max(x_o_batch_dim, 1))
+    ), "Sample shape wrong"
+    assert batched_log_probs.shape == (10, max(x_o_batch_dim, 1)), "logprob shape wrong"
 
 
 @pytest.mark.mcmc
@@ -117,14 +117,9 @@ def test_batched_mcmc_sample_log_prob_with_different_x(
     )
 
     samples = posterior.sample_batched((10,), x_o)
-    print(x_o.shape)
-    print(samples.shape)
-    batched_log_probs = posterior.log_prob_batched(samples, x_o)
-    print(batched_log_probs.shape)
 
     assert (
         samples.shape == (10, x_o_batch_dim, num_dim)
         if x_o_batch_dim > 0
         else (10, num_dim)
-    )
-    # assert batched_log_probs.shape == (10, max(x_o_batch_dim, 1))
+    ), "Sampel shape wrong"
