@@ -242,13 +242,12 @@ class SBMISamplingObject:
         else:
             return x_opt
 
-    def p_model_mask(self, model_masks, x, n=10):
+    def p_model_mask(self, model_masks, x):
         """computes the probability of a model mask
 
         Args:
             model_masks (_type_): (batch,len(partition))
             x (Tensor): (context_shape), context without model mask
-            n (int): number of internal MADE masks to sample
 
         Returns:
             Tensor: posterior probability of model mask
