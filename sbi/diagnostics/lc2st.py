@@ -42,10 +42,16 @@ class LC2ST:
         2. The L-C2ST statistic is the mean squared error between the predicted
         probabilities of being in p (class 0) and a Dirac at 0.5, which corresponds to
         the chance level of the classifier, unable to distinguish between p and q.
+        - If `num_ensemble`>1, the average prediction over all classifiers is used.
+        - If `num_folds`>1 the average statistic over all cv-folds is used.
 
-        To evaluate the test, the classifier is trained over multiple trials under the
-        null hypothesis. If the null distribution is not known, it is estimated using
-        the permutation method, i.e. by training the classifier on the permuted data.
+        To evaluate the test, steps 1 and 2 are performed over multiple trials under the
+        null hypothesis (H0). If the null distribution is not known, it is estimated
+        using the permutation method, i.e. by training the classifier on the permuted
+        data. The statistics obtained under (H0) is then compared to the one obtained
+        on observed data to compute the p-value, used to decide whether to reject (H0)
+        or not.
+
 
         Args:
             thetas: Samples from the prior, of shape (sample_size, dim).
@@ -165,11 +171,14 @@ class LC2ST:
         # initialize classifier
         clf = self.clf_class(**self.clf_kwargs or {})
 
+        if self.num_ensemble > 1:
+            clf = EnsembleClassifier(clf, self.num_ensemble, verbosity=verbosity)
+
         # cross-validation
         if self.num_folds > 1:
             trained_clfs = []
             kf = KFold(n_splits=self.num_folds, shuffle=True, random_state=self.seed)
-            cv_splits = kf.split(theta_p)
+            cv_splits = kf.split(theta_p.numpy())
             for train_idx, _ in tqdm(
                 cv_splits, desc="Cross-validation", disable=verbosity < 1
             ):
@@ -183,23 +192,6 @@ class LC2ST:
                 )
 
                 trained_clfs.append(clf_n)
-
-        # ensembling
-        if self.num_ensemble > 1:
-            trained_clfs = []
-            for n in tqdm(
-                range(self.num_ensemble), desc="Ensembling", disable=verbosity < 1
-            ):
-                # set random state and initialize classifier
-                if "random_state" in self.clf_kwargs:
-                    self.clf_kwargs["random_state"] += n
-                    clf = self.clf_class(**self.clf_kwargs)
-                else:
-                    clf = self.clf_class(**self.clf_kwargs, random_state=n + 1)
-                # train single classifier
-                clf_n = train_lc2st(theta_p, theta_q, x_p, x_q, clf)
-                trained_clfs.append(clf_n)
-
         else:
             # train single classifier
             clf = train_lc2st(theta_p, theta_q, x_p, x_q, clf)
@@ -207,26 +199,29 @@ class LC2ST:
 
         return trained_clfs
 
-    def _scores(
+    def get_scores(
         self,
         theta_o: Tensor,
         x_o: Tensor,
         trained_clfs: List[Any],
         return_probs: bool = False,
     ) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
-        """Compute the L-C2ST scores given the trained classifiers.
+        """Computes the L-C2ST scores given the trained classifiers:
+        Mean squared error (MSE) between 0.5 and the predicted probabilities
+        of being in class 0 over the dataset (`theta_o`, `x_o`).
 
         Args:
             theta_o: Samples from the posterior conditioned on the observation `x_o`,
                 of shape (sample_size, dim).
             x_o: The observation, of shape (,dim_x).
-            trained_clfs: Trained classifiers.
+            trained_clfs: List of trained classifiers, of length `num_folds`.
             return_probs: Whether to return the predicted probabilities of being in P,
                 defaults to False.
 
         Returns: one of
-            scores: L-C2ST scores at `x_o`.
-            (probs, scores): Predicted probabilities and L-C2ST scores at `x_o`.
+            scores: L-C2ST scores at `x_o`, of shape (`num_folds`,).
+            (probs, scores): Predicted probabilities and L-C2ST scores at `x_o`,
+                each of shape (`num_folds`,).
         """
         # prepare data
         if self.z_score:
@@ -247,64 +242,54 @@ class LC2ST:
         else:
             return scores
 
-    def train_on_observed_data(self) -> None:
-        """Train the classifiers on the observed data.
-        Saves the trained classifiers.
-        """
-        trained_clfs = self._train(self.theta_p, self.theta_q, self.x_p, self.x_q)
-        self.trained_clfs = trained_clfs
-
-    def get_scores_on_observed_data(
-        self, theta_o: Tensor, x_o: Tensor, return_probs: bool = False
-    ) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
-        """Compute the L-C2ST scores for the observed data.
+    def train_on_observed_data(
+        self, seed: Optional[int] = None, verbosity: int = 1
+    ) -> Union[None, List[Any]]:
+        """Trains the classifier on the observed data.
+        Saves the trained classifier(s) as a list of length `num_folds`.
 
         Args:
-            theta_o: Samples from the posterior conditioned on the observation `x_o`,
-                of shape (sample_size, dim).
-            x_o: The observation, of shape (,dim_x).
-            return_probs: Whether to return the predicted probabilities of being in P,
-                defaults to False.
-
-        Returns: one of
-            scores: L-C2ST scores at `x_o`.
-            (probs, scores): Predicted probabilities and L-C2ST scores at `x_o`.
+            seed: random state of the classifier, defaults to None.
+            verbosity: Verbosity level, defaults to 1.
         """
-        assert (
-            self.trained_clfs is not None
-        ), "No trained classifiers found. Run `train_on_observed_data` first."
-        return self._scores(
-            theta_o=theta_o,
-            x_o=x_o,
-            trained_clfs=self.trained_clfs,
-            return_probs=return_probs,
+        # set random state
+        if seed is not None:
+            if "random_state" in self.clf_kwargs:
+                print("WARNING: changing the random state of the classifier.")
+            self.clf_kwargs["random_state"] = seed
+
+        # train the classifier
+        trained_clfs = self._train(
+            self.theta_p, self.theta_q, self.x_p, self.x_q, verbosity=verbosity
         )
+        self.trained_clfs = trained_clfs
 
     def get_statistic_on_observed_data(
         self,
         theta_o: Tensor,
         x_o: Tensor,
-        return_probs: bool = False,
-    ) -> Union[float, Tuple[np.ndarray, float]]:
-        """Computes the L-C2ST statistic for the observed data.
+    ) -> float:
+        """Computes the L-C2ST statistics for the observed data:
+        Mean over all cv-scores.
 
         Args:
             theta_o: Samples from the posterior conditioned on the observation `x_o`,
                 of shape (sample_size, dim).
             x_o: The observation, of shape (, dim_x)
-            return_probs: Whether to return the predicted probabilities of being in P,
-                defaults to False.
 
         Returns:
             L-C2ST statistic at `x_o`.
         """
-        probs, scores = self.get_scores_on_observed_data(
-            theta_o=theta_o, x_o=x_o, return_probs=True
+        assert (
+            self.trained_clfs is not None
+        ), "No trained classifiers found. Run `train_on_observed_data` first."
+        _, scores = self.get_scores(
+            theta_o=theta_o,
+            x_o=x_o,
+            trained_clfs=self.trained_clfs,
+            return_probs=True,
         )
-        if return_probs:
-            return probs, scores.mean()
-        else:
-            return scores.mean()
+        return scores.mean()
 
     def p_value(
         self,
@@ -326,9 +311,7 @@ class LC2ST:
         Returns:
             p-value for L-C2ST at `x_o`.
         """
-        _, stat_data = self.get_statistic_on_observed_data(
-            theta_o=theta_o, x_o=x_o, return_probs=True
-        )
+        stat_data = self.get_statistic_on_observed_data(theta_o=theta_o, x_o=x_o)
         _, stats_null = self.get_statistics_under_null_hypothesis(
             theta_o=theta_o, x_o=x_o, return_probs=True, verbosity=0
         )
@@ -357,7 +340,7 @@ class LC2ST:
         self,
         verbosity: int = 1,
     ) -> None:
-        """Compute the L-C2ST scores under the null hypothesis (H0).
+        """Computes the L-C2ST scores under the null hypothesis (H0).
         Saves the trained classifiers for each null trial.
 
         Args:
@@ -412,7 +395,7 @@ class LC2ST:
         return_probs: bool = False,
         verbosity: int = 0,
     ) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
-        """Compute the L-C2ST scores under the null hypothesis.
+        """Computes the L-C2ST scores under the null hypothesis.
 
         Args:
             theta_o: Samples from the posterior conditioned on the observation `x_o`,
@@ -435,7 +418,7 @@ class LC2ST:
         else:
             assert (
                 len(self.trained_clfs_null) == self.num_trials_null
-            ), " You need one classifier per trial."
+            ), "You need one classifier per trial."
 
         probs_null, stats_null = [], []
         for t in tqdm(
@@ -459,11 +442,11 @@ class LC2ST:
 
             # evaluate
             clf_t = self.trained_clfs_null[t]
-            proba, score = self._scores(
+            probs, scores = self.get_scores(
                 theta_o=theta_o_t, x_o=x_o, trained_clfs=clf_t, return_probs=True
             )
-            probs_null.append(proba)
-            stats_null.append(score.mean())
+            probs_null.append(probs)
+            stats_null.append(scores.mean())
 
         probs_null, stats_null = np.array(probs_null), np.array(stats_null)
 
@@ -486,19 +469,27 @@ class LC2ST_NF(LC2ST):
         **kwargs: Any,
     ) -> None:
         """
-        L-C2ST for normalizing flows.
+        L-C2ST for Normalizing Flows.
 
         LC2ST_NF is a subclass of LC2ST that performs the test in the space of the
         base distribution of a normalizing flow. It uses the inverse transform of the
         normalizing flow $T_\\phi^{-1}$ to map the samples from the prior and the
         posterior to the base distribution space. Following Theorem 4, Eq. 17 from [1],
         the new null hypothesis for a Gaussian base distribution is:
-        $H_0(x_o) := p(T_\\phi^{-1}(\theta ; x_o) | x_o) = N(0, I_m)$.
+
+            $H_0(x_o) := p(T_\\phi^{-1}(\theta ; x_o) | x_o) = N(0, I_m)$.
+
+        This is because a sample from the NF is a sample from the base distribution
+        pushed through the flow:
+
+            $z = T_\\phi^{-1}(\\theta) \\sim N(0, I_m) \\iff theta = T_\\phi(z)$.
+
+        This defines the two classes P and Q for the L-C2ST test, one of which is
+        the Gaussion distribution that can be easily be sampled from and is independent
+        of the observation `x_o` and the estimator q.
 
         Important features are:
-        - the null distribution is the base distribution (e.g. Gaussian) of the flow,
-            independent of the observation `x_o` and the estimator q.
-        - no `theta_o` is passed to the evaluation functions (e.g. `_scores`),
+        - no `theta_o` is passed to the evaluation functions (e.g. `get_scores`),
             as the base distribution is known, samples are drawn at initialization.
         - no permutation method is used, as the null distribution is known,
             samples are drawn during `train_under_null_hypothesis`.
@@ -539,14 +530,14 @@ class LC2ST_NF(LC2ST):
         # Draw samples from the base distribution for evaluation
         self.theta_o = flow_base_dist.sample(torch.Size([num_eval]))
 
-    def _scores(
+    def get_scores(
         self,
         x_o: Tensor,
         trained_clfs: List[Any],
         return_probs: bool = False,
         **kwargs: Any,
     ) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
-        """Compute the L-C2ST scores given the trained classifiers.
+        """Computes the L-C2ST scores given the trained classifiers.
 
         Args:
             x_o: The observation, of shape (,dim_x).
@@ -559,54 +550,29 @@ class LC2ST_NF(LC2ST):
             scores: L-C2ST scores at `x_o`.
             (probs, scores): Predicted probabilities and L-C2ST scores at `x_o`.
         """
-        return super()._scores(
+        return super().get_scores(
             theta_o=self.theta_o,
             x_o=x_o,
             trained_clfs=trained_clfs,
             return_probs=return_probs,
         )
 
-    def get_scores_on_observed_data(
-        self,
-        x_o: Tensor,
-        return_probs: bool = False,
-        **kwargs: Any,
-    ) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
-        """Compute the L-C2ST scores for the observed data.
-
-        Args:
-            x_o: The observation, of shape (,dim_x).
-            return_probs: Whether to return the predicted probabilities of being in P,
-                defaults to False.
-            kwargs: Additional arguments used in the parent class.
-
-        Returns: one of
-            scores: L-C2ST scores at `x_o`.
-            (probs, scores): Predicted probabilities and L-C2ST scores at `x_o`.
-        """
-        return super().get_scores_on_observed_data(
-            theta_o=self.theta_o, x_o=x_o, return_probs=return_probs
-        )
-
     def get_statistic_on_observed_data(
         self,
         x_o: Tensor,
-        return_probs: bool = False,
         **kwargs: Any,
-    ) -> Union[float, Tuple[np.ndarray, float]]:
-        """Computes the L-C2ST statistic for the observed data.
+    ) -> float:
+        """Computes the L-C2ST statistics for the observed data:
+        Mean over all cv-scores.
 
         Args:
             x_o: The observation, of shape (, dim_x).
             kwargs: Additional arguments used in the parent class.
-            return_probs: Whether to return the predicted probabilities of being in P,
 
         Returns:
             L-C2ST statistic at `x_o`.
         """
-        return super().get_statistic_on_observed_data(
-            theta_o=self.theta_o, x_o=x_o, return_probs=return_probs
-        )
+        return super().get_statistic_on_observed_data(theta_o=self.theta_o, x_o=x_o)
 
     def p_value(
         self,
@@ -651,7 +617,7 @@ class LC2ST_NF(LC2ST):
         self,
         verbosity: int = 1,
     ) -> None:
-        """Compute the L-C2ST scores under the null hypothesis.
+        """Computes the L-C2ST scores under the null hypothesis.
         Saves the trained classifiers for the null distribution.
 
         Args:
@@ -671,7 +637,7 @@ class LC2ST_NF(LC2ST):
         verbosity: int = 0,
         **kwargs: Any,
     ) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
-        """Compute the L-C2ST scores under the null hypothesis.
+        """Computes the L-C2ST scores under the null hypothesis.
 
         Args:
             x_o: The observation.
@@ -736,14 +702,15 @@ def eval_lc2st(
     `x_o` and over the samples `P`.
 
     Args:
-        theta_p: Samples from P, of shape (sample_size, dim).
+        theta_p: Samples from p (class 0), of shape (sample_size, dim).
         x_o: The observation, of shape (, dim_x).
         clf: Trained classifier.
         return_proba: Whether to return the predicted probabilities of being in P,
             defaults to False.
 
     Returns:
-        L-C2ST score at `x_o`.
+        L-C2ST score at `x_o`: MSE between 0.5 and the predicted classifier
+        probability for class 0 on `theta_p`.
     """
     # concatenate to get joint data
     joint_p = np.concatenate(
@@ -784,3 +751,29 @@ def permute_data(
     X = torch.cat([theta_p, theta_q], dim=0)
     x_perm = X[torch.randperm(sample_size * 2)]
     return x_perm[:sample_size], x_perm[sample_size:]
+
+
+class EnsembleClassifier(BaseEstimator):
+    def __init__(self, clf, num_ensemble=1, verbosity=1):
+        self.clf = clf
+        self.num_ensemble = num_ensemble
+        self.trained_clfs = []
+        self.verbosity = verbosity
+
+    def fit(self, X, y):
+        for n in tqdm(
+            range(self.num_ensemble),
+            desc="Ensemble training",
+            disable=self.verbosity < 1,
+        ):
+            clf = clone(self.clf)
+            if clf.random_state is not None:
+                clf.random_state += n
+            else:
+                clf.random_state = n + 1
+            clf.fit(X, y)
+            self.trained_clfs.append(clf)
+
+    def predict_proba(self, X):
+        probas = [clf.predict_proba(X) for clf in self.trained_clfs]
+        return np.mean(probas, axis=0)

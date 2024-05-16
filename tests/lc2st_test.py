@@ -90,8 +90,12 @@ def test_running_lc2st(method, classifier, cv_folds, num_ensemble, z_score):
     _ = lc2st.train_under_null_hypothesis()
     _ = lc2st.train_on_observed_data()
 
-    _ = lc2st.get_scores_on_observed_data(x_o=xs[0], return_probs=True, **kwargs_eval)
-    _ = lc2st.get_scores_on_observed_data(x_o=xs[0], return_probs=False, **kwargs_eval)
+    _ = lc2st.get_scores(
+        x_o=xs[0], trained_clfs=lc2st.trained_clfs, return_probs=True, **kwargs_eval
+    )
+    _ = lc2st.get_scores(
+        x_o=xs[0], trained_clfs=lc2st.trained_clfs, return_probs=False, **kwargs_eval
+    )
     _ = lc2st.get_statistic_on_observed_data(x_o=xs[0], **kwargs_eval)
 
     _ = lc2st.get_statistics_under_null_hypothesis(
@@ -106,8 +110,7 @@ def test_running_lc2st(method, classifier, cv_folds, num_ensemble, z_score):
 
 @pytest.mark.slow
 @pytest.mark.parametrize("method", (LC2ST, LC2ST_NF))
-@pytest.mark.parametrize("num_ensemble", (1, 3))
-def test_lc2st_true_negativ_rate(method, num_ensemble):
+def test_lc2st_true_negativ_rate(method):
     """Tests the true negative rate of the LC2ST-(NF) test:
     for a "bad" estimator, the LC2ST-(NF) should reject the null hypothesis."""
     num_runs = 100
@@ -154,9 +157,7 @@ def test_lc2st_true_negativ_rate(method, num_ensemble):
             "num_eval": num_eval,
         }
 
-    lc2st = method(
-        thetas, xs, posterior_samples, num_ensemble=num_ensemble, **kwargs_test
-    )
+    lc2st = method(thetas, xs, posterior_samples, **kwargs_test)
 
     _ = lc2st.train_under_null_hypothesis()
     _ = lc2st.train_on_observed_data()
@@ -188,8 +189,7 @@ def test_lc2st_true_negativ_rate(method, num_ensemble):
 
 @pytest.mark.slow
 @pytest.mark.parametrize("method", (LC2ST, LC2ST_NF))
-@pytest.mark.parametrize("num_ensemble", (1, 3))
-def test_lc2st_true_positiv_rate(method, num_ensemble):
+def test_lc2st_true_positiv_rate(method):
     """Tests the true negative rate of the LC2ST-(NF) test:
     for a "good" estimator, the LC2ST-(NF) should accept the null hypothesis."""
     num_runs = 100
@@ -236,9 +236,7 @@ def test_lc2st_true_positiv_rate(method, num_ensemble):
             "num_eval": num_eval,
         }
 
-    lc2st = method(
-        thetas, xs, posterior_samples, num_ensemble=num_ensemble, **kwargs_test
-    )
+    lc2st = method(thetas, xs, posterior_samples, **kwargs_test)
 
     _ = lc2st.train_under_null_hypothesis()
     _ = lc2st.train_on_observed_data()
