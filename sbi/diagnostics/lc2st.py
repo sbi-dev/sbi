@@ -256,7 +256,7 @@ class LC2ST:
         if seed is not None:
             if "random_state" in self.clf_kwargs:
                 print("WARNING: changing the random state of the classifier.")
-            self.clf_kwargs["random_state"] = seed
+            self.clf_kwargs["random_state"] = seed  # type: ignore
 
         # train the classifier
         trained_clfs = self._train(
@@ -767,11 +767,11 @@ class EnsembleClassifier(BaseEstimator):
             disable=self.verbosity < 1,
         ):
             clf = clone(self.clf)
-            if clf.random_state is not None:
-                clf.random_state += n
+            if clf.random_state is not None:  # type: ignore
+                clf.random_state += n  # type: ignore
             else:
-                clf.random_state = n + 1
-            clf.fit(X, y)
+                clf.random_state = n + 1  # type: ignore
+            clf.fit(X, y)  # type: ignore
             self.trained_clfs.append(clf)
 
     def predict_proba(self, X):
