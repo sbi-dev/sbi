@@ -1,5 +1,5 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from typing import Optional
 
@@ -82,6 +82,8 @@ def build_mdn(
     )
 
     neural_net = flows.Flow(transform, distribution, embedding_net)
-    flow = NFlowsFlow(neural_net, condition_shape=batch_y[0].shape)
+    flow = NFlowsFlow(
+        neural_net, input_shape=batch_x[0].shape, condition_shape=batch_y[0].shape
+    )
 
     return flow

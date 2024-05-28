@@ -1,5 +1,5 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from __future__ import annotations
 
@@ -46,19 +46,19 @@ from sbi.utils.user_input_checks import (
         (SNPE_C, "maf", "direct"),
         (SNPE_C, "mdn", "rejection"),
         pytest.param(SNPE_C, "maf", "slice_np_vectorized", marks=pytest.mark.mcmc),
-        pytest.param(SNPE_C, "mdn", "slice", marks=pytest.mark.mcmc),
+        pytest.param(SNPE_C, "mdn", "slice_np", marks=pytest.mark.mcmc),
         pytest.param(SNLE, "nsf", "slice_np_vectorized", marks=pytest.mark.mcmc),
-        pytest.param(SNLE, "mdn", "slice", marks=pytest.mark.mcmc),
+        pytest.param(SNLE, "mdn", "slice_np", marks=pytest.mark.mcmc),
         (SNLE, "nsf", "rejection"),
         (SNLE, "maf", "importance"),
         pytest.param(SNRE_A, "mlp", "slice_np_vectorized", marks=pytest.mark.mcmc),
-        pytest.param(SNRE_A, "mlp", "slice", marks=pytest.mark.mcmc),
+        pytest.param(SNRE_A, "mlp", "slice_np", marks=pytest.mark.mcmc),
         (SNRE_B, "resnet", "rejection"),
         (SNRE_B, "resnet", "importance"),
-        pytest.param(SNRE_B, "resnet", "slice", marks=pytest.mark.mcmc),
+        pytest.param(SNRE_B, "resnet", "slice_np", marks=pytest.mark.mcmc),
         (SNRE_C, "resnet", "rejection"),
         (SNRE_C, "resnet", "importance"),
-        pytest.param(SNRE_C, "resnet", "nuts", marks=pytest.mark.mcmc),
+        pytest.param(SNRE_C, "resnet", "nuts_pymc", marks=pytest.mark.mcmc),
     ],
 )
 @pytest.mark.parametrize(
@@ -151,7 +151,7 @@ def test_training_and_mcmc_on_device(
         )
 
         # mcmc cases
-        if sampling_method in ["slice", "slice_np", "slice_np_vectorized", "nuts"]:
+        if sampling_method in ["slice_np", "slice_np_vectorized", "nuts_pymc"]:
             posterior = inferer.build_posterior(
                 sample_with="mcmc",
                 mcmc_method=sampling_method,

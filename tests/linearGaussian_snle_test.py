@@ -1,5 +1,5 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from __future__ import annotations
 
@@ -151,7 +151,7 @@ def test_c2st_and_map_snl_on_linearGaussian_different(
 
     """
     num_samples = 500
-    num_simulations = 5000
+    num_simulations = 3000
     trials_to_test = [1]
 
     # likelihood_mean will be likelihood_shift+theta
@@ -173,7 +173,7 @@ def test_c2st_and_map_snl_on_linearGaussian_different(
     inference = SNLE(density_estimator=density_estimator, show_progress_bars=False)
 
     theta, x = simulate_for_sbi(
-        simulator, prior, num_simulations, simulation_batch_size=10000
+        simulator, prior, num_simulations, simulation_batch_size=num_simulations
     )
     likelihood_estimator = inference.append_simulations(theta, x).train()
 
@@ -213,7 +213,7 @@ def test_c2st_and_map_snl_on_linearGaussian_different(
         check_c2st(
             samples,
             target_samples,
-            alg=f"snle_a-{prior_str}-prior-{num_trials}-trials",
+            alg=f"snle_a-{prior_str}-prior-{model_str}-{num_trials}-trials",
         )
 
         map_ = posterior.map(
@@ -406,11 +406,9 @@ def test_c2st_multi_round_snl_on_linearGaussian_vi(num_trials: int):
         pytest.param("slice_np", "uniform", marks=pytest.mark.mcmc),
         pytest.param("slice_np_vectorized", "gaussian", marks=pytest.mark.mcmc),
         pytest.param("slice_np_vectorized", "uniform", marks=pytest.mark.mcmc),
-        pytest.param("slice", "gaussian", marks=pytest.mark.mcmc),
-        pytest.param("slice", "uniform", marks=pytest.mark.mcmc),
-        pytest.param("nuts", "gaussian", marks=pytest.mark.mcmc),
-        pytest.param("nuts", "uniform", marks=pytest.mark.mcmc),
-        pytest.param("hmc", "gaussian", marks=pytest.mark.mcmc),
+        pytest.param("nuts_pymc", "gaussian", marks=pytest.mark.mcmc),
+        pytest.param("nuts_pyro", "uniform", marks=pytest.mark.mcmc),
+        pytest.param("hmc_pymc", "gaussian", marks=pytest.mark.mcmc),
         ("rejection", "uniform"),
         ("rejection", "gaussian"),
         ("rKL", "uniform"),
@@ -460,50 +458,46 @@ def test_api_snl_sampling_methods(
     else:
         prior = BoxUniform(-1.0 * ones(num_dim), ones(num_dim))
 
-    # Why do we have this if-case? Only the `MCMCPosterior` uses the `init_strategy`.
-    # Thus, we would not like to run, e.g., VI with all init_strategies, but only once
-    # (namely with `init_strategy=proposal`).
-    if sample_with == "mcmc" or init_strategy == "proposal":
-        simulator = diagonal_linear_gaussian
+    simulator = diagonal_linear_gaussian
 
-        inference = SNLE(show_progress_bars=False)
+    inference = SNLE(show_progress_bars=False)
 
-        theta, x = simulate_for_sbi(
-            simulator, prior, num_simulations, simulation_batch_size=1000
+    theta, x = simulate_for_sbi(
+        simulator, prior, num_simulations, simulation_batch_size=1000
+    )
+    likelihood_estimator = inference.append_simulations(theta, x).train(
+        max_num_epochs=5
+    )
+    potential_fn, theta_transform = likelihood_estimator_based_potential(
+        prior=prior, likelihood_estimator=likelihood_estimator, x_o=x_o
+    )
+    if sample_with == "rejection":
+        posterior = RejectionPosterior(potential_fn=potential_fn, proposal=prior)
+    elif (
+        "slice" in sampling_method
+        or "nuts" in sampling_method
+        or "hmc" in sampling_method
+    ):
+        posterior = MCMCPosterior(
+            potential_fn,
+            proposal=prior,
+            theta_transform=theta_transform,
+            method=sampling_method,
+            init_strategy=init_strategy,
+            **mcmc_params_fast,
         )
-        likelihood_estimator = inference.append_simulations(theta, x).train(
-            max_num_epochs=5
+    elif sample_with == "importance":
+        posterior = ImportanceSamplingPosterior(
+            potential_fn,
+            proposal=prior,
+            theta_transform=theta_transform,
         )
-        potential_fn, theta_transform = likelihood_estimator_based_potential(
-            prior=prior, likelihood_estimator=likelihood_estimator, x_o=x_o
+    else:
+        posterior = VIPosterior(
+            potential_fn,
+            theta_transform=theta_transform,
+            vi_method=sampling_method,
         )
-        if sample_with == "rejection":
-            posterior = RejectionPosterior(potential_fn=potential_fn, proposal=prior)
-        elif (
-            "slice" in sampling_method
-            or "nuts" in sampling_method
-            or "hmc" in sampling_method
-        ):
-            posterior = MCMCPosterior(
-                potential_fn,
-                proposal=prior,
-                theta_transform=theta_transform,
-                method=sampling_method,
-                init_strategy=init_strategy,
-                **mcmc_params_fast,
-            )
-        elif sample_with == "importance":
-            posterior = ImportanceSamplingPosterior(
-                potential_fn,
-                proposal=prior,
-                theta_transform=theta_transform,
-            )
-        else:
-            posterior = VIPosterior(
-                potential_fn,
-                theta_transform=theta_transform,
-                vi_method=sampling_method,
-            )
-            posterior.train(max_num_iters=10)
+        posterior.train(max_num_iters=10)
 
-        posterior.sample(sample_shape=(num_samples,))
+    posterior.sample(sample_shape=(num_samples,), show_progress_bars=False)

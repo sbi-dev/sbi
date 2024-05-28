@@ -96,7 +96,7 @@ class EnsemblePosterior(NeuralPosterior):
             potential_fn=potential_fn,
             theta_transform=theta_transform,
             device=device,
-            x_shape=self.posteriors[0]._x_shape,
+            x_shape=None,
         )
 
     def ensure_same_device(self, posteriors: List) -> str:
@@ -243,7 +243,7 @@ class EnsemblePosterior(NeuralPosterior):
             passed.
         """
         self._x = process_x(
-            x, x_shape=self._x_shape, allow_iid_x=self.potential_fn.allow_iid_x
+            x, x_event_shape=None, allow_iid_x=self.potential_fn.allow_iid_x
         ).to(self._device)
 
         for posterior in self.posteriors:

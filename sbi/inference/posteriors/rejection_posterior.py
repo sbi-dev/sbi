@@ -1,5 +1,6 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+
 from functools import partial
 from typing import Any, Callable, Optional, Union
 from warnings import warn
@@ -49,8 +50,7 @@ class RejectionPosterior(NeuralPosterior):
             m: Multiplier to the `potential_fn / proposal` ratio.
             device: Training device, e.g., "cpu", "cuda" or "cuda:0". If None,
                 `potential_fn.device` is used.
-            x_shape: Shape of a single simulator output. If passed, it is used to check
-                the shape of the observed data and give a descriptive error.
+            x_shape: Deprecated, should not be passed.
         """
         super().__init__(
             potential_fn,

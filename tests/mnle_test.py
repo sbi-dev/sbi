@@ -1,5 +1,5 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import pytest
 import torch
@@ -43,7 +43,7 @@ def test_mnle_on_device(
     device,
     mcmc_params_fast: dict,
     num_simulations: int = 100,
-    mcmc_method: str = "slice",
+    mcmc_method: str = "slice_np",
 ):
     """Test MNLE API on device."""
 

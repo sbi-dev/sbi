@@ -1,5 +1,5 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import os
 import sys
@@ -22,20 +22,20 @@ class MCMCSampler:
     Superclass for MCMC samplers.
     """
 
-    def __init__(self, x, lp_f: Callable, thin: Optional[int], verbose: bool = False):
+    def __init__(self, x, lp_f: Callable, thin: int, verbose: bool = False):
         """
 
         Args:
             x: initial state
             lp_f: Function that returns the log prob.
-            thin: amount of thinning; if None, no thinning.
+            thin: Thinning (subsampling) factor, default 1 (no thinning).
             verbose: Whether to show progress bars (False).
         """
 
         self.x = np.array(x, dtype=float)
         self.lp_f = lp_f
         self.L = lp_f(self.x)
-        self.thin = 1 if thin is None else thin
+        self.thin = thin
         self.n_dims = self.x.size if self.x.ndim == 1 else self.x.shape[1]
         self.verbose = verbose
 
@@ -61,7 +61,7 @@ class SliceSampler(MCMCSampler):
         lp_f,
         max_width=float("inf"),
         init_width: Union[float, np.ndarray] = 0.01,
-        thin=None,
+        thin=1,
         tuning: int = 50,
         verbose: bool = False,
     ):
@@ -222,7 +222,7 @@ class SliceSamplerSerial:
         log_prob_fn: Callable,
         init_params: np.ndarray,
         num_chains: int = 1,
-        thin: Optional[int] = None,
+        thin: int = 1,
         tuning: int = 50,
         verbose: bool = True,
         init_width: Union[float, np.ndarray] = 0.01,
@@ -237,7 +237,7 @@ class SliceSamplerSerial:
             log_prob_fn: Log prob function.
             init_params: Initial parameters.
             num_chains: Number of MCMC chains to run in parallel
-            thin: amount of thinning; if None, no thinning.
+            thin: Thinning (subsampling) factor, default 1 (no thinning).
             tuning: Number of tuning steps for brackets.
             verbose: Show/hide additional info such as progress bars.
             init_width: Inital width of brackets.
@@ -356,7 +356,7 @@ class SliceSamplerVectorized:
         log_prob_fn: Callable,
         init_params: np.ndarray,
         num_chains: int = 1,
-        thin: Optional[int] = None,
+        thin: int = 1,
         tuning: int = 50,
         verbose: bool = True,
         init_width: Union[float, np.ndarray] = 0.01,
@@ -369,7 +369,7 @@ class SliceSamplerVectorized:
             log_prob_fn: Log prob function.
             init_params: Initial parameters.
             num_chains: Number of MCMC chains to run in parallel
-            thin: amount of thinning; if None, no thinning.
+            thin: Thinning (subsampling) factor, default 1 (no thinning).
             tuning: Number of tuning steps for brackets.
             verbose: Show/hide additional info such as progress bars.
             init_width: Inital width of brackets.

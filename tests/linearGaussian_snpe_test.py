@@ -1,5 +1,5 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from __future__ import annotations
 
@@ -389,7 +389,6 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str):
     "sample_with, mcmc_method, prior_str",
     (
         pytest.param("mcmc", "slice_np", "gaussian", marks=pytest.mark.mcmc),
-        pytest.param("mcmc", "slice", "gaussian", marks=pytest.mark.mcmc),
         pytest.param("mcmc", "slice_np_vectorized", "gaussian", marks=pytest.mark.mcmc),
         ("rejection", "rejection", "uniform"),
     ),

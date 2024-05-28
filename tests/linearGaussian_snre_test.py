@@ -1,5 +1,5 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from __future__ import annotations
 
@@ -326,11 +326,9 @@ def test_c2st_multi_round_snr_on_linearGaussian_vi(
         pytest.param("slice_np", "uniform", marks=pytest.mark.mcmc),
         pytest.param("slice_np_vectorized", "gaussian", marks=pytest.mark.mcmc),
         pytest.param("slice_np_vectorized", "uniform", marks=pytest.mark.mcmc),
-        pytest.param("slice", "gaussian", marks=pytest.mark.mcmc),
-        pytest.param("slice", "uniform", marks=pytest.mark.mcmc),
-        pytest.param("nuts", "gaussian", marks=pytest.mark.mcmc),
-        pytest.param("nuts", "uniform", marks=pytest.mark.mcmc),
-        pytest.param("hmc", "gaussian", marks=pytest.mark.mcmc),
+        pytest.param("nuts_pymc", "gaussian", marks=pytest.mark.mcmc),
+        pytest.param("nuts_pyro", "uniform", marks=pytest.mark.mcmc),
+        pytest.param("hmc_pyro", "gaussian", marks=pytest.mark.mcmc),
         ("rejection", "uniform"),
         ("rejection", "gaussian"),
         ("rKL", "uniform"),
@@ -419,4 +417,4 @@ def test_api_sre_sampling_methods(
         )
         posterior.train(max_num_iters=10)
 
-    posterior.sample(sample_shape=(num_samples,))
+    posterior.sample(sample_shape=(num_samples,), show_progress_bars=False)

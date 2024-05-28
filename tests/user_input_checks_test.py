@@ -1,5 +1,5 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from __future__ import annotations
 
@@ -183,13 +183,13 @@ def test_process_prior(prior):
 @pytest.mark.parametrize(
     "x, x_shape, allow_iid",
     (
-        (ones(3), torch.Size([1, 3]), False),
-        (ones(1, 3), torch.Size([1, 3]), False),
-        (ones(10, 3), torch.Size([1, 10, 3]), False),  # 2D data / iid SNPE
+        (ones(3), torch.Size([3]), False),
+        (ones(1, 3), torch.Size([3]), False),
+        (ones(10, 3), torch.Size([10, 3]), False),  # 2D data / iid SNPE
         pytest.param(
             ones(10, 3), None, False, marks=pytest.mark.xfail
         ),  # 2D data / iid SNPE without x_shape
-        (ones(10, 10), torch.Size([1, 10]), True),  # iid likelihood based
+        (ones(10, 10), torch.Size([10]), True),  # iid likelihood based
     ),
 )
 def test_process_x(x, x_shape, allow_iid):

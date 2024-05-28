@@ -1,0 +1,65 @@
+name: Manual-Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      pytest-marker:
+        description: "Combination of markers to restrict the tests, use '' to run all tests."
+        type: choice
+        options:
+          - 'not slow and not gpu'
+          - 'not gpu'
+          - 'not slow'
+          - ''
+        default: ''
+        required: true
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: manual-test
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.8']
+        torch-version: ['1.11', '2.2']
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        lfs: false
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Cache dependency
+      id: cache-dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ matrix.torch-version }}$
+        restore-keys: |
+          ${{ runner.os }}-pip-${{ matrix.python-version }}-
+          ${{ runner.os }}-pip-
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install torch==${{ matrix.torch-version }} --extra-index-url https://download.pytorch.org/whl/cpu
+        pip install -e .[dev]
+
+    - name: Run the selected tests without coverage
+      run: |
+        pytest -v -x -m ${{ inputs.pytest-marker }} tests/

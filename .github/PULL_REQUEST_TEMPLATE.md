@@ -32,3 +32,4 @@ your code.
 - [ ] I performed linting and formatting as described in the [contribution
   guidelines](https://github.com/sbi-dev/sbi/blob/main/CONTRIBUTING.md)
 - [ ] I rebased on `main` (or there are no conflicts with `main`)
+- [ ] For reviewer: The continuous deployment (CD) workflow are passing.
