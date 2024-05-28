@@ -19,9 +19,12 @@ class Distance:
         """Distance class for ABC
 
         Args:
-            distance:
-            requires_iid_data:
-            distance_kwargs:
+            distance: A distance function comparing the simulations with 'x_o'.
+            Implemented distances are the 'mse', 'l2', and 'l1' norm as pairwise
+            distances, or the 'wasserstein' and 'mmd' as statistical distances.
+            requires_iid_data: 'True' if the distance is a statistical distance.
+            Only needs to be specified if 'distance' is a custom distance
+            distance_kwargs: Arguments for the specific distance.
         """
         self.batch_size = batch_size
         self.distance_kwargs = distance_kwargs or {}
@@ -60,31 +63,31 @@ class Distance:
             except KeyError as exc:
                 raise KeyError(f"Distance {distance} not supported.") from exc
 
-    def __call__(self, xo, x) -> torch.Tensor:
+    def __call__(self, x_o, x) -> torch.Tensor:
         """Distance evaluation between the reference data and the simulated data.
 
         Args:
-            xo: Reference data
+            x_o: Reference data
             x: Simulated data
         """
         if self.requires_iid_data:
             assert x.ndim >= 3, "simulated data needs batch dimension"
-            assert xo.ndim + 1 == x.ndim
+            assert x_o.ndim + 1 == x.ndim
         else:
             assert x.ndim >= 2, "simulated data needs batch dimension"
         if self.batch_size == -1:
-            return self.distance_fn(xo, x)
+            return self.distance_fn(x_o, x)
         else:
-            return self._batched_distance(xo, x)
+            return self._batched_distance(x_o, x)
 
-    def _batched_distance(self, xo, x):
+    def _batched_distance(self, x_o, x):
         """Evaluate the distance is mini-batches.
         Especially for statistical distances, batching over two empirical
         datasets can lead to memory overflow. Batching can help to resolve
         the memory problems.
 
         Args:
-            xo: Reference data
+            x_o: Reference data
             x: Simulated data
         """
         num_batches = x.shape[0] // self.batch_size - 1
@@ -95,10 +98,12 @@ class Distance:
         distances = torch.empty(x.shape[0])
         for i in tqdm(range(num_batches)):
             distances[self.batch_size * i : (i + 1) * self.batch_size] = (
-                self.distance_fn(xo, x[self.batch_size * i : (i + 1) * self.batch_size])
+                self.distance_fn(
+                    x_o, x[self.batch_size * i : (i + 1) * self.batch_size]
+                )
             )
         if remaining > 0:
-            distances[-remaining:] = self.distance_fn(xo, x[-remaining:])
+            distances[-remaining:] = self.distance_fn(x_o, x[-remaining:])
 
         return distances
 
@@ -107,25 +112,25 @@ class Distance:
         return self._requires_iid_data
 
 
-def mse_distance(xo, x):
-    return torch.mean((xo - x) ** 2, dim=-1)
+def mse_distance(x_o, x):
+    return torch.mean((x_o - x) ** 2, dim=-1)
 
 
-def l2_distance(xo, x):
-    return torch.norm((xo - x), dim=-1)
+def l2_distance(x_o, x):
+    return torch.norm((x_o - x), dim=-1)
 
 
-def l1_distance(xo, x):
-    return torch.mean(abs(xo - x), dim=-1)
+def l1_distance(x_o, x):
+    return torch.mean(abs(x_o - x), dim=-1)
 
 
-def mmd(xo, x, scale=None):
+def mmd(x_o, x, scale=None):
     dist_fn = partial(unbiased_mmd_squared, scale=scale)
-    return torch.vmap(dist_fn, in_dims=(None, 0))(xo, x)
+    return torch.vmap(dist_fn, in_dims=(None, 0))(x_o, x)
 
 
-def wasserstein(xo, x, epsilon=1e-3, max_iter=1000, tol=1e-9):
-    batched_xo = xo.repeat((x.shape[0], *[1] * len(xo.shape)))
+def wasserstein(x_o, x, epsilon=1e-3, max_iter=1000, tol=1e-9):
+    batched_x_o = x_o.repeat((x.shape[0], *[1] * len(x_o.shape)))
     return wasserstein_2_squared(
-        batched_xo, x, epsilon=epsilon, max_iter=max_iter, tol=tol
+        batched_x_o, x, epsilon=epsilon, max_iter=max_iter, tol=tol
     )
