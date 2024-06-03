@@ -38,6 +38,6 @@
 ## Examples:
 
 <div class="grid cards" markdown>
-- [Hodgkin-Huxley example](../examples/00_HH_simulator)
-- [Decision making model](../examples/01_decision_making_model)
+- [Hodgkin-Huxley model](../examples/00_HH_simulator)
+- [Decision-making model](../examples/01_decision_making_model)
 </div>

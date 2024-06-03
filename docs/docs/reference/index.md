@@ -4,18 +4,18 @@
 
 - [Inference](inference.md)
   <br/>
-  *XXX*
+  *SBI algorithms and helper functions.*
 - [Neural Networks](models.md)
   <br/>
-  *Models to perform posterior approximation and signal embeddings.*
+  *Utilities to build neural network-based density estimators and feature extractors.*
 - [Posteriors](posteriors.md)
   <br/>
-  *XXX*
+  *Posterior classes*
 - [Potentials](potentials.md)
   <br/>
-  *XXX*
+  *Potential function classes for posterior sampling.*
 - [Analysis](analysis.md)
   <br/>
-  *XXX*
+  *Utilities for SBI visualizations and analyses.*
 
 </div>

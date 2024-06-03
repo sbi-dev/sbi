@@ -4,6 +4,14 @@
 interface:
 
 ```python
+import torch
+from sbi.inference import SNPE
+from sbi.utils import BoxUniform
+
+# define prior and simulator
+prior = BoxUniform(torch.tensor([0]), torch.tensor([1]))
+simulator = lambda theta: torch.randn_like(theta) + theta
+
 # simulation
 theta = prior.sample((1000,))
 x = simulator(theta)
@@ -13,6 +21,7 @@ inference = SNPE(prior).append_simulations(theta, x)
 inference.train()
 
 # inference
+x_o = torch.tensor([1.5])
 posterior = inference.build_posterior()
 posterior_samples = posterior.sample((1000,), x=x_o)
 ```
