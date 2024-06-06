@@ -18,8 +18,7 @@ classifiers = [
     "Topic :: Scientific/Engineering",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Topic :: Scientific/Engineering :: Mathematics",
-    """License :: OSI Approved :: GNU Affero General Public License v3 or later
-    (AGPLv3+)""",
+    """License :: OSI Approved :: Apache License, Version 2.0 (Apache-2.0""",
     "Natural Language :: English",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
@@ -115,9 +114,11 @@ quote-style = "preserve"
 [tool.pytest.ini_options]
 minversion = "6.0"
 addopts = "-ra -q"
-testpaths = [
-    "tests",
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning"
 ]
+testpaths = ["tests"]
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "gpu: marks tests that require a gpu (deselect with '-m \"not gpu\"')",

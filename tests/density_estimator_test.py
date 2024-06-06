@@ -1,5 +1,5 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from __future__ import annotations
 
@@ -281,6 +281,75 @@ def test_correctness_of_density_estimator_log_prob(
     )
     log_probs = density_estimator.log_prob(inputs, condition=condition)
     assert torch.allclose(log_probs[0, :], log_probs[1, :])
+
+
+@pytest.mark.parametrize(
+    "density_estimator_build_fn",
+    (
+        build_mdn,
+        build_maf,
+        build_maf_rqs,
+        build_nsf,
+        build_zuko_bpf,
+        build_zuko_gf,
+        build_zuko_maf,
+        build_zuko_naf,
+        build_zuko_ncsf,
+        build_zuko_nice,
+        build_zuko_nsf,
+        build_zuko_sospf,
+        build_zuko_unaf,
+        build_categoricalmassestimator,
+        build_mnle,
+    ),
+)
+@pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
+@pytest.mark.parametrize("condition_event_shape", ((1,), (7,)))
+def test_correctness_of_batched_vs_seperate_sample_and_log_prob(
+    density_estimator_build_fn, input_event_shape, condition_event_shape
+):
+    input_sample_dim = 2
+    batch_dim = 2
+    density_estimator, inputs, condition = _build_density_estimator_and_tensors(
+        density_estimator_build_fn,
+        input_event_shape,
+        condition_event_shape,
+        batch_dim,
+        input_sample_dim,
+    )
+    # Batched vs separate sampling
+    samples = density_estimator.sample((1000,), condition=condition)
+    samples_separate1 = density_estimator.sample(
+        (1000,), condition=condition[0][None, ...]
+    )
+    samples_separate2 = density_estimator.sample(
+        (1000,), condition=condition[1][None, ...]
+    )
+
+    # Check if means are approx. same
+    samples_m = torch.mean(samples, dim=0, dtype=torch.float32)
+    samples_separate1_m = torch.mean(samples_separate1, dim=0, dtype=torch.float32)
+    samples_separate2_m = torch.mean(samples_separate2, dim=0, dtype=torch.float32)
+    samples_sep_m = torch.cat([samples_separate1_m, samples_separate2_m], dim=0)
+
+    assert torch.allclose(
+        samples_m, samples_sep_m, atol=0.5, rtol=0.5
+    ), "Batched sampling is not consistent with separate sampling."
+
+    # Batched vs separate log_prob
+    log_probs = density_estimator.log_prob(inputs, condition=condition)
+
+    log_probs_separate1 = density_estimator.log_prob(
+        inputs[:, :1], condition=condition[0][None, ...]
+    )
+    log_probs_separate2 = density_estimator.log_prob(
+        inputs[:, 1:], condition=condition[1][None, ...]
+    )
+    log_probs_sep = torch.hstack([log_probs_separate1, log_probs_separate2])
+
+    assert torch.allclose(
+        log_probs, log_probs_sep, atol=1e-2, rtol=1e-2
+    ), "Batched log_prob is not consistent with separate log_prob."
 
 
 def _build_density_estimator_and_tensors(

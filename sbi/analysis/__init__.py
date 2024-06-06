@@ -9,7 +9,10 @@ from sbi.analysis.plot import (
     conditional_marginal_plot,
     conditional_pairplot,
     marginal_plot,
+    marginal_plot_with_probs_intensity,
     pairplot,
+    pp_plot,
+    pp_plot_lc2st,
     sbc_rank_plot,
 )
 from sbi.analysis.sensitivity_analysis import ActiveSubspace

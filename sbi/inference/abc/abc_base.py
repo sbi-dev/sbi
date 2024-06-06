@@ -1,14 +1,17 @@
+# This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+
 """Base class for Approximate Bayesian Computation methods."""
 
 import logging
-from typing import Callable, Union
+from typing import Callable, Dict, Optional, Union
 
 import numpy as np
 import torch
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import PolynomialFeatures
-from torch import Tensor
 
+from sbi.inference.abc.distances import Distance
 from sbi.simulators.simutils import simulate_in_batches
 
 
@@ -20,8 +23,11 @@ class ABCBASE:
         simulator: Callable,
         prior,
         distance: Union[str, Callable] = "l2",
+        requires_iid_data: Optional[bool] = None,
+        distance_kwargs: Optional[Dict] = None,
         num_workers: int = 1,
         simulation_batch_size: int = 1,
+        distance_batch_size: int = -1,
         show_progress_bars: bool = True,
     ) -> None:
         r"""Base class for Approximate Bayesian Computation methods.
@@ -36,12 +42,21 @@ class ABCBASE:
                 object with `.log_prob()`and `.sample()` (for example, a PyTorch
                 distribution) can be used.
             distance: Distance function to compare observed and simulated data. Can be
-                a custom callable function or one of `l1`, `l2`, `mse`.
+                a custom callable function or one of `l1`, `l2`, `mse`,
+                `mmd`, `wasserstein`.
+            requires_iid_data: Whether to allow conditioning on iid sampled data or not.
+                Typically, this information is inferred by the choice of the distance,
+                but in case a custom distance is used, this information is pivotal.
+            distance_kwargs: Configurations parameters for the distances. In particular
+                useful for the MMD and Wasserstein distance.
             num_workers: Number of parallel workers to use for simulations.
             simulation_batch_size: Number of parameter sets that the simulator
                 maps to data x at once. If None, we simulate all parameter sets at the
                 same time. If >= 1, the simulator has to process data of shape
                 (simulation_batch_size, parameter_dimension).
+            distance_batch_size: Number of simulations that the distance function
+                evaluates against the reference observations at once. If -1, we evaluate
+                all simulations at the same time.
             show_progress_bars: Whether to show a progressbar during simulation and
                 sampling.
         """
@@ -54,7 +69,9 @@ class ABCBASE:
         self.x_shape = None
 
         # Select distance function.
-        self.distance = self.get_distance_function(distance)
+        self.distance = Distance(
+            distance, requires_iid_data, distance_kwargs, batch_size=distance_batch_size
+        )
 
         self._batched_simulator = lambda theta: simulate_in_batches(
             simulator=self._simulator,
@@ -65,61 +82,6 @@ class ABCBASE:
         )
 
         self.logger = logging.getLogger(__name__)
-
-    @staticmethod
-    def get_distance_function(distance_type: Union[str, Callable] = "l2") -> Callable:
-        """Return distance function for given distance type.
-
-        Args:
-            distance_type: string indicating the distance type, e.g., 'l2', 'l1',
-                'mse'. Note that the returned distance function averages over the last
-                dimension, e.g., over the summary statistics.
-
-        Returns:
-            distance_fun: distance functions built from passe string. Returns
-                distance_type is callable.
-        """
-
-        if isinstance(distance_type, Callable):
-            return distance_type
-
-        # Select distance function.
-        implemented_distances = ["l1", "l2", "mse"]
-        assert (
-            distance_type in implemented_distances
-        ), f"{distance_type} must be one of {implemented_distances}."
-
-        def mse_distance(xo, x):
-            return torch.mean((xo - x) ** 2, dim=-1)
-
-        def l2_distance(xo, x):
-            return torch.norm((xo - x), dim=-1)
-
-        def l1_distance(xo, x):
-            return torch.mean(abs(xo - x), dim=-1)
-
-        distance_functions = {"mse": mse_distance, "l2": l2_distance, "l1": l1_distance}
-
-        try:
-            distance = distance_functions[distance_type]
-        except KeyError as exc:
-            raise KeyError(f"Distance {distance_type} not supported.") from exc
-
-        def distance_fun(observed_data: Tensor, simulated_data: Tensor) -> Tensor:
-            """Return distance over batch dimension.
-
-            Args:
-                observed_data: Observed data, could be 1D.
-                simulated_data: Batch of simulated data, has batch dimension.
-
-            Returns:
-                Torch tensor with batch of distances.
-            """
-            assert simulated_data.ndim == 2, "simulated data needs batch dimension"
-
-            return distance(observed_data, simulated_data)
-
-        return distance_fun
 
     @staticmethod
     def get_sass_transform(

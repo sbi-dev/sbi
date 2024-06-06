@@ -1,3 +1,6 @@
+# This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+
 from typing import Tuple
 
 import torch
@@ -132,12 +135,8 @@ class NFlowsFlow(DensityEstimator):
         num_samples = torch.Size(sample_shape).numel()
 
         samples = self.net.sample(num_samples, context=condition)
-
-        return samples.reshape((
-            *sample_shape,
-            condition_batch_dim,
-            -1,
-        ))
+        samples = samples.transpose(0, 1)
+        return samples.reshape((*sample_shape, condition_batch_dim, *self.input_shape))
 
     def sample_and_log_prob(
         self, sample_shape: torch.Size, condition: Tensor, **kwargs

@@ -1,17 +1,30 @@
 # Credits
 
+## Community and Contributions
+
+`sbi` is a community-driven package. We are grateful to all our contributors who have
+played a significant role in shaping `sbi`. Their valuable input, suggestions, and
+direct contributions to the codebase have been instrumental in the development of `sbi`.
+
 ## License
 
-`sbi` is licensed under the [Affero General Public License version 3 (AGPLv3)](https://www.gnu.org/licenses/agpl-3.0.html) and
+`sbi` is licensed under the [Apache License (Apache-2.0)](https://www.apache.org/licenses/LICENSE-2.0) and
 
 > Copyright (C) 2020 Álvaro Tejero-Cantero, Jakob H. Macke, Jan-Matthis Lückmann,
 > Michael Deistler, Jan F. Bölts.
 
 > Copyright (C) 2020 Conor M. Durkan.
 
+> All contributors hold the copyright of their specific contributions.
+
 ## Support
 
-`sbi` has been supported by the German Federal Ministry of Education and Research (BMBF) through the project ADIMEM, FKZ 01IS18052 A-D). [ADIMEM](https://fit.uni-tuebingen.de/Project/Details?id=9199) is a collaborative project between the groups of Jakob Macke (Uni Tübingen), Philipp Berens (Uni Tübingen), Philipp Hennig (Uni Tübingen) and Marcel Oberlaender (caesar Bonn) which aims to develop inference methods for mechanistic models.
+`sbi` has been supported by the German Federal Ministry of Education and Research (BMBF)
+through the project ADIMEM (FKZ 01IS18052 A-D).
+[ADIMEM](https://fit.uni-tuebingen.de/Project/Details?id=9199) is a collaborative
+project between the groups of Jakob Macke (Uni Tübingen), Philipp Berens (Uni Tübingen),
+Philipp Hennig (Uni Tübingen), and Marcel Oberlaender (caesar Bonn), which aims to develop
+inference methods for mechanistic models.
 
 ![](static/logo_bmbf.svg)
 
