@@ -183,16 +183,24 @@ class EnsemblePosterior(NeuralPosterior):
         self,
         sample_shape: Shape,
         x: Tensor,
-        max_sampling_batch_size: int = 10000,
-        show_progress_bars: bool = True,
+        **kwargs,
     ) -> Tensor:
-        # TODO Can be implemented in the future, for all base posterior that support
-        # batched sampling.
-        raise NotImplementedError(
-            "Batched sampling is not implemented for EnsemblePosterior. \
-            Alternatively you can use `sample` in a loop \
-            [posterior.sample(theta, x_o) for x_o in x]."
+        num_samples = torch.Size(sample_shape).numel()
+        posterior_indizes = torch.multinomial(
+            self._weights, num_samples, replacement=True
         )
+        samples = []
+        for posterior_index, sample_size in torch.vstack(
+            posterior_indizes.unique(return_counts=True)
+        ).T:
+            sample_shape_c = torch.Size((int(sample_size),))
+            samples.append(
+                self.posteriors[posterior_index].sample_batched(
+                    sample_shape_c, x=x, **kwargs
+                )
+            )
+        samples = torch.vstack(samples)
+        return samples.reshape(sample_shape + samples.shape[1:])
 
     def log_prob(
         self,
