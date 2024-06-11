@@ -8,7 +8,7 @@ import torch
 from sbi.inference import SNPE
 from sbi.utils import BoxUniform
 
-# uniform prior and gaussian simulator
+# use dummy prior and simulator
 theta = torch.rand(1000)
 x = torch.randn_like(theta) + theta
 
@@ -16,7 +16,7 @@ x = torch.randn_like(theta) + theta
 inference = SNPE()
 inference.append_simulations(theta, x).train()
 
-# inference
+# do inference
 posterior = inference.build_posterior()
 samples = posterior.sample((1000,), x=torch.tensor([1.5]))
 ```
@@ -39,7 +39,7 @@ Then, check out our material:
    <br/><br/>
    *General motivation for the SBI framework and methods included in `sbi`.*
 
--  :rocket: [__Tutorials__](tutorials/)
+-  :rocket: [__Tutorials and Examples__](tutorials/)
    <br/><br/>
    *Various examples illustrating how to use the `sbi` package.*
 

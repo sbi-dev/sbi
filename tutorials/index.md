@@ -19,7 +19,7 @@ inference.
 - [Amortized inference](01_gaussian_amortized)
 - [Implemented algorithms](16_implemented_methods)
 - [Example application with a simulator from neuroscience
-  (Hodgkin-Huxley)](../examples/00_HH_simulator.ipynb)
+  (Hodgkin-Huxley)](../examples/00_HH_simulator)
 </div>
 
 ## Advanced
