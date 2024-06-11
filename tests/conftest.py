@@ -18,7 +18,7 @@ def set_seed():
 
 @pytest.fixture(scope="session", autouse=True)
 def set_default_tensor_type():
-    torch.set_default_tensor_type("torch.FloatTensor")
+    torch.set_default_dtype(torch.float32)
 
 
 # Pytest hook to skip GPU tests if no devices are available.
