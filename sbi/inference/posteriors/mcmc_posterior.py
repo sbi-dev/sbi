@@ -17,7 +17,6 @@ from pyro.infer.mcmc.api import MCMC
 from torch import Tensor
 from torch import multiprocessing as mp
 from tqdm.auto import tqdm
-import numpy as np
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials.base_potential import BasePotential
@@ -436,7 +435,6 @@ class MCMCPosterior(NeuralPosterior):
         samples = self.theta_transform.inv(transformed_samples)
 
         return samples.reshape((*sample_shape, batch_size, -1))  # type: ignore
-
 
     def _build_mcmc_init_fn(
         self,
