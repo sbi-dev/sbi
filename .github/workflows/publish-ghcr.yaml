@@ -1,10 +1,8 @@
 name: Docker Image for sbi toolkit
 
 on:
-  push:
-    branches:
-      - main
-      - provide-a-devcontainer-to-be-used-in-codespace
+  release:
+    types: [published]
 
 jobs:
   build_devcontainer_base:
