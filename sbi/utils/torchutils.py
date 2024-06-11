@@ -4,7 +4,6 @@
 """Various PyTorch utility functions."""
 
 import os
-import warnings
 from typing import Any, Optional, Union
 
 import numpy as np
@@ -28,14 +27,6 @@ def process_device(device: str) -> str:
     if device == "cpu":
         return "cpu"
     else:
-        warnings.warn(
-            "GPU was selected as a device for training the neural network. "
-            "Note that we expect no significant speed ups in training for the "
-            "default architectures we provide. Using the GPU will be effective "
-            "only for large neural networks with operations that are fast on the "
-            "GPU, e.g., for a CNN or RNN `embedding_net`.",
-            stacklevel=2,
-        )
         # If user just passes 'gpu', search for CUDA or MPS.
         if device == "gpu":
             # check whether either pytorch cuda or mps is available
