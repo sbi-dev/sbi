@@ -194,9 +194,9 @@ def init_affine_coupling(dim: int, device: str = "cpu", **kwargs):
     """Provides the default initial arguments for an affine autoregressive transform."""
     assert dim > 1, "In 1d this would be equivalent to affine flows, use them."
     nonlinearity = kwargs.pop("nonlinearity", nn.ReLU())
-    split_dim: int = kwargs.get("split_dim", dim // 2)
+    split_dim: int = int(kwargs.get("split_dim", dim // 2))
     hidden_dims = kwargs.pop("hidden_dims", [5 * dim + 20, 5 * dim + 20])
-    params_dims = (dim - split_dim, dim - split_dim)
+    params_dims = [dim - split_dim, dim - split_dim]
     arn = DenseNN(
         split_dim,
         hidden_dims,
