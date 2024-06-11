@@ -371,4 +371,4 @@ def accept_reject_sample(
         samples.shape[0] == num_samples
     ), "Number of accepted samples must match required samples."
 
-    return samples, as_tensor(acceptance_rate)
+    return samples, as_tensor(min_acceptance_rate)

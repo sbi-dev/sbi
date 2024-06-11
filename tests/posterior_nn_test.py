@@ -11,6 +11,9 @@ from sbi.inference import (
     SNLE_A,
     SNPE_A,
     SNPE_C,
+    SNRE_A,
+    SNRE_B,
+    SNRE_C,
     DirectPosterior,
     simulate_for_sbi,
 )
@@ -89,7 +92,7 @@ def test_batched_sample_log_prob_with_different_x(
 
 
 @pytest.mark.mcmc
-@pytest.mark.parametrize("snlre_method", [SNLE_A])
+@pytest.mark.parametrize("snlre_method", [SNLE_A, SNRE_A, SNRE_B, SNRE_C])
 @pytest.mark.parametrize(
     "x_o_batch_dim",
     (
@@ -122,4 +125,4 @@ def test_batched_mcmc_sample_log_prob_with_different_x(
         samples.shape == (10, x_o_batch_dim, num_dim)
         if x_o_batch_dim > 0
         else (10, num_dim)
-    ), "Sampel shape wrong"
+    ), "Sample shape wrong"
