@@ -9,12 +9,15 @@ from torch import Tensor, nn
 
 
 class Estimator(nn.Module, ABC):
-    r"""Base class for estimators i.e. neural nets estimating a certain quantity that
-    characterizes a distribution. This for example can be:
+    r"""Base class for estimators to characterize some distribution quantities.
+    
+    For example, this can be:
     - Conditional density estimator of the posterior $p(\theta|x)$.
     - Conditional density estimator of the likelihood $p(x|\theta)$.
     - Estimator of the density ratio $p(x|\theta)/p(x)$.
-    - and more ...
+
+    Subclasses of Estimator should implement the ``loss(input, condition)`` method
+    to be compatible with sbi's inference procedures.
     """
 
     def __init__(self, input_shape: torch.Size, condition_shape: torch.Size) -> None:
@@ -66,19 +69,20 @@ class Estimator(nn.Module, ABC):
             ValueError: If the shape of the condition does not match the expected
                         input dimensionality.
         """
-        if len(condition.shape) < len(self.condition_shape):
+        exp_condition_shape = tuple(self.condition_shape)
+        if len(condition.shape) < len(exp_condition_shape):
             raise ValueError(
-                f"Dimensionality of condition is to small and does not match the\
-                expected input dimensionality {len(self.condition_shape)}, as provided\
-                by condition_shape."
+                "Dimensionality of condition is too small and does not match the "
+                f"expected dimensionality {len(exp_condition_shape)}. It should "
+                f"be compatible with condition_shape {exp_condition_shape}."
             )
         else:
-            condition_shape = condition.shape[-len(self.condition_shape) :]
-            if tuple(condition_shape) != tuple(self.condition_shape):
+            condition_shape = tuple(condition.shape[-len(self.condition_shape):])
+            if condition_shape != exp_condition_shape:
                 raise ValueError(
-                    f"Shape of condition {tuple(condition_shape)} does not match the \
-                    expected input dimensionality {tuple(self.condition_shape)}, as \
-                    provided by condition_shape. Please reshape it accordingly."
+                    f"Shape of condition {condition_shape} does not match the "
+                    f"expected input dimensionality {exp_condition_shape}, as "
+                    "provided by condition_shape. Please reshape it accordingly."
                 )
 
     def _check_input_shape(self, input: Tensor):
@@ -94,19 +98,21 @@ class Estimator(nn.Module, ABC):
             ValueError: If the shape of the input does not match the expected
                         input dimensionality.
         """
-        if len(input.shape) < len(self.input_shape):
+        input_shape = tuple(input.shape)
+        exp_input_shape = tuple(self.input_shape)
+        if len(input_shape) < len(exp_input_shape):
             raise ValueError(
-                f"Dimensionality of input is to small and does not match the expected \
-                input dimensionality {len(self.input_shape)}, as provided by \
-                input_shape."
+                "Dimensionality of input is too small and does not match the "
+                f"expected dimensionality {len(exp_input_shape)}. It should "
+                f"be compatible with the provided input_shape {exp_input_shape}."
             )
         else:
-            input_shape = input.shape[-len(self.input_shape) :]
-            if tuple(input_shape) != tuple(self.input_shape):
+            input_shape = input.shape[-len(self.input_shape):]
+            if input_shape != exp_input_shape:
                 raise ValueError(
-                    f"Shape of input {tuple(input_shape)} does not match the expected \
-                    input dimensionality {tuple(self.input_shape)}, as provided by \
-                    input_shape. Please reshape it accordingly."
+                    f"Shape of input {input_shape} does not match the "
+                    f"expected input dimensionality {exp_input_shape}, as "
+                    "provided by input_shape. Please reshape it accordingly."
                 )
 
 
