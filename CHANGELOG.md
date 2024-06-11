@@ -1,136 +1,49 @@
 # v0.23.0
 
-## New contributors 🎉
+## Announcements
 
-- @anastasiakrouglova, @theogruner, @felixp8, @Matthijspals, @jsvetter, @pfuhr,
-  @turnmanh, @fariedabuzaid
+- Re-licensing: license change from [AGPLv3](https://www.gnu.org/licenses/agpl-3.0.en.html) to
+  [Apache-2.0](https://www.apache.org/licenses/LICENSE-2.0) (see #997 for details)
+- New contributors🎉: @anastasiakrouglova, @theogruner, @felixp8, @Matthijspals, @jsvetter, @pfuhr,
+  @turnmanh, @fariedabuzaid, @augustes, @zinastef, @Baschdl, @danielmk, @lisahaxel
 
 ## Major Changes
 
-- change license from [AGPLv3](https://www.gnu.org/licenses/agpl-3.0.en.html) to
-  [Apache-2.0](https://www.apache.org/licenses/LICENSE-2.0)
 - support @zuko as a backend for normalizing flows (#1088, #1116) (@anastasiakrouglova)
-- ABC methods for trial-based data using statistical distances (#1104) (@theogruner)
+- more flexible API for density estimator classes (#952, #965, #979, #1151)
+  (@guymoss, @tomMoral, @manualgloeckler)
 - local c2st metric (#1109) (@JuliaLinhart)
 - add interface for @PyMC samplers (#1053) (@famura, @felixp8)
 - big refactoring of plotting utilities, new tutorial (#1084) (@Matthijspals)
-- more flexible API for density estimator classes (#952, #965, #979, #1151)
-  (@guymoss, @tomMoral, @manualgloeckler)
 - flow matching density estimators (#1049) (@turnmanh, @fariedabuzaid)
 - score matching density estimators (#1015) (@rdgao, @jsvetter, @pfuhr, @manuelgloeckler)
+- ABC methods for trial-based data using statistical distances (#1104) (@theogruner)
+- Improved tutorials and website documentation (#1012, #1051, #1073) (@augustes, @zinaStef, @lisahaxel, @psteinb)
+- Improved website structure and contribution guides (#1019) (@tomMoral)
+- support Apple MPS as gpu device (#912) (@janfb)
+- introduce sample_batched method for fast amortized sampling (#1153) (@manuelgloeckler, @deismic)
 
 ## Bug Fixes
 
-- bugfix for tutorial on embedding net (michaeldeistler)
-- Fixes current density estimator bug (#1155) (manuelgloeckler)
-- fixes to readme; add contributors to credits. (Jan Boelts)
-- Fixup for process_x in EnsemblePosterior (#1148) (Michael Deistler)
-- fix #1047: process_device will return input when device is working. (#1143) (Jan)
-- Fix circular imports (michaeldeistler)
-- Revise tutorials; fix broken links (michaeldeistler)
-- FIX: track_gradients boolean bug. (Jan Boelts)
-- fix deprecated nuts and hmc kwargs. (Jan Boelts)
-- fix snle test. (Jan Boelts)
-- Fixes rendering bug on website (#1125) (manuelgloeckler)
-- fix snpe-a tests. (#1119) (Jan)
-- fix ruff linting in pre-commit hook. (#1113) (Jan)
-- Fix issues pyright raises on newer Python versions (#1108) (Sebastian Bischoff)
-- fixed notebook by changing mcmc parameters (#1058) (zinaStef)
-- Use newest version of pyright, ignored a lot of errors, identified some bugs (#1045) (Sebastian Bischoff)
-- set embedding nets to eval before forward pass for batchnorm bug (#1024) (Felix Pei)
-- fix: add NeuralPosteriorEnsemble to utils.__init__ (#1002) (jnsbck)
-- fix codecov token, turn off CI fail. (Jan Boelts)
-- fix x_o and broken link tutorial 7 (#1003) (Matthijs Pals)
-- fixed print_false_positive_rate (danielmk)
-- fix PR template.; (Jan Boelts)
-- fix #945: update guidelines, add ref to CoC. (Jan Boelts)
-- small fixes: sbc warnings, sample defaults, docs. (Jan Boelts)
-- fix slow tests and add missing MPS features. (Jan Boelts)
-- fix pyright errors after ruff linting (Jan Boelts)
-- fix #959: all ruff check fixed, add to pre-commit (Jan Boelts)
-- fix ruff checks in tests/ (Jan Boelts)
-- flake8-simplify fixes (Jan Boelts)
-- fix E501: line too long (Jan Boelts)
-- fix E721: not comparing types; B007 (Jan Boelts)
-- fix flake B904: err in except clause (Jan Boelts)
-- fix flake B006: no mutable default args. (Jan Boelts)
-- ignore flake B008: function calls in default args (Jan Boelts)
-- fix B028: warning stacklevel=2 (Jan Boelts)
-- fix #960: ruff linting in all notebooks (Jan Boelts)
-- fixes by ruff formatter (Jan Boelts)
-- ruff linting on notebooks (isort). (Jan Boelts)
-- formatting and fixes by ruff linter. (Jan Boelts)
-- formatting by pre-commit hooks (Jan Boelts)
-- move pyright options to pyproject.toml (Jan Boelts)
-- add pre-commit and ruff to ci actions. (Jan Boelts)
-- update pre-commit to ruff, without linting. (Jan Boelts)
-- add ruff to replace isort, black, flake (Jan Boelts)
-- remove vscode folder from repo (Jan Boelts)
-- replace setup.py with pyproject.toml (Jan Boelts)
-- update isort and black version in pre-commit (Jan Boelts)
-- add pull request template (Jan Boelts)
-- Update issue templates (#936) (Jan)
-- linting changes (Jan Boelts)
-- speed up gpu tests. (janfb)
-- allow "gpu" as device str (janfb)
-- Remove coordination sentence from readme (Michael Deistler)
-- Clarify tutorial on multi-round (#917) (Michael Deistler)
-- update vscode settings to match v>1.84 (Jan Boelts)
-- 873 seed error in simulator (#904) (manuelgloeckler)
-- Update tutorial on embedding net (Michael Deistler)
-- Change support in readme (Michael Deistler)
+- bugfix for tutorial on embedding net (#1159) (@deismic)
+- Fixup for process_x in EnsemblePosterior (#1148) (@deismic)
+- Switch to newest pyright and fix all typing errors (#1045, #1108) (@Baschdl)
+- fixed notebook by changing mcmc parameters (#1058) (@zinaStef)
+- fix: add NeuralPosteriorEnsemble to utils.__init__ (#1002) (@jnsbck)
+- fix: print_false_positive_rate (#976) (@danielmk)
+- fix: require potential_fn as Callable to make posteriors pickable (#943) (@deismic)
+- fix: make VIPosterior pickable (#951) (@manuelgloeckler)
+- fix: bug in importance sampled posterior (#1081) (@max-dax)
+ 
+## Maintenance and other changes
 
-## Enhancements and Refactorings
-
-- DOC improve reference API rendering (#1019) (Thomas Moreau)
-- 935 is our documentation good and up to date (#1012) (augustes)
-- Issue #1006: new diagnostics folder and refactoring changes (#1007) (Julia Linhart)
-- Docstring and optional algorithm argument (jsvetter)
-- refactor faqs; update gpu faq with MPS. (Jan Boelts)
-- refactor device tests (Jan Boelts)
-- Update docstring, ensure potential_fn signature (michaeldeistler)
-- refactor mnle and snle tests (Jan Boelts)
-- refactor slow tests for speed. (janfb)
-- Refactor CI tests for speed (#923) (Jan)
-- refactor abc classes (Jan Boelts)
-
-## Documentation and maintenance
-
--
-
-## Minor Changes
-
-- fixes to readme; add contributors to credits. (Jan Boelts)
-- add license comment to all files (Jan Boelts)
-- change license to Apache-2.0 (Jan Boelts)
-- expose progress bar in IS posterior. (Jan Boelts)
-- fix snle test. (Jan Boelts)
-- set embedding nets to eval before forward pass for batchnorm bug (#1024) (Felix Pei)
-- DOC improve reference API rendering (#1019) (Thomas Moreau)
-- 935 is our documentation good and up to date (#1012) (augustes)
-- remove vscode folder from repo (Jan Boelts)
-- replace setup.py with pyproject.toml (Jan Boelts)
-- update isort and black version in pre-commit (Jan Boelts)
-- add pull request template (Jan Boelts)
-- Update issue templates (#936) (Jan)
-- linting changes (Jan Boelts)
-- speed up gpu tests. (janfb)
-- allow "gpu" as device str (janfb)
-- Remove coordination sentence from readme (Michael Deistler)
-- Clarify tutorial on multi-round (#917) (Michael Deistler)
-- update vscode settings to match v>1.84 (Jan Boelts)
-- 873 seed error in simulator (#904) (manuelgloeckler)
-- Update tutorial on embedding net (Michael Deistler)
-- Change support in readme (Michael Deistler)
-
-## Other Changes
-
-- Split the github workflow in CI and CD (#1063) (Fabio Muratore)
-- exclude nflows kwargs in zuko flow builder. (Jan Boelts)
-- make mcmc tests more difficult. (Jan Boelts)
-- remove duplicate slice mcmc tests (Jan Boelts)
-- CD workflow tick to template. (Jan Boelts)
-- ruff linting in all notebooks (Jan Boelts)
+- add pre-commit hooks (#955) (@janfb)
+- add ruff to replace isort, black, flake (#960, #978, #1113) (@janfb)
+- switch to pyproject.toml for package specification (#941) (@janfb)
+- Split the github workflow in CI and CD (#1063) (@famura)
+- split linting process from the CI/CD workflow (#1164) (@tomMoral)
+- adapt mnle to new densityestimator abstraction (#1089) (@coschroeder)
+- 
 
 # v0.22.0
 
