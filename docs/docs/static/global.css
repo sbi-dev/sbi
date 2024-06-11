@@ -19,6 +19,10 @@ a[title="Edit this page"] {
   margin-left: -0.4em !important;
 }
 
+.md-typeset .admonition,
+.md-typeset details {
+  font-size: 16px
+}
 
 /* Indentation. */
 div.doc-contents:not(.first), div.doc-function div.doc-contents {

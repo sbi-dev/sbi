@@ -1,5 +1,5 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import warnings
 from copy import deepcopy
@@ -18,6 +18,7 @@ from sbi.inference.snpe.snpe_base import PosteriorEstimator
 from sbi.neural_nets.density_estimators.base import DensityEstimator
 from sbi.sbi_types import TensorboardSummaryWriter, TorchModule
 from sbi.utils import torchutils
+from sbi.utils.torchutils import atleast_2d
 
 
 class SNPE_A(PosteriorEstimator):
@@ -398,7 +399,7 @@ class SNPE_A_MDN(DensityEstimator):
         """
         # Call nn.Module's constructor.
 
-        super().__init__(flow, flow._condition_shape)
+        super().__init__(flow, flow.input_shape, flow.condition_shape)
 
         self._neural_net = flow
         self._prior = prior
@@ -408,12 +409,14 @@ class SNPE_A_MDN(DensityEstimator):
         if isinstance(proposal, (utils.BoxUniform, MultivariateNormal)):
             self._apply_correction = False
         else:
+            # Add iid dimension.
+            default_x = proposal.default_x  # type: ignore
             self._apply_correction = True
             (
                 logits_pp,
                 m_pp,
                 prec_pp,
-            ) = proposal.posterior_estimator._posthoc_correction(proposal.default_x)  # type: ignore
+            ) = proposal.posterior_estimator._posthoc_correction(default_x)
             self._logits_pp, self._m_pp, self._prec_pp = (
                 logits_pp.detach(),
                 m_pp.detach(),
@@ -477,7 +480,7 @@ class SNPE_A_MDN(DensityEstimator):
             # \tilde{p} has already been observed. To analytically calculate the
             # log-prob of the Gaussian, we first need to compute the mixture components.
             num_samples = torch.Size(sample_shape).numel()
-            condition_ndim = len(self._condition_shape)
+            condition_ndim = len(self.condition_shape)
             batch_size = condition.shape[:-condition_ndim]
             batch_size = torch.Size(batch_size).numel()
             return self._sample_approx_posterior_mog(num_samples, condition, batch_size)
@@ -544,17 +547,24 @@ class SNPE_A_MDN(DensityEstimator):
         estimator and the proposal.
 
         Args:
-            x: Conditioning context for posterior.
+            x: Conditioning context for posterior, shape
+                `(batch_dim, *event_shape)`.
 
         Returns:
             Mixture components of the posterior.
         """
+        # Remove the batch dimension of `x` (SNPE-A always has a single `x`).
+        assert (
+            x.shape[0] == 1
+        ), f"Batchsize of `x_o` == {x.shape[0]}. SNPE-A only supports a single `x_o`."
+        x = x.squeeze(dim=0)
 
         # Evaluate the density estimator.
         embedded_x = self._neural_net.net._embedding_net(x)
         dist = self._neural_net.net._distribution  # defined to avoid black formatting.
         logits_d, m_d, prec_d, _, _ = dist.get_mixture_components(embedded_x)
         norm_logits_d = logits_d - torch.logsumexp(logits_d, dim=-1, keepdim=True)
+        norm_logits_d = atleast_2d(norm_logits_d)
 
         # The following if case is needed because, in the constructor, we call
         # `_posthoc_correction` regardless of whether the `proposal` itself had a
@@ -572,6 +582,7 @@ class SNPE_A_MDN(DensityEstimator):
         logits_p, m_p, prec_p, cov_p = self._proposal_posterior_transformation(
             logits_pp, m_pp, prec_pp, norm_logits_d, m_d, prec_d
         )
+        logits_p = atleast_2d(logits_p)
         return logits_p, m_p, prec_p
 
     def _proposal_posterior_transformation(
@@ -606,7 +617,6 @@ class SNPE_A_MDN(DensityEstimator):
         Returns: (Component weight, mean, precision matrix, covariance matrix) of each
             Gaussian of the approximate posterior.
         """
-
         precisions_post, covariances_post = self._precisions_posterior(
             precisions_pp, precisions_d
         )

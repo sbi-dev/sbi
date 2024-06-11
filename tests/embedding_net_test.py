@@ -1,3 +1,6 @@
+# This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+
 from __future__ import annotations
 
 import pytest
@@ -21,10 +24,13 @@ from sbi.simulators.linear_gaussian import (
 from .test_utils import check_c2st
 
 
+@pytest.mark.mcmc
 @pytest.mark.parametrize("method", ["SNPE", "SNLE", "SNRE"])
 @pytest.mark.parametrize("num_dim", [1, 2])
 @pytest.mark.parametrize("embedding_net", ["mlp"])
-def test_embedding_net_api(method, num_dim: int, embedding_net: str):
+def test_embedding_net_api(
+    method, num_dim: int, embedding_net: str, mcmc_params_fast: dict
+):
     """Tests the API when using a preconfigured embedding net."""
 
     x_o = zeros(1, num_dim)
@@ -62,7 +68,7 @@ def test_embedding_net_api(method, num_dim: int, embedding_net: str):
     _ = inference.append_simulations(theta, x).train(max_num_epochs=2)
     posterior = inference.build_posterior(
         mcmc_method="slice_np_vectorized",
-        mcmc_parameters=dict(num_chains=2, warmup_steps=10, thin=5),
+        mcmc_parameters=mcmc_params_fast,
     ).set_default_x(x_o)
 
     s = posterior.sample((1,))

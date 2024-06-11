@@ -1,3 +1,6 @@
+# This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+
 from typing import Any, Callable
 
 from pyro import poutine as poutine
@@ -25,7 +28,8 @@ def get_transforms(model: Callable, *model_args: Any, **model_kwargs: Any):
     model_trace = poutine.trace(model).get_trace(*model_args, **model_kwargs)
 
     for name, node in model_trace.iter_stochastic_nodes():
-        fn = node["fn"]
-        transforms[name] = biject_to(fn.support).inv
+        if "fn" in node:
+            fn = node["fn"]
+            transforms[name] = biject_to(fn.support).inv
 
     return transforms

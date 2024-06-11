@@ -1,6 +1,5 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
-
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from typing import Callable, Dict, Optional, Union
 
@@ -13,6 +12,10 @@ from torch.distributions import Distribution, MultivariateNormal, Uniform
 from sbi import utils as utils
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.inference.snpe.snpe_base import PosteriorEstimator
+from sbi.neural_nets.density_estimators.shape_handling import (
+    reshape_to_batch_event,
+    reshape_to_sample_batch_event,
+)
 from sbi.sbi_types import TensorboardSummaryWriter
 from sbi.utils import (
     batched_mixture_mv,
@@ -318,7 +321,6 @@ class SNPE_C(PosteriorEstimator):
         Returns:
             Log-probability of the proposal posterior.
         """
-
         batch_size = theta.shape[0]
 
         num_atoms = int(
@@ -343,15 +345,21 @@ class SNPE_C(PosteriorEstimator):
             batch_size * num_atoms, -1
         )
 
-        # Evaluate large batch giving (batch_size * num_atoms) log prob posterior evals.
-        log_prob_posterior = self._neural_net.log_prob(atomic_theta, repeated_x)
-        utils.assert_all_finite(log_prob_posterior, "posterior eval")
-        log_prob_posterior = log_prob_posterior.reshape(batch_size, num_atoms)
-
         # Get (batch_size * num_atoms) log prob prior evals.
         log_prob_prior = self._prior.log_prob(atomic_theta)
         log_prob_prior = log_prob_prior.reshape(batch_size, num_atoms)
         utils.assert_all_finite(log_prob_prior, "prior eval")
+
+        # Evaluate large batch giving (batch_size * num_atoms) log prob posterior evals.
+        atomic_theta = reshape_to_sample_batch_event(
+            atomic_theta, atomic_theta.shape[1:]
+        )
+        repeated_x = reshape_to_batch_event(
+            repeated_x, self._neural_net.condition_shape
+        )
+        log_prob_posterior = self._neural_net.log_prob(atomic_theta, repeated_x)
+        utils.assert_all_finite(log_prob_posterior, "posterior eval")
+        log_prob_posterior = log_prob_posterior.reshape(batch_size, num_atoms)
 
         # Compute unnormalized proposal posterior.
         unnormalized_log_prob = log_prob_posterior - log_prob_prior
@@ -364,7 +372,12 @@ class SNPE_C(PosteriorEstimator):
 
         # XXX This evaluates the posterior on _all_ prior samples
         if self._use_combined_loss:
+            theta = reshape_to_sample_batch_event(theta, self._neural_net.input_shape)
+            x = reshape_to_batch_event(x, self._neural_net.condition_shape)
             log_prob_posterior_non_atomic = self._neural_net.log_prob(theta, x)
+            # squeeze to remove sample dimension, which is always one during the loss
+            # evaluation of `SNPE_C` (because we have one theta vector per x vector).
+            log_prob_posterior_non_atomic = log_prob_posterior_non_atomic.squeeze(dim=0)
             masks = masks.reshape(-1)
             log_prob_proposal_posterior = (
                 masks * log_prob_posterior_non_atomic + log_prob_proposal_posterior

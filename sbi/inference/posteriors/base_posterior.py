@@ -1,9 +1,10 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import inspect
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, Optional, Union
+from warnings import warn
 
 import torch
 import torch.distributions.transforms as torch_tf
@@ -42,8 +43,15 @@ class NeuralPosterior(ABC):
                 Allows to perform, e.g. MCMC in unconstrained space.
             device: Training device, e.g., "cpu", "cuda" or "cuda:0". If None,
                 `potential_fn.device` is used.
-            x_shape: Shape of the observed data.
+            x_shape: Deprecated, should not be passed.
         """
+        if x_shape is not None:
+            warn(
+                "x_shape is not None. However, passing x_shape to the `Posterior` is "
+                "deprecated and will be removed in a future release of `sbi`.",
+                stacklevel=2,
+            )
+
         if not isinstance(potential_fn, BasePotential):
             kwargs_of_callable = list(inspect.signature(potential_fn).parameters.keys())
             for key in ["theta", "x_o"]:
@@ -74,7 +82,6 @@ class NeuralPosterior(ABC):
 
         self._map = None
         self._purpose = ""
-        self._x_shape = x_shape
 
         # If the sampler interface (#573) is used, the user might have passed `x_o`
         # already to the potential function builder. If so, this `x_o` will be used
@@ -146,7 +153,7 @@ class NeuralPosterior(ABC):
             `NeuralPosterior` that will use a default `x` when not explicitly passed.
         """
         self._x = process_x(
-            x, x_shape=self._x_shape, allow_iid_x=self.potential_fn.allow_iid_x
+            x, x_event_shape=None, allow_iid_x=self.potential_fn.allow_iid_x
         ).to(self._device)
         self._map = None
         return self
@@ -156,7 +163,7 @@ class NeuralPosterior(ABC):
             # New x, reset posterior sampler.
             self._posterior_sampler = None
             return process_x(
-                x, x_shape=self._x_shape, allow_iid_x=self.potential_fn.allow_iid_x
+                x, x_event_shape=None, allow_iid_x=self.potential_fn.allow_iid_x
             )
         elif self.default_x is None:
             raise ValueError(

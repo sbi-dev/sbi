@@ -1,5 +1,5 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from abc import ABC, abstractmethod
 from copy import deepcopy
@@ -29,7 +29,11 @@ from sbi.utils import (
 )
 from sbi.utils.sbiutils import get_simulations_since_round
 from sbi.utils.torchutils import check_if_prior_on_device, process_device
-from sbi.utils.user_input_checks import prepare_for_sbi
+from sbi.utils.user_input_checks import (
+    check_sbi_inputs,
+    process_prior,
+    process_simulator,
+)
 
 
 def infer(
@@ -101,7 +105,9 @@ def infer(
     if init_kwargs is None:
         init_kwargs = {}
 
-    simulator, prior = prepare_for_sbi(simulator, prior)
+    prior, _, prior_returns_numpy = process_prior(prior)
+    simulator = process_simulator(simulator, prior, prior_returns_numpy)
+    check_sbi_inputs(simulator, prior)
 
     inference = method_fun(prior=prior, **init_kwargs)
     theta, x = simulate_for_sbi(

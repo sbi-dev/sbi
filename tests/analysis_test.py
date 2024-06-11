@@ -1,3 +1,6 @@
+# This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+
 import pytest
 import torch
 
@@ -18,6 +21,7 @@ def test_analysis_modules(device: str) -> None:
     Args:
         device: Which device to run the inference on.
     """
+
     num_dim = 3
     device = process_device(device)
     prior = BoxUniform(
