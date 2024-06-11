@@ -8,7 +8,7 @@ from torch import Tensor
 from torch.distributions import Distribution
 
 from sbi.inference.potentials.base_potential import BasePotential
-from sbi.neural_nets.density_estimators import DensityEstimator
+from sbi.neural_nets.density_estimators import ConditionalDensityEstimator
 from sbi.neural_nets.density_estimators.shape_handling import (
     reshape_to_batch_event,
     reshape_to_sample_batch_event,
@@ -19,7 +19,7 @@ from sbi.utils import mcmc_transform
 
 
 def likelihood_estimator_based_potential(
-    likelihood_estimator: DensityEstimator,
+    likelihood_estimator: ConditionalDensityEstimator,
     prior: Distribution,
     x_o: Optional[Tensor],
     enable_transform: bool = True,
@@ -58,7 +58,7 @@ class LikelihoodBasedPotential(BasePotential):
 
     def __init__(
         self,
-        likelihood_estimator: DensityEstimator,
+        likelihood_estimator: ConditionalDensityEstimator,
         prior: Distribution,
         x_o: Optional[Tensor],
         device: str = "cpu",
@@ -103,7 +103,10 @@ class LikelihoodBasedPotential(BasePotential):
 
 
 def _log_likelihoods_over_trials(
-    x: Tensor, theta: Tensor, estimator: DensityEstimator, track_gradients: bool = False
+    x: Tensor,
+    theta: Tensor,
+    estimator: ConditionalDensityEstimator,
+    track_gradients: bool = False,
 ) -> Tensor:
     r"""Return log likelihoods summed over iid trials of `x`.
 

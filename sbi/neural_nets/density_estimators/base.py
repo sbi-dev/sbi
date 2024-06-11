@@ -8,13 +8,13 @@ import torch
 from torch import Tensor, nn
 
 
-class Estimator(nn.Module, ABC):
-    r"""Base class for estimators to characterize some distribution quantities.
+class ConditionalEstimator(nn.Module, ABC):
+    r"""Base class for conditionalestimators to characterize some distribution
+    quantities.
 
     For example, this can be:
     - Conditional density estimator of the posterior $p(\theta|x)$.
     - Conditional density estimator of the likelihood $p(x|\theta)$.
-    - Estimator of the density ratio $p(x|\theta)/p(x)$.
 
     Subclasses of Estimator should implement the ``loss(input, condition)`` method
     to be compatible with sbi's inference procedures.
@@ -115,7 +115,7 @@ class Estimator(nn.Module, ABC):
                 )
 
 
-class DensityEstimator(Estimator):
+class ConditionalDensityEstimator(ConditionalEstimator):
     r"""Base class for density estimators.
 
     The density estimator class is a wrapper around neural networks that
