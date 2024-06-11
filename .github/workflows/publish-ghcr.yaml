@@ -34,4 +34,4 @@ jobs:
           file: .devcontainer/Dockerfile
           platforms: linux/amd64
           push: true
-          tags: ghcr.io/${{ github.repository }}/base-image-devcontainer:latest
+          tags: ghcr.io/${{ github.repository }}/base-image-codespaces:latest
