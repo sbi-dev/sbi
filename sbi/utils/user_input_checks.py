@@ -736,8 +736,8 @@ def validate_theta_and_x(
 
     if str(x.device) != data_device:
         warnings.warn(
-            f"Data x has device '{x.device}'."
-            f"Moving x to the data_device '{data_device}'."
+            f"Data x has device '{x.device}'. "
+            f"Moving x to the data_device '{data_device}'. "
             f"Training will proceed on device '{training_device}'.",
             stacklevel=2,
         )
@@ -746,7 +746,7 @@ def validate_theta_and_x(
     if str(theta.device) != data_device:
         warnings.warn(
             f"Parameters theta has device '{theta.device}'. "
-            f"Moving theta to the data_device '{data_device}'."
+            f"Moving theta to the data_device '{data_device}'. "
             f"Training will proceed on device '{training_device}'.",
             stacklevel=2,
         )
