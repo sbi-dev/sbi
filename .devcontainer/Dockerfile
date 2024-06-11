@@ -1,7 +1,11 @@
 FROM jupyter/base-notebook:python-3.10
+LABEL org.opencontainers.image.source="https://github.com/sbi-dev/sbi"
+LABEL org.opencontainers.image.description="Image for a Docker Devcontainer for the sbi toolbox."
+LABEL org.opencontainers.image.licenses="Apache-2.0"
 
 # Install latest release of sbi instead of current main branch this is
 # intenationally as the codespace shall facilitate as an easy access for new
 # users to experience the toolkit rather than a development environment.
-RUN pip install --upgrade pip && \
-    pip install sbi ipywidgets
+RUN pip install \ 
+    sbi \
+    ipywidgets
