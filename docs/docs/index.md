@@ -6,11 +6,11 @@ interface:
 ```python
 import torch
 from sbi.inference import SNPE
-from sbi.utils import BoxUniform
 
 # use dummy prior and simulator
-theta = torch.rand(1000)
+theta = torch.randn(1000, 2)
 x = torch.randn_like(theta) + theta
+print(theta.shape, x.shape)
 
 # choose sbi method and train
 inference = SNPE()
@@ -18,7 +18,7 @@ inference.append_simulations(theta, x).train()
 
 # do inference
 posterior = inference.build_posterior()
-samples = posterior.sample((1000,), x=torch.tensor([1.5]))
+samples = posterior.sample((1000,), x=torch.ones(2))
 ```
 
 ## Overview
