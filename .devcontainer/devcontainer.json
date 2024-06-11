@@ -1,5 +1,5 @@
 {
-    "name": "Simple Codespace for the SBI Toolkit.",
+    "name": "Codespace for the SBI Toolkit.",
 
     "image": "ghcr.io/sbi-dev/sbi/base-image-codespaces:latest",
 
