@@ -2,26 +2,34 @@
 
 ## Announcements
 
-- Re-licensing: license change from [AGPLv3](https://www.gnu.org/licenses/agpl-3.0.en.html) to
-  [Apache-2.0](https://www.apache.org/licenses/LICENSE-2.0) (see #997 for details)
-- New contributors🎉: @anastasiakrouglova, @theogruner, @felixp8, @Matthijspals, @jsvetter, @pfuhr,
-  @turnmanh, @fariedabuzaid, @augustes, @zinastef, @Baschdl, @danielmk, @lisahaxel
+- Re-licensing: license change from
+  [AGPLv3](https://www.gnu.org/licenses/agpl-3.0.en.html) to
+  [Apache-2.0](https://www.apache.org/licenses/LICENSE-2.0) (see #997 for
+  details)
+- New contributors🎉: @anastasiakrouglova, @theogruner, @felixp8, @Matthijspals,
+  @jsvetter, @pfuhr, @turnmanh, @fariedabuzaid, @augustes, @zinastef, @Baschdl,
+  @danielmk, @lisahaxel
 
 ## Major Changes
 
-- support @zuko as a backend for normalizing flows (#1088, #1116) (@anastasiakrouglova)
 - more flexible API for density estimator classes (#952, #965, #979, #1151)
   (@guymoss, @tomMoral, @manualgloeckler)
+- support @zuko as a backend for normalizing flows (#1088, #1116)
+  (@anastasiakrouglova)
 - local c2st metric (#1109) (@JuliaLinhart)
 - add interface for @PyMC samplers (#1053) (@famura, @felixp8)
 - big refactoring of plotting utilities, new tutorial (#1084) (@Matthijspals)
 - flow matching density estimators (#1049) (@turnmanh, @fariedabuzaid)
-- score matching density estimators (#1015) (@rdgao, @jsvetter, @pfuhr, @manuelgloeckler)
-- ABC methods for trial-based data using statistical distances (#1104) (@theogruner)
-- Improved tutorials and website documentation (#1012, #1051, #1073) (@augustes, @zinaStef, @lisahaxel, @psteinb)
+- score matching density estimators (#1015) (@rdgao, @jsvetter, @pfuhr,
+  @manuelgloeckler)
+- ABC methods for trial-based data using statistical distances (#1104)
+  (@theogruner)
+- Improved tutorials and website documentation (#1012, #1051, #1073) (@augustes,
+  @zinaStef, @lisahaxel, @psteinb)
 - Improved website structure and contribution guides (#1019) (@tomMoral)
 - support Apple MPS as gpu device (#912) (@janfb)
-- introduce sample_batched method for fast amortized sampling (#1153) (@manuelgloeckler, @deismic)
+- introduce sample_batched method for fast amortized sampling (#1153)
+  (@manuelgloeckler, @deismic)
 
 ## Bug Fixes
 
@@ -31,10 +39,11 @@
 - fixed notebook by changing mcmc parameters (#1058) (@zinaStef)
 - fix: add NeuralPosteriorEnsemble to utils.__init__ (#1002) (@jnsbck)
 - fix: print_false_positive_rate (#976) (@danielmk)
-- fix: require potential_fn as Callable to make posteriors pickable (#943) (@deismic)
+- fix: require potential_fn as Callable to make posteriors pickable (#943)
+  (@deismic)
 - fix: make VIPosterior pickable (#951) (@manuelgloeckler)
 - fix: bug in importance sampled posterior (#1081) (@max-dax)
- 
+
 ## Maintenance and other changes
 
 - add pre-commit hooks (#955) (@janfb)
@@ -43,7 +52,6 @@
 - Split the github workflow in CI and CD (#1063) (@famura)
 - split linting process from the CI/CD workflow (#1164) (@tomMoral)
 - adapt mnle to new densityestimator abstraction (#1089) (@coschroeder)
-- 
 
 # v0.22.0
 
