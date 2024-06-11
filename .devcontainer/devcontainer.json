@@ -1,8 +1,8 @@
 {
     "name": "Simple Codespace for the SBI Toolkit.",
-    "build": {
-        "dockerfile": "Dockerfile"
-    },
+
+    "image": "ghcr.io/sbi-dev/sbi/base-image-codespaces:latest",
+
     "customizations": {
         "vscode": {
             "terminal": {
@@ -16,5 +16,8 @@
                 "streetsidesoftware.code-spell-checker"
             ]
         }
-    }
+    },
+
+    // open the default port for jupyter notebook
+	"forwardPorts": [8888]
 }
