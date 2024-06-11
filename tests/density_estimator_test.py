@@ -299,14 +299,18 @@ def test_correctness_of_density_estimator_log_prob(
         build_zuko_nsf,
         build_zuko_sospf,
         build_zuko_unaf,
-        build_categoricalmassestimator,
-        build_mnle,
+        # build_categoricalmassestimator,   NOTE: This does not support 2d sample_shape
+        # build_mnle,                     NOTE: This does not support 2d sample_shape
     ),
 )
 @pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
 @pytest.mark.parametrize("condition_event_shape", ((1,), (7,)))
+@pytest.mark.parametrize("sample_shape", ((1000,), (500, 2)))
 def test_correctness_of_batched_vs_seperate_sample_and_log_prob(
-    density_estimator_build_fn, input_event_shape, condition_event_shape
+    density_estimator_build_fn,
+    input_event_shape,
+    condition_event_shape,
+    sample_shape,
 ):
     input_sample_dim = 2
     batch_dim = 2
@@ -318,7 +322,9 @@ def test_correctness_of_batched_vs_seperate_sample_and_log_prob(
         input_sample_dim,
     )
     # Batched vs separate sampling
-    samples = density_estimator.sample((1000,), condition=condition)
+    samples = density_estimator.sample(sample_shape, condition=condition)
+    samples = samples.reshape(-1, batch_dim, *input_event_shape)  # Flat for comp.
+
     samples_separate1 = density_estimator.sample(
         (1000,), condition=condition[0][None, ...]
     )
