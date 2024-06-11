@@ -59,7 +59,8 @@ print(posterior)
 For first time users, you can now head over to the turorials and get going with
 [Getting Started](https://sbi-dev.github.io/sbi/tutorial/00_getting_started/).
 
-The tutorials are easily accessible by opening a Codespace on this repo. To do
+The tutorials are easily accessible by opening a
+[Codespace](https://docs.github.com/en/codespaces/overview) on this repo. To do
 so, click on the green "Code" button and select "Open with Codespaces". This
 provides you with a fully functional environment to run the tutorials as jupyter
 notebooks.
