@@ -10,7 +10,7 @@ from torch import Tensor, nn
 
 class Estimator(nn.Module, ABC):
     r"""Base class for estimators to characterize some distribution quantities.
-    
+
     For example, this can be:
     - Conditional density estimator of the posterior $p(\theta|x)$.
     - Conditional density estimator of the likelihood $p(x|\theta)$.
@@ -26,8 +26,7 @@ class Estimator(nn.Module, ABC):
         Args:
             input_shape: Event shape of the input at which the density is being
                 evaluated (and which is also the event_shape of samples).
-            condition_shape: Shape of the condition. If not provided, it will assume a
-                1D input.
+            condition_shape: Shape of the condition.
         """
         super().__init__()
         self._input_shape = torch.Size(input_shape)
@@ -77,7 +76,7 @@ class Estimator(nn.Module, ABC):
                 f"be compatible with condition_shape {exp_condition_shape}."
             )
         else:
-            condition_shape = tuple(condition.shape[-len(self.condition_shape):])
+            condition_shape = tuple(condition.shape[-len(self.condition_shape) :])
             if condition_shape != exp_condition_shape:
                 raise ValueError(
                     f"Shape of condition {condition_shape} does not match the "
@@ -107,7 +106,7 @@ class Estimator(nn.Module, ABC):
                 f"be compatible with the provided input_shape {exp_input_shape}."
             )
         else:
-            input_shape = input.shape[-len(self.input_shape):]
+            input_shape = input.shape[-len(self.input_shape) :]
             if input_shape != exp_input_shape:
                 raise ValueError(
                     f"Shape of input {input_shape} does not match the "
@@ -137,11 +136,11 @@ class DensityEstimator(Estimator):
         r"""Base class for density estimators.
 
         Args:
-            net: Neural network.
+            net: Neural network or any parameterized model that is used to estimate the
+                probability density of the input given a condition.
             input_shape: Event shape of the input at which the density is being
                 evaluated (and which is also the event_shape of samples).
-            condition_shape: Shape of the condition. If not provided, it will assume a
-                1D input.
+            condition_shape: Shape of the condition.
         """
         super().__init__(input_shape, condition_shape)
         self.net = net
