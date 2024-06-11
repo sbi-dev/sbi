@@ -356,10 +356,6 @@ def accept_reject_sample(
 
     pbar.close()
 
-    for obs_index in range(num_xo):
-        accepted_every_obs[obs_index] = accepted_every_obs[obs_index][:num_samples]
-
-    accepted_every_obs = torch.stack(accepted_every_obs)
     # When in case of leakage a batch size was used there could be too many samples.
     samples = [torch.cat(accepted[i], dim=0)[:num_samples] for i in range(num_xos)]
     samples = torch.stack(samples, dim=1)
@@ -368,4 +364,4 @@ def accept_reject_sample(
         samples.shape[0] == num_samples
     ), "Number of accepted samples must match required samples."
 
-    return torch.permute(accepted_every_obs, (1, 0, -1)), as_tensor(acceptance_rate)
+    return samples, as_tensor(acceptance_rate)
