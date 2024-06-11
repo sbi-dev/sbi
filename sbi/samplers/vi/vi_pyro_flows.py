@@ -159,8 +159,8 @@ def get_flow_builder(
 
 def init_affine_autoregressive(dim: int, device: str = "cpu", **kwargs):
     """Provides the default initial arguments for an affine autoregressive transform."""
-    hidden_dims = kwargs.pop("hidden_dims", [3 * dim + 5, 3 * dim + 5])
-    skip_connections = kwargs.pop("skip_connections", False)
+    hidden_dims: List[int] = kwargs.pop("hidden_dims", [3 * dim + 5, 3 * dim + 5])
+    skip_connections: bool = kwargs.pop("skip_connections", False)
     nonlinearity = kwargs.pop("nonlinearity", nn.ReLU())
     arn = AutoRegressiveNN(
         dim, hidden_dims, nonlinearity=nonlinearity, skip_connections=skip_connections
@@ -170,12 +170,12 @@ def init_affine_autoregressive(dim: int, device: str = "cpu", **kwargs):
 
 def init_spline_autoregressive(dim: int, device: str = "cpu", **kwargs):
     """Provides the default initial arguments for an spline autoregressive transform."""
-    hidden_dims = kwargs.pop("hidden_dims", [3 * dim + 5, 3 * dim + 5])
-    skip_connections = kwargs.pop("skip_connections", False)
+    hidden_dims: List[int] = kwargs.pop("hidden_dims", [3 * dim + 5, 3 * dim + 5])
+    skip_connections: bool = kwargs.pop("skip_connections", False)
     nonlinearity = kwargs.pop("nonlinearity", nn.ReLU())
-    count_bins = kwargs.get("count_bins", 10)
-    order = kwargs.get("order", "linear")
-    bound = kwargs.get("bound", 10)
+    count_bins: int = kwargs.get("count_bins", 10)
+    order: str = kwargs.get("order", "linear")
+    bound: int = kwargs.get("bound", 10)
     if order == "linear":
         param_dims = [count_bins, count_bins, (count_bins - 1), count_bins]
     else:
@@ -194,12 +194,15 @@ def init_affine_coupling(dim: int, device: str = "cpu", **kwargs):
     """Provides the default initial arguments for an affine autoregressive transform."""
     assert dim > 1, "In 1d this would be equivalent to affine flows, use them."
     nonlinearity = kwargs.pop("nonlinearity", nn.ReLU())
-    split_dim = kwargs.get("split_dim", dim // 2)
-    hidden_dims = kwargs.pop("hidden_dims", [5 * dim + 20, 5 * dim + 20])
-    params_dims = (dim - split_dim, dim - split_dim)
-    arn = DenseNN(split_dim, hidden_dims, params_dims, nonlinearity=nonlinearity).to(
-        device
-    )
+    split_dim: int = int(kwargs.get("split_dim", dim // 2))
+    hidden_dims: List[int] = kwargs.pop("hidden_dims", [5 * dim + 20, 5 * dim + 20])
+    params_dims: List[int] = [dim - split_dim, dim - split_dim]
+    arn = DenseNN(
+        split_dim,
+        hidden_dims,
+        params_dims,
+        nonlinearity=nonlinearity,
+    ).to(device)
     return [split_dim, arn], {"log_scale_min_clip": -3.0}
 
 
@@ -207,12 +210,12 @@ def init_spline_coupling(dim: int, device: str = "cpu", **kwargs):
     """Intitialize a spline coupling transform, by providing necessary args and
     kwargs."""
     assert dim > 1, "In 1d this would be equivalent to affine flows, use them."
-    split_dim = kwargs.get("split_dim", dim // 2)
-    hidden_dims = kwargs.pop("hidden_dims", [5 * dim + 30, 5 * dim + 30])
+    split_dim: int = kwargs.get("split_dim", dim // 2)
+    hidden_dims: List[int] = kwargs.pop("hidden_dims", [5 * dim + 30, 5 * dim + 30])
     nonlinearity = kwargs.pop("nonlinearity", nn.ReLU())
-    count_bins = kwargs.get("count_bins", 15)
-    order = kwargs.get("order", "linear")
-    bound = kwargs.get("bound", 10)
+    count_bins: int = kwargs.get("count_bins", 15)
+    order: str = kwargs.get("order", "linear")
+    bound: int = kwargs.get("bound", 10)
     if order == "linear":
         param_dims = [
             (dim - split_dim) * count_bins,
