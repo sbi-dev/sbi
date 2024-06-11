@@ -1,4 +1,4 @@
-FROM jupyter/base-notebook:python-3.10
+FROM jupyter/base-notebook:python-3.11
 LABEL org.opencontainers.image.source="https://github.com/sbi-dev/sbi"
 LABEL org.opencontainers.image.description="Image for a Docker Devcontainer for the sbi toolbox."
 LABEL org.opencontainers.image.licenses="Apache-2.0"
