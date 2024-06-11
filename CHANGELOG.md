@@ -1,19 +1,26 @@
 # v0.23.0
 
+## New contributors 🎉
+
+- @anastasiakrouglova, @theogruner, @felixp8, @Matthijspals, @jsvetter, @pfuhr,
+  @turnmanh, @fariedabuzaid
+
 ## Major Changes
 
-- 998 abc methods for trial based data using statistical distances (#1104) (theogruner)
-- feat: local c2st metric (#1109) (Julia Linhart)
-- Zuko density estimators (#1088) (#1116) (Nastya Krouglova)
-- Integrate PyMC samplers and clean up unsued MCMC sampler (#1053) (Fabio Muratore)
-- Uniform and better MCMC params for the tests (#1107) (Fabio Muratore)
-- Integrate new density estimator interface into SBI (#979) (Guy Moss)
-- nn module as base class for density estimator (#965) (manuelgloeckler)
-- Density Estimator Class (#952) (Guy Moss)
+- change license from [AGPLv3](https://www.gnu.org/licenses/agpl-3.0.en.html) to
+  [Apache-2.0](https://www.apache.org/licenses/LICENSE-2.0)
+- support @zuko as a backend for normalizing flows (#1088, #1116) (@anastasiakrouglova)
+- ABC methods for trial-based data using statistical distances (#1104) (@theogruner)
+- local c2st metric (#1109) (@JuliaLinhart)
+- add interface for @PyMC samplers (#1053) (@famura, @felixp8)
+- big refactoring of plotting utilities, new tutorial (#1084) (@Matthijspals)
+- more flexible API for density estimator classes (#952, #965, #979, #1151)
+  (@guymoss, @tomMoral, @manualgloeckler)
+- flow matching density estimators (#1049) (@turnmanh, @fariedabuzaid)
+- score matching density estimators (#1015) (@rdgao, @jsvetter, @pfuhr, @manuelgloeckler)
 
 ## Bug Fixes
 
-- fix: pyro flow pyright errors in GitHub action (#1165) (manuelgloeckler)
 - bugfix for tutorial on embedding net (michaeldeistler)
 - Fixes current density estimator bug (#1155) (manuelgloeckler)
 - fixes to readme; add contributors to credits. (Jan Boelts)
@@ -21,7 +28,6 @@
 - fix #1047: process_device will return input when device is working. (#1143) (Jan)
 - Fix circular imports (michaeldeistler)
 - Revise tutorials; fix broken links (michaeldeistler)
-- fix pymc bugs (felixp8)
 - FIX: track_gradients boolean bug. (Jan Boelts)
 - fix deprecated nuts and hmc kwargs. (Jan Boelts)
 - fix snle test. (Jan Boelts)
@@ -76,7 +82,6 @@
 
 ## Enhancements and Refactorings
 
-- pairplot refactoring (#1084) (Matthijs Pals)
 - DOC improve reference API rendering (#1019) (Thomas Moreau)
 - 935 is our documentation good and up to date (#1012) (augustes)
 - Issue #1006: new diagnostics folder and refactoring changes (#1007) (Julia Linhart)
@@ -88,6 +93,10 @@
 - refactor slow tests for speed. (janfb)
 - Refactor CI tests for speed (#923) (Jan)
 - refactor abc classes (Jan Boelts)
+
+## Documentation and maintenance
+
+-
 
 ## Minor Changes
 
