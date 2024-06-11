@@ -199,7 +199,7 @@ def init_affine_coupling(dim: int, device: str = "cpu", **kwargs):
     params_dims = (dim - split_dim, dim - split_dim)
     arn = DenseNN(split_dim, hidden_dims, params_dims, nonlinearity=nonlinearity).to(
         device
-    )
+    )  # type: ignore
     return [split_dim, arn], {"log_scale_min_clip": -3.0}
 
 
