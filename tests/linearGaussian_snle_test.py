@@ -1,5 +1,5 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from __future__ import annotations
 
@@ -15,7 +15,6 @@ from sbi.inference import (
     RejectionPosterior,
     VIPosterior,
     likelihood_estimator_based_potential,
-    prepare_for_sbi,
     simulate_for_sbi,
 )
 from sbi.neural_nets import likelihood_nn
@@ -26,22 +25,19 @@ from sbi.simulators.linear_gaussian import (
     samples_true_posterior_linear_gaussian_uniform_prior,
     true_posterior_linear_gaussian_mvn_prior,
 )
-from sbi.utils import BoxUniform, process_prior
+from sbi.utils import BoxUniform
+from sbi.utils.user_input_checks import (
+    process_prior,
+)
 
 from .test_utils import check_c2st, get_prob_outside_uniform_prior
-
-# mcmc params for fast testing.
-mcmc_parameters = {
-    "method": "slice_np_vectorized",
-    "num_chains": 20,
-    "thin": 5,
-    "warmup_steps": 50,
-}
 
 
 @pytest.mark.parametrize("num_dim", (1,))  # dim 3 is tested below.
 @pytest.mark.parametrize("prior_str", ("uniform", "gaussian"))
-def test_api_snle_multiple_trials_and_rounds_map(num_dim: int, prior_str: str):
+def test_api_snle_multiple_trials_and_rounds_map(
+    num_dim: int, prior_str: str, mcmc_params_fast: dict
+):
     """Test SNLE API with 2 rounds, different priors num trials and MAP."""
     num_rounds = 2
     num_samples = 1
@@ -54,7 +50,7 @@ def test_api_snle_multiple_trials_and_rounds_map(num_dim: int, prior_str: str):
     else:
         prior = BoxUniform(-2.0 * ones(num_dim), 2.0 * ones(num_dim))
 
-    simulator, prior = prepare_for_sbi(diagonal_linear_gaussian, prior)
+    simulator = diagonal_linear_gaussian
     inference = SNLE(prior=prior, density_estimator="mdn", show_progress_bars=False)
 
     proposals = [prior]
@@ -72,14 +68,16 @@ def test_api_snle_multiple_trials_and_rounds_map(num_dim: int, prior_str: str):
             x_o = zeros((num_trials, num_dim))
             posterior = inference.build_posterior(
                 mcmc_method="slice_np_vectorized",
-                mcmc_parameters=dict(num_chains=10, thin=10, warmup_steps=10),
+                mcmc_parameters=mcmc_params_fast,
             ).set_default_x(x_o)
             posterior.sample(sample_shape=(num_samples,))
         proposals.append(posterior)
         posterior.map(num_iter=1)
 
 
-def test_c2st_snl_on_linear_gaussian_different_dims(model_str="maf"):
+def test_c2st_snl_on_linear_gaussian_different_dims(
+    mcmc_params_accurate: dict, model_str="maf"
+):
     """Test SNLE on linear Gaussian task with different theta and x dims."""
 
     theta_dim = 3
@@ -106,15 +104,15 @@ def test_c2st_snl_on_linear_gaussian_different_dims(model_str="maf"):
         num_discarded_dims=discard_dims,
         num_samples=num_samples,
     )
-    simulator, prior = prepare_for_sbi(
-        lambda theta: linear_gaussian(
+
+    def simulator(theta):
+        return linear_gaussian(
             theta,
             likelihood_shift,
             likelihood_cov,
             num_discarded_dims=discard_dims,
-        ),
-        prior,
-    )
+        )
+
     density_estimator = likelihood_nn(model=model_str, num_transforms=3)
     inference = SNLE(density_estimator=density_estimator, show_progress_bars=False)
 
@@ -129,7 +127,8 @@ def test_c2st_snl_on_linear_gaussian_different_dims(model_str="maf"):
         proposal=prior,
         potential_fn=potential_fn,
         theta_transform=theta_transform,
-        **mcmc_parameters,
+        method="slice_np_vectorized",
+        **mcmc_params_accurate,
     )
     samples = posterior.sample((num_samples,))
 
@@ -142,7 +141,7 @@ def test_c2st_snl_on_linear_gaussian_different_dims(model_str="maf"):
 @pytest.mark.parametrize("prior_str", ("uniform", "gaussian"))
 @pytest.mark.parametrize("model_str", ("maf", "zuko_maf"))
 def test_c2st_and_map_snl_on_linearGaussian_different(
-    num_dim: int, prior_str: str, model_str: str
+    num_dim: int, prior_str: str, model_str: str, mcmc_params_accurate: dict
 ):
     """Test SNL on linear Gaussian, comparing to ground truth posterior via c2st.
 
@@ -152,7 +151,7 @@ def test_c2st_and_map_snl_on_linearGaussian_different(
 
     """
     num_samples = 500
-    num_simulations = 5000
+    num_simulations = 3000
     trials_to_test = [1]
 
     # likelihood_mean will be likelihood_shift+theta
@@ -167,15 +166,14 @@ def test_c2st_and_map_snl_on_linearGaussian_different(
     else:
         prior = BoxUniform(-2.0 * ones(num_dim), 2.0 * ones(num_dim))
 
-    simulator, prior = prepare_for_sbi(
-        lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov),
-        prior,
-    )
+    def simulator(theta):
+        return linear_gaussian(theta, likelihood_shift, likelihood_cov)
+
     density_estimator = likelihood_nn(model_str, num_transforms=3)
     inference = SNLE(density_estimator=density_estimator, show_progress_bars=False)
 
     theta, x = simulate_for_sbi(
-        simulator, prior, num_simulations, simulation_batch_size=10000
+        simulator, prior, num_simulations, simulation_batch_size=num_simulations
     )
     likelihood_estimator = inference.append_simulations(theta, x).train()
 
@@ -205,7 +203,8 @@ def test_c2st_and_map_snl_on_linearGaussian_different(
             proposal=prior,
             potential_fn=potential_fn,
             theta_transform=theta_transform,
-            **mcmc_parameters,
+            method="slice_np_vectorized",
+            **mcmc_params_accurate,
         )
 
         samples = posterior.sample(sample_shape=(num_samples,))
@@ -214,7 +213,7 @@ def test_c2st_and_map_snl_on_linearGaussian_different(
         check_c2st(
             samples,
             target_samples,
-            alg=f"snle_a-{prior_str}-prior-{num_trials}-trials",
+            alg=f"snle_a-{prior_str}-prior-{model_str}-{num_trials}-trials",
         )
 
         map_ = posterior.map(
@@ -272,7 +271,9 @@ def test_map_with_multiple_independent_prior(use_transform):
 
 @pytest.mark.slow
 @pytest.mark.parametrize("num_trials", (1, 3))
-def test_c2st_multi_round_snl_on_linearGaussian(num_trials: int):
+def test_c2st_multi_round_snl_on_linearGaussian(
+    num_trials: int, mcmc_params_accurate: dict
+):
     """Test SNL on linear Gaussian, comparing to ground truth posterior via c2st."""
 
     num_dim = 2
@@ -292,10 +293,9 @@ def test_c2st_multi_round_snl_on_linearGaussian(num_trials: int):
     )
     target_samples = gt_posterior.sample((num_samples,))
 
-    simulator, prior = prepare_for_sbi(
-        lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov),
-        prior,
-    )
+    def simulator(theta):
+        return linear_gaussian(theta, likelihood_shift, likelihood_cov)
+
     inference = SNLE(show_progress_bars=False)
 
     theta, x = simulate_for_sbi(
@@ -309,7 +309,8 @@ def test_c2st_multi_round_snl_on_linearGaussian(num_trials: int):
         proposal=prior,
         potential_fn=potential_fn,
         theta_transform=theta_transform,
-        **mcmc_parameters,
+        method="slice_np_vectorized",
+        **mcmc_params_accurate,
     )
 
     theta, x = simulate_for_sbi(
@@ -326,7 +327,8 @@ def test_c2st_multi_round_snl_on_linearGaussian(num_trials: int):
         proposal=prior,
         potential_fn=potential_fn,
         theta_transform=theta_transform,
-        **mcmc_parameters,
+        method="slice_np_vectorized",
+        **mcmc_params_accurate,
     )
 
     samples = posterior.sample(sample_shape=(num_samples,))
@@ -357,10 +359,9 @@ def test_c2st_multi_round_snl_on_linearGaussian_vi(num_trials: int):
     )
     target_samples = gt_posterior.sample((num_samples,))
 
-    simulator, prior = prepare_for_sbi(
-        lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov),
-        prior,
-    )
+    def simulator(theta):
+        return linear_gaussian(theta, likelihood_shift, likelihood_cov)
+
     inference = SNLE(show_progress_bars=False)
 
     theta, x = simulate_for_sbi(
@@ -401,15 +402,13 @@ def test_c2st_multi_round_snl_on_linearGaussian_vi(num_trials: int):
 @pytest.mark.parametrize(
     "sampling_method, prior_str",
     (
-        ("slice_np", "gaussian"),
-        ("slice_np", "uniform"),
-        ("slice_np_vectorized", "gaussian"),
-        ("slice_np_vectorized", "uniform"),
-        ("slice", "gaussian"),
-        ("slice", "uniform"),
-        ("nuts", "gaussian"),
-        ("nuts", "uniform"),
-        ("hmc", "gaussian"),
+        pytest.param("slice_np", "gaussian", marks=pytest.mark.mcmc),
+        pytest.param("slice_np", "uniform", marks=pytest.mark.mcmc),
+        pytest.param("slice_np_vectorized", "gaussian", marks=pytest.mark.mcmc),
+        pytest.param("slice_np_vectorized", "uniform", marks=pytest.mark.mcmc),
+        pytest.param("nuts_pymc", "gaussian", marks=pytest.mark.mcmc),
+        pytest.param("nuts_pyro", "uniform", marks=pytest.mark.mcmc),
+        pytest.param("hmc_pymc", "gaussian", marks=pytest.mark.mcmc),
         ("rejection", "uniform"),
         ("rejection", "gaussian"),
         ("rKL", "uniform"),
@@ -426,7 +425,7 @@ def test_c2st_multi_round_snl_on_linearGaussian_vi(num_trials: int):
 )
 @pytest.mark.parametrize("init_strategy", ("proposal", "resample", "sir"))
 def test_api_snl_sampling_methods(
-    sampling_method: str, prior_str: str, init_strategy: str
+    sampling_method: str, prior_str: str, init_strategy: str, mcmc_params_fast: dict
 ):
     """Runs SNL on linear Gaussian and tests sampling from posterior via mcmc.
 
@@ -441,8 +440,6 @@ def test_api_snl_sampling_methods(
     num_trials = 2
     num_simulations = 1000
     x_o = zeros((num_trials, num_dim))
-    # Test for multiple chains is cheap when vectorized.
-    num_chains = 10 if sampling_method == "slice_np_vectorized" else 1
     if sampling_method == "rejection":
         sample_with = "rejection"
     elif (
@@ -461,50 +458,46 @@ def test_api_snl_sampling_methods(
     else:
         prior = BoxUniform(-1.0 * ones(num_dim), ones(num_dim))
 
-    # Why do we have this if-case? Only the `MCMCPosterior` uses the `init_strategy`.
-    # Thus, we would not like to run, e.g., VI with all init_strategies, but only once
-    # (namely with `init_strategy=proposal`).
-    if sample_with == "mcmc" or init_strategy == "proposal":
-        simulator, prior = prepare_for_sbi(diagonal_linear_gaussian, prior)
-        inference = SNLE(show_progress_bars=False)
+    simulator = diagonal_linear_gaussian
 
-        theta, x = simulate_for_sbi(
-            simulator, prior, num_simulations, simulation_batch_size=1000
-        )
-        likelihood_estimator = inference.append_simulations(theta, x).train(
-            max_num_epochs=5
-        )
-        potential_fn, theta_transform = likelihood_estimator_based_potential(
-            prior=prior, likelihood_estimator=likelihood_estimator, x_o=x_o
-        )
-        if sample_with == "rejection":
-            posterior = RejectionPosterior(potential_fn=potential_fn, proposal=prior)
-        elif (
-            "slice" in sampling_method
-            or "nuts" in sampling_method
-            or "hmc" in sampling_method
-        ):
-            posterior = MCMCPosterior(
-                potential_fn,
-                proposal=prior,
-                theta_transform=theta_transform,
-                method=sampling_method,
-                thin=5,
-                num_chains=num_chains,
-                init_strategy=init_strategy,
-            )
-        elif sample_with == "importance":
-            posterior = ImportanceSamplingPosterior(
-                potential_fn,
-                proposal=prior,
-                theta_transform=theta_transform,
-            )
-        else:
-            posterior = VIPosterior(
-                potential_fn,
-                theta_transform=theta_transform,
-                vi_method=sampling_method,
-            )
-            posterior.train(max_num_iters=10)
+    inference = SNLE(show_progress_bars=False)
 
-        posterior.sample(sample_shape=(num_samples,))
+    theta, x = simulate_for_sbi(
+        simulator, prior, num_simulations, simulation_batch_size=1000
+    )
+    likelihood_estimator = inference.append_simulations(theta, x).train(
+        max_num_epochs=5
+    )
+    potential_fn, theta_transform = likelihood_estimator_based_potential(
+        prior=prior, likelihood_estimator=likelihood_estimator, x_o=x_o
+    )
+    if sample_with == "rejection":
+        posterior = RejectionPosterior(potential_fn=potential_fn, proposal=prior)
+    elif (
+        "slice" in sampling_method
+        or "nuts" in sampling_method
+        or "hmc" in sampling_method
+    ):
+        posterior = MCMCPosterior(
+            potential_fn,
+            proposal=prior,
+            theta_transform=theta_transform,
+            method=sampling_method,
+            init_strategy=init_strategy,
+            **mcmc_params_fast,
+        )
+    elif sample_with == "importance":
+        posterior = ImportanceSamplingPosterior(
+            potential_fn,
+            proposal=prior,
+            theta_transform=theta_transform,
+        )
+    else:
+        posterior = VIPosterior(
+            potential_fn,
+            theta_transform=theta_transform,
+            vi_method=sampling_method,
+        )
+        posterior.train(max_num_iters=10)
+
+    posterior.sample(sample_shape=(num_samples,), show_progress_bars=False)

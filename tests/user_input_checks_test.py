@@ -1,5 +1,5 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
 from sbi.utils import mcmc_transform, within_support
 from sbi.utils.torchutils import BoxUniform
 from sbi.utils.user_input_checks import (
-    prepare_for_sbi,
+    check_sbi_inputs,
     process_prior,
     process_simulator,
     process_x,
@@ -183,13 +183,13 @@ def test_process_prior(prior):
 @pytest.mark.parametrize(
     "x, x_shape, allow_iid",
     (
-        (ones(3), torch.Size([1, 3]), False),
-        (ones(1, 3), torch.Size([1, 3]), False),
-        (ones(10, 3), torch.Size([1, 10, 3]), False),  # 2D data / iid SNPE
+        (ones(3), torch.Size([3]), False),
+        (ones(1, 3), torch.Size([3]), False),
+        (ones(10, 3), torch.Size([10, 3]), False),  # 2D data / iid SNPE
         pytest.param(
             ones(10, 3), None, False, marks=pytest.mark.xfail
         ),  # 2D data / iid SNPE without x_shape
-        (ones(10, 10), torch.Size([1, 10]), True),  # iid likelihood based
+        (ones(10, 10), torch.Size([10]), True),  # iid likelihood based
     ),
 )
 def test_process_x(x, x_shape, allow_iid):
@@ -269,7 +269,9 @@ def test_prepare_sbi_problem(simulator: Callable, prior):
         x_shape: shape of data as defined by the user.
     """
 
-    simulator, prior = prepare_for_sbi(simulator, prior)
+    prior, _, prior_returns_numpy = process_prior(prior)
+    simulator = process_simulator(simulator, prior, prior_returns_numpy)
+    check_sbi_inputs(simulator, prior)
 
     # check batch sims and type
     n_batch = 5
@@ -315,7 +317,9 @@ def test_inference_with_user_sbi_problems(
     Test inference with combinations of user defined simulators, priors and x_os.
     """
 
-    simulator, prior = prepare_for_sbi(user_simulator, user_prior)
+    prior, _, prior_returns_numpy = process_prior(user_prior)
+    simulator = process_simulator(user_simulator, prior, prior_returns_numpy)
+    check_sbi_inputs(simulator, prior)
     inference = snpe_method(
         prior=prior,
         density_estimator="mdn_snpe_a" if snpe_method == SNPE_A else "maf",

@@ -1,5 +1,5 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from typing import Any, Callable, List, Optional, Tuple, Union
 from warnings import warn
@@ -10,7 +10,6 @@ from pyknos.mdn.mdn import MultivariateGaussianMDN
 from torch import Tensor
 from torch.distributions import Distribution
 
-from sbi.neural_nets.density_estimators.nflows_flow import NFlowsFlow
 from sbi.sbi_types import Shape, TorchTransform
 from sbi.utils.conditional_density_utils import (
     ConditionedPotential,
@@ -186,7 +185,7 @@ def conditional_corrcoeff(
 class ConditionedMDN:
     def __init__(
         self,
-        mdn: NFlowsFlow,
+        mdn,
         x_o: Tensor,
         condition: Tensor,
         dims_to_sample: List[int],
@@ -194,8 +193,9 @@ class ConditionedMDN:
         r"""Class that can sample and evaluate a conditional mixture-of-gaussians.
 
         Args:
-            mdn: Mixture density network that models $p(\theta|x). We use the normflows
-                implementation of MDNs.
+            mdn Mixture density network that models $p(\theta|x). We use the normflows
+                implementation of MDNs. Type is `NFlowsFlow`, type hint removed to
+                avoid circular import, see #1140.
             x_o: The datapoint at which the `net` is evaluated.
             condition: Parameter set that all dimensions not specified in
                 `dims_to_sample` will be fixed to. Should contain dim_theta elements,

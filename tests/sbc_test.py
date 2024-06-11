@@ -1,5 +1,5 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from __future__ import annotations
 
@@ -18,9 +18,16 @@ from tests.test_utils import PosteriorPotential, TractablePosterior
 @pytest.mark.parametrize("reduce_fn_str", ("marginals", "posterior_log_prob"))
 @pytest.mark.parametrize("prior", ("boxuniform", "independent"))
 @pytest.mark.parametrize(
-    "method, sampler", ((SNPE, None), (SNLE, "mcmc"), (SNLE, "vi"))
+    "method, sampler",
+    (
+        (SNPE, None),
+        pytest.param(SNLE, "mcmc", marks=pytest.mark.mcmc),
+        pytest.param(SNLE, "vi", marks=pytest.mark.mcmc),
+    ),
 )
-def test_running_sbc(method, prior, reduce_fn_str, sampler, model="mdn"):
+def test_running_sbc(
+    method, prior, reduce_fn_str, sampler, mcmc_params_accurate: dict, model="mdn"
+):
     """Tests running inference and then SBC and obtaining nltp."""
 
     num_dim = 2
@@ -52,7 +59,7 @@ def test_running_sbc(method, prior, reduce_fn_str, sampler, model="mdn"):
         posterior_kwargs = {
             "sample_with": "mcmc" if sampler == "mcmc" else "vi",
             "mcmc_method": "slice_np_vectorized",
-            "mcmc_parameters": {"num_chains": 10, "thin": 5, "warmup_steps": 10},
+            "mcmc_parameters": mcmc_params_accurate,
         }
     else:
         posterior_kwargs = {}
@@ -74,6 +81,66 @@ def test_running_sbc(method, prior, reduce_fn_str, sampler, model="mdn"):
 
     # Check nltp
     get_nltp(thetas, xs, posterior)
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("method", [SNPE])
+def test_consistent_sbc_results(method, model="mdn"):
+    """Tests running inference and then SBC and obtaining nltp."""
+
+    num_dim = 2
+    prior = BoxUniform(-torch.ones(num_dim), torch.ones(num_dim))
+
+    num_simulations = 1000
+    max_num_epochs = 20
+    num_sbc_runs = 100
+
+    likelihood_shift = -1.0 * ones(num_dim)
+    likelihood_cov = 0.3 * eye(num_dim)
+
+    def simulator(theta):
+        return linear_gaussian(theta, likelihood_shift, likelihood_cov)
+
+    inferer = method(prior, show_progress_bars=False, density_estimator=model)
+
+    theta, x = simulate_for_sbi(simulator, prior, num_simulations)
+
+    _ = inferer.append_simulations(theta, x).train(
+        training_batch_size=100, max_num_epochs=max_num_epochs
+    )
+
+    posterior = inferer.build_posterior()
+    num_posterior_samples = 1000
+    thetas = prior.sample((num_sbc_runs,))
+    xs = simulator(thetas)
+
+    mranks, mdaps = run_sbc(
+        thetas,
+        xs,
+        posterior,
+        num_workers=1,
+        num_posterior_samples=num_posterior_samples,
+    )
+    mstats = check_sbc(
+        mranks, thetas, mdaps, num_posterior_samples=num_posterior_samples
+    )
+    lranks, ldaps = run_sbc(
+        thetas,
+        xs,
+        posterior,
+        num_workers=1,
+        num_posterior_samples=num_posterior_samples,
+        reduce_fns=posterior.log_prob,
+    )
+    lstats = check_sbc(
+        lranks, thetas, ldaps, num_posterior_samples=num_posterior_samples
+    )
+
+    assert lstats["ks_pvals"] > 0.05
+    assert (mstats["ks_pvals"] > 0.05).all()
+
+    assert lstats["c2st_ranks"] < 0.75
+    assert (mstats["c2st_ranks"] < 0.75).all()
 
 
 def test_sbc_accuracy():

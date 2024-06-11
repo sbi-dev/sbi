@@ -1,13 +1,11 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
-
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import warnings
 from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union, cast
 
 import torch
 from numpy import ndarray
-from pyknos.nflows import flows
 from scipy.stats._distn_infrastructure import rv_frozen
 from scipy.stats._multivariate import multi_rv_frozen
 from torch import Tensor, float32, nn
@@ -567,16 +565,19 @@ def get_batch_loop_simulator(simulator: Callable) -> Callable:
 
 
 def process_x(
-    x: Array, x_shape: Optional[torch.Size] = None, allow_iid_x: bool = False
+    x: Array, x_event_shape: Optional[torch.Size] = None, allow_iid_x: bool = False
 ) -> Tensor:
     """Return observed data adapted to match sbi's shape and type requirements.
+
+    This means that `x` is returned with a `batch_dim`.
 
     If `x_shape` is `None`, the shape is not checked.
 
     Args:
         x: Observed data as provided by the user.
-        x_shape: Prescribed shape - either directly provided by the user at init or
-            inferred by sbi by running a simulation and checking the output.
+        x_event_shape: Prescribed shape - either directly provided by the user at init
+            or inferred by sbi by running a simulation and checking the output. Does not
+            contain a batch dimension.
         allow_iid_x: Whether multiple trials in x are allowed.
 
     Returns:
@@ -585,24 +586,29 @@ def process_x(
 
     x = atleast_2d(torch.as_tensor(x, dtype=float32))
 
+    if x_event_shape is not None and len(x_event_shape) > len(x.shape):
+        raise ValueError(
+            f"You passed an `x` of shape {x.shape} but the `x_event_shape` (inferred "
+            f"from simulations) is {x_event_shape}. We are raising this error because "
+            f"len(x_event_shape) > len(x.shape)"
+        )
+
     # If x_shape is provided, we can fix a missing batch dim for >1D data.
-    if x_shape is not None and len(x_shape) > len(x.shape):
+    if x_event_shape is not None and len(x_event_shape) == len(x.shape):
         x = x.unsqueeze(0)
 
     input_x_shape = x.shape
     if not allow_iid_x:
         check_for_possibly_batched_x_shape(input_x_shape)
-        start_idx = 0
     else:
         warn_on_iid_x(num_trials=input_x_shape[0])
-        start_idx = 1
 
-    if x_shape is not None:
+    if x_event_shape is not None:
         # Number of trials can change for every new x, but single trial x shape must
         # match.
-        assert input_x_shape[start_idx:] == x_shape[start_idx:], (
-            f"Observed data shape ({input_x_shape[start_idx:]}) must match "
-            f"the shape of simulated data x ({x_shape[start_idx:]})."
+        assert input_x_shape[1:] == x_event_shape, (
+            f"Observed data shape ({input_x_shape[1:]}) must match "
+            f"the shape of simulated data x ({x_event_shape})."
         )
     return x
 
@@ -610,7 +616,9 @@ def process_x(
 def prepare_for_sbi(simulator: Callable, prior) -> Tuple[Callable, Distribution]:
     """Prepare simulator and prior for usage in sbi.
 
-    NOTE: This is a wrapper around `process_prior` and `process_simulator` which can be
+    NOTE: This method is deprecated as of sbi version v0.23.0. and will be removed in a
+    future release. Please use `process_prior` and `process_simulator` in the future.
+    This is a wrapper around `process_prior` and `process_simulator` which can be
     used in isolation as well.
 
     Attempts to meet the following requirements by reshaping and type-casting:
@@ -629,6 +637,14 @@ def prepare_for_sbi(simulator: Callable, prior) -> Tuple[Callable, Distribution]
     Returns:
         Tuple (simulator, prior) checked and matching the requirements of sbi.
     """
+
+    warnings.warn(
+        "This method is deprecated as of sbi version v0.23.0. and will be removed in a \
+        future release."
+        "Please use `process_prior` and `process_simulator` in the future.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
 
     # Check prior, return PyTorch prior.
     prior, _, prior_returns_numpy = process_prior(prior)
@@ -739,17 +755,19 @@ def validate_theta_and_x(
     return theta, x
 
 
-def test_posterior_net_for_multi_d_x(net: flows.Flow, theta: Tensor, x: Tensor) -> None:
+def test_posterior_net_for_multi_d_x(net, theta: Tensor, x: Tensor) -> None:
     """Test log prob method of the net.
 
     This is done to make sure the net can handle multidimensional inputs via an
     embedding net. If not, it usually fails with a RuntimeError. Here we catch the
     error, append a debug hint and raise it again.
-    """
 
+    Args:
+        net: A `DensityEstimator`.
+    """
     try:
         # torch.nn.functional needs at least two inputs here.
-        net.log_prob(theta[:2], x[:2])
+        net.log_prob(theta[:, :2], condition=x[:2])
     except RuntimeError as rte:
         ndims = x.ndim
         if ndims > 2:

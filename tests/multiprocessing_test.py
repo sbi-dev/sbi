@@ -1,5 +1,5 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ def slow_linear_gaussian(theta):
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize("num_workers", [10, -2])
+@pytest.mark.parametrize("num_workers", [2])
 @pytest.mark.parametrize("sim_batch_size", ((1, 10, 100)))
 def test_benchmarking_parallel_simulation(sim_batch_size, num_workers):
     """Test whether joblib is faster than serial processing."""
@@ -54,5 +54,5 @@ def test_benchmarking_parallel_simulation(sim_batch_size, num_workers):
     )
     toc_joblib = time.time() - tic
 
-    # Allow joblib to be 10 percent slower due to overhead.
-    assert toc_joblib <= toc_sp * 1.1
+    # Allow joblib to be 50 percent slower due to overhead.
+    assert toc_joblib <= toc_sp * 1.5

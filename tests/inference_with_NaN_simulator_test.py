@@ -1,5 +1,5 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import pytest
 import torch
@@ -13,7 +13,6 @@ from sbi.inference import (
     SNPE_C,
     SRE,
     DirectPosterior,
-    prepare_for_sbi,
     simulate_for_sbi,
 )
 from sbi.simulators.linear_gaussian import (
@@ -22,6 +21,10 @@ from sbi.simulators.linear_gaussian import (
 )
 from sbi.utils import RestrictionEstimator
 from sbi.utils.sbiutils import handle_invalid_x
+from sbi.utils.user_input_checks import (
+    check_sbi_inputs,
+    process_simulator,
+)
 
 from .test_utils import check_c2st
 
@@ -96,7 +99,8 @@ def test_inference_with_nan_simulator(method: type, percent_nans: float):
         prior=prior,
     )
 
-    simulator, prior = prepare_for_sbi(linear_gaussian_nan, prior)
+    simulator = process_simulator(linear_gaussian_nan, prior, False)
+    check_sbi_inputs(simulator, prior)
     inference = method(prior=prior)
 
     theta, x = simulate_for_sbi(simulator, prior, num_simulations)
@@ -137,7 +141,8 @@ def test_inference_with_restriction_estimator():
         prior=prior,
     )
 
-    simulator, prior = prepare_for_sbi(linear_gaussian_nan, prior)
+    simulator = process_simulator(linear_gaussian_nan, prior, False)
+    check_sbi_inputs(simulator, prior)
     restriction_estimator = RestrictionEstimator(prior=prior)
     proposal = prior
     num_rounds = 2

@@ -1,5 +1,5 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import copy
 from copy import deepcopy
@@ -91,8 +91,7 @@ class VIPosterior(NeuralPosterior):
                 typically cover all modes (`fKL`, `IW`, `alpha` for alpha < 1).
             device: Training device, e.g., `cpu`, `cuda` or `cuda:0`. We will ensure
                 that all other objects are also on this device.
-            x_shape: Shape of a single simulator output. If passed, it is used to check
-                the shape of the observed data and give a descriptive error.
+            x_shape: Deprecated, should not be passed.
             parameters: List of parameters of the variational posterior. This is only
                 required for user-defined q i.e. if q does not have a `parameters`
                 attribute.

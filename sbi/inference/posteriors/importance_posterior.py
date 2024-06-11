@@ -1,5 +1,6 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+
 from typing import Any, Callable, Optional, Tuple, Union
 
 import torch
@@ -52,8 +53,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
                 proposal at every iteration.
             device: Device on which to sample, e.g., "cpu", "cuda" or "cuda:0". If
                 None, `potential_fn.device` is used.
-            x_shape: Shape of a single simulator output. If passed, it is used to check
-                the shape of the observed data and give a descriptive error.
+            x_shape: Deprecated, should not be passed.
         """
         super().__init__(
             potential_fn,
@@ -160,12 +160,18 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         oversampling_factor: int = 32,
         max_sampling_batch_size: int = 10_000,
         sample_with: Optional[str] = None,
+        show_progress_bars: bool = False,
     ) -> Union[Tensor, Tuple[Tensor, Tensor]]:
         """Return samples from the approximate posterior distribution.
 
         Args:
             sample_shape: _description_
             x: _description_
+            oversampling_factor: Number of proposed samples from which only one is
+                selected based on its importance weight.
+            max_sampling_batch_size: The batch size of samples being drawn from the
+                proposal at every iteration.
+            show_progress_bars: Whether to show a progressbar during sampling.
         """
         if sample_with is not None:
             raise ValueError(
@@ -181,6 +187,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
                 sample_shape,
                 oversampling_factor=oversampling_factor,
                 max_sampling_batch_size=max_sampling_batch_size,
+                show_progress_bars=show_progress_bars,
             )
         elif self.method == "importance":
             return self._importance_sample(sample_shape)
@@ -190,6 +197,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
     def _importance_sample(
         self,
         sample_shape: Shape = torch.Size(),
+        show_progress_bars: bool = False,
     ) -> Tuple[Tensor, Tensor]:
         """Returns samples from the proposal and log of their importance weights.
 
@@ -197,6 +205,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
             sample_shape: Desired shape of samples that are drawn from posterior.
             sample_with: This argument only exists to keep backward-compatibility with
                 `sbi` v0.17.2 or older. If it is set, we instantly raise an error.
+            show_progress_bars: Whether to show sampling progress monitor.
 
         Returns:
             Samples and logarithm of corresponding importance weights.
@@ -206,6 +215,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
             self.potential_fn,
             proposal=self.proposal,
             num_samples=num_samples,
+            show_progress_bars=show_progress_bars,
         )
 
         samples = samples.reshape((*sample_shape, -1)).to(self._device)
@@ -253,7 +263,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
             self.potential_fn,
             proposal=self.proposal,
             num_samples=num_samples,
-            oversampling_factor=oversampling_factor,
+            num_candidate_samples=oversampling_factor,
             show_progress_bars=show_progress_bars,
             max_sampling_batch_size=max_sampling_batch_size,
             device=self._device,

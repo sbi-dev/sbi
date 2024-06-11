@@ -1,3 +1,6 @@
+# This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+
 import pickle
 
 import pytest
@@ -11,8 +14,8 @@ from sbi.inference import SNLE, SNPE, SNRE
     "inference_method, sampling_method",
     (
         (SNPE, "direct"),
-        (SNLE, "mcmc"),
-        (SNRE, "mcmc"),
+        pytest.param(SNLE, "mcmc", marks=pytest.mark.mcmc),
+        pytest.param(SNRE, "mcmc", marks=pytest.mark.mcmc),
         pytest.param(SNRE, "vi", marks=pytest.mark.xfail),  # bug: see #684
         (SNRE, "rejection"),
     ),

@@ -1,5 +1,5 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from __future__ import annotations
 
@@ -18,7 +18,6 @@ from sbi.inference import (
     MCMCPosterior,
     RejectionPosterior,
     VIPosterior,
-    prepare_for_sbi,
     ratio_estimator_based_potential,
     simulate_for_sbi,
 )
@@ -36,28 +35,22 @@ from tests.test_utils import (
     get_prob_outside_uniform_prior,
 )
 
-# mcmc params for fast testing.
-mcmc_parameters = {
-    "method": "slice_np_vectorized",
-    "num_chains": 20,
-    "thin": 5,
-    "warmup_steps": 50,
-}
 
-
+@pytest.mark.mcmc
 @pytest.mark.parametrize("num_dim", (1,))  # dim 3 is tested below.
 @pytest.mark.parametrize("snre_method", (SNRE_B, SNRE_C))
 def test_api_snre_multiple_trials_and_rounds_map(
-    num_dim: int, snre_method: RatioEstimator
+    num_dim: int,
+    snre_method: RatioEstimator,
+    mcmc_params_fast: dict,
+    num_rounds: int = 2,
+    num_samples: int = 12,
+    num_simulations: int = 100,
 ):
     """Test SNRE API with 2 rounds, different priors num trials and MAP."""
-
-    num_rounds = 2
-    num_samples = 1
-    num_simulations = 100
     prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
 
-    simulator, prior = prepare_for_sbi(diagonal_linear_gaussian, prior)
+    simulator = diagonal_linear_gaussian
     inference = snre_method(prior=prior, classifier="mlp", show_progress_bars=False)
 
     proposals = [prior]
@@ -75,15 +68,18 @@ def test_api_snre_multiple_trials_and_rounds_map(
             x_o = zeros((num_trials, num_dim))
             posterior = inference.build_posterior(
                 mcmc_method="slice_np_vectorized",
-                mcmc_parameters=dict(num_chains=10, thin=5, warmup_steps=10),
+                mcmc_parameters=mcmc_params_fast,
             ).set_default_x(x_o)
             posterior.sample(sample_shape=(num_samples,))
         proposals.append(posterior)
         posterior.map(num_iter=1)
 
 
+@pytest.mark.mcmc
 @pytest.mark.parametrize("snre_method", (SNRE_B, SNRE_C))
-def test_c2st_sre_on_linearGaussian(snre_method: RatioEstimator):
+def test_c2st_sre_on_linearGaussian(
+    snre_method: RatioEstimator, mcmc_params_accurate: dict
+):
     """Test whether SRE infers well a simple example with available ground truth.
 
     This example has different number of parameters theta than number of x. This test
@@ -106,12 +102,11 @@ def test_c2st_sre_on_linearGaussian(snre_method: RatioEstimator):
     prior_cov = eye(theta_dim)
     prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
 
-    simulator, prior = prepare_for_sbi(
-        lambda theta: linear_gaussian(
+    def simulator(theta):
+        return linear_gaussian(
             theta, likelihood_shift, likelihood_cov, num_discarded_dims=discard_dims
-        ),
-        prior,
-    )
+        )
+
     inference = snre_method(classifier="resnet", show_progress_bars=False)
 
     theta, x = simulate_for_sbi(
@@ -136,7 +131,8 @@ def test_c2st_sre_on_linearGaussian(snre_method: RatioEstimator):
         potential_fn=potential_fn,
         theta_transform=theta_transform,
         proposal=prior,
-        **mcmc_parameters,
+        method="slice_np_vectorized",
+        **mcmc_params_accurate,
     )
     samples = posterior.sample((num_samples,))
 
@@ -144,12 +140,16 @@ def test_c2st_sre_on_linearGaussian(snre_method: RatioEstimator):
     check_c2st(samples, target_samples, alg=f"{snre_method.__name__}")
 
 
+@pytest.mark.mcmc
 @pytest.mark.slow
 @pytest.mark.parametrize("snre_method", (SNRE_A, SNRE_B, SNRE_C, BNRE))
 @pytest.mark.parametrize("prior_str", ("gaussian", "uniform"))
 @pytest.mark.parametrize("num_trials", (3,))  # num_trials=1 is tested above.
 def test_c2st_snre_variants_on_linearGaussian_with_multiple_trials(
-    snre_method: RatioEstimator, prior_str: str, num_trials: int
+    snre_method: RatioEstimator,
+    prior_str: str,
+    num_trials: int,
+    mcmc_params_accurate: dict,
 ):
     """Test C2ST and MAP accuracy of SNRE variants on linear gaussian.
 
@@ -160,7 +160,7 @@ def test_c2st_snre_variants_on_linearGaussian_with_multiple_trials(
     """
 
     num_dim = 2
-    num_simulations = 1500
+    num_simulations = 1750
     num_samples = 500
     x_o = zeros(num_trials, num_dim)
 
@@ -182,7 +182,6 @@ def test_c2st_snre_variants_on_linearGaussian_with_multiple_trials(
     def simulator(theta):
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    simulator, prior = prepare_for_sbi(simulator, prior)
     kwargs = dict(
         classifier="resnet",
         show_progress_bars=False,
@@ -202,7 +201,8 @@ def test_c2st_snre_variants_on_linearGaussian_with_multiple_trials(
         potential_fn=potential_fn,
         theta_transform=theta_transform,
         proposal=prior,
-        **mcmc_parameters,
+        method="slice_np_vectorized",
+        **mcmc_params_accurate,
     )
     samples = posterior.sample(sample_shape=(num_samples,))
 
@@ -280,9 +280,9 @@ def test_c2st_multi_round_snr_on_linearGaussian_vi(
     )
     target_samples = gt_posterior.sample((num_samples,))
 
-    simulator, prior = prepare_for_sbi(
-        lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov), prior
-    )
+    def simulator(theta):
+        return linear_gaussian(theta, likelihood_shift, likelihood_cov)
+
     inference = snre_method(show_progress_bars=False)
 
     theta, x = simulate_for_sbi(
@@ -322,15 +322,13 @@ def test_c2st_multi_round_snr_on_linearGaussian_vi(
 @pytest.mark.parametrize(
     "sampling_method, prior_str",
     (
-        ("slice_np", "gaussian"),
-        ("slice_np", "uniform"),
-        ("slice_np_vectorized", "gaussian"),
-        ("slice_np_vectorized", "uniform"),
-        ("slice", "gaussian"),
-        ("slice", "uniform"),
-        ("nuts", "gaussian"),
-        ("nuts", "uniform"),
-        ("hmc", "gaussian"),
+        pytest.param("slice_np", "gaussian", marks=pytest.mark.mcmc),
+        pytest.param("slice_np", "uniform", marks=pytest.mark.mcmc),
+        pytest.param("slice_np_vectorized", "gaussian", marks=pytest.mark.mcmc),
+        pytest.param("slice_np_vectorized", "uniform", marks=pytest.mark.mcmc),
+        pytest.param("nuts_pymc", "gaussian", marks=pytest.mark.mcmc),
+        pytest.param("nuts_pyro", "uniform", marks=pytest.mark.mcmc),
+        pytest.param("hmc_pyro", "gaussian", marks=pytest.mark.mcmc),
         ("rejection", "uniform"),
         ("rejection", "gaussian"),
         ("rKL", "uniform"),
@@ -345,7 +343,9 @@ def test_c2st_multi_round_snr_on_linearGaussian_vi(
         ("importance", "gaussian"),
     ),
 )
-def test_api_sre_sampling_methods(sampling_method: str, prior_str: str):
+def test_api_sre_sampling_methods(
+    sampling_method: str, prior_str: str, mcmc_params_fast: dict
+):
     """Test leakage correction both for MCMC and rejection sampling.
 
     Args:
@@ -359,7 +359,7 @@ def test_api_sre_sampling_methods(sampling_method: str, prior_str: str):
     num_simulations = 100
     x_o = zeros((num_trials, num_dim))
     # Test for multiple chains is cheap when vectorized.
-    num_chains = 5 if sampling_method == "slice_np_vectorized" else 1
+
     if sampling_method == "rejection":
         sample_with = "rejection"
     elif (
@@ -378,7 +378,8 @@ def test_api_sre_sampling_methods(sampling_method: str, prior_str: str):
     else:
         prior = utils.BoxUniform(-ones(num_dim), ones(num_dim))
 
-    simulator, prior = prepare_for_sbi(diagonal_linear_gaussian, prior)
+    simulator = diagonal_linear_gaussian
+
     inference = SNRE_B(classifier="resnet", show_progress_bars=False)
 
     theta, x = simulate_for_sbi(
@@ -395,14 +396,12 @@ def test_api_sre_sampling_methods(sampling_method: str, prior_str: str):
         or "nuts" in sampling_method
         or "hmc" in sampling_method
     ):
-        mcmc_parameters.update({"num_chains": num_chains})
-        mcmc_parameters.update({"method": sampling_method})
-
         posterior = MCMCPosterior(
             potential_fn,
             proposal=prior,
             theta_transform=theta_transform,
-            **mcmc_parameters,
+            method=sampling_method,
+            **mcmc_params_fast,
         )
     elif sample_with == "importance":
         posterior = ImportanceSamplingPosterior(
@@ -418,4 +417,4 @@ def test_api_sre_sampling_methods(sampling_method: str, prior_str: str):
         )
         posterior.train(max_num_iters=10)
 
-    posterior.sample(sample_shape=(num_samples,))
+    posterior.sample(sample_shape=(num_samples,), show_progress_bars=False)
