@@ -354,7 +354,7 @@ class MCMCPosterior(NeuralPosterior):
         samples = self.theta_transform.inv(transformed_samples)
         samples = samples.reshape((*sample_shape, -1))  # type: ignore
 
-        return samples.reshape((*sample_shape, -1))  # type: ignore
+        return samples
 
     def sample_batched(
         self,
@@ -405,6 +405,7 @@ class MCMCPosterior(NeuralPosterior):
         )
         self.potential_ = self._prepare_potential(method)  # type: ignore
 
+        # For each observation in the batch, we have num_chains independent chains.
         num_chains_extended = batch_size * num_chains
         initial_params = self._get_initial_params(
             init_strategy,  # type: ignore
@@ -413,7 +414,7 @@ class MCMCPosterior(NeuralPosterior):
             show_progress_bars,
             **init_strategy_parameters,
         )
-
+        # We need num_samples from each posterior in the batch
         num_samples = torch.Size(sample_shape).numel() * batch_size
 
         assert (
@@ -433,7 +434,7 @@ class MCMCPosterior(NeuralPosterior):
             )
 
         samples = self.theta_transform.inv(transformed_samples)
-
+        # Samples are of shape (num_samples, num_chains_extended, *input_shape)
         return samples.reshape((*sample_shape, batch_size, -1))  # type: ignore
 
     def _build_mcmc_init_fn(
