@@ -308,7 +308,7 @@ def accept_reject_sample(
         # samples will be of shape(sampling_batch_size,*batch_shape, *event_shape)
         # and hence work in dim = 0.
         num_accepted = are_accepted.sum(dim=0)
-        num_sampled_total += num_accepted
+        num_sampled_total += num_accepted.to(num_sampled_total.device)
         num_samples_possible += sampling_batch_size
         min_num_accepted = num_accepted.min().item()
         num_remaining -= min_num_accepted
@@ -371,4 +371,4 @@ def accept_reject_sample(
         samples.shape[0] == num_samples
     ), "Number of accepted samples must match required samples."
 
-    return samples, as_tensor(min_acceptance_rate)
+    return samples, acceptance_rate
