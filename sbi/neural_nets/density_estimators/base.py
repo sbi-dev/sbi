@@ -9,18 +9,19 @@ from torch import Tensor, nn
 
 
 class ConditionalEstimator(nn.Module, ABC):
-    r"""Base class for conditionalestimators to characterize some distribution
+    r"""Base class for conditional estimators to characterize some distribution
     quantities.
 
     For example, this can be:
     - Conditional density estimator of the posterior $p(\theta|x)$.
     - Conditional density estimator of the likelihood $p(x|\theta)$.
+    - Conditional vector field estimator e.g. $\nabla_\theta \log p(\theta|x)$.
 
-    Subclasses of Estimator should implement the ``loss(input, condition)`` method
-    to be compatible with sbi's inference procedures.
+    Subclasses of ConditionalEstimator should implement the ``loss(input, condition)``
+    method to be compatible with sbi's training procedures.
     """
 
-    def __init__(self, input_shape: torch.Size, condition_shape: torch.Size) -> None:
+    def __init__(self, input_shape: Tuple, condition_shape: Tuple) -> None:
         r"""Base class for estimators.
 
         Args:
@@ -68,7 +69,7 @@ class ConditionalEstimator(nn.Module, ABC):
             ValueError: If the shape of the condition does not match the expected
                         input dimensionality.
         """
-        exp_condition_shape = tuple(self.condition_shape)
+        exp_condition_shape = self.condition_shape
         if len(condition.shape) < len(exp_condition_shape):
             raise ValueError(
                 "Dimensionality of condition is too small and does not match the "
@@ -76,7 +77,7 @@ class ConditionalEstimator(nn.Module, ABC):
                 f"be compatible with condition_shape {exp_condition_shape}."
             )
         else:
-            condition_shape = tuple(condition.shape[-len(self.condition_shape) :])
+            condition_shape = condition.shape[-len(self.condition_shape) :]
             if condition_shape != exp_condition_shape:
                 raise ValueError(
                     f"Shape of condition {condition_shape} does not match the "
@@ -97,8 +98,8 @@ class ConditionalEstimator(nn.Module, ABC):
             ValueError: If the shape of the input does not match the expected
                         input dimensionality.
         """
-        input_shape = tuple(input.shape)
-        exp_input_shape = tuple(self.input_shape)
+        input_shape = input.shape
+        exp_input_shape = self.input_shape
         if len(input_shape) < len(exp_input_shape):
             raise ValueError(
                 "Dimensionality of input is too small and does not match the "
@@ -150,6 +151,7 @@ class ConditionalDensityEstimator(ConditionalEstimator):
         r"""Return the embedding network if it exists."""
         return None
 
+    @abstractmethod
     def log_prob(self, input: Tensor, condition: Tensor, **kwargs) -> Tensor:
         r"""Return the log probabilities of the inputs given a condition or multiple
         i.e. batched conditions.
@@ -167,8 +169,9 @@ class ConditionalDensityEstimator(ConditionalEstimator):
             Sample-wise log probabilities.
         """
 
-        raise NotImplementedError
+        pass
 
+    @abstractmethod
     def loss(self, input: Tensor, condition: Tensor, **kwargs) -> Tensor:
         r"""Return the loss for training the density estimator.
 
@@ -181,8 +184,9 @@ class ConditionalDensityEstimator(ConditionalEstimator):
             Loss of shape (batch_dim,)
         """
 
-        raise NotImplementedError
+        pass
 
+    @abstractmethod
     def sample(self, sample_shape: torch.Size, condition: Tensor, **kwargs) -> Tensor:
         r"""Return samples from the density estimator.
 
@@ -194,7 +198,7 @@ class ConditionalDensityEstimator(ConditionalEstimator):
             Samples of shape (*sample_shape, batch_dim, *event_shape_input).
         """
 
-        raise NotImplementedError
+        pass
 
     def sample_and_log_prob(
         self, sample_shape: torch.Size, condition: Tensor, **kwargs
