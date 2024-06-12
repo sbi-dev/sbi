@@ -9,8 +9,8 @@ from torch import Tensor, nn
 
 
 class ConditionalEstimator(nn.Module, ABC):
-    r"""Base class for conditionalestimators to characterize some distribution
-    quantities.
+    r"""Base class for conditional estimators that estimate properties of
+    distributions conditional on an input. 
 
     For example, this can be:
     - Conditional density estimator of the posterior $p(\theta|x)$.
@@ -21,7 +21,7 @@ class ConditionalEstimator(nn.Module, ABC):
     """
 
     def __init__(self, input_shape: torch.Size, condition_shape: torch.Size) -> None:
-        r"""Base class for estimators.
+        r"""Construct a conditional estimator given shapes.
 
         Args:
             input_shape: Event shape of the input at which the density is being
