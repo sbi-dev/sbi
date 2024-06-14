@@ -15,7 +15,7 @@ from torch.distributions import Distribution, MultivariateNormal
 import sbi.utils as utils
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.inference.snpe.snpe_base import PosteriorEstimator
-from sbi.neural_nets.density_estimators.base import DensityEstimator
+from sbi.neural_nets.density_estimators.base import ConditionalDensityEstimator
 from sbi.sbi_types import TensorboardSummaryWriter, TorchModule
 from sbi.utils import torchutils
 from sbi.utils.torchutils import atleast_2d
@@ -110,7 +110,7 @@ class SNPE_A(PosteriorEstimator):
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[Dict] = None,
         component_perturbation: float = 5e-3,
-    ) -> DensityEstimator:
+    ) -> ConditionalDensityEstimator:
         r"""Return density estimator that approximates the proposal posterior.
 
         [1] _Fast epsilon-free Inference of Simulation Models with Bayesian Conditional
@@ -363,7 +363,7 @@ class SNPE_A(PosteriorEstimator):
                     param.grad = None  # let autograd construct a new gradient
 
 
-class SNPE_A_MDN(DensityEstimator):
+class SNPE_A_MDN(ConditionalDensityEstimator):
     """Generates a posthoc-corrected MDN which approximates the posterior.
 
     TODO: Adapt this class to the new `DensityEstimator` interface. Maybe even to a
@@ -385,7 +385,7 @@ class SNPE_A_MDN(DensityEstimator):
 
     def __init__(
         self,
-        flow: DensityEstimator,
+        flow: ConditionalDensityEstimator,
         proposal: Union["utils.BoxUniform", "MultivariateNormal", "DirectPosterior"],
         prior: Distribution,
         device: str,
@@ -459,6 +459,9 @@ class SNPE_A_MDN(DensityEstimator):
                 log_prob_proposal_posterior, "proposal posterior eval"
             )
             return log_prob_proposal_posterior  # \hat{p} from eq (3) in [1]
+
+    def loss(self, inputs, condition, **kwargs) -> Tensor:
+        return -self.log_prob(inputs, condition, **kwargs)
 
     def sample(self, sample_shape: torch.Size, condition: Tensor, **kwargs) -> Tensor:
         """Sample from the approximate posterior.

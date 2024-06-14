@@ -7,11 +7,11 @@ import torch
 from torch import Tensor, nn
 from zuko.flows.core import Flow
 
-from sbi.neural_nets.density_estimators.base import DensityEstimator
+from sbi.neural_nets.density_estimators.base import ConditionalDensityEstimator
 from sbi.sbi_types import Shape
 
 
-class ZukoFlow(DensityEstimator):
+class ZukoFlow(ConditionalDensityEstimator):
     r"""`zuko`- based normalizing flow density estimator.
 
     Flow type objects already have a .log_prob() and .sample() method, so here we just

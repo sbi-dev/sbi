@@ -14,7 +14,7 @@ from torch.utils.tensorboard.writer import SummaryWriter
 from sbi.inference import NeuralInference
 from sbi.inference.posteriors import MCMCPosterior, RejectionPosterior, VIPosterior
 from sbi.inference.potentials import likelihood_estimator_based_potential
-from sbi.neural_nets import DensityEstimator, likelihood_nn
+from sbi.neural_nets import ConditionalDensityEstimator, likelihood_nn
 from sbi.neural_nets.density_estimators.shape_handling import (
     reshape_to_batch_event,
 )
@@ -127,7 +127,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
         retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[Dict] = None,
-    ) -> DensityEstimator:
+    ) -> ConditionalDensityEstimator:
         r"""Train the density estimator to learn the distribution $p(x|\theta)$.
 
         Args:
@@ -262,7 +262,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
 
     def build_posterior(
         self,
-        density_estimator: Optional[DensityEstimator] = None,
+        density_estimator: Optional[ConditionalDensityEstimator] = None,
         prior: Optional[Distribution] = None,
         sample_with: str = "mcmc",
         mcmc_method: str = "slice_np",
