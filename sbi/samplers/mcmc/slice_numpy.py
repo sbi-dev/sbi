@@ -438,7 +438,7 @@ class SliceSamplerVectorized:
 
         if self.verbose:
             pbar = tqdm(
-                range(self.num_chains * num_samples),
+                range(self.num_chains * (num_samples + self.tuning)),
                 desc=f"Running vectorized MCMC with {self.num_chains} chains",
             )
 
@@ -536,12 +536,12 @@ class SliceSamplerVectorized:
                         ])
 
                     else:
-                        if sc["t"] < num_samples:
+                        if sc["t"] < num_samples + self.tuning:
                             sc["state"] = "BEGIN"
 
                             sc["x"] = sc["next_param"].copy()
 
-                            if sc["t"] <= (self.tuning):
+                            if sc["t"] < (self.tuning):
                                 i = sc["order"][sc["i"]]
                                 sc["width"][i] += (
                                     (sc["ux"] - sc["lx"]) - sc["width"][i]
@@ -551,8 +551,10 @@ class SliceSamplerVectorized:
                                 sc["i"] += 1
 
                             else:
-                                if sc["t"] > self.tuning:
-                                    sc["samples"][sc["t"]] = sc["x"].copy()
+                                if sc["t"] >= self.tuning:
+                                    sc["samples"][sc["t"] - self.tuning] = sc[
+                                        "x"
+                                    ].copy()
 
                                 sc["t"] += 1
 
@@ -562,6 +564,11 @@ class SliceSamplerVectorized:
 
                                 if self.verbose and sc["t"] % 10 == 0:
                                     pbar.update(10)  # type: ignore
+                                elif (
+                                    self.verbose
+                                    and sc["t"] == num_samples + self.tuning
+                                ):
+                                    pbar.update(sc["t"] % 10)  # type: ignore
 
                         else:
                             sc["state"] = "DONE"
