@@ -299,8 +299,8 @@ def test_correctness_of_density_estimator_log_prob(
         build_zuko_nsf,
         build_zuko_sospf,
         build_zuko_unaf,
-        # build_categoricalmassestimator,   NOTE: This does not support 2d sample_shape
-        # build_mnle,                     NOTE: This does not support 2d sample_shape
+        pytest.param(build_categoricalmassestimator, marks=pytest.mark.xfail(reason='see issue #1172')),
+        pytest.param(build_mnle, marks=pytest.mark.xfail(reason='see issue #1172')),
     ),
 )
 @pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
