@@ -352,6 +352,9 @@ class MCMCPosterior(NeuralPosterior):
                 raise NameError(f"The sampling method {method} is not implemented!")
 
         samples = self.theta_transform.inv(transformed_samples)
+        # NOTE: Currently MCMCPosteriors will require a single dimension for the
+        # parameter dimension. With recent ConditionalDensity(Ratio) estimators, we
+        # can have multiple dimensions for the parameter dimension.
         samples = samples.reshape((*sample_shape, -1))  # type: ignore
 
         return samples
@@ -591,11 +594,7 @@ class MCMCPosterior(NeuralPosterior):
 
         def multi_obs_potential(params):
             # Params are of shape (num_chains * num_obs, event).
-            # We now reshape them to (num_chains, num_obs, event).
-            # params = np.reshape(params, (num_chains, num_obs, -1))
-
-            # `all_potentials` is of shape (num_chains, num_obs).
-            all_potentials = potential_function(params)
+            all_potentials = potential_function(params)  # Shape: (num_chains, num_obs)
             return all_potentials.flatten()
 
         posterior_sampler = SliceSamplerMultiChain(
