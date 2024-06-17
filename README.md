@@ -56,14 +56,14 @@ print(posterior)
 
 ## Tutorials
 
-For first time users, you can now head over to the turorials and get going with
-[Getting Started](https://sbi-dev.github.io/sbi/tutorial/00_getting_started/).
+If you're new to `sbi`, we recommend starting with our [Getting
+Started](https://sbi-dev.github.io/sbi/tutorial/00_getting_started/) tutorial.
 
-The tutorials are easily accessible by opening a
+You can easily access and run these tutorials by opening a
 [Codespace](https://docs.github.com/en/codespaces/overview) on this repo. To do
-so, click on the green "Code" button and select "Open with Codespaces". This
-provides you with a fully functional environment to run the tutorials as jupyter
-notebooks.
+so, click on the green "Code" button and select "Open with Codespaces". This will
+provide you with a fully functional environment where you can run the tutorials as
+Jupyter notebooks.
 
 ## Inference Algorithms
 
