@@ -424,21 +424,23 @@ class SliceSamplerVectorized:
 
         # Init chains
         for c in range(self.num_chains):
-            self.state[c]["x"] = self.x[c, :]
+            self.state[c]["x"] = self.x[c, :]  # current position of chain
 
-            self.state[c]["i"] = 0
-            self.state[c]["order"] = list(range(self.n_dims))
+            self.state[c]["i"] = 0  # current dimension
+            self.state[c]["order"] = list(range(self.n_dims))  # order of dimensions
             self.rng.shuffle(self.state[c]["order"])
-
+            # accepted samples
             self.state[c]["samples"] = np.empty([int(num_samples), int(self.n_dims)])
 
-            self.state[c]["state"] = "BEGIN"
+            self.state[c]["state"] = "BEGIN"  # state of chain
 
-            self.state[c]["width"] = np.full(self.n_dims, self.init_width)
+            self.state[c]["width"] = np.full(
+                self.n_dims, self.init_width
+            )  # bracket width per dimension
 
         if self.verbose:
             pbar = tqdm(
-                range(self.num_chains * num_samples),
+                range(self.num_chains * (num_samples + self.tuning)),
                 desc=f"Running vectorized MCMC with {self.num_chains} chains",
             )
 
@@ -463,7 +465,7 @@ class SliceSamplerVectorized:
                 sc = self.state[c]
 
                 if sc["state"] == "BEGIN":
-                    # position the bracket randomly around the current sample
+                    # position the bracket randomly around the current sample.
                     sc["logu"] = log_probs[c] + np.log(1.0 - self.rng.rand())
                     sc["lx"] = sc["cxi"] - sc["wi"] * self.rng.rand()
                     sc["ux"] = sc["lx"] + sc["wi"]
@@ -479,7 +481,7 @@ class SliceSamplerVectorized:
                         log_probs[c] >= sc["logu"]
                         and sc["cxi"] - sc["lx"] < self.max_width
                     )
-
+                    # decrease lower end of bracket.
                     if outside_lower:
                         sc["lx"] -= sc["wi"]
                         sc["next_param"] = np.concatenate([
@@ -487,7 +489,7 @@ class SliceSamplerVectorized:
                             [sc["lx"]],
                             sc["x"][sc["order"][sc["i"]] + 1 :],
                         ])
-
+                    # lower end calibrated, move to upper end.
                     else:
                         sc["next_param"] = np.concatenate([
                             sc["x"][: sc["order"][sc["i"]]],
@@ -501,7 +503,7 @@ class SliceSamplerVectorized:
                         log_probs[c] >= sc["logu"]
                         and sc["ux"] - sc["cxi"] < self.max_width
                     )
-
+                    # increase upper end of bracket.
                     if outside_upper:
                         sc["ux"] += sc["wi"]
                         sc["next_param"] = np.concatenate([
@@ -510,7 +512,7 @@ class SliceSamplerVectorized:
                             sc["x"][sc["order"][sc["i"]] + 1 :],
                         ])
                     else:
-                        # sample uniformly from bracket
+                        # sample uniformly from bracket.
                         sc["xi"] = (sc["ux"] - sc["lx"]) * self.rng.rand() + sc["lx"]
                         sc["next_param"] = np.concatenate([
                             sc["x"][: sc["order"][sc["i"]]],
@@ -520,7 +522,7 @@ class SliceSamplerVectorized:
                         sc["state"] = "SAMPLE_SLICE"
 
                 elif sc["state"] == "SAMPLE_SLICE":
-                    # if outside slice, reject sample and shrink bracket
+                    # if outside slice, reject sample and shrink bracket.
                     rejected = log_probs[c] < sc["logu"]
 
                     if rejected:
@@ -536,12 +538,12 @@ class SliceSamplerVectorized:
                         ])
 
                     else:
-                        if sc["t"] < num_samples:
+                        if sc["t"] < num_samples + self.tuning:
                             sc["state"] = "BEGIN"
 
                             sc["x"] = sc["next_param"].copy()
-
-                            if sc["t"] <= (self.tuning):
+                            # if tuning, update bracket width.
+                            if sc["t"] < (self.tuning):
                                 i = sc["order"][sc["i"]]
                                 sc["width"][i] += (
                                     (sc["ux"] - sc["lx"]) - sc["width"][i]
@@ -549,10 +551,12 @@ class SliceSamplerVectorized:
 
                             if sc["i"] < len(sc["order"]) - 1:
                                 sc["i"] += 1
-
+                            # save accepted sample and shuffle dimensions.
                             else:
-                                if sc["t"] > self.tuning:
-                                    sc["samples"][sc["t"]] = sc["x"].copy()
+                                if sc["t"] >= self.tuning:
+                                    sc["samples"][sc["t"] - self.tuning] = sc[
+                                        "x"
+                                    ].copy()
 
                                 sc["t"] += 1
 
@@ -562,6 +566,11 @@ class SliceSamplerVectorized:
 
                                 if self.verbose and sc["t"] % 10 == 0:
                                     pbar.update(10)  # type: ignore
+                                elif (
+                                    self.verbose
+                                    and sc["t"] == num_samples + self.tuning
+                                ):
+                                    pbar.update(sc["t"] % 10)  # type: ignore
 
                         else:
                             sc["state"] = "DONE"
