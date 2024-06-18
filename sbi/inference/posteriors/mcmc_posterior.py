@@ -352,8 +352,51 @@ class MCMCPosterior(NeuralPosterior):
                 raise NameError(f"The sampling method {method} is not implemented!")
 
         samples = self.theta_transform.inv(transformed_samples)
+        # NOTE: Currently MCMCPosteriors will require a single dimension for the
+        # parameter dimension. With recent ConditionalDensity(Ratio) estimators, we
+        # can have multiple dimensions for the parameter dimension.
+        samples = samples.reshape((*sample_shape, -1))  # type: ignore
 
-        return samples.reshape((*sample_shape, -1))  # type: ignore
+        return samples
+
+    def sample_batched(
+        self,
+        sample_shape: Shape,
+        x: Tensor,
+        method: Optional[str] = None,
+        thin: Optional[int] = None,
+        warmup_steps: Optional[int] = None,
+        num_chains: Optional[int] = None,
+        init_strategy: Optional[str] = None,
+        init_strategy_parameters: Optional[Dict[str, Any]] = None,
+        num_workers: Optional[int] = None,
+        mp_context: Optional[str] = None,
+        show_progress_bars: bool = True,
+    ) -> Tensor:
+        r"""Given a batch of observations [x_1, ..., x_B] this function samples from
+        posteriors $p(\theta|x_1)$, ... ,$p(\theta|x_B)$, in a batched (i.e. vectorized)
+        manner.
+
+        Check the `__init__()` method for a description of all arguments as well as
+        their default values.
+
+        Args:
+            sample_shape: Desired shape of samples that are drawn from the posterior
+                given every observation.
+            x: A batch of observations, of shape `(batch_dim, event_shape_x)`.
+                `batch_dim` corresponds to the number of observations to be drawn.
+            show_progress_bars: Whether to show sampling progress monitor.
+
+        Returns:
+            Samples from the posteriors of shape (*sample_shape, B, *input_shape)
+        """
+
+        # See #1176 for a discussion on the implementation of batched sampling.
+        raise NotImplementedError(
+            "Batched sampling is not implemented for MCMC posterior. \
+            Alternatively you can use `sample` in a loop \
+            [posterior.sample(theta, x_o) for x_o in x]."
+        )
 
     def _build_mcmc_init_fn(
         self,

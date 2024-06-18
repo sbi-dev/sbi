@@ -179,6 +179,29 @@ class EnsemblePosterior(NeuralPosterior):
             )
         return torch.vstack(samples).reshape(*sample_shape, -1)
 
+    def sample_batched(
+        self,
+        sample_shape: Shape,
+        x: Tensor,
+        **kwargs,
+    ) -> Tensor:
+        num_samples = torch.Size(sample_shape).numel()
+        posterior_indices = torch.multinomial(
+            self._weights, num_samples, replacement=True
+        )
+        samples = []
+        for posterior_index, sample_size in torch.vstack(
+            posterior_indices.unique(return_counts=True)
+        ).T:
+            sample_shape_c = torch.Size((int(sample_size),))
+            samples.append(
+                self.posteriors[posterior_index].sample_batched(
+                    sample_shape_c, x=x, **kwargs
+                )
+            )
+        samples = torch.vstack(samples)
+        return samples.reshape(sample_shape + samples.shape[1:])
+
     def log_prob(
         self,
         theta: Tensor,

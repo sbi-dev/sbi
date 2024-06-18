@@ -121,6 +121,17 @@ class NeuralPosterior(ABC):
         """See child classes for docstring."""
         pass
 
+    @abstractmethod
+    def sample_batched(
+        self,
+        sample_shape: Shape,
+        x: Tensor,
+        max_sampling_batch_size: int = 10_000,
+        show_progress_bars: bool = True,
+    ) -> Tensor:
+        """See child classes for docstring."""
+        pass
+
     @property
     def default_x(self) -> Optional[Tensor]:
         """Return default x used by `.sample(), .log_prob` as conditioning context."""

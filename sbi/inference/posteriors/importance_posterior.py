@@ -194,6 +194,19 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         else:
             raise NameError
 
+    def sample_batched(
+        self,
+        sample_shape: Shape,
+        x: Tensor,
+        max_sampling_batch_size: int = 10000,
+        show_progress_bars: bool = True,
+    ) -> Tensor:
+        raise NotImplementedError(
+            "Batched sampling is not implemented for ImportanceSamplingPosterior. \
+            Alternatively you can use `sample` in a loop \
+            [posterior.sample(theta, x_o) for x_o in x]."
+        )
+
     def _importance_sample(
         self,
         sample_shape: Shape = torch.Size(),
