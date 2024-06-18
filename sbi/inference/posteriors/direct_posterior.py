@@ -264,7 +264,7 @@ class DirectPosterior(NeuralPosterior):
     ) -> Tensor:
         """Given a batch of observations [x_1, ..., x_B] and a batch of parameters \
             [$\theta_1$,..., $\theta_B$] this function evalautes the log-probabilities \
-            of the posterior $p(\theta_1|x_1)$, ..., $p(\theta_B|x_B)$ in a batched \
+            of the posteriors $p(\theta_1|x_1)$, ..., $p(\theta_B|x_B)$ in a batched \
             (i.e. vectorized) manner.
 
         Args:
