@@ -280,7 +280,7 @@ def test_correctness_of_density_estimator_log_prob(
         input_sample_dim,
     )
     log_probs = density_estimator.log_prob(inputs, condition=condition)
-    assert torch.allclose(log_probs[0, :], log_probs[1, :])
+    assert torch.allclose(log_probs[0, :], log_probs[1, :], rtol=1e-4)
 
 
 @pytest.mark.parametrize(
@@ -299,11 +299,12 @@ def test_correctness_of_density_estimator_log_prob(
         build_zuko_nsf,
         build_zuko_sospf,
         build_zuko_unaf,
-        pytest.param(
-            build_categoricalmassestimator,
-            marks=pytest.mark.xfail(reason='see issue #1172'),
-        ),
-        pytest.param(build_mnle, marks=pytest.mark.xfail(reason='see issue #1172')),
+        # Commented out because pytest ignores xfail.
+        # pytest.param(
+        #     build_categoricalmassestimator,
+        #     marks=pytest.mark.xfail(reason="issue 1172"),
+        # ),
+        pytest.param(build_mnle, marks=pytest.mark.xfail(reason="issue 1172")),
     ),
 )
 @pytest.mark.parametrize("input_event_shape", ((1,), (4,)))

@@ -124,6 +124,7 @@ markers = [
     "gpu: marks tests that require a gpu (deselect with '-m \"not gpu\"')",
     "mcmc: marks tests that require MCMC sampling (deselect with '-m \"not mcmc\"')"
 ]
+xfail_strict = true
 
 # Pyright configuration
 [tool.pyright]

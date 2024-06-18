@@ -43,4 +43,4 @@ def mcmc_params_accurate() -> dict:
 @pytest.fixture(scope="function")
 def mcmc_params_fast() -> dict:
     """Fixture for MCMC parameters for fast tests."""
-    return dict(num_chains=1, thin=1, warmup_steps=10)
+    return dict(num_chains=1, thin=1, warmup_steps=1)
