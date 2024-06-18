@@ -600,7 +600,7 @@ def test_sample_conditional(mcmc_params_accurate: dict):
     error = np.abs(sample_kde_grid - eval_grid.numpy())
 
     max_err = np.max(error)
-    assert max_err < 0.005
+    assert max_err < 0.0027
 
 
 def test_mdn_conditional_density(num_dim: int = 3, cond_dim: int = 1):
