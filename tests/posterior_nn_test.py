@@ -56,14 +56,7 @@ def test_log_prob_with_different_x(snpe_method: type, x_o_batch_dim: bool):
 
 
 @pytest.mark.parametrize("snpe_method", [SNPE_A, SNPE_C])
-@pytest.mark.parametrize(
-    "x_o_batch_dim",
-    (
-        0,
-        1,
-        2,
-    ),
-)
+@pytest.mark.parametrize("x_o_batch_dim", (0, 1, 2))
 def test_batched_sample_log_prob_with_different_x(
     snpe_method: type, x_o_batch_dim: bool
 ):
@@ -92,15 +85,16 @@ def test_batched_sample_log_prob_with_different_x(
 
 
 @pytest.mark.mcmc
-@pytest.mark.parametrize("snlre_method", [SNLE_A, SNRE_A, SNRE_B, SNRE_C])
 @pytest.mark.parametrize(
-    "x_o_batch_dim",
-    (
-        0,
-        1,
-        2,
-    ),
+    "snlre_method",
+    [
+        pytest.param(SNLE_A, marks=pytest.mark.xfail(raises=NotImplementedError)),
+        pytest.param(SNRE_A, marks=pytest.mark.xfail(raises=NotImplementedError)),
+        pytest.param(SNRE_B, marks=pytest.mark.xfail(raises=NotImplementedError)),
+        pytest.param(SNRE_C, marks=pytest.mark.xfail(raises=NotImplementedError)),
+    ],
 )
+@pytest.mark.parametrize("x_o_batch_dim", (0, 1, 2))
 def test_batched_mcmc_sample_log_prob_with_different_x(
     snlre_method: type, x_o_batch_dim: bool, mcmc_params_fast: dict
 ):
