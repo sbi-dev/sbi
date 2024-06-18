@@ -474,7 +474,8 @@ class SNPE_A_MDN(DensityEstimator):
         condition = condition.to(self._device)
 
         if not self._apply_correction:
-            return self._neural_net.sample(sample_shape, condition=condition)
+            samples = self._neural_net.sample(sample_shape, condition=condition)
+            return samples
         else:
             # When we want to sample from the approx. posterior, a proposal prior
             # \tilde{p} has already been observed. To analytically calculate the
@@ -483,7 +484,12 @@ class SNPE_A_MDN(DensityEstimator):
             condition_ndim = len(self.condition_shape)
             batch_size = condition.shape[:-condition_ndim]
             batch_size = torch.Size(batch_size).numel()
-            return self._sample_approx_posterior_mog(num_samples, condition, batch_size)
+            samples = self._sample_approx_posterior_mog(
+                num_samples, condition, batch_size
+            )
+            # NOTE: New batching convention: (batch_dim, sample_dim, *event_shape)
+            samples = samples.transpose(0, 1)
+            return samples
 
     def _sample_approx_posterior_mog(
         self, num_samples, x: Tensor, batch_size: int
