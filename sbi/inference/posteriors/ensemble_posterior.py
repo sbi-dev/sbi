@@ -186,12 +186,12 @@ class EnsemblePosterior(NeuralPosterior):
         **kwargs,
     ) -> Tensor:
         num_samples = torch.Size(sample_shape).numel()
-        posterior_indizes = torch.multinomial(
+        posterior_indices = torch.multinomial(
             self._weights, num_samples, replacement=True
         )
         samples = []
         for posterior_index, sample_size in torch.vstack(
-            posterior_indizes.unique(return_counts=True)
+            posterior_indices.unique(return_counts=True)
         ).T:
             sample_shape_c = torch.Size((int(sample_size),))
             samples.append(
