@@ -6,7 +6,6 @@ from typing import Any, Callable, Optional, Tuple, Union
 import torch
 from torch import Tensor
 
-from sbi import utils as utils
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.samplers.importance.importance_sampling import importance_sample
