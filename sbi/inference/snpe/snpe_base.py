@@ -13,8 +13,7 @@ from torch.distributions import Distribution
 from torch.nn.utils.clip_grad import clip_grad_norm_
 from torch.utils.tensorboard.writer import SummaryWriter
 
-from sbi import utils as utils
-from sbi.inference import NeuralInference, check_if_proposal_has_default_x
+from sbi.inference.base import NeuralInference, check_if_proposal_has_default_x
 from sbi.inference.posteriors import (
     DirectPosterior,
     MCMCPosterior,
@@ -31,6 +30,7 @@ from sbi.neural_nets.density_estimators.shape_handling import (
 from sbi.utils import (
     RestrictedPrior,
     check_estimator_arg,
+    check_prior,
     handle_invalid_x,
     nle_nre_apt_msg_on_invalid_x,
     npe_msg_on_invalid_x,
@@ -483,7 +483,7 @@ class PosteriorEstimator(NeuralInference, ABC):
             )
             prior = self._prior
         else:
-            utils.check_prior(prior)
+            check_prior(prior)
 
         if density_estimator is None:
             posterior_estimator = self._neural_net

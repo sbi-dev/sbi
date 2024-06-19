@@ -11,7 +11,7 @@ from torch.distributions import Distribution
 from torch.nn.utils.clip_grad import clip_grad_norm_
 from torch.utils.tensorboard.writer import SummaryWriter
 
-from sbi.inference import NeuralInference
+from sbi.inference.base import NeuralInference
 from sbi.inference.posteriors import MCMCPosterior, RejectionPosterior, VIPosterior
 from sbi.inference.potentials import likelihood_estimator_based_potential
 from sbi.neural_nets import ConditionalDensityEstimator, likelihood_nn
