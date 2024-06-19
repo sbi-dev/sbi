@@ -5,7 +5,7 @@ import random
 
 
 def import_first_function(module_name: str):
-    # This is a helper which emualtes
+    # This is a helper which emulates the following:
     # from sbi.xxx import yyy
     module = importlib.import_module(module_name)
     functions = inspect.getmembers(module, inspect.isfunction)
@@ -32,7 +32,7 @@ def find_submodules(package_name):
     return submodules
 
 
-def test_circular_input():
+def test_for_circular_imports():
     modules = find_submodules("sbi")
     # Permute the list of modules
     random.shuffle(modules)
