@@ -12,13 +12,18 @@ from pyknos.nflows.transforms import CompositeTransform
 from torch import Tensor
 from torch.distributions import Distribution, MultivariateNormal
 
-import sbi.utils as utils
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.inference.snpe.snpe_base import PosteriorEstimator
 from sbi.neural_nets.density_estimators.base import ConditionalDensityEstimator
 from sbi.sbi_types import TensorboardSummaryWriter, TorchModule
 from sbi.utils import torchutils
-from sbi.utils.torchutils import atleast_2d
+from sbi.utils.sbiutils import (
+    batched_mixture_mv,
+    batched_mixture_vmv,
+    del_entries,
+    mog_log_prob,
+)
+from sbi.utils.torchutils import BoxUniform, assert_all_finite, atleast_2d
 
 
 class SNPE_A(PosteriorEstimator):
@@ -89,7 +94,7 @@ class SNPE_A(PosteriorEstimator):
         # requiring the signature to have `num_atoms`, save it for use below, and
         # continue. It's sneaky because we are using the object (self) as a namespace
         # to pass arguments between functions, and that's implicit state management.
-        kwargs = utils.del_entries(
+        kwargs = del_entries(
             locals(),
             entries=("self", "__class__", "num_components"),
         )
@@ -164,7 +169,7 @@ class SNPE_A(PosteriorEstimator):
             estimator, the z-scoring would change, which would break the posthoc
             correction. This is a pure implementation issue."""
 
-        kwargs = utils.del_entries(
+        kwargs = del_entries(
             locals(),
             entries=(
                 "self",
@@ -252,7 +257,7 @@ class SNPE_A(PosteriorEstimator):
         ):
             proposal = self._prior
             assert isinstance(
-                proposal, (MultivariateNormal, utils.BoxUniform)
+                proposal, (MultivariateNormal, BoxUniform)
             ), """Prior must be `torch.distributions.MultivariateNormal` or `sbi.utils.
                 BoxUniform`"""
         else:
@@ -386,7 +391,7 @@ class SNPE_A_MDN(ConditionalDensityEstimator):
     def __init__(
         self,
         flow: ConditionalDensityEstimator,
-        proposal: Union["utils.BoxUniform", "MultivariateNormal", "DirectPosterior"],
+        proposal: Union["BoxUniform", "MultivariateNormal", "DirectPosterior"],
         prior: Distribution,
         device: str,
     ):
@@ -406,7 +411,7 @@ class SNPE_A_MDN(ConditionalDensityEstimator):
         self._device = device
 
         # Set the proposal using the `default_x`.
-        if isinstance(proposal, (utils.BoxUniform, MultivariateNormal)):
+        if isinstance(proposal, (BoxUniform, MultivariateNormal)):
             self._apply_correction = False
         else:
             # Add iid dimension.
@@ -452,12 +457,8 @@ class SNPE_A_MDN(ConditionalDensityEstimator):
             theta = self._maybe_z_score_theta(inputs)
 
             # Compute the log_prob of theta under the product.
-            log_prob_proposal_posterior = utils.mog_log_prob(
-                theta, logits_pp, m_pp, prec_pp
-            )
-            utils.assert_all_finite(
-                log_prob_proposal_posterior, "proposal posterior eval"
-            )
+            log_prob_proposal_posterior = mog_log_prob(theta, logits_pp, m_pp, prec_pp)
+            assert_all_finite(log_prob_proposal_posterior, "proposal posterior eval")
             return log_prob_proposal_posterior  # \hat{p} from eq (3) in [1]
 
     def loss(self, inputs, condition, **kwargs) -> Tensor:
@@ -724,7 +725,7 @@ class SNPE_A_MDN(ConditionalDensityEstimator):
                 )
             else:
                 range_ = torch.sqrt(almost_one_std * 3.0)
-                self._maybe_z_scored_prior = utils.BoxUniform(
+                self._maybe_z_scored_prior = BoxUniform(
                     almost_zero_mean - range_, almost_zero_mean + range_
                 )
         else:
@@ -825,8 +826,8 @@ class SNPE_A_MDN(ConditionalDensityEstimator):
         num_comps_d = precisions_d.shape[1]
 
         # Compute the products P_k * m_k and P_0 * m_0.
-        prec_m_prod_pp = utils.batched_mixture_mv(precisions_pp, means_pp)
-        prec_m_prod_d = utils.batched_mixture_mv(precisions_d, means_d)
+        prec_m_prod_pp = batched_mixture_mv(precisions_pp, means_pp)
+        prec_m_prod_d = batched_mixture_mv(precisions_d, means_d)
 
         # Repeat them to allow for matrix operations: same trick as for the precisions.
         prec_m_prod_pp_rep = prec_m_prod_pp.repeat_interleave(num_comps_d, dim=1)
@@ -837,7 +838,7 @@ class SNPE_A_MDN(ConditionalDensityEstimator):
         if isinstance(self._maybe_z_scored_prior, MultivariateNormal):
             summed_cov_m_prod_rep += self.prec_m_prod_prior
 
-        means_p = utils.batched_mixture_mv(covariances_p, summed_cov_m_prod_rep)
+        means_p = batched_mixture_mv(covariances_p, summed_cov_m_prod_rep)
         return means_p
 
     @staticmethod
@@ -902,15 +903,15 @@ class SNPE_A_MDN(ConditionalDensityEstimator):
         )
 
         # Compute for proposal, density estimator, and proposal posterior:
-        exponent_pp = utils.batched_mixture_vmv(
+        exponent_pp = batched_mixture_vmv(
             precisions_pp,
             means_pp,  # m_0 in eq (26) in Appendix C of [1]
         )
-        exponent_d = utils.batched_mixture_vmv(
+        exponent_d = batched_mixture_vmv(
             precisions_d,
             means_d,  # m_k in eq (26) in Appendix C of [1]
         )
-        exponent_post = utils.batched_mixture_vmv(
+        exponent_post = batched_mixture_vmv(
             precisions_post,
             means_post,  # m_k^\prime in eq (26) in Appendix C of [1]
         )

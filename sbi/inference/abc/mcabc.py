@@ -10,7 +10,8 @@ from numpy import ndarray
 from torch import Tensor
 
 from sbi.inference.abc.abc_base import ABCBASE
-from sbi.utils import KDEWrapper, get_kde, process_x
+from sbi.utils.kde import KDEWrapper, get_kde
+from sbi.utils.user_input_checks import process_x
 
 
 class MCABC(ABCBASE):

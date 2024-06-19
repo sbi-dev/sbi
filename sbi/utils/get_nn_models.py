@@ -6,9 +6,9 @@ from warnings import warn
 
 from torch import nn
 
-from sbi.neural_nets import classifier_nn as classifier_nn_moved_to_neural_nets
-from sbi.neural_nets import likelihood_nn as likelihood_nn_moved_to_neural_nets
-from sbi.neural_nets import posterior_nn as posterior_nn_moved_to_neural_nets
+from sbi.neural_nets.factory import classifier_nn as classifier_nn_moved_to_neural_nets
+from sbi.neural_nets.factory import likelihood_nn as likelihood_nn_moved_to_neural_nets
+from sbi.neural_nets.factory import posterior_nn as posterior_nn_moved_to_neural_nets
 
 
 def classifier_nn(

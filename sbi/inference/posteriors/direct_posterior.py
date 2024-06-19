@@ -18,8 +18,9 @@ from sbi.neural_nets.density_estimators.shape_handling import (
 )
 from sbi.samplers.rejection import rejection
 from sbi.sbi_types import Shape
-from sbi.utils import check_prior, within_support
+from sbi.utils.sbiutils import within_support
 from sbi.utils.torchutils import ensure_theta_batched
+from sbi.utils.user_input_checks import check_prior
 
 
 class DirectPosterior(NeuralPosterior):

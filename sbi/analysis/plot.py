@@ -18,7 +18,7 @@ from matplotlib.patches import Rectangle
 from scipy.stats import binom, gaussian_kde, iqr
 from torch import Tensor
 
-from sbi.analysis import eval_conditional_density
+from sbi.analysis.conditional_density import eval_conditional_density
 from sbi.utils.analysis_utils import pp_vals
 
 try:

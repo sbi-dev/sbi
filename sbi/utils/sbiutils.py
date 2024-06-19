@@ -23,7 +23,6 @@ from torch.distributions import (
     constraints,
 )
 
-from sbi import utils as utils
 from sbi.sbi_types import TorchTransform
 from sbi.utils.torchutils import atleast_2d
 from sbi.utils.zukoutils import UnconditionalLazyTransform
@@ -857,7 +856,7 @@ def mog_log_prob(
     constant = -(output_dim / 2.0) * torch.log(torch.tensor([2 * pi]))
     log_det = 0.5 * torch.log(torch.det(precisions_pp))
     theta_minus_mean = theta.expand_as(means_pp) - means_pp
-    exponent = -0.5 * utils.batched_mixture_vmv(precisions_pp, theta_minus_mean)
+    exponent = -0.5 * batched_mixture_vmv(precisions_pp, theta_minus_mean)
 
     return torch.logsumexp(weights + constant + log_det + exponent, dim=-1)
 

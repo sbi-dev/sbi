@@ -15,7 +15,7 @@ from sbi.neural_nets.density_estimators.shape_handling import (
 )
 from sbi.neural_nets.mnle import MixedDensityEstimator
 from sbi.sbi_types import TorchTransform
-from sbi.utils import mcmc_transform
+from sbi.utils.sbiutils import mcmc_transform
 
 
 def likelihood_estimator_based_potential(

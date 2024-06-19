@@ -8,7 +8,6 @@ from warnings import warn
 import torch
 from torch import Tensor
 
-from sbi import utils as utils
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.samplers.rejection.rejection import rejection_sample

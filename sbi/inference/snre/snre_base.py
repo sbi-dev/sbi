@@ -11,7 +11,6 @@ from torch.distributions import Distribution
 from torch.nn.utils.clip_grad import clip_grad_norm_
 from torch.utils.tensorboard.writer import SummaryWriter
 
-from sbi import utils as utils
 from sbi.inference.base import NeuralInference
 from sbi.inference.posteriors import MCMCPosterior, RejectionPosterior, VIPosterior
 from sbi.inference.potentials import ratio_estimator_based_potential
@@ -22,6 +21,7 @@ from sbi.utils import (
     clamp_and_warn,
     x_shape_from_simulation,
 )
+from sbi.utils.torchutils import repeat_rows
 
 
 class RatioEstimator(NeuralInference, ABC):
@@ -293,7 +293,7 @@ class RatioEstimator(NeuralInference, ABC):
         The logits are obtained from atomic sets of (theta,x) pairs.
         """
         batch_size = theta.shape[0]
-        repeated_x = utils.repeat_rows(x, num_atoms)
+        repeated_x = repeat_rows(x, num_atoms)
 
         # Choose `1` or `num_atoms - 1` thetas from the rest of the batch for each x.
         probs = ones(batch_size, batch_size) * (1 - eye(batch_size)) / (batch_size - 1)

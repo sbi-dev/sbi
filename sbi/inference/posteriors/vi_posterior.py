@@ -29,7 +29,7 @@ from sbi.sbi_types import (
     TorchTensor,
     TorchTransform,
 )
-from sbi.utils import mcmc_transform
+from sbi.utils.sbiutils import mcmc_transform
 from sbi.utils.torchutils import atleast_2d_float32_tensor, ensure_theta_batched
 
 
