@@ -8,7 +8,7 @@ import torch
 from torch import Tensor
 from torch.distributions import Independent, MultivariateNormal, Uniform
 
-from sbi.utils import within_support
+from sbi.utils.sbiutils import within_support
 from sbi.utils.torchutils import atleast_2d
 
 
