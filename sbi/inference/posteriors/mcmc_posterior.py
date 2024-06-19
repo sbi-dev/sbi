@@ -31,8 +31,8 @@ from sbi.samplers.mcmc import (
 )
 from sbi.sbi_types import Shape, TorchTransform
 from sbi.simulators.simutils import tqdm_joblib
-from sbi.utils import pyro_potential_wrapper, tensor2numpy, transformed_potential
-from sbi.utils.torchutils import ensure_theta_batched
+from sbi.utils.potentialutils import pyro_potential_wrapper, transformed_potential
+from sbi.utils.torchutils import ensure_theta_batched, tensor2numpy
 
 
 class MCMCPosterior(NeuralPosterior):
