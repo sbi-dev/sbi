@@ -962,7 +962,6 @@ def build_zuko_bpf(
     num_transforms: int = 3,
     embedding_net: nn.Module = nn.Identity(),
     degree: int = 16,
-    linear: bool = False,
     **kwargs,
 ) -> ZukoFlow:
     """
@@ -993,11 +992,10 @@ def build_zuko_bpf(
         num_transforms: The number of transformations in the flow. Defaults to 5.
         embedding_net: The embedding network to use. Defaults to nn.Identity().
         degree: The degree :math:`M` of the Bernstein polynomial.
-        linear: Whether to use a linear or sigmoid mapping to :math:`[0, 1]`.
         **kwargs: Additional keyword arguments to pass to the flow constructor.
     """
     which_nf = "BPF"
-    additional_kwargs = {"degree": degree, "linear": linear, **kwargs}
+    additional_kwargs = {"degree": degree, **kwargs}
     flow = build_zuko_flow(
         which_nf,
         batch_x,
