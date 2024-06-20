@@ -22,10 +22,10 @@ from torch.distributions import (
     biject_to,
     constraints,
 )
+from zuko.flows import UnconditionalTransform
 
 from sbi.sbi_types import TorchTransform
 from sbi.utils.torchutils import atleast_2d
-from sbi.utils.zukoutils import UnconditionalLazyTransform
 
 
 def warn_if_zscoring_changes_data(x: Tensor, duplicate_tolerance: float = 0.1) -> None:
@@ -187,7 +187,7 @@ def standardizing_transform_zuko(
         Affine transform for z-scoring
     """
     t_mean, t_std = z_standardization(batch_t, structured_dims, min_std)
-    return UnconditionalLazyTransform(
+    return UnconditionalTransform(
         AffineTransform,
         loc=-t_mean / t_std,
         scale=1 / t_std,
