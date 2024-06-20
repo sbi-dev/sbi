@@ -13,6 +13,7 @@ from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi.inference.base import NeuralInference
 from sbi.inference.posteriors import MCMCPosterior, RejectionPosterior, VIPosterior
+from sbi.inference.posteriors.importance_posterior import ImportanceSamplingPosterior
 from sbi.inference.potentials import likelihood_estimator_based_potential
 from sbi.neural_nets import ConditionalDensityEstimator, likelihood_nn
 from sbi.neural_nets.density_estimators.shape_handling import (
@@ -270,6 +271,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
         mcmc_parameters: Optional[Dict[str, Any]] = None,
         vi_parameters: Optional[Dict[str, Any]] = None,
         rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
+        importance_sampling_parameters: Optional[Dict[str, Any]] = None,
     ) -> Union[MCMCPosterior, RejectionPosterior, VIPosterior]:
         r"""Build posterior from the neural density estimator.
 
@@ -349,6 +351,13 @@ class LikelihoodEstimator(NeuralInference, ABC):
                 vi_method=vi_method,
                 device=device,
                 **vi_parameters or {},
+            )
+        elif sample_with == "importance":
+            self._posterior = ImportanceSamplingPosterior(
+                potential_fn=potential_fn,
+                proposal=prior,
+                device=device,
+                **importance_sampling_parameters or {},
             )
         else:
             raise NotImplementedError

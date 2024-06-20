@@ -21,6 +21,7 @@ from sbi.inference.posteriors import (
     VIPosterior,
 )
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
+from sbi.inference.posteriors.importance_posterior import ImportanceSamplingPosterior
 from sbi.inference.potentials import posterior_estimator_based_potential
 from sbi.neural_nets import ConditionalDensityEstimator, posterior_nn
 from sbi.neural_nets.density_estimators.shape_handling import (
@@ -441,6 +442,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         mcmc_parameters: Optional[Dict[str, Any]] = None,
         vi_parameters: Optional[Dict[str, Any]] = None,
         rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
+        importance_sampling_parameters: Optional[Dict[str, Any]] = None,
     ) -> Union[MCMCPosterior, RejectionPosterior, VIPosterior, DirectPosterior]:
         r"""Build posterior from the neural density estimator.
 
@@ -539,6 +541,14 @@ class PosteriorEstimator(NeuralInference, ABC):
                 vi_method=vi_method,
                 device=device,
                 **vi_parameters or {},
+            )
+        elif sample_with == "importance":
+            self._posterior = ImportanceSamplingPosterior(
+                potential_fn=potential_fn,
+                theta_transform=theta_transform,
+                prior=prior,  # type: ignore
+                device=device,
+                **importance_sampling_parameters or {},
             )
         else:
             raise NotImplementedError
