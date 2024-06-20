@@ -38,12 +38,13 @@ the end of every year. Additionally, we mention all contributors in the releases
     propose and then working on your pull request after getting some feedback from
     others.
 
-### How to contribute
+### Contribution workflow
 
-The following steps describe all parts of the workflow for doing a contribution such as
-installing locally `sbi` from source, creating a `conda` environment, setting up
-your `git` repository, etc. We've taken strong inspiration from the guides for
-contribution of [`scikit-learn`](https://scikit-learn.org/stable/developers/contributing.html)
+The following steps describe all parts of the workflow for doing a contribution
+such as installing locally `sbi` from source, creating a `conda` environment,
+setting up your `git` repository, etc. We've taken strong inspiration from the
+contribution guides of
+[`scikit-learn`](https://scikit-learn.org/stable/developers/contributing.html)
 and [`mne`](https://mne.tools/stable/development/contributing.html):
 
 **Step 1**: [Create an account](https://github.com/) on GitHub if you do not

@@ -39,11 +39,11 @@ Then, check out our material:
    <br/><br/>
    *General motivation for the SBI framework and methods included in `sbi`.*
 
--  :rocket: [__Tutorials and Examples__](tutorials/)
+-  :rocket: [__Tutorials and Examples__](tutorials/index.md)
    <br/><br/>
    *Various examples illustrating how to use the `sbi` package.*
 
--  :building_construction: [__Reference API__](reference/)
+-  :building_construction: [__Reference API__](reference/index.md)
    <br/><br/>
    *The detailed description of the package classes and functions.*
 
@@ -119,7 +119,7 @@ the inference on one particular observation to be more simulation-efficient
 
 Below, we list all implemented methods and the corresponding publications. To see
 how to access these methods in `sbi`, check out our [Inference API's reference](
-reference/inference/) and the [tutorial on implemented
+reference/inference.md) and the [tutorial on implemented
 methods](tutorials/16_implemented_methods.ipynb).
 
 ### Posterior estimation (`(S)NPE`)

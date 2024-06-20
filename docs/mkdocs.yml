@@ -69,7 +69,7 @@ plugins:
   - mkdocs-jupyter:
       include: ["*.ipynb"] # Default: ["*.py", "*.ipynb"]
       ignore: [".ipynb_checkpoints/*.ipynb"]
-      no_input_tag: True
+      no_input: True
   - mkdocstrings:
       default_handler: python
       handlers:
