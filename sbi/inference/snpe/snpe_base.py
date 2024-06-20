@@ -545,8 +545,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         elif sample_with == "importance":
             self._posterior = ImportanceSamplingPosterior(
                 potential_fn=potential_fn,
-                theta_transform=theta_transform,
-                prior=prior,  # type: ignore
+                proposal=prior,
                 device=device,
                 **importance_sampling_parameters or {},
             )
