@@ -156,6 +156,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         self,
         sample_shape: Shape = torch.Size(),
         x: Optional[Tensor] = None,
+        method: Optional[str] = None,
         oversampling_factor: int = 32,
         max_sampling_batch_size: int = 10_000,
         sample_with: Optional[str] = None,
@@ -164,14 +165,22 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         """Return samples from the approximate posterior distribution.
 
         Args:
-            sample_shape: _description_
-            x: _description_
+            sample_shape: Shape of samples that are drawn from posterior.
+            x: Observed data.
+            method: Either of [`sir`|`importance`]. This sets the behavior of the
+                `.sample()` method. With `sir`, approximate posterior samples are
+                generated with sampling importance resampling (SIR). With
+                `importance`, the `.sample()` method returns a tuple of samples and
+                corresponding importance weights.
             oversampling_factor: Number of proposed samples from which only one is
                 selected based on its importance weight.
             max_sampling_batch_size: The batch size of samples being drawn from the
                 proposal at every iteration.
             show_progress_bars: Whether to show a progressbar during sampling.
         """
+
+        method = self.method if method is None else method
+
         if sample_with is not None:
             raise ValueError(
                 f"You set `sample_with={sample_with}`. As of sbi v0.18.0, setting "
@@ -181,14 +190,14 @@ class ImportanceSamplingPosterior(NeuralPosterior):
 
         self.potential_fn.set_x(self._x_else_default_x(x))
 
-        if self.method == "sir":
+        if method == "sir":
             return self._sir_sample(
                 sample_shape,
                 oversampling_factor=oversampling_factor,
                 max_sampling_batch_size=max_sampling_batch_size,
                 show_progress_bars=show_progress_bars,
             )
-        elif self.method == "importance":
+        elif method == "importance":
             return self._importance_sample(sample_shape)
         else:
             raise NameError
