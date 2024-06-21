@@ -324,7 +324,9 @@ class RatioEstimator(NeuralInference, ABC):
         vi_parameters: Optional[Dict[str, Any]] = None,
         rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
         importance_sampling_parameters: Optional[Dict[str, Any]] = None,
-    ) -> Union[MCMCPosterior, RejectionPosterior, VIPosterior]:
+    ) -> Union[
+        MCMCPosterior, RejectionPosterior, VIPosterior, ImportanceSamplingPosterior
+    ]:
         r"""Build posterior from the neural density estimator.
 
         SNRE trains a neural network to approximate likelihood ratios. The

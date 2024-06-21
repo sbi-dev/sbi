@@ -443,7 +443,13 @@ class PosteriorEstimator(NeuralInference, ABC):
         vi_parameters: Optional[Dict[str, Any]] = None,
         rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
         importance_sampling_parameters: Optional[Dict[str, Any]] = None,
-    ) -> Union[MCMCPosterior, RejectionPosterior, VIPosterior, DirectPosterior]:
+    ) -> Union[
+        MCMCPosterior,
+        RejectionPosterior,
+        VIPosterior,
+        DirectPosterior,
+        ImportanceSamplingPosterior,
+    ]:
         r"""Build posterior from the neural density estimator.
 
         For SNPE, the posterior distribution that is returned here implements the
