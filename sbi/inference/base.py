@@ -12,7 +12,7 @@ import numpy as np
 import torch
 from joblib import Parallel, delayed
 from numpy import ndarray
-from torch import Tensor
+from torch import Tensor, float32
 from torch.distributions import Distribution
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
@@ -573,7 +573,7 @@ def simulate_for_sbi(
     proposal: Any,
     num_simulations: int,
     num_workers: int = 1,
-    sim_batch_size: int = 1,
+    simulation_batch_size: int = 1,
     seed: Optional[int] = None,
     show_progress_bar: bool = True,
 ) -> Tuple[Tensor, Tensor]:
@@ -606,18 +606,21 @@ def simulate_for_sbi(
     """
 
     if num_simulations == 0:
-        theta = torch.tensor([])
-        x = torch.tensor([])
+        theta = torch.tensor([], dtype=float32)
+        x = torch.tensor([], dtype=float32)
 
     else:
         # Cast theta to numpy for better joblib performance (seee #1175)
         seed_all_backends(seed)
         theta = proposal.sample((num_simulations,)).numpy()
 
-        if sim_batch_size is not None and sim_batch_size < num_simulations:
+        if (
+            simulation_batch_size is not None
+            and simulation_batch_size < num_simulations
+        ):
             # The batch size will be an approximation, since np.array_split does
             # not take as argument the size of the batch.
-            num_batches = num_simulations // sim_batch_size
+            num_batches = num_simulations // simulation_batch_size
 
             batches = np.array_split(theta, num_batches, axis=0)
 
@@ -631,6 +634,7 @@ def simulate_for_sbi(
                     seed_all_backends(seed)
                     return simulator(theta)
 
+                #
                 simulation_outputs: list[Tensor] = [
                     xx
                     for xx in tqdm(
@@ -643,9 +647,15 @@ def simulate_for_sbi(
                 ]
 
                 x = torch.cat(simulation_outputs, dim=0)
+                theta = torch.as_tensor(theta, dtype=float32)
 
             else:
+                # Attention: due to the current simulation wrapping structure,
+                # the following simulator call ends up having a back and forth
+                # casting torch -> numpy -> torch. Despite the overhead being
+                # minimal, the logic is not the best.
                 x = simulator(theta)
+                theta = torch.as_tensor(theta, dtype=float32)
 
     return theta, x
 
