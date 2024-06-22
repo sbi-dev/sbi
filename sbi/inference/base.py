@@ -619,7 +619,7 @@ def simulate_for_sbi(
             and simulation_batch_size < num_simulations
         ):
             # The batch size will be an approximation, since np.array_split does
-            # not take as argument the size of the batch.
+            # not take as argument the size of the batch but their total.
             num_batches = num_simulations // simulation_batch_size
 
             batches = np.array_split(theta, num_batches, axis=0)
@@ -634,17 +634,27 @@ def simulate_for_sbi(
                     seed_all_backends(seed)
                     return simulator(theta)
 
-                #
-                simulation_outputs: list[Tensor] = [
-                    xx
-                    for xx in tqdm(
-                        Parallel(return_as="generator", n_jobs=num_workers)(
+                # Run the batched simulation
+                if show_progress_bar:
+                    simulation_outputs: list[Tensor] = [
+                        xx
+                        for xx in tqdm(
+                            Parallel(return_as="generator", n_jobs=num_workers)(
+                                delayed(simulator_seeded)(batch, seed)
+                                for batch, seed in zip(batches, batch_seeds)
+                            ),
+                            total=num_simulations,
+                        )
+                    ]
+
+                else:
+                    simulation_outputs: list[Tensor] = [
+                        xx
+                        for xx in Parallel(return_as="generator", n_jobs=num_workers)(
                             delayed(simulator_seeded)(batch, seed)
                             for batch, seed in zip(batches, batch_seeds)
-                        ),
-                        total=num_simulations,
-                    )
-                ]
+                        )
+                    ]
 
                 x = torch.cat(simulation_outputs, dim=0)
                 theta = torch.as_tensor(theta, dtype=float32)
