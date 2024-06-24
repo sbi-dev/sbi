@@ -87,7 +87,7 @@ def plt_hist_1d(
     ):
         if diag_kwargs["bin_heuristic"] == "Freedman-Diaconis":
             # The Freedman-Diaconis heuristic
-            binsize = 2 * iqr(samples, nan_policy="omit") * len(samples) ** (-1 / 3)
+            binsize = 2 * iqr(samples) * len(samples) ** (-1 / 3)
             diag_kwargs["mpl_kwargs"]["bins"] = np.arange(
                 limits[0], limits[1] + binsize, binsize
             )
