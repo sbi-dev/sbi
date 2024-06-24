@@ -199,7 +199,7 @@ def run_tarp(
                  (posterior) samples for one observation are encouraged.
         theta: The true parameter value theta. Theta is expected to
                  have shape ``(n_sims, n_dims)``.
-        references: the reference points to use for the DRP regions, with
+        references: the reference points to use for the coverage regions, with
                 shape ``(n_references, n_sims, n_dims)``, or ``None``.
                 If ``None``, then reference points are chosen randomly from
                 the unit hypercube over the parameter space given by theta.
@@ -257,6 +257,7 @@ def run_tarp(
         )  # should be 1 if normalized
 
         refpdf = torch.distributions.Uniform(low=lo, high=hi)
+        # sample one reference point for each entry in theta
         references = refpdf.sample((1, num_sims))
     else:
         if len(references.shape) == 2:
@@ -299,138 +300,3 @@ def run_tarp(
     ecp = torch.cumsum(hist, dim=0) * stepsize
 
     return torch.cat([Tensor([0]), ecp]), bin_edges
-
-
-class TARP:
-    """
-    Implementation taken from Lemos et al, 'Sampling-Based Accuracy Testing of
-    Posterior Estimators for General Inference' https://arxiv.org/abs/2302.03026
-
-    The TARP diagnostic is a global diagnostic which can be used to check a
-    trained posterior against a set of true values of theta.
-
-    This class implements the distance to random point as a diagnostic method
-    for samples of posterior estimators.
-
-    """
-
-    def __init__(
-        self,
-        references: Tensor = None,
-        metric: str = "euclidean",
-        num_alpha_bins: Union[int, None] = None,
-        num_bootstrap: int = 100,
-        norm: bool = False,
-        bootstrap: bool = False,
-        seed: Union[int, None] = None,
-    ):
-        """TARP diagnostics of posterior samples
-        Reference: `Lemos, Coogan et al 2023 <https://arxiv.org/abs/2302.03026>`_
-
-        Args:
-          references: the reference points to use for the DRP regions, with
-                shape ``(n_references, n_sims)``, or ``None``. If the latter,
-                then the reference points are chosen randomly from the unit
-                hypercube over the parameter space.
-          metric: the metric to use when computing the distance. Can be
-                ``"euclidean"`` or ``"manhattan"``.
-          norm : whether to normalize parameters before coverage test
-                (Default = True)
-          num_alpha_bins: number of bins to use for the credibility values.
-                If ``None``, then ``n_sims // 10`` bins are used.
-          bootstrap: perform bootstrapped TARP analysis (not implemented yet)
-          seed: the seed to use for the random number generator. If ``None``,
-                then no seed
-        """
-        self.references = references
-        self.n_bins = num_alpha_bins
-        if self.n_bins and self.n_bins < 10:
-            warnings.warn(
-                f"""Number of bins to assess TARP coverage should be between
-                20 to 50. {self.n_bins} is low. TARP will work, but the
-                statistical assessment might fluctuate.""",
-                stacklevel=2,
-            )
-
-        self.n_bootstrap = num_bootstrap
-        self.do_norm = norm
-        self.do_bootstrap = bootstrap
-        if bootstrap:
-            raise NotImplementedError(
-                "The bootstrapped version of TARP is not implemented yet in SBI."
-            )
-        self.seed = seed
-
-        self.distance = None
-        if metric.lower() in ["l2", "euclidean"]:
-            self.distance = l2
-        elif metric.lower() in ["l1", "manhattan"]:
-            self.distance = l1
-        else:
-            raise ValueError(
-                "metric must be either 'euclidean' or 'manhattan'," f"received {metric}"
-            )
-
-    def run(
-        self,
-        xs: Tensor,
-        posterior: NeuralPosterior,
-        num_posterior_samples: int = 1000,
-        num_workers: int = 1,
-        infer_batch_size: int = 1,
-        show_progress_bar: bool = True,
-    ) -> Tensor:
-        """perform inference on batched x values using the provided posterior
-
-        Args:
-            xs: observed data for tarp, simulated from thetas.
-            posterior: a posterior obtained from sbi.
-            num_posterior_samples: number of approximate posterior samples used
-                for ranking.
-            num_workers: number of CPU cores to use in parallel for running
-                infer_batch_size inferences.
-            infer_batch_size: batch size for workers.
-            show_progress_bar: whether to display a progress bar
-
-        Returns:
-            samples: posterior samples obtained by performing inference on xs
-                under the posterior
-
-        """
-        samples = prepare_estimates(
-            xs,
-            posterior,
-            num_posterior_samples,
-            num_workers,
-            infer_batch_size,
-            show_progress_bar,
-        )
-        return samples
-
-    def check(
-        self,
-        samples: Tensor,
-        theta: Tensor,
-    ) -> Tuple[Tensor, Tensor]:
-        """
-        Estimates coverage with the TARP method.
-        Reference: `Lemos, Coogan et al 2023 <https://arxiv.org/abs/2302.03026>`_
-
-        Args:
-            samples: The predicted parameter samples to compute the coverage of,
-                     these samples are expected to have shape
-                     ``(n_samples, n_sims, n_dims)``. These are obtained by
-                     sampling a trained posterior `n_samples` times. Multiple
-                     (posterior) samples for one observation are encouraged.
-            theta: The true parameter value theta. Theta is expected to
-                     have shape ``(n_sims, n_dims)``.
-
-        Returns:
-            ecp: Expected coverage probability (``ecp``)
-            alpha: credibility values
-
-        """
-
-        return run_tarp(
-            samples, theta, self.references, self.distance, self.n_bins, self.do_norm
-        )
