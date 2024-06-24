@@ -121,7 +121,7 @@ class ZukoFlowMatchingEstimator(DensityEstimator):
 
         # todo: is calling forward here the right thing to do?
         # compute the mean squared error between the vector fields
-        return (self.forward(theta_prime, x, t) - vector_field).pow(2).mean()
+        return (self.forward(theta_prime, x, t) - vector_field).pow(2).sum(dim=-1)
 
     # TODO: rename? apply z_scores
     def forward(

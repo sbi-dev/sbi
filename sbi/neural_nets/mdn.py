@@ -8,7 +8,7 @@ from pyknos.nflows import flows, transforms
 from torch import Tensor, nn
 
 import sbi.utils as utils
-from sbi.neural_nets.density_estimators import NFlowsFlow
+from sbi.neural_nets.density_estimators.nflows_flow import NFlowsFlow
 from sbi.utils.user_input_checks import check_data_device, check_embedding_net_device
 
 

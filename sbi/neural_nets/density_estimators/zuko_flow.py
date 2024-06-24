@@ -7,6 +7,8 @@ from zuko.flows import Flow
 from sbi.neural_nets.density_estimators.base import DensityEstimator
 from sbi.types import Shape
 
+from typing import Tuple
+
 
 class ZukoFlow(DensityEstimator):
     r"""`zuko`- based normalizing flow density estimator.
@@ -148,3 +150,5 @@ class ZukoFlow(DensityEstimator):
         log_probs = log_probs.reshape(*batch_shape, *sample_shape)
 
         return samples, log_probs
+
+
