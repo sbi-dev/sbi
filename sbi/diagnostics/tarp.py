@@ -213,8 +213,6 @@ def run_tarp(
         samples = (samples - lo) / (hi - lo + 1e-10)
         theta = (theta - lo) / (hi - lo + 1e-10)
 
-    assert len(theta.shape) == len(samples.shape)
-
     if not isinstance(references, Tensor):
         # obtain min/max per dimension of theta
         lo = (
