@@ -12,6 +12,8 @@ from sbi.sbi_types import Shape
 
 from typing import Tuple
 
+from typing import Tuple
+
 
 class ZukoFlow(ConditionalDensityEstimator):
     r"""`zuko`- based normalizing flow density estimator.
