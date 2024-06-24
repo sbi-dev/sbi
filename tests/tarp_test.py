@@ -144,7 +144,7 @@ def test_distances(onsamples):
 ## Reproduce Toy Examples in paper, see Section 4.1
 
 
-def test_run_tarp_function_correct(onsamples):
+def test_run_tarp_correct(onsamples):
     theta, samples = onsamples
 
     ecp, alpha = run_tarp(samples, theta, num_bins=30)
@@ -156,7 +156,7 @@ def test_run_tarp_function_correct(onsamples):
     assert allclose((ecp - alpha).abs().max(), Tensor([0.0]), atol=1e-1)
 
 
-def test_run_tarp_function_correct_using_norm(onsamples):
+def test_run_tarp_correct_using_norm(onsamples):
     theta, samples = onsamples
 
     # tarp = TARP(num_alpha_bins=30, norm=True)
@@ -174,7 +174,7 @@ def test_run_tarp_function_correct_using_norm(onsamples):
     assert allclose((ecp - alpha).abs().max(), Tensor([0.0]), atol=1e-1)
 
 
-def test_run_tarp_function_detect_overdispersed(oversamples):
+def test_run_tarp_detect_overdispersed(oversamples):
     theta, samples = oversamples
 
     # tarp = TARP(num_alpha_bins=30, norm=True)
@@ -191,7 +191,7 @@ def test_run_tarp_function_detect_overdispersed(oversamples):
     assert not allclose((ecp - alpha).abs().max(), Tensor([0.0]), atol=1e-1)
 
 
-def test_run_tarp_function_detect_underdispersed(undersamples):
+def test_run_tarp_detect_underdispersed(undersamples):
     theta, samples = undersamples
 
     # tarp = TARP(num_alpha_bins=30, norm=True)
@@ -208,7 +208,7 @@ def test_run_tarp_function_detect_underdispersed(undersamples):
     assert not allclose((ecp - alpha).abs().max(), Tensor([0.0]), atol=1e-1)
 
 
-def test_run_tarp_function_detect_bias(biased):
+def test_run_tarp_detect_bias(biased):
     theta, samples = biased
 
     # tarp = TARP(num_alpha_bins=30, norm=True)
@@ -279,7 +279,7 @@ def test_batched_prepare_estimates(method, model="mdn"):
 
 @pytest.mark.slow
 @pytest.mark.parametrize("method", [SNPE])
-def test_consistent_run_tarp_function_results_with_posterior(method, model="mdn"):
+def test_consistent_run_tarp_results_with_posterior(method, model="mdn"):
     """Tests running inference and checking samples with tarp."""
 
     num_dim = 2
