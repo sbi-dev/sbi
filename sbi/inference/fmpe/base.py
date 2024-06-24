@@ -146,7 +146,7 @@ class FMPE(NeuralInference):
             self.epoch += 1
 
             train_loss_average = train_loss_sum / len(train_loader)  # type: ignore
-            self._summary["training_loss"].append(train_log_prob_average)
+            self._summary["training_loss"].append(train_loss_average)
 
             # Calculate validation performance.
             # self._neural_net.eval()
