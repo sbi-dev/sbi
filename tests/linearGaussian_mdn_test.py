@@ -97,6 +97,8 @@ def test_mdn_with_1D_uniform_prior():
 
     inference = SNPE(density_estimator="mdn")
 
+    prior, _, prior_returns_numpy = process_prior(prior)
+    simulator = process_simulator(simulator, prior, prior_returns_numpy)
     theta, x = simulate_for_sbi(simulator, prior, 100)
     posterior_estimator = inference.append_simulations(theta, x).train()
     posterior = DirectPosterior(posterior_estimator=posterior_estimator, prior=prior)

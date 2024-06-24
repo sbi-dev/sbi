@@ -492,12 +492,6 @@ def process_simulator(
 
     assert isinstance(user_simulator, Callable), "Simulator must be a function."
 
-    # pytorch_simulator = wrap_as_pytorch_simulator(
-    #     user_simulator, prior, is_numpy_simulator
-    # )
-    #
-    # batch_simulator = ensure_batched_simulator(pytorch_simulator, prior)
-
     joblib_simulator = wrap_as_joblib_efficient_simulator(
         user_simulator, prior, is_numpy_simulator
     )
@@ -507,7 +501,11 @@ def process_simulator(
     return batch_simulator
 
 
-# New simulator wrapper, deriving from #1175 refactoring of simulate_for_sbi
+# New simulator wrapper, deriving from #1175 refactoring of simulate_for_sbi.
+# For now it just blindly applies a cast to tensor to the input and the output
+# of the simulator. This is not efficient (~3 times slowdown), but is compatible
+# with the new joblib and, importantly, does not break previous code. It should
+# be removed with a future restructuring of the simulation pipeline.
 def wrap_as_joblib_efficient_simulator(
     simulator: Callable, prior, is_numpy_simulator
 ) -> Callable:
@@ -518,34 +516,8 @@ def wrap_as_joblib_efficient_simulator(
 
     return joblib_simulator
 
-    # If numpy in input, check for simulator consistency, and cast simulation
-    # output to tensor.
-    if is_numpy_simulator:
-        # theta = prior.sample().numpy()  # Cast to numpy because is in PyTorch already.
-        # x = simulator(theta)
-        # assert isinstance(
-        #     x, ndarray
-        # ), f"Simulator output type {type(x)} must match its input type {type(theta)}"
 
-        def joblib_simulator(theta: ndarray) -> Tensor:
-            return torch.as_tensor(simulator(torch.as_tensor(theta)), dtype=float32)
-
-    # If simulator accepts torch as input, we have to cast theta from numpy to
-    # tensor - joblib uses numpy theta
-    else:
-        # theta = prior.sample()
-        # x = simulator(theta)
-        # assert isinstance(
-        #     x, Tensor
-        # ), f"Simulator output type {type(x)} must match its input type {type(theta)}"
-
-        def joblib_simulator(theta: ndarray) -> Tensor:
-            return torch.as_tensor(simulator(torch.as_tensor(theta)), dtype=float32)
-
-    return joblib_simulator
-
-
-# Potentially not used anymore
+# Probably not used anymore
 def wrap_as_pytorch_simulator(
     simulator: Callable, prior, is_numpy_simulator
 ) -> Callable:

@@ -568,6 +568,16 @@ class NeuralInference(ABC):
         self.__dict__ = state_dict
 
 
+# Refactoring following #1175. As commented in
+# `sbi.utils.user_input_checks.wrap_as_joblib_efficient_simulator`
+# this implementation relies on a double cast torch -> numpy -> torch that
+# allows joblib to iterate over numpy arrays instead of torch tensors. This
+# allows for a final speedup of rougly 10x. Getting rid of the casts adds an
+# additional 3x speedup (at least on my machine). Unfortunately, due to the
+# casts are necessary in order to not introduce breaking changes in project
+# that are currently depending on SBI, but a general restructuring of the
+# simulation pipeline should be considered in the future, leaving the
+# opportunity to the user to simulate natively in numpy.
 def simulate_for_sbi(
     simulator: Callable,
     proposal: Any,
@@ -638,7 +648,7 @@ def simulate_for_sbi(
                     seed_all_backends(seed)
                     return simulator(theta)
 
-                # 3. if with progess bar
+                # 3. if progess bar
                 if show_progress_bar:
                     simulation_outputs: list[Tensor] = [
                         xx
@@ -680,10 +690,6 @@ def simulate_for_sbi(
             theta = torch.as_tensor(theta, dtype=float32)
 
         else:
-            # Attention: due to the current simulation wrapping structure,
-            # the following simulator call ends up having a back and forth
-            # casting torch -> numpy -> torch. Despite the overhead being
-            # minimal, the logic is not the best.
             x = simulator(theta)
             theta = torch.as_tensor(theta, dtype=float32)
 
