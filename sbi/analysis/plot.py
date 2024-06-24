@@ -534,8 +534,9 @@ def ensure_numpy(t: Union[np.ndarray, torch.Tensor]) -> np.ndarray:
     """
     if isinstance(t, torch.Tensor):
         return t.numpy()
-    else:
-        return t
+    elif not isinstance(t, np.ndarray):
+        return np.array(t)
+    return t
 
 
 def prepare_for_plot(
