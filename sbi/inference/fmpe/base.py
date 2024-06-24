@@ -162,9 +162,8 @@ class FMPE(NeuralInference):
                     batch[1].to(self._device),
                 )
 
-                train_losses = self._neural_net.loss(theta_batch, x_batch)
-                train_loss = torch.mean(train_losses)
-                train_log_probs_sum -= train_losses.sum().item()
+                train_loss = self._neural_net.loss(theta_batch, x_batch).mean()
+                train_loss_sum += train_loss.item()
 
                 train_loss.backward()
                 if clip_max_norm is not None:
