@@ -191,6 +191,10 @@ def run_tarp(
     theta = theta.detach() if len(theta.shape) != 2 else theta.detach().unsqueeze(0)
     samples = samples.detach()
 
+    assert (
+        theta.shape == samples.shape[1:]
+    ), f"shapes of theta {theta.shape} and samples {samples[1:].shape} do not fit"
+
     num_samples = samples.shape[0]  # samples per simulation
     num_sims = samples.shape[-2]
     num_dims = samples.shape[-1]
