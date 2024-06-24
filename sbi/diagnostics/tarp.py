@@ -158,13 +158,13 @@ def run_tarp(
     Args:
         samples: The predicted parameter samples to compute the coverage of,
                  these samples are expected to have shape
-                 ``(n_samples, n_sims, n_dims)``. These are obtained by
-                 sampling a trained posterior `n_samples` times. Multiple
+                 ``(num_samples, num_sims, num_dims)``. These are obtained by
+                 sampling a trained posterior `num_samples` times. Multiple
                  (posterior) samples for one observation are encouraged.
         theta: The true parameter value theta. Theta is expected to
-                 have shape ``(n_sims, n_dims)``.
+                 have shape ``(num_sims, num_dims)``.
         references: the reference points to use for the coverage regions, with
-                shape ``(1, n_sims, n_dims)``, or ``None``.
+                shape ``(1, num_sims, num_dims)``, or ``None``.
                 If ``None``, then reference points are chosen randomly from
                 the unit hypercube over the parameter space given by theta.
                 In other words, reference samples are drawn from the
@@ -177,7 +177,7 @@ def run_tarp(
                 Possible values: ``sbi.utils.metrics.l1`` or
                 ``sbi.utils.metrics.l2``. ``l2`` is the default.
         num_bins: number of bins to use for the credibility values.
-                If ``None``, then ``n_sims // 10`` bins are used.
+                If ``None``, then ``num_sims // 10`` bins are used.
         do_norm : whether to normalize parameters before coverage test
                 (Default = True)
 
@@ -277,11 +277,11 @@ def check_tarp(
     Args:
         samples: The predicted parameter samples to compute the coverage of,
                  these samples are expected to have shape
-                 ``(n_samples, n_sims, n_dims)``. These are obtained by
-                 sampling a trained posterior `n_samples` times. Multiple
+                 ``(num_samples, num_sims, num_dims)``. These are obtained by
+                 sampling a trained posterior `num_samples` times. Multiple
                  (posterior) samples for one observation are encouraged.
         theta: The true parameter value theta. Theta is expected to
-                 have shape ``(n_sims, n_dims)``.
+                 have shape ``(num_sims, num_dims)``.
 
     Returns:
         atc: area to curve, this number should be close to ``1``, values
