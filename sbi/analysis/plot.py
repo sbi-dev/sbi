@@ -2,9 +2,9 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import collections
+import logging
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union, cast
 from warnings import warn
-import logging
 
 import matplotlib as mpl
 import numpy as np
@@ -36,9 +36,9 @@ def hex2rgb(hex: str) -> List[int]:
 def rgb2hex(RGB: List[int]) -> str:
     """Components need to be integers for hex to make sense"""
     RGB = [int(x) for x in RGB]
-    return "#" + "".join([
-        "0{0:x}".format(v) if v < 16 else "{0:x}".format(v) for v in RGB
-    ])
+    return "#" + "".join(
+        ["0{0:x}".format(v) if v < 16 else "{0:x}".format(v) for v in RGB]
+    )
 
 
 def to_list_string(
@@ -82,23 +82,23 @@ def plt_hist_1d(
 ) -> None:
     """Plot 1D histogram."""
     if (
-        "bins" not in diag_kwargs['mpl_kwargs']
-        or diag_kwargs['mpl_kwargs']["bins"] is None
+        "bins" not in diag_kwargs["mpl_kwargs"]
+        or diag_kwargs["mpl_kwargs"]["bins"] is None
     ):
         if diag_kwargs["bin_heuristic"] == "Freedman-Diaconis":
             # The Freedman-Diaconis heuristic
-            binsize = 2 * iqr(samples,nan_policy='omit') * len(samples) ** (-1 / 3)
-            diag_kwargs['mpl_kwargs']["bins"] = np.arange(
+            binsize = 2 * iqr(samples, nan_policy="omit") * len(samples) ** (-1 / 3)
+            diag_kwargs["mpl_kwargs"]["bins"] = np.arange(
                 limits[0], limits[1] + binsize, binsize
             )
         else:
             # TODO: add more bin heuristics
             pass
-    if isinstance(diag_kwargs['mpl_kwargs']["bins"], int):
-        diag_kwargs['mpl_kwargs']["bins"] = np.linspace(
-            limits[0], limits[1], diag_kwargs['mpl_kwargs']["bins"]
+    if isinstance(diag_kwargs["mpl_kwargs"]["bins"], int):
+        diag_kwargs["mpl_kwargs"]["bins"] = np.linspace(
+            limits[0], limits[1], diag_kwargs["mpl_kwargs"]["bins"]
         )
-    ax.hist(samples, **diag_kwargs['mpl_kwargs'])
+    ax.hist(samples, **diag_kwargs["mpl_kwargs"])
 
 
 def plt_kde_1d(
@@ -111,7 +111,7 @@ def plt_kde_1d(
     density = gaussian_kde(samples, bw_method=diag_kwargs["bw_method"])
     xs = np.linspace(limits[0], limits[1], diag_kwargs["bins"])
     ys = density(xs)
-    ax.plot(xs, ys, **diag_kwargs['mpl_kwargs'])
+    ax.plot(xs, ys, **diag_kwargs["mpl_kwargs"])
 
 
 def plt_scatter_1d(
@@ -122,7 +122,7 @@ def plt_scatter_1d(
 ) -> None:
     """Plot vertical lines for each sample. Note: limits are not used."""
     for single_sample in samples:
-        ax.axvline(single_sample, **diag_kwargs['mpl_kwargs'])
+        ax.axvline(single_sample, **diag_kwargs["mpl_kwargs"])
 
 
 def plt_hist_2d(
@@ -135,8 +135,8 @@ def plt_hist_2d(
 ):
     """Plot 2D histogram."""
     if (
-        "bins" not in offdiag_kwargs['np_hist_kwargs']
-        or offdiag_kwargs['np_hist_kwargs']["bins"] is None
+        "bins" not in offdiag_kwargs["np_hist_kwargs"]
+        or offdiag_kwargs["np_hist_kwargs"]["bins"] is None
     ):
         if offdiag_kwargs["bin_heuristic"] == "Freedman-Diaconis":
             # The Freedman-Diaconis heuristic applied to each direction
@@ -144,7 +144,7 @@ def plt_hist_2d(
             n_bins_col = int((limits_col[1] - limits_col[0]) / binsize_col)
             binsize_row = 2 * iqr(samples_row) * len(samples_row) ** (-1 / 3)
             n_bins_row = int((limits_row[1] - limits_row[0]) / binsize_row)
-            offdiag_kwargs['np_hist_kwargs']["bins"] = [n_bins_col, n_bins_row]
+            offdiag_kwargs["np_hist_kwargs"]["bins"] = [n_bins_col, n_bins_row]
         else:
             # TODO: add more bin heuristics
             pass
@@ -155,7 +155,7 @@ def plt_hist_2d(
             [limits_col[0], limits_col[1]],
             [limits_row[0], limits_row[1]],
         ],
-        **offdiag_kwargs['np_hist_kwargs'],
+        **offdiag_kwargs["np_hist_kwargs"],
     )
     ax.imshow(
         hist.T,
@@ -165,7 +165,7 @@ def plt_hist_2d(
             yedges[0],
             yedges[-1],
         ),
-        **offdiag_kwargs['mpl_kwargs'],
+        **offdiag_kwargs["mpl_kwargs"],
     )
 
 
@@ -188,7 +188,7 @@ def plt_kde_2d(
             limits_row[0],
             limits_row[1],
         ),
-        **offdiag_kwargs['mpl_kwargs'],
+        **offdiag_kwargs["mpl_kwargs"],
     )
 
 
@@ -215,7 +215,7 @@ def plt_contour_2d(
             limits_row[1],
         ),
         levels=offdiag_kwargs["levels"],
-        **offdiag_kwargs['mpl_kwargs'],
+        **offdiag_kwargs["mpl_kwargs"],
     )
 
 
@@ -231,7 +231,7 @@ def plt_scatter_2d(
     ax.scatter(
         samples_col,
         samples_row,
-        **offdiag_kwargs['mpl_kwargs'],
+        **offdiag_kwargs["mpl_kwargs"],
     )
 
 
@@ -248,7 +248,7 @@ def plt_plot_2d(
     ax.plot(
         samples_col,
         samples_row,
-        **offdiag_kwargs['mpl_kwargs'],
+        **offdiag_kwargs["mpl_kwargs"],
     )
 
 
@@ -305,11 +305,11 @@ def get_diag_funcs(
     """make a list of the functions for the diagonal plots."""
     diag_funcs = []
     for diag in diag_list:
-        if diag == 'hist':
+        if diag == "hist":
             diag_funcs.append(plt_hist_1d)
-        elif diag == 'kde':
+        elif diag == "kde":
             diag_funcs.append(plt_kde_1d)
-        elif diag == 'scatter':
+        elif diag == "scatter":
             diag_funcs.append(plt_scatter_1d)
         else:
             diag_funcs.append(None)
@@ -336,15 +336,15 @@ def get_offdiag_funcs(
     """make a list of the functions for the off-diagonal plots."""
     offdiag_funcs = []
     for offdiag in off_diag_list:
-        if offdiag == 'hist' or offdiag == 'hist2d':
+        if offdiag == "hist" or offdiag == "hist2d":
             offdiag_funcs.append(plt_hist_2d)
-        elif offdiag == 'kde' or offdiag == 'kde2d':
+        elif offdiag == "kde" or offdiag == "kde2d":
             offdiag_funcs.append(plt_kde_2d)
-        elif offdiag == 'contour' or offdiag == 'contourf':
+        elif offdiag == "contour" or offdiag == "contourf":
             offdiag_funcs.append(plt_contour_2d)
-        elif offdiag == 'scatter':
+        elif offdiag == "scatter":
             offdiag_funcs.append(plt_scatter_2d)
-        elif offdiag == 'plot':
+        elif offdiag == "plot":
             offdiag_funcs.append(plt_plot_2d)
         else:
             offdiag_funcs.append(None)
@@ -399,9 +399,13 @@ def _format_subplot(
 
     # Ticks
     if ticks is not None:
-        ax.set_xticks((ticks[col][0], ticks[col][1]))  # pyright: ignore[reportCallIssue]
+        ax.set_xticks(
+            (ticks[col][0], ticks[col][1])
+        )  # pyright: ignore[reportCallIssue]
         if current != "diag":
-            ax.set_yticks((ticks[row][0], ticks[row][1]))  # pyright: ignore[reportCallIssue]
+            ax.set_yticks(
+                (ticks[row][0], ticks[row][1])
+            )  # pyright: ignore[reportCallIssue]
 
     # make square
     if fig_kwargs["square_subplots"]:
@@ -435,10 +439,12 @@ def _format_subplot(
         else:
             _format_axis(ax, xhide=True, yhide=True)
     if fig_kwargs["tick_labels"] is not None:
-        ax.set_xticklabels((  # pyright: ignore[reportCallIssue]
-            str(fig_kwargs["tick_labels"][col][0]),
-            str(fig_kwargs["tick_labels"][col][1]),
-        ))
+        ax.set_xticklabels(
+            (  # pyright: ignore[reportCallIssue]
+                str(fig_kwargs["tick_labels"][col][0]),
+                str(fig_kwargs["tick_labels"][col][1]),
+            )
+        )
 
 
 def _format_axis(
@@ -539,6 +545,7 @@ def ensure_numpy(t: Union[np.ndarray, torch.Tensor]) -> np.ndarray:
         return np.array(t)
     return t
 
+
 def handle_nan_infs(samples: List[np.ndarray]) -> List[np.ndarray]:
     """Check if there are NaNs or Infs in the samples."""
     for i in range(len(samples)):
@@ -547,9 +554,12 @@ def handle_nan_infs(samples: List[np.ndarray]) -> List[np.ndarray]:
         if np.isinf(samples[i]).any():
             logging.warning("Infs found in samples, omitting datapoints.")
             # cast inf to nan, so they are omitted in the next step
-            np.nan_to_num(samples[i], copy=False, nan=np.nan,posinf=np.nan,neginf=np.nan)
+            np.nan_to_num(
+                samples[i], copy=False, nan=np.nan, posinf=np.nan, neginf=np.nan
+            )
         samples[i] = samples[i][~np.isnan(samples[i]).any(axis=1)]
     return samples
+
 
 def prepare_for_plot(
     samples: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
@@ -566,10 +576,10 @@ def prepare_for_plot(
         samples = [samples]
     else:
         samples = [ensure_numpy(sample) for sample in samples]
-    
+
     # check if nans and infs
     samples = handle_nan_infs(samples)
-    
+
     # Dimensionality of the problem.
     dim = samples[0].shape[1]
 
@@ -928,7 +938,9 @@ def _get_default_offdiag_kwargs(offdiag: Optional[str], i: int = 0) -> Dict:
     elif offdiag == "scatter":
         offdiag_kwargs = {
             "mpl_kwargs": {
-                "color": plt.rcParams["axes.prop_cycle"].by_key()["color"][i * 2],  # pyright: ignore[reportOptionalMemberAccess]
+                "color": plt.rcParams["axes.prop_cycle"].by_key()["color"][
+                    i * 2
+                ],  # pyright: ignore[reportOptionalMemberAccess]
                 "edgecolor": "white",
                 "alpha": 0.5,
                 "rasterized": False,
@@ -941,13 +953,17 @@ def _get_default_offdiag_kwargs(offdiag: Optional[str], i: int = 0) -> Dict:
             "levels": [0.68, 0.95, 0.99],
             "percentile": True,
             "mpl_kwargs": {
-                "colors": plt.rcParams["axes.prop_cycle"].by_key()["color"][i * 2]  # pyright: ignore[reportOptionalMemberAccess]
+                "colors": plt.rcParams["axes.prop_cycle"].by_key()["color"][
+                    i * 2
+                ]  # pyright: ignore[reportOptionalMemberAccess]
             },
         }
     elif offdiag == "plot":
         offdiag_kwargs = {
             "mpl_kwargs": {
-                "color": plt.rcParams["axes.prop_cycle"].by_key()["color"][i * 2]  # pyright: ignore[reportOptionalMemberAccess]
+                "color": plt.rcParams["axes.prop_cycle"].by_key()["color"][
+                    i * 2
+                ]  # pyright: ignore[reportOptionalMemberAccess]
             }
         }
     else:
@@ -962,7 +978,9 @@ def _get_default_diag_kwargs(diag: Optional[str], i: int = 0) -> Dict:
             "bw_method": "scott",
             "bins": 50,
             "mpl_kwargs": {
-                "color": plt.rcParams["axes.prop_cycle"].by_key()["color"][i * 2]  # pyright: ignore[reportOptionalMemberAccess]
+                "color": plt.rcParams["axes.prop_cycle"].by_key()["color"][
+                    i * 2
+                ]  # pyright: ignore[reportOptionalMemberAccess]
             },
         }
 
@@ -970,7 +988,9 @@ def _get_default_diag_kwargs(diag: Optional[str], i: int = 0) -> Dict:
         diag_kwargs = {
             "bin_heuristic": "Freedman-Diaconis",
             "mpl_kwargs": {
-                "color": plt.rcParams["axes.prop_cycle"].by_key()["color"][i * 2],  # pyright: ignore[reportOptionalMemberAccess]
+                "color": plt.rcParams["axes.prop_cycle"].by_key()["color"][
+                    i * 2
+                ],  # pyright: ignore[reportOptionalMemberAccess]
                 "density": False,
                 "histtype": "step",
             },
@@ -978,7 +998,9 @@ def _get_default_diag_kwargs(diag: Optional[str], i: int = 0) -> Dict:
     elif diag == "scatter":
         diag_kwargs = {
             "mpl_kwargs": {
-                "color": plt.rcParams["axes.prop_cycle"].by_key()["color"][i * 2]  # pyright: ignore[reportOptionalMemberAccess]
+                "color": plt.rcParams["axes.prop_cycle"].by_key()["color"][
+                    i * 2
+                ]  # pyright: ignore[reportOptionalMemberAccess]
             }
         }
     else:
@@ -995,8 +1017,12 @@ def _get_default_fig_kwargs() -> Dict:
         "points_labels": [f"points_{idx}" for idx in range(10)],  # for points
         "samples_labels": [f"samples_{idx}" for idx in range(10)],  # for samples
         # colors: take even colors for samples, odd colors for points
-        "samples_colors": plt.rcParams["axes.prop_cycle"].by_key()["color"][0::2],  # pyright: ignore[reportOptionalMemberAccess]
-        "points_colors": plt.rcParams["axes.prop_cycle"].by_key()["color"][1::2],  # pyright: ignore[reportOptionalMemberAccess]
+        "samples_colors": plt.rcParams["axes.prop_cycle"].by_key()["color"][
+            0::2
+        ],  # pyright: ignore[reportOptionalMemberAccess]
+        "points_colors": plt.rcParams["axes.prop_cycle"].by_key()["color"][
+            1::2
+        ],  # pyright: ignore[reportOptionalMemberAccess]
         # ticks
         "tickformatter": mpl.ticker.FormatStrFormatter("%g"),  # type: ignore
         "tick_labels": None,
@@ -1304,7 +1330,9 @@ def _arrange_grid(
 
     # Create fig and axes if they were not passed.
     if fig is None or axes is None:
-        fig, axes = plt.subplots(rows, cols, figsize=figsize, **fig_kwargs["subplots"])  # pyright: ignore reportAssignmenttype
+        fig, axes = plt.subplots(
+            rows, cols, figsize=figsize, **fig_kwargs["subplots"]
+        )  # pyright: ignore reportAssignmenttype
     else:
         assert axes.shape == (  # pyright: ignore reportAttributeAccessIssue
             rows,
@@ -1326,9 +1354,9 @@ def _arrange_grid(
                 current = "lower"
 
             if one_dim:
-                ax = axes # pyright: ignore reportIndexIssue
+                ax = axes  # pyright: ignore reportIndexIssue
             elif flat:
-                ax = axes[col_idx]   # pyright: ignore reportIndexIssue
+                ax = axes[col_idx]  # pyright: ignore reportIndexIssue
             else:
                 ax = axes[row_idx, col_idx]  # pyright: ignore reportIndexIssue
             # Diagonals
@@ -1422,17 +1450,25 @@ def _arrange_grid(
     # Add dots if we subset
     if len(subset) < dim:
         if flat:
-            ax = axes[len(subset) - 1]  # pyright: ignore[reportIndexIssue, reportOptionalSubscript]
+            ax = axes[
+                len(subset) - 1
+            ]  # pyright: ignore[reportIndexIssue, reportOptionalSubscript]
             x0, x1 = ax.get_xlim()
             y0, y1 = ax.get_ylim()
-            text_kwargs = {"fontsize": plt.rcParams["font.size"] * 2.0}  # pyright: ignore[reportOptionalOperand]
+            text_kwargs = {
+                "fontsize": plt.rcParams["font.size"] * 2.0
+            }  # pyright: ignore[reportOptionalOperand]
             ax.text(x1 + (x1 - x0) / 8.0, (y0 + y1) / 2.0, "...", **text_kwargs)
         else:
             for row in range(len(subset)):
-                ax = axes[row, len(subset) - 1]  # pyright: ignore[reportIndexIssue, reportOptionalSubscript]
+                ax = axes[
+                    row, len(subset) - 1
+                ]  # pyright: ignore[reportIndexIssue, reportOptionalSubscript]
                 x0, x1 = ax.get_xlim()
                 y0, y1 = ax.get_ylim()
-                text_kwargs = {"fontsize": plt.rcParams["font.size"] * 2.0}  # pyright: ignore[reportOptionalOperand]
+                text_kwargs = {
+                    "fontsize": plt.rcParams["font.size"] * 2.0
+                }  # pyright: ignore[reportOptionalOperand]
                 ax.text(x1 + (x1 - x0) / 8.0, (y0 + y1) / 2.0, "...", **text_kwargs)
                 if row == len(subset) - 1:
                     ax.text(
@@ -1828,7 +1864,9 @@ def _plot_cdf_region_expected_under_uniformity(
     plt.fill_between(
         x=np.linspace(0, num_bins, num_repeats * num_bins),
         y1=np.repeat(lower / np.max(lower), num_repeats),
-        y2=np.repeat(upper / np.max(upper), num_repeats),  # pyright: ignore[reportArgumentType]
+        y2=np.repeat(
+            upper / np.max(upper), num_repeats
+        ),  # pyright: ignore[reportArgumentType]
         color=color,
         alpha=alpha,
     )
@@ -1975,14 +2013,14 @@ def marginal_plot_with_probs_intensity(
     if marginal_dim == 1:
         # extract bins and patches
         _, bins, patches = ax_.hist(
-            probs_per_marginal['s'], n_bins, density=True, color="green"
+            probs_per_marginal["s"], n_bins, density=True, color="green"
         )
         # create bins: all samples between bin edges are assigned to the same bin
-        probs_per_marginal["bins"] = np.searchsorted(bins, probs_per_marginal['s']) - 1
+        probs_per_marginal["bins"] = np.searchsorted(bins, probs_per_marginal["s"]) - 1
         probs_per_marginal["bins"][probs_per_marginal["bins"] < 0] = 0
         # get mean prob for each bin (same as pandas groupy method)
         array_probs = np.concatenate(
-            [probs_per_marginal['bins'][:, None], probs_per_marginal['probs'][:, None]],
+            [probs_per_marginal["bins"][:, None], probs_per_marginal["probs"][:, None]],
             axis=1,
         )
         array_probs = array_probs[array_probs[:, 0].argsort()]
@@ -1991,7 +2029,7 @@ def marginal_plot_with_probs_intensity(
         )
         weights = np.array([np.mean(w) for w in weights])
         # remove empty bins
-        id = list(set(range(n_bins)) - set(probs_per_marginal['bins']))
+        id = list(set(range(n_bins)) - set(probs_per_marginal["bins"]))
         patches = np.delete(patches, id)
         bins = np.delete(bins, id)
 
@@ -2006,19 +2044,19 @@ def marginal_plot_with_probs_intensity(
     if marginal_dim == 2:
         # extract bin edges
         _, x, y = np.histogram2d(
-            probs_per_marginal['s_1'], probs_per_marginal['s_2'], bins=n_bins
+            probs_per_marginal["s_1"], probs_per_marginal["s_2"], bins=n_bins
         )
         # create bins: all samples between bin edges are assigned to the same bin
-        probs_per_marginal["bins_x"] = np.searchsorted(x, probs_per_marginal['s_1']) - 1
-        probs_per_marginal["bins_y"] = np.searchsorted(y, probs_per_marginal['s_2']) - 1
+        probs_per_marginal["bins_x"] = np.searchsorted(x, probs_per_marginal["s_1"]) - 1
+        probs_per_marginal["bins_y"] = np.searchsorted(y, probs_per_marginal["s_2"]) - 1
         probs_per_marginal["bins_x"][probs_per_marginal["bins_x"] < 0] = 0
         probs_per_marginal["bins_y"][probs_per_marginal["bins_y"] < 0] = 0
 
         # extract unique bin pairs
         group_idx = np.concatenate(
             [
-                probs_per_marginal['bins_x'][:, None],
-                probs_per_marginal['bins_y'][:, None],
+                probs_per_marginal["bins_x"][:, None],
+                probs_per_marginal["bins_y"][:, None],
             ],
             axis=1,
         )
@@ -2028,7 +2066,7 @@ def marginal_plot_with_probs_intensity(
         mean_probs = np.zeros((len(unique_bins),))
         for i in range(len(unique_bins)):
             idx = np.where((group_idx == unique_bins[i]).all(axis=1))
-            mean_probs[i] = np.mean(probs_per_marginal['probs'][idx])
+            mean_probs[i] = np.mean(probs_per_marginal["probs"][idx])
 
         # create weight matrix with nan values for non-existing bins
         weights = np.zeros((n_bins, n_bins))
@@ -2555,10 +2593,12 @@ def _arrange_plots(
                 else:
                     _format_axis(ax, xhide=True, yhide=True)
             if opts["tick_labels"] is not None:
-                ax.set_xticklabels((
-                    str(opts["tick_labels"][col][0]),
-                    str(opts["tick_labels"][col][1]),
-                ))
+                ax.set_xticklabels(
+                    (
+                        str(opts["tick_labels"][col][0]),
+                        str(opts["tick_labels"][col][1]),
+                    )
+                )
 
             # Diagonals
             if current == "diag":
@@ -2599,14 +2639,18 @@ def _arrange_plots(
             ax = axes[0, len(subset) - 1]
             x0, x1 = ax.get_xlim()
             y0, y1 = ax.get_ylim()
-            text_kwargs = {"fontsize": plt.rcParams["font.size"] * 2.0}  # pyright: ignore[reportOptionalOperand]
+            text_kwargs = {
+                "fontsize": plt.rcParams["font.size"] * 2.0
+            }  # pyright: ignore[reportOptionalOperand]
             ax.text(x1 + (x1 - x0) / 8.0, (y0 + y1) / 2.0, "...", **text_kwargs)
         else:
             for row in range(len(subset)):
                 ax = axes[row, len(subset) - 1]
                 x0, x1 = ax.get_xlim()
                 y0, y1 = ax.get_ylim()
-                text_kwargs = {"fontsize": plt.rcParams["font.size"] * 2.0}  # pyright: ignore[reportOptionalOperand]
+                text_kwargs = {
+                    "fontsize": plt.rcParams["font.size"] * 2.0
+                }  # pyright: ignore[reportOptionalOperand]
                 ax.text(x1 + (x1 - x0) / 8.0, (y0 + y1) / 2.0, "...", **text_kwargs)
                 if row == len(subset) - 1:
                     ax.text(
@@ -2636,8 +2680,12 @@ def _get_default_opts():
         "points_labels": [f"points_{idx}" for idx in range(10)],  # for points
         "samples_labels": [f"samples_{idx}" for idx in range(10)],  # for samples
         # colors: take even colors for samples, odd colors for points
-        "samples_colors": plt.rcParams["axes.prop_cycle"].by_key()["color"][0::2],  # pyright: ignore[reportOptionalMemberAccess]
-        "points_colors": plt.rcParams["axes.prop_cycle"].by_key()["color"][1::2],  # pyright: ignore[reportOptionalMemberAccess]
+        "samples_colors": plt.rcParams["axes.prop_cycle"].by_key()["color"][
+            0::2
+        ],  # pyright: ignore[reportOptionalMemberAccess]
+        "points_colors": plt.rcParams["axes.prop_cycle"].by_key()["color"][
+            1::2
+        ],  # pyright: ignore[reportOptionalMemberAccess]
         # ticks
         "ticks": [],
         "tickformatter": mpl.ticker.FormatStrFormatter("%g"),  # type: ignore
