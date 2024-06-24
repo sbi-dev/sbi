@@ -1337,7 +1337,7 @@ def _arrange_grid(
                 ax = axes[row_idx, col_idx]  # pyright: ignore reportIndexIssue
             # Diagonals
             _format_subplot(
-                ax, # pyright: ignore reportArgumentType
+                ax,  # pyright: ignore reportArgumentType
                 current,
                 limits,
                 ticks,
