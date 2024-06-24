@@ -1,5 +1,5 @@
 import pytest
-from sbi.diagnostics.tarp import (infer_posterior_on_batch, l1, l2,
+from sbi.diagnostics.tarp import (check_tarp, infer_posterior_on_batch, l1, l2,
                                   prepare_estimates, run_tarp)
 from sbi.inference import SNPE, simulate_for_sbi
 from sbi.simulators import linear_gaussian
@@ -67,7 +67,7 @@ def undersamples():
     nsims = 100
     ndims = 5
 
-    return generate_toy_gaussian(nsamples, nsims, ndims, covfactor=0.5)
+    return generate_toy_gaussian(nsamples, nsims, ndims, covfactor=0.25)
 
 
 @pytest.fixture
@@ -78,7 +78,7 @@ def oversamples():
     nsims = 100
     ndims = 5
 
-    return generate_toy_gaussian(nsamples, nsims, ndims, covfactor=2.0)
+    return generate_toy_gaussian(nsamples, nsims, ndims, covfactor=4.0)
 
 
 @pytest.fixture
@@ -223,6 +223,68 @@ def test_run_tarp_detect_bias(biased):
     # TARP detects that this is NOT a correct representation of the posterior
     # hence we test for not allclose
     assert not allclose((ecp - alpha).abs().max(), Tensor([0.0]), atol=1e-1)
+
+
+def test_check_tarp_correct(onsamples):
+    theta, samples = onsamples
+
+    ecp, alpha = run_tarp(samples, theta, num_bins=30, do_norm=False)
+    print("onsamples")
+    print("tarp results", ecp, alpha)
+    atc, kspvals = check_tarp(ecp, alpha)
+
+    print("tarp checks", atc, kspvals)
+    assert atc != 0.0
+    assert atc < 1.0
+
+    assert kspvals > 0.05  # samples are likely from the same PDF
+
+
+def test_check_tarp_correct_underdispersed(undersamples):
+    theta, samples = undersamples
+
+    ecp, alpha = run_tarp(samples, theta, num_bins=30, do_norm=False)
+    print("underdispersed")
+    print("tarp results", ecp, alpha)
+    atc, kspvals = check_tarp(ecp, alpha)
+
+    print("tarp checks", atc, kspvals)
+    assert atc != 0.0
+    assert atc < 0.0
+    assert atc < -1.0
+
+    assert kspvals < 0.05  # samples are unlikely from the same PDF
+
+
+def test_check_tarp_correct_overdispersed(oversamples):
+    theta, samples = oversamples
+
+    ecp, alpha = run_tarp(samples, theta, num_bins=30, do_norm=False)
+    print("overdispersed")
+    print("tarp results", ecp, alpha)
+    atc, kspvals = check_tarp(ecp, alpha)
+
+    print("tarp checks", atc, kspvals)
+    assert atc != 0.0
+    assert atc > 1.0
+
+    assert kspvals < 0.05  # samples are unlikely from the same PDF
+
+
+def test_check_tarp_detect_bias(biased):
+    theta, samples = biased
+
+    # tarp = TARP(num_alpha_bins=30, norm=True)
+    ecp, alpha = run_tarp(samples, theta, num_bins=30, do_norm=True)
+    print("biased")
+    print("tarp results", ecp, alpha)
+    atc, kspvals = check_tarp(ecp, alpha)
+
+    print("tarp checks", atc, kspvals)
+    assert atc != 0.0
+    assert atc > 1.0
+
+    assert kspvals < 0.05  # samples are unlikely from the same PDF
 
 
 ######################################################################

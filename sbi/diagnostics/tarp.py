@@ -15,6 +15,7 @@ from joblib import Parallel, delayed
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.posteriors.vi_posterior import VIPosterior
 from sbi.simulators.simutils import tqdm_joblib
+from scipy.stats import kstest
 from torch import Tensor
 from tqdm.auto import tqdm
 
@@ -200,7 +201,7 @@ def run_tarp(
         theta: The true parameter value theta. Theta is expected to
                  have shape ``(n_sims, n_dims)``.
         references: the reference points to use for the coverage regions, with
-                shape ``(n_references, n_sims, n_dims)``, or ``None``.
+                shape ``(1, n_sims, n_dims)``, or ``None``.
                 If ``None``, then reference points are chosen randomly from
                 the unit hypercube over the parameter space given by theta.
                 In other words, reference samples are drawn from the
@@ -300,3 +301,41 @@ def run_tarp(
     ecp = torch.cumsum(hist, dim=0) * stepsize
 
     return torch.cat([Tensor([0]), ecp]), bin_edges
+
+
+def check_tarp(
+    ecp: Tensor,
+    alpha: Tensor,
+) -> Tuple[float, float]:
+    """check the obtained TARP credibitlity levels and
+    expected coverage probabilities. This will help to uncover underdispersed,
+    well covering or overdispersed posteriors.
+
+    Args:
+        samples: The predicted parameter samples to compute the coverage of,
+                 these samples are expected to have shape
+                 ``(n_samples, n_sims, n_dims)``. These are obtained by
+                 sampling a trained posterior `n_samples` times. Multiple
+                 (posterior) samples for one observation are encouraged.
+        theta: The true parameter value theta. Theta is expected to
+                 have shape ``(n_sims, n_dims)``.
+
+    Returns:
+        atc: area to curve, this number should be close to ``1``, values
+             larger than ``1.`` indicated overdispersed distributions (i.e.
+             the estimated posterior is too wide), values smaller than ``1``
+             indicate underdispersed distributions (i.e. the estimated posterior
+             is too narrow).
+        ks prob: p-value for a two sample Kolmogorov-Smirnov test. The null
+             hypothesis is that the two distributions (ecp and alpha) are
+             identical. If they were, the p-value should be close 1. Commonly,
+             people reject the null if p-value is below 0.05!
+    """
+
+    atc = (ecp - alpha).sum()
+    kstest_pvals = torch.tensor(
+        kstest(ecp.numpy(), alpha.numpy())[1],
+        dtype=torch.float32,
+    )
+
+    return atc, kstest_pvals
