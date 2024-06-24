@@ -152,7 +152,7 @@ class FMPE(NeuralInference):
         # ):
         while self.epoch <= max_num_epochs:
             self._neural_net.net.train()
-            train_log_probs_sum = 0
+            train_loss_sum = 0
             epoch_start_time = time.time()
             for batch in train_loader:
                 self.optimizer.zero_grad()
@@ -162,9 +162,8 @@ class FMPE(NeuralInference):
                     batch[1].to(self._device),
                 )
 
-                train_losses = self._neural_net.loss(theta_batch, x_batch)
-                train_loss = torch.mean(train_losses)
-                train_log_probs_sum -= train_losses.sum().item()
+                train_loss = self._neural_net.loss(theta_batch, x_batch).mean()
+                train_loss_sum += train_loss.item()
 
                 train_loss.backward()
                 if clip_max_norm is not None:
@@ -175,10 +174,8 @@ class FMPE(NeuralInference):
 
             self.epoch += 1
 
-            train_log_prob_average = train_log_probs_sum / (
-                len(train_loader) * train_loader.batch_size  # type: ignore
-            )
-            self._summary["training_loss"].append(train_log_prob_average)
+            train_loss_average = train_loss_sum / len(train_loader)  # type: ignore
+            self._summary["training_loss"].append(train_loss_average)
 
             # Calculate validation performance.
             # self._neural_net.eval()
