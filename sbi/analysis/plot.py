@@ -36,9 +36,9 @@ def hex2rgb(hex: str) -> List[int]:
 def rgb2hex(RGB: List[int]) -> str:
     """Components need to be integers for hex to make sense"""
     RGB = [int(x) for x in RGB]
-    return "#" + "".join(
-        ["0{0:x}".format(v) if v < 16 else "{0:x}".format(v) for v in RGB]
-    )
+    return "#" + "".join([
+        "0{0:x}".format(v) if v < 16 else "{0:x}".format(v) for v in RGB
+    ])
 
 
 def to_list_string(
@@ -399,13 +399,9 @@ def _format_subplot(
 
     # Ticks
     if ticks is not None:
-        ax.set_xticks(
-            (ticks[col][0], ticks[col][1])
-        )  # pyright: ignore[reportCallIssue]
+        ax.set_xticks((ticks[col][0], ticks[col][1]))  # pyright: ignore[reportCallIssue]
         if current != "diag":
-            ax.set_yticks(
-                (ticks[row][0], ticks[row][1])
-            )  # pyright: ignore[reportCallIssue]
+            ax.set_yticks((ticks[row][0], ticks[row][1]))  # pyright: ignore[reportCallIssue]
 
     # make square
     if fig_kwargs["square_subplots"]:
@@ -439,12 +435,10 @@ def _format_subplot(
         else:
             _format_axis(ax, xhide=True, yhide=True)
     if fig_kwargs["tick_labels"] is not None:
-        ax.set_xticklabels(
-            (  # pyright: ignore[reportCallIssue]
-                str(fig_kwargs["tick_labels"][col][0]),
-                str(fig_kwargs["tick_labels"][col][1]),
-            )
-        )
+        ax.set_xticklabels((  # pyright: ignore[reportCallIssue]
+            str(fig_kwargs["tick_labels"][col][0]),
+            str(fig_kwargs["tick_labels"][col][1]),
+        ))
 
 
 def _format_axis(
@@ -938,9 +932,7 @@ def _get_default_offdiag_kwargs(offdiag: Optional[str], i: int = 0) -> Dict:
     elif offdiag == "scatter":
         offdiag_kwargs = {
             "mpl_kwargs": {
-                "color": plt.rcParams["axes.prop_cycle"].by_key()["color"][
-                    i * 2
-                ],  # pyright: ignore[reportOptionalMemberAccess]
+                "color": plt.rcParams["axes.prop_cycle"].by_key()["color"][i * 2],  # pyright: ignore[reportOptionalMemberAccess]
                 "edgecolor": "white",
                 "alpha": 0.5,
                 "rasterized": False,
@@ -953,17 +945,13 @@ def _get_default_offdiag_kwargs(offdiag: Optional[str], i: int = 0) -> Dict:
             "levels": [0.68, 0.95, 0.99],
             "percentile": True,
             "mpl_kwargs": {
-                "colors": plt.rcParams["axes.prop_cycle"].by_key()["color"][
-                    i * 2
-                ]  # pyright: ignore[reportOptionalMemberAccess]
+                "colors": plt.rcParams["axes.prop_cycle"].by_key()["color"][i * 2]  # pyright: ignore[reportOptionalMemberAccess]
             },
         }
     elif offdiag == "plot":
         offdiag_kwargs = {
             "mpl_kwargs": {
-                "color": plt.rcParams["axes.prop_cycle"].by_key()["color"][
-                    i * 2
-                ]  # pyright: ignore[reportOptionalMemberAccess]
+                "color": plt.rcParams["axes.prop_cycle"].by_key()["color"][i * 2]  # pyright: ignore[reportOptionalMemberAccess]
             }
         }
     else:
@@ -978,9 +966,7 @@ def _get_default_diag_kwargs(diag: Optional[str], i: int = 0) -> Dict:
             "bw_method": "scott",
             "bins": 50,
             "mpl_kwargs": {
-                "color": plt.rcParams["axes.prop_cycle"].by_key()["color"][
-                    i * 2
-                ]  # pyright: ignore[reportOptionalMemberAccess]
+                "color": plt.rcParams["axes.prop_cycle"].by_key()["color"][i * 2]  # pyright: ignore[reportOptionalMemberAccess]
             },
         }
 
@@ -988,9 +974,7 @@ def _get_default_diag_kwargs(diag: Optional[str], i: int = 0) -> Dict:
         diag_kwargs = {
             "bin_heuristic": "Freedman-Diaconis",
             "mpl_kwargs": {
-                "color": plt.rcParams["axes.prop_cycle"].by_key()["color"][
-                    i * 2
-                ],  # pyright: ignore[reportOptionalMemberAccess]
+                "color": plt.rcParams["axes.prop_cycle"].by_key()["color"][i * 2],  # pyright: ignore[reportOptionalMemberAccess]
                 "density": False,
                 "histtype": "step",
             },
@@ -998,9 +982,7 @@ def _get_default_diag_kwargs(diag: Optional[str], i: int = 0) -> Dict:
     elif diag == "scatter":
         diag_kwargs = {
             "mpl_kwargs": {
-                "color": plt.rcParams["axes.prop_cycle"].by_key()["color"][
-                    i * 2
-                ]  # pyright: ignore[reportOptionalMemberAccess]
+                "color": plt.rcParams["axes.prop_cycle"].by_key()["color"][i * 2]  # pyright: ignore[reportOptionalMemberAccess]
             }
         }
     else:
@@ -1017,12 +999,8 @@ def _get_default_fig_kwargs() -> Dict:
         "points_labels": [f"points_{idx}" for idx in range(10)],  # for points
         "samples_labels": [f"samples_{idx}" for idx in range(10)],  # for samples
         # colors: take even colors for samples, odd colors for points
-        "samples_colors": plt.rcParams["axes.prop_cycle"].by_key()["color"][
-            0::2
-        ],  # pyright: ignore[reportOptionalMemberAccess]
-        "points_colors": plt.rcParams["axes.prop_cycle"].by_key()["color"][
-            1::2
-        ],  # pyright: ignore[reportOptionalMemberAccess]
+        "samples_colors": plt.rcParams["axes.prop_cycle"].by_key()["color"][0::2],  # pyright: ignore[reportOptionalMemberAccess]
+        "points_colors": plt.rcParams["axes.prop_cycle"].by_key()["color"][1::2],  # pyright: ignore[reportOptionalMemberAccess]
         # ticks
         "tickformatter": mpl.ticker.FormatStrFormatter("%g"),  # type: ignore
         "tick_labels": None,
@@ -1330,9 +1308,7 @@ def _arrange_grid(
 
     # Create fig and axes if they were not passed.
     if fig is None or axes is None:
-        fig, axes = plt.subplots(
-            rows, cols, figsize=figsize, **fig_kwargs["subplots"]
-        )  # pyright: ignore reportAssignmenttype
+        fig, axes = plt.subplots(rows, cols, figsize=figsize, **fig_kwargs["subplots"])  # pyright: ignore reportAssignmenttype
     else:
         assert axes.shape == (  # pyright: ignore reportAttributeAccessIssue
             rows,
@@ -1450,25 +1426,17 @@ def _arrange_grid(
     # Add dots if we subset
     if len(subset) < dim:
         if flat:
-            ax = axes[
-                len(subset) - 1
-            ]  # pyright: ignore[reportIndexIssue, reportOptionalSubscript]
+            ax = axes[len(subset) - 1]  # pyright: ignore[reportIndexIssue, reportOptionalSubscript]
             x0, x1 = ax.get_xlim()
             y0, y1 = ax.get_ylim()
-            text_kwargs = {
-                "fontsize": plt.rcParams["font.size"] * 2.0
-            }  # pyright: ignore[reportOptionalOperand]
+            text_kwargs = {"fontsize": plt.rcParams["font.size"] * 2.0}  # pyright: ignore[reportOptionalOperand]
             ax.text(x1 + (x1 - x0) / 8.0, (y0 + y1) / 2.0, "...", **text_kwargs)
         else:
             for row in range(len(subset)):
-                ax = axes[
-                    row, len(subset) - 1
-                ]  # pyright: ignore[reportIndexIssue, reportOptionalSubscript]
+                ax = axes[row, len(subset) - 1]  # pyright: ignore[reportIndexIssue, reportOptionalSubscript]
                 x0, x1 = ax.get_xlim()
                 y0, y1 = ax.get_ylim()
-                text_kwargs = {
-                    "fontsize": plt.rcParams["font.size"] * 2.0
-                }  # pyright: ignore[reportOptionalOperand]
+                text_kwargs = {"fontsize": plt.rcParams["font.size"] * 2.0}  # pyright: ignore[reportOptionalOperand]
                 ax.text(x1 + (x1 - x0) / 8.0, (y0 + y1) / 2.0, "...", **text_kwargs)
                 if row == len(subset) - 1:
                     ax.text(
@@ -1864,9 +1832,7 @@ def _plot_cdf_region_expected_under_uniformity(
     plt.fill_between(
         x=np.linspace(0, num_bins, num_repeats * num_bins),
         y1=np.repeat(lower / np.max(lower), num_repeats),
-        y2=np.repeat(
-            upper / np.max(upper), num_repeats
-        ),  # pyright: ignore[reportArgumentType]
+        y2=np.repeat(upper / np.max(upper), num_repeats),  # pyright: ignore[reportArgumentType]
         color=color,
         alpha=alpha,
     )
@@ -2593,12 +2559,10 @@ def _arrange_plots(
                 else:
                     _format_axis(ax, xhide=True, yhide=True)
             if opts["tick_labels"] is not None:
-                ax.set_xticklabels(
-                    (
-                        str(opts["tick_labels"][col][0]),
-                        str(opts["tick_labels"][col][1]),
-                    )
-                )
+                ax.set_xticklabels((
+                    str(opts["tick_labels"][col][0]),
+                    str(opts["tick_labels"][col][1]),
+                ))
 
             # Diagonals
             if current == "diag":
@@ -2639,18 +2603,14 @@ def _arrange_plots(
             ax = axes[0, len(subset) - 1]
             x0, x1 = ax.get_xlim()
             y0, y1 = ax.get_ylim()
-            text_kwargs = {
-                "fontsize": plt.rcParams["font.size"] * 2.0
-            }  # pyright: ignore[reportOptionalOperand]
+            text_kwargs = {"fontsize": plt.rcParams["font.size"] * 2.0}  # pyright: ignore[reportOptionalOperand]
             ax.text(x1 + (x1 - x0) / 8.0, (y0 + y1) / 2.0, "...", **text_kwargs)
         else:
             for row in range(len(subset)):
                 ax = axes[row, len(subset) - 1]
                 x0, x1 = ax.get_xlim()
                 y0, y1 = ax.get_ylim()
-                text_kwargs = {
-                    "fontsize": plt.rcParams["font.size"] * 2.0
-                }  # pyright: ignore[reportOptionalOperand]
+                text_kwargs = {"fontsize": plt.rcParams["font.size"] * 2.0}  # pyright: ignore[reportOptionalOperand]
                 ax.text(x1 + (x1 - x0) / 8.0, (y0 + y1) / 2.0, "...", **text_kwargs)
                 if row == len(subset) - 1:
                     ax.text(
@@ -2680,12 +2640,8 @@ def _get_default_opts():
         "points_labels": [f"points_{idx}" for idx in range(10)],  # for points
         "samples_labels": [f"samples_{idx}" for idx in range(10)],  # for samples
         # colors: take even colors for samples, odd colors for points
-        "samples_colors": plt.rcParams["axes.prop_cycle"].by_key()["color"][
-            0::2
-        ],  # pyright: ignore[reportOptionalMemberAccess]
-        "points_colors": plt.rcParams["axes.prop_cycle"].by_key()["color"][
-            1::2
-        ],  # pyright: ignore[reportOptionalMemberAccess]
+        "samples_colors": plt.rcParams["axes.prop_cycle"].by_key()["color"][0::2],  # pyright: ignore[reportOptionalMemberAccess]
+        "points_colors": plt.rcParams["axes.prop_cycle"].by_key()["color"][1::2],  # pyright: ignore[reportOptionalMemberAccess]
         # ticks
         "ticks": [],
         "tickformatter": mpl.ticker.FormatStrFormatter("%g"),  # type: ignore
