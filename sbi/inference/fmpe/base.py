@@ -152,7 +152,7 @@ class FMPE(NeuralInference):
         # ):
         while self.epoch <= max_num_epochs:
             self._neural_net.net.train()
-            train_log_probs_sum = 0
+            train_loss_sum = 0
             epoch_start_time = time.time()
             for batch in train_loader:
                 self.optimizer.zero_grad()
