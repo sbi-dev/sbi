@@ -1351,7 +1351,7 @@ def _arrange_grid(
             )
             if current == "diag":
                 if excl_diag:
-                    ax.axis("off")
+                    ax.axis("off")  # pyright: ignore reportOptionalMemberAccess
                 else:
                     for sample_ind, sample in enumerate(samples):
                         diag_f = diag_funcs[sample_ind]
@@ -1361,9 +1361,9 @@ def _arrange_grid(
                             )
 
                 if len(points) > 0:
-                    extent = ax.get_ylim()
+                    extent = ax.get_ylim()  # pyright: ignore reportOptionalMemberAccess
                     for n, v in enumerate(points):
-                        ax.plot(
+                        ax.plot(  # pyright: ignore reportOptionalMemberAccess
                             [v[:, col], v[:, col]],
                             extent,
                             color=fig_kwargs["points_colors"][n],
@@ -1371,14 +1371,14 @@ def _arrange_grid(
                             label=fig_kwargs["points_labels"][n],
                         )
                 if fig_kwargs["legend"] and col == 0:
-                    ax.legend(**fig_kwargs["legend_kwargs"])
+                    ax.legend(**fig_kwargs["legend_kwargs"])  # pyright: ignore reportOptionalMemberAccess
 
             # Off-diagonals
 
             # upper
             elif current == "upper":
                 if excl_upper:
-                    ax.axis("off")
+                    ax.axis("off")  # pyright: ignore reportOptionalMemberAccess
                 else:
                     for sample_ind, sample in enumerate(samples):
                         upper_f = upper_funcs[sample_ind]
@@ -1393,7 +1393,7 @@ def _arrange_grid(
                             )
                     if len(points) > 0:
                         for n, v in enumerate(points):
-                            ax.plot(
+                            ax.plot(  # pyright: ignore reportOptionalMemberAccess
                                 v[:, col],
                                 v[:, row],
                                 color=fig_kwargs["points_colors"][n],
@@ -1402,7 +1402,7 @@ def _arrange_grid(
             # lower
             elif current == "lower":
                 if excl_lower:
-                    ax.axis("off")
+                    ax.axis("off")  # pyright: ignore reportOptionalMemberAccess
                 else:
                     for sample_ind, sample in enumerate(samples):
                         lower_f = lower_funcs[sample_ind]
@@ -1417,7 +1417,7 @@ def _arrange_grid(
                             )
                     if len(points) > 0:
                         for n, v in enumerate(points):
-                            ax.plot(
+                            ax.plot(  # pyright: ignore reportOptionalMemberAccess
                                 v[:, col],
                                 v[:, row],
                                 color=fig_kwargs["points_colors"][n],
