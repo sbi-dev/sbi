@@ -4,6 +4,7 @@
 import collections
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union, cast
 from warnings import warn
+import logging
 
 import matplotlib as mpl
 import numpy as np
@@ -86,7 +87,7 @@ def plt_hist_1d(
     ):
         if diag_kwargs["bin_heuristic"] == "Freedman-Diaconis":
             # The Freedman-Diaconis heuristic
-            binsize = 2 * iqr(samples) * len(samples) ** (-1 / 3)
+            binsize = 2 * iqr(samples,nan_policy='omit') * len(samples) ** (-1 / 3)
             diag_kwargs['mpl_kwargs']["bins"] = np.arange(
                 limits[0], limits[1] + binsize, binsize
             )
@@ -538,6 +539,17 @@ def ensure_numpy(t: Union[np.ndarray, torch.Tensor]) -> np.ndarray:
         return np.array(t)
     return t
 
+def handle_nan_infs(samples: List[np.ndarray]) -> List[np.ndarray]:
+    """Check if there are NaNs or Infs in the samples."""
+    for i in range(len(samples)):
+        if np.isnan(samples[i]).any():
+            logging.warning("NaNs found in samples, omitting datapoints.")
+        if np.isinf(samples[i]).any():
+            logging.warning("Infs found in samples, omitting datapoints.")
+            # cast inf to nan, so they are omitted in the next step
+            np.nan_to_num(samples[i], copy=False, nan=np.nan,posinf=np.nan,neginf=np.nan)
+        samples[i] = samples[i][~np.isnan(samples[i]).any(axis=1)]
+    return samples
 
 def prepare_for_plot(
     samples: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
@@ -554,7 +566,10 @@ def prepare_for_plot(
         samples = [samples]
     else:
         samples = [ensure_numpy(sample) for sample in samples]
-
+    
+    # check if nans and infs
+    samples = handle_nan_infs(samples)
+    
     # Dimensionality of the problem.
     dim = samples[0].shape[1]
 
@@ -565,9 +580,9 @@ def prepare_for_plot(
             min = +np.inf
             max = -np.inf
             for sample in samples:
-                min_ = sample[:, d].min()
+                min_ = np.min(sample[:, d])
                 min = min_ if min_ < min else min
-                max_ = sample[:, d].max()
+                max_ = np.max(sample[:, d])
                 max = max_ if max_ > max else max
             limits.append([min, max])
     else:
@@ -1278,7 +1293,7 @@ def _arrange_grid(
     excl_upper = all(v is None for v in upper_funcs)
     excl_diag = all(v is None for v in diag_funcs)
     flat = excl_lower and excl_upper
-
+    one_dim = dim == 1
     # select the subset of rows and cols to be plotted
     if flat:
         rows = 1
@@ -1310,8 +1325,12 @@ def _arrange_grid(
             else:
                 current = "lower"
 
-            ax = axes[col_idx] if flat else axes[row_idx, col_idx]  # pyright: ignore reportIndexIssue
-
+            if one_dim:
+                ax = axes # pyright: ignore reportIndexIssue
+            elif flat:
+                ax = axes[col_idx]   # pyright: ignore reportIndexIssue
+            else:
+                ax = axes[row_idx, col_idx]  # pyright: ignore reportIndexIssue
             # Diagonals
             _format_subplot(
                 ax,
