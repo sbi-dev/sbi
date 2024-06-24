@@ -513,6 +513,11 @@ def wrap_as_joblib_efficient_simulator(
 ) -> Callable:
     """Return a simulator that accepts `ndarray` and returns `Tensor` arguments."""
 
+    def joblib_simulator(theta: ndarray) -> Tensor:
+        return torch.as_tensor(simulator(torch.as_tensor(theta)), dtype=float32)
+
+    return joblib_simulator
+
     # If numpy in input, check for simulator consistency, and cast simulation
     # output to tensor.
     if is_numpy_simulator:
@@ -523,7 +528,7 @@ def wrap_as_joblib_efficient_simulator(
         ), f"Simulator output type {type(x)} must match its input type {type(theta)}"
 
         def joblib_simulator(theta: ndarray) -> Tensor:
-            return torch.as_tensor(simulator(theta), dtype=float32)
+            return torch.as_tensor(simulator(torch.as_tensor(theta)), dtype=float32)
 
     # If simulator accepts torch as input, we have to cast theta from numpy to
     # tensor - joblib uses numpy theta
