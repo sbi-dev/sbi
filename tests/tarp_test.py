@@ -301,7 +301,7 @@ def test_run_tarp_function_detect_underdispersed(undersamples):
 
 def test_tarp_detect_bias(biased):
     theta, samples = biased
-    print(theta.shape, samples.shape)
+
     tarp = TARP(num_alpha_bins=30, norm=True)
     ecp, alpha = tarp.check(samples, theta)
 
@@ -318,7 +318,6 @@ def test_tarp_detect_bias(biased):
 
 def test_run_tarp_function_detect_bias(biased):
     theta, samples = biased
-    print(theta.shape, samples.shape)
 
     # tarp = TARP(num_alpha_bins=30, norm=True)
     ecp, alpha = run_tarp(samples, theta, num_bins=30, do_norm=True)
@@ -421,7 +420,6 @@ def test_consistent_tarp_results_with_posterior(method, model="mdn"):
 
     samples = tarp.run(xs, posterior, num_posterior_samples)
 
-    print(thetas.shape, samples.shape)
     ecp, alpha = tarp.check(samples, thetas)
 
     assert allclose((ecp - alpha).abs().max(), Tensor([0.0]), atol=1e-1)
