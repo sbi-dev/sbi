@@ -1,9 +1,9 @@
 """
-    Implementation taken from Lemos et al, 'Sampling-Based Accuracy Testing of
-    Posterior Estimators for General Inference' https://arxiv.org/abs/2302.03026
+Implementation taken from Lemos et al, 'Sampling-Based Accuracy Testing of
+Posterior Estimators for General Inference' https://arxiv.org/abs/2302.03026
 
-    The TARP diagnostic is a global diagnostic which can be used to check a
-    trained posterior against a set of true values of theta.
+The TARP diagnostic is a global diagnostic which can be used to check a
+trained posterior against a set of true values of theta.
 """
 
 import warnings
@@ -113,9 +113,7 @@ def prepare_estimates(
             )
         ) as _:
             samples: Tensor
-            samples = Parallel(
-                n_jobs=num_workers
-            )(  # pyright: ignore[reportAssignmentType]
+            samples = Parallel(n_jobs=num_workers)(  # pyright: ignore[reportAssignmentType]
                 delayed(infer_posterior_on_batch)(
                     xs_batch, posterior, num_posterior_samples
                 )

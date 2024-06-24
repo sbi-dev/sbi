@@ -1,6 +1,10 @@
 import pytest
-from sbi.diagnostics.tarp import (check_tarp, infer_posterior_on_batch,
-                                  prepare_estimates, run_tarp)
+from sbi.diagnostics.tarp import (
+    check_tarp,
+    infer_posterior_on_batch,
+    prepare_estimates,
+    run_tarp,
+)
 from sbi.inference import SNPE, simulate_for_sbi
 from sbi.simulators import linear_gaussian
 from sbi.utils import BoxUniform
