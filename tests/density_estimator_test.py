@@ -4,15 +4,17 @@
 from __future__ import annotations
 
 import pytest
+from sbi.neural_nets.density_estimators.nflows_flow import NFlowsFlow
 import torch
 from torch import eye, zeros
 from torch.distributions import MultivariateNormal
 
-from sbi.neural_nets.density_estimators import NFlowsFlow, ZukoFlow
-from sbi.neural_nets.flow import build_nsf, build_zuko_maf
+from sbi.neural_nets.density_estimators.zuko_flow import ZukoFlow
+from sbi.neural_nets.density_estimators.zuko_flow_estimator import ZukoFlowMatchingEstimator
+from sbi.neural_nets.flow import build_nsf, build_zuko_maf, build_zuko_flow_matching
 
 
-@pytest.mark.parametrize("density_estimator", (NFlowsFlow, ZukoFlow))
+@pytest.mark.parametrize("density_estimator", (NFlowsFlow, ZukoFlow, ZukoFlowMatchingEstimator))
 @pytest.mark.parametrize("input_dims", (1, 2))
 @pytest.mark.parametrize(
     "condition_shape", ((1,), (2,), (1, 1), (2, 2), (1, 1, 1), (2, 2, 2))
@@ -60,9 +62,17 @@ def test_api_density_estimator(density_estimator, input_dims, condition_shape):
             num_transforms=2,
             embedding_net=EmbeddingNet(),
         )
+    elif density_estimator == ZukoFlowMatchingEstimator:
+        estimator = build_zuko_flow_matching(
+            batch_input,
+            batch_context,
+            hidden_features=10,
+            num_transforms=2
+        )
 
     # Loss is only required to work for batched inputs and contexts
     loss = estimator.loss(batch_input, batch_context)
+    print(density_estimator, loss)
     assert loss.shape == (
         nsamples,
     ), f"Loss shape is not correct. It is of shape {loss.shape}, but should \
