@@ -7,7 +7,7 @@
 """
 
 import warnings
-from typing import Callable, Tuple, Union
+from typing import Callable, Optional, Tuple
 
 # import numpy as np
 import torch
@@ -143,9 +143,9 @@ def prepare_estimates(
 def run_tarp(
     samples: Tensor,
     theta: Tensor,
-    references: Union[Tensor, None] = None,
+    references: Optional[Tensor] = None,
     distance: Callable = l2,
-    num_bins: Union[int, None] = None,
+    num_bins: Optional[int] = None,
     do_norm: bool = False,
 ) -> Tuple[Tensor, Tensor]:
     """
