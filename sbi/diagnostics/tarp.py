@@ -140,6 +140,51 @@ def prepare_estimates(
     return samples
 
 
+def _check_references(references: Tensor, theta: Tensor) -> Tensor:
+    """construct references"""
+
+    num_dims = theta.shape[-1]
+    num_sims = theta.shape[0]
+
+    if not isinstance(references, Tensor):
+        # obtain min/max per dimension of theta
+        lo = (
+            torch.min(theta, dim=-2).values.min(axis=0).values
+        )  # should be 0 if normalized
+        hi = (
+            torch.max(theta, dim=-2).values.max(axis=0).values
+        )  # should be 1 if normalized
+
+        refpdf = torch.distributions.Uniform(low=lo, high=hi)
+        # sample one reference point for each entry in theta
+        references = refpdf.sample((1, num_sims))
+    else:
+        if len(references.shape) == 2:
+            # add singleton dimension in front
+            references = references.unsqueeze(0)
+
+        if len(references.shape) == 3 and references.shape[0] != 1:
+            raise ValueError(
+                f"""references must be a 2D array with a singular first
+                    dimension, received {references.shape}"""
+            )
+
+        if references.shape[-2] != num_sims:
+            raise ValueError(
+                f"references must have the same number samples as samples,"
+                f"received {references.shape[-2]} != {num_sims}"
+            )
+
+        if references.shape[-1] != num_dims:
+            raise ValueError(
+                "references must have the same number of dimensions as "
+                f"samples or theta, received {references.shape[-1]}"
+                f"!= {num_dims}"
+            )
+
+    return references
+
+
 def run_tarp(
     samples: Tensor,
     theta: Tensor,
@@ -192,8 +237,8 @@ def run_tarp(
     samples = samples.detach()
 
     assert (
-        theta.shape == samples.shape[1:]
-    ), f"shapes of theta {theta.shape} and samples {samples[1:].shape} do not fit"
+        theta.shape[-2:] == samples.shape[-2:]
+    ), f"shapes of theta {theta.shape[-2:]} and samples {samples.shape[-2:]} do not fit"
 
     num_samples = samples.shape[0]  # samples per simulation
     num_sims = samples.shape[-2]
@@ -213,42 +258,7 @@ def run_tarp(
         samples = (samples - lo) / (hi - lo + 1e-10)
         theta = (theta - lo) / (hi - lo + 1e-10)
 
-    if not isinstance(references, Tensor):
-        # obtain min/max per dimension of theta
-        lo = (
-            torch.min(theta, dim=-2).values.min(axis=0).values
-        )  # should be 0 if normalized
-        hi = (
-            torch.max(theta, dim=-2).values.max(axis=0).values
-        )  # should be 1 if normalized
-
-        refpdf = torch.distributions.Uniform(low=lo, high=hi)
-        # sample one reference point for each entry in theta
-        references = refpdf.sample((1, num_sims))
-    else:
-        if len(references.shape) == 2:
-            # add singleton dimension in front
-            references = references.unsqueeze(0)
-
-        if len(references.shape) == 3 and references.shape[0] != 1:
-            raise ValueError(
-                f"""references must be a 2D array with a singular first
-                    dimension, received {references.shape}"""
-            )
-
-        if references.shape[-2] != num_sims:
-            raise ValueError(
-                f"references must have the same number samples as samples,"
-                f"received {references.shape[-2]} != {num_sims}"
-            )
-
-        if references.shape[-1] != num_dims:
-            raise ValueError(
-                "references must have the same number of dimensions as "
-                f"samples or theta, received {references.shape[-1]}"
-                f"!= {num_dims}"
-            )
-
+    references = _check_references(references, theta)
     assert len(references.shape) == len(
         samples.shape
     ), f"references {references.shape} != samples {samples.shape}"
