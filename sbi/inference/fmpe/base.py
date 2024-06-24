@@ -1,5 +1,5 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
+# under the Apache License v2.0, see <https://www.apache.org/licenses/LICENSE-2.0>.
 
 
 import time
@@ -37,6 +37,9 @@ from sbi.utils import (
 
 
 class FMPE(NeuralInference):
+    """Implements the Flow Matching Posterior Estimator (FMPE) for 
+    simulation-based inference. 
+    """
     def __init__(
         self,
         prior: Optional[Distribution],
@@ -46,6 +49,16 @@ class FMPE(NeuralInference):
         summary_writer: Optional[SummaryWriter] = None,
         show_progress_bars: bool = True,
     ) -> None:
+        """Initialization method for the FMPE class.
+        
+        Args:
+            prior: Prior distribution.
+            density_estimator: Density estimator for the FMPE. Defaults to None.
+            device: Device to use for training. Defaults to "cpu".
+            logging_level: Logging level. Defaults to "WARNING".
+            summary_writer: Summary writer for tensorboard. Defaults to None.
+            show_progress_bars: Whether to show progress bars. Defaults to True.
+        """
         # obtain the shape of the prior samples
         if density_estimator is None:
             self._build_neural_net = utils.posterior_nn(model="zuko_fm")
@@ -73,7 +86,23 @@ class FMPE(NeuralInference):
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[dict] = None,
     ) -> DensityEstimator:
-
+        """Train the density estimator.
+        
+        Args:
+            training_batch_size: Batch size for training. Defaults to 50.
+            learning_rate: Learning rate for training. Defaults to 5e-4.
+            validation_fraction: Fraction of the data to use for validation. Defaults to 0.1.
+            stop_after_epochs: Number of epochs to train for. Defaults to 20.
+            max_num_epochs: Maximum number of epochs to train for. Defaults to 2**31 - 1.
+            clip_max_norm: Maximum norm for gradient clipping. Defaults to 5.0.
+            discard_prior_samples: Whether to discard prior samples. Defaults to False.
+            resume_training: Whether to resume training. Defaults to False.
+            show_train_summary: Whether to show the training summary. Defaults to False.
+            dataloader_kwargs: Additional keyword arguments for the dataloader. Defaults to None.
+        
+        Returns:
+            DensityEstimator: Trained density estimator.
+        """
         if resume_training:
             raise NotImplementedError("Resume training is not yet implemented.")
 
@@ -200,6 +229,16 @@ class FMPE(NeuralInference):
         prior: Optional[Distribution] = None,
         direct_sampling_parameters: Optional[Dict[str, Any]] = None,
     ) -> DirectPosterior:
+        """Build the posterior distribution.
+        
+        Args:
+            density_estimator: Density estimator for the posterior. Defaults to None.
+            prior: Prior distribution. Defaults to None.
+            direct_sampling_parameters: Direct sampling parameters. Defaults to None.
+
+        Returns:
+            DirectPosterior: Posterior distribution.
+        """
         if prior is None:
             assert self._prior is not None, (
                 "You did not pass a prior. You have to pass the prior either at "
@@ -213,7 +252,7 @@ class FMPE(NeuralInference):
         if density_estimator is None:
             # todo: what we call density estimator is often saved as _neural_net in
             # other classes
-            posterior_estimator = self.density_estimator
+            posterior_estimator = self._neural_net
             # If internal net is used device is defined.
             device = self._device
         else:
