@@ -1,9 +1,10 @@
 import pytest
-from sbi.diagnostics.tarp import (check_tarp, infer_posterior_on_batch, l1, l2,
+from sbi.diagnostics.tarp import (check_tarp, infer_posterior_on_batch,
                                   prepare_estimates, run_tarp)
 from sbi.inference import SNPE, simulate_for_sbi
 from sbi.simulators import linear_gaussian
 from sbi.utils import BoxUniform
+from sbi.utils.metrics import l1, l2
 from scipy.stats import uniform
 from torch import Tensor, allclose, exp, eye, ones
 from torch.distributions import Normal, Uniform

@@ -15,47 +15,10 @@ from joblib import Parallel, delayed
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.posteriors.vi_posterior import VIPosterior
 from sbi.simulators.simutils import tqdm_joblib
+from sbi.utils.metrics import l1, l2
 from scipy.stats import kstest
 from torch import Tensor
 from tqdm.auto import tqdm
-
-
-def l2(x: Tensor, y: Tensor, axis=-1) -> Tensor:
-    """
-    Calculates the L2 distance between two tensors. Note, we cannot use the
-    torch.nn.MSELoss function as this sums across the batch dimension AND the
-    dimension given by <axis>. For tarp, we only require to sum across
-    the <axis> dimension.
-
-    Args:
-        x (Tensor): The first tensor.
-        y (Tensor): The second tensor.
-        axis (int, optional): The axis along which to calculate the L2 distance.
-                Defaults to -1.
-    Returns:
-        Tensor: A tensor containing the L2 distance between x and y along the
-                specified axis.
-    """
-    return torch.sqrt(torch.sum((x - y) ** 2, axis=axis))
-
-
-def l1(x: Tensor, y: Tensor, axis=-1) -> Tensor:
-    """
-    Calculates the L1 distance between two tensors. Note, we cannot use the
-    torch.nn.L1Loss function as this sums across the batch dimension AND the
-    dimension given by <axis>. For tarp, we only require to sum across
-    the <axis> dimension.
-
-    Args:
-        x (Tensor): The first tensor.
-        y (Tensor): The second tensor.
-        axis (int, optional): The axis along which to calculate the L1 distance.
-                Defaults to -1.
-    Returns:
-        Tensor: A tensor containing the L1 distance between x and y along the
-                specified axis.
-    """
-    return torch.sum(torch.abs(x - y), axis=axis)
 
 
 def infer_posterior_on_batch(
@@ -211,8 +174,8 @@ def run_tarp(
                 computes the distance between them, e.g. given two tensors
                 of shape ``(batch, 3)`` and ``(batch,3)``, this function should
                 return ``(batch,1)`` distance values.
-                Possible values: ``sbi.diagnostics.tarp.l1`` or
-                ``sbi.diagnostics.tarp.l2``. ``l2`` is the default.
+                Possible values: ``sbi.utils.metrics.l1`` or
+                ``sbi.utils.metrics.l2``. ``l2`` is the default.
         num_bins: number of bins to use for the credibility values.
                 If ``None``, then ``n_sims // 10`` bins are used.
         do_norm : whether to normalize parameters before coverage test
