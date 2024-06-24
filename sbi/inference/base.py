@@ -605,15 +605,18 @@ def simulate_for_sbi(
     Returns: Sampled parameters $\theta$ and simulation-outputs $x$.
     """
 
+    # 0. if no simulations
     if num_simulations == 0:
         theta = torch.tensor([], dtype=float32)
         x = torch.tensor([], dtype=float32)
 
+    # 0. if some simulations
     else:
         # Cast theta to numpy for better joblib performance (seee #1175)
         seed_all_backends(seed)
         theta = proposal.sample((num_simulations,)).numpy()
 
+        # 1. if meaningful batching
         if (
             simulation_batch_size is not None
             and simulation_batch_size < num_simulations
@@ -624,6 +627,7 @@ def simulate_for_sbi(
 
             batches = np.array_split(theta, num_batches, axis=0)
 
+            # 2. if multiprocessing
             if num_workers != 1:
                 batch_seeds = np.random.randint(
                     low=0, high=1_000_000, size=(len(batches),)
@@ -634,7 +638,7 @@ def simulate_for_sbi(
                     seed_all_backends(seed)
                     return simulator(theta)
 
-                # Run the batched simulation
+                # 3. if with progess bar
                 if show_progress_bar:
                     simulation_outputs: list[Tensor] = [
                         xx
@@ -647,6 +651,7 @@ def simulate_for_sbi(
                         )
                     ]
 
+                # 3. if no progress bar
                 else:
                     simulation_outputs: list[Tensor] = [
                         xx
@@ -656,16 +661,33 @@ def simulate_for_sbi(
                         )
                     ]
 
-                x = torch.cat(simulation_outputs, dim=0)
-                theta = torch.as_tensor(theta, dtype=float32)
 
+            # 2. if not multiprocessing (sequential)
             else:
-                # Attention: due to the current simulation wrapping structure,
-                # the following simulator call ends up having a back and forth
-                # casting torch -> numpy -> torch. Despite the overhead being
-                # minimal, the logic is not the best.
-                x = simulator(theta)
-                theta = torch.as_tensor(theta, dtype=float32)
+                simulation_outputs: list[Tensor] = []
+
+                # 3. if progress bar
+                if show_progress_bar:
+                    for batch in tqdm(batches):
+                        simulation_outputs.append(simulator(batch))
+
+                # 3. if not progress bar
+                else:
+                    for batch in batches:
+                        simulation_outputs.append(simulator(batch))
+
+            # Correctly format the output
+            x = torch.cat(simulation_outputs, dim=0)
+            theta = torch.as_tensor(theta, dtype=float32)
+
+
+        else:
+            # Attention: due to the current simulation wrapping structure,
+            # the following simulator call ends up having a back and forth
+            # casting torch -> numpy -> torch. Despite the overhead being
+            # minimal, the logic is not the best.
+            x = simulator(theta)
+            theta = torch.as_tensor(theta, dtype=float32)
 
     return theta, x
 

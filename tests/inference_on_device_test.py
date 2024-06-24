@@ -34,6 +34,8 @@ from sbi.simulators import diagonal_linear_gaussian, linear_gaussian
 from sbi.utils.torchutils import BoxUniform, gpu_available, process_device
 from sbi.utils.user_input_checks import (
     check_embedding_net_device,
+    process_prior,
+    process_simulator,
     validate_theta_and_x,
 )
 
@@ -471,6 +473,9 @@ def test_nograd_after_inference_train(inference_method) -> None:
         ),
         show_progress_bars=False,
     )
+
+    prior, _, prior_returns_numpy = process_prior(prior)
+    simulator = process_simulator(simulator, prior, prior_returns_numpy)
 
     theta, x = simulate_for_sbi(simulator, prior, 32)
     inference = inference.append_simulations(theta, x)
