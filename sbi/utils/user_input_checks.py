@@ -492,17 +492,17 @@ def process_simulator(
 
     assert isinstance(user_simulator, Callable), "Simulator must be a function."
 
-    pytorch_simulator = wrap_as_pytorch_simulator(
-        user_simulator, prior, is_numpy_simulator
-    )
-
-    batch_simulator = ensure_batched_simulator(pytorch_simulator, prior)
-
-    # joblib_simulator = wrap_as_joblib_efficient_simulator(
+    # pytorch_simulator = wrap_as_pytorch_simulator(
     #     user_simulator, prior, is_numpy_simulator
     # )
     #
-    # batch_simulator = ensure_batched_simulator(joblib_simulator, prior)
+    # batch_simulator = ensure_batched_simulator(pytorch_simulator, prior)
+
+    joblib_simulator = wrap_as_joblib_efficient_simulator(
+        user_simulator, prior, is_numpy_simulator
+    )
+
+    batch_simulator = ensure_batched_simulator(joblib_simulator, prior)
 
     return batch_simulator
 
@@ -513,10 +513,10 @@ def wrap_as_joblib_efficient_simulator(
 ) -> Callable:
     """Return a simulator that accepts `ndarray` and returns `Tensor` arguments."""
 
-    # def joblib_simulator(theta: ndarray) -> Tensor:
-    #     return torch.as_tensor(simulator(torch.as_tensor(theta)), dtype=float32)
+    def joblib_simulator(theta: ndarray) -> Tensor:
+        return torch.as_tensor(simulator(torch.as_tensor(theta)), dtype=float32)
 
-    # return joblib_simulator
+    return joblib_simulator
 
     # If numpy in input, check for simulator consistency, and cast simulation
     # output to tensor.

@@ -122,7 +122,11 @@ def test_c2st_snl_on_linear_gaussian_different_dims(
     prior, _, prior_returns_numpy = process_prior(prior)
     simulator = process_simulator(simulator, prior, prior_returns_numpy)
     theta, x = simulate_for_sbi(
-        simulator, prior, num_simulations, simulation_batch_size=num_simulations
+        simulator,
+        prior,
+        num_simulations,
+        simulation_batch_size=num_simulations,
+        seed=1,
     )
     likelihood_estimator = inference.append_simulations(theta, x).train()
     potential_fn, theta_transform = likelihood_estimator_based_potential(

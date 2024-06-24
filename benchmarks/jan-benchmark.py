@@ -44,13 +44,12 @@ def torch_numpy_simulator(theta: Tensor) -> Tensor:
     return torch.from_numpy(theta)
 
 
-@pytest.mark.parametrize("type", ["numpy"])
+@pytest.mark.parametrize("type", ["torch"])
 @pytest.mark.parametrize(
     "simulator",
     # [numpy_simulator]
     # [numpy_torch_simulator]
-    # [torch_simulator]
-    [torch_numpy_simulator],
+    [torch_simulator],
 )
 def test_joblib_benchmark(simulator, type):
     num_simulations = 1000000

@@ -661,7 +661,6 @@ def simulate_for_sbi(
                         )
                     ]
 
-
             # 2. if not multiprocessing (sequential)
             else:
                 simulation_outputs: list[Tensor] = []
@@ -679,7 +678,6 @@ def simulate_for_sbi(
             # Correctly format the output
             x = torch.cat(simulation_outputs, dim=0)
             theta = torch.as_tensor(theta, dtype=float32)
-
 
         else:
             # Attention: due to the current simulation wrapping structure,
