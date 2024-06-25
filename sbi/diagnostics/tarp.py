@@ -9,8 +9,6 @@ trained posterior against a set of true values of theta.
 from typing import Callable, Optional, Tuple
 
 import matplotlib.pyplot as plt
-
-# import numpy as np
 import torch
 from joblib import Parallel, delayed
 from matplotlib.axes import Axes
@@ -243,27 +241,24 @@ def run_tarp(
     ), f"shapes of theta {theta.shape[-2:]} and samples {samples.shape[-2:]} do not fit"
 
     num_samples = samples.shape[0]  # samples per simulation
-    num_sims = samples.shape[-2]
-    num_dims = samples.shape[-1]
 
     if num_bins is None:
-        num_bins = num_sims // 10
-
-    if theta.shape[-2] != num_sims:
-        raise ValueError("theta must have the same number of rows as samples")
-    if theta.shape[-1] != num_dims:
-        raise ValueError("theta must have the same number of columns as samples")
+        num_bins = samples.shape[-2] // 10
 
     if do_norm:
-        lo = torch.min(theta, dim=-2, keepdims=True).values  # min along num_sims
-        hi = torch.max(theta, dim=-2, keepdims=True).values  # max along num_sims
+        lo = torch.min(
+            theta, dim=-2, keepdims=True
+        ).values  # min along samples.shape[-2]
+        hi = torch.max(
+            theta, dim=-2, keepdims=True
+        ).values  # max along samples.shape[-2]
         samples = (samples - lo) / (hi - lo + 1e-10)
         theta = (theta - lo) / (hi - lo + 1e-10)
 
     references = _check_references(references, theta)
     assert len(references.shape) == len(
         samples.shape
-    ), f"references {references.shape} != samples {samples.shape}"
+    ), f"shape mismatch of references {references.shape} and samples {samples.shape}"
 
     # distances between references and samples
     sample_dists = distance(references.expand(num_samples, -1, -1), samples)
