@@ -68,6 +68,7 @@ def _infer_posterior_on_batch(
 # this function currently does not perform any TARP related operation
 # the purpose of the function is (a) to align with the sbc interface and
 # (b) to provide the data which is required to run TARP
+# NOTE: this function needs to be removed once better alternatives exist.
 def _prepare_estimates(
     xs: Tensor,
     posterior: NeuralPosterior,
@@ -124,9 +125,20 @@ def _prepare_estimates(
 
 
 def _check_references(
-    theta: Tensor, references: Optional[Tensor] = None, rng_seed: Optional[int] = None
+    thetas: Tensor, references: Optional[Tensor] = None, rng_seed: Optional[int] = None
 ) -> Tensor:
-    """construct or correct references tensor"""
+    """
+    construct or correct references tensor required to perform TARP
+
+    Args:
+        thetas: The ground truth theta values.
+        references: reference values for theta drawn from an arbitrary
+            distribution. According to the TARP paper, it is irrelevant
+            how these values are produced. The tensor needs to be of
+            the same shape as thetas.
+        rng_seed: Seed for the ``torch.random`` random number generator.
+            If rng_seed is None, no seed is set.
+    """
 
     if not isinstance(references, Tensor):
         if not isinstance(rng_seed, type(None)):
@@ -134,15 +146,15 @@ def _check_references(
 
         # obtain min/max per dimension of theta
         lo = (
-            torch.min(theta, dim=-2).values.min(axis=0).values
+            torch.min(thetas, dim=-2).values.min(axis=0).values
         )  # should be 0 if normalized
         hi = (
-            torch.max(theta, dim=-2).values.max(axis=0).values
+            torch.max(thetas, dim=-2).values.max(axis=0).values
         )  # should be 1 if normalized
 
         refpdf = torch.distributions.Uniform(low=lo, high=hi)
         # sample one reference point for each entry in theta
-        references = refpdf.sample((1, theta.shape[-2]))
+        references = refpdf.sample((1, thetas.shape[-2]))
     else:
         if len(references.shape) == 2:
             # add singleton dimension in front
@@ -154,8 +166,8 @@ def _check_references(
                     dimension, received {references.shape}"""
             )
 
-    assert references.shape[-2:] == theta.shape[-2:], f"""shape mismatch between
-    references {references.shape} and ground truth theta {theta.shape}"""
+    assert references.shape[-2:] == thetas.shape[-2:], f"""shape mismatch between
+    references {references.shape} and ground truth theta {thetas.shape}"""
 
     return references
 
