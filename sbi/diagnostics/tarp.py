@@ -6,19 +6,23 @@ The TARP diagnostic is a global diagnostic which can be used to check a
 trained posterior against a set of true values of theta.
 """
 
-import warnings
 from typing import Callable, Optional, Tuple
+
+import matplotlib.pyplot as plt
 
 # import numpy as np
 import torch
 from joblib import Parallel, delayed
-from sbi.inference.posteriors.base_posterior import NeuralPosterior
-from sbi.inference.posteriors.vi_posterior import VIPosterior
-from sbi.simulators.simutils import tqdm_joblib
-from sbi.utils.metrics import l1, l2
+from matplotlib.axes import Axes
+from matplotlib.figure import Figure
 from scipy.stats import kstest
 from torch import Tensor
 from tqdm.auto import tqdm
+
+from sbi.inference.posteriors.base_posterior import NeuralPosterior
+from sbi.inference.posteriors.vi_posterior import VIPosterior
+from sbi.simulators.simutils import tqdm_joblib
+from sbi.utils.metrics import l2
 
 
 def infer_posterior_on_batch(
@@ -225,8 +229,8 @@ def run_tarp(
                 (Default = True)
 
     Returns:
-        ecp: Expected coverage probability (``ecp``)
-        alpha: credibility values
+        ecp: Expected coverage probability (``ecp``), see equation 4 of the paper
+        alpha: credibility values, see equation 2 of the paper
 
     """
     # TARP assumes that the predicted thetas are sampled from the "true"
@@ -280,35 +284,71 @@ def check_tarp(
     ecp: Tensor,
     alpha: Tensor,
 ) -> Tuple[float, float]:
-    """check the obtained TARP credibitlity levels and
+    r"""check the obtained TARP credibitlity levels and
     expected coverage probabilities. This will help to uncover underdispersed,
     well covering or overdispersed posteriors.
 
     Args:
-        samples: The predicted parameter samples to compute the coverage of,
-                 these samples are expected to have shape
-                 ``(num_samples, num_sims, num_dims)``. These are obtained by
-                 sampling a trained posterior `num_samples` times. Multiple
-                 (posterior) samples for one observation are encouraged.
-        theta: The true parameter value theta. Theta is expected to
-                 have shape ``(num_sims, num_dims)``.
+        ecp: expected coverage probabilities computed with the TARP method,
+            i.e. first output of ``run_tarp``.
+        alpha: credibility levels $\alpha$, i.e. second output of ``run_tarp``.
 
     Returns:
-        atc: area to curve, this number should be close to ``1``, values
-             larger than ``1.`` indicated overdispersed distributions (i.e.
-             the estimated posterior is too wide), values smaller than ``1``
-             indicate underdispersed distributions (i.e. the estimated posterior
-             is too narrow).
+        atc: area to curve for large values of alpha, this number should be
+             close to ``0``. Values larger than ``0`` indicated overdispersed
+             distributions (i.e. the estimated posterior is too wide). Values
+             smaller than ``0`` indicate underdispersed distributions (i.e.
+             the estimated posterior is too narrow). Note, this property of
+             the ecp curve can also indicate if the posterior is biased, see
+             figure 2 of the paper for details
+             (https://arxiv.org/abs/2302.03026).
         ks prob: p-value for a two sample Kolmogorov-Smirnov test. The null
-             hypothesis is that the two distributions (ecp and alpha) are
-             identical. If they were, the p-value should be close 1. Commonly,
+             hypothesis of this test is that the two distributions (ecp and
+             alpha) are identical, i.e. are produced by one common CDF. If
+             they were, the p-value should be close to ``1``. Commonly,
              people reject the null if p-value is below 0.05!
     """
 
-    atc = (ecp - alpha).sum()
+    nentries = alpha.shape[0]
+    midindex = nentries // 2
+    atc = (ecp[midindex:, ...] - alpha[midindex:, ...]).sum()
+
     kstest_pvals = torch.tensor(
         kstest(ecp.numpy(), alpha.numpy())[1],
         dtype=torch.float32,
     )
 
     return atc, kstest_pvals
+
+
+def plot_tarp(ecp: Tensor, alpha: Tensor, title="") -> Tuple[Figure, Axes]:
+    """
+    Plots the expected coverage probability (ECP) against the credibility
+    level,alpha, for a given alpha grid.
+
+    Args:
+        ecp : numpy.ndarray
+            Array of expected coverage probabilities.
+        alpha : numpy.ndarray
+            Array of credibility levels.
+        title : str, optional
+            Title for the plot. The default is "".
+
+     Returns
+        fig : matplotlib.figure.Figure
+            The figure object.
+        ax : matplotlib.axes.Axes
+            The axes object.
+
+    """
+
+    fig, ax = plt.subplots(1, 1)
+    ax.plot(alpha, ecp, color="blue", label="TARP")
+    ax.plot(alpha, alpha, color="black", linestyle="--", label="ideal")
+    ax.set_xlabel(r"Credibility Level $\alpha$")
+    ax.set_ylabel(r"Expected Coverage Probility")
+    ax.set_xlim(0.0, 1.0)
+    ax.set_ylim(0.0, 1.0)
+    ax.set_title(title)
+    ax.legend()
+    return fig, ax

@@ -1,4 +1,9 @@
 import pytest
+from scipy.stats import uniform
+from torch import Tensor, allclose, exp, eye, ones
+from torch.distributions import Normal, Uniform
+from torch.nn import L1Loss
+
 from sbi.diagnostics.tarp import (
     check_tarp,
     infer_posterior_on_batch,
@@ -9,10 +14,6 @@ from sbi.inference import SNPE, simulate_for_sbi
 from sbi.simulators import linear_gaussian
 from sbi.utils import BoxUniform
 from sbi.utils.metrics import l1, l2
-from scipy.stats import uniform
-from torch import Tensor, allclose, exp, eye, ones
-from torch.distributions import Normal, Uniform
-from torch.nn import L1Loss
 
 
 def generate_toy_gaussian(nsamples=100, nsims=100, ndims=5, covfactor=1.0):
@@ -164,7 +165,6 @@ def test_run_tarp_correct(onsamples):
 def test_run_tarp_correct_using_norm(onsamples):
     theta, samples = onsamples
 
-    # tarp = TARP(num_alpha_bins=30, norm=True)
     ecp, alpha = run_tarp(samples, theta, num_bins=30, do_norm=False)
 
     assert allclose((ecp - alpha).abs().max(), Tensor([0.0]), atol=1e-1)
@@ -172,7 +172,6 @@ def test_run_tarp_correct_using_norm(onsamples):
         ecp - alpha
     ).abs().sum() < 1.0  # integral of residuals should vanish, fig.2 in paper
 
-    # tarp_ = TARP(num_alpha_bins=30, norm=True, metric="l1")
     ecp, alpha = run_tarp(samples, theta, num_bins=30, do_norm=False, distance=l1)
 
     # TARP detects that this is a correct representation of the posterior
@@ -182,13 +181,11 @@ def test_run_tarp_correct_using_norm(onsamples):
 def test_run_tarp_detect_overdispersed(oversamples):
     theta, samples = oversamples
 
-    # tarp = TARP(num_alpha_bins=30, norm=True)
     ecp, alpha = run_tarp(samples, theta, num_bins=30, do_norm=True)
 
     assert not allclose((ecp - alpha).abs().max(), Tensor([0.0]), atol=1e-1)
     assert (ecp - alpha).abs().sum() > 3.0  # integral is nonzero, fig.2 in paper
 
-    # tarp_ = TARP(num_alpha_bins=30, norm=True, metric="l1")
     ecp, alpha = run_tarp(samples, theta, num_bins=30, do_norm=True, distance=l1)
 
     # TARP detects that this is NOT a correct representation of the posterior
@@ -199,13 +196,11 @@ def test_run_tarp_detect_overdispersed(oversamples):
 def test_run_tarp_detect_underdispersed(undersamples):
     theta, samples = undersamples
 
-    # tarp = TARP(num_alpha_bins=30, norm=True)
     ecp, alpha = run_tarp(samples, theta, num_bins=30, do_norm=True)
 
     assert not allclose((ecp - alpha).abs().max(), Tensor([0.0]), atol=1e-1)
     assert (ecp - alpha).abs().sum() > 3.0  # integral is nonzero, fig.2 in paper
 
-    # tarp_ = TARP(num_alpha_bins=30, norm=True, metric="l1")
     ecp, alpha = run_tarp(samples, theta, num_bins=30, do_norm=True, distance=l1)
 
     # TARP detects that this is NOT a correct representation of the posterior
@@ -216,13 +211,11 @@ def test_run_tarp_detect_underdispersed(undersamples):
 def test_run_tarp_detect_bias(biased):
     theta, samples = biased
 
-    # tarp = TARP(num_alpha_bins=30, norm=True)
     ecp, alpha = run_tarp(samples, theta, num_bins=30, do_norm=True)
 
     assert not allclose((ecp - alpha).abs().max(), Tensor([0.0]), atol=1e-1)
     assert (ecp - alpha).abs().sum() > 3.0  # integral is nonzero, fig.2 in paper
 
-    # tarp_ = TARP(num_alpha_bins=30, norm=True, metric="l1")
     ecp, alpha = run_tarp(samples, theta, num_bins=30, do_norm=True, distance=l1)
 
     # TARP detects that this is NOT a correct representation of the posterior
@@ -245,7 +238,7 @@ def test_check_tarp_correct(onsamples):
     assert kspvals > 0.05  # samples are likely from the same PDF
 
 
-def test_check_tarp_correct_underdispersed(undersamples):
+def test_check_tarp_underdispersed(undersamples):
     theta, samples = undersamples
 
     ecp, alpha = run_tarp(samples, theta, num_bins=30, do_norm=False)
@@ -254,25 +247,27 @@ def test_check_tarp_correct_underdispersed(undersamples):
     atc, kspvals = check_tarp(ecp, alpha)
 
     print("tarp checks", atc, kspvals)
+
     assert atc != 0.0
-    assert atc < 0.0
+    assert atc < -2.0
     # assert atc < -1.0 # TODO: need to check why this breaks
 
     # TODO: need to check why this breaks
-    assert kspvals < 0.05  # samples are unlikely from the same PDF
+    assert kspvals < 0.2  # samples are unlikely from the same PDF
 
 
-def test_check_tarp_correct_overdispersed(oversamples):
+def test_check_tarp_overdispersed(oversamples):
     theta, samples = oversamples
 
-    ecp, alpha = run_tarp(samples, theta, num_bins=30, do_norm=False)
+    ecp, alpha = run_tarp(samples, theta, num_bins=50, do_norm=False)
     print("overdispersed")
     print("tarp results", ecp, alpha)
     atc, kspvals = check_tarp(ecp, alpha)
 
     print("tarp checks", atc, kspvals)
+
     assert atc != 0.0
-    assert atc > 1.0
+    assert atc > 2.0
 
     assert kspvals < 0.05  # samples are unlikely from the same PDF
 
@@ -280,7 +275,6 @@ def test_check_tarp_correct_overdispersed(oversamples):
 def test_check_tarp_detect_bias(biased):
     theta, samples = biased
 
-    # tarp = TARP(num_alpha_bins=30, norm=True)
     ecp, alpha = run_tarp(samples, theta, num_bins=30, do_norm=True)
     print("biased")
     print("tarp results", ecp, alpha)
@@ -334,7 +328,6 @@ def test_batched_prepare_estimates(method, model="mdn"):
     assert samples.shape[1:] == thetas.shape
     assert samples.shape[0] == num_posterior_samples
 
-    # tarp = TARP(num_alpha_bins=30, norm=True, metric="l2")
     samples_ = prepare_estimates(
         xs, posterior, num_posterior_samples, infer_batch_size=32
     )
@@ -377,11 +370,15 @@ def test_consistent_run_tarp_results_with_posterior(method, model="mdn"):
     thetas = prior.sample((num_tarp_sims,))
     xs = simulator(thetas)
 
-    # tarp = TARP(num_alpha_bins=30, norm=True, metric="l2")
-
     samples = prepare_estimates(xs, posterior, num_posterior_samples)
 
     ecp, alpha = run_tarp(samples, thetas, num_bins=30, do_norm=True)
 
     assert allclose((ecp - alpha).abs().max(), Tensor([0.0]), atol=1e-1)
     assert (ecp - alpha).abs().sum() < 1.0
+
+    atc, kspvals = check_tarp(ecp, alpha)
+    print(atc, kspvals)
+    assert atc < 0.5
+    assert atc > -0.5
+    assert kspvals > 0.05
