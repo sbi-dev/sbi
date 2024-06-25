@@ -72,11 +72,14 @@ class RatioBasedPotential(BasePotential):
         self.ratio_estimator = ratio_estimator
         self.ratio_estimator.eval()
 
-    def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
+    def __call__(
+        self, theta: Tensor, x_is_iid: bool = True, track_gradients: bool = True
+    ) -> Tensor:
         r"""Returns the potential for likelihood-ratio-based methods.
 
         Args:
             theta: The parameter set at which to evaluate the potential function.
+            x_is_iid: Whether the observed data is iid.
             track_gradients: Whether to track the gradients.
 
         Returns:

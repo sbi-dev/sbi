@@ -144,7 +144,7 @@ class MCMCPosterior(NeuralPosterior):
                 init_strategy_num_candidates
             )
 
-        self.potential_ = self._prepare_potential(method)
+        self.potential_ = self._prepare_potential(method, x_is_iid=True)
 
         self._purpose = (
             "It provides MCMC to .sample() from the posterior and "
@@ -300,7 +300,7 @@ class MCMCPosterior(NeuralPosterior):
         warmup_steps = _maybe_use_dict_entry(warmup_steps, "warmup_steps", m_p)
         num_chains = _maybe_use_dict_entry(num_chains, "num_chains", m_p)
         init_strategy = _maybe_use_dict_entry(init_strategy, "init_strategy", m_p)
-        self.potential_ = self._prepare_potential(method)  # type: ignore
+        self.potential_ = self._prepare_potential(method, x_is_iid=True)  # type: ignore
 
         initial_params = self._get_initial_params(
             init_strategy,  # type: ignore
@@ -406,7 +406,7 @@ class MCMCPosterior(NeuralPosterior):
             if init_strategy_parameters is None
             else init_strategy_parameters
         )
-        self.potential_ = self._prepare_potential(method)  # type: ignore
+        self.potential_ = self._prepare_potential(method, x_is_iid=False)  # type: ignore
 
         # For each observation in the batch, we have num_chains independent chains.
         num_chains_extended = batch_size * num_chains
@@ -437,8 +437,16 @@ class MCMCPosterior(NeuralPosterior):
             )
 
         samples = self.theta_transform.inv(transformed_samples)
+        sample_shape_len = len(sample_shape)
         # Samples are of shape (num_samples, num_chains_extended, *input_shape)
-        return samples.reshape((*sample_shape, batch_size, -1))  # type: ignore
+        # concatenate all chains the chains per x together and return.
+        return samples.reshape((batch_size, *sample_shape, -1)).permute(
+            tuple(range(1, sample_shape_len + 1))
+            + (
+                0,
+                -1,
+            )
+        )  # type: ignore
 
     def _build_mcmc_init_fn(
         self,
@@ -619,8 +627,10 @@ class MCMCPosterior(NeuralPosterior):
         # Save sample as potential next init (if init_strategy == 'latest_sample').
         self._mcmc_init_params = samples[:, -1, :].reshape(num_chains, dim_samples)
 
+        # Update: don't concatenate all chains yet, as they might be used for batched
+        # sampling.
         # Collect samples from all chains.
-        samples = samples.reshape(-1, dim_samples)[:num_samples]
+        # samples = samples.reshape(-1, dim_samples)[:num_samples]
 
         return samples.type(torch.float32).to(self._device)
 
@@ -738,7 +748,7 @@ class MCMCPosterior(NeuralPosterior):
 
         return samples
 
-    def _prepare_potential(self, method: str) -> Callable:
+    def _prepare_potential(self, method: str, x_is_iid: bool) -> Callable:
         """Combines potential and transform and takes care of gradients and pyro.
 
         Args:
@@ -772,6 +782,7 @@ class MCMCPosterior(NeuralPosterior):
             theta_transform=self.theta_transform,
             device=self._device,
             track_gradients=track_gradients,
+            x_is_iid=x_is_iid,
         )
         if pyro:
             prepared_potential = partial(

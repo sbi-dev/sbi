@@ -85,7 +85,9 @@ class PosteriorBasedPotential(BasePotential):
         self.posterior_estimator = posterior_estimator
         self.posterior_estimator.eval()
 
-    def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
+    def __call__(
+        self, theta: Tensor, x_is_iid: bool = True, track_gradients: bool = True
+    ) -> Tensor:
         r"""Returns the potential for posterior-based methods.
 
         Args:

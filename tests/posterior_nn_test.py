@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import pytest
+import torch
 from torch import eye, ones, zeros
 from torch.distributions import MultivariateNormal
 
@@ -92,7 +93,7 @@ def test_batched_sample_log_prob_with_different_x(
 
 
 @pytest.mark.mcmc
-@pytest.mark.parametrize("snlre_method", [SNLE_A, SNRE_A, SNRE_B, SNRE_C])
+@pytest.mark.parametrize("snlre_method", [SNLE_A, SNRE_A, SNRE_B, SNRE_C, SNPE_C])
 @pytest.mark.parametrize(
     "x_o_batch_dim",
     (
@@ -101,7 +102,7 @@ def test_batched_sample_log_prob_with_different_x(
         2,
     ),
 )
-def test_batched_mcmc_sample_log_prob_with_different_x(
+def test_batched_mcmc_sample_log_prob_shape_with_different_x(
     snlre_method: type, x_o_batch_dim: bool, mcmc_params_fast: dict
 ):
     num_dim = 2
@@ -116,7 +117,9 @@ def test_batched_mcmc_sample_log_prob_with_different_x(
     x_o = ones(num_dim) if x_o_batch_dim == 0 else ones(x_o_batch_dim, num_dim)
 
     posterior = inference.build_posterior(
-        mcmc_method="slice_np_vectorized", mcmc_parameters=mcmc_params_fast
+        sample_with="mcmc",
+        mcmc_method="slice_np_vectorized",
+        mcmc_parameters=mcmc_params_fast,
     )
 
     samples = posterior.sample_batched((10,), x_o)
@@ -126,3 +129,58 @@ def test_batched_mcmc_sample_log_prob_with_different_x(
         if x_o_batch_dim > 0
         else (10, num_dim)
     ), "Sample shape wrong"
+
+
+@pytest.mark.mcmc
+@pytest.mark.parametrize(
+    "snlre_method",
+    [
+        SNLE_A,
+        # SNRE_A,
+        # SNRE_B,
+        # SNRE_C,
+        # SNPE_C
+    ],
+)
+def test_batched_mcmc_sample_log_prob_with_different_x(
+    snlre_method: type, mcmc_params_fast: dict
+):
+    x_o_batch_dim = 2
+    num_dim = 2
+    prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
+    simulator = diagonal_linear_gaussian
+
+    inference = snlre_method(prior=prior)
+    theta, x = simulate_for_sbi(simulator, prior, 1000)
+    _ = inference.append_simulations(theta, x).train()
+
+    x_o = ones(x_o_batch_dim, num_dim)
+
+    posterior = inference.build_posterior(
+        sample_with="mcmc",
+        mcmc_method="slice_np_vectorized",
+        mcmc_parameters=mcmc_params_fast,
+    )
+
+    x_o = torch.stack([0.5 * ones(num_dim), -0.5 * ones(num_dim)], dim=0)
+    # test with multiple chains to test whether concatenating chain is done correctly.
+    samples = posterior.sample_batched((1000,), x_o, num_chains=2, warmup_steps=500)
+
+    samples_separate1 = posterior.sample(
+        (1000,), x_o[0], num_chains=2, warmup_steps=500
+    )
+    samples_separate2 = posterior.sample(
+        (1000,), x_o[1], num_chains=2, warmup_steps=500
+    )
+
+    # Check if means are approx. same
+    samples_m = torch.mean(samples, dim=0, dtype=torch.float32)
+    samples_separate1_m = torch.mean(samples_separate1, dim=0, dtype=torch.float32)
+    samples_separate2_m = torch.mean(samples_separate2, dim=0, dtype=torch.float32)
+    samples_sep_m = torch.stack([samples_separate1_m, samples_separate2_m], dim=0)
+    print(samples_m)
+    print(samples_sep_m)
+
+    assert torch.allclose(
+        samples_m, samples_sep_m, atol=0.2, rtol=0.2
+    ), "Batched sampling is not consistent with separate sampling."
