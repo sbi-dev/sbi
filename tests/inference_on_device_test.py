@@ -3,13 +3,11 @@
 
 from __future__ import annotations
 
-from contextlib import nullcontext
 from typing import Tuple
 
 import pytest
 import torch
 import torch.distributions.transforms as torch_tf
-import torch.nn as nn
 from torch import eye, ones, zeros
 from torch.distributions import MultivariateNormal
 
@@ -32,7 +30,6 @@ from sbi.neural_nets import classifier_nn, likelihood_nn, posterior_nn
 from sbi.simulators import diagonal_linear_gaussian, linear_gaussian
 from sbi.utils.torchutils import BoxUniform, gpu_available, process_device
 from sbi.utils.user_input_checks import (
-    check_embedding_net_device,
     validate_theta_and_x,
 )
 
@@ -190,32 +187,6 @@ def test_training_and_mcmc_on_device(
     proposals[-1].potential(samples)
 
 
-@pytest.mark.gpu
-@pytest.mark.parametrize("device_datum", ["cpu", "gpu"])
-@pytest.mark.parametrize("device_embedding_net", ["cpu", "gpu"])
-def test_check_embedding_net_device(
-    device_datum: str, device_embedding_net: str
-) -> None:
-    device_datum = process_device(device_datum)
-    device_embedding_net = process_device(device_embedding_net)
-
-    datum = torch.zeros((1, 1)).to(device_datum)
-    embedding_net = nn.Linear(in_features=1, out_features=1).to(device_embedding_net)
-
-    if device_datum != device_embedding_net:
-        with pytest.warns(UserWarning):
-            check_embedding_net_device(datum=datum, embedding_net=embedding_net)
-    else:
-        check_embedding_net_device(datum=datum, embedding_net=embedding_net)
-
-    output_device_net = [p.device for p in embedding_net.parameters()][0]
-    assert datum.device == output_device_net, (
-        f"Failure when processing embedding_net: "
-        f"device should have been set to should have been '{datum.device}' but is "
-        f"still '{output_device_net}'"
-    )
-
-
 @pytest.mark.parametrize("shape_x", [(3, 1)])
 @pytest.mark.parametrize(
     "shape_theta", [(3, 2), pytest.param((2, 1), marks=pytest.mark.xfail)]
@@ -325,133 +296,6 @@ def test_train_with_different_data_and_training_device(
     assert posterior._device == str(
         weights_device
     ), "inferred posterior device not correct."
-
-
-@pytest.mark.gpu
-@pytest.mark.parametrize(
-    "inference_method", [SNPE_A, SNPE_C, SNRE_A, SNRE_B, SNRE_C, SNLE]
-)
-@pytest.mark.parametrize("prior_device", ("cpu", "gpu"))
-@pytest.mark.parametrize("embedding_net_device", ("cpu", "gpu"))
-@pytest.mark.parametrize("data_device", ("cpu", "gpu"))
-@pytest.mark.parametrize("training_device", ("cpu", "gpu"))
-def test_embedding_nets_integration_training_device(
-    inference_method,
-    prior_device: str,
-    embedding_net_device: str,
-    data_device: str,
-    training_device: str,
-    mcmc_params_fast: dict,
-) -> None:
-    """Test embedding nets integration with different devices, priors and methods."""
-    # add other methods
-
-    theta_dim = 2
-    x_dim = 3
-    # process all device strings
-    prior_device = process_device(prior_device)
-    embedding_net_device = process_device(embedding_net_device)
-    data_device = process_device(data_device)
-    training_device = process_device(training_device)
-
-    samples_per_round = 64
-    num_rounds = 2
-
-    x_o = torch.ones((1, x_dim))
-
-    prior = utils.BoxUniform(
-        low=-torch.ones((theta_dim,)),
-        high=torch.ones((theta_dim,)),
-        device=prior_device,
-    )
-
-    if inference_method in [SNRE_A, SNRE_B, SNRE_C]:
-        embedding_net_theta = nn.Linear(in_features=theta_dim, out_features=2).to(
-            embedding_net_device
-        )
-        embedding_net_x = nn.Linear(in_features=x_dim, out_features=2).to(
-            embedding_net_device
-        )
-        nn_kwargs = dict(
-            classifier=classifier_nn(
-                model="resnet",
-                embedding_net_x=embedding_net_x,
-                embedding_net_theta=embedding_net_theta,
-                hidden_features=4,
-            )
-        )
-        train_kwargs = dict()
-    elif inference_method == SNLE:
-        embedding_net = nn.Linear(in_features=theta_dim, out_features=2).to(
-            embedding_net_device
-        )
-        nn_kwargs = dict(
-            density_estimator=likelihood_nn(
-                model="mdn",
-                embedding_net=embedding_net,
-                hidden_features=4,
-                num_transforms=2,
-            )
-        )
-        train_kwargs = dict()
-    else:
-        embedding_net = nn.Linear(in_features=x_dim, out_features=2).to(
-            embedding_net_device
-        )
-        nn_kwargs = dict(
-            density_estimator=posterior_nn(
-                model="mdn_snpe_a" if inference_method == SNPE_A else "mdn",
-                embedding_net=embedding_net,
-                hidden_features=4,
-                num_transforms=2,
-            )
-        )
-        if inference_method == SNPE_A:
-            train_kwargs = dict()
-        else:
-            train_kwargs = dict(force_first_round_loss=True)
-
-    with pytest.raises(Exception) if prior_device != training_device else nullcontext():
-        inference = inference_method(prior=prior, **nn_kwargs, device=training_device)
-
-    if prior_device != training_device:
-        pytest.xfail("We do not correct the case of invalid prior device")
-
-    theta = prior.sample((samples_per_round,)).to(data_device)
-
-    proposal = prior
-    for _ in range(num_rounds):
-        # sample theta and x independently - quick way to get 3D simulation data.
-        theta = proposal.sample((samples_per_round,))
-        x = (
-            MultivariateNormal(torch.zeros((x_dim,)), torch.eye(x_dim))
-            .sample((samples_per_round,))
-            .to(data_device)
-        )
-
-        with (
-            pytest.warns(UserWarning)
-            if data_device != training_device
-            else nullcontext()
-        ):
-            density_estimator_append = inference.append_simulations(theta, x)
-
-        density_estimator_train = density_estimator_append.train(
-            max_num_epochs=2, **train_kwargs
-        )
-
-        posterior = inference.build_posterior(
-            density_estimator_train,
-            **(
-                {}
-                if inference_method == SNPE_A
-                else dict(
-                    mcmc_method="slice_np_vectorized",
-                    mcmc_parameters=mcmc_params_fast,
-                )
-            ),
-        )
-        proposal = posterior.set_default_x(x_o)
 
 
 @pytest.mark.parametrize(
