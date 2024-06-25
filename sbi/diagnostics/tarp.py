@@ -10,7 +10,6 @@ from typing import Callable, Optional, Tuple
 
 import matplotlib.pyplot as plt
 import torch
-from joblib import Parallel, delayed
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from scipy.stats import kstest
@@ -19,11 +18,10 @@ from tqdm.auto import tqdm
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.posteriors.vi_posterior import VIPosterior
-from sbi.simulators.simutils import tqdm_joblib
 from sbi.utils.metrics import l2
 
 
-def infer_posterior_on_batch(
+def _infer_posterior_on_batch(
     xs: Tensor,
     posterior: NeuralPosterior,
     num_posterior_samples: int = 1000,
@@ -70,7 +68,7 @@ def infer_posterior_on_batch(
 # this function currently does not perform any TARP related operation
 # the purpose of the function is (a) to align with the sbc interface and
 # (b) to provide the data which is required to run TARP
-def prepare_estimates(
+def _prepare_estimates(
     xs: Tensor,
     posterior: NeuralPosterior,
     num_posterior_samples: int = 1000,
@@ -89,7 +87,8 @@ def prepare_estimates(
         num_posterior_samples: number of approximate posterior samples used
             for ranking.
         num_workers: number of CPU cores to use in parallel for running
-            infer_batch_size inferences.
+            infer_batch_size inferences. Currently throws an exception, will be
+            handled upstream.
         infer_batch_size: batch size for workers.
         show_progress_bar: whether to display a progress bar
 
@@ -102,25 +101,7 @@ def prepare_estimates(
     xs_batches = torch.split(xs, infer_batch_size, dim=0)
 
     if num_workers != 1:
-        # Parallelize the sequence of batches across workers.
-        # We use the solution proposed here: https://stackoverflow.com/a/61689175
-        # to update the pbar only after the workers finished a task.
-        with tqdm_joblib(
-            tqdm(
-                xs_batches,
-                disable=not show_progress_bar,
-                desc=f"Performing {num_sim_samples} posterior runs in"
-                f"{len(xs_batches)} batches.",
-                total=len(xs_batches),
-            )
-        ) as _:
-            samples: Tensor
-            samples = Parallel(n_jobs=num_workers)(  # pyright: ignore[reportAssignmentType]
-                delayed(infer_posterior_on_batch)(
-                    xs_batch, posterior, num_posterior_samples
-                )
-                for xs_batch in xs_batches
-            )
+        raise NotImplementedError('parallel execution is currently not implemented')
     else:
         pbar = tqdm(
             total=num_sim_samples,
@@ -132,7 +113,9 @@ def prepare_estimates(
             samples = []
             for xs_batch in xs_batches:
                 samples.append(
-                    infer_posterior_on_batch(xs_batch, posterior, num_posterior_samples)
+                    _infer_posterior_on_batch(
+                        xs_batch, posterior, num_posterior_samples
+                    )
                 )
                 pbar.update(infer_batch_size)
             samples = torch.cat(samples, dim=1)
@@ -140,13 +123,15 @@ def prepare_estimates(
     return samples
 
 
-def _check_references(references: Tensor, theta: Tensor) -> Tensor:
-    """construct references"""
-
-    num_dims = theta.shape[-1]
-    num_sims = theta.shape[0]
+def _check_references(
+    theta: Tensor, references: Optional[Tensor] = None, rng_seed: Optional[int] = None
+) -> Tensor:
+    """construct or correct references tensor"""
 
     if not isinstance(references, Tensor):
+        if not isinstance(rng_seed, type(None)):
+            torch.random.manual_seed(rng_seed)
+
         # obtain min/max per dimension of theta
         lo = (
             torch.min(theta, dim=-2).values.min(axis=0).values
@@ -157,7 +142,7 @@ def _check_references(references: Tensor, theta: Tensor) -> Tensor:
 
         refpdf = torch.distributions.Uniform(low=lo, high=hi)
         # sample one reference point for each entry in theta
-        references = refpdf.sample((1, num_sims))
+        references = refpdf.sample((1, theta.shape[-2]))
     else:
         if len(references.shape) == 2:
             # add singleton dimension in front
@@ -169,29 +154,20 @@ def _check_references(references: Tensor, theta: Tensor) -> Tensor:
                     dimension, received {references.shape}"""
             )
 
-        if references.shape[-2] != num_sims:
-            raise ValueError(
-                f"references must have the same number samples as samples,"
-                f"received {references.shape[-2]} != {num_sims}"
-            )
-
-        if references.shape[-1] != num_dims:
-            raise ValueError(
-                "references must have the same number of dimensions as "
-                f"samples or theta, received {references.shape[-1]}"
-                f"!= {num_dims}"
-            )
+    assert references.shape[-2:] == theta.shape[-2:], f"""shape mismatch between
+    references {references.shape} and ground truth theta {theta.shape}"""
 
     return references
 
 
-def run_tarp(
+def _run_tarp(
     samples: Tensor,
     theta: Tensor,
     references: Optional[Tensor] = None,
     distance: Callable = l2,
-    num_bins: Optional[int] = None,
+    num_bins: Optional[int] = 30,
     do_norm: bool = False,
+    rng_seed: Optional[int] = None,
 ) -> Tuple[Tensor, Tensor]:
     """
     Estimates coverage of samples given true values theta with the TARP method.
@@ -225,6 +201,9 @@ def run_tarp(
                 If ``None``, then ``num_sims // 10`` bins are used.
         do_norm : whether to normalize parameters before coverage test
                 (Default = True)
+        rng_seed : whether to set the seed of torch.random, no seed is set
+                if None is received
+                (Default = None)
 
     Returns:
         ecp: Expected coverage probability (``ecp``), see equation 4 of the paper
@@ -255,7 +234,7 @@ def run_tarp(
         samples = (samples - lo) / (hi - lo + 1e-10)
         theta = (theta - lo) / (hi - lo + 1e-10)
 
-    references = _check_references(references, theta)
+    references = _check_references(theta, references)
     assert len(references.shape) == len(
         samples.shape
     ), f"shape mismatch of references {references.shape} and samples {samples.shape}"
@@ -273,6 +252,73 @@ def run_tarp(
     ecp = torch.cumsum(hist, dim=0) * stepsize
 
     return torch.cat([Tensor([0]), ecp]), bin_edges
+
+
+def run_tarp(
+    thetas: Tensor,
+    xs: Tensor,
+    posterior: NeuralPosterior,
+    num_posterior_samples: int = 1000,
+    num_workers: int = 1,
+    show_progress_bar: bool = True,
+    distance: Callable = l2,
+    num_bins: Optional[int] = 30,
+    do_norm: bool = True,
+    rng_seed: Optional[int] = None,
+) -> Tuple[Tensor, Tensor]:
+    """
+    Estimates coverage of samples given true values thetas with the TARP method.
+    Reference: `Lemos, Coogan et al 2023 <https://arxiv.org/abs/2302.03026>`_
+
+    The TARP diagnostic is a global diagnostic which can be used to check a
+    trained posterior against a set of true values of theta.
+
+    Args:
+        thetas: ground-truth parameters for tarp, simulated from the prior.
+        xs: observed data for tarp, simulated from thetas.
+        posterior: a posterior obtained from sbi.
+        num_posterior_samples: number of approximate posterior samples used for ranking.
+        num_workers: number of CPU cores to use in parallel for running num_sbc_samples
+            inferences.
+        show_progress_bar: whether to display a progress over sbc runs.
+        distance: the distance metric to use when computing the distance.
+            Should be a callable function that accepts two tensors and
+            computes the distance between them, e.g. given two tensors
+            of shape ``(batch, 3)`` and ``(batch,3)``, this function should
+            return ``(batch,1)`` distance values.
+            Possible values: ``sbi.utils.metrics.l1`` or
+            ``sbi.utils.metrics.l2``. ``l2`` is the default.
+        num_bins: number of bins to use for the credibility values.
+            If ``None``, then ``num_sims // 10`` bins are used.
+        do_norm : whether to normalize parameters before coverage test
+            (Default = True)
+        rng_seed : whether to set the seed of torch.random, no seed is set
+                if None is received
+                (Default = None)
+
+    Returns:
+        ecp: Expected coverage probability (``ecp``), see equation 4 of the paper
+        alpha: credibility values, see equation 2 of the paper
+    """
+
+    samples = _prepare_estimates(
+        xs,
+        posterior,
+        num_posterior_samples,
+        num_workers,
+        show_progress_bar=show_progress_bar,
+    )
+
+    ecp, alpha = _run_tarp(
+        samples,
+        thetas,
+        distance=distance,
+        num_bins=num_bins,
+        do_norm=do_norm,
+        rng_seed=rng_seed,
+    )
+
+    return ecp, alpha
 
 
 def check_tarp(

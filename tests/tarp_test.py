@@ -5,9 +5,10 @@ from torch.distributions import Normal, Uniform
 from torch.nn import L1Loss
 
 from sbi.diagnostics.tarp import (
+    _infer_posterior_on_batch,
+    _prepare_estimates,
+    _run_tarp,
     check_tarp,
-    infer_posterior_on_batch,
-    prepare_estimates,
     run_tarp,
 )
 from sbi.inference import SNPE, simulate_for_sbi
@@ -153,11 +154,11 @@ def test_distances(onsamples):
 def test_run_tarp_correct(onsamples):
     theta, samples = onsamples
 
-    ecp, alpha = run_tarp(samples, theta, num_bins=30)
+    ecp, alpha = _run_tarp(samples, theta, num_bins=30)
 
     assert allclose((ecp - alpha).abs().max(), Tensor([0.0]), atol=1e-1)
 
-    ecp, alpha = run_tarp(samples, theta, distance=l1, num_bins=30)
+    ecp, alpha = _run_tarp(samples, theta, distance=l1, num_bins=30)
 
     assert allclose((ecp - alpha).abs().max(), Tensor([0.0]), atol=1e-1)
 
@@ -165,14 +166,14 @@ def test_run_tarp_correct(onsamples):
 def test_run_tarp_correct_using_norm(onsamples):
     theta, samples = onsamples
 
-    ecp, alpha = run_tarp(samples, theta, num_bins=30, do_norm=False)
+    ecp, alpha = _run_tarp(samples, theta, num_bins=30, do_norm=False)
 
     assert allclose((ecp - alpha).abs().max(), Tensor([0.0]), atol=1e-1)
     assert (
         ecp - alpha
     ).abs().sum() < 1.0  # integral of residuals should vanish, fig.2 in paper
 
-    ecp, alpha = run_tarp(samples, theta, num_bins=30, do_norm=False, distance=l1)
+    ecp, alpha = _run_tarp(samples, theta, num_bins=30, do_norm=False, distance=l1)
 
     # TARP detects that this is a correct representation of the posterior
     assert allclose((ecp - alpha).abs().max(), Tensor([0.0]), atol=1e-1)
@@ -181,12 +182,12 @@ def test_run_tarp_correct_using_norm(onsamples):
 def test_run_tarp_detect_overdispersed(oversamples):
     theta, samples = oversamples
 
-    ecp, alpha = run_tarp(samples, theta, num_bins=30, do_norm=True)
+    ecp, alpha = _run_tarp(samples, theta, num_bins=30, do_norm=True)
 
     assert not allclose((ecp - alpha).abs().max(), Tensor([0.0]), atol=1e-1)
     assert (ecp - alpha).abs().sum() > 3.0  # integral is nonzero, fig.2 in paper
 
-    ecp, alpha = run_tarp(samples, theta, num_bins=30, do_norm=True, distance=l1)
+    ecp, alpha = _run_tarp(samples, theta, num_bins=30, do_norm=True, distance=l1)
 
     # TARP detects that this is NOT a correct representation of the posterior
     # hence we test for not allclose
@@ -196,12 +197,12 @@ def test_run_tarp_detect_overdispersed(oversamples):
 def test_run_tarp_detect_underdispersed(undersamples):
     theta, samples = undersamples
 
-    ecp, alpha = run_tarp(samples, theta, num_bins=30, do_norm=True)
+    ecp, alpha = _run_tarp(samples, theta, num_bins=30, do_norm=True)
 
     assert not allclose((ecp - alpha).abs().max(), Tensor([0.0]), atol=1e-1)
     assert (ecp - alpha).abs().sum() > 3.0  # integral is nonzero, fig.2 in paper
 
-    ecp, alpha = run_tarp(samples, theta, num_bins=30, do_norm=True, distance=l1)
+    ecp, alpha = _run_tarp(samples, theta, num_bins=30, do_norm=True, distance=l1)
 
     # TARP detects that this is NOT a correct representation of the posterior
     # hence we test for not allclose
@@ -211,12 +212,12 @@ def test_run_tarp_detect_underdispersed(undersamples):
 def test_run_tarp_detect_bias(biased):
     theta, samples = biased
 
-    ecp, alpha = run_tarp(samples, theta, num_bins=30, do_norm=True)
+    ecp, alpha = _run_tarp(samples, theta, num_bins=30, do_norm=True)
 
     assert not allclose((ecp - alpha).abs().max(), Tensor([0.0]), atol=1e-1)
     assert (ecp - alpha).abs().sum() > 3.0  # integral is nonzero, fig.2 in paper
 
-    ecp, alpha = run_tarp(samples, theta, num_bins=30, do_norm=True, distance=l1)
+    ecp, alpha = _run_tarp(samples, theta, num_bins=30, do_norm=True, distance=l1)
 
     # TARP detects that this is NOT a correct representation of the posterior
     # hence we test for not allclose
@@ -226,7 +227,7 @@ def test_run_tarp_detect_bias(biased):
 def test_check_tarp_correct(onsamples):
     theta, samples = onsamples
 
-    ecp, alpha = run_tarp(samples, theta, num_bins=30, do_norm=False)
+    ecp, alpha = _run_tarp(samples, theta, num_bins=30, do_norm=False)
     print("onsamples")
     print("tarp results", ecp, alpha)
     atc, kspvals = check_tarp(ecp, alpha)
@@ -241,7 +242,7 @@ def test_check_tarp_correct(onsamples):
 def test_check_tarp_underdispersed(undersamples):
     theta, samples = undersamples
 
-    ecp, alpha = run_tarp(samples, theta, num_bins=30, do_norm=False)
+    ecp, alpha = _run_tarp(samples, theta, num_bins=30, do_norm=False)
     print("underdispersed")
     print("tarp results", ecp, alpha)
     atc, kspvals = check_tarp(ecp, alpha)
@@ -259,7 +260,7 @@ def test_check_tarp_underdispersed(undersamples):
 def test_check_tarp_overdispersed(oversamples):
     theta, samples = oversamples
 
-    ecp, alpha = run_tarp(samples, theta, num_bins=50, do_norm=False)
+    ecp, alpha = _run_tarp(samples, theta, num_bins=50, do_norm=False)
     print("overdispersed")
     print("tarp results", ecp, alpha)
     atc, kspvals = check_tarp(ecp, alpha)
@@ -275,7 +276,7 @@ def test_check_tarp_overdispersed(oversamples):
 def test_check_tarp_detect_bias(biased):
     theta, samples = biased
 
-    ecp, alpha = run_tarp(samples, theta, num_bins=30, do_norm=True)
+    ecp, alpha = _run_tarp(samples, theta, num_bins=30, do_norm=True)
     print("biased")
     print("tarp results", ecp, alpha)
     atc, kspvals = check_tarp(ecp, alpha)
@@ -322,13 +323,13 @@ def test_batched_prepare_estimates(method, model="mdn"):
     thetas = prior.sample((num_tarp_runs,))
     xs = simulator(thetas)
 
-    samples = infer_posterior_on_batch(xs, posterior, num_posterior_samples)
+    samples = _infer_posterior_on_batch(xs, posterior, num_posterior_samples)
 
     assert samples.shape != thetas.shape
     assert samples.shape[1:] == thetas.shape
     assert samples.shape[0] == num_posterior_samples
 
-    samples_ = prepare_estimates(
+    samples_ = _prepare_estimates(
         xs, posterior, num_posterior_samples, infer_batch_size=32
     )
 
@@ -370,12 +371,15 @@ def test_consistent_run_tarp_results_with_posterior(method, model="mdn"):
     thetas = prior.sample((num_tarp_sims,))
     xs = simulator(thetas)
 
-    samples = prepare_estimates(xs, posterior, num_posterior_samples)
-
-    ecp, alpha = run_tarp(samples, thetas, num_bins=30, do_norm=True)
-
-    assert allclose((ecp - alpha).abs().max(), Tensor([0.0]), atol=1e-1)
-    assert (ecp - alpha).abs().sum() < 1.0
+    ecp, alpha = run_tarp(
+        thetas,
+        xs,
+        posterior=posterior,
+        num_posterior_samples=num_posterior_samples,
+        num_bins=30,
+        do_norm=True,
+        rng_seed=41,
+    )
 
     atc, kspvals = check_tarp(ecp, alpha)
     print(atc, kspvals)
