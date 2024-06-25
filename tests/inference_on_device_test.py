@@ -21,7 +21,6 @@ from sbi.inference import (
     SNRE_A,
     SNRE_B,
     SNRE_C,
-    DirectPosterior,
     VIPosterior,
     likelihood_estimator_based_potential,
     ratio_estimator_based_potential,
@@ -311,15 +310,21 @@ def test_train_with_different_data_and_training_device(
     x_o = torch.zeros(x.shape[1])
     inference = inference.append_simulations(theta, x, data_device=data_device)
 
-    posterior_estimator = inference.train(max_num_epochs=2)
+    estimator = inference.train(max_num_epochs=2)
 
     # Check for default device for inference object
     weights_device = next(inference._neural_net.parameters()).device
     assert torch.device(training_device) == weights_device
 
-    _ = DirectPosterior(
-        posterior_estimator=posterior_estimator, prior=prior
+    # Check device inference in posterior class
+    posterior = inference.build_posterior(
+        # use data_device as switch to test both device inference cases.
+        density_estimator=estimator if data_device == "cpu" else None,
+        prior=prior,
     ).set_default_x(x_o)
+    assert posterior._device == str(
+        weights_device
+    ), "inferred posterior device not correct."
 
 
 @pytest.mark.gpu
