@@ -28,6 +28,7 @@ from sbi.neural_nets.flow import (
 )
 from sbi.neural_nets.mdn import build_mdn
 from sbi.neural_nets.mnle import build_mnle
+from sbi.utils.nn_utils import check_net_device
 
 model_builders = {
     "mdn": build_mdn,
@@ -98,8 +99,8 @@ def classifier_nn(
                 z_score_theta,
                 z_score_x,
                 hidden_features,
-                embedding_net_theta,
-                embedding_net_x,
+                check_net_device(embedding_net_theta, "cpu"),
+                check_net_device(embedding_net_x, "cpu"),
             ),
         ),
         **kwargs,
@@ -180,7 +181,7 @@ def likelihood_nn(
                 hidden_features,
                 num_transforms,
                 num_bins,
-                embedding_net,
+                check_net_device(embedding_net, "cpu"),
                 num_components,
             ),
         ),
@@ -256,7 +257,7 @@ def posterior_nn(
                 hidden_features,
                 num_transforms,
                 num_bins,
-                embedding_net,
+                check_net_device(embedding_net, "cpu"),
                 num_components,
             ),
         ),

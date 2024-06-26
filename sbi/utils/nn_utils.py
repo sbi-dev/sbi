@@ -10,8 +10,8 @@ from sbi.utils.user_input_checks import check_data_device
 def get_numel(
     batch_x: Tensor,
     batch_y: Tensor,
-    embedding_net_x: Optional[nn.Module] | None = None,
-    embedding_net_y: Optional[nn.Module] | None = None,
+    embedding_net_x: Optional[nn.Module] = None,
+    embedding_net_y: Optional[nn.Module] = None,
     warn_on_1d: bool = False,
 ) -> Tuple[int, int]:
     """
@@ -45,3 +45,27 @@ def get_numel(
         )
 
     return x_numel, y_numel
+
+
+def check_net_device(net: nn.Module, device: str) -> nn.Module:
+    """
+    Check whether a net is on the desired device and move it there if not.
+
+    Args:
+        net: neural network.
+        device: desired device.
+
+    Returns:
+        Neural network on the desired device.
+    """
+
+    if isinstance(net, nn.Identity):
+        return net
+    if str(next(net.parameters()).device) != device:
+        warn(
+            f"Network is not on the correct device. Moving it to {device}.",
+            stacklevel=2,
+        )
+        return net.to(device)
+    else:
+        return net
