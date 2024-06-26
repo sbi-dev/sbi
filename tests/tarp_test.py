@@ -347,9 +347,9 @@ def test_consistent_run_tarp_results_with_posterior(method, model="mdn"):
     num_dim = 2
     prior = BoxUniform(-ones(num_dim), ones(num_dim))
 
-    num_simulations = 1000
-    max_num_epochs = 20
-    num_tarp_sims = 100
+    num_simulations = 6000
+    num_tarp_sims = 1000
+    num_posterior_samples = 1000
 
     likelihood_shift = -1.0 * ones(num_dim)
     likelihood_cov = 0.3 * eye(num_dim)
@@ -357,16 +357,14 @@ def test_consistent_run_tarp_results_with_posterior(method, model="mdn"):
     def simulator(theta):
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    inferer = method(prior, show_progress_bars=False, density_estimator=model)
+    inferer = method(prior, show_progress_bars=True, density_estimator=model)
 
-    theta, x = simulate_for_sbi(simulator, prior, num_simulations)
+    theta = prior.sample((num_simulations,))
+    x = simulator(theta)
 
-    _ = inferer.append_simulations(theta, x).train(
-        training_batch_size=100, max_num_epochs=max_num_epochs
-    )
+    _ = inferer.append_simulations(theta, x).train(training_batch_size=1000)
 
     posterior = inferer.build_posterior()
-    num_posterior_samples = 256
 
     thetas = prior.sample((num_tarp_sims,))
     xs = simulator(thetas)
@@ -383,6 +381,5 @@ def test_consistent_run_tarp_results_with_posterior(method, model="mdn"):
 
     atc, kspvals = check_tarp(ecp, alpha)
     print(atc, kspvals)
-    assert atc < 0.5
-    assert atc > -0.5
+    assert -0.5 < atc < 0.5
     assert kspvals > 0.05
