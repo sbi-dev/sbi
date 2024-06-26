@@ -374,7 +374,7 @@ def check_tarp(
 
     kstest_pvals = kstest(ecp.numpy(), alpha.numpy())[1]
 
-    return atc.item(), kstest_pvals.item()
+    return atc, kstest_pvals
 
 
 def plot_tarp(ecp: Tensor, alpha: Tensor, title="") -> Tuple[Figure, Axes]:
