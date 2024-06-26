@@ -9,8 +9,10 @@ import warnings
 import pytest
 import torch
 
+from sbi.inference import simulate_for_sbi
 from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
-from sbi.simulators.simutils import simulate_in_batches
+from sbi.utils.torchutils import BoxUniform
+from sbi.utils.user_input_checks import process_prior, process_simulator
 
 warnings.simplefilter(action="ignore", category=FutureWarning)
 
@@ -31,26 +33,28 @@ def slow_linear_gaussian(theta):
 def test_benchmarking_parallel_simulation(sim_batch_size, num_workers):
     """Test whether joblib is faster than serial processing."""
     num_simulations = 100
-    theta = torch.zeros(num_simulations, 2)
-    show_pbar = True
+
+    prior = BoxUniform(low=torch.tensor([0]), high=torch.tensor([1]), device='cpu')
+    prior, _, prior_returns_numpy = process_prior(prior)
+    simulator = process_simulator(slow_linear_gaussian, prior, prior_returns_numpy)
 
     tic = time.time()
-    simulate_in_batches(
-        slow_linear_gaussian,
-        theta,
-        sim_batch_size,
+    simulate_for_sbi(
+        simulator,
+        proposal=prior,
+        num_simulations=num_simulations,
         num_workers=1,
-        show_progress_bars=show_pbar,
+        simulation_batch_size=sim_batch_size,
     )
     toc_sp = time.time() - tic
 
     tic = time.time()
-    simulate_in_batches(
-        slow_linear_gaussian,
-        theta,
-        sim_batch_size,
+    simulate_for_sbi(
+        simulator,
+        proposal=prior,
+        num_simulations=num_simulations,
         num_workers=num_workers,
-        show_progress_bars=show_pbar,
+        simulation_batch_size=sim_batch_size,
     )
     toc_joblib = time.time() - tic
 
