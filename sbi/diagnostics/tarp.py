@@ -224,14 +224,13 @@ def _run_tarp(
     """
     # TARP assumes that the predicted thetas are sampled from the "true"
     # PDF num_samples times
-    # TARP assumes that the predicted thetas are sampled from the "true"
-    # PDF num_samples times
     assert (
         len(theta.shape) == 2
     ), f"theta must be of shape (num_sims, num_dims), received {theta.shape}"
     assert (
         len(samples.shape) == 3
-    ), f"samples must be of shape (num_samples, num_sims, num_dims), received {samples.shape}"
+    ), f"""samples must be of shape (num_samples, num_sims, num_dims),
+        received {samples.shape}"""
 
     assert (
         theta.shape[-2:] == samples.shape[-2:]
