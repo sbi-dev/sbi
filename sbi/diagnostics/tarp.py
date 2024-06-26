@@ -224,8 +224,14 @@ def _run_tarp(
     """
     # TARP assumes that the predicted thetas are sampled from the "true"
     # PDF num_samples times
-    theta = theta.detach() if len(theta.shape) != 2 else theta.detach().unsqueeze(0)
-    samples = samples.detach()
+    # TARP assumes that the predicted thetas are sampled from the "true"
+    # PDF num_samples times
+    assert (
+        len(theta.shape) == 2
+    ), f"theta must be of shape (num_sims, num_dims), received {theta.shape}"
+    assert (
+        len(samples.shape) == 3
+    ), f"samples must be of shape (num_samples, num_sims, num_dims), received {samples.shape}"
 
     assert (
         theta.shape[-2:] == samples.shape[-2:]
@@ -247,12 +253,13 @@ def _run_tarp(
         theta = (theta - lo) / (hi - lo + 1e-10)
 
     references = _check_references(theta, references)
-    assert len(references.shape) == len(
-        samples.shape
-    ), f"shape mismatch of references {references.shape} and samples {samples.shape}"
+    assert (
+        references.shape == samples.shape[1:]
+    ), f"""reference.shape must match the last two dimensions of samples:
+    {references.shape} vs {samples.shape}."""
 
     # distances between references and samples
-    sample_dists = distance(references.expand(num_samples, -1, -1), samples)
+    sample_dists = distance(references, samples)
 
     # distances between references and true values
     theta_dists = distance(references, theta)
@@ -368,7 +375,7 @@ def check_tarp(
 
     kstest_pvals = kstest(ecp.numpy(), alpha.numpy())[1]
 
-    return atc, kstest_pvals
+    return atc.item(), kstest_pvals.item()
 
 
 def plot_tarp(ecp: Tensor, alpha: Tensor, title="") -> Tuple[Figure, Axes]:
