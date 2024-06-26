@@ -146,15 +146,15 @@ def _check_references(
 
         # obtain min/max per dimension of theta
         lo = (
-            torch.min(thetas, dim=-2).values.min(axis=0).values
+            torch.min(thetas, dim=-2).values.min(dim=0).values
         )  # should be 0 if normalized
         hi = (
-            torch.max(thetas, dim=-2).values.max(axis=0).values
+            torch.max(thetas, dim=-2).values.max(dim=0).values
         )  # should be 1 if normalized
 
         refpdf = torch.distributions.Uniform(low=lo, high=hi)
         # sample one reference point for each entry in theta
-        references = refpdf.sample((1, thetas.shape[-2]))
+        references = refpdf.sample(torch.Size((1, thetas.shape[-2])))
     else:
         if len(references.shape) == 2:
             # add singleton dimension in front
@@ -238,10 +238,10 @@ def _run_tarp(
 
     if do_norm:
         lo = torch.min(
-            theta, dim=-2, keepdims=True
+            theta, dim=-2, keepdim=True
         ).values  # min along samples.shape[-2]
         hi = torch.max(
-            theta, dim=-2, keepdims=True
+            theta, dim=-2, keepdim=True
         ).values  # max along samples.shape[-2]
         samples = (samples - lo) / (hi - lo + 1e-10)
         theta = (theta - lo) / (hi - lo + 1e-10)
@@ -258,7 +258,7 @@ def _run_tarp(
     theta_dists = distance(references, theta)
 
     # compute coverage, f in algorithm 2
-    coverage_values = torch.sum(sample_dists < theta_dists, axis=0) / num_samples
+    coverage_values = torch.sum(sample_dists < theta_dists, dim=0) / num_samples
     hist, bin_edges = torch.histogram(coverage_values, density=True, bins=num_bins)
     stepsize = bin_edges[1] - bin_edges[0]
     ecp = torch.cumsum(hist, dim=0) * stepsize
@@ -364,12 +364,9 @@ def check_tarp(
 
     nentries = alpha.shape[0]
     midindex = nentries // 2
-    atc = (ecp[midindex:, ...] - alpha[midindex:, ...]).sum()
+    atc = float((ecp[midindex:, ...] - alpha[midindex:, ...]).sum())
 
-    kstest_pvals = torch.tensor(
-        kstest(ecp.numpy(), alpha.numpy())[1],
-        dtype=torch.float32,
-    )
+    kstest_pvals = kstest(ecp.numpy(), alpha.numpy())[1]
 
     return atc, kstest_pvals
 
