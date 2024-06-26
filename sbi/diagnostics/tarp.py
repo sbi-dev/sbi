@@ -21,6 +21,7 @@ from sbi.inference.posteriors.vi_posterior import VIPosterior
 from sbi.utils.metrics import l2
 
 
+# TODO: can be replaced by batched sampling for DirectPosterior.
 def _infer_posterior_on_batch(
     xs: Tensor,
     posterior: NeuralPosterior,
@@ -69,6 +70,7 @@ def _infer_posterior_on_batch(
 # the purpose of the function is (a) to align with the sbc interface and
 # (b) to provide the data which is required to run TARP
 # NOTE: this function needs to be removed once better alternatives exist.
+# TODO: Can be integrated into tarp method loop, and into sbc function.
 def _prepare_estimates(
     xs: Tensor,
     posterior: NeuralPosterior,
@@ -145,16 +147,12 @@ def _check_references(
             torch.random.manual_seed(rng_seed)
 
         # obtain min/max per dimension of theta
-        lo = (
-            torch.min(thetas, dim=-2).values.min(dim=0).values
-        )  # should be 0 if normalized
-        hi = (
-            torch.max(thetas, dim=-2).values.max(dim=0).values
-        )  # should be 1 if normalized
+        lo = thetas.min(dim=0).values  # min for each theta dimension
+        hi = thetas.max(dim=0).values  # max for each theta dimension
 
         refpdf = torch.distributions.Uniform(low=lo, high=hi)
         # sample one reference point for each entry in theta
-        references = refpdf.sample(torch.Size((1, thetas.shape[-2])))
+        references = refpdf.sample(torch.Size([thetas.shape[0]]))
     else:
         if len(references.shape) == 2:
             # add singleton dimension in front
@@ -233,21 +231,17 @@ def _run_tarp(
         received {samples.shape}"""
 
     assert (
-        theta.shape[-2:] == samples.shape[-2:]
-    ), f"shapes of theta {theta.shape[-2:]} and samples {samples.shape[-2:]} do not fit"
+        theta.shape == samples.shape[1:]
+    ), f"shapes of theta {theta.shape} and samples {samples.shape[1:]} do not fit"
 
-    num_samples = samples.shape[0]  # samples per simulation
+    num_samples, num_sims, num_dims = samples.shape  # samples per simulation
 
     if num_bins is None:
-        num_bins = samples.shape[-2] // 10
+        num_bins = num_sims // 10
 
     if do_norm:
-        lo = torch.min(
-            theta, dim=-2, keepdim=True
-        ).values  # min along samples.shape[-2]
-        hi = torch.max(
-            theta, dim=-2, keepdim=True
-        ).values  # max along samples.shape[-2]
+        lo = theta.min(dim=0, keepdim=True).values  # min over batch
+        hi = theta.max(dim=0, keepdim=True).values  # max over batch
         samples = (samples - lo) / (hi - lo + 1e-10)
         theta = (theta - lo) / (hi - lo + 1e-10)
 
