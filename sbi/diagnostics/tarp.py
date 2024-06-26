@@ -398,7 +398,9 @@ def plot_tarp(ecp: Tensor, alpha: Tensor, title="") -> Tuple[Figure, Axes]:
 
     """
 
-    fig, ax = plt.subplots(1, 1)
+    fig = plt.figure(figsize=(6, 6))
+    ax: Axes = plt.gca()
+
     ax.plot(alpha, ecp, color="blue", label="TARP")
     ax.plot(alpha, alpha, color="black", linestyle="--", label="ideal")
     ax.set_xlabel(r"Credibility Level $\alpha$")
@@ -407,4 +409,4 @@ def plot_tarp(ecp: Tensor, alpha: Tensor, title="") -> Tuple[Figure, Axes]:
     ax.set_ylim(0.0, 1.0)
     ax.set_title(title)
     ax.legend()
-    return fig, ax
+    return fig, ax  # type: ignore
