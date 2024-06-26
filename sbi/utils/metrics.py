@@ -538,7 +538,7 @@ def l2(x: Tensor, y: Tensor, axis=-1) -> Tensor:
         Tensor: A tensor containing the L2 distance between x and y along the
                 specified axis.
     """
-    return torch.sqrt(torch.sum((x - y) ** 2, axis=axis))
+    return torch.sqrt(torch.sum((x - y) ** 2, dim=axis))
 
 
 def l1(x: Tensor, y: Tensor, axis=-1) -> Tensor:
@@ -557,7 +557,7 @@ def l1(x: Tensor, y: Tensor, axis=-1) -> Tensor:
         Tensor: A tensor containing the L1 distance between x and y along the
                 specified axis.
     """
-    return torch.sum(torch.abs(x - y), axis=axis)
+    return torch.sum(torch.abs(x - y), dim=axis)
 
 
 def main():
