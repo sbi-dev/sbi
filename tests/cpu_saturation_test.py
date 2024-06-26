@@ -4,7 +4,8 @@
 # #1175. In the old main:
 # 1. open the process manager / htop, an start monitoring the cpu usage
 # 2. run the test, allow the processes to spawn correctly and take note of the
-#    CPU usage/iterations per second
+#    CPU usage/iterations per second. THERE IS NO NEED TO RUN THE TEST UNTIL THE
+#    END as it does not check anything per se.
 # Run this same test in the patched branch. There should be a significant
 # improvement in performance, due to higher CPU saturation.
 
