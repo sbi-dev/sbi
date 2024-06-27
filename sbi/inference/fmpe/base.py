@@ -20,7 +20,7 @@ from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.neural_nets.density_estimators.zuko_flow_estimator import (
     ZukoFlowMatchingEstimator,
 )
-from sbi.neural_nets.density_estimators import DensityEstimator
+from sbi.neural_nets.density_estimators import ConditionalDensityEstimator
 from sbi.utils.sbiutils import mask_sims_from_prior
 
 from sbi.utils import (
@@ -43,7 +43,7 @@ class FMPE(NeuralInference):
     def __init__(
         self,
         prior: Optional[Distribution],
-        density_estimator: ZukoFlowMatchingEstimator = None,
+        density_estimator: Optional[ZukoFlowMatchingEstimator] = None,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
@@ -85,7 +85,7 @@ class FMPE(NeuralInference):
         resume_training: bool = False,
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[dict] = None,
-    ) -> DensityEstimator:
+    ) -> ConditionalDensityEstimator:
         """Train the density estimator.
         
         Args:
@@ -114,7 +114,7 @@ class FMPE(NeuralInference):
             start_idx,
             training_batch_size,
             validation_fraction,
-            resume_training=None,
+            resume_training=False,
             dataloader_kwargs=dataloader_kwargs,
         )
 
@@ -222,7 +222,7 @@ class FMPE(NeuralInference):
 
     def build_posterior(
         self,
-        density_estimator: Optional[DensityEstimator] = None,
+        density_estimator: Optional[ConditionalDensityEstimator] = None,
         prior: Optional[Distribution] = None,
         direct_sampling_parameters: Optional[Dict[str, Any]] = None,
     ) -> DirectPosterior:

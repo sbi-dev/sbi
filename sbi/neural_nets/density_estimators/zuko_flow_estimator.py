@@ -1,9 +1,9 @@
 import math
 import torch
 import torch.nn as nn
-from typing import Tuple
+from typing import Optional, Tuple
 
-from sbi.neural_nets.density_estimators.base import DensityEstimator
+from sbi.neural_nets.density_estimators.base import ConditionalDensityEstimator
 from torch.distributions import Distribution
 import zuko
 from zuko.distributions import DiagNormal, NormalizingFlow
@@ -12,17 +12,17 @@ from zuko.transforms import FreeFormJacobianTransform
 from zuko.utils import broadcast
 
 
-class ZukoFlowMatchingEstimator(DensityEstimator):
+class ZukoFlowMatchingEstimator(ConditionalDensityEstimator):
     def __init__(
         self,
-        theta_shape: torch.Size,
+        theta_shape: int,
         condition_shape: torch.Size,
-        net: nn.Module = None,
+        net: Optional[nn.Module] = None,
         frequency: int = 3,
         eta: float = 1e-3,
         device: str = "cpu",
-        z_score_theta: zuko.transforms.MonotonicAffineTransform = None,
-        z_score_x: torch.nn.Module = None,
+        z_score_theta: Optional[zuko.transforms.MonotonicAffineTransform] = None,
+        z_score_x: Optional[torch.nn.Module] = None,
     ) -> None:
         """Creates a vector field estimator for Flow Matching.
 
@@ -38,7 +38,7 @@ class ZukoFlowMatchingEstimator(DensityEstimator):
         # instantiate the regression network
         if not net:
             net = MLP(
-                in_features=theta_shape.numel()
+                in_features=theta_shape
                 + condition_shape.numel()
                 + 2 * frequency,
                 out_features=theta_shape,
@@ -50,7 +50,7 @@ class ZukoFlowMatchingEstimator(DensityEstimator):
         else:
             raise ValueError("net must be an instance of torch.nn.Module")
 
-        super().__init__(net=net, condition_shape=condition_shape)
+        super().__init__(net=net, input_shape=theta_shape ,condition_shape=condition_shape)
         self.device = device
         self.theta_shape = theta_shape
         self.frequency = torch.arange(1, frequency + 1, device=self.device) * math.pi
