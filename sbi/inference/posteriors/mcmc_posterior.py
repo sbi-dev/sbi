@@ -391,12 +391,63 @@ class MCMCPosterior(NeuralPosterior):
             Samples from the posteriors of shape (*sample_shape, B, *input_shape)
         """
 
-        # See #1176 for a discussion on the implementation of batched sampling.
-        raise NotImplementedError(
-            "Batched sampling is not implemented for MCMC posterior. \
-            Alternatively you can use `sample` in a loop \
-            [posterior.sample(theta, x_o) for x_o in x]."
+        batch_size = x.shape[0]
+        self.potential_fn.set_x(x, interpret_as_iid=False)
+
+        # Replace arguments that were not passed with their default.
+        method = self.method if method is None else method
+        thin = self.thin if thin is None else thin
+        warmup_steps = self.warmup_steps if warmup_steps is None else warmup_steps
+        num_chains = self.num_chains if num_chains is None else num_chains
+        init_strategy = self.init_strategy if init_strategy is None else init_strategy
+        num_workers = self.num_workers if num_workers is None else num_workers
+        mp_context = self.mp_context if mp_context is None else mp_context
+        init_strategy_parameters = (
+            self.init_strategy_parameters
+            if init_strategy_parameters is None
+            else init_strategy_parameters
         )
+        self.potential_ = self._prepare_potential(method)  # type: ignore
+
+        # For each observation in the batch, we have num_chains independent chains.
+        num_chains_extended = batch_size * num_chains
+        initial_params = self._get_initial_params(
+            init_strategy,  # type: ignore
+            num_chains_extended,  # type: ignore
+            num_workers,
+            show_progress_bars,
+            **init_strategy_parameters,
+        )
+        # We need num_samples from each posterior in the batch
+        num_samples = torch.Size(sample_shape).numel() * batch_size
+
+        assert (
+            method == "slice_np_vectorized"
+        ), "Batched sampling only supported for vectorized samplers!"
+
+        with torch.set_grad_enabled(False):
+            transformed_samples = self._slice_np_mcmc(
+                num_samples=num_samples,
+                potential_function=self.potential_,
+                initial_params=initial_params,
+                thin=thin,  # type: ignore
+                warmup_steps=warmup_steps,  # type: ignore
+                vectorized=(method == "slice_np_vectorized"),
+                num_workers=num_workers,
+                show_progress_bars=show_progress_bars,
+            )
+
+        samples = self.theta_transform.inv(transformed_samples)
+        sample_shape_len = len(sample_shape)
+        # Samples are of shape (num_samples, num_chains_extended, *input_shape)
+        # concatenate all chains the chains per x together and return.
+        return samples.reshape((batch_size, *sample_shape, -1)).permute(
+            tuple(range(1, sample_shape_len + 1))
+            + (
+                0,
+                -1,
+            )
+        )  # type: ignore
 
     def _build_mcmc_init_fn(
         self,
@@ -550,9 +601,14 @@ class MCMCPosterior(NeuralPosterior):
         else:
             SliceSamplerMultiChain = SliceSamplerVectorized
 
+        def multi_obs_potential(params):
+            # Params are of shape (num_chains * num_obs, event).
+            all_potentials = potential_function(params)  # Shape: (num_chains, num_obs)
+            return all_potentials.flatten()
+
         posterior_sampler = SliceSamplerMultiChain(
             init_params=tensor2numpy(initial_params),
-            log_prob_fn=potential_function,
+            log_prob_fn=multi_obs_potential,
             num_chains=num_chains,
             thin=thin,
             verbose=show_progress_bars,
@@ -572,8 +628,10 @@ class MCMCPosterior(NeuralPosterior):
         # Save sample as potential next init (if init_strategy == 'latest_sample').
         self._mcmc_init_params = samples[:, -1, :].reshape(num_chains, dim_samples)
 
+        # Update: don't concatenate all chains yet, as they might be used for batched
+        # sampling.
         # Collect samples from all chains.
-        samples = samples.reshape(-1, dim_samples)[:num_samples]
+        # samples = samples.reshape(-1, dim_samples)[:num_samples]
 
         return samples.type(torch.float32).to(self._device)
 

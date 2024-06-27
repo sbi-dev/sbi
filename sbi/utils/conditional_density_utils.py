@@ -292,7 +292,7 @@ class ConditionedPotential:
         self.condition = condition
         self.dims_to_sample = dims_to_sample
         self.device = self.potential_fn.device
-        self.allow_iid_x = allow_iid_x
+        self.x_is_iid = allow_iid_x
 
     def __call__(
         self, theta: Tensor, x_o: Optional[Tensor] = None, track_gradients: bool = True
@@ -326,7 +326,7 @@ class ConditionedPotential:
     def set_x(self, x_o: Optional[Tensor]):
         """Check the shape of the observed data and, if valid, set it."""
         if x_o is not None:
-            x_o = process_x(x_o, allow_iid_x=self.allow_iid_x).to(self.device)
+            x_o = process_x(x_o).to(self.device)
         self.potential_fn.set_x(x_o)
 
     @property
