@@ -16,7 +16,7 @@ from sbi.inference import SNLE, SNPE, SNRE
         (SNPE, "direct"),
         pytest.param(SNLE, "mcmc", marks=pytest.mark.mcmc),
         pytest.param(SNRE, "mcmc", marks=pytest.mark.mcmc),
-        pytest.param(SNRE, "vi", marks=pytest.mark.xfail),  # bug: see #684
+        pytest.param(SNRE, "vi", marks=pytest.mark.mcmc),
         (SNRE, "rejection"),
     ),
 )

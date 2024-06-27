@@ -42,7 +42,7 @@ dependencies = [
     "torch>=1.8.0",
     "tqdm",
     "pymc>=5.0.0",
-    "zuko>=1.1.0",
+    "zuko>=1.2.0",
 ]
 
 [project.optional-dependencies]
@@ -124,6 +124,7 @@ markers = [
     "gpu: marks tests that require a gpu (deselect with '-m \"not gpu\"')",
     "mcmc: marks tests that require MCMC sampling (deselect with '-m \"not mcmc\"')"
 ]
+xfail_strict = true
 
 # Pyright configuration
 [tool.pyright]

@@ -15,7 +15,7 @@ from sbi.inference.potentials.base_potential import (
     CallablePotentialWrapper,
 )
 from sbi.sbi_types import Array, Shape, TorchTransform
-from sbi.utils import gradient_ascent
+from sbi.utils.sbiutils import gradient_ascent
 from sbi.utils.torchutils import ensure_theta_batched, process_device
 from sbi.utils.user_input_checks import process_x
 

@@ -56,15 +56,36 @@ def test_log_prob_with_different_x(snpe_method: type, x_o_batch_dim: bool):
     _ = posterior.log_prob(samples)
 
 
-@pytest.mark.parametrize("snpe_method", [SNPE_A, SNPE_C])
+
 @pytest.mark.parametrize(
-    "x_o_batch_dim",
-    (
-        0,
-        1,
-        2,
-    ),
+    "snplre_method", [SNPE_A, SNPE_C, SNLE_A, SNRE_A, SNRE_B, SNRE_C]
 )
+def test_importance_posterior_sample_log_prob(snplre_method: type):
+    num_dim = 2
+
+    prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
+    simulator = diagonal_linear_gaussian
+
+    inference = snplre_method(prior=prior)
+    theta, x = simulate_for_sbi(simulator, prior, 1000)
+    _ = inference.append_simulations(theta, x).train(max_num_epochs=3)
+
+    posterior = inference.build_posterior(sample_with="importance")
+
+    x_o = ones(num_dim)
+    samples = posterior.sample((10,), x=x_o)
+    samples2, weights = posterior.sample((10,), x=x_o, method="importance")
+    assert samples.shape == (10, num_dim), "Sample shape of sample is wrong"
+    assert samples2.shape == (10, num_dim), "Sample of sample_with_weights shape wrong"
+    assert weights.shape == (10,), "Weights shape wrong"
+
+    log_prob = posterior.log_prob(samples, x=x_o)
+
+    assert log_prob.shape == (10,), "logprob shape wrong"
+
+
+@pytest.mark.parametrize("snpe_method", [SNPE_A, SNPE_C])
+@pytest.mark.parametrize("x_o_batch_dim", (0, 1, 2))
 def test_batched_sample_log_prob_with_different_x(
     snpe_method: type, x_o_batch_dim: bool
 ):
@@ -120,6 +141,7 @@ def test_batched_mcmc_sample_log_prob_shape_with_different_x(
         sample_with="mcmc",
         mcmc_method="slice_np_vectorized",
         mcmc_parameters=mcmc_params_fast,
+
     )
 
     samples = posterior.sample_batched((10,), x_o)

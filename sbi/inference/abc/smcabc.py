@@ -14,7 +14,10 @@ from torch.distributions import Distribution, Multinomial, MultivariateNormal
 
 from sbi.inference.abc.abc_base import ABCBASE
 from sbi.sbi_types import Array
-from sbi.utils import BoxUniform, KDEWrapper, get_kde, process_x, within_support
+from sbi.utils.kde import KDEWrapper, get_kde
+from sbi.utils.sbiutils import within_support
+from sbi.utils.torchutils import BoxUniform
+from sbi.utils.user_input_checks import process_x
 
 
 class SMCABC(ABCBASE):

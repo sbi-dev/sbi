@@ -7,8 +7,12 @@ from pyknos.mdn.mdn import MultivariateGaussianMDN
 from pyknos.nflows import flows, transforms
 from torch import Tensor, nn
 
-import sbi.utils as utils
 from sbi.neural_nets.density_estimators import NFlowsFlow
+from sbi.utils.sbiutils import (
+    standardizing_net,
+    standardizing_transform,
+    z_score_parser,
+)
 from sbi.utils.user_input_checks import check_data_device, check_embedding_net_device
 
 
@@ -53,15 +57,15 @@ def build_mdn(
 
     transform = transforms.IdentityTransform()
 
-    z_score_x_bool, structured_x = utils.z_score_parser(z_score_x)
+    z_score_x_bool, structured_x = z_score_parser(z_score_x)
     if z_score_x_bool:
-        transform_zx = utils.standardizing_transform(batch_x, structured_x)
+        transform_zx = standardizing_transform(batch_x, structured_x)
         transform = transforms.CompositeTransform([transform_zx, transform])
 
-    z_score_y_bool, structured_y = utils.z_score_parser(z_score_y)
+    z_score_y_bool, structured_y = z_score_parser(z_score_y)
     if z_score_y_bool:
         embedding_net = nn.Sequential(
-            utils.standardizing_net(batch_y, structured_y), embedding_net
+            standardizing_net(batch_y, structured_y), embedding_net
         )
 
     distribution = MultivariateGaussianMDN(

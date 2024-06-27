@@ -11,7 +11,8 @@ from sbi.inference.potentials import mixed_likelihood_estimator_based_potential
 from sbi.inference.snle.snle_base import LikelihoodEstimator
 from sbi.neural_nets.mnle import MixedDensityEstimator
 from sbi.sbi_types import TensorboardSummaryWriter, TorchModule
-from sbi.utils import check_prior, del_entries
+from sbi.utils.sbiutils import del_entries
+from sbi.utils.user_input_checks import check_prior
 
 
 class MNLE(LikelihoodEstimator):

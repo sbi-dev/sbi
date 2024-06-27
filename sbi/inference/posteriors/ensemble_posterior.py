@@ -11,7 +11,7 @@ from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.inference.potentials.posterior_based_potential import PosteriorBasedPotential
 from sbi.sbi_types import Shape, TorchTransform
-from sbi.utils import gradient_ascent
+from sbi.utils.sbiutils import gradient_ascent
 from sbi.utils.torchutils import ensure_theta_batched
 from sbi.utils.user_input_checks import process_x
 
@@ -186,12 +186,12 @@ class EnsemblePosterior(NeuralPosterior):
         **kwargs,
     ) -> Tensor:
         num_samples = torch.Size(sample_shape).numel()
-        posterior_indizes = torch.multinomial(
+        posterior_indices = torch.multinomial(
             self._weights, num_samples, replacement=True
         )
         samples = []
         for posterior_index, sample_size in torch.vstack(
-            posterior_indizes.unique(return_counts=True)
+            posterior_indices.unique(return_counts=True)
         ).T:
             sample_shape_c = torch.Size((int(sample_size),))
             samples.append(

@@ -11,15 +11,16 @@ from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials.posterior_based_potential import (
     posterior_estimator_based_potential,
 )
-from sbi.neural_nets.density_estimators.base import DensityEstimator
+from sbi.neural_nets.density_estimators.base import ConditionalDensityEstimator
 from sbi.neural_nets.density_estimators.shape_handling import (
     reshape_to_batch_event,
     reshape_to_sample_batch_event,
 )
 from sbi.samplers.rejection import rejection
 from sbi.sbi_types import Shape
-from sbi.utils import check_prior, within_support
+from sbi.utils.sbiutils import within_support
 from sbi.utils.torchutils import ensure_theta_batched
+from sbi.utils.user_input_checks import check_prior
 
 
 class DirectPosterior(NeuralPosterior):
@@ -38,7 +39,7 @@ class DirectPosterior(NeuralPosterior):
 
     def __init__(
         self,
-        posterior_estimator: DensityEstimator,
+        posterior_estimator: ConditionalDensityEstimator,
         prior: Distribution,
         max_sampling_batch_size: int = 10_000,
         device: Optional[str] = None,
@@ -264,7 +265,7 @@ class DirectPosterior(NeuralPosterior):
     ) -> Tensor:
         """Given a batch of observations [x_1, ..., x_B] and a batch of parameters \
             [$\theta_1$,..., $\theta_B$] this function evalautes the log-probabilities \
-            of the posterior $p(\theta_1|x_1)$, ..., $p(\theta_B|x_B)$ in a batched \
+            of the posteriors $p(\theta_1|x_1)$, ..., $p(\theta_B|x_B)$ in a batched \
             (i.e. vectorized) manner.
 
         Args:

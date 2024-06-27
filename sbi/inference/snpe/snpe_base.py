@@ -13,8 +13,7 @@ from torch.distributions import Distribution
 from torch.nn.utils.clip_grad import clip_grad_norm_
 from torch.utils.tensorboard.writer import SummaryWriter
 
-from sbi import utils as utils
-from sbi.inference import NeuralInference, check_if_proposal_has_default_x
+from sbi.inference.base import NeuralInference, check_if_proposal_has_default_x
 from sbi.inference.posteriors import (
     DirectPosterior,
     MCMCPosterior,
@@ -22,8 +21,9 @@ from sbi.inference.posteriors import (
     VIPosterior,
 )
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
+from sbi.inference.posteriors.importance_posterior import ImportanceSamplingPosterior
 from sbi.inference.potentials import posterior_estimator_based_potential
-from sbi.neural_nets import DensityEstimator, posterior_nn
+from sbi.neural_nets import ConditionalDensityEstimator, posterior_nn
 from sbi.neural_nets.density_estimators.shape_handling import (
     reshape_to_batch_event,
     reshape_to_sample_batch_event,
@@ -31,6 +31,7 @@ from sbi.neural_nets.density_estimators.shape_handling import (
 from sbi.utils import (
     RestrictedPrior,
     check_estimator_arg,
+    check_prior,
     handle_invalid_x,
     nle_nre_apt_msg_on_invalid_x,
     npe_msg_on_invalid_x,
@@ -220,7 +221,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[dict] = None,
-    ) -> DensityEstimator:
+    ) -> ConditionalDensityEstimator:
         r"""Return density estimator that approximates the distribution $p(\theta|x)$.
 
         Args:
@@ -432,7 +433,7 @@ class PosteriorEstimator(NeuralInference, ABC):
 
     def build_posterior(
         self,
-        density_estimator: Optional[DensityEstimator] = None,
+        density_estimator: Optional[ConditionalDensityEstimator] = None,
         prior: Optional[Distribution] = None,
         sample_with: str = "direct",
         mcmc_method: str = "slice_np",
@@ -441,7 +442,14 @@ class PosteriorEstimator(NeuralInference, ABC):
         mcmc_parameters: Optional[Dict[str, Any]] = None,
         vi_parameters: Optional[Dict[str, Any]] = None,
         rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
-    ) -> Union[MCMCPosterior, RejectionPosterior, VIPosterior, DirectPosterior]:
+        importance_sampling_parameters: Optional[Dict[str, Any]] = None,
+    ) -> Union[
+        MCMCPosterior,
+        RejectionPosterior,
+        VIPosterior,
+        DirectPosterior,
+        ImportanceSamplingPosterior,
+    ]:
         r"""Build posterior from the neural density estimator.
 
         For SNPE, the posterior distribution that is returned here implements the
@@ -483,7 +491,7 @@ class PosteriorEstimator(NeuralInference, ABC):
             )
             prior = self._prior
         else:
-            utils.check_prior(prior)
+            check_prior(prior)
 
         if density_estimator is None:
             posterior_estimator = self._neural_net
@@ -539,6 +547,13 @@ class PosteriorEstimator(NeuralInference, ABC):
                 vi_method=vi_method,
                 device=device,
                 **vi_parameters or {},
+            )
+        elif sample_with == "importance":
+            self._posterior = ImportanceSamplingPosterior(
+                potential_fn=potential_fn,
+                proposal=prior,
+                device=device,
+                **importance_sampling_parameters or {},
             )
         else:
             raise NotImplementedError

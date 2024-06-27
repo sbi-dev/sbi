@@ -5,7 +5,7 @@ from torch import Tensor, nn
 from torch.distributions import Categorical
 from torch.nn import Sigmoid, Softmax
 
-from sbi.neural_nets.density_estimators import DensityEstimator
+from sbi.neural_nets.density_estimators.base import ConditionalDensityEstimator
 
 
 class CategoricalNet(nn.Module):
@@ -107,7 +107,7 @@ class CategoricalNet(nn.Module):
         return Categorical(probs=ps).sample(sample_shape=sample_shape)
 
 
-class CategoricalMassEstimator(DensityEstimator):
+class CategoricalMassEstimator(ConditionalDensityEstimator):
     """Conditional density (mass) estimation for a categorical random variable.
 
     The event_shape of this class is `()`.

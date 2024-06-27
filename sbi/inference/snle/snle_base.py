@@ -11,10 +11,11 @@ from torch.distributions import Distribution
 from torch.nn.utils.clip_grad import clip_grad_norm_
 from torch.utils.tensorboard.writer import SummaryWriter
 
-from sbi.inference import NeuralInference
+from sbi.inference.base import NeuralInference
 from sbi.inference.posteriors import MCMCPosterior, RejectionPosterior, VIPosterior
+from sbi.inference.posteriors.importance_posterior import ImportanceSamplingPosterior
 from sbi.inference.potentials import likelihood_estimator_based_potential
-from sbi.neural_nets import DensityEstimator, likelihood_nn
+from sbi.neural_nets import ConditionalDensityEstimator, likelihood_nn
 from sbi.neural_nets.density_estimators.shape_handling import (
     reshape_to_batch_event,
 )
@@ -127,7 +128,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
         retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[Dict] = None,
-    ) -> DensityEstimator:
+    ) -> ConditionalDensityEstimator:
         r"""Train the density estimator to learn the distribution $p(x|\theta)$.
 
         Args:
@@ -262,7 +263,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
 
     def build_posterior(
         self,
-        density_estimator: Optional[DensityEstimator] = None,
+        density_estimator: Optional[ConditionalDensityEstimator] = None,
         prior: Optional[Distribution] = None,
         sample_with: str = "mcmc",
         mcmc_method: str = "slice_np",
@@ -270,7 +271,10 @@ class LikelihoodEstimator(NeuralInference, ABC):
         mcmc_parameters: Optional[Dict[str, Any]] = None,
         vi_parameters: Optional[Dict[str, Any]] = None,
         rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
-    ) -> Union[MCMCPosterior, RejectionPosterior, VIPosterior]:
+        importance_sampling_parameters: Optional[Dict[str, Any]] = None,
+    ) -> Union[
+        MCMCPosterior, RejectionPosterior, VIPosterior, ImportanceSamplingPosterior
+    ]:
         r"""Build posterior from the neural density estimator.
 
         SNLE trains a neural network to approximate the likelihood $p(x|\theta)$. The
@@ -349,6 +353,13 @@ class LikelihoodEstimator(NeuralInference, ABC):
                 vi_method=vi_method,
                 device=device,
                 **vi_parameters or {},
+            )
+        elif sample_with == "importance":
+            self._posterior = ImportanceSamplingPosterior(
+                potential_fn=potential_fn,
+                proposal=prior,
+                device=device,
+                **importance_sampling_parameters or {},
             )
         else:
             raise NotImplementedError

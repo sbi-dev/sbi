@@ -6,16 +6,14 @@ from typing import Tuple
 import torch
 from torch import Tensor
 
-from sbi.neural_nets.density_estimators import (
-    CategoricalMassEstimator,
-    DensityEstimator,
-)
+from sbi.neural_nets.density_estimators.base import ConditionalDensityEstimator
+from sbi.neural_nets.density_estimators.categorical_net import CategoricalMassEstimator
 from sbi.neural_nets.density_estimators.nflows_flow import NFlowsFlow
 from sbi.utils.sbiutils import match_theta_and_x_batch_shapes
 from sbi.utils.torchutils import atleast_2d
 
 
-class MixedDensityEstimator(DensityEstimator):
+class MixedDensityEstimator(ConditionalDensityEstimator):
     """Class performing Mixed Neural Likelihood Estimation.
 
     MNLE combines a Categorical net and a neural spline flow to model data with

@@ -8,18 +8,18 @@ from torch import Tensor
 from torch.distributions import Distribution
 
 from sbi.inference.potentials.base_potential import BasePotential
-from sbi.neural_nets.density_estimators import DensityEstimator
+from sbi.neural_nets.density_estimators import ConditionalDensityEstimator
 from sbi.neural_nets.density_estimators.shape_handling import (
     reshape_to_batch_event,
     reshape_to_sample_batch_event,
 )
 from sbi.sbi_types import TorchTransform
-from sbi.utils import mcmc_transform
-from sbi.utils.sbiutils import within_support
+from sbi.utils.sbiutils import mcmc_transform, within_support
+from sbi.utils.torchutils import ensure_theta_batched
 
 
 def posterior_estimator_based_potential(
-    posterior_estimator: DensityEstimator,
+    posterior_estimator: ConditionalDensityEstimator,
     prior: Distribution,
     x_o: Optional[Tensor],
     enable_transform: bool = True,
@@ -60,7 +60,7 @@ def posterior_estimator_based_potential(
 class PosteriorBasedPotential(BasePotential):
     def __init__(
         self,
-        posterior_estimator: DensityEstimator,
+        posterior_estimator: ConditionalDensityEstimator,
         prior: Distribution,
         x_o: Optional[Tensor],
         device: str = "cpu",

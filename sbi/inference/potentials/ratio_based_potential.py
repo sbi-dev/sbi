@@ -13,8 +13,7 @@ from sbi.neural_nets.density_estimators.shape_handling import (
     reshape_to_sample_batch_event,
 )
 from sbi.sbi_types import TorchTransform
-from sbi.utils import mcmc_transform
-from sbi.utils.sbiutils import match_theta_and_x_batch_shapes
+from sbi.utils.sbiutils import match_theta_and_x_batch_shapes, mcmc_transform
 from sbi.utils.torchutils import atleast_2d
 
 

@@ -5,7 +5,7 @@ from sbi.neural_nets.classifier import (
     build_mlp_classifier,
     build_resnet_classifier,
 )
-from sbi.neural_nets.density_estimators import DensityEstimator, NFlowsFlow
+from sbi.neural_nets.density_estimators import ConditionalDensityEstimator, NFlowsFlow
 from sbi.neural_nets.embedding_nets import (
     CNNEmbedding,
     FCEmbedding,
