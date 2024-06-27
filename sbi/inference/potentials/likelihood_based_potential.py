@@ -165,7 +165,10 @@ def _log_likelihoods_over_trials(
 
 
 def _log_likelihoods_over_batches(
-    x: Tensor, theta: Tensor, estimator: DensityEstimator, track_gradients: bool = False
+    x: Tensor,
+    theta: Tensor,
+    estimator: ConditionalDensityEstimator,
+    track_gradients: bool = False,
 ) -> Tensor:
     r"""Return log likelihoods for batch trials of `x`.
 
@@ -180,7 +183,7 @@ def _log_likelihoods_over_batches(
     Args:
         x: Batch of data of shape `(condition_batch_dim, *event_shape)`.
         theta: Batch of parameters of shape `(batch_dim, *event_shape)`.
-        estimator: DensityEstimator.
+        estimator: ConditionalDensityEstimator.
         track_gradients: Whether to track gradients.
 
     Returns:
@@ -201,7 +204,7 @@ def _log_likelihoods_over_batches(
 
     # Shape of `theta` is (batch_dim, *event_shape). Therefore, the call below should
     # not change anything, and we just have it as "best practice" before calling
-    # `DensityEstimator.log_prob`.
+    # `ConditionalDensityEstimator.log_prob`.
     theta = reshape_to_batch_event(theta, event_shape=theta.shape[1:])
 
     x_batch_size = x.shape[0]

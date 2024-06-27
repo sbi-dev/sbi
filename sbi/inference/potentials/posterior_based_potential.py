@@ -15,7 +15,6 @@ from sbi.neural_nets.density_estimators.shape_handling import (
 )
 from sbi.sbi_types import TorchTransform
 from sbi.utils.sbiutils import mcmc_transform, within_support
-from sbi.utils.torchutils import ensure_theta_batched
 
 
 def posterior_estimator_based_potential(
@@ -128,7 +127,10 @@ class PosteriorBasedPotential(BasePotential):
 
 
 def _log_posteriors_over_trials(
-    x: Tensor, theta: Tensor, estimator: DensityEstimator, track_gradients: bool = False
+    x: Tensor,
+    theta: Tensor,
+    estimator: ConditionalDensityEstimator,
+    track_gradients: bool = False,
 ) -> Tensor:
     r"""Return log posterior probabilities for batch trials of `x`.
 
@@ -141,7 +143,7 @@ def _log_posteriors_over_trials(
     Args:
         x: Batch of iid data of shape `(iid_dim, *event_shape)`.
         theta: Batch of parameters of shape `(batch_dim, *event_shape)`.
-        estimator: DensityEstimator.
+        estimator: ConditionalDensityEstimator.
         track_gradients: Whether to track gradients.
 
     Returns:
@@ -173,7 +175,10 @@ def _log_posteriors_over_trials(
 
 
 def _log_posteriors_over_batches(
-    x: Tensor, theta: Tensor, estimator: DensityEstimator, track_gradients: bool = False
+    x: Tensor,
+    theta: Tensor,
+    estimator: ConditionalDensityEstimator,
+    track_gradients: bool = False,
 ) -> Tensor:
     r"""Return log posterior probabilities for batch trials of `x`.
 
@@ -188,7 +193,7 @@ def _log_posteriors_over_batches(
     Args:
         x: Batch of iid data of shape `(iid_dim, *event_shape)`.
         theta: Batch of parameters of shape `(batch_dim, *event_shape)`.
-        estimator: DensityEstimator.
+        estimator: ConditionalDensityEstimator.
         track_gradients: Whether to track gradients.
 
     Returns:
@@ -200,7 +205,7 @@ def _log_posteriors_over_batches(
 
     # Shape of `theta` is (batch_dim, *event_shape). Therefore, the call below should
     # not change anything, and we just have it as "best practice" before calling
-    # `DensityEstimator.log_prob`.
+    # `ConditionalDensityEstimator.log_prob`.
     theta = reshape_to_sample_batch_event(
         theta, event_shape=theta.shape[1:], leading_is_sample=False
     )
