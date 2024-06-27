@@ -16,7 +16,6 @@ from sbi.neural_nets.density_estimators.shape_handling import (
 from sbi.sbi_types import TorchTransform
 from sbi.utils import mcmc_transform
 from sbi.utils.sbiutils import within_support
-from sbi.utils.torchutils import ensure_theta_batched
 
 
 def posterior_estimator_based_potential(
@@ -59,8 +58,6 @@ def posterior_estimator_based_potential(
 
 
 class PosteriorBasedPotential(BasePotential):
-    allow_iid_x = False  # type: ignore
-
     def __init__(
         self,
         posterior_estimator: DensityEstimator,
@@ -85,9 +82,7 @@ class PosteriorBasedPotential(BasePotential):
         self.posterior_estimator = posterior_estimator
         self.posterior_estimator.eval()
 
-    def __call__(
-        self, theta: Tensor, x_is_iid: bool = True, track_gradients: bool = True
-    ) -> Tensor:
+    def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
         r"""Returns the potential for posterior-based methods.
 
         Args:
@@ -103,29 +98,124 @@ class PosteriorBasedPotential(BasePotential):
                 "No observed data x_o is available. Please reinitialize \
                 the potential or manually set self._x_o."
             )
+        # Force probability to be zero outside prior support.
 
-        theta = ensure_theta_batched(torch.as_tensor(theta)).to(self.device)
+        in_prior_support = within_support(self.prior, theta)
+        if self.x_is_iid:
+            # Calculate posterior probabilities over trials and in one batch.
+            posterior_log_prob = _log_posteriors_over_trials(
+                x=self._x_o,
+                theta=theta.to(self.device),
+                estimator=self.posterior_estimator,
+                track_gradients=track_gradients,
+            )
+        else:
+            # Calculate posterior probabilities over batches.
+            posterior_log_prob = _log_posteriors_over_batches(
+                x=self._x_o,
+                theta=theta.to(self.device),
+                estimator=self.posterior_estimator,
+                track_gradients=track_gradients,
+            )
 
         with torch.set_grad_enabled(track_gradients):
-            # Force probability to be zero outside prior support.
-            in_prior_support = within_support(self.prior, theta)
-
-            x = reshape_to_batch_event(self.x_o, event_shape=self.x_o.shape[1:])
-            assert (
-                x.shape[0] == 1
-            ), f"`x` has batchsize {x.shape[0]}. Only `batchsize == 1` is supported."
-            theta = reshape_to_sample_batch_event(
-                theta, event_shape=theta.shape[1:], leading_is_sample=True
-            )
-            # We assume that a single `x` is passed (i.e. batchsize==1), so we squeeze
-            # the batch dimension of the log-prob with `.squeeze(dim=1)`.
-            posterior_log_prob = self.posterior_estimator.log_prob(
-                theta, condition=x
-            ).squeeze(dim=1)
-
             posterior_log_prob = torch.where(
                 in_prior_support,
                 posterior_log_prob,
                 torch.tensor(float("-inf"), dtype=torch.float32, device=self.device),
             )
         return posterior_log_prob
+
+
+def _log_posteriors_over_trials(
+    x: Tensor, theta: Tensor, estimator: DensityEstimator, track_gradients: bool = False
+) -> Tensor:
+    r"""Return log posterior probabilities for batch trials of `x`.
+
+    Note: `x` can be a batch with batch size larger 1. Batches in `x` are assumed
+    to be iid trials, i.e., data generated based on the same paramters /
+    experimental conditions.
+
+    Repeats `x` and $\theta$ to cover all their combinations of batch entries.
+
+    Args:
+        x: Batch of iid data of shape `(iid_dim, *event_shape)`.
+        theta: Batch of parameters of shape `(batch_dim, *event_shape)`.
+        estimator: DensityEstimator.
+        track_gradients: Whether to track gradients.
+
+    Returns:
+        posterior_log_prob: log posterior probability for each parameter, summed over
+        all batch entries (iid trials) in `x`.
+    """
+    theta = reshape_to_sample_batch_event(
+        theta, event_shape=theta.shape[1:], leading_is_sample=False
+    )
+    x = reshape_to_batch_event(x, event_shape=x.shape[1:])
+
+    # Match the number of `x` to the number of conditions (`theta`). This is important
+    # if the potential is simulataneously evaluated at multiple `theta` (e.g.
+    # multi-chain MCMC).
+    theta_batch_size = theta.shape[1]
+    trailing_minus_ones = [-1 for _ in range(x.dim() - 1)]
+    x = x.expand(theta_batch_size, *trailing_minus_ones)
+
+    assert (
+        next(estimator.parameters()).device == x.device and x.device == theta.device
+    ), f"""device mismatch: estimator, x, theta: \
+        {next(estimator.parameters()).device}, {x.device},
+        {theta.device}."""
+
+    with torch.set_grad_enabled(track_gradients):
+        posterior_log_prob = estimator.log_prob(theta, condition=x).sum(0)
+
+    return posterior_log_prob
+
+
+def _log_posteriors_over_batches(
+    x: Tensor, theta: Tensor, estimator: DensityEstimator, track_gradients: bool = False
+) -> Tensor:
+    r"""Return log posterior probabilities for batch trials of `x`.
+
+    Note: `x` can be a batch with batch size larger 1. Batches in `x` are assumed
+    to be independent queries, e.g. MCMC chains with different target distributions.
+
+    If `x` and $\theta$ have the same batch dimension, return the log posteriors.
+    Otherwise, assume that the batch dimension of $\theta$ is a multiple of the batch
+    dimension of `x`. In this case, repeat `x` in order to cover all combinations of
+    `x`, $\theta$.
+
+    Args:
+        x: Batch of iid data of shape `(iid_dim, *event_shape)`.
+        theta: Batch of parameters of shape `(batch_dim, *event_shape)`.
+        estimator: DensityEstimator.
+        track_gradients: Whether to track gradients.
+
+    Returns:
+        posterior_log_prob: log posterior probability for each parameter, conditioned on
+        the corresponding entry of `x`.
+    """
+    # Shape of `x` is (condition_batch_dim, *event_shape).
+    x = reshape_to_batch_event(x, event_shape=x.shape[1:])
+
+    # Shape of `theta` is (batch_dim, *event_shape). Therefore, the call below should
+    # not change anything, and we just have it as "best practice" before calling
+    # `DensityEstimator.log_prob`.
+    theta = reshape_to_sample_batch_event(
+        theta, event_shape=theta.shape[1:], leading_is_sample=False
+    )
+    x_batch_size = x.shape[0]
+    theta_batch_size = theta.shape[1]
+    theta_per_x = theta_batch_size // x_batch_size
+    assert (
+        theta_batch_size % x_batch_size == 0
+    ), f"Batch size mismatch: {theta.shape[0]} and {x.shape[0]}.\
+        When performing batched mcmc sampling, the batch size of `theta` must be a\
+        multiple of the batch size of `x`."
+
+    x = torch.repeat_interleave(x, theta_per_x, dim=0)
+    # density estimator expects (sample_dim, batch_dim, *event_shape)
+    with torch.set_grad_enabled(track_gradients):
+        posterior_log_prob = estimator.log_prob(theta, condition=x)
+
+    return posterior_log_prob

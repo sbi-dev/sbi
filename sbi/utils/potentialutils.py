@@ -17,7 +17,6 @@ def transformed_potential(
     theta_transform: torch_tf.Transform,
     device: str,
     track_gradients: bool = False,
-    x_is_iid: bool = True,
 ) -> Tensor:
     """Return potential after a transformation by adding the log-abs-determinant.
 
@@ -43,9 +42,7 @@ def transformed_potential(
     theta = theta_transform.inv(transformed_theta)  # type: ignore
     log_abs_det = theta_transform.log_abs_det_jacobian(theta, transformed_theta)
 
-    posterior_potential = potential_fn(
-        theta, x_is_iid=x_is_iid, track_gradients=track_gradients
-    )
+    posterior_potential = potential_fn(theta, track_gradients=track_gradients)
     posterior_potential_transformed = posterior_potential - log_abs_det
     return posterior_potential_transformed
 

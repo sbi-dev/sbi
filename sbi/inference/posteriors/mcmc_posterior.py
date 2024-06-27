@@ -144,7 +144,7 @@ class MCMCPosterior(NeuralPosterior):
                 init_strategy_num_candidates
             )
 
-        self.potential_ = self._prepare_potential(method, x_is_iid=True)
+        self.potential_ = self._prepare_potential(method)
 
         self._purpose = (
             "It provides MCMC to .sample() from the posterior and "
@@ -300,7 +300,7 @@ class MCMCPosterior(NeuralPosterior):
         warmup_steps = _maybe_use_dict_entry(warmup_steps, "warmup_steps", m_p)
         num_chains = _maybe_use_dict_entry(num_chains, "num_chains", m_p)
         init_strategy = _maybe_use_dict_entry(init_strategy, "init_strategy", m_p)
-        self.potential_ = self._prepare_potential(method, x_is_iid=True)  # type: ignore
+        self.potential_ = self._prepare_potential(method)  # type: ignore
 
         initial_params = self._get_initial_params(
             init_strategy,  # type: ignore
@@ -391,7 +391,7 @@ class MCMCPosterior(NeuralPosterior):
             Samples from the posteriors of shape (*sample_shape, B, *input_shape)
         """
         batch_size = x.shape[0]
-        self.potential_fn.set_x(x)
+        self.potential_fn.set_x(x, interpret_as_iid=False)
 
         # Replace arguments that were not passed with their default.
         method = self.method if method is None else method
@@ -406,7 +406,7 @@ class MCMCPosterior(NeuralPosterior):
             if init_strategy_parameters is None
             else init_strategy_parameters
         )
-        self.potential_ = self._prepare_potential(method, x_is_iid=False)  # type: ignore
+        self.potential_ = self._prepare_potential(method)  # type: ignore
 
         # For each observation in the batch, we have num_chains independent chains.
         num_chains_extended = batch_size * num_chains
@@ -748,7 +748,7 @@ class MCMCPosterior(NeuralPosterior):
 
         return samples
 
-    def _prepare_potential(self, method: str, x_is_iid: bool) -> Callable:
+    def _prepare_potential(self, method: str) -> Callable:
         """Combines potential and transform and takes care of gradients and pyro.
 
         Args:
@@ -782,7 +782,6 @@ class MCMCPosterior(NeuralPosterior):
             theta_transform=self.theta_transform,
             device=self._device,
             track_gradients=track_gradients,
-            x_is_iid=x_is_iid,
         )
         if pyro:
             prepared_potential = partial(

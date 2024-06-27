@@ -406,10 +406,11 @@ def warn_on_iid_x(num_trials):
     if num_trials > 1:
         warnings.warn(
             f"An x with a batch size of {num_trials} was passed. "
-            + """It will be interpreted as a batch of independent and identically
-            distributed data X={x_1, ..., x_n}, i.e., data generated based on the
-            same underlying (unknown) parameter. The resulting posterior will be with
-            respect to entire batch, i.e,. p(theta | X).""",
+            + """Unless you are using `sample_batched` or `log_prob_batched`, this will
+            be interpreted as a batch of independent and identically distributed data
+            X={x_1, ..., x_n}, i.e., data generated based on the same underlying
+            (unknown) parameter. The resulting posterior will be with respect to entire
+            batch, i.e,. p(theta | X).""",
             stacklevel=2,
         )
 

@@ -134,13 +134,7 @@ def test_batched_mcmc_sample_log_prob_shape_with_different_x(
 @pytest.mark.mcmc
 @pytest.mark.parametrize(
     "snlre_method",
-    [
-        SNLE_A,
-        # SNRE_A,
-        # SNRE_B,
-        # SNRE_C,
-        # SNPE_C
-    ],
+    [SNLE_A, SNRE_A, SNRE_B, SNRE_C, SNPE_C],
 )
 def test_batched_mcmc_sample_log_prob_with_different_x(
     snlre_method: type, mcmc_params_fast: dict
@@ -178,8 +172,6 @@ def test_batched_mcmc_sample_log_prob_with_different_x(
     samples_separate1_m = torch.mean(samples_separate1, dim=0, dtype=torch.float32)
     samples_separate2_m = torch.mean(samples_separate2, dim=0, dtype=torch.float32)
     samples_sep_m = torch.stack([samples_separate1_m, samples_separate2_m], dim=0)
-    print(samples_m)
-    print(samples_sep_m)
 
     assert torch.allclose(
         samples_m, samples_sep_m, atol=0.2, rtol=0.2

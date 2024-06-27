@@ -54,8 +54,6 @@ def likelihood_estimator_based_potential(
 
 
 class LikelihoodBasedPotential(BasePotential):
-    allow_iid_x = True  # type: ignore
-
     def __init__(
         self,
         likelihood_estimator: DensityEstimator,
@@ -80,9 +78,7 @@ class LikelihoodBasedPotential(BasePotential):
         self.likelihood_estimator = likelihood_estimator
         self.likelihood_estimator.eval()
 
-    def __call__(
-        self, theta: Tensor, x_is_iid: bool = True, track_gradients: bool = True
-    ) -> Tensor:
+    def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
         r"""Returns the potential $\log(p(x_o|\theta)p(\theta))$.
 
         Args:
@@ -93,7 +89,7 @@ class LikelihoodBasedPotential(BasePotential):
         Returns:
             The potential $\log(p(x_o|\theta)p(\theta))$.
         """
-        if x_is_iid:
+        if self.x_is_iid:
             # Calculate likelihood over trials and in one batch.
             log_likelihood_trial_sum = _log_likelihoods_over_trials(
                 x=self.x_o,
@@ -266,7 +262,9 @@ class MixedLikelihoodBasedPotential(LikelihoodBasedPotential):
     ):
         super().__init__(likelihood_estimator, prior, x_o, device)
 
-    def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
+    def __call__(
+        self, theta: Tensor, x_is_iid: bool = True, track_gradients: bool = True
+    ) -> Tensor:
         prior_log_prob = self.prior.log_prob(theta)  # type: ignore
 
         # Shape of `x` is (iid_dim, *event_shape)
