@@ -27,7 +27,7 @@ from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
     (
         0,
         1,
-        pytest.param(2, marks=pytest.mark.xfail(raises=ValueError)),
+        pytest.param(2, marks=pytest.mark.xfail(raises=AssertionError)),
     ),
 )
 def test_log_prob_with_different_x(snpe_method: type, x_o_batch_dim: bool):
@@ -54,7 +54,6 @@ def test_log_prob_with_different_x(snpe_method: type, x_o_batch_dim: bool):
     ).set_default_x(x_o)
     samples = posterior.sample((10,))
     _ = posterior.log_prob(samples)
-
 
 
 @pytest.mark.parametrize(
@@ -141,7 +140,6 @@ def test_batched_mcmc_sample_log_prob_shape_with_different_x(
         sample_with="mcmc",
         mcmc_method="slice_np_vectorized",
         mcmc_parameters=mcmc_params_fast,
-
     )
 
     samples = posterior.sample_batched((10,), x_o)
