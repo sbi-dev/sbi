@@ -1,26 +1,27 @@
 import math
-import torch
-import torch.nn as nn
 from typing import Optional, Tuple
 
-from sbi.neural_nets.density_estimators.base import ConditionalDensityEstimator
-from torch.distributions import Distribution
+import torch
+import torch.nn as nn
 import zuko
+from torch.distributions import Distribution
 from zuko.distributions import DiagNormal, NormalizingFlow
 from zuko.nn import MLP
 from zuko.transforms import FreeFormJacobianTransform
 from zuko.utils import broadcast
 
+from sbi.neural_nets.density_estimators.base import ConditionalDensityEstimator
+
 
 class ZukoFlowMatchingEstimator(ConditionalDensityEstimator):
-    def __init__(
+    def __init__( # TODO: adopt interface from zuko_flow.py
         self,
         theta_shape: int,
         condition_shape: torch.Size,
-        net: Optional[nn.Module] = None,
-        frequency: int = 3,
-        eta: float = 1e-3,
-        device: str = "cpu",
+        net: nn.Module, 
+        frequency: int = 3, # TODO goes out, net build somewhere else
+        eta: float = 1e-3, # TODO same here
+        device: str = "cpu", # TODO goes out (device handling somewhere else)
         z_score_theta: Optional[zuko.transforms.MonotonicAffineTransform] = None,
         z_score_x: Optional[torch.nn.Module] = None,
     ) -> None:
@@ -34,23 +35,8 @@ class ZukoFlowMatchingEstimator(ConditionalDensityEstimator):
             frequency: Frequency of the embedding. Defaults to 3.
             eta: Minimal variance of the conditional probability path. Defaults to 1e-3.
         """
-        # todo: add embedding net
-        # instantiate the regression network
-        if not net:
-            net = MLP(
-                in_features=theta_shape
-                + condition_shape.numel()
-                + 2 * frequency,
-                out_features=theta_shape,
-                hidden_features=[64] * 5,
-                activation=nn.ELU,
-            )
-        elif isinstance(net, nn.Module):
-            pass
-        else:
-            raise ValueError("net must be an instance of torch.nn.Module")
 
-        super().__init__(net=net, input_shape=theta_shape ,condition_shape=condition_shape)
+        super().__init__(net=net, input_shape=theta_shape, condition_shape=condition_shape)
         self.device = device
         self.theta_shape = theta_shape
         self.frequency = torch.arange(1, frequency + 1, device=self.device) * math.pi
@@ -79,9 +65,18 @@ class ZukoFlowMatchingEstimator(ConditionalDensityEstimator):
 
         return log_prob
 
-    def maybe_z_score(
+    def maybe_z_score( # TODO obsolete. 
         self, theta: torch.Tensor, x: torch.Tensor
     ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Returns z-scored theta and x if z-score functions are provided.
+        Note that we cannot make z-scoring part of the forward pass, since
+        we are working with continuous normalizing flows, where the networks
+        parametrizes the time dependant vector field and not the transformation.
+        
+        Args:
+            theta: Parameters.
+            x: Observed data.
+        """
         if self.z_score_theta:
             theta = self.z_score_theta(theta)
         if self.z_score_x:
@@ -93,6 +88,11 @@ class ZukoFlowMatchingEstimator(ConditionalDensityEstimator):
         self,
         theta: torch.Tensor,
     ) -> torch.Tensor:
+        """ Returns z-scored theta if z-score function is provided.
+        
+        Args:
+            theta: Parameters.
+        """
         if self.z_score_theta:
             theta = self.z_score_theta(theta)
         return theta
@@ -101,11 +101,24 @@ class ZukoFlowMatchingEstimator(ConditionalDensityEstimator):
         self,
         x: torch.Tensor,
     ) -> torch.Tensor:
+        """ Returns z-scored x if z-score function is provided.
+        
+        Args:
+            x: Observed data.
+        """
         if self.z_score_x:
             x = self.z_score_x(x)
         return x
 
     def loss(self, theta: torch.Tensor, x: torch.Tensor, **kwargs) -> torch.Tensor:
+        """ Return the loss for training the density estimator. More precisely,
+        we compute the conditional flow matching loss with naive optimal 
+        trajectories as described in the original paper.
+        
+        Args:
+            theta: Parameters.
+            x: Observed data.
+        """
         theta, x = self.maybe_z_score(theta, x)
 
         # randomly sample the time steps to compare the vector field at different time steps
