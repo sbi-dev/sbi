@@ -218,7 +218,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
             train_log_prob_average = train_log_probs_sum / (
                 len(train_loader) * train_loader.batch_size  # type: ignore
             )
-            self._summary["training_log_probs"].append(train_log_prob_average)
+            self._summary["training_loss"].append(train_log_prob_average)
 
             # Calculate validation performance.
             self._neural_net.eval()
@@ -238,7 +238,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
                 len(val_loader) * val_loader.batch_size  # type: ignore
             )
             # Log validation log prob for every epoch.
-            self._summary["validation_log_probs"].append(self._val_log_prob)
+            self._summary["validation_loss"].append(self._val_log_prob)
 
             self._maybe_show_progress(self._show_progress_bars, self.epoch)
 
@@ -246,7 +246,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
 
         # Update summary.
         self._summary["epochs_trained"].append(self.epoch)
-        self._summary["best_validation_log_prob"].append(self._best_val_log_prob)
+        self._summary["best_validation_loss"].append(self._best_val_loss)
 
         # Update TensorBoard and summary dict.
         self._summarize(round_=self._round)

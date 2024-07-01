@@ -173,7 +173,7 @@ class NeuralInference(ABC):
         self._data_round_index = []
 
         self._round = 0
-        self._val_log_prob = float("-Inf")
+        self._val_loss = float("Inf")
 
         # XXX We could instantiate here the Posterior for all children. Two problems:
         #     1. We must dispatch to right PotentialProvider for mcmc based on name
@@ -187,9 +187,9 @@ class NeuralInference(ABC):
         # Logging during training (by SummaryWriter).
         self._summary = dict(
             epochs_trained=[],
-            best_validation_log_prob=[],
-            validation_log_probs=[],
-            training_log_probs=[],
+            best_validation_loss=[],
+            validation_loss=[],
+            training_loss=[],
             epoch_durations_sec=[],
         )
 
@@ -390,8 +390,8 @@ class NeuralInference(ABC):
         neural_net = self._neural_net
 
         # (Re)-start the epoch count with the first epoch or any improvement.
-        if epoch == 0 or self._val_log_prob > self._best_val_log_prob:
-            self._best_val_log_prob = self._val_log_prob
+        if epoch == 0 or self._val_loss < self._best_val_loss:
+            self._best_val_loss = self._val_loss
             self._epochs_since_last_improvement = 0
             self._best_model_state_dict = deepcopy(neural_net.state_dict())
         else:
@@ -416,14 +416,14 @@ class NeuralInference(ABC):
     @staticmethod
     def _describe_round(round_: int, summary: Dict[str, list]) -> str:
         epochs = summary["epochs_trained"][-1]
-        best_validation_log_prob = summary["best_validation_log_prob"][-1]
+        best_validation_loss = summary["best_validation_loss"][-1]
 
         description = f"""
         -------------------------
         ||||| ROUND {round_ + 1} STATS |||||:
         -------------------------
         Epochs trained: {epochs}
-        Best validation performance: {best_validation_log_prob:.4f}
+        Best validation performance: {best_validation_loss:.4f}
         -------------------------
         """
 
@@ -488,8 +488,8 @@ class NeuralInference(ABC):
         )
 
         self._summary_writer.add_scalar(
-            tag="best_validation_log_prob",
-            scalar_value=self._summary["best_validation_log_prob"][-1],
+            tag="best_validation_loss",
+            scalar_value=self._summary["best_validation_loss"][-1],
             global_step=round_ + 1,
         )
 
@@ -500,16 +500,16 @@ class NeuralInference(ABC):
             .sum()
             .item()
         )
-        for i, vlp in enumerate(self._summary["validation_log_probs"][offset:]):
+        for i, vlp in enumerate(self._summary["validation_loss"][offset:]):
             self._summary_writer.add_scalar(
-                tag="validation_log_probs",
+                tag="validation_loss",
                 scalar_value=vlp,
                 global_step=offset + i,
             )
 
-        for i, tlp in enumerate(self._summary["training_log_probs"][offset:]):
+        for i, tlp in enumerate(self._summary["training_loss"][offset:]):
             self._summary_writer.add_scalar(
-                tag="training_log_probs",
+                tag="training_loss",
                 scalar_value=tlp,
                 global_step=offset + i,
             )
