@@ -20,6 +20,7 @@ from sbi.simulators.linear_gaussian import (
     linear_gaussian,
     true_posterior_linear_gaussian_mvn_prior,
 )
+from sbi.utils.user_input_checks import process_prior, process_simulator
 from tests.test_utils import check_c2st
 
 
@@ -49,6 +50,8 @@ def test_mdn_inference_with_different_methods(method, mcmc_params_accurate: dict
 
     inference = method(density_estimator="mdn")
 
+    prior, _, prior_returns_numpy = process_prior(prior)
+    simulator = process_simulator(simulator, prior, prior_returns_numpy)
     theta, x = simulate_for_sbi(simulator, prior, num_simulations)
     estimator = inference.append_simulations(theta, x).train()
     if method == SNPE:
@@ -94,6 +97,8 @@ def test_mdn_with_1D_uniform_prior():
 
     inference = SNPE(density_estimator="mdn")
 
+    prior, _, prior_returns_numpy = process_prior(prior)
+    simulator = process_simulator(simulator, prior, prior_returns_numpy)
     theta, x = simulate_for_sbi(simulator, prior, 100)
     posterior_estimator = inference.append_simulations(theta, x).train()
     posterior = DirectPosterior(posterior_estimator=posterior_estimator, prior=prior)

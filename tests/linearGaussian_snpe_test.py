@@ -31,6 +31,7 @@ from sbi.simulators.linear_gaussian import (
     true_posterior_linear_gaussian_mvn_prior,
 )
 from sbi.utils import RestrictedPrior, get_density_thresholder
+from sbi.utils.user_input_checks import process_prior, process_simulator
 
 from .sbiutils_test import conditional_of_mvn
 from .test_utils import (
@@ -79,6 +80,9 @@ def test_c2st_snpe_on_linearGaussian(snpe_method, num_dim: int, prior_str: str):
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     inference = snpe_method(prior, show_progress_bars=False)
+
+    prior, _, prior_returns_numpy = process_prior(prior)
+    simulator = process_simulator(simulator, prior, prior_returns_numpy)
 
     theta, x = simulate_for_sbi(
         simulator, prior, num_simulations, simulation_batch_size=1000
@@ -235,6 +239,8 @@ def test_c2st_snpe_on_linearGaussian_different_dims(density_estimator="maf"):
     )
 
     # type: ignore
+    prior, _, prior_returns_numpy = process_prior(prior)
+    simulator = process_simulator(simulator, prior, prior_returns_numpy)
     theta, x = simulate_for_sbi(
         simulator, prior, num_simulations, simulation_batch_size=num_simulations
     )
@@ -477,6 +483,8 @@ def test_api_force_first_round_loss(
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     inference = SNPE_C(prior, show_progress_bars=False)
+    prior, _, prior_returns_numpy = process_prior(prior)
+    simulator = process_simulator(simulator, prior, prior_returns_numpy)
 
     proposal = prior
     for _ in range(2):
@@ -654,6 +662,9 @@ def test_mdn_conditional_density(num_dim: int = 3, cond_dim: int = 1):
 
     inference = SNPE_C(density_estimator="mdn", show_progress_bars=False)
 
+    prior, _, prior_returns_numpy = process_prior(prior)
+    simulator = process_simulator(simulator, prior, prior_returns_numpy)
+
     theta, x = simulate_for_sbi(
         simulator, prior, num_simulations, simulation_batch_size=1000
     )
@@ -692,6 +703,8 @@ def test_example_posterior(snpe_method: type):
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     inference = snpe_method(prior, show_progress_bars=False)
+    prior, _, prior_returns_numpy = process_prior(prior)
+    simulator = process_simulator(simulator, prior, prior_returns_numpy)
 
     theta, x = simulate_for_sbi(
         simulator,

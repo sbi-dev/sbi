@@ -18,6 +18,7 @@ from sbi.inference import (
     simulate_for_sbi,
 )
 from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
+from sbi.utils.user_input_checks import process_prior, process_simulator
 
 
 @pytest.mark.parametrize("snpe_method", [SNPE_A, SNPE_C])
@@ -36,6 +37,8 @@ def test_log_prob_with_different_x(snpe_method: type, x_o_batch_dim: bool):
     simulator = diagonal_linear_gaussian
 
     inference = snpe_method(prior=prior)
+    prior, _, prior_returns_numpy = process_prior(prior)
+    simulator = process_simulator(simulator, prior, prior_returns_numpy)
     theta, x = simulate_for_sbi(simulator, prior, 1000)
     posterior_estimator = inference.append_simulations(theta, x).train(max_num_epochs=3)
 
@@ -65,6 +68,8 @@ def test_importance_posterior_sample_log_prob(snplre_method: type):
     simulator = diagonal_linear_gaussian
 
     inference = snplre_method(prior=prior)
+    prior, _, prior_returns_numpy = process_prior(prior)
+    simulator = process_simulator(simulator, prior, prior_returns_numpy)
     theta, x = simulate_for_sbi(simulator, prior, 1000)
     _ = inference.append_simulations(theta, x).train(max_num_epochs=3)
 
@@ -93,6 +98,8 @@ def test_batched_sample_log_prob_with_different_x(
     simulator = diagonal_linear_gaussian
 
     inference = snpe_method(prior=prior)
+    prior, _, prior_returns_numpy = process_prior(prior)
+    simulator = process_simulator(simulator, prior, prior_returns_numpy)
     theta, x = simulate_for_sbi(simulator, prior, 1000)
     posterior_estimator = inference.append_simulations(theta, x).train(max_num_epochs=3)
 
@@ -131,6 +138,8 @@ def test_batched_mcmc_sample_log_prob_with_different_x(
     simulator = diagonal_linear_gaussian
 
     inference = snlre_method(prior=prior)
+    prior, _, prior_returns_numpy = process_prior(prior)
+    simulator = process_simulator(simulator, prior, prior_returns_numpy)
     theta, x = simulate_for_sbi(simulator, prior, 1000)
     _ = inference.append_simulations(theta, x).train(max_num_epochs=3)
 

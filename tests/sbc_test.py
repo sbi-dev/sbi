@@ -12,6 +12,7 @@ from sbi.diagnostics import check_sbc, get_nltp, run_sbc
 from sbi.inference import SNLE, SNPE, simulate_for_sbi
 from sbi.simulators import linear_gaussian
 from sbi.utils import BoxUniform, MultipleIndependent
+from sbi.utils.user_input_checks import process_prior, process_simulator
 from tests.test_utils import PosteriorPotential, TractablePosterior
 
 
@@ -50,6 +51,8 @@ def test_running_sbc(
 
     inferer = method(prior, show_progress_bars=False, density_estimator=model)
 
+    prior, _, prior_returns_numpy = process_prior(prior)
+    simulator = process_simulator(simulator, prior, prior_returns_numpy)
     theta, x = simulate_for_sbi(simulator, prior, num_simulations)
 
     _ = inferer.append_simulations(theta, x).train(
