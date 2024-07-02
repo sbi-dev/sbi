@@ -26,11 +26,22 @@ from sbi.inference import (
 )
 from sbi.inference.posteriors.importance_posterior import ImportanceSamplingPosterior
 from sbi.inference.potentials.base_potential import BasePotential
-from sbi.neural_nets import classifier_nn, likelihood_nn, posterior_nn
+from sbi.neural_nets.embedding_nets import FCEmbedding
+from sbi.neural_nets.factory import (
+    classifier_nn,
+    embedding_net_warn_msg,
+    likelihood_nn,
+    posterior_nn,
+)
 from sbi.simulators import diagonal_linear_gaussian, linear_gaussian
 from sbi.utils.torchutils import BoxUniform, gpu_available, process_device
 from sbi.utils.user_input_checks import (
     validate_theta_and_x,
+)
+
+# tests in this file are skipped if there is GPU device available
+pytestmark = pytest.mark.skipif(
+    not gpu_available(), reason="No CUDA or MPS device available."
 )
 
 
@@ -239,19 +250,18 @@ def test_validate_theta_and_x_device(training_device: str, data_device: str) -> 
     )
 
 
-@pytest.mark.gpu
 @pytest.mark.parametrize(
     "inference_method", [SNPE_A, SNPE_C, SNRE_A, SNRE_B, SNRE_C, SNLE]
 )
 @pytest.mark.parametrize("data_device", ("cpu", "gpu"))
 @pytest.mark.parametrize("training_device", ("cpu", "gpu"))
+@pytest.mark.parametrize("embedding_device", ("cpu", "gpu"))
 def test_train_with_different_data_and_training_device(
-    inference_method, data_device: str, training_device: str
+    inference_method, data_device: str, training_device: str, embedding_device: str
 ) -> None:
-    assert gpu_available(), "this test requires that gpu is available."
-
     data_device = process_device(data_device)
     training_device = process_device(training_device)
+    embedding_device = process_device(embedding_device)
 
     num_dim = 2
     num_simulations = 32
@@ -260,19 +270,33 @@ def test_train_with_different_data_and_training_device(
     )
     simulator = diagonal_linear_gaussian
 
+    # moving embedding net to device to mimic user with large custom embedding.
+    embedding_net = FCEmbedding(input_dim=num_dim, output_dim=num_dim).to(
+        embedding_device
+    )
+
+    if inference_method in [SNRE_A, SNRE_B, SNRE_C]:
+        net_builder_fun = classifier_nn
+        kwargs = dict(model="mlp", embedding_net_x=embedding_net)
+    elif inference_method == SNLE:
+        net_builder_fun = likelihood_nn
+        kwargs = dict(model="mdn", embedding_net=embedding_net)
+    elif inference_method == SNPE_A:
+        net_builder_fun = posterior_nn
+        kwargs = dict(model="mdn_snpe_a", embedding_net=embedding_net)
+    else:
+        net_builder_fun = posterior_nn
+        kwargs = dict(model="mdn", embedding_net=embedding_net)
+
+    # warning must be issued when embedding not on cpu.
+    if embedding_device != "cpu":
+        with pytest.warns(UserWarning, match=embedding_net_warn_msg):
+            net_builder = net_builder_fun(**kwargs)
+    else:
+        net_builder = net_builder_fun(**kwargs)
+
     inference = inference_method(
-        prior,
-        **(
-            dict(classifier="resnet")
-            if inference_method in [SNRE_A, SNRE_B, SNRE_C]
-            else dict(
-                density_estimator=(
-                    "mdn_snpe_a" if inference_method == SNPE_A else "maf"
-                )
-            )
-        ),
-        show_progress_bars=False,
-        device=training_device,
+        prior, net_builder, show_progress_bars=False, device=training_device
     )
 
     theta = prior.sample((num_simulations,))

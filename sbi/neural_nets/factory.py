@@ -48,6 +48,9 @@ model_builders = {
     "zuko_bpf": build_zuko_bpf,
 }
 
+embedding_net_warn_msg = """The passed embedding net will be moved to cpu for
+                        constructing the net building function."""
+
 
 def classifier_nn(
     model: str,
@@ -99,8 +102,8 @@ def classifier_nn(
                 z_score_theta,
                 z_score_x,
                 hidden_features,
-                check_net_device(embedding_net_theta, "cpu"),
-                check_net_device(embedding_net_x, "cpu"),
+                check_net_device(embedding_net_theta, "cpu", embedding_net_warn_msg),
+                check_net_device(embedding_net_x, "cpu", embedding_net_warn_msg),
             ),
         ),
         **kwargs,
@@ -181,7 +184,7 @@ def likelihood_nn(
                 hidden_features,
                 num_transforms,
                 num_bins,
-                check_net_device(embedding_net, "cpu"),
+                check_net_device(embedding_net, "cpu", embedding_net_warn_msg),
                 num_components,
             ),
         ),
@@ -257,7 +260,7 @@ def posterior_nn(
                 hidden_features,
                 num_transforms,
                 num_bins,
-                check_net_device(embedding_net, "cpu"),
+                check_net_device(embedding_net, "cpu", embedding_net_warn_msg),
                 num_components,
             ),
         ),
