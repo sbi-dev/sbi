@@ -23,6 +23,7 @@ from sbi.utils.sbiutils import (
     z_score_parser,
 )
 from sbi.utils.torchutils import create_alternating_binary_mask
+from sbi.utils.user_input_checks import check_data_device
 
 nflow_specific_kwargs = ["num_bins", "num_components"]
 
@@ -59,7 +60,9 @@ def build_made(
     Returns:
         Neural network.
     """
-    x_numel, y_numel = get_numel(batch_x, batch_y, embedding_net_y=embedding_net)
+    check_data_device(batch_x, batch_y)
+    x_numel = get_numel(batch_x, embedding_net=None)
+    y_numel = get_numel(batch_y, embedding_net=embedding_net)
 
     transform = transforms.IdentityTransform()
 
@@ -134,9 +137,9 @@ def build_maf(
     Returns:
         Neural network.
     """
-    x_numel, y_numel = get_numel(
-        batch_x, batch_y, embedding_net_y=embedding_net, warn_on_1d=True
-    )
+    check_data_device(batch_x, batch_y)
+    x_numel = get_numel(batch_x, embedding_net=None)
+    y_numel = get_numel(batch_y, embedding_net=embedding_net, warn_on_1d=True)
 
     transform_list = []
     for _ in range(num_transforms):
@@ -236,9 +239,9 @@ def build_maf_rqs(
     Returns:
         Neural network.
     """
-    x_numel, y_numel = get_numel(
-        batch_x, batch_y, embedding_net_y=embedding_net, warn_on_1d=True
-    )
+    check_data_device(batch_x, batch_y)
+    x_numel = get_numel(batch_x, embedding_net=None)
+    y_numel = get_numel(batch_y, embedding_net=embedding_net, warn_on_1d=True)
 
     transform_list = []
     for _ in range(num_transforms):
@@ -333,7 +336,9 @@ def build_nsf(
     Returns:
         Neural network.
     """
-    x_numel, y_numel = get_numel(batch_x, batch_y, embedding_net_y=embedding_net)
+    check_data_device(batch_x, batch_y)
+    x_numel = get_numel(batch_x, embedding_net=None)
+    y_numel = get_numel(batch_y, embedding_net=embedding_net)
 
     # Define mask function to alternate between predicted x-dimensions.
     def mask_in_layer(i):
@@ -1022,7 +1027,9 @@ def build_zuko_flow(
         ZukoFlow: The constructed Zuko normalizing flow model.
     """
 
-    x_numel, y_numel = get_numel(batch_x, batch_y, embedding_net_y=embedding_net)
+    check_data_device(batch_x, batch_y)
+    x_numel = get_numel(batch_x, embedding_net=None)
+    y_numel = get_numel(batch_y, embedding_net=embedding_net)
 
     # keep only zuko kwargs
     kwargs = {k: v for k, v in kwargs.items() if k not in nflow_specific_kwargs}

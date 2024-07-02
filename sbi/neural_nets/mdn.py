@@ -14,6 +14,7 @@ from sbi.utils.sbiutils import (
     standardizing_transform,
     z_score_parser,
 )
+from sbi.utils.user_input_checks import check_data_device
 
 
 def build_mdn(
@@ -48,7 +49,9 @@ def build_mdn(
     Returns:
         Neural network.
     """
-    x_numel, y_numel = get_numel(batch_x, batch_y, embedding_net_y=embedding_net)
+    check_data_device(batch_x, batch_y)
+    x_numel = get_numel(batch_x, embedding_net=None)
+    y_numel = get_numel(batch_y, embedding_net=embedding_net)
 
     transform = transforms.IdentityTransform()
 
