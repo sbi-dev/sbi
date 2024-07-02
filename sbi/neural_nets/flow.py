@@ -138,8 +138,12 @@ def build_maf(
         Neural network.
     """
     check_data_device(batch_x, batch_y)
-    x_numel = get_numel(batch_x, embedding_net=None)
-    y_numel = get_numel(batch_y, embedding_net=embedding_net, warn_on_1d=True)
+    x_numel = get_numel(
+        batch_x,
+        embedding_net=None,
+        warn_on_1d=True,  # warn if output space is 1D.
+    )
+    y_numel = get_numel(batch_y, embedding_net=embedding_net)
 
     transform_list = []
     for _ in range(num_transforms):
@@ -240,8 +244,12 @@ def build_maf_rqs(
         Neural network.
     """
     check_data_device(batch_x, batch_y)
-    x_numel = get_numel(batch_x, embedding_net=None)
-    y_numel = get_numel(batch_y, embedding_net=embedding_net, warn_on_1d=True)
+    x_numel = get_numel(
+        batch_x,
+        embedding_net=None,
+        warn_on_1d=True,  # warn if output space is 1D.
+    )
+    y_numel = get_numel(batch_y, embedding_net=embedding_net)
 
     transform_list = []
     for _ in range(num_transforms):
