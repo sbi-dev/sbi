@@ -2,8 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from functools import partial
-from typing import List, Optional, Sequence, Tuple, Union
-from warnings import warn
+from typing import List, Optional, Sequence, Union
 
 import torch
 import zuko
@@ -16,6 +15,7 @@ from pyknos.nflows.transforms.splines import (
 from torch import Tensor, nn, relu, tanh, tensor, uint8
 
 from sbi.neural_nets.density_estimators import NFlowsFlow, ZukoFlow
+from sbi.utils.nn_utils import get_numel
 from sbi.utils.sbiutils import (
     standardizing_net,
     standardizing_transform,
@@ -23,36 +23,9 @@ from sbi.utils.sbiutils import (
     z_score_parser,
 )
 from sbi.utils.torchutils import create_alternating_binary_mask
-from sbi.utils.user_input_checks import check_data_device, check_embedding_net_device
+from sbi.utils.user_input_checks import check_data_device
 
 nflow_specific_kwargs = ["num_bins", "num_components"]
-
-
-def get_numel(batch_x: Tensor, batch_y: Tensor, embedding_net) -> Tuple[int, int]:
-    """
-    Get the number of elements in the input and output space.
-
-    Args:
-        batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring.
-        batch_y: Batch of ys, used to infer dimensionality and (optional) z-scoring.
-        embedding_net: Optional embedding network for y.
-
-    Returns:
-        Tuple of the number of elements in the input and output space.
-
-    """
-    x_numel = batch_x[0].numel()
-    # Infer the output dimensionality of the embedding_net by making a forward pass.
-    check_data_device(batch_x, batch_y)
-    check_embedding_net_device(embedding_net=embedding_net, datum=batch_y)
-    y_numel = embedding_net(batch_y[:1]).numel()
-    if x_numel == 1:
-        warn(
-            "In one-dimensional output space, this flow is limited to Gaussians",
-            stacklevel=2,
-        )
-
-    return x_numel, y_numel
 
 
 def build_made(
@@ -87,7 +60,9 @@ def build_made(
     Returns:
         Neural network.
     """
-    x_numel, y_numel = get_numel(batch_x, batch_y, embedding_net)
+    check_data_device(batch_x, batch_y)
+    x_numel = get_numel(batch_x, embedding_net=None)
+    y_numel = get_numel(batch_y, embedding_net=embedding_net)
 
     transform = transforms.IdentityTransform()
 
@@ -162,7 +137,13 @@ def build_maf(
     Returns:
         Neural network.
     """
-    x_numel, y_numel = get_numel(batch_x, batch_y, embedding_net)
+    check_data_device(batch_x, batch_y)
+    x_numel = get_numel(
+        batch_x,
+        embedding_net=None,
+        warn_on_1d=True,  # warn if output space is 1D.
+    )
+    y_numel = get_numel(batch_y, embedding_net=embedding_net)
 
     transform_list = []
     for _ in range(num_transforms):
@@ -262,7 +243,13 @@ def build_maf_rqs(
     Returns:
         Neural network.
     """
-    x_numel, y_numel = get_numel(batch_x, batch_y, embedding_net)
+    check_data_device(batch_x, batch_y)
+    x_numel = get_numel(
+        batch_x,
+        embedding_net=None,
+        warn_on_1d=True,  # warn if output space is 1D.
+    )
+    y_numel = get_numel(batch_y, embedding_net=embedding_net)
 
     transform_list = []
     for _ in range(num_transforms):
@@ -357,7 +344,9 @@ def build_nsf(
     Returns:
         Neural network.
     """
-    x_numel, y_numel = get_numel(batch_x, batch_y, embedding_net)
+    check_data_device(batch_x, batch_y)
+    x_numel = get_numel(batch_x, embedding_net=None)
+    y_numel = get_numel(batch_y, embedding_net=embedding_net)
 
     # Define mask function to alternate between predicted x-dimensions.
     def mask_in_layer(i):
@@ -1046,7 +1035,9 @@ def build_zuko_flow(
         ZukoFlow: The constructed Zuko normalizing flow model.
     """
 
-    x_numel, y_numel = get_numel(batch_x, batch_y, embedding_net)
+    check_data_device(batch_x, batch_y)
+    x_numel = get_numel(batch_x, embedding_net=None)
+    y_numel = get_numel(batch_y, embedding_net=embedding_net)
 
     # keep only zuko kwargs
     kwargs = {k: v for k, v in kwargs.items() if k not in nflow_specific_kwargs}

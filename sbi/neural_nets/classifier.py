@@ -7,8 +7,9 @@ import torch
 from pyknos.nflows.nn import nets
 from torch import Tensor, nn, relu
 
+from sbi.utils.nn_utils import get_numel
 from sbi.utils.sbiutils import standardizing_net, z_score_parser
-from sbi.utils.user_input_checks import check_data_device, check_embedding_net_device
+from sbi.utils.user_input_checks import check_data_device
 
 
 class StandardizeInputs(nn.Module):
@@ -114,13 +115,11 @@ def build_linear_classifier(
     Returns:
         Neural network.
     """
+    # Infer the output dimensionalities of the embedding_net by making a forward
+    # pass.
     check_data_device(batch_x, batch_y)
-    check_embedding_net_device(embedding_net=embedding_net_x, datum=batch_y)
-    check_embedding_net_device(embedding_net=embedding_net_y, datum=batch_y)
-
-    # Infer the output dimensionalities of the embedding_net by making a forward pass.
-    x_numel = embedding_net_x(batch_x[:1]).numel()
-    y_numel = embedding_net_y(batch_y[:1]).numel()
+    x_numel = get_numel(batch_x, embedding_net=embedding_net_x)
+    y_numel = get_numel(batch_y, embedding_net=embedding_net_y)
 
     neural_net = nn.Linear(x_numel + y_numel, 1)
 
@@ -164,13 +163,10 @@ def build_mlp_classifier(
     Returns:
         Neural network.
     """
-    check_data_device(batch_x, batch_y)
-    check_embedding_net_device(embedding_net=embedding_net_x, datum=batch_y)
-    check_embedding_net_device(embedding_net=embedding_net_y, datum=batch_y)
-
     # Infer the output dimensionalities of the embedding_net by making a forward pass.
-    x_numel = embedding_net_x(batch_x[:1]).numel()
-    y_numel = embedding_net_y(batch_y[:1]).numel()
+    check_data_device(batch_x, batch_y)
+    x_numel = get_numel(batch_x, embedding_net=embedding_net_x)
+    y_numel = get_numel(batch_y, embedding_net=embedding_net_y)
 
     neural_net = nn.Sequential(
         nn.Linear(x_numel + y_numel, hidden_features),
@@ -226,12 +222,8 @@ def build_resnet_classifier(
         Neural network.
     """
     check_data_device(batch_x, batch_y)
-    check_embedding_net_device(embedding_net=embedding_net_x, datum=batch_y)
-    check_embedding_net_device(embedding_net=embedding_net_y, datum=batch_y)
-
-    # Infer the output dimensionalities of the embedding_net by making a forward pass.
-    x_numel = embedding_net_x(batch_x[:1]).numel()
-    y_numel = embedding_net_y(batch_y[:1]).numel()
+    x_numel = get_numel(batch_x, embedding_net=embedding_net_x)
+    y_numel = get_numel(batch_y, embedding_net=embedding_net_y)
 
     neural_net = nets.ResidualNet(
         in_features=x_numel + y_numel,
