@@ -1,6 +1,4 @@
 from sbi.neural_nets.classifier import (
-    StandardizeInputs,
-    build_input_layer,
     build_linear_classifier,
     build_mlp_classifier,
     build_resnet_classifier,

@@ -307,7 +307,7 @@ class RatioEstimator(NeuralInference, ABC):
             batch_size * num_atoms, -1
         )
 
-        return self._neural_net([atomic_theta, repeated_x])
+        return self._neural_net(atomic_theta, repeated_x)
 
     @abstractmethod
     def _loss(self, theta: Tensor, x: Tensor, num_atoms: int) -> Tensor:
