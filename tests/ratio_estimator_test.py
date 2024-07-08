@@ -9,6 +9,7 @@ from torch import eye, zeros
 from torch.distributions import MultivariateNormal
 
 from sbi.neural_nets.classifier import build_linear_classifier
+from sbi.neural_nets.embedding_nets import CNNEmbedding
 from sbi.neural_nets.ratio_estimators import RatioEstimator
 
 
@@ -23,11 +24,18 @@ class EmbeddingNet(torch.nn.Module):
         return x
 
 
+def get_embedding_net(shape: torch.Size) -> torch.nn.Module:
+    if len(shape) == 3:
+        return CNNEmbedding(shape[:2], shape[-1], kernel_size=2)
+    else:
+        return EmbeddingNet(shape)
+
+
 @pytest.mark.parametrize("ratio_estimator", (RatioEstimator,))
 @pytest.mark.parametrize(
-    "theta_shape", ((1,), (2,), (1, 1), (2, 2), (1, 1, 1), (2, 2, 2))
+    "theta_shape", ((1,), (2,), (1, 1), (2, 2), (28, 28, 1), (28, 28, 3), (28, 36, 3))
 )
-@pytest.mark.parametrize("x_shape", ((1,), (2,), (1, 1), (2, 2), (1, 1, 1), (2, 2, 2)))
+@pytest.mark.parametrize("x_shape", ((1,), (2,), (1, 1), (2, 2), (28, 28, 1), (28, 28, 3), (28, 36, 3)))
 def test_api_ratio_estimator(ratio_estimator, theta_shape, x_shape):
     r"""Checks whether we can evaluate ratio estimators correctly.
 
@@ -49,8 +57,8 @@ def test_api_ratio_estimator(ratio_estimator, theta_shape, x_shape):
         estimator = build_linear_classifier(
             batch_x=batch_theta,
             batch_y=batch_x,
-            embedding_net_x=EmbeddingNet(theta_shape),
-            embedding_net_y=EmbeddingNet(x_shape),
+            embedding_net_x=get_embedding_net(theta_shape),
+            embedding_net_y=get_embedding_net(x_shape),
         )
     else:
         raise NotImplementedError()
