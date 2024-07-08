@@ -111,7 +111,9 @@ class RatioEstimator(nn.Module):
         """
         return self._check_shape_suffix(theta, self.theta_shape, "theta", "theta_shape")
 
-    def _get_shape_prefix(self, theta: Tensor, x: Tensor) -> torch.Size | tuple[int, ...]:
+    def _get_shape_prefix(
+        self, theta: Tensor, x: Tensor
+    ) -> torch.Size | tuple[int, ...]:
         r"""This method checks whether theta and x agree on the prefix of their shape.
 
         Args:
@@ -124,8 +126,10 @@ class RatioEstimator(nn.Module):
         theta_prefix = theta.shape[: -len(self.theta_shape)]
         x_prefix = x.shape[: -len(self.x_shape)]
         if theta_prefix != x_prefix:
-            raise ValueError(f"{tuple(theta_prefix)=} != {tuple(x_prefix)=}. \
-                             Make them agree, since we do not broadcast for you.")
+            raise ValueError(
+                f"{tuple(theta_prefix)=} != {tuple(x_prefix)=}. \
+                             Make them agree, since we do not broadcast for you."
+            )
         else:
             return theta_prefix
 
@@ -145,7 +149,9 @@ class RatioEstimator(nn.Module):
         prefix_shape = self._get_shape_prefix(theta, x)
         embedded_theta = self.embedding_net_theta(theta.reshape(-1, *self.theta_shape))
         embedded_x = self.embedding_net_x(x.reshape(-1, *self.x_shape))
-        return torch.cat([embedded_theta, embedded_x], dim=dim).reshape(*prefix_shape, dim)
+        return torch.cat([embedded_theta, embedded_x], dim=dim).reshape(
+            *prefix_shape, dim
+        )
 
     def unnormalized_log_ratio(self, theta: Tensor, x: Tensor) -> Tensor:
         r"""Return the unnormalized log ratios of the thetas given an x, or multiple

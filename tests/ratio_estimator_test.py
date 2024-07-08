@@ -35,7 +35,9 @@ def get_embedding_net(shape: torch.Size) -> torch.nn.Module:
 @pytest.mark.parametrize(
     "theta_shape", ((1,), (2,), (1, 1), (2, 2), (28, 28, 1), (28, 28, 3), (28, 36, 3))
 )
-@pytest.mark.parametrize("x_shape", ((1,), (2,), (1, 1), (2, 2), (28, 28, 1), (28, 28, 3), (28, 36, 3)))
+@pytest.mark.parametrize(
+    "x_shape", ((1,), (2,), (1, 1), (2, 2), (28, 28, 1), (28, 28, 3), (28, 36, 3))
+)
 def test_api_ratio_estimator(ratio_estimator, theta_shape, x_shape):
     r"""Checks whether we can evaluate ratio estimators correctly.
 
