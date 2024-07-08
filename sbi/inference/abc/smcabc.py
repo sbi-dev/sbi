@@ -1,5 +1,9 @@
+# This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+
 """Sequential Monte Carlo Approximate Bayesian Computation."""
 
+import math
 from typing import Any, Callable, Dict, Optional, Tuple, Union
 
 import numpy as np
@@ -10,7 +14,10 @@ from torch.distributions import Distribution, Multinomial, MultivariateNormal
 
 from sbi.inference.abc.abc_base import ABCBASE
 from sbi.sbi_types import Array
-from sbi.utils import BoxUniform, KDEWrapper, get_kde, process_x, within_support
+from sbi.utils.kde import KDEWrapper, get_kde
+from sbi.utils.sbiutils import within_support
+from sbi.utils.torchutils import BoxUniform
+from sbi.utils.user_input_checks import process_x
 
 
 class SMCABC(ABCBASE):
@@ -21,8 +28,11 @@ class SMCABC(ABCBASE):
         simulator: Callable,
         prior: Distribution,
         distance: Union[str, Callable] = "l2",
+        requires_iid_data: Optional[None] = None,
+        distance_kwargs: Optional[Dict] = None,
         num_workers: int = 1,
         simulation_batch_size: int = 1,
+        distance_batch_size: int = -1,
         show_progress_bars: bool = True,
         kernel: Optional[str] = "gaussian",
         algorithm_variant: str = "C",
@@ -51,25 +61,36 @@ class SMCABC(ABCBASE):
                 object with `.log_prob()`and `.sample()` (for example, a PyTorch
                 distribution) can be used.
             distance: Distance function to compare observed and simulated data. Can be
-                a custom function or one of `l1`, `l2`, `mse`.
+                a custom callable function or one of `l1`, `l2`, `mse`,
+                `mmd`, `wasserstein`.
+            requires_iid_data: Whether to allow conditioning on iid sampled data or not.
+                Typically, this information is inferred by the choice of the distance,
+                but in case a custom distance is used, this information is pivotal.
+            distance_kwargs: Configurations parameters for the distances. In particular
+                useful for the MMD and Wasserstein distance.
             num_workers: Number of parallel workers to use for simulations.
             simulation_batch_size: Number of parameter sets that the simulator
                 maps to data x at once. If None, we simulate all parameter sets at the
                 same time. If >= 1, the simulator has to process data of shape
                 (simulation_batch_size, parameter_dimension).
+            distance_batch_size: Number of simulations that the distance function
+                evaluates against the reference observations at once. If -1, we evaluate
+                all simulations at the same time.
             show_progress_bars: Whether to show a progressbar during simulation and
                 sampling.
             kernel: Perturbation kernel.
             algorithm_variant: Indicating the choice of algorithm variant, A, B, or C.
-
         """
 
         super().__init__(
             simulator=simulator,
             prior=prior,
             distance=distance,
+            requires_iid_data=requires_iid_data,
+            distance_kwargs=distance_kwargs,
             num_workers=num_workers,
             simulation_batch_size=simulation_batch_size,
+            distance_batch_size=distance_batch_size,
             show_progress_bars=show_progress_bars,
         )
 
@@ -117,6 +138,7 @@ class SMCABC(ABCBASE):
         sass: bool = False,
         sass_fraction: float = 0.25,
         sass_expansion_degree: int = 1,
+        num_iid_samples: int = 1,
     ) -> Union[Tensor, KDEWrapper, Tuple[Tensor, dict], Tuple[KDEWrapper, dict]]:
         r"""Run SMCABC and return accepted parameters or KDE object fitted on them.
 
@@ -157,6 +179,10 @@ class SMCABC(ABCBASE):
                 particles.
             return_summary: Whether to return a dictionary with all accepted particles,
                 weights, etc. at the end.
+            num_iid_samples: Number of simulations per parameter. Choose
+                `num_iid_samples>1`, if you have chosen a statistical distance that
+                evaluates sets of simulations against a set of reference observations
+                instead of a single data-point comparison.
 
         Returns:
             theta (if kde False): accepted parameters of the last population.
@@ -168,10 +194,18 @@ class SMCABC(ABCBASE):
         """
 
         pop_idx = 0
-        self.num_simulations = num_simulations
+        self.num_simulations = num_simulations * num_iid_samples
         if kde_kwargs is None:
             kde_kwargs = {}
         assert isinstance(epsilon_decay, float) and epsilon_decay > 0.0
+        assert not (
+            self.distance.requires_iid_data and lra
+        ), "Currently there is no support to run inference "
+        "on multiple observations together with lra."
+        assert not (
+            self.distance.requires_iid_data and sass
+        ), "Currently there is no support to run inference "
+        "on multiple observations together with sass."
 
         # Pilot run for SASS.
         if sass:
@@ -180,7 +214,12 @@ class SMCABC(ABCBASE):
                 "Running SASS with %s pilot samples.", num_pilot_simulations
             )
             sass_transform = self.run_sass_set_xo(
-                num_particles, num_pilot_simulations, x_o, lra, sass_expansion_degree
+                num_particles,
+                num_pilot_simulations,
+                x_o,
+                num_iid_samples,
+                lra,
+                sass_expansion_degree,
             )
             # Udpate simulator and xo
             x_o = sass_transform(self.x_o)
@@ -193,7 +232,7 @@ class SMCABC(ABCBASE):
 
         # run initial population
         particles, epsilon, distances, x = self._set_xo_and_sample_initial_population(
-            x_o, num_particles, num_initial_pop
+            x_o, num_particles, num_initial_pop, num_iid_samples
         )
         log_weights = torch.log(1 / num_particles * torch.ones(num_particles))
 
@@ -235,6 +274,7 @@ class SMCABC(ABCBASE):
                 distances=all_distances[pop_idx - 1],
                 epsilon=epsilon,
                 x=all_x[pop_idx - 1],
+                num_iid_samples=num_iid_samples,
                 use_last_pop_samples=use_last_pop_samples,
             )
 
@@ -319,6 +359,7 @@ class SMCABC(ABCBASE):
         x_o: Array,
         num_particles: int,
         num_initial_pop: int,
+        num_iid_samples: int,
     ) -> Tuple[Tensor, float, Tensor, Tensor]:
         """Return particles, epsilon and distances of initial population."""
 
@@ -326,20 +367,39 @@ class SMCABC(ABCBASE):
             num_particles <= num_initial_pop
         ), "number of initial round simulations must be greater than population size"
 
+        assert (x_o.shape[0] == 1) or self.distance.requires_iid_data, (
+            "Your data contain iid data-points, but the choice of "
+            "your distance does not allow multiple conditioning "
+            "observations."
+        )
+
         theta = self.prior.sample((num_initial_pop,))
-        x = self._simulate_with_budget(theta)
+
+        theta_repeat = theta.repeat_interleave(num_iid_samples, dim=0)
+        x = self._simulate_with_budget(theta_repeat)
+        x = x.reshape((
+            num_initial_pop,
+            num_iid_samples,
+            -1,
+        ))  # Dim(num_initial_pop, num_iid_samples, -1)
 
         # Infer x shape to test and set x_o.
-        self.x_shape = x[0].unsqueeze(0).shape
-        self.x_o = process_x(x_o, self.x_shape)
+        if not self.distance.requires_iid_data:
+            x = x.squeeze(1)
+            self.x_shape = x[0].shape
+        else:
+            self.x_shape = x[0, 0].shape
+        self.x_o = process_x(
+            x_o, self.x_shape, allow_iid_x=self.distance.requires_iid_data
+        )
 
         distances = self.distance(self.x_o, x)
         sortidx = torch.argsort(distances)
         particles = theta[sortidx][:num_particles]
         # Take last accepted distance as epsilon.
-        initial_epsilon = distances[sortidx][num_particles - 1]
+        initial_epsilon = distances[sortidx][num_particles - 1].item()
 
-        if not torch.isfinite(initial_epsilon):
+        if not math.isfinite(initial_epsilon):
             initial_epsilon = 1e8
 
         return (
@@ -356,6 +416,7 @@ class SMCABC(ABCBASE):
         distances: Tensor,
         epsilon: float,
         x: Tensor,
+        num_iid_samples: int,
         use_last_pop_samples: bool = True,
     ) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
         """Return particles, weights and distances of new population."""
@@ -380,10 +441,21 @@ class SMCABC(ABCBASE):
                 particles, torch.exp(log_weights), num_samples=num_batch
             )
             # Simulate and select based on distance.
-            x_candidates = self._simulate_with_budget(particle_candidates)
+            candidates_repeated = particle_candidates.repeat_interleave(
+                num_iid_samples, dim=0
+            )
+            x_candidates = self._simulate_with_budget(candidates_repeated)
+            x_candidates = x_candidates.reshape((
+                num_batch,
+                num_iid_samples,
+                -1,
+            ))  # Dim(num_initial_pop, num_iid_samples, -1)
+            if not self.distance.requires_iid_data:
+                x_candidates = x_candidates.squeeze(1)
+
             dists = self.distance(self.x_o, x_candidates)
             is_accepted = dists <= epsilon
-            num_accepted_batch = is_accepted.sum().item()
+            num_accepted_batch = int(is_accepted.sum().item())
 
             if num_accepted_batch > 0:
                 new_particles.append(particle_candidates[is_accepted])
@@ -678,6 +750,7 @@ class SMCABC(ABCBASE):
         num_particles: int,
         num_pilot_simulations: int,
         x_o,
+        num_iid_samples: int,
         lra: bool = False,
         sass_expansion_degree: int = 1,
     ) -> Callable:
@@ -694,7 +767,7 @@ class SMCABC(ABCBASE):
             _,
             pilot_xs,
         ) = self._set_xo_and_sample_initial_population(
-            x_o, num_particles, num_pilot_simulations
+            x_o, num_particles, num_pilot_simulations, num_iid_samples
         )
         assert self.x_o is not None, "x_o not set yet."
 

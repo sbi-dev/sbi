@@ -1,5 +1,5 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from __future__ import annotations
 
@@ -505,8 +505,9 @@ def test_sample_conditional(mcmc_params_accurate: dict):
     num_dim = 3
     dim_to_sample_1 = 0
     dim_to_sample_2 = 2
-    num_simulations = 6000
-    num_conditional_samples = 500
+    num_simulations = 5000
+    num_conditional_samples = 1000
+    num_conditions = 50
 
     x_o = zeros(1, num_dim)
 
@@ -516,6 +517,11 @@ def test_sample_conditional(mcmc_params_accurate: dict):
     prior = utils.BoxUniform(-2.0 * ones(num_dim), 2.0 * ones(num_dim))
 
     def simulator(theta):
+        batch_size, _ = theta.shape
+        # create -1 1 mask for bimodality
+        mask = torch.ones(batch_size, 1)
+        # set mask to -1 randomly across the batch
+        mask = mask * 2 * (torch.rand(batch_size, 1) > 0.5) - 1
         if torch.rand(1) > 0.5:
             return linear_gaussian(theta, likelihood_shift, likelihood_cov)
         else:
@@ -524,20 +530,24 @@ def test_sample_conditional(mcmc_params_accurate: dict):
     # Test whether SNPE works properly with structured z-scoring.
     net = posterior_nn("maf", z_score_x="structured", hidden_features=20)
 
-    inference = SNPE_C(prior, density_estimator=net, show_progress_bars=False)
+    inference = SNPE_C(prior, density_estimator=net, show_progress_bars=True)
 
     # We need a pretty big dataset to properly model the bimodality.
     theta, x = simulate_for_sbi(
-        simulator, prior, num_simulations, simulation_batch_size=num_simulations
+        simulator,
+        prior,
+        num_simulations,
+        simulation_batch_size=num_simulations,
     )
     posterior_estimator = inference.append_simulations(theta, x).train(
-        max_num_epochs=60
+        training_batch_size=1000, max_num_epochs=60
     )
 
+    # generate conditions
     posterior = DirectPosterior(
         prior=prior, posterior_estimator=posterior_estimator
     ).set_default_x(x_o)
-    samples = posterior.sample((50,))
+    samples = posterior.sample((num_conditions,))
 
     # Evaluate the conditional density be drawing samples and smoothing with a Gaussian
     # kde.
@@ -562,16 +572,7 @@ def test_sample_conditional(mcmc_params_accurate: dict):
         method="slice_np_vectorized",
         **mcmc_params_accurate,
     )
-    mcmc_posterior.set_default_x(x_o)  # TODO: This test has a bug? Needed to add this
-    cond_samples = mcmc_posterior.sample((num_conditional_samples,))
-
-    _ = analysis.pairplot(
-        cond_samples,
-        limits=[[-2, 2], [-2, 2], [-2, 2]],
-        figsize=(2, 2),
-        diag="kde",
-        offdiag="kde",
-    )
+    cond_samples = mcmc_posterior.sample((num_conditional_samples,), x=x_o)
 
     limits = [[-2, 2], [-2, 2], [-2, 2]]
 

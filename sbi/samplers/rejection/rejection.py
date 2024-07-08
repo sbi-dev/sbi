@@ -236,7 +236,8 @@ def accept_reject_sample(
             `rejection_sample()`. Warn if not empty.
 
     Returns:
-        Accepted samples and acceptance rate as scalar Tensor.
+        Accepted samples of shape `(sample_dim, batch_dim, *event_shape)`, and
+        acceptance rates for each observation.
     """
 
     if kwargs:
@@ -253,39 +254,61 @@ def accept_reject_sample(
         total=num_samples,
         desc=f"Drawing {num_samples} posterior samples",
     )
-
-    num_sampled_total, num_remaining = 0, num_samples
-    accepted, acceptance_rate = [], float("Nan")
-    leakage_warning_raised = False
-    # Ruff suggestion
     if proposal_sampling_kwargs is None:
         proposal_sampling_kwargs = {}
 
+    num_remaining = num_samples
+
+    # NOTE: We might want to change this to a more general approach in the future.
+    # Currently limited to a single "batch_dim" for the condition.
+    # But this would require giving the method the condition_shape explicitly...
+    if "condition" in proposal_sampling_kwargs:
+        num_xos = proposal_sampling_kwargs["condition"].shape[0]
+    else:
+        num_xos = 1
+
+    accepted = [[] for _ in range(num_xos)]
+    acceptance_rate = torch.full((num_xos,), float("Nan"))
+    leakage_warning_raised = False
+    # Ruff suggestion
+
     # To cover cases with few samples without leakage:
     sampling_batch_size = min(num_samples, max_sampling_batch_size)
+    num_sampled_total = torch.zeros(num_xos)
+    num_samples_possible = 0
     while num_remaining > 0:
         # Sample and reject.
         candidates = proposal.sample(
             (sampling_batch_size,),  # type: ignore
             **proposal_sampling_kwargs,
         )
-
         # SNPE-style rejection-sampling when the proposal is the neural net.
         are_accepted = accept_reject_fn(candidates)
-        samples = candidates[are_accepted]
-        accepted.append(samples)
+        # Reshape necessary in certain cases which do not follow the shape conventions
+        # of the "DensityEstimator" class.
+        are_accepted = are_accepted.reshape(sampling_batch_size, num_xos)
+        candidates_to_reject = candidates.reshape(
+            sampling_batch_size, num_xos, *candidates.shape[candidates.ndim - 1 :]
+        )
+
+        for i in range(num_xos):
+            accepted[i].append(candidates_to_reject[are_accepted[:, i], i])
 
         # Update.
         # Note: For any condition of shape (*batch_shape, *condition_shape), the
-        # samples will be of shape(*batch_shape, sampling_batch_size, d) and hence work
-        # in dim = -2.
-        num_sampled_total += sampling_batch_size
-        num_remaining -= samples.shape[-2]
-        pbar.update(samples.shape[-2])
+        # samples will be of shape(sampling_batch_size,*batch_shape, *event_shape)
+        # and hence work in dim = 0.
+        num_accepted = are_accepted.sum(dim=0)
+        num_sampled_total += num_accepted.to(num_sampled_total.device)
+        num_samples_possible += sampling_batch_size
+        min_num_accepted = num_accepted.min().item()
+        num_remaining -= min_num_accepted
+        pbar.update(min_num_accepted)
 
         # To avoid endless sampling when leakage is high, we raise a warning if the
         # acceptance rate is too low after the first 1_000 samples.
-        acceptance_rate = (num_samples - num_remaining) / num_sampled_total
+        acceptance_rate = num_sampled_total / num_samples_possible
+        min_acceptance_rate = acceptance_rate.min().item()
 
         # For remaining iterations (leakage or many samples) continue
         # sampling with fixed batch size, reduced in cased the number
@@ -293,20 +316,21 @@ def accept_reject_sample(
         # by zero if acceptance rate is zero.
         sampling_batch_size = min(
             max_sampling_batch_size,
-            max(int(1.5 * num_remaining / max(acceptance_rate, 1e-12)), 100),
+            max(int(1.5 * num_remaining / max(min_acceptance_rate, 1e-12)), 100),
         )
         if (
-            num_sampled_total > 1000
-            and acceptance_rate < warn_acceptance
+            num_sampled_total.min().item() > 1000
+            and min_acceptance_rate < warn_acceptance
             and not leakage_warning_raised
         ):
             if sample_for_correction_factor:
+                idx_min = acceptance_rate.argmin().item()
                 logging.warning(
                     f"""Drawing samples from posterior to estimate the normalizing
                         constant for `log_prob()`. However, only
-                        {acceptance_rate:.3%} posterior samples are within the
-                        prior support. It may take a long time to collect the
-                        remaining {num_remaining} samples.
+                        {min_acceptance_rate:.3%} posterior samples are within the
+                        prior support (for condition {idx_min}). It may take a long time
+                        to collect the remaining {num_remaining} samples.
                         Consider interrupting (Ctrl-C) and either basing the
                         estimate of the normalizing constant on fewer samples (by
                         calling `posterior.leakage_correction(x_o,
@@ -318,7 +342,7 @@ def accept_reject_sample(
                         result in an unnormalized `log_prob()`."""
                 )
             else:
-                warn_msg = f"""Only {acceptance_rate:.3%} proposal samples are
+                warn_msg = f"""Only {min_acceptance_rate:.3%} proposal samples are
                     accepted. It may take a long time to collect the remaining
                     {num_remaining} samples. """
                 if alternative_method is not None:
@@ -331,9 +355,13 @@ def accept_reject_sample(
     pbar.close()
 
     # When in case of leakage a batch size was used there could be too many samples.
-    samples = torch.cat(accepted, dim=-2)[..., :num_samples, :]
+    samples = [torch.cat(accepted[i], dim=0)[:num_samples] for i in range(num_xos)]
+    samples = torch.stack(samples, dim=1)
+    samples = samples.reshape(num_samples, *candidates.shape[1:])
     assert (
-        samples.shape[-2] == num_samples
+        samples.shape[0] == num_samples
     ), "Number of accepted samples must match required samples."
 
-    return samples, as_tensor(acceptance_rate)
+    # NOTE: Restriction prior does currently require a float as return for the
+    # acceptance rate, which is why we for now also return the minimum acceptance rate.
+    return samples, as_tensor(min_acceptance_rate)

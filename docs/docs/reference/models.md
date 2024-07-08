@@ -6,4 +6,4 @@
 
 ::: sbi.neural_nets.factory.classifier_nn
 
-::: sbi.neural_nets.density_estimators.DensityEstimator
+::: sbi.neural_nets.density_estimators.ConditionalDensityEstimator

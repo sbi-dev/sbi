@@ -1,11 +1,9 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
-
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from copy import deepcopy
 from typing import Any, Callable, Dict, Optional, Union
 
-from torch import Tensor
 from torch.distributions import Distribution
 
 from sbi.inference.posteriors import MCMCPosterior, RejectionPosterior, VIPosterior
@@ -13,7 +11,8 @@ from sbi.inference.potentials import mixed_likelihood_estimator_based_potential
 from sbi.inference.snle.snle_base import LikelihoodEstimator
 from sbi.neural_nets.mnle import MixedDensityEstimator
 from sbi.sbi_types import TensorboardSummaryWriter, TorchModule
-from sbi.utils import check_prior, del_entries
+from sbi.utils.sbiutils import del_entries
+from sbi.utils.user_input_checks import check_prior
 
 
 class MNLE(LikelihoodEstimator):
@@ -167,7 +166,6 @@ class MNLE(LikelihoodEstimator):
                 proposal=prior,
                 method=mcmc_method,
                 device=device,
-                x_shape=self._x_shape,
                 **mcmc_parameters or {},
             )
         elif sample_with == "rejection":
@@ -175,7 +173,6 @@ class MNLE(LikelihoodEstimator):
                 potential_fn=potential_fn,
                 proposal=prior,
                 device=device,
-                x_shape=self._x_shape,
                 **rejection_sampling_parameters or {},
             )
         elif sample_with == "vi":
@@ -185,7 +182,6 @@ class MNLE(LikelihoodEstimator):
                 prior=prior,  # type: ignore
                 vi_method=vi_method,
                 device=device,
-                x_shape=self._x_shape,
                 **vi_parameters or {},
             )
         else:
@@ -195,14 +191,3 @@ class MNLE(LikelihoodEstimator):
         self._model_bank.append(deepcopy(self._posterior))
 
         return deepcopy(self._posterior)
-
-    # Temporary: need to rewrite mixed likelihood estimators as DensityEstimator
-    # objects.
-    # TODO: Fix and merge issue #968
-    def _loss(self, theta: Tensor, x: Tensor) -> Tensor:
-        r"""Return loss for SNLE, which is the likelihood of $-\log q(x_i | \theta_i)$.
-
-        Returns:
-            Negative log prob.
-        """
-        return -self._neural_net.log_prob(x, context=theta)

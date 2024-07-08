@@ -1,3 +1,6 @@
+# This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+
 import pytest
 import torch
 
@@ -20,7 +23,7 @@ def test_infer():
         prior,
         method="SNPE_A",
         num_simulations=10,
-        init_kwargs={'num_components': 5},
+        init_kwargs={"num_components": 5},
         train_kwargs={"max_num_epochs": 2},
         build_posterior_kwargs={"prior": prior},
     )

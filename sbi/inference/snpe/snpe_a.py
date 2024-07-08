@@ -1,5 +1,5 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import warnings
 from copy import deepcopy
@@ -12,12 +12,18 @@ from pyknos.nflows.transforms import CompositeTransform
 from torch import Tensor
 from torch.distributions import Distribution, MultivariateNormal
 
-import sbi.utils as utils
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.inference.snpe.snpe_base import PosteriorEstimator
-from sbi.neural_nets.density_estimators.base import DensityEstimator
+from sbi.neural_nets.density_estimators.base import ConditionalDensityEstimator
 from sbi.sbi_types import TensorboardSummaryWriter, TorchModule
 from sbi.utils import torchutils
+from sbi.utils.sbiutils import (
+    batched_mixture_mv,
+    batched_mixture_vmv,
+    del_entries,
+    mog_log_prob,
+)
+from sbi.utils.torchutils import BoxUniform, assert_all_finite, atleast_2d
 
 
 class SNPE_A(PosteriorEstimator):
@@ -88,7 +94,7 @@ class SNPE_A(PosteriorEstimator):
         # requiring the signature to have `num_atoms`, save it for use below, and
         # continue. It's sneaky because we are using the object (self) as a namespace
         # to pass arguments between functions, and that's implicit state management.
-        kwargs = utils.del_entries(
+        kwargs = del_entries(
             locals(),
             entries=("self", "__class__", "num_components"),
         )
@@ -109,7 +115,7 @@ class SNPE_A(PosteriorEstimator):
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[Dict] = None,
         component_perturbation: float = 5e-3,
-    ) -> DensityEstimator:
+    ) -> ConditionalDensityEstimator:
         r"""Return density estimator that approximates the proposal posterior.
 
         [1] _Fast epsilon-free Inference of Simulation Models with Bayesian Conditional
@@ -163,7 +169,7 @@ class SNPE_A(PosteriorEstimator):
             estimator, the z-scoring would change, which would break the posthoc
             correction. This is a pure implementation issue."""
 
-        kwargs = utils.del_entries(
+        kwargs = del_entries(
             locals(),
             entries=(
                 "self",
@@ -251,7 +257,7 @@ class SNPE_A(PosteriorEstimator):
         ):
             proposal = self._prior
             assert isinstance(
-                proposal, (MultivariateNormal, utils.BoxUniform)
+                proposal, (MultivariateNormal, BoxUniform)
             ), """Prior must be `torch.distributions.MultivariateNormal` or `sbi.utils.
                 BoxUniform`"""
         else:
@@ -362,7 +368,7 @@ class SNPE_A(PosteriorEstimator):
                     param.grad = None  # let autograd construct a new gradient
 
 
-class SNPE_A_MDN(DensityEstimator):
+class SNPE_A_MDN(ConditionalDensityEstimator):
     """Generates a posthoc-corrected MDN which approximates the posterior.
 
     TODO: Adapt this class to the new `DensityEstimator` interface. Maybe even to a
@@ -384,8 +390,8 @@ class SNPE_A_MDN(DensityEstimator):
 
     def __init__(
         self,
-        flow: DensityEstimator,
-        proposal: Union["utils.BoxUniform", "MultivariateNormal", "DirectPosterior"],
+        flow: ConditionalDensityEstimator,
+        proposal: Union["BoxUniform", "MultivariateNormal", "DirectPosterior"],
         prior: Distribution,
         device: str,
     ):
@@ -398,22 +404,24 @@ class SNPE_A_MDN(DensityEstimator):
         """
         # Call nn.Module's constructor.
 
-        super().__init__(flow, flow._condition_shape)
+        super().__init__(flow, flow.input_shape, flow.condition_shape)
 
         self._neural_net = flow
         self._prior = prior
         self._device = device
 
         # Set the proposal using the `default_x`.
-        if isinstance(proposal, (utils.BoxUniform, MultivariateNormal)):
+        if isinstance(proposal, (BoxUniform, MultivariateNormal)):
             self._apply_correction = False
         else:
+            # Add iid dimension.
+            default_x = proposal.default_x  # type: ignore
             self._apply_correction = True
             (
                 logits_pp,
                 m_pp,
                 prec_pp,
-            ) = proposal.posterior_estimator._posthoc_correction(proposal.default_x)  # type: ignore
+            ) = proposal.posterior_estimator._posthoc_correction(default_x)
             self._logits_pp, self._m_pp, self._prec_pp = (
                 logits_pp.detach(),
                 m_pp.detach(),
@@ -449,13 +457,12 @@ class SNPE_A_MDN(DensityEstimator):
             theta = self._maybe_z_score_theta(inputs)
 
             # Compute the log_prob of theta under the product.
-            log_prob_proposal_posterior = utils.mog_log_prob(
-                theta, logits_pp, m_pp, prec_pp
-            )
-            utils.assert_all_finite(
-                log_prob_proposal_posterior, "proposal posterior eval"
-            )
+            log_prob_proposal_posterior = mog_log_prob(theta, logits_pp, m_pp, prec_pp)
+            assert_all_finite(log_prob_proposal_posterior, "proposal posterior eval")
             return log_prob_proposal_posterior  # \hat{p} from eq (3) in [1]
+
+    def loss(self, inputs, condition, **kwargs) -> Tensor:
+        return -self.log_prob(inputs, condition, **kwargs)
 
     def sample(self, sample_shape: torch.Size, condition: Tensor, **kwargs) -> Tensor:
         """Sample from the approximate posterior.
@@ -471,16 +478,22 @@ class SNPE_A_MDN(DensityEstimator):
         condition = condition.to(self._device)
 
         if not self._apply_correction:
-            return self._neural_net.sample(sample_shape, condition=condition)
+            samples = self._neural_net.sample(sample_shape, condition=condition)
+            return samples
         else:
             # When we want to sample from the approx. posterior, a proposal prior
             # \tilde{p} has already been observed. To analytically calculate the
             # log-prob of the Gaussian, we first need to compute the mixture components.
             num_samples = torch.Size(sample_shape).numel()
-            condition_ndim = len(self._condition_shape)
+            condition_ndim = len(self.condition_shape)
             batch_size = condition.shape[:-condition_ndim]
             batch_size = torch.Size(batch_size).numel()
-            return self._sample_approx_posterior_mog(num_samples, condition, batch_size)
+            samples = self._sample_approx_posterior_mog(
+                num_samples, condition, batch_size
+            )
+            # NOTE: New batching convention: (batch_dim, sample_dim, *event_shape)
+            samples = samples.transpose(0, 1)
+            return samples
 
     def _sample_approx_posterior_mog(
         self, num_samples, x: Tensor, batch_size: int
@@ -544,17 +557,24 @@ class SNPE_A_MDN(DensityEstimator):
         estimator and the proposal.
 
         Args:
-            x: Conditioning context for posterior.
+            x: Conditioning context for posterior, shape
+                `(batch_dim, *event_shape)`.
 
         Returns:
             Mixture components of the posterior.
         """
+        # Remove the batch dimension of `x` (SNPE-A always has a single `x`).
+        assert (
+            x.shape[0] == 1
+        ), f"Batchsize of `x_o` == {x.shape[0]}. SNPE-A only supports a single `x_o`."
+        x = x.squeeze(dim=0)
 
         # Evaluate the density estimator.
         embedded_x = self._neural_net.net._embedding_net(x)
         dist = self._neural_net.net._distribution  # defined to avoid black formatting.
         logits_d, m_d, prec_d, _, _ = dist.get_mixture_components(embedded_x)
         norm_logits_d = logits_d - torch.logsumexp(logits_d, dim=-1, keepdim=True)
+        norm_logits_d = atleast_2d(norm_logits_d)
 
         # The following if case is needed because, in the constructor, we call
         # `_posthoc_correction` regardless of whether the `proposal` itself had a
@@ -572,6 +592,7 @@ class SNPE_A_MDN(DensityEstimator):
         logits_p, m_p, prec_p, cov_p = self._proposal_posterior_transformation(
             logits_pp, m_pp, prec_pp, norm_logits_d, m_d, prec_d
         )
+        logits_p = atleast_2d(logits_p)
         return logits_p, m_p, prec_p
 
     def _proposal_posterior_transformation(
@@ -606,7 +627,6 @@ class SNPE_A_MDN(DensityEstimator):
         Returns: (Component weight, mean, precision matrix, covariance matrix) of each
             Gaussian of the approximate posterior.
         """
-
         precisions_post, covariances_post = self._precisions_posterior(
             precisions_pp, precisions_d
         )
@@ -705,7 +725,7 @@ class SNPE_A_MDN(DensityEstimator):
                 )
             else:
                 range_ = torch.sqrt(almost_one_std * 3.0)
-                self._maybe_z_scored_prior = utils.BoxUniform(
+                self._maybe_z_scored_prior = BoxUniform(
                     almost_zero_mean - range_, almost_zero_mean + range_
                 )
         else:
@@ -806,8 +826,8 @@ class SNPE_A_MDN(DensityEstimator):
         num_comps_d = precisions_d.shape[1]
 
         # Compute the products P_k * m_k and P_0 * m_0.
-        prec_m_prod_pp = utils.batched_mixture_mv(precisions_pp, means_pp)
-        prec_m_prod_d = utils.batched_mixture_mv(precisions_d, means_d)
+        prec_m_prod_pp = batched_mixture_mv(precisions_pp, means_pp)
+        prec_m_prod_d = batched_mixture_mv(precisions_d, means_d)
 
         # Repeat them to allow for matrix operations: same trick as for the precisions.
         prec_m_prod_pp_rep = prec_m_prod_pp.repeat_interleave(num_comps_d, dim=1)
@@ -818,7 +838,7 @@ class SNPE_A_MDN(DensityEstimator):
         if isinstance(self._maybe_z_scored_prior, MultivariateNormal):
             summed_cov_m_prod_rep += self.prec_m_prod_prior
 
-        means_p = utils.batched_mixture_mv(covariances_p, summed_cov_m_prod_rep)
+        means_p = batched_mixture_mv(covariances_p, summed_cov_m_prod_rep)
         return means_p
 
     @staticmethod
@@ -883,15 +903,15 @@ class SNPE_A_MDN(DensityEstimator):
         )
 
         # Compute for proposal, density estimator, and proposal posterior:
-        exponent_pp = utils.batched_mixture_vmv(
+        exponent_pp = batched_mixture_vmv(
             precisions_pp,
             means_pp,  # m_0 in eq (26) in Appendix C of [1]
         )
-        exponent_d = utils.batched_mixture_vmv(
+        exponent_d = batched_mixture_vmv(
             precisions_d,
             means_d,  # m_k in eq (26) in Appendix C of [1]
         )
-        exponent_post = utils.batched_mixture_vmv(
+        exponent_post = batched_mixture_vmv(
             precisions_post,
             means_post,  # m_k^\prime in eq (26) in Appendix C of [1]
         )

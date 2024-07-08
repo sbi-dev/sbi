@@ -1,5 +1,5 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from __future__ import annotations
 
@@ -245,6 +245,17 @@ class TractablePosterior(NeuralPosterior):
         """See child classes for docstring."""
 
         return self.potential_fn.posterior.sample(sample_shape)
+
+    def sample_batched(
+        self,
+        sample_shape: Shape,
+        x: Tensor,
+        max_sampling_batch_size: int = 10000,
+        show_progress_bars: bool = True,
+    ) -> Tensor:
+        raise NotImplementedError(
+            "Batched sampling is not supported for TractablePosterior."
+        )
 
     def log_prob(
         self,

@@ -1,5 +1,5 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import logging
 import random
@@ -22,11 +22,10 @@ from torch.distributions import (
     biject_to,
     constraints,
 )
+from zuko.flows import UnconditionalTransform
 
-from sbi import utils as utils
 from sbi.sbi_types import TorchTransform
 from sbi.utils.torchutils import atleast_2d
-from sbi.utils.zukoutils import UnconditionalLazyTransform
 
 
 def warn_if_zscoring_changes_data(x: Tensor, duplicate_tolerance: float = 0.1) -> None:
@@ -188,7 +187,7 @@ def standardizing_transform_zuko(
         Affine transform for z-scoring
     """
     t_mean, t_std = z_standardization(batch_t, structured_dims, min_std)
-    return UnconditionalLazyTransform(
+    return UnconditionalTransform(
         AffineTransform,
         loc=-t_mean / t_std,
         scale=1 / t_std,
@@ -857,7 +856,7 @@ def mog_log_prob(
     constant = -(output_dim / 2.0) * torch.log(torch.tensor([2 * pi]))
     log_det = 0.5 * torch.log(torch.det(precisions_pp))
     theta_minus_mean = theta.expand_as(means_pp) - means_pp
-    exponent = -0.5 * utils.batched_mixture_vmv(precisions_pp, theta_minus_mean)
+    exponent = -0.5 * batched_mixture_vmv(precisions_pp, theta_minus_mean)
 
     return torch.logsumexp(weights + constant + log_det + exponent, dim=-1)
 

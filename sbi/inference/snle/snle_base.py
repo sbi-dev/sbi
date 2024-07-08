@@ -1,6 +1,5 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
-
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from abc import ABC
 from copy import deepcopy
@@ -12,10 +11,14 @@ from torch.distributions import Distribution
 from torch.nn.utils.clip_grad import clip_grad_norm_
 from torch.utils.tensorboard.writer import SummaryWriter
 
-from sbi.inference import NeuralInference
+from sbi.inference.base import NeuralInference
 from sbi.inference.posteriors import MCMCPosterior, RejectionPosterior, VIPosterior
+from sbi.inference.posteriors.importance_posterior import ImportanceSamplingPosterior
 from sbi.inference.potentials import likelihood_estimator_based_potential
-from sbi.neural_nets import DensityEstimator, likelihood_nn
+from sbi.neural_nets import ConditionalDensityEstimator, likelihood_nn
+from sbi.neural_nets.density_estimators.shape_handling import (
+    reshape_to_batch_event,
+)
 from sbi.utils import check_estimator_arg, check_prior, x_shape_from_simulation
 
 
@@ -125,7 +128,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
         retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[Dict] = None,
-    ) -> DensityEstimator:
+    ) -> ConditionalDensityEstimator:
         r"""Train the density estimator to learn the distribution $p(x|\theta)$.
 
         Args:
@@ -172,11 +175,10 @@ class LikelihoodEstimator(NeuralInference, ABC):
                 theta[self.train_indices].to("cpu"),
                 x[self.train_indices].to("cpu"),
             )
-            self._x_shape = x_shape_from_simulation(x.to("cpu"))
-            del theta, x
             assert (
-                len(self._x_shape) < 3
+                len(x_shape_from_simulation(x.to("cpu"))) < 3
             ), "SNLE cannot handle multi-dimensional simulator output."
+            del theta, x
 
         self._neural_net.to(self._device)
         if not resume_training:
@@ -261,7 +263,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
 
     def build_posterior(
         self,
-        density_estimator: Optional[DensityEstimator] = None,
+        density_estimator: Optional[ConditionalDensityEstimator] = None,
         prior: Optional[Distribution] = None,
         sample_with: str = "mcmc",
         mcmc_method: str = "slice_np",
@@ -269,7 +271,10 @@ class LikelihoodEstimator(NeuralInference, ABC):
         mcmc_parameters: Optional[Dict[str, Any]] = None,
         vi_parameters: Optional[Dict[str, Any]] = None,
         rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
-    ) -> Union[MCMCPosterior, RejectionPosterior, VIPosterior]:
+        importance_sampling_parameters: Optional[Dict[str, Any]] = None,
+    ) -> Union[
+        MCMCPosterior, RejectionPosterior, VIPosterior, ImportanceSamplingPosterior
+    ]:
         r"""Build posterior from the neural density estimator.
 
         SNLE trains a neural network to approximate the likelihood $p(x|\theta)$. The
@@ -316,7 +321,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
         else:
             likelihood_estimator = density_estimator
             # Otherwise, infer it from the device of the net parameters.
-            device = next(density_estimator.parameters()).device.type
+            device = str(next(density_estimator.parameters()).device)
 
         potential_fn, theta_transform = likelihood_estimator_based_potential(
             likelihood_estimator=likelihood_estimator,
@@ -331,7 +336,6 @@ class LikelihoodEstimator(NeuralInference, ABC):
                 proposal=prior,
                 method=mcmc_method,
                 device=device,
-                x_shape=self._x_shape,
                 **mcmc_parameters or {},
             )
         elif sample_with == "rejection":
@@ -339,7 +343,6 @@ class LikelihoodEstimator(NeuralInference, ABC):
                 potential_fn=potential_fn,
                 proposal=prior,
                 device=device,
-                x_shape=self._x_shape,
                 **rejection_sampling_parameters or {},
             )
         elif sample_with == "vi":
@@ -349,8 +352,14 @@ class LikelihoodEstimator(NeuralInference, ABC):
                 prior=prior,  # type: ignore
                 vi_method=vi_method,
                 device=device,
-                x_shape=self._x_shape,
                 **vi_parameters or {},
+            )
+        elif sample_with == "importance":
+            self._posterior = ImportanceSamplingPosterior(
+                potential_fn=potential_fn,
+                proposal=prior,
+                device=device,
+                **importance_sampling_parameters or {},
             )
         else:
             raise NotImplementedError
@@ -366,4 +375,8 @@ class LikelihoodEstimator(NeuralInference, ABC):
         Returns:
             Negative log prob.
         """
+        theta = reshape_to_batch_event(
+            theta, event_shape=self._neural_net.condition_shape
+        )
+        x = reshape_to_batch_event(x, event_shape=self._neural_net.input_shape)
         return self._neural_net.loss(x, condition=theta)

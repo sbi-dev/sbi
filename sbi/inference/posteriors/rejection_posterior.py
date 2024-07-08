@@ -1,5 +1,6 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+
 from functools import partial
 from typing import Any, Callable, Optional, Union
 from warnings import warn
@@ -7,7 +8,6 @@ from warnings import warn
 import torch
 from torch import Tensor
 
-from sbi import utils as utils
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.samplers.rejection.rejection import rejection_sample
@@ -49,8 +49,7 @@ class RejectionPosterior(NeuralPosterior):
             m: Multiplier to the `potential_fn / proposal` ratio.
             device: Training device, e.g., "cpu", "cuda" or "cuda:0". If None,
                 `potential_fn.device` is used.
-            x_shape: Shape of a single simulator output. If passed, it is used to check
-                the shape of the observed data and give a descriptive error.
+            x_shape: Deprecated, should not be passed.
         """
         super().__init__(
             potential_fn,
@@ -166,6 +165,19 @@ class RejectionPosterior(NeuralPosterior):
         )
 
         return samples.reshape((*sample_shape, -1))
+
+    def sample_batched(
+        self,
+        sample_shape: Shape,
+        x: Tensor,
+        max_sampling_batch_size: int = 10000,
+        show_progress_bars: bool = True,
+    ) -> Tensor:
+        raise NotImplementedError(
+            "Batched sampling is not implemented for RejectionPosterior. \
+            Alternatively you can use `sample` in a loop \
+            [posterior.sample(theta, x_o) for x_o in x]."
+        )
 
     def map(
         self,

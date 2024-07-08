@@ -1,5 +1,5 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from __future__ import annotations
 
@@ -9,8 +9,9 @@ from pyknos.nflows.nn import nets
 from torch import Tensor, nn, relu
 
 from sbi.neural_nets.ratio_estimators import RatioEstimator
+from sbi.utils.nn_utils import get_numel
 from sbi.utils.sbiutils import standardizing_net, z_score_parser
-from sbi.utils.user_input_checks import check_data_device, check_embedding_net_device
+from sbi.utils.user_input_checks import check_data_device
 
 
 def build_z_scored_embedding_net(
@@ -48,7 +49,6 @@ def build_linear_classifier(
     z_score_y: Optional[str] = "independent",
     embedding_net_x: nn.Module = nn.Identity(),
     embedding_net_y: nn.Module = nn.Identity(),
-    **kwargs,
 ) -> RatioEstimator:
     """Builds linear classifier.
 
@@ -73,17 +73,11 @@ def build_linear_classifier(
     Returns:
         Neural network.
     """
+    # Infer the output dimensionalities of the embedding_net by making a forward
+    # pass.
     check_data_device(batch_x, batch_y)
-    check_embedding_net_device(embedding_net=embedding_net_x, datum=batch_y)
-    check_embedding_net_device(embedding_net=embedding_net_y, datum=batch_y)
-
-    # Infer the shapes
-    x_shape = batch_x[:1].shape
-    y_shape = batch_y[:1].shape
-
-    # Infer the output dimensionalities of the embedding_net by making a forward pass.
-    x_numel = embedding_net_x(batch_x[:1]).size(-1)
-    y_numel = embedding_net_y(batch_y[:1]).size(-1)
+    x_numel = get_numel(batch_x, embedding_net=embedding_net_x)
+    y_numel = get_numel(batch_y, embedding_net=embedding_net_y)
 
     neural_net = nn.Linear(x_numel + y_numel, 1)
 
@@ -92,8 +86,8 @@ def build_linear_classifier(
 
     return RatioEstimator(
         net=neural_net,
-        theta_shape=x_shape,
-        x_shape=y_shape,
+        theta_shape=batch_x[0].shape,
+        x_shape=batch_y[0].shape,
         embedding_net_theta=embedding_net_x,
         embedding_net_x=embedding_net_y,
     )
@@ -127,17 +121,10 @@ def build_mlp_classifier(
     Returns:
         Neural network.
     """
-    check_data_device(batch_x, batch_y)
-    check_embedding_net_device(embedding_net=embedding_net_x, datum=batch_y)
-    check_embedding_net_device(embedding_net=embedding_net_y, datum=batch_y)
-
-    # Infer the shapes
-    x_shape = batch_x[:1].shape
-    y_shape = batch_y[:1].shape
-
     # Infer the output dimensionalities of the embedding_net by making a forward pass.
-    x_numel = embedding_net_x(batch_x[:1]).size(-1)
-    y_numel = embedding_net_y(batch_y[:1]).size(-1)
+    check_data_device(batch_x, batch_y)
+    x_numel = get_numel(batch_x, embedding_net=embedding_net_x)
+    y_numel = get_numel(batch_y, embedding_net=embedding_net_y)
 
     neural_net = nn.Sequential(
         nn.Linear(x_numel + y_numel, hidden_features),
@@ -154,8 +141,8 @@ def build_mlp_classifier(
 
     return RatioEstimator(
         net=neural_net,
-        theta_shape=x_shape,
-        x_shape=y_shape,
+        theta_shape=batch_x[0].shape,
+        x_shape=batch_y[0].shape,
         embedding_net_theta=embedding_net_x,
         embedding_net_x=embedding_net_y,
     )
@@ -195,16 +182,8 @@ def build_resnet_classifier(
         Neural network.
     """
     check_data_device(batch_x, batch_y)
-    check_embedding_net_device(embedding_net=embedding_net_x, datum=batch_y)
-    check_embedding_net_device(embedding_net=embedding_net_y, datum=batch_y)
-
-    # Infer the shapes
-    x_shape = batch_x[:1].shape
-    y_shape = batch_y[:1].shape
-
-    # Infer the output dimensionalities of the embedding_net by making a forward pass.
-    x_numel = embedding_net_x(batch_x[:1]).size(-1)
-    y_numel = embedding_net_y(batch_y[:1]).size(-1)
+    x_numel = get_numel(batch_x, embedding_net=embedding_net_x)
+    y_numel = get_numel(batch_y, embedding_net=embedding_net_y)
 
     neural_net = nets.ResidualNet(
         in_features=x_numel + y_numel,
@@ -222,8 +201,8 @@ def build_resnet_classifier(
 
     return RatioEstimator(
         net=neural_net,
-        theta_shape=x_shape,
-        x_shape=y_shape,
+        theta_shape=batch_x[0].shape,
+        x_shape=batch_y[0].shape,
         embedding_net_theta=embedding_net_x,
         embedding_net_x=embedding_net_y,
     )

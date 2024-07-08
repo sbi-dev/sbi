@@ -1,29 +1,12 @@
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    List,
-    Optional,
-    Sequence,
-    Tuple,
-    TypeVar,
-    Union,
-    cast,
-)
-
-from sbi.inference.abc.mcabc import MCABC
-from sbi.inference.abc.smcabc import SMCABC
+from sbi.inference.abc import MCABC, SMCABC
 from sbi.inference.base import (
     NeuralInference,  # noqa: F401
     check_if_proposal_has_default_x,
     infer,
     simulate_for_sbi,
 )
-from sbi.inference.snle.mnle import MNLE
-from sbi.inference.snle.snle_a import SNLE_A
-from sbi.inference.snpe.snpe_a import SNPE_A
-from sbi.inference.snpe.snpe_b import SNPE_B
-from sbi.inference.snpe.snpe_c import SNPE_C  # noqa: F401
+from sbi.inference.snle import MNLE, SNLE_A
+from sbi.inference.snpe import SNPE_A, SNPE_B, SNPE_C  # noqa: F401
 from sbi.inference.snre import BNRE, SNRE, SNRE_A, SNRE_B, SNRE_C  # noqa: F401
 
 SNL = SNLE = SNLE_A
@@ -46,19 +29,17 @@ _abc_family = ["ABC", "MCABC", "SMC", "SMCABC"]
 
 __all__ = _snpe_family + _snre_family + _snle_family + _abc_family
 
-from sbi.inference.posteriors.direct_posterior import DirectPosterior
-from sbi.inference.posteriors.ensemble_posterior import EnsemblePosterior
-from sbi.inference.posteriors.importance_posterior import ImportanceSamplingPosterior
-from sbi.inference.posteriors.mcmc_posterior import MCMCPosterior
-from sbi.inference.posteriors.rejection_posterior import RejectionPosterior
-from sbi.inference.posteriors.vi_posterior import VIPosterior
-from sbi.inference.potentials.likelihood_based_potential import (
+from sbi.inference.posteriors import (
+    DirectPosterior,
+    EnsemblePosterior,
+    ImportanceSamplingPosterior,
+    MCMCPosterior,
+    RejectionPosterior,
+    VIPosterior,
+)
+from sbi.inference.potentials import (
     likelihood_estimator_based_potential,
     mixed_likelihood_estimator_based_potential,
-)
-from sbi.inference.potentials.posterior_based_potential import (
     posterior_estimator_based_potential,
-)
-from sbi.inference.potentials.ratio_based_potential import (
     ratio_estimator_based_potential,
 )

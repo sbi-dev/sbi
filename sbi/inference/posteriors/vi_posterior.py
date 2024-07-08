@@ -1,5 +1,5 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import copy
 from copy import deepcopy
@@ -29,7 +29,7 @@ from sbi.sbi_types import (
     TorchTensor,
     TorchTransform,
 )
-from sbi.utils import mcmc_transform
+from sbi.utils.sbiutils import mcmc_transform
 from sbi.utils.torchutils import atleast_2d_float32_tensor, ensure_theta_batched
 
 
@@ -91,8 +91,7 @@ class VIPosterior(NeuralPosterior):
                 typically cover all modes (`fKL`, `IW`, `alpha` for alpha < 1).
             device: Training device, e.g., `cpu`, `cuda` or `cuda:0`. We will ensure
                 that all other objects are also on this device.
-            x_shape: Shape of a single simulator output. If passed, it is used to check
-                the shape of the observed data and give a descriptive error.
+            x_shape: Deprecated, should not be passed.
             parameters: List of parameters of the variational posterior. This is only
                 required for user-defined q i.e. if q does not have a `parameters`
                 attribute.
@@ -296,6 +295,19 @@ class VIPosterior(NeuralPosterior):
             )
         samples = self.q.sample(torch.Size(sample_shape))
         return samples.reshape((*sample_shape, samples.shape[-1]))
+
+    def sample_batched(
+        self,
+        sample_shape: Shape,
+        x: Tensor,
+        max_sampling_batch_size: int = 10000,
+        show_progress_bars: bool = True,
+    ) -> Tensor:
+        raise NotImplementedError(
+            "Batched sampling is not implemented for VIPosterior. \
+            Alternatively you can use `sample` in a loop \
+            [posterior.sample(theta, x_o) for x_o in x]."
+        )
 
     def log_prob(
         self,

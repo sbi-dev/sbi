@@ -1,13 +1,11 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
-
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import warnings
 from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union, cast
 
 import torch
 from numpy import ndarray
-from pyknos.nflows import flows
 from scipy.stats._distn_infrastructure import rv_frozen
 from scipy.stats._multivariate import multi_rv_frozen
 from torch import Tensor, float32, nn
@@ -428,36 +426,6 @@ def check_prior_support(prior):
         ) from err
 
 
-def check_embedding_net_device(embedding_net: nn.Module, datum: torch.Tensor) -> None:
-    """Checks if the device for the `embedding_net`'s weights is the same as the device
-    for the fed `datum`. In case of discrepancy, warn the user and move the
-    embedding_net` to  the `datum`'s device.
-
-    Args:
-        embedding_net: torch `Module` embedding data
-        datum torch `Tensor` from the training device
-    """
-    datum_device = datum.device
-    embedding_net_devices = [p.device for p in embedding_net.parameters()]
-    if len(embedding_net_devices) > 0:
-        embedding_net_device = embedding_net_devices[0]
-        if embedding_net_device != datum_device:
-            warnings.warn(
-                "Mismatch between the device of the data fed "
-                "to the embedding_net and the device of the "
-                "embedding_net's weights. Fed data has device "
-                f"'{datum_device}' vs embedding_net weights have "
-                f"device '{embedding_net_device}'. "
-                "Automatically switching the embedding_net's device to "
-                f"'{datum_device}', which could otherwise be done manually "
-                f"""using the line `embedding_net.to('{datum_device}')`.""",
-                stacklevel=2,
-            )
-            embedding_net.to(datum_device)
-    else:
-        pass
-
-
 def check_data_device(datum_1: torch.Tensor, datum_2: torch.Tensor) -> None:
     """Checks if two tensors have the seme device. Fails if there is a device
     discrepancy
@@ -567,16 +535,19 @@ def get_batch_loop_simulator(simulator: Callable) -> Callable:
 
 
 def process_x(
-    x: Array, x_shape: Optional[torch.Size] = None, allow_iid_x: bool = False
+    x: Array, x_event_shape: Optional[torch.Size] = None, allow_iid_x: bool = False
 ) -> Tensor:
     """Return observed data adapted to match sbi's shape and type requirements.
+
+    This means that `x` is returned with a `batch_dim`.
 
     If `x_shape` is `None`, the shape is not checked.
 
     Args:
         x: Observed data as provided by the user.
-        x_shape: Prescribed shape - either directly provided by the user at init or
-            inferred by sbi by running a simulation and checking the output.
+        x_event_shape: Prescribed shape - either directly provided by the user at init
+            or inferred by sbi by running a simulation and checking the output. Does not
+            contain a batch dimension.
         allow_iid_x: Whether multiple trials in x are allowed.
 
     Returns:
@@ -585,24 +556,29 @@ def process_x(
 
     x = atleast_2d(torch.as_tensor(x, dtype=float32))
 
+    if x_event_shape is not None and len(x_event_shape) > len(x.shape):
+        raise ValueError(
+            f"You passed an `x` of shape {x.shape} but the `x_event_shape` (inferred "
+            f"from simulations) is {x_event_shape}. We are raising this error because "
+            f"len(x_event_shape) > len(x.shape)"
+        )
+
     # If x_shape is provided, we can fix a missing batch dim for >1D data.
-    if x_shape is not None and len(x_shape) > len(x.shape):
+    if x_event_shape is not None and len(x_event_shape) == len(x.shape):
         x = x.unsqueeze(0)
 
     input_x_shape = x.shape
     if not allow_iid_x:
         check_for_possibly_batched_x_shape(input_x_shape)
-        start_idx = 0
     else:
         warn_on_iid_x(num_trials=input_x_shape[0])
-        start_idx = 1
 
-    if x_shape is not None:
+    if x_event_shape is not None:
         # Number of trials can change for every new x, but single trial x shape must
         # match.
-        assert input_x_shape[start_idx:] == x_shape[start_idx:], (
-            f"Observed data shape ({input_x_shape[start_idx:]}) must match "
-            f"the shape of simulated data x ({x_shape[start_idx:]})."
+        assert input_x_shape[1:] == x_event_shape, (
+            f"Observed data shape ({input_x_shape[1:]}) must match "
+            f"the shape of simulated data x ({x_event_shape})."
         )
     return x
 
@@ -730,8 +706,8 @@ def validate_theta_and_x(
 
     if str(x.device) != data_device:
         warnings.warn(
-            f"Data x has device '{x.device}'."
-            f"Moving x to the data_device '{data_device}'."
+            f"Data x has device '{x.device}'. "
+            f"Moving x to the data_device '{data_device}'. "
             f"Training will proceed on device '{training_device}'.",
             stacklevel=2,
         )
@@ -740,7 +716,7 @@ def validate_theta_and_x(
     if str(theta.device) != data_device:
         warnings.warn(
             f"Parameters theta has device '{theta.device}'. "
-            f"Moving theta to the data_device '{data_device}'."
+            f"Moving theta to the data_device '{data_device}'. "
             f"Training will proceed on device '{training_device}'.",
             stacklevel=2,
         )
@@ -749,17 +725,19 @@ def validate_theta_and_x(
     return theta, x
 
 
-def test_posterior_net_for_multi_d_x(net: flows.Flow, theta: Tensor, x: Tensor) -> None:
+def test_posterior_net_for_multi_d_x(net, theta: Tensor, x: Tensor) -> None:
     """Test log prob method of the net.
 
     This is done to make sure the net can handle multidimensional inputs via an
     embedding net. If not, it usually fails with a RuntimeError. Here we catch the
     error, append a debug hint and raise it again.
-    """
 
+    Args:
+        net: A `DensityEstimator`.
+    """
     try:
         # torch.nn.functional needs at least two inputs here.
-        net.log_prob(theta[:2], x[:2])
+        net.log_prob(theta[:, :2], condition=x[:2])
     except RuntimeError as rte:
         ndims = x.ndim
         if ndims > 2:

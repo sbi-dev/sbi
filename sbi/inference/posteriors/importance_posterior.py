@@ -1,11 +1,11 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+
 from typing import Any, Callable, Optional, Tuple, Union
 
 import torch
 from torch import Tensor
 
-from sbi import utils as utils
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.samplers.importance.importance_sampling import importance_sample
@@ -52,8 +52,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
                 proposal at every iteration.
             device: Device on which to sample, e.g., "cpu", "cuda" or "cuda:0". If
                 None, `potential_fn.device` is used.
-            x_shape: Shape of a single simulator output. If passed, it is used to check
-                the shape of the observed data and give a descriptive error.
+            x_shape: Deprecated, should not be passed.
         """
         super().__init__(
             potential_fn,
@@ -157,6 +156,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         self,
         sample_shape: Shape = torch.Size(),
         x: Optional[Tensor] = None,
+        method: Optional[str] = None,
         oversampling_factor: int = 32,
         max_sampling_batch_size: int = 10_000,
         sample_with: Optional[str] = None,
@@ -165,14 +165,22 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         """Return samples from the approximate posterior distribution.
 
         Args:
-            sample_shape: _description_
-            x: _description_
+            sample_shape: Shape of samples that are drawn from posterior.
+            x: Observed data.
+            method: Either of [`sir`|`importance`]. This sets the behavior of the
+                `.sample()` method. With `sir`, approximate posterior samples are
+                generated with sampling importance resampling (SIR). With
+                `importance`, the `.sample()` method returns a tuple of samples and
+                corresponding importance weights.
             oversampling_factor: Number of proposed samples from which only one is
                 selected based on its importance weight.
             max_sampling_batch_size: The batch size of samples being drawn from the
                 proposal at every iteration.
             show_progress_bars: Whether to show a progressbar during sampling.
         """
+
+        method = self.method if method is None else method
+
         if sample_with is not None:
             raise ValueError(
                 f"You set `sample_with={sample_with}`. As of sbi v0.18.0, setting "
@@ -182,17 +190,30 @@ class ImportanceSamplingPosterior(NeuralPosterior):
 
         self.potential_fn.set_x(self._x_else_default_x(x))
 
-        if self.method == "sir":
+        if method == "sir":
             return self._sir_sample(
                 sample_shape,
                 oversampling_factor=oversampling_factor,
                 max_sampling_batch_size=max_sampling_batch_size,
                 show_progress_bars=show_progress_bars,
             )
-        elif self.method == "importance":
+        elif method == "importance":
             return self._importance_sample(sample_shape)
         else:
             raise NameError
+
+    def sample_batched(
+        self,
+        sample_shape: Shape,
+        x: Tensor,
+        max_sampling_batch_size: int = 10000,
+        show_progress_bars: bool = True,
+    ) -> Tensor:
+        raise NotImplementedError(
+            "Batched sampling is not implemented for ImportanceSamplingPosterior. \
+            Alternatively you can use `sample` in a loop \
+            [posterior.sample(theta, x_o) for x_o in x]."
+        )
 
     def _importance_sample(
         self,

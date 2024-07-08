@@ -1,5 +1,5 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 """Test PyTorch utility functions."""
 
@@ -215,10 +215,8 @@ def test_process_device(device_input: str) -> None:
             elif torch.backends.mps.is_available():
                 assert device_output == "mps:0"
 
-        if device_input == "cuda" and torch.cuda.is_available():
-            assert device_output == "cuda:0"
-        if device_input == "cuda:0" and torch.cuda.is_available():
-            assert device_output == "cuda:0"
+        if device_input.startswith("cuda") and torch.cuda.is_available():
+            assert device_output == device_input
         if device_input == "mps" and torch.backends.mps.is_available():
             assert device_output == "mps"
 

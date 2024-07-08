@@ -7,7 +7,6 @@ nav:
   - Tutorials and Examples:
       - Introduction:
         - Getting started: tutorial/00_getting_started_flexible.md
-        - Flexible interface: tutorial/02_flexible_interface.md
         - Amortized inference: tutorial/01_gaussian_amortized.md
         - Implemented algorithms: tutorial/16_implemented_methods.md
       - Advanced:
@@ -25,6 +24,7 @@ nav:
       - Analysis:
         - Conditional distributions: tutorial/07_conditional_distributions.md
         - Posterior sensitivity analysis: tutorial/09_sensitivity_analysis.md
+        - Pair and marginal plots: tutorial/19_plotting_functionality.md
       - Examples:
         - Hodgkin-Huxley example: examples/00_HH_simulator.md
         - Decision making model: examples/01_decision_making_model.md
