@@ -186,7 +186,7 @@ def standardizing_transform_zuko(
     Returns:
         Affine transform for z-scoring
     """
-    t_mean, t_std = z_standardization(batch_t, structured_dims, min_std)
+    t_mean, t_std = z_standardization(batch_t, structured_dims, min_std, backend="zuko")
     return UnconditionalTransform(
         AffineTransform,
         loc=-t_mean / t_std,
@@ -199,6 +199,7 @@ def z_standardization(
     batch_t: Tensor,
     structured_dims: bool = False,
     min_std: float = 1e-14,
+    backend: str = "nflows",
 ) -> [Tensor, Tensor]:
     """Computes mean and standard deviation for z-scoring
 
@@ -211,6 +212,7 @@ def z_standardization(
             batch, or independent (default), which z-scores dimensions independently.
         min_std:  Minimum value of the standard deviation to use when z-scoring to
             avoid division by zero.
+        backend: Whether to use nflows or zuko backend
 
     Returns:
         Mean and standard deviation for z-scoring
@@ -234,6 +236,7 @@ def z_standardization(
 
     if backend == "nflows":
         return transforms.AffineTransform(shift=-t_mean / t_std, scale=1 / t_std)
+    # TODO: janfb is not sure what is done here and why.
     elif backend == "zuko":
         return zuko.flows.Unconditional(
             zuko.transforms.MonotonicAffineTransform,
@@ -244,8 +247,9 @@ def z_standardization(
     elif backend == "zuko_transform":
         return zuko.transforms.MonotonicAffineTransform(
             shift=-t_mean / t_std,
-            scale=(1 / t_std).log(), # zuko computes: scale = exp(scale / (1 + abs(scale / slope)))
-            slope=1e-100 
+            # zuko computes: scale = exp(scale / (1 + abs(scale / slope)))
+            scale=(1 / t_std).log(),
+            slope=1e-100,
         )
 
     else:

@@ -109,7 +109,8 @@ def _bridge(
     experimental conditions.
     """
 
-    # NOTE: Should conform to (batch_size1, 1, input_size) + (batch_size2, *condition_shape)
+    # NOTE: Should conform to
+    # (batch_size1, 1, input_size) + (batch_size2, *condition_shape)
     # unsqueeze to ensure that the x-batch dimension is the first dimension for the
     # broadcasting of the density estimator.
 

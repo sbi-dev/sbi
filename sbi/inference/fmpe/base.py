@@ -4,42 +4,37 @@
 
 import time
 from copy import deepcopy
-from typing import Any, Callable, Dict, Optional, Union, Tuple
+from typing import Any, Dict, Optional, Union
 
 import torch
 from torch import optim
 from torch.distributions import Distribution
 from torch.nn.utils.clip_grad import clip_grad_norm_
-from torch.utils.data import DataLoader, TensorDataset
-from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi import utils as utils
 from sbi.inference.base import NeuralInference
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
+from sbi.neural_nets.density_estimators import ConditionalDensityEstimator
 from sbi.neural_nets.density_estimators.zuko_flow_estimator import (
     ZukoFlowMatchingEstimator,
 )
-from sbi.neural_nets.density_estimators import ConditionalDensityEstimator
-from sbi.utils.sbiutils import mask_sims_from_prior
-
 from sbi.utils import (
     RestrictedPrior,
-    check_estimator_arg,
     handle_invalid_x,
-    nle_nre_apt_msg_on_invalid_x,
     npe_msg_on_invalid_x,
-    test_posterior_net_for_multi_d_x,
     validate_theta_and_x,
     warn_if_zscoring_changes_data,
     x_shape_from_simulation,
 )
+from sbi.utils.sbiutils import mask_sims_from_prior
 
 
 class FMPE(NeuralInference):
-    """Implements the Flow Matching Posterior Estimator (FMPE) for 
-    simulation-based inference. 
+    """Implements the Flow Matching Posterior Estimator (FMPE) for
+    simulation-based inference.
     """
+
     def __init__(
         self,
         prior: Optional[Distribution],
@@ -50,7 +45,7 @@ class FMPE(NeuralInference):
         show_progress_bars: bool = True,
     ) -> None:
         """Initialization method for the FMPE class.
-        
+
         Args:
             prior: Prior distribution.
             density_estimator: Density estimator for the FMPE. Defaults to None.
@@ -87,19 +82,19 @@ class FMPE(NeuralInference):
         dataloader_kwargs: Optional[dict] = None,
     ) -> ConditionalDensityEstimator:
         """Train the density estimator.
-        
+
         Args:
             training_batch_size: Batch size for training. Defaults to 50.
             learning_rate: Learning rate for training. Defaults to 5e-4.
-            validation_fraction: Fraction of the data to use for validation. Defaults to 0.1.
+            validation_fraction: Fraction of the data to use for validation.
             stop_after_epochs: Number of epochs to train for. Defaults to 20.
-            max_num_epochs: Maximum number of epochs to train for. Defaults to 2**31 - 1.
+            max_num_epochs: Maximum number of epochs to train for.
             clip_max_norm: Maximum norm for gradient clipping. Defaults to 5.0.
             discard_prior_samples: Whether to discard prior samples. Defaults to False.
             resume_training: Whether to resume training. Defaults to False.
             show_train_summary: Whether to show the training summary. Defaults to False.
-            dataloader_kwargs: Additional keyword arguments for the dataloader. Defaults to None.
-        
+            dataloader_kwargs: Additional keyword arguments for the dataloader.
+
         Returns:
             DensityEstimator: Trained density estimator.
         """
@@ -139,7 +134,7 @@ class FMPE(NeuralInference):
 
         # Move entire net to device for training.
         self._neural_net.to(self._device)
-        
+
         # initialize optimizer and training parameters
         if not resume_training:
             self.optimizer = optim.Adam(
@@ -227,7 +222,7 @@ class FMPE(NeuralInference):
         direct_sampling_parameters: Optional[Dict[str, Any]] = None,
     ) -> DirectPosterior:
         """Build the posterior distribution.
-        
+
         Args:
             density_estimator: Density estimator for the posterior. Defaults to None.
             prior: Prior distribution. Defaults to None.

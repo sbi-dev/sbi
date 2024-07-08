@@ -426,36 +426,6 @@ def check_prior_support(prior):
         ) from err
 
 
-def check_embedding_net_device(embedding_net: nn.Module, datum: torch.Tensor) -> None:
-    """Checks if the device for the `embedding_net`'s weights is the same as the device
-    for the fed `datum`. In case of discrepancy, warn the user and move the
-    embedding_net` to  the `datum`'s device.
-
-    Args:
-        embedding_net: torch `Module` embedding data
-        datum torch `Tensor` from the training device
-    """
-    datum_device = datum.device
-    embedding_net_devices = [p.device for p in embedding_net.parameters()]
-    if len(embedding_net_devices) > 0:
-        embedding_net_device = embedding_net_devices[0]
-        if embedding_net_device != datum_device:
-            warnings.warn(
-                "Mismatch between the device of the data fed "
-                "to the embedding_net and the device of the "
-                "embedding_net's weights. Fed data has device "
-                f"'{datum_device}' vs embedding_net weights have "
-                f"device '{embedding_net_device}'. "
-                "Automatically switching the embedding_net's device to "
-                f"'{datum_device}', which could otherwise be done manually "
-                f"""using the line `embedding_net.to('{datum_device}')`.""",
-                stacklevel=2,
-            )
-            embedding_net.to(datum_device)
-    else:
-        pass
-
-
 def check_data_device(datum_1: torch.Tensor, datum_2: torch.Tensor) -> None:
     """Checks if two tensors have the seme device. Fails if there is a device
     discrepancy
@@ -768,10 +738,10 @@ def test_posterior_net_for_multi_d_x(net, theta: Tensor, x: Tensor) -> None:
     try:
         # torch.nn.functional needs at least two inputs here.
         if hasattr(net, "log_prob"):
-            # This only is checked for density estimators, not for classifiers and 
+            # This only is checked for density estimators, not for classifiers and
             # others
             net.log_prob(theta[:2], x[:2])
-        
+
     except RuntimeError as rte:
         ndims = x.ndim
         if ndims > 2:

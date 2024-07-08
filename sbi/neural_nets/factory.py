@@ -6,17 +6,29 @@ from typing import Any, Callable, Optional
 
 from torch import nn
 
-from sbi.neural_nets.classifier import (build_linear_classifier,
-                                        build_mlp_classifier,
-                                        build_resnet_classifier)
-from sbi.neural_nets.flow import (build_made, build_maf, build_maf_rqs,
-                                  build_nsf, build_zuko_bpf, build_zuko_gf,
-                                  build_zuko_maf, build_zuko_naf,
-                                  build_zuko_ncsf, build_zuko_nice,
-                                  build_zuko_nsf, build_zuko_sospf,
-                                  build_zuko_unaf)
+from sbi.neural_nets.classifier import (
+    build_linear_classifier,
+    build_mlp_classifier,
+    build_resnet_classifier,
+)
+from sbi.neural_nets.flow import (
+    build_made,
+    build_maf,
+    build_maf_rqs,
+    build_nsf,
+    build_zuko_bpf,
+    build_zuko_gf,
+    build_zuko_maf,
+    build_zuko_naf,
+    build_zuko_ncsf,
+    build_zuko_nice,
+    build_zuko_nsf,
+    build_zuko_sospf,
+    build_zuko_unaf,
+)
 from sbi.neural_nets.mdn import build_mdn
 from sbi.neural_nets.mnle import build_mnle
+from sbi.utils.nn_utils import check_net_device
 
 model_builders = {
     "mdn": build_mdn,
@@ -35,6 +47,9 @@ model_builders = {
     "zuko_gf": build_zuko_gf,
     "zuko_bpf": build_zuko_bpf,
 }
+
+embedding_net_warn_msg = """The passed embedding net will be moved to cpu for
+                        constructing the net building function."""
 
 
 def classifier_nn(
@@ -87,8 +102,8 @@ def classifier_nn(
                 z_score_theta,
                 z_score_x,
                 hidden_features,
-                embedding_net_theta,
-                embedding_net_x,
+                check_net_device(embedding_net_theta, "cpu", embedding_net_warn_msg),
+                check_net_device(embedding_net_x, "cpu", embedding_net_warn_msg),
             ),
         ),
         **kwargs,
@@ -169,7 +184,7 @@ def likelihood_nn(
                 hidden_features,
                 num_transforms,
                 num_bins,
-                embedding_net,
+                check_net_device(embedding_net, "cpu", embedding_net_warn_msg),
                 num_components,
             ),
         ),
@@ -185,16 +200,18 @@ def likelihood_nn(
     return build_fn
 
 
-def flowmatching_nn(model: str,
+def flowmatching_nn(
+    model: str,
     hidden_features: int = 50,
-    frequency: int = 3, 
-    eta: float = 0.3, 
+    frequency: int = 3,
+    eta: float = 0.3,
     embedding_net: nn.Module = nn.Identity(),
-    **kwargs: Any,) -> Callable:
-    r"""Returns a function that builds a neural net that can act as 
+    **kwargs: Any,
+) -> Callable:
+    r"""Returns a function that builds a neural net that can act as
     a vector field estimator for Flow Matching. This function will usually
     be used for Flow Matching. The returned function is to be passed to the
-    
+
     Args:
         model: The type of density estimator that will be created. One of [`mdn`,
             `made`, `maf`, `maf_rqs`, `nsf`].
@@ -218,8 +235,6 @@ def flowmatching_nn(model: str,
             Ignored if density estimator is not an mdn.
         kwargs: additional custom arguments passed to downstream build functions.
     """
-    
-
 
 
 def posterior_nn(
@@ -282,7 +297,7 @@ def posterior_nn(
                 hidden_features,
                 num_transforms,
                 num_bins,
-                embedding_net,
+                check_net_device(embedding_net, "cpu", embedding_net_warn_msg),
                 num_components,
             ),
         ),

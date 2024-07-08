@@ -1,12 +1,12 @@
 ### Posterior object using vector field estimators
-from typing import Optional, Tuple
+from typing import Optional
 
 import torch
-from torch import Tensor, nn, log
-from typing import Optional, Union
 from torch.distributions import Distribution
 
+from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.neural_nets.vf_estimators import VectorFieldEstimator
+
 
 class VectorFieldPosterior(NeuralPosterior):
     def __init__(
@@ -19,7 +19,6 @@ class VectorFieldPosterior(NeuralPosterior):
         enable_transform: bool = True,
     ):
         raise NotImplementedError
-    
+
     def sample():
         raise NotImplementedError
-    

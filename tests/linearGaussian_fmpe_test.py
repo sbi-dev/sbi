@@ -14,6 +14,9 @@ from sbi import analysis as analysis
 from sbi import utils as utils
 from sbi.analysis import ConditionedMDN, conditional_potential
 from sbi.inference import (
+    SNPE_A,
+    SNPE_B,
+    SNPE_C,
     DirectPosterior,
     MCMCPosterior,
     RejectionPosterior,
@@ -21,6 +24,7 @@ from sbi.inference import (
     prepare_for_sbi,
     simulate_for_sbi,
 )
+
 # TODO import this from inference
 from sbi.inference.fmpe.base import FMPE
 from sbi.simulators.linear_gaussian import (
@@ -38,6 +42,7 @@ from .test_utils import (
     get_normalization_uniform_prior,
     get_prob_outside_uniform_prior,
 )
+
 
 @pytest.mark.parametrize(
     "num_dim, prior_str",

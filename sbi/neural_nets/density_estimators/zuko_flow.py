@@ -10,10 +10,6 @@ from zuko.flows.core import Flow
 from sbi.neural_nets.density_estimators.base import ConditionalDensityEstimator
 from sbi.sbi_types import Shape
 
-from typing import Tuple
-
-from typing import Tuple
-
 
 class ZukoFlow(ConditionalDensityEstimator):
     r"""`zuko`- based normalizing flow density estimator.
@@ -175,5 +171,3 @@ class ZukoFlow(ConditionalDensityEstimator):
 
         samples, log_probs = dists.rsample_and_log_prob(sample_shape)
         return samples, log_probs
-
-

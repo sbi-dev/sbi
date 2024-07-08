@@ -1,4 +1,4 @@
-from typing import Optional, Tuple
+from typing import Optional
 
 import torch
 from torch import Tensor, nn
@@ -18,6 +18,7 @@ class VectorFieldEstimator(nn.Module):
         condition_shape is the shape of the condition tensor.
 
     """
+
     def __init__(self, net: nn.Module, condition_shape: torch.Size) -> None:
         r"""Base class for vector field estimators.
 
@@ -50,7 +51,6 @@ class VectorFieldEstimator(nn.Module):
         """
 
         raise NotImplementedError
-
 
     def _check_condition_shape(self, condition: Tensor):
         r"""This method checks whether the condition has the correct shape.

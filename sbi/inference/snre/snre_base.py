@@ -376,7 +376,7 @@ class RatioEstimator(NeuralInference, ABC):
         else:
             ratio_estimator = density_estimator
             # Otherwise, infer it from the device of the net parameters.
-            device = next(density_estimator.parameters()).device.type
+            device = str(next(density_estimator.parameters()).device)
 
         potential_fn, theta_transform = ratio_estimator_based_potential(
             ratio_estimator=ratio_estimator,
