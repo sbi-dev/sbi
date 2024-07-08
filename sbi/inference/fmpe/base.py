@@ -16,9 +16,7 @@ from sbi import utils as utils
 from sbi.inference.base import NeuralInference
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.neural_nets.density_estimators import ConditionalDensityEstimator
-from sbi.neural_nets.density_estimators.zuko_flow_estimator import (
-    ZukoFlowMatchingEstimator,
-)
+from sbi.neural_nets.density_estimators.zuko_flow import FlowMatchingEstimator
 from sbi.utils import (
     RestrictedPrior,
     handle_invalid_x,
@@ -38,7 +36,7 @@ class FMPE(NeuralInference):
     def __init__(
         self,
         prior: Optional[Distribution],
-        density_estimator: Optional[ZukoFlowMatchingEstimator] = None,
+        density_estimator: Optional[FlowMatchingEstimator] = None,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,

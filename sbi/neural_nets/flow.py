@@ -16,9 +16,7 @@ from torch import Tensor, nn, relu, tanh, tensor, uint8
 from zuko.nn import MLP
 
 from sbi.neural_nets.density_estimators import NFlowsFlow, ZukoFlow
-from sbi.neural_nets.density_estimators.zuko_flow_estimator import (
-    ZukoFlowMatchingEstimator,
-)
+from sbi.neural_nets.density_estimators.zuko_flow import FlowMatchingEstimator
 from sbi.utils.nn_utils import get_numel
 from sbi.utils.sbiutils import (
     standardizing_net,
@@ -1123,8 +1121,10 @@ def build_zuko_flow_matching(
     hidden_features: Union[Sequence[int], int] = 50,
     num_transforms: int = 5,
     frequency: int = 3,
+    embedding_net_x: nn.Module = nn.Identity(),
+    embedding_net_y: nn.Module = nn.Identity(),
     **kwargs,
-) -> ZukoFlowMatchingEstimator:
+) -> FlowMatchingEstimator:
     x_numel = batch_x[0].numel()
     y_numel = batch_y[0].numel()
 
@@ -1140,9 +1140,12 @@ def build_zuko_flow_matching(
     vector_field_regression_net = MLP(
         in_features=x_numel + y_numel + 2 * frequency,
         out_features=x_numel,
-        hidden_features=[64] * 5,
+        hidden_features=hidden_features,
         activation=nn.ELU,
     )
+
+    # TODO: build input layer that z-scores the x and theta separately and takes
+    # into account the time embedding (z-score it as well?)
 
     z_score_x_bool, structured_x = z_score_parser(z_score_x)
     if z_score_x_bool:
@@ -1154,10 +1157,10 @@ def build_zuko_flow_matching(
     if z_score_y_bool:
         z_score_x = standardizing_net(batch_y, structured_y)
 
-    flow_matching_estimator = ZukoFlowMatchingEstimator(
-        theta_shape=batch_x[0].shape,
-        condition_shape=batch_y[0].shape,
+    flow_matching_estimator = FlowMatchingEstimator(
         net=vector_field_regression_net,
+        input_shape=batch_x[0].shape,
+        condition_shape=batch_y[0].shape,
         frequency=frequency,
         z_score_theta=z_score_theta,
         z_score_x=z_score_x,

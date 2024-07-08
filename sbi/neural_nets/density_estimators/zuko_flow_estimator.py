@@ -1,10 +1,10 @@
-import math
 from typing import Optional, Tuple
 
 import torch
 import torch.nn as nn
 import zuko
 from torch.distributions import Distribution
+from torch.nn.functional import mse_loss
 from zuko.distributions import DiagNormal, NormalizingFlow
 from zuko.transforms import FreeFormJacobianTransform
 from zuko.utils import broadcast
@@ -12,14 +12,13 @@ from zuko.utils import broadcast
 from sbi.neural_nets.density_estimators.base import ConditionalDensityEstimator
 
 
-class ZukoFlowMatchingEstimator(ConditionalDensityEstimator):
+class FlowMatchingEstimator(ConditionalDensityEstimator):
     def __init__(  # TODO: adopt interface from zuko_flow.py
         self,
-        theta_shape: int,
-        condition_shape: torch.Size,
         net: nn.Module,
-        frequency: int = 3,  # TODO goes out, net build somewhere else
-        eta: float = 1e-3,  # TODO same here
+        input_shape: torch.Size,
+        condition_shape: torch.Size,
+        noise_scale: float = 1e-3,
         device: str = "cpu",  # TODO goes out (device handling somewhere else)
         z_score_theta: Optional[zuko.transforms.MonotonicAffineTransform] = None,
         z_score_x: Optional[torch.nn.Module] = None,
@@ -27,21 +26,21 @@ class ZukoFlowMatchingEstimator(ConditionalDensityEstimator):
         """Creates a vector field estimator for Flow Matching.
 
         Args:
-            theta_shape: Shape of the parameters.
-            condition_shape: Shape of observed data.
-            net: Regression network to estimate v at time t which accepts
-            input shape (theta_shape + condition_shape + 2 * freq). Defaults to None.
-            frequency: Frequency of the embedding. Defaults to 3.
-            eta: Minimal variance of the conditional probability path. Defaults to 1e-3.
+            net: Neural network that estimates the vector field.
+            input_shape: Shape of the input.
+            condition_shape: Shape of the condition.
+            noise_scale: Scale of the noise added to the vector field.
+            device: Device to run the estimator on.
+            z_score_theta: Z-score function for the parameters.
+            z_score_x: Z-score function for the observed data.
         """
 
         super().__init__(
-            net=net, input_shape=theta_shape, condition_shape=condition_shape
+            net=net, input_shape=input_shape, condition_shape=condition_shape
         )
         self.device = device
-        self.theta_shape = theta_shape
-        self.frequency = torch.arange(1, frequency + 1, device=self.device) * math.pi
-        self.eta = eta
+        self.theta_shape = input_shape
+        self.noise_scale = noise_scale
         self.z_score_theta = z_score_theta
         self.z_score_x = z_score_x
 
@@ -130,20 +129,21 @@ class ZukoFlowMatchingEstimator(ConditionalDensityEstimator):
 
         # sample from probability path at time t
         epsilon = torch.randn_like(theta)
-        theta_prime = (1 - t_) * theta + (t_ + self.eta) * epsilon
+        theta_prime = (1 - t_) * theta + (t_ + self.noise_scale) * epsilon
 
         # compute vector field at the sampled time steps
         vector_field = epsilon - theta
 
         # todo: is calling forward here the right thing to do?
         # compute the mean squared error between the vector fields
-        return (self.forward(theta_prime, x, t) - vector_field).pow(2).sum(dim=-1)
+        return mse_loss(self.forward(theta_prime, x, t), vector_field)
 
     # TODO: rename? apply z_scores
     def forward(
         self, theta: torch.Tensor, x: torch.Tensor, t: torch.Tensor
     ) -> torch.Tensor:
         # positional encoding of time steps
+        # TODO: this could happen in the forward pass of the network
         t = self.frequency * t[..., None]
         t = torch.cat((t.cos(), t.sin()), dim=-1)
 

@@ -26,6 +26,7 @@ from sbi.neural_nets.flow import (
     build_zuko_sospf,
     build_zuko_unaf,
 )
+from sbi.neural_nets.flow_matcher import build_zuko_flow_matching
 from sbi.neural_nets.mdn import build_mdn
 from sbi.neural_nets.mnle import build_mnle
 from sbi.utils.nn_utils import check_net_device
@@ -202,10 +203,13 @@ def likelihood_nn(
 
 def flowmatching_nn(
     model: str,
-    hidden_features: int = 50,
-    frequency: int = 3,
-    eta: float = 0.3,
-    embedding_net: nn.Module = nn.Identity(),
+    z_score_theta: Optional[str] = "independent",
+    z_score_x: Optional[str] = "independent",
+    hidden_features: int = 64,
+    hidden_layers: int = 5,
+    num_frequencies: int = 3,
+    embedding_net_theta: nn.Module = nn.Identity(),
+    embedding_net_x: nn.Module = nn.Identity(),
     **kwargs: Any,
 ) -> Callable:
     r"""Returns a function that builds a neural net that can act as
@@ -235,6 +239,26 @@ def flowmatching_nn(
             Ignored if density estimator is not an mdn.
         kwargs: additional custom arguments passed to downstream build functions.
     """
+    implemented_models = ["mlp"]
+
+    if model not in implemented_models:
+        raise NotImplementedError(f"Model {model} in not implemented")
+
+    def build_fn(batch_theta, batch_x):
+        return build_zuko_flow_matching(
+            batch_x=batch_theta,
+            batch_y=batch_x,
+            z_score_x=z_score_theta,
+            z_score_y=z_score_x,
+            hidden_features=hidden_features,
+            num_transforms=hidden_layers,
+            num_freqs=num_frequencies,
+            embedding_net_x=embedding_net_theta,
+            embedding_net_y=embedding_net_x,
+            **kwargs,
+        )
+
+    return build_fn
 
 
 def posterior_nn(
