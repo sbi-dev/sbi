@@ -121,8 +121,8 @@ class RatioEstimator(nn.Module):
         Raises:
             ValueError: If the `batch_shape`s do not agree.
         """
-        theta_prefix = theta.shape[-len(self.theta_shape) :]
-        x_prefix = x.shape[-len(self.x_shape) :]
+        theta_prefix = theta.shape[:-len(self.theta_shape)]
+        x_prefix = x.shape[:-len(self.x_shape)]
         if theta_prefix != x_prefix:
             raise ValueError(f"{tuple(theta_prefix)=} != {tuple(x_prefix)}. \
                              Make them agree, since we do not broadcast for you.")

@@ -41,9 +41,9 @@ def test_api_ratio_estimator(ratio_estimator, theta_shape, x_shape):
     theta_mvn = MultivariateNormal(
         loc=zeros(*theta_shape), covariance_matrix=eye(theta_shape[-1])
     )
-    batch_theta = theta_mvn.sample((nsamples,))
+    batch_theta = theta_mvn.sample(torch.Size((nsamples,)))
     x_mvn = MultivariateNormal(loc=zeros(*x_shape), covariance_matrix=eye(x_shape[-1]))
-    batch_x = x_mvn.sample((nsamples,))
+    batch_x = x_mvn.sample(torch.Size((nsamples,)))
 
     if ratio_estimator == RatioEstimator:
         estimator = build_linear_classifier(
