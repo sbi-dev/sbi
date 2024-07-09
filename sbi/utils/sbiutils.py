@@ -8,7 +8,7 @@ from math import pi
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Type, Union
 
 import numpy as np
-import pyknos.nflows.transforms as transforms
+import pyknos.nflows.transforms as nflows_tf
 import torch
 import torch.distributions.transforms as torch_tf
 import zuko
@@ -22,7 +22,6 @@ from torch.distributions import (
     biject_to,
     constraints,
 )
-from zuko.flows import UnconditionalTransform
 
 from sbi.sbi_types import TorchTransform
 from sbi.utils.torchutils import atleast_2d
@@ -146,7 +145,7 @@ def standardizing_transform(
     batch_t: Tensor,
     structured_dims: bool = False,
     min_std: float = 1e-14,
-) -> transforms.AffineTransform:
+) -> nflows_tf.PointwiseAffineTransform:
     """Builds standardizing transform for nflows
 
     Args:
@@ -163,9 +162,10 @@ def standardizing_transform(
         Affine transform for z-scoring
     """
     t_mean, t_std = z_standardization(batch_t, structured_dims, min_std)
-    return transforms.AffineTransform(shift=-t_mean / t_std, scale=1 / t_std)
+    return nflows_tf.PointwiseAffineTransform(shift=-t_mean / t_std, scale=1 / t_std)
 
 
+# NOTE: we need a separate function for zuko to return the precise type for pyright.
 def standardizing_transform_zuko(
     batch_t: Tensor,
     structured_dims: bool = False,
@@ -186,8 +186,8 @@ def standardizing_transform_zuko(
     Returns:
         Affine transform for z-scoring
     """
-    t_mean, t_std = z_standardization(batch_t, structured_dims, min_std, backend="zuko")
-    return UnconditionalTransform(
+    t_mean, t_std = z_standardization(batch_t, structured_dims, min_std)
+    return zuko.flows.UnconditionalTransform(
         AffineTransform,
         loc=-t_mean / t_std,
         scale=1 / t_std,
@@ -199,7 +199,6 @@ def z_standardization(
     batch_t: Tensor,
     structured_dims: bool = False,
     min_std: float = 1e-14,
-    backend: str = "nflows",
 ) -> [Tensor, Tensor]:
     """Computes mean and standard deviation for z-scoring
 
@@ -234,26 +233,8 @@ def z_standardization(
         t_std = torch.std(batch_t[is_valid_t], dim=0)
         t_std[t_std < min_std] = min_std
 
-    if backend == "nflows":
-        return transforms.AffineTransform(shift=-t_mean / t_std, scale=1 / t_std)
-    # TODO: janfb is not sure what is done here and why.
-    elif backend == "zuko":
-        return zuko.flows.Unconditional(
-            zuko.transforms.MonotonicAffineTransform,
-            shift=-t_mean / t_std,
-            scale=1 / t_std,
-            buffer=True,
-        )
-    elif backend == "zuko_transform":
-        return zuko.transforms.MonotonicAffineTransform(
-            shift=-t_mean / t_std,
-            # zuko computes: scale = exp(scale / (1 + abs(scale / slope)))
-            scale=(1 / t_std).log(),
-            slope=1e-100,
-        )
-
-    else:
-        raise ValueError("Invalid backend. Use 'nflows' or 'zuko'.")
+    # Return mean and std for z-scoring.
+    return t_mean, t_std
 
 
 class Standardize(nn.Module):
