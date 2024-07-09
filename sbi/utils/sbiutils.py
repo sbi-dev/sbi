@@ -170,7 +170,7 @@ def standardizing_transform_zuko(
     batch_t: Tensor,
     structured_dims: bool = False,
     min_std: float = 1e-14,
-) -> zuko.flows.LazyTransform:
+) -> zuko.flows.UnconditionalTransform:
     """Builds standardizing transform for Zuko flows
 
     Args:

@@ -254,7 +254,7 @@ def flowmatching_nn(
             num_transforms=hidden_layers,
             num_freqs=num_frequencies,
             embedding_net_x=embedding_net_theta,
-            embedding_net_y=embedding_net_x,
+            embedding_net=embedding_net_x,
             **kwargs,
         )
 

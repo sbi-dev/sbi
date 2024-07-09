@@ -6,14 +6,17 @@
 
 from typing import Optional, Sequence, Union
 
+import torch
+import zuko
 from torch import Tensor, nn
 from zuko.nn import MLP
 
 from sbi.neural_nets.density_estimators.zuko_flow import FlowMatchingEstimator
 from sbi.utils.nn_utils import get_numel
 from sbi.utils.sbiutils import (
-    standardizing_transform_zuko,
+    standardizing_net,
     z_score_parser,
+    z_standardization,
 )
 from sbi.utils.user_input_checks import check_data_device
 
@@ -26,8 +29,7 @@ def build_mlp_flow_matcher(
     hidden_features: Union[Sequence[int], int] = 64,
     num_transforms: int = 5,
     num_freqs: int = 3,
-    embedding_net_x: nn.Module = nn.Identity(),
-    embedding_net_y: nn.Module = nn.Identity(),
+    embedding_net: nn.Module = nn.Identity(),
     **kwargs,
 ) -> FlowMatchingEstimator:
     """Builds a flow matching neural network.
@@ -52,8 +54,8 @@ def build_mlp_flow_matcher(
     """
     # Infer the output dimensionality of the embedding_net by making a forward pass.
     check_data_device(batch_x, batch_y)
-    x_numel = get_numel(batch_x, embedding_net=embedding_net_x)
-    y_numel = get_numel(batch_y, embedding_net=embedding_net_y)
+    x_numel = get_numel(batch_x)
+    y_numel = get_numel(batch_y, embedding_net=embedding_net)
 
     # create a list of layers for the regression network; the vector field
     # regressor is a MLP consisting of num_transforms of layers with
@@ -68,17 +70,21 @@ def build_mlp_flow_matcher(
         activation=nn.ELU,
     )
 
-    # pre-pend the z-scoring layer to the embedding nets.
+    # input data is only z-scored, not embedded.
     z_score_x_bool, structured_x = z_score_parser(z_score_x)
     if z_score_x_bool:
-        embedding_net_x = nn.Sequential(
-            standardizing_transform_zuko(batch_x, structured_x), embedding_net_x
+        t_mean, t_std = z_standardization(batch_x, structured_x)
+        z_score_transform = torch.distributions.AffineTransform(
+            -t_mean / t_std, 1 / t_std
         )
+    else:
+        z_score_transform = zuko.transforms.IdentityTransform()
 
+    # pre-pend the z-scoring layer to the embedding net.
     z_score_y_bool, structured_y = z_score_parser(z_score_y)
     if z_score_y_bool:
-        embedding_net_y = nn.Sequential(
-            standardizing_transform_zuko(batch_y, structured_y), embedding_net_y
+        embedding_net = nn.Sequential(
+            standardizing_net(batch_y, structured_y), embedding_net
         )
 
     # create the flow matching estimator, will take care of time embeddings.
@@ -86,8 +92,8 @@ def build_mlp_flow_matcher(
         net=vector_field_regression_net,
         input_shape=batch_x[0].shape,
         condition_shape=batch_y[0].shape,
-        embedding_net_input=embedding_net_x,
-        embedding_net_condition=embedding_net_y,
+        zscore_transform_input=z_score_transform,
+        embedding_net=embedding_net,
         num_freqs=num_freqs,
         **kwargs,  # e.g., noise_scale
     )
