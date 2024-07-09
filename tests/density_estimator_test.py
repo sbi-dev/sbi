@@ -30,7 +30,32 @@ from sbi.neural_nets.flow import (
     build_zuko_sospf,
     build_zuko_unaf,
 )
+from sbi.neural_nets.flow_matcher import build_mlp_flow_matcher
 from sbi.neural_nets.mdn import build_mdn
+
+mdn_and_flow_build_functions = [
+    build_mdn,
+    build_maf,
+    build_maf_rqs,
+    build_nsf,
+    build_zuko_bpf,
+    build_zuko_gf,
+    build_zuko_maf,
+    build_zuko_naf,
+    build_zuko_ncsf,
+    build_zuko_nice,
+    build_zuko_nsf,
+    build_zuko_sospf,
+    build_zuko_unaf,
+]
+# Commented out because pytest ignores xfail.
+mnle_build_functions = [
+    # build_categoricalmassestimator,
+    # pytest.param(build_mnle, marks=pytest.mark.xfail(reason="issue 1172")),
+]
+flowmatching_build_functions = [
+    build_mlp_flow_matcher,
+]
 
 
 def get_batch_input(nsamples: int, input_dims: int) -> torch.Tensor:
@@ -112,23 +137,7 @@ def test_shape_handling_utility_for_density_estimator(
 
 @pytest.mark.parametrize(
     "density_estimator_build_fn",
-    (
-        build_mdn,
-        build_maf,
-        build_maf_rqs,
-        build_nsf,
-        build_zuko_bpf,
-        build_zuko_gf,
-        build_zuko_maf,
-        build_zuko_naf,
-        build_zuko_ncsf,
-        build_zuko_nice,
-        build_zuko_nsf,
-        build_zuko_sospf,
-        build_zuko_unaf,
-        build_categoricalmassestimator,
-        build_mnle,
-    ),
+    mdn_and_flow_build_functions + mnle_build_functions + flowmatching_build_functions,
 )
 @pytest.mark.parametrize("input_sample_dim", (1, 2))
 @pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
@@ -155,23 +164,7 @@ def test_density_estimator_loss_shapes(
 
 
 @pytest.mark.parametrize(
-    "density_estimator_build_fn",
-    (
-        build_mdn,
-        build_maf,
-        build_maf_rqs,
-        build_nsf,
-        build_zuko_bpf,
-        build_zuko_gf,
-        build_zuko_maf,
-        build_zuko_naf,
-        build_zuko_ncsf,
-        build_zuko_nice,
-        build_zuko_nsf,
-        build_zuko_sospf,
-        build_zuko_unaf,
-        build_categoricalmassestimator,
-    ),
+    "density_estimator_build_fn", mdn_and_flow_build_functions + mnle_build_functions
 )
 @pytest.mark.parametrize("input_sample_dim", (1, 2))
 @pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
@@ -198,24 +191,7 @@ def test_density_estimator_log_prob_shapes_with_embedding(
 
 
 @pytest.mark.parametrize(
-    "density_estimator_build_fn",
-    (
-        build_mdn,
-        build_maf,
-        build_maf_rqs,
-        build_nsf,
-        build_zuko_bpf,
-        build_zuko_gf,
-        build_zuko_maf,
-        build_zuko_naf,
-        build_zuko_ncsf,
-        build_zuko_nice,
-        build_zuko_nsf,
-        build_zuko_sospf,
-        build_zuko_unaf,
-        build_categoricalmassestimator,
-        build_mnle,
-    ),
+    "density_estimator_build_fn", mdn_and_flow_build_functions + mnle_build_functions
 )
 @pytest.mark.parametrize("sample_shape", ((), (1,), (2, 3)))
 @pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
@@ -242,24 +218,7 @@ def test_density_estimator_sample_shapes(
 
 
 @pytest.mark.parametrize(
-    "density_estimator_build_fn",
-    (
-        build_mdn,
-        build_maf,
-        build_maf_rqs,
-        build_nsf,
-        build_zuko_bpf,
-        build_zuko_gf,
-        build_zuko_maf,
-        build_zuko_naf,
-        build_zuko_ncsf,
-        build_zuko_nice,
-        build_zuko_nsf,
-        build_zuko_sospf,
-        build_zuko_unaf,
-        build_categoricalmassestimator,
-        build_mnle,
-    ),
+    "density_estimator_build_fn", mdn_and_flow_build_functions + mnle_build_functions
 )
 @pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
 @pytest.mark.parametrize("condition_event_shape", ((1,), (7,)))
@@ -285,27 +244,7 @@ def test_correctness_of_density_estimator_log_prob(
 
 @pytest.mark.parametrize(
     "density_estimator_build_fn",
-    (
-        build_mdn,
-        build_maf,
-        build_maf_rqs,
-        build_nsf,
-        build_zuko_bpf,
-        build_zuko_gf,
-        build_zuko_maf,
-        build_zuko_naf,
-        build_zuko_ncsf,
-        build_zuko_nice,
-        build_zuko_nsf,
-        build_zuko_sospf,
-        build_zuko_unaf,
-        # Commented out because pytest ignores xfail.
-        # pytest.param(
-        #     build_categoricalmassestimator,
-        #     marks=pytest.mark.xfail(reason="issue 1172"),
-        # ),
-        pytest.param(build_mnle, marks=pytest.mark.xfail(reason="issue 1172")),
-    ),
+    mdn_and_flow_build_functions + mnle_build_functions + flowmatching_build_functions,
 )
 @pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
 @pytest.mark.parametrize("condition_event_shape", ((1,), (7,)))
