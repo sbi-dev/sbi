@@ -13,10 +13,8 @@ from pyknos.nflows.transforms.splines import (
     rational_quadratic,  # pyright: ignore[reportAttributeAccessIssue]
 )
 from torch import Tensor, nn, relu, tanh, tensor, uint8
-from zuko.nn import MLP
 
 from sbi.neural_nets.density_estimators import NFlowsFlow, ZukoFlow
-from sbi.neural_nets.density_estimators.zuko_flow import FlowMatchingEstimator
 from sbi.utils.nn_utils import get_numel
 from sbi.utils.sbiutils import (
     standardizing_net,
@@ -1111,62 +1109,6 @@ def build_zuko_flow(
     )
 
     return flow
-
-
-def build_zuko_flow_matching(
-    batch_x: Tensor,
-    batch_y: Tensor,
-    z_score_x: Optional[str] = "independent",
-    z_score_y: Optional[str] = "independent",
-    hidden_features: Union[Sequence[int], int] = 50,
-    num_transforms: int = 5,
-    frequency: int = 3,
-    embedding_net_x: nn.Module = nn.Identity(),
-    embedding_net_y: nn.Module = nn.Identity(),
-    **kwargs,
-) -> FlowMatchingEstimator:
-    x_numel = batch_x[0].numel()
-    y_numel = batch_y[0].numel()
-
-    # Infer the output dimensionality of the embedding_net by making a forward pass.
-    check_data_device(batch_x, batch_y)
-
-    # create a list of layers for the regression network; the vector field
-    # regressor is a MLP consisting of num_transforms of layers with
-    # hidden_features neurons each
-    if isinstance(hidden_features, int):
-        hidden_features = [hidden_features] * num_transforms
-
-    vector_field_regression_net = MLP(
-        in_features=x_numel + y_numel + 2 * frequency,
-        out_features=x_numel,
-        hidden_features=hidden_features,
-        activation=nn.ELU,
-    )
-
-    # TODO: build input layer that z-scores the x and theta separately and takes
-    # into account the time embedding (z-score it as well?)
-
-    z_score_x_bool, structured_x = z_score_parser(z_score_x)
-    if z_score_x_bool:
-        z_score_theta = standardizing_transform(
-            batch_x, structured_x, backend="zuko_transform"
-        )
-
-    z_score_y_bool, structured_y = z_score_parser(z_score_y)
-    if z_score_y_bool:
-        z_score_x = standardizing_net(batch_y, structured_y)
-
-    flow_matching_estimator = FlowMatchingEstimator(
-        net=vector_field_regression_net,
-        input_shape=batch_x[0].shape,
-        condition_shape=batch_y[0].shape,
-        frequency=frequency,
-        z_score_theta=z_score_theta,
-        z_score_x=z_score_x,
-    )
-
-    return flow_matching_estimator
 
 
 class ContextSplineMap(nn.Module):

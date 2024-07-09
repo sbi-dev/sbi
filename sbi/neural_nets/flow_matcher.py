@@ -7,10 +7,10 @@
 from typing import Optional, Sequence, Union
 
 from torch import Tensor, nn
-from utils.nn_utils import get_numel
 from zuko.nn import MLP
 
 from sbi.neural_nets.density_estimators.zuko_flow import FlowMatchingEstimator
+from sbi.utils.nn_utils import get_numel
 from sbi.utils.sbiutils import (
     standardizing_transform_zuko,
     z_score_parser,
