@@ -26,7 +26,7 @@ from sbi.neural_nets.flow import (
     build_zuko_sospf,
     build_zuko_unaf,
 )
-from sbi.neural_nets.flow_matcher import build_zuko_flow_matching
+from sbi.neural_nets.flow_matcher import build_mlp_flow_matcher
 from sbi.neural_nets.mdn import build_mdn
 from sbi.neural_nets.mnle import build_mnle
 from sbi.utils.nn_utils import check_net_device
@@ -245,7 +245,7 @@ def flowmatching_nn(
         raise NotImplementedError(f"Model {model} in not implemented")
 
     def build_fn(batch_theta, batch_x):
-        return build_zuko_flow_matching(
+        return build_mlp_flow_matcher(
             batch_x=batch_theta,
             batch_y=batch_x,
             z_score_x=z_score_theta,
