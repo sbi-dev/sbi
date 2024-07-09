@@ -43,6 +43,10 @@ from .test_utils import (
     get_prob_outside_uniform_prior,
 )
 
+# TODO @maternus: rename all functions with snpe to fmpe
+# - remove multi-round tests
+# - remove all tests that are not related to fmpe
+
 
 @pytest.mark.parametrize(
     "num_dim, prior_str",
