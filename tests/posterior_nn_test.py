@@ -142,7 +142,9 @@ def test_batched_mcmc_sample_log_prob_shape_with_different_x(
         mcmc_parameters=mcmc_params_fast,
     )
 
-    samples = posterior.sample_batched((10,), x_o)
+    samples = posterior.sample_batched(
+        (10,), x_o, init_strategy="proposal"
+    )  # TODO: implement batched init strategies
 
     assert (
         samples.shape == (10, x_o_batch_dim, num_dim)
@@ -178,7 +180,9 @@ def test_batched_mcmc_sample_log_prob_with_different_x(
 
     x_o = torch.stack([0.5 * ones(num_dim), -0.5 * ones(num_dim)], dim=0)
     # test with multiple chains to test whether concatenating chain is done correctly.
-    samples = posterior.sample_batched((1000,), x_o, num_chains=2, warmup_steps=500)
+    samples = posterior.sample_batched(
+        (1000,), x_o, num_chains=2, warmup_steps=500, init_strategy="proposal"
+    )  # TODO: implement batched init strategies
 
     samples_separate1 = posterior.sample(
         (1000,), x_o[0], num_chains=2, warmup_steps=500

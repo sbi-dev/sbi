@@ -20,6 +20,7 @@ from tqdm.auto import tqdm
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials.base_potential import BasePotential
+from sbi.neural_nets.density_estimators.shape_handling import reshape_to_batch_event
 from sbi.samplers.mcmc import (
     IterateParameters,
     PyMCSampler,
@@ -391,9 +392,6 @@ class MCMCPosterior(NeuralPosterior):
             Samples from the posteriors of shape (*sample_shape, B, *input_shape)
         """
 
-        batch_size = x.shape[0]
-        self.potential_fn.set_x(x, interpret_as_iid=False)
-
         # Replace arguments that were not passed with their default.
         method = self.method if method is None else method
         thin = self.thin if thin is None else thin
@@ -407,6 +405,18 @@ class MCMCPosterior(NeuralPosterior):
             if init_strategy_parameters is None
             else init_strategy_parameters
         )
+
+        # custom shape handling to make sure to match the batch size of x and theta
+        # without unnecessary combinations.
+        if len(x.shape) == 1:
+            x = x.unsqueeze(0)
+        batch_size = x.shape[0]
+
+        x = reshape_to_batch_event(x, event_shape=x.shape[1:])
+
+        x_ = x.repeat_interleave(num_chains, dim=0)
+
+        self.potential_fn.set_x(x_, interpret_as_iid=False)
         self.potential_ = self._prepare_potential(method)  # type: ignore
 
         # For each observation in the batch, we have num_chains independent chains.
@@ -441,13 +451,13 @@ class MCMCPosterior(NeuralPosterior):
         sample_shape_len = len(sample_shape)
         # Samples are of shape (num_samples, num_chains_extended, *input_shape)
         # concatenate all chains the chains per x together and return.
-        return samples.reshape((batch_size, *sample_shape, -1)).permute(
+        return samples.reshape((batch_size, *sample_shape, -1)).permute(  # type: ignore
             tuple(range(1, sample_shape_len + 1))
             + (
                 0,
                 -1,
             )
-        )  # type: ignore
+        )
 
     def _build_mcmc_init_fn(
         self,
