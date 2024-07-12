@@ -568,16 +568,11 @@ class NeuralInference(ABC):
         self.__dict__ = state_dict
 
 
-# Refactoring following #1175. As commented in
-# `sbi.utils.user_input_checks.wrap_as_joblib_efficient_simulator`
-# this implementation relies on a double cast torch -> numpy -> torch that
-# allows joblib to iterate over numpy arrays instead of torch tensors. This
-# allows for a final speedup of rougly 10x. Getting rid of the casts adds an
-# additional 3x speedup (at least on my machine). Unfortunately, due to the
-# casts are necessary in order to not introduce breaking changes in project
-# that are currently depending on SBI, but a general restructuring of the
-# simulation pipeline should be considered in the future, leaving the
-# opportunity to the user to simulate natively in numpy.
+# Refactoring following #1175. tl:dr: letting joblib iterate over numpy arrays
+# allows for a roughly 10x performance gain. The resulting casting necessity
+# (cfr. user_input_checks.wrap_as_joblib_efficient_simulator) introduces
+# considerable overhead. The simulating pipeline should, therefore, be further
+# restructured in the future (PR #1188).
 def simulate_for_sbi(
     simulator: Callable,
     proposal: Any,
@@ -603,10 +598,13 @@ def simulate_for_sbi(
             from.
         num_simulations: Number of simulations that are run.
         num_workers: Number of parallel workers to use for simulations.
-        sim_batch_size: Number of parameter sets that the simulator
-            maps to data x at once. If None, we simulate all parameter sets at the
-            same time. If >= 1, the simulator has to process data of shape
-            (simulation_batch_size, parameter_dimension).
+        simulation_batch_size: Size of the parameter batch that the simulator
+            receives per call. If simulation_batch_size = None or
+            simulation_batch_size >= num_simulations, we simulate all parameter
+            sets at the same time. If 1 < simulation_batch_size <
+            num_simulations, we construct parameter set batches of size
+            (simulation_batch_size, parameter_dimension) and distribute them
+            among num_workers.
         seed: Seed for reproducibility.
         show_progress_bar: Whether to show a progress bar for simulating. This will not
             affect whether there will be a progressbar while drawing samples from the
@@ -648,47 +646,30 @@ def simulate_for_sbi(
                     seed_all_backends(seed)
                     return simulator(theta)
 
-                # 3. if progess bar
-                if show_progress_bar:
-                    simulation_outputs: list[Tensor] = [
-                        xx
-                        for xx in tqdm(
-                            Parallel(return_as="generator", n_jobs=num_workers)(
-                                delayed(simulator_seeded)(batch, seed)
-                                for batch, seed in zip(batches, batch_seeds)
-                            ),
-                            total=num_simulations,
-                        )
-                    ]
-
-                # 3. if no progress bar
-                else:
-                    simulation_outputs: list[Tensor] = [
-                        xx
-                        for xx in Parallel(return_as="generator", n_jobs=num_workers)(
+                simulation_outputs: list[Tensor] = [
+                    xx
+                    for xx in tqdm(
+                        Parallel(return_as="generator", n_jobs=num_workers)(
                             delayed(simulator_seeded)(batch, seed)
                             for batch, seed in zip(batches, batch_seeds)
-                        )
-                    ]
+                        ),
+                        total=num_simulations,
+                        disable=not show_progress_bar,
+                    )
+                ]
 
             # 2. if not multiprocessing (sequential)
             else:
                 simulation_outputs: list[Tensor] = []
 
-                # 3. if progress bar
-                if show_progress_bar:
-                    for batch in tqdm(batches):
-                        simulation_outputs.append(simulator(batch))
-
-                # 3. if not progress bar
-                else:
-                    for batch in batches:
-                        simulation_outputs.append(simulator(batch))
+                for batch in tqdm(batches, disable=not show_progress_bar):
+                    simulation_outputs.append(simulator(batch))
 
             # Correctly format the output
             x = torch.cat(simulation_outputs, dim=0)
             theta = torch.as_tensor(theta, dtype=float32)
 
+        # If no meaningful batching (vectorization)
         else:
             x = simulator(theta)
             theta = torch.as_tensor(theta, dtype=float32)
