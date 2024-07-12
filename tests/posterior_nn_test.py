@@ -122,8 +122,9 @@ def test_batched_sample_log_prob_with_different_x(
         2,
     ),
 )
+@pytest.mark.parametrize("init_strategy", ["proposal", "resample"])
 def test_batched_mcmc_sample_log_prob_shape_with_different_x(
-    snlre_method: type, x_o_batch_dim: bool, mcmc_params_fast: dict
+    snlre_method: type, x_o_batch_dim: bool, mcmc_params_fast: dict, init_strategy: str
 ):
     num_dim = 2
 
@@ -143,8 +144,11 @@ def test_batched_mcmc_sample_log_prob_shape_with_different_x(
     )
 
     samples = posterior.sample_batched(
-        (10,), x_o, init_strategy="proposal"
-    )  # TODO: implement batched init strategies
+        (10,),
+        x_o,
+        init_strategy=init_strategy,
+        num_chains=2,
+    )
 
     assert (
         samples.shape == (10, x_o_batch_dim, num_dim)
@@ -180,9 +184,7 @@ def test_batched_mcmc_sample_log_prob_with_different_x(
 
     x_o = torch.stack([0.5 * ones(num_dim), -0.5 * ones(num_dim)], dim=0)
     # test with multiple chains to test whether concatenating chain is done correctly.
-    samples = posterior.sample_batched(
-        (1000,), x_o, num_chains=2, warmup_steps=500, init_strategy="proposal"
-    )  # TODO: implement batched init strategies
+    samples = posterior.sample_batched((1000,), x_o, num_chains=2, warmup_steps=500)
 
     samples_separate1 = posterior.sample(
         (1000,), x_o[0], num_chains=2, warmup_steps=500

@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+from copy import deepcopy
 from functools import partial
 from math import ceil
 from typing import Any, Callable, Dict, Optional, Union
@@ -421,9 +422,11 @@ class MCMCPosterior(NeuralPosterior):
 
         # For each observation in the batch, we have num_chains independent chains.
         num_chains_extended = batch_size * num_chains
-        initial_params = self._get_initial_params(
+        init_strategy_parameters["num_return_samples"] = num_chains_extended
+        initial_params = self._get_initial_params_batched(
+            x,
             init_strategy,  # type: ignore
-            num_chains_extended,  # type: ignore
+            num_chains,  # type: ignore
             num_workers,
             show_progress_bars,
             **init_strategy_parameters,
@@ -570,7 +573,86 @@ class MCMCPosterior(NeuralPosterior):
             initial_params = torch.cat(
                 [init_fn() for _ in range(num_chains)]  # type: ignore
             )
+            # initial_params = init_fn()
+        return initial_params
 
+    def _get_initial_params_batched(
+        self,
+        x: torch.Tensor,
+        init_strategy: str,
+        num_chains_per_x: int,
+        num_workers: int,
+        show_progress_bars: bool,
+        **kwargs,
+    ) -> Tensor:
+        """Return initial parameters for MCMC obtained with given init strategy.
+
+        Parallelizes across CPU cores only for SIR.
+
+        Args:
+            x: Batch of observations to create different initial parameters for.
+            init_strategy: Specifies the initialization method. Either of
+                [`proposal`|`sir`|`resample`|`latest_sample`].
+            num_chains_per_x: number of MCMC chains for each x, generates initial params
+                for each x
+            num_workers: number of CPU cores for parallization
+            show_progress_bars: whether to show progress bars for SIR init
+            kwargs: Passed on to `_build_mcmc_init_fn`.
+
+        Returns:
+            Tensor: initial parameters, one for each chain
+        """
+
+        potential_ = deepcopy(self.potential_fn)
+        initial_params = []
+        init_fn = self._build_mcmc_init_fn(
+            self.proposal,
+            potential_fn=potential_,
+            transform=self.theta_transform,
+            init_strategy=init_strategy,  # type: ignore
+            **kwargs,
+        )
+        for xi in x:
+            # Build init function
+            potential_.set_x(xi)
+
+            # Parallelize inits for resampling only.
+            if num_workers > 1 and (
+                init_strategy == "resample" or init_strategy == "sir"
+            ):
+
+                def seeded_init_fn(seed):
+                    torch.manual_seed(seed)
+                    return init_fn()
+
+                seeds = torch.randint(high=2**31, size=(num_chains_per_x,))
+
+                # Generate initial params parallelized over num_workers.
+                with tqdm_joblib(
+                    tqdm(
+                        range(num_chains_per_x),  # type: ignore
+                        disable=not show_progress_bars,
+                        desc=f"""Generating {num_chains_per_x} MCMC inits with
+                                {num_workers} workers.""",
+                        total=num_chains_per_x,
+                    )
+                ):
+                    initial_params = (
+                        initial_params
+                        + [
+                            Parallel(n_jobs=num_workers)(
+                                # pyright: ignore[reportArgumentType]
+                                delayed(seeded_init_fn)(seed)
+                                for seed in seeds
+                            )
+                        ][0]
+                    )  # type: ignore
+            else:
+                initial_params = initial_params + [
+                    init_fn() for _ in range(num_chains_per_x)
+                ]  # type: ignore
+
+        initial_params = torch.cat(initial_params)
         return initial_params
 
     def _slice_np_mcmc(
