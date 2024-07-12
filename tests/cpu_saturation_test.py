@@ -11,6 +11,7 @@
 
 from __future__ import annotations
 
+import time
 import warnings
 
 import pytest
@@ -28,7 +29,6 @@ def slow_linear_gaussian(theta):
     """Linear Gaussian simulator with a sleep statement."""
     x = []
     for th in theta:
-        # time.sleep(0.05)
         x.append(diagonal_linear_gaussian(th.reshape(1, -1)))
 
     return torch.cat(x)
@@ -43,7 +43,7 @@ def test_benchmarking_parallel_simulation(num_simulations):
     prior, _, prior_returns_numpy = process_prior(prior)
     simulator = process_simulator(slow_linear_gaussian, prior, prior_returns_numpy)
 
-    # tic = time.time()
+    tic = time.time()
     simulate_for_sbi(
         simulator,
         proposal=prior,
@@ -51,7 +51,5 @@ def test_benchmarking_parallel_simulation(num_simulations):
         num_workers=-1,
         simulation_batch_size=1,
     )
-    # toc_joblib = time.time() - tic
-
-    # Allow joblib to be 50 percent slower due to overhead.
-    # assert toc_joblib <= toc_sp * 1.5
+    toc = time.time() - tic
+    print(f'Runtime: {toc - tic:.3}')
