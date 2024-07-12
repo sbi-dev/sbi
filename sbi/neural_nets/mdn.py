@@ -8,12 +8,13 @@ from pyknos.nflows import flows, transforms
 from torch import Tensor, nn
 
 from sbi.neural_nets.density_estimators import NFlowsFlow
+from sbi.utils.nn_utils import get_numel
 from sbi.utils.sbiutils import (
     standardizing_net,
     standardizing_transform,
     z_score_parser,
 )
-from sbi.utils.user_input_checks import check_data_device, check_embedding_net_device
+from sbi.utils.user_input_checks import check_data_device
 
 
 def build_mdn(
@@ -48,12 +49,9 @@ def build_mdn(
     Returns:
         Neural network.
     """
-    x_numel = batch_x[0].numel()
-    # Infer the output dimensionality of the embedding_net by making a forward pass.
     check_data_device(batch_x, batch_y)
-    check_embedding_net_device(embedding_net=embedding_net, datum=batch_y)
-    embedding_net.eval()
-    y_numel = embedding_net(batch_y[:1]).numel()
+    x_numel = get_numel(batch_x, embedding_net=None)
+    y_numel = get_numel(batch_y, embedding_net=embedding_net)
 
     transform = transforms.IdentityTransform()
 
