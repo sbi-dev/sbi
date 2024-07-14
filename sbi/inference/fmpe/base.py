@@ -143,6 +143,7 @@ class FMPE(NeuralInference):
         # while self.epoch <= max_num_epochs and not self._converged(
         #     self.epoch, stop_after_epochs
         # ):
+        # todo: add convergence criterion and stop
         while self.epoch <= max_num_epochs:
             self._neural_net.net.train()
             train_loss_sum = 0
