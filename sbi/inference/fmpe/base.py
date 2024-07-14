@@ -140,11 +140,9 @@ class FMPE(NeuralInference):
             )
             self.epoch, self._val_log_prob = 0, float("-Inf")
 
-        # while self.epoch <= max_num_epochs and not self._converged(
-        #     self.epoch, stop_after_epochs
-        # ):
-        # todo: add convergence criterion and stop
-        while self.epoch <= max_num_epochs:
+        while self.epoch <= max_num_epochs and not self._converged(
+            self.epoch, stop_after_epochs
+        ):
             self._neural_net.net.train()
             train_loss_sum = 0
             epoch_start_time = time.time()
@@ -172,7 +170,7 @@ class FMPE(NeuralInference):
             self._summary["training_loss"].append(train_loss_average)
 
             # Calculate validation performance.
-            # self._neural_net.eval()
+            self._neural_net.eval()
             val_log_prob_sum = 0
 
             with torch.no_grad():
@@ -195,7 +193,7 @@ class FMPE(NeuralInference):
 
             self._maybe_show_progress(self._show_progress_bars, self.epoch)
 
-        # self._report_convergence_at_end(self.epoch, stop_after_epochs, max_num_epochs)
+        self._report_convergence_at_end(self.epoch, stop_after_epochs, max_num_epochs)
 
         # Update summary.
         # self._summary["epochs_trained"].append(self.epoch)
