@@ -11,7 +11,7 @@ from sbi.neural_nets.embedding_nets import (
     FCEmbedding,
     PermutationInvariantEmbedding,
 )
-from sbi.neural_nets.factory import classifier_nn, likelihood_nn, posterior_nn
+from sbi.neural_nets.factory import classifier_nn, likelihood_nn, posterior_nn, flowmatching_nn
 from sbi.neural_nets.flow import (
     build_made,
     build_maf,

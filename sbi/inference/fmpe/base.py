@@ -15,7 +15,7 @@ from torch.utils.tensorboard.writer import SummaryWriter
 from sbi import utils as utils
 from sbi.inference.base import NeuralInference
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
-from sbi.neural_nets.density_estimators import ConditionalDensityEstimator
+from sbi.neural_nets import ConditionalDensityEstimator, flowmatching_nn
 from sbi.neural_nets.density_estimators.zuko_flow import FlowMatchingEstimator
 from sbi.utils import (
     RestrictedPrior,
@@ -54,7 +54,7 @@ class FMPE(NeuralInference):
         """
         # obtain the shape of the prior samples
         if density_estimator is None:
-            self._build_neural_net = utils.posterior_nn(model="zuko_fm")
+            self._build_neural_net = flowmatching_nn(model="mlp")
 
         super().__init__(
             prior=prior,
