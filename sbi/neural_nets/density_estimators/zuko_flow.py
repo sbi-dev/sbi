@@ -186,7 +186,8 @@ class FlowMatchingEstimator(ConditionalDensityEstimator):
         net: nn.Module,
         input_shape: torch.Size,
         condition_shape: torch.Size,
-        embedding_net: nn.Module,
+        embedding_net_input: nn.Module,
+        embedding_net_condition: nn.Module,
         zscore_transform_input: Optional[Transform] = None,
         num_freqs: int = 3,
         noise_scale: float = 1e-3,
@@ -212,7 +213,8 @@ class FlowMatchingEstimator(ConditionalDensityEstimator):
         if zscore_transform_input is None:
             zscore_transform_input = zuko.transforms.IdentityTransform()
         self.zscore_transform_input: Transform = zscore_transform_input
-        self._embedding_net = embedding_net
+        self._embedding_net = embedding_net_input
+        self._embedding_net_condition = embedding_net_condition
 
         self.register_buffer("freqs", torch.arange(1, num_freqs + 1) * math.pi)
         self.register_buffer('zeros', torch.zeros(input_shape))

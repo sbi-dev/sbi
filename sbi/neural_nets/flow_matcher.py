@@ -30,6 +30,7 @@ def build_mlp_flow_matcher(
     num_transforms: int = 5,
     num_freqs: int = 3,
     embedding_net: nn.Module = nn.Identity(),
+    embedding_net_x: nn.Module = nn.Identity(),
     **kwargs,
 ) -> FlowMatchingEstimator:
     """Builds a flow matching neural network.
@@ -93,7 +94,8 @@ def build_mlp_flow_matcher(
         input_shape=batch_x[0].shape,
         condition_shape=batch_y[0].shape,
         zscore_transform_input=z_score_transform,
-        embedding_net=embedding_net,
+        embedding_net_input=embedding_net,
+        embedding_net_condition=embedding_net_x,
         num_freqs=num_freqs,
         **kwargs,  # e.g., noise_scale
     )
