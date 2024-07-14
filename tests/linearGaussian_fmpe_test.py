@@ -14,14 +14,10 @@ from sbi import analysis as analysis
 from sbi import utils as utils
 from sbi.analysis import ConditionedMDN, conditional_potential
 from sbi.inference import (
-    SNPE_A,
-    SNPE_B,
-    SNPE_C,
     DirectPosterior,
     MCMCPosterior,
     RejectionPosterior,
     posterior_estimator_based_potential,
-    prepare_for_sbi,
     simulate_for_sbi,
 )
 
@@ -43,17 +39,13 @@ from .test_utils import (
     get_prob_outside_uniform_prior,
 )
 
-# TODO @maternus: rename all functions with snpe to fmpe
-# - remove multi-round tests
-# - remove all tests that are not related to fmpe
-
 
 @pytest.mark.parametrize(
     "num_dim, prior_str",
     ((2, "gaussian"), (2, "uniform"), (1, "gaussian")),
 )
-def test_c2st_snpe_on_linearGaussian(num_dim: int, prior_str: str):
-    """Test whether SNPE infers well a simple example with available ground truth."""
+def test_c2st_fmpe_on_linearGaussian(num_dim: int, prior_str: str):
+    """Test whether fmpe infers well a simple example with available ground truth."""
 
     x_o = zeros(1, num_dim)
     num_samples = 1000
@@ -100,7 +92,7 @@ def test_c2st_snpe_on_linearGaussian(num_dim: int, prior_str: str):
     samples = posterior.sample((num_samples,))
 
     # Compute the c2st and assert it is near chance level of 0.5.
-    check_c2st(samples, target_samples, alg="snpe_c")
+    check_c2st(samples, target_samples, alg="fmpe")
 
     map_ = posterior.map(num_init_samples=1_000, show_progress_bars=False)
 
@@ -157,7 +149,7 @@ def test_c2st_snpe_on_linearGaussian(num_dim: int, prior_str: str):
     "density_estimator", ["mdn", "maf", "maf_rqs", "nsf", "zuko_maf"]
 )
 def test_density_estimators_on_linearGaussian(density_estimator):
-    """Test SNPE with different density estimators on linear Gaussian example."""
+    """Test fmpe with different density estimators on linear Gaussian example."""
 
     theta_dim = 4
     x_dim = 4
@@ -184,7 +176,7 @@ def test_density_estimators_on_linearGaussian(density_estimator):
         prior,
     )
 
-    inference = SNPE_C(prior, density_estimator=density_estimator)
+    inference = FMPE(prior, density_estimator=density_estimator)
 
     theta, x = simulate_for_sbi(
         simulator, prior, num_simulations, simulation_batch_size=1000
@@ -198,11 +190,11 @@ def test_density_estimators_on_linearGaussian(density_estimator):
     samples = posterior.sample((num_samples,))
 
     # Compute the c2st and assert it is near chance level of 0.5.
-    check_c2st(samples, target_samples, alg=f"snpe_{density_estimator}")
+    check_c2st(samples, target_samples, alg=f"fmpe_{density_estimator}")
 
 
-def test_c2st_snpe_on_linearGaussian_different_dims(density_estimator="maf"):
-    """Test SNPE on linear Gaussian with different theta and x dimensionality."""
+def test_c2st_fmpe_on_linearGaussian_different_dims(density_estimator="maf"):
+    """Test fmpe on linear Gaussian with different theta and x dimensionality."""
 
     theta_dim = 3
     x_dim = 2
@@ -239,7 +231,7 @@ def test_c2st_snpe_on_linearGaussian_different_dims(density_estimator="maf"):
         prior,
     )
     # Test whether prior can be `None`.
-    inference = SNPE_C(
+    inference = FMPE(
         prior=None,
         density_estimator=density_estimator,
         show_progress_bars=False,
@@ -263,7 +255,7 @@ def test_c2st_snpe_on_linearGaussian_different_dims(density_estimator="maf"):
     samples = posterior.sample((num_samples,))
 
     # Compute the c2st and assert it is near chance level of 0.5.
-    check_c2st(samples, target_samples, alg="snpe_c_different_dims")
+    check_c2st(samples, target_samples, alg="fmpe_different_dims")
 
 
 @pytest.mark.parametrize(
@@ -295,7 +287,7 @@ def test_api_force_first_round_loss(
         lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov),
         prior,
     )
-    inference = SNPE_C(prior, show_progress_bars=False)
+    inference = FMPE(prior, show_progress_bars=False)
 
     proposal = prior
     for _ in range(2):
@@ -343,12 +335,12 @@ def test_sample_conditional():
         else:
             return linear_gaussian(theta, -likelihood_shift, likelihood_cov)
 
-    # Test whether SNPE works properly with structured z-scoring.
+    # Test whether fmpe works properly with structured z-scoring.
     net = utils.posterior_nn("maf", z_score_x="structured", hidden_features=20)
 
     simulator, prior = prepare_for_sbi(simulator, prior)
 
-    inference = SNPE_C(prior, density_estimator=net, show_progress_bars=False)
+    inference = FMPE(prior, density_estimator=net, show_progress_bars=False)
 
     # We need a pretty big dataset to properly model the bimodality.
     theta, x = simulate_for_sbi(
@@ -426,8 +418,8 @@ def test_sample_conditional():
     assert max_err < 0.0027
 
 
-@pytest.mark.parametrize("snpe_method", [SNPE_A, SNPE_C])
-def test_example_posterior(snpe_method: type):
+@pytest.mark.parametrize("fmpe_method", [FMPE])
+def test_example_posterior(fmpe_method: type):
     """Return an inferred `NeuralPosterior` for interactive examination."""
     num_dim = 2
     x_o = zeros(1, num_dim)
@@ -441,13 +433,11 @@ def test_example_posterior(snpe_method: type):
     prior_cov = eye(num_dim)
     prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
 
-    extra_kwargs = dict(final_round=True) if snpe_method == SNPE_A else dict()
-
     simulator, prior = prepare_for_sbi(
         lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov),
         prior,
     )
-    inference = snpe_method(prior, show_progress_bars=False)
+    inference = fmpe_method(prior, show_progress_bars=False)
 
     theta, x = simulate_for_sbi(
         simulator,
@@ -457,10 +447,8 @@ def test_example_posterior(snpe_method: type):
         num_workers=6,
     )
     posterior_estimator = inference.append_simulations(theta, x).train(
-        max_num_epochs=2, **extra_kwargs
+        max_num_epochs=2
     )
-    if snpe_method == SNPE_A:
-        posterior_estimator = inference.correct_for_proposal()
     posterior = DirectPosterior(
         prior=prior, posterior_estimator=posterior_estimator
     ).set_default_x(x_o)
