@@ -124,12 +124,6 @@ class FMPE(NeuralInference):
             )
             self._x_shape = x_shape_from_simulation(x.to("cpu"))
 
-            # test_posterior_net_for_multi_d_x(
-            #     self._neural_net,
-            #     theta.to("cpu"),
-            #     x.to("cpu"),
-            # )
-
             del theta, x
 
         # Move entire net to device for training.
