@@ -315,38 +315,3 @@ class FMPE(NeuralInference):
         # self._proposal_roundwise.append(proposal)
 
         return self
-
-    # def get_dataloaders(
-    #     self,
-    #     training_batch_size: int,
-    #     validation_fraction: float,
-    #     dataloader_kwargs: Optional[Dict[str, Any]] = None,
-    # ) -> Tuple[DataLoader, DataLoader]:
-    #     # todo: utilize method from super
-    #     dataset = TensorDataset(self._theta, self._x)
-
-    #     num_examples = self._theta.size(0)
-
-    #     num_training_examples = int((1 - validation_fraction) * num_examples)
-    #     num_validation_examples = num_examples - num_training_examples
-
-    #     train_loader_kwargs = {
-    #         "batch_size": min(training_batch_size, num_training_examples),
-    #         "drop_last": True,
-    #         # "sampler": SubsetRandomSampler(self.train_indices.tolist()),
-    #     }
-    #     val_loader_kwargs = {
-    #         "batch_size": min(training_batch_size, num_validation_examples),
-    #         "shuffle": False,
-    #         "drop_last": True,
-    #         # "sampler": SubsetRandomSampler(self.val_indices.tolist()),
-    #     }
-
-    #     if dataloader_kwargs is not None:
-    #         train_loader_kwargs = dict(train_loader_kwargs, **dataloader_kwargs)
-    #         val_loader_kwargs = dict(val_loader_kwargs, **dataloader_kwargs)
-
-    #     train_loader = DataLoader(dataset, **train_loader_kwargs)
-    #     val_loader = DataLoader(dataset, **val_loader_kwargs)
-
-    #     return train_loader, val_loader
