@@ -114,10 +114,10 @@ class FMPE(NeuralInference):
         )
 
         if self._neural_net is None:
-            # Get theta,x to initialize NN
+            # Get theta, x to initialize NN
             theta, x, _ = self.get_simulations(starting_round=start_idx)
+            
             # Use only training data for building the neural net (z-scoring transforms)
-
             self._neural_net = self._build_neural_net(
                 theta[self.train_indices].to("cpu"),
                 x[self.train_indices].to("cpu"),
