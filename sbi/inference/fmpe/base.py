@@ -256,8 +256,6 @@ class FMPE(NeuralInference):
         self._posterior = DirectPosterior(
             posterior_estimator=posterior_estimator,  # type: ignore
             prior=prior,
-            # todo: what's the x_shape used for??
-            x_shape=self.x_dim,
             device=device,
             **direct_sampling_parameters or {},
         )
