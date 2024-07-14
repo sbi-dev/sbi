@@ -140,7 +140,7 @@ class FMPE(NeuralInference):
             self.optimizer = optim.Adam(
                 list(self._neural_net.net.parameters()), lr=learning_rate
             )
-            self.epoch, self._val_log_prob = 0, float("-Inf")
+            self.epoch, self._val_loss = 0, float("-Inf")
 
         while self.epoch <= max_num_epochs and not self._converged(
             self.epoch, stop_after_epochs
@@ -181,7 +181,7 @@ class FMPE(NeuralInference):
                         batch[0].to(self._device),
                         batch[1].to(self._device),
                     )
-                    # Take negative loss here to get validation log_prob.
+                    # Aggregate the validation losses.
                     val_losses = self._neural_net.loss(theta_batch, x_batch)
                     val_loss_sum += val_losses.sum().item()
 
@@ -198,19 +198,19 @@ class FMPE(NeuralInference):
         self._report_convergence_at_end(self.epoch, stop_after_epochs, max_num_epochs)
 
         # Update summary.
-        # self._summary["epochs_trained"].append(self.epoch)
-        # self._summary["best_validation_log_prob"].append(self._best_val_log_prob)
+        self._summary["epochs_trained"].append(self.epoch)
+        self._summary["best_validation_loss"].append(self._best_val_loss)
 
         # Update tensorboard and summary dict.
-        # self._summarize(round_=self._round)
+        self._summarize(round_=self._round)
 
         # Update description for progress bar.
-        # if show_train_summary:
-        #     print(self._describe_round(self._round, self._summary))
+        if show_train_summary:
+            print(self._describe_round(self._round, self._summary))
 
         # Avoid keeping the gradients in the resulting network, which can
         # cause memory leakage when benchmarking.
-        # self._neural_net.zero_grad(set_to_none=True)
+        self._neural_net.zero_grad(set_to_none=True)
 
         return deepcopy(self._neural_net)
 
