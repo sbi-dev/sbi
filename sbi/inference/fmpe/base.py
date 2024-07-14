@@ -4,7 +4,7 @@
 
 import time
 from copy import deepcopy
-from typing import Any, Dict, Optional, Union
+from typing import Any, Callable, Dict, Optional, Union
 
 import torch
 from torch import optim
@@ -36,7 +36,7 @@ class FMPE(NeuralInference):
     def __init__(
         self,
         prior: Optional[Distribution],
-        density_estimator: Optional[FlowMatchingEstimator] = None,
+        density_estimator: Union[str, Callable] = "mlp",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
@@ -53,8 +53,10 @@ class FMPE(NeuralInference):
             show_progress_bars: Whether to show progress bars. Defaults to True.
         """
         # obtain the shape of the prior samples
-        if density_estimator is None:
-            self._build_neural_net = flowmatching_nn(model="mlp")
+        if isinstance(density_estimator, str):
+            self._build_neural_net = flowmatching_nn(model=density_estimator)
+        else:
+            self._build_neural_net = density_estimator
 
         super().__init__(
             prior=prior,
@@ -171,7 +173,7 @@ class FMPE(NeuralInference):
 
             # Calculate validation performance.
             self._neural_net.eval()
-            val_log_prob_sum = 0
+            val_loss_sum = 0
 
             with torch.no_grad():
                 for batch in val_loader:
@@ -181,14 +183,14 @@ class FMPE(NeuralInference):
                     )
                     # Take negative loss here to get validation log_prob.
                     val_losses = self._neural_net.loss(theta_batch, x_batch)
-                    val_log_prob_sum -= val_losses.sum().item()
+                    val_loss_sum += val_losses.sum().item()
 
             # Take mean over all validation samples.
-            val_log_prob = val_log_prob_sum / (
+            self._val_loss = val_loss_sum / (
                 len(val_loader) * val_loader.batch_size  # type: ignore
             )
             # Log validation log prob for every epoch.
-            self._summary["validation_loss"].append(val_log_prob)
+            self._summary["validation_loss"].append(self._val_loss)
             self._summary["epoch_durations_sec"].append(time.time() - epoch_start_time)
 
             self._maybe_show_progress(self._show_progress_bars, self.epoch)
