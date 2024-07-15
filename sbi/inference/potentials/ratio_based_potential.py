@@ -100,7 +100,7 @@ class RatioBasedPotential(BasePotential):
                 When performing batched sampling for multiple `x`, the batch size of\
                 `theta` must match the batch size of `x`."
             with torch.set_grad_enabled(track_gradients):
-                log_ratio_batches = self.ratio_estimator([theta, self.x_o])
+                log_ratio_batches = self.ratio_estimator(theta, self.x_o)
                 log_ratio_batches = log_ratio_batches.reshape(-1)
             return log_ratio_batches + self.prior.log_prob(theta)  # type: ignore
 
