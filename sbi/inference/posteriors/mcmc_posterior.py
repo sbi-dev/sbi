@@ -323,6 +323,7 @@ class MCMCPosterior(NeuralPosterior):
                     thin=thin,  # type: ignore
                     warmup_steps=warmup_steps,  # type: ignore
                     vectorized=(method == "slice_np_vectorized"),
+                    interchangeable_chains=True,
                     num_workers=num_workers,
                     show_progress_bars=show_progress_bars,
                 )
@@ -446,6 +447,7 @@ class MCMCPosterior(NeuralPosterior):
                 thin=thin,  # type: ignore
                 warmup_steps=warmup_steps,  # type: ignore
                 vectorized=(method == "slice_np_vectorized"),
+                interchangeable_chains=False,
                 num_workers=num_workers,
                 show_progress_bars=show_progress_bars,
             )
@@ -663,6 +665,7 @@ class MCMCPosterior(NeuralPosterior):
         thin: int,
         warmup_steps: int,
         vectorized: bool = False,
+        interchangeable_chains=True,
         num_workers: int = 1,
         init_width: Union[float, ndarray] = 0.01,
         show_progress_bars: bool = True,
@@ -677,6 +680,8 @@ class MCMCPosterior(NeuralPosterior):
             warmup_steps: Initial number of samples to discard.
             vectorized: Whether to use a vectorized implementation of the
                 `SliceSampler`.
+            interchangeable_chains: Whether chains are interchangeable, i.e., whether
+                we can mix samples between chains.
             num_workers: Number of CPU cores to use.
             init_width: Inital width of brackets.
             show_progress_bars: Whether to show a progressbar during sampling;
@@ -720,10 +725,11 @@ class MCMCPosterior(NeuralPosterior):
         # Save sample as potential next init (if init_strategy == 'latest_sample').
         self._mcmc_init_params = samples[:, -1, :].reshape(num_chains, dim_samples)
 
-        # Update: don't concatenate all chains yet, as they might be used for batched
-        # sampling.
-        # Collect samples from all chains.
-        # samples = samples.reshape(-1, dim_samples)[:num_samples]
+        # Update: If chains are interchangeable, return concatenated samples. Otherwise
+        # return samples per chain.
+        if interchangeable_chains:
+            # Collect samples from all chains.
+            samples = samples.reshape(-1, dim_samples)[:num_samples]
 
         return samples.type(torch.float32).to(self._device)
 
