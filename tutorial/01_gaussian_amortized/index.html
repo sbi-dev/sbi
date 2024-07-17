@@ -844,27 +844,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../19_plotting_functionality/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Pair and marginal plots
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -1301,7 +1280,7 @@
 <h1 id="amortized-posterior-inference-on-gaussian-example">Amortized posterior inference on Gaussian example<a class="headerlink" href="#amortized-posterior-inference-on-gaussian-example" title="Permanent link">&para;</a></h1>
 <p>Note, you can find the original version of this notebook at <a href="https://github.com/sbi-dev/sbi/blob/main/tutorials/01_gaussian_amortized.ipynb">https://github.com/sbi-dev/sbi/blob/main/tutorials/01_gaussian_amortized.ipynb</a> in the <code>sbi</code> repository.</p>
 <p>In this tutorial, we introduce <strong>amortization</strong> that is the capability to evaluate the posterior for different observations without having to re-run inference.</p>
-<p>We will demonstrate how <code>sbi</code> can infer an amortized posterior for the illustrative linear Gaussian example introduced in <a href="00_getting_started_flexible.ipynb">Getting Started</a>, that takes in 3 parameters (<span class="arithmatex">\(\theta\)</span>). </p>
+<p>We will demonstrate how <code>sbi</code> can infer an amortized posterior for the illustrative linear Gaussian example introduced in <a href="https://sbi-dev.github.io/sbi/tutorial/00_getting_started_flexible/">Getting Started</a>, that takes in 3 parameters (<span class="arithmatex">\(\theta\)</span>). </p>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">torch</span>
 
 <span class="kn">from</span> <span class="nn">sbi</span> <span class="kn">import</span> <span class="n">analysis</span> <span class="k">as</span> <span class="n">analysis</span>
@@ -1390,7 +1369,7 @@
 <p>This in a nutshell demonstrates the benefit of amortized methods. </p>
 <h1 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h1>
 <p>Now that you got familiar with amortization and are probably good to go and have a first shot at applying <code>sbi</code> to your own inference problem. If you want to learn more, we recommend checking out our tutorial on
-<a href="03_multiround_inference.ipynb">multiround inference </a> which aims to make inference for a single observation more sampling efficient.</p>
+<a href="https://sbi-dev.github.io/sbi/tutorial/03_multiround_inference/">multiround inference </a> which aims to make inference for a single observation more sampling efficient.</p>
 
 
 

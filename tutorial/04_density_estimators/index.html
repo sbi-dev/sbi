@@ -853,27 +853,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../19_plotting_functionality/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Pair and marginal plots
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -1317,7 +1296,7 @@
 
 
 <h1 id="customizing-the-density-estimator">Customizing the density estimator<a class="headerlink" href="#customizing-the-density-estimator" title="Permanent link">&para;</a></h1>
-<p><code>sbi</code> allows to specify a custom density estimator for each of the implemented methods. For all options, check the API reference <a href="https://sbi-dev.github.io/sbi/reference/#models">here</a>.</p>
+<p><code>sbi</code> allows to specify a custom density estimator for each of the implemented methods. For all options, check the API reference <a href="https://sbi-dev.github.io/sbi/reference/models/">here</a>.</p>
 <h2 id="changing-the-type-of-density-estimator">Changing the type of density estimator<a class="headerlink" href="#changing-the-type-of-density-estimator" title="Permanent link">&para;</a></h2>
 <p>One option is to use one of set of preconfigured density estimators by passing a string in the <code>density_estimator</code> keyword argument to the inference object (<code>SNPE</code> or <code>SNLE</code>), e.g., &ldquo;maf&rdquo; to use a Masked Autoregressive Flow, of &ldquo;nsf&rdquo; to use a Neural Spline Flow with default hyperparameters.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">torch</span>
@@ -1352,7 +1331,9 @@
 <li><code>loss(input, condition, **kwargs)</code>: Return the loss for training the density estimator.</li>
 <li><code>sample(sample_shape, condition, **kwargs)</code>: Return samples from the density estimator.</li>
 </ul>
-<p>See more information on the <a href="https://sbi-dev.github.io/sbi/reference/#sbi.neural_nets.density_estimators.DensityEstimator">Reference API page</a></p>
+<p>See more information on the <a href="https://sbi-dev.github.io/sbi/reference/models/#sbi.neural_nets.density_estimators.ConditionalDensityEstimator">Reference API page</a>.</p>
+<div class="highlight"><pre><span></span><code>
+</code></pre></div>
 
 
 

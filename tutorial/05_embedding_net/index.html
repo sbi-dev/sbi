@@ -904,27 +904,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../19_plotting_functionality/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Pair and marginal plots
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -1574,7 +1553,7 @@
 <li>Permutation-invariant neural network (for trial-based data, see <a href="https://sbi-dev.github.io/sbi/tutorial/14_iid_data_and_permutation_invariant_embeddings/">here</a>)</li>
 </ul>
 <p>In the example considered here, the most appropriate <code>embedding_net</code> would be a CNN for two-dimensional images. We can setup it as per:</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi.neural_nets</span> <span class="kn">import</span> <span class="n">CNNEmbedding</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi.neural_nets.embedding_nets</span> <span class="kn">import</span> <span class="n">CNNEmbedding</span>
 
 <span class="n">embedding_net</span> <span class="o">=</span> <span class="n">CNNEmbedding</span><span class="p">(</span>
     <span class="n">input_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">32</span><span class="p">,</span> <span class="mi">32</span><span class="p">),</span>
