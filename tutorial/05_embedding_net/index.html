@@ -18,11 +18,11 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.0, mkdocs-material-9.5.21">
+      <meta name="generator" content="mkdocs-1.6.0, mkdocs-material-9.5.20">
     
     
       
-        <title>Learning summary statistics - sbi</title>
+        <title>Embedding nets for observations - sbi</title>
       
     
     
@@ -32,6 +32,14 @@
         <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
       
       
+  
+  
+    
+    
+  
+  
+  <style>:root{--md-admonition-icon--note:url('data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M1 7.775V2.75C1 1.784 1.784 1 2.75 1h5.025c.464 0 .91.184 1.238.513l6.25 6.25a1.75 1.75 0 0 1 0 2.474l-5.026 5.026a1.75 1.75 0 0 1-2.474 0l-6.25-6.25A1.752 1.752 0 0 1 1 7.775Zm1.5 0c0 .066.026.13.073.177l6.25 6.25a.25.25 0 0 0 .354 0l5.025-5.025a.25.25 0 0 0 0-.354l-6.25-6.25a.25.25 0 0 0-.177-.073H2.75a.25.25 0 0 0-.25.25ZM6 5a1 1 0 1 1 0 2 1 1 0 0 1 0-2Z"/></svg>');}</style>
+
 
 
     
@@ -76,7 +84,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#learning-summary-statistics-with-a-neural-net" class="md-skip">
+        <a href="#embedding-nets-for-observations" class="md-skip">
           Skip to content
         </a>
       
@@ -111,7 +119,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Learning summary statistics
+              Embedding nets for observations
             
           </span>
         </div>
@@ -339,32 +347,11 @@
   
   
     <li class="md-nav__item">
-      <a href="../00_getting_started/" class="md-nav__link">
+      <a href="../00_getting_started_flexible/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
     Getting started
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../02_flexible_interface/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Flexible interface
   </span>
   
 
@@ -544,7 +531,7 @@
           
   
   <span class="md-ellipsis">
-    Learning summary statistics
+    Embedding nets for observations
   </span>
   
 
@@ -555,7 +542,7 @@
         
   
   <span class="md-ellipsis">
-    Learning summary statistics
+    Embedding nets for observations
   </span>
   
 
@@ -577,6 +564,34 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#introduction" class="md-nav__link">
+    <span class="md-ellipsis">
+      Introduction
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#main-syntax" class="md-nav__link">
+    <span class="md-ellipsis">
+      Main syntax
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#inferring-parameters-from-images" class="md-nav__link">
+    <span class="md-ellipsis">
+      Inferring parameters from images
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Inferring parameters from images">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
   <a href="#the-simulator-model" class="md-nav__link">
     <span class="md-ellipsis">
       The simulator model
@@ -584,11 +599,16 @@
   </a>
   
 </li>
+        
+      </ul>
+    </nav>
+  
+</li>
       
         <li class="md-nav__item">
-  <a href="#defining-an-embedding_net" class="md-nav__link">
+  <a href="#choosing-an-embedding_net" class="md-nav__link">
     <span class="md-ellipsis">
-      Defining an embedding_net
+      Choosing an embedding_net
     </span>
   </a>
   
@@ -607,6 +627,15 @@
   <a href="#visualizing-the-results" class="md-nav__link">
     <span class="md-ellipsis">
       Visualizing the results
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#defining-custom-embedding-networks" class="md-nav__link">
+    <span class="md-ellipsis">
+      Defining custom embedding networks
     </span>
   </a>
   
@@ -875,6 +904,27 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../19_plotting_functionality/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Pair and marginal plots
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -996,7 +1046,7 @@
             
   
   <span class="md-ellipsis">
-    Contributing
+    API Reference
   </span>
   
 
@@ -1005,6 +1055,153 @@
         
         <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            API Reference
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/inference/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Inference
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/models/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Neural Networks
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/posteriors/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Posteriors
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/potentials/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Potentials
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/analysis/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Analysis
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Contributing
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
             <span class="md-nav__icon md-icon"></span>
             Contributing
           </label>
@@ -1021,7 +1218,7 @@
         
   
   <span class="md-ellipsis">
-    Guide
+    How to contribute
   </span>
   
 
@@ -1055,26 +1252,6 @@
           </ul>
         </nav>
       
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../reference/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    API Reference
-  </span>
-  
-
-      </a>
     </li>
   
 
@@ -1146,6 +1323,34 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#introduction" class="md-nav__link">
+    <span class="md-ellipsis">
+      Introduction
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#main-syntax" class="md-nav__link">
+    <span class="md-ellipsis">
+      Main syntax
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#inferring-parameters-from-images" class="md-nav__link">
+    <span class="md-ellipsis">
+      Inferring parameters from images
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Inferring parameters from images">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
   <a href="#the-simulator-model" class="md-nav__link">
     <span class="md-ellipsis">
       The simulator model
@@ -1153,11 +1358,16 @@
   </a>
   
 </li>
+        
+      </ul>
+    </nav>
+  
+</li>
       
         <li class="md-nav__item">
-  <a href="#defining-an-embedding_net" class="md-nav__link">
+  <a href="#choosing-an-embedding_net" class="md-nav__link">
     <span class="md-ellipsis">
-      Defining an embedding_net
+      Choosing an embedding_net
     </span>
   </a>
   
@@ -1181,6 +1391,15 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#defining-custom-embedding-networks" class="md-nav__link">
+    <span class="md-ellipsis">
+      Defining custom embedding networks
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1199,50 +1418,86 @@
   
 
 
-<h1 id="learning-summary-statistics-with-a-neural-net">Learning summary statistics with a neural net<a class="headerlink" href="#learning-summary-statistics-with-a-neural-net" title="Permanent link">&para;</a></h1>
-<p>When doing simulation-based inference, it is very important to use well-chosen summary statistics for describing the data generated by the simulator. Usually, these statistics take into account domain knowledge. For instance, in the <a href="https://sbi-dev.github.io/sbi/examples/00_HH_simulator/">example of the Hodgkin-Huxley model</a>, the summary statistics are defined by a <a href="https://github.com/sbi-dev/sbi/blob/86d9b07238f5a0176638fecdd5622694d92f2962/examples/HH_helper_functions.py#L159">function</a> which takes a 120 ms recording as input (a 12000-dimensional input vector) and outputs a 7-dimensional feature vector containing different statistical descriptors of the recording (e.g., number of spikes, average value, etc.). </p>
-<p>However, in other cases, it might be of interest to actually <strong>learn from the data</strong> which summary statistics to use, e.g., because the raw data is highly complex and domain knowledge is not available or not applicable. </p>
-<p><code>sbi</code> offers functionality to learn summary statistics from (potentially high-dimensional) simulation outputs with a neural network. In <code>sbi</code>, this neural network is referred to as <code>embedding_net</code>. If an <code>embedding_net</code> is specified, the simulation outputs are passed through the <code>embedding_net</code>, whose outputs are then passed to the neural density estimator. The parameters of the <code>embedding_net</code> are learned together with the parameters of the neural density estimator.</p>
-<p>NB: only <code>SNPE</code> and <code>SNRE</code> methods can use an <code>embedding_net</code> to learn summary statistics from simulation outputs. <code>SNLE</code> does not offer this functionality since the simulation outputs <span class="arithmatex">\(x\)</span> are the outputs of the neural density estimator.</p>
-<p>In the example that follows, we illustrate a situation where the data points generated by the simulator model are high-dimensional (32 by 32 images) and we use a convolutional neural network as summary statistics extractor.</p>
-<p>Note, you can find the original version of this notebook at <a href="https://github.com/sbi-dev/sbi/blob/main/tutorials/05_embedding_net.ipynb">https://github.com/sbi-dev/sbi/blob/main/tutorials/05_embedding_net.ipynb</a> in the <code>sbi</code> repository.</p>
+<h1 id="embedding-nets-for-observations">Embedding nets for observations<a class="headerlink" href="#embedding-nets-for-observations" title="Permanent link">&para;</a></h1>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>You can find the original version of this notebook at <a href="https://github.com/sbi-dev/sbi/blob/main/tutorials/05_embedding_net.ipynb">tutorials/05_embedding_net.ipynb</a> in the <code>sbi</code> repository.</p>
+</div>
+<h2 id="introduction">Introduction<a class="headerlink" href="#introduction" title="Permanent link">&para;</a></h2>
+<p>When engaging in simulation-based inference, the selection of appropriate summary statistics for observations holds significant importance. These statistics serve to succinctly describe the data generated by simulators, often leveraging domain-specific knowledge. However, in certain scenarios, particularly when dealing with highly complex raw data where domain knowledge may be limited or non-existent, it becomes necessary to learn directly from the data the appropriate summary statistics to employ. <code>sbi</code> offers functionality to learn summary statistics from simulation outputs with an <strong>embedding neural network</strong>, referred to as <code>embedding_net</code>. </p>
+<p>When an embedding network is used, the posterior approximation for a given observation <span class="arithmatex">\(x_o\)</span> can be denoted as <span class="arithmatex">\(q_\phi\big(\theta \mid f_\lambda(x_o)\big)\)</span> where <span class="arithmatex">\(\phi\)</span> are the parameters of the conditional density estimator and <span class="arithmatex">\(\lambda\)</span> the parameters of the embedding neural network. Note that the simulation outputs pass through the <code>embedding_net</code> before reaching the density estimator and that <span class="arithmatex">\(\phi\)</span> and <span class="arithmatex">\(\lambda\)</span> are <strong>jointly learned</strong> during training. <code>sbi</code> provides pre-configured embedding networks (MLP, CNN, and permutation-invariant networks) or allows to pass custom-written embedding networks.</p>
+<p>It is worth noting that only <code>SNPE</code> and <code>SNRE</code> methods can use an <code>embedding_net</code> to learn summary statistics from simulation outputs. <code>SNLE</code> does not offer such functionality because the simulation outputs are also the output of the neural density estimator. </p>
+<h2 id="main-syntax">Main syntax<a class="headerlink" href="#main-syntax" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><span class="c1"># import required modules</span>
+<span class="kn">from</span> <span class="nn">sbi.utils</span> <span class="kn">import</span> <span class="n">posterior_nn</span>
+
+<span class="c1"># import the different choices of pre-configured embedding networks</span>
+<span class="kn">from</span> <span class="nn">sbi.neural_nets.embedding_nets</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="n">FCEmbedding</span><span class="p">,</span>
+    <span class="n">CNNEmbedding</span><span class="p">,</span>
+    <span class="n">PermutationInvariantEmbedding</span>
+<span class="p">)</span>
+
+<span class="c1"># choose which type of pre-configured embedding net to use (e.g. CNN)</span>
+<span class="n">embedding_net</span> <span class="o">=</span> <span class="n">CNNEmbedding</span><span class="p">(</span><span class="n">input_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">32</span><span class="p">,</span> <span class="mi">32</span><span class="p">))</span>
+
+<span class="c1"># instantiate the conditional neural density estimator</span>
+<span class="n">neural_posterior</span> <span class="o">=</span> <span class="n">posterior_nn</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">&quot;maf&quot;</span><span class="p">,</span> <span class="n">embedding_net</span><span class="o">=</span><span class="n">embedding_net</span><span class="p">)</span>
+
+<span class="c1"># setup the inference procedure with the SNPE-C procedure</span>
+<span class="n">inferer</span> <span class="o">=</span> <span class="n">SNPE</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span> <span class="n">density_estimator</span><span class="o">=</span><span class="n">neural_posterior</span><span class="p">)</span>
+
+<span class="c1"># train the density estimator</span>
+<span class="n">density_estimator</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
+
+<span class="c1"># build the posterior</span>
+<span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">(</span><span class="n">density_estimator</span><span class="p">)</span>
+</code></pre></div>
+<h2 id="inferring-parameters-from-images">Inferring parameters from images<a class="headerlink" href="#inferring-parameters-from-images" title="Permanent link">&para;</a></h2>
+<p>In the example that follows, we consider a simple setup where the data points generated by the simulator model are high-dimensional (32x32 grayscale images) and we use a convolutional neural network as summary statistics extractor.</p>
 <p>First of all, we import all the packages required for running the tutorial</p>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
 <span class="kn">import</span> <span class="nn">torch</span>
 <span class="kn">import</span> <span class="nn">torch.nn</span> <span class="k">as</span> <span class="nn">nn</span>
 <span class="kn">import</span> <span class="nn">torch.nn.functional</span> <span class="k">as</span> <span class="nn">F</span>
-<span class="kn">from</span> <span class="nn">sbi</span> <span class="kn">import</span> <span class="n">utils</span>
-<span class="kn">from</span> <span class="nn">sbi</span> <span class="kn">import</span> <span class="n">analysis</span>
-<span class="kn">from</span> <span class="nn">sbi</span> <span class="kn">import</span> <span class="n">inference</span>
-<span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">SNPE</span><span class="p">,</span> <span class="n">simulate_for_sbi</span><span class="p">,</span> <span class="n">prepare_for_sbi</span>
+
+<span class="kn">from</span> <span class="nn">sbi</span> <span class="kn">import</span> <span class="n">analysis</span><span class="p">,</span> <span class="n">utils</span>
+<span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">SNPE</span><span class="p">,</span> <span class="n">simulate_for_sbi</span>
+<span class="kn">from</span> <span class="nn">sbi.utils.user_input_checks</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="n">check_sbi_inputs</span><span class="p">,</span>
+    <span class="n">process_prior</span><span class="p">,</span>
+    <span class="n">process_simulator</span><span class="p">,</span>
+<span class="p">)</span>
 
 <span class="n">seed</span> <span class="o">=</span> <span class="mi">0</span>
 <span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>&lt;torch._C.Generator at 0x7f124d5d04b0&gt;
+<div class="codehilite"><pre><span></span><code>&lt;torch._C.Generator at 0x13a41c190&gt;
 </code></pre></div>
 
-<h2 id="the-simulator-model">The simulator model<a class="headerlink" href="#the-simulator-model" title="Permanent link">&para;</a></h2>
+<h3 id="the-simulator-model">The simulator model<a class="headerlink" href="#the-simulator-model" title="Permanent link">&para;</a></h3>
 <p>The simulator model that we consider has two parameters: <span class="arithmatex">\(r\)</span> and <span class="arithmatex">\(\theta\)</span>. On each run, it generates 100 two-dimensional points centered around <span class="arithmatex">\((r \cos(\theta), r \sin(\theta))\)</span> and perturbed by a Gaussian noise with variance 0.01. Instead of simply outputting the <span class="arithmatex">\((x,y)\)</span> coordinates of each data point, the model generates a grayscale image of the scattered points with dimensions 32 by 32. This image is further perturbed by an uniform noise with values betweeen 0 and 0.2. The code below defines such model.</p>
 <div class="highlight"><pre><span></span><code><span class="k">def</span> <span class="nf">simulator_model</span><span class="p">(</span><span class="n">parameter</span><span class="p">,</span> <span class="n">return_points</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Simulator model with two-dimensional input parameter and 1024-dimensional output</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Simulator model with two-dimensional input parameter and 1024-D output</span>
 
-<span class="sd">    This simulator serves as a basic example for using a neural net for learning summary features.</span>
-<span class="sd">    It has only two input parameters but generates high-dimensional output vectors.</span>
-<span class="sd">    The data is generated as follows:</span>
-<span class="sd">        (-) Input:  parameter = [r, theta]</span>
-<span class="sd">        (1) Generate 100 two-dimensional points centered around (r cos(theta),r sin(theta))</span>
+<span class="sd">    This simulator serves as a basic example for using a neural net for learning</span>
+<span class="sd">    summary features. It has only two input parameters but generates</span>
+<span class="sd">    high-dimensional output vectors. The data is generated as follows:</span>
+<span class="sd">        (-) Input:  parameter = [r, phi] (1) Generate 100 two-dimensional</span>
+<span class="sd">        points centered around (r cos(phi),r sin(phi))</span>
 <span class="sd">            and perturbed by a Gaussian noise with variance 0.01</span>
-<span class="sd">        (2) Create a grayscale image I of the scattered points with dimensions 32 by 32</span>
+<span class="sd">        (2) Create a grayscale image I of the scattered points with dimensions</span>
+<span class="sd">            32 by 32</span>
 <span class="sd">        (3) Perturb I with an uniform noise with values betweeen 0 and 0.2</span>
 <span class="sd">        (-) Output: I</span>
 
 <span class="sd">    Parameters</span>
 <span class="sd">    ----------</span>
 <span class="sd">    parameter : array-like, shape (2)</span>
-<span class="sd">        The two input parameters of the model, ordered as [r, theta]</span>
+<span class="sd">        The two input parameters of the model, ordered as [r, phi]</span>
 <span class="sd">    return_points : bool (default: False)</span>
-<span class="sd">        Whether the simulator should return the coordinates of the simulated data points as well</span>
+<span class="sd">        Whether the simulator should return the coordinates of the simulated</span>
+<span class="sd">        data points as well</span>
 
 <span class="sd">    Returns</span>
 <span class="sd">    -------</span>
@@ -1253,34 +1508,34 @@
 
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">r</span> <span class="o">=</span> <span class="n">parameter</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
-    <span class="n">theta</span> <span class="o">=</span> <span class="n">parameter</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+    <span class="n">phi</span> <span class="o">=</span> <span class="n">parameter</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
 
     <span class="n">sigma_points</span> <span class="o">=</span> <span class="mf">0.10</span>
     <span class="n">npoints</span> <span class="o">=</span> <span class="mi">100</span>
     <span class="n">points</span> <span class="o">=</span> <span class="p">[]</span>
     <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">npoints</span><span class="p">):</span>
-        <span class="n">x</span> <span class="o">=</span> <span class="n">r</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span> <span class="o">+</span> <span class="n">sigma_points</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
-        <span class="n">y</span> <span class="o">=</span> <span class="n">r</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span> <span class="o">+</span> <span class="n">sigma_points</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">r</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">phi</span><span class="p">)</span> <span class="o">+</span> <span class="n">sigma_points</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">y</span> <span class="o">=</span> <span class="n">r</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">phi</span><span class="p">)</span> <span class="o">+</span> <span class="n">sigma_points</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
         <span class="n">points</span><span class="o">.</span><span class="n">append</span><span class="p">([</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">])</span>
     <span class="n">points</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">as_tensor</span><span class="p">(</span><span class="n">points</span><span class="p">)</span>
 
     <span class="n">nx</span> <span class="o">=</span> <span class="mi">32</span>
     <span class="n">ny</span> <span class="o">=</span> <span class="mi">32</span>
     <span class="n">sigma_image</span> <span class="o">=</span> <span class="mf">0.20</span>
-    <span class="n">I</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">nx</span><span class="p">,</span> <span class="n">ny</span><span class="p">)</span>
+    <span class="n">im</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">nx</span><span class="p">,</span> <span class="n">ny</span><span class="p">)</span>
     <span class="k">for</span> <span class="n">point</span> <span class="ow">in</span> <span class="n">points</span><span class="p">:</span>
         <span class="n">pi</span> <span class="o">=</span> <span class="nb">int</span><span class="p">((</span><span class="n">point</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">))</span> <span class="o">/</span> <span class="p">((</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span> <span class="o">-</span> <span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">))</span> <span class="o">*</span> <span class="n">nx</span><span class="p">)</span>
         <span class="n">pj</span> <span class="o">=</span> <span class="nb">int</span><span class="p">((</span><span class="n">point</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">))</span> <span class="o">/</span> <span class="p">((</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span> <span class="o">-</span> <span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">))</span> <span class="o">*</span> <span class="n">ny</span><span class="p">)</span>
         <span class="k">if</span> <span class="p">(</span><span class="n">pi</span> <span class="o">&lt;</span> <span class="n">nx</span><span class="p">)</span> <span class="ow">and</span> <span class="p">(</span><span class="n">pj</span> <span class="o">&lt;</span> <span class="n">ny</span><span class="p">):</span>
-            <span class="n">I</span><span class="p">[</span><span class="n">pi</span><span class="p">,</span> <span class="n">pj</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
-    <span class="n">I</span> <span class="o">=</span> <span class="n">I</span> <span class="o">+</span> <span class="n">sigma_image</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="n">nx</span><span class="p">,</span> <span class="n">ny</span><span class="p">)</span>
-    <span class="n">I</span> <span class="o">=</span> <span class="n">I</span><span class="o">.</span><span class="n">T</span>
-    <span class="n">I</span> <span class="o">=</span> <span class="n">I</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+            <span class="n">im</span><span class="p">[</span><span class="n">pi</span><span class="p">,</span> <span class="n">pj</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
+    <span class="n">im</span> <span class="o">=</span> <span class="n">im</span> <span class="o">+</span> <span class="n">sigma_image</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="n">nx</span><span class="p">,</span> <span class="n">ny</span><span class="p">)</span>
+    <span class="n">im</span> <span class="o">=</span> <span class="n">im</span><span class="o">.</span><span class="n">T</span>
+    <span class="n">im</span> <span class="o">=</span> <span class="n">im</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
 
     <span class="k">if</span> <span class="n">return_points</span><span class="p">:</span>
-        <span class="k">return</span> <span class="n">I</span><span class="p">,</span> <span class="n">points</span>
+        <span class="k">return</span> <span class="n">im</span><span class="p">,</span> <span class="n">points</span>
     <span class="k">else</span><span class="p">:</span>
-        <span class="k">return</span> <span class="n">I</span>
+        <span class="k">return</span> <span class="n">im</span>
 </code></pre></div>
 <p>The figure below shows an example of the output of the simulator when <span class="arithmatex">\(r = 0.70\)</span> and <span class="arithmatex">\(\theta = \pi/4\)</span></p>
 <div class="highlight"><pre><span></span><code><span class="c1"># simulate samples</span>
@@ -1300,7 +1555,7 @@
 <span class="n">ax</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set_xticks</span><span class="p">([</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="o">+</span><span class="mf">1.0</span><span class="p">])</span>
 <span class="n">ax</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set_ylim</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">+</span><span class="mi">1</span><span class="p">)</span>
 <span class="n">ax</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set_yticks</span><span class="p">([</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="o">+</span><span class="mf">1.0</span><span class="p">])</span>
-<span class="n">ax</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;original simulated points with $r = 0.70$ and $\theta = \pi/4$&quot;</span><span class="p">)</span>
+<span class="n">ax</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;original simulated points with $r = 0.70$ and $\phi = \pi/4$&quot;</span><span class="p">)</span>
 <span class="n">ax</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">x_observed</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="mi">32</span><span class="p">,</span> <span class="mi">32</span><span class="p">),</span> <span class="n">origin</span><span class="o">=</span><span class="s2">&quot;lower&quot;</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s2">&quot;gray&quot;</span><span class="p">)</span>
 <span class="n">ax</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">set_xticks</span><span class="p">([])</span>
 <span class="n">ax</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">set_yticks</span><span class="p">([])</span>
@@ -1310,63 +1565,68 @@
 </code></pre></div>
 
 <p><img alt="png" src="../05_embedding_net_files/05_embedding_net_7_1.png" /></p>
-<h2 id="defining-an-embedding_net">Defining an <code>embedding_net</code><a class="headerlink" href="#defining-an-embedding_net" title="Permanent link">&para;</a></h2>
-<p>An inference procedure applied to the output data from this simulator model determines the posterior distribution of <span class="arithmatex">\(r\)</span> and <span class="arithmatex">\(\theta\)</span> given an observation of <span class="arithmatex">\(x\)</span>, which lives in a 1024 dimensional space (32 x 32 = 1024). To avoid working directly on these high-dimensional vectors, one can use a convolutional neural network (CNN) that takes the 32x32 images as input and encodes them into 8-dimensional feature vectors. This CNN is trained along with the neural density estimator of the inference procedure and serves as an automatic summary statistics extractor. </p>
-<p>We define and instantiate the CNN as follows:</p>
-<div class="highlight"><pre><span></span><code><span class="k">class</span> <span class="nc">SummaryNet</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
-        <span class="c1"># 2D convolutional layer</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">conv1</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Conv2d</span><span class="p">(</span><span class="n">in_channels</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">out_channels</span><span class="o">=</span><span class="mi">6</span><span class="p">,</span> <span class="n">kernel_size</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">padding</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
-        <span class="c1"># Maxpool layer that reduces 32x32 image to 4x4</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">pool</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">MaxPool2d</span><span class="p">(</span><span class="n">kernel_size</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">stride</span><span class="o">=</span><span class="mi">8</span><span class="p">)</span>
-        <span class="c1"># Fully connected layer taking as input the 6 flattened output arrays from the maxpooling layer</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">fc</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="n">in_features</span><span class="o">=</span><span class="mi">6</span> <span class="o">*</span> <span class="mi">4</span> <span class="o">*</span> <span class="mi">4</span><span class="p">,</span> <span class="n">out_features</span><span class="o">=</span><span class="mi">8</span><span class="p">)</span>
+<h2 id="choosing-an-embedding_net">Choosing an <code>embedding_net</code><a class="headerlink" href="#choosing-an-embedding_net" title="Permanent link">&para;</a></h2>
+<p>The outputs <span class="arithmatex">\(x\)</span> from the simulator are defined in a 1024 dimensional space (32 x 32 = 1024). To avoid having to setup a conditional neural density estimator to work directly on such high-dimensional vectors, one could use an <code>embedding_net</code> that would take the images as input and encode them into smaller vectors.</p>
+<p><code>sbi</code> provides pre-configured embedding networks of the following types:</p>
+<ul>
+<li>Fully-connected multi-layer perceptron</li>
+<li>Convolutional neural network (1D and 2D convolutions)</li>
+<li>Permutation-invariant neural network (for trial-based data, see <a href="https://sbi-dev.github.io/sbi/tutorial/14_iid_data_and_permutation_invariant_embeddings/">here</a>)</li>
+</ul>
+<p>In the example considered here, the most appropriate <code>embedding_net</code> would be a CNN for two-dimensional images. We can setup it as per:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi.neural_nets</span> <span class="kn">import</span> <span class="n">CNNEmbedding</span>
 
-    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
-        <span class="n">x</span> <span class="o">=</span> <span class="n">x</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">32</span><span class="p">,</span> <span class="mi">32</span><span class="p">)</span>
-        <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">pool</span><span class="p">(</span><span class="n">F</span><span class="o">.</span><span class="n">relu</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">conv1</span><span class="p">(</span><span class="n">x</span><span class="p">)))</span>
-        <span class="n">x</span> <span class="o">=</span> <span class="n">x</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">6</span> <span class="o">*</span> <span class="mi">4</span> <span class="o">*</span> <span class="mi">4</span><span class="p">)</span>
-        <span class="n">x</span> <span class="o">=</span> <span class="n">F</span><span class="o">.</span><span class="n">relu</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fc</span><span class="p">(</span><span class="n">x</span><span class="p">))</span>
-        <span class="k">return</span> <span class="n">x</span>
-
-
-<span class="n">embedding_net</span> <span class="o">=</span> <span class="n">SummaryNet</span><span class="p">()</span>
+<span class="n">embedding_net</span> <span class="o">=</span> <span class="n">CNNEmbedding</span><span class="p">(</span>
+    <span class="n">input_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">32</span><span class="p">,</span> <span class="mi">32</span><span class="p">),</span>
+    <span class="n">in_channels</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+    <span class="n">out_channels_per_layer</span><span class="o">=</span><span class="p">[</span><span class="mi">6</span><span class="p">],</span>
+    <span class="n">num_conv_layers</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+    <span class="n">num_linear_layers</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+    <span class="n">output_dim</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span>
+    <span class="n">kernel_size</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
+    <span class="n">pool_kernel_size</span><span class="o">=</span><span class="mi">8</span>
+<span class="p">)</span>
 </code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>See <a href="https://github.com/sbi-dev/sbi/blob/main/sbi/neural_nets/embedding_nets.py">here</a> for details on all hyperparametes for each available embedding net in <code>sbi</code></p>
+</div>
 <h2 id="the-inference-procedure">The inference procedure<a class="headerlink" href="#the-inference-procedure" title="Permanent link">&para;</a></h2>
-<p>With the <code>embedding_net</code> defined and instantiated, we can follow the usual workflow of an inference procedure in <code>sbi</code>. The <code>embedding_net</code> object appears as an input argument when instantiating the neural density estimator with <code>utils.posterior_nn</code>.</p>
+<p>With the <code>embedding_net</code> defined and instantiated, we can follow the usual workflow of an inference procedure in <code>sbi</code>. The <code>embedding_net</code> object appears as an input argument when instantiating the neural density estimator with <code>sbi.neural_nets.posterior_nn</code>.</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># set prior distribution for the parameters</span>
 <span class="n">prior</span> <span class="o">=</span> <span class="n">utils</span><span class="o">.</span><span class="n">BoxUniform</span><span class="p">(</span>
     <span class="n">low</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">]),</span> <span class="n">high</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="mf">1.0</span><span class="p">,</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">pi</span><span class="p">])</span>
 <span class="p">)</span>
 
 <span class="c1"># make a SBI-wrapper on the simulator object for compatibility</span>
-<span class="n">simulator_wrapper</span><span class="p">,</span> <span class="n">prior</span> <span class="o">=</span> <span class="n">prepare_for_sbi</span><span class="p">(</span><span class="n">simulator_model</span><span class="p">,</span> <span class="n">prior</span><span class="p">)</span>
+<span class="n">prior</span><span class="p">,</span> <span class="n">num_parameters</span><span class="p">,</span> <span class="n">prior_returns_numpy</span> <span class="o">=</span> <span class="n">process_prior</span><span class="p">(</span><span class="n">prior</span><span class="p">)</span>
+<span class="n">simulator_wrapper</span> <span class="o">=</span> <span class="n">process_simulator</span><span class="p">(</span><span class="n">simulator_model</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">prior_returns_numpy</span><span class="p">)</span>
+<span class="n">check_sbi_inputs</span><span class="p">(</span><span class="n">simulator_wrapper</span><span class="p">,</span> <span class="n">prior</span><span class="p">)</span>
 </code></pre></div>
-<div class="highlight"><pre><span></span><code><span class="c1"># instantiate the neural density estimator</span>
-<span class="n">neural_posterior</span> <span class="o">=</span> <span class="n">utils</span><span class="o">.</span><span class="n">posterior_nn</span><span class="p">(</span>
-    <span class="n">model</span><span class="o">=</span><span class="s2">&quot;maf&quot;</span><span class="p">,</span> <span class="n">embedding_net</span><span class="o">=</span><span class="n">embedding_net</span><span class="p">,</span> <span class="n">hidden_features</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">num_transforms</span><span class="o">=</span><span class="mi">2</span>
-<span class="p">)</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi.utils</span> <span class="kn">import</span> <span class="n">posterior_nn</span>
+
+<span class="c1"># instantiate the neural density estimator</span>
+<span class="n">neural_posterior</span> <span class="o">=</span> <span class="n">posterior_nn</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">&quot;maf&quot;</span><span class="p">,</span> <span class="n">embedding_net</span><span class="o">=</span><span class="n">embedding_net</span><span class="p">)</span>
 
 <span class="c1"># setup the inference procedure with the SNPE-C procedure</span>
-<span class="n">inference</span> <span class="o">=</span> <span class="n">SNPE</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span> <span class="n">density_estimator</span><span class="o">=</span><span class="n">neural_posterior</span><span class="p">)</span>
+<span class="n">inferer</span> <span class="o">=</span> <span class="n">SNPE</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span> <span class="n">density_estimator</span><span class="o">=</span><span class="n">neural_posterior</span><span class="p">)</span>
 </code></pre></div>
 <div class="highlight"><pre><span></span><code><span class="c1"># run the inference procedure on one round and 10000 simulated data points</span>
-<span class="n">theta</span><span class="p">,</span> <span class="n">x</span> <span class="o">=</span> <span class="n">simulate_for_sbi</span><span class="p">(</span><span class="n">simulator_wrapper</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">num_simulations</span><span class="o">=</span><span class="mi">10000</span><span class="p">)</span>
+<span class="n">theta</span><span class="p">,</span> <span class="n">x</span> <span class="o">=</span> <span class="n">simulate_for_sbi</span><span class="p">(</span><span class="n">simulator_wrapper</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">num_simulations</span><span class="o">=</span><span class="mi">10_000</span><span class="p">)</span>
 </code></pre></div>
 <div class="codehilite"><pre><span></span><code>Running 10000 simulations.:   0%|          | 0/10000 [00:00&lt;?, ?it/s]
 </code></pre></div>
 
-<div class="highlight"><pre><span></span><code><span class="n">density_estimator</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
-<span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">(</span><span class="n">density_estimator</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><span class="n">density_estimator</span> <span class="o">=</span> <span class="n">inferer</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">(</span><span class="n">training_batch_size</span><span class="o">=</span><span class="mi">256</span><span class="p">)</span>
+<span class="n">posterior</span> <span class="o">=</span> <span class="n">inferer</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">(</span><span class="n">density_estimator</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 76 epochs.
+<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 198 epochs.
 </code></pre></div>
 
 <h2 id="visualizing-the-results">Visualizing the results<a class="headerlink" href="#visualizing-the-results" title="Permanent link">&para;</a></h2>
-<p>We now generate 50000 samples of the posterior distribution of <span class="arithmatex">\(r\)</span> and <span class="arithmatex">\(\theta\)</span> when observing an input data point <span class="arithmatex">\(x\)</span> generated from the <code>simulator model</code> with <span class="arithmatex">\(r = 0.70\)</span> and <span class="arithmatex">\(\theta = \pi/4\)</span>. </p>
+<p>We now generate 50000 samples of the posterior distribution of <span class="arithmatex">\(r\)</span> and <span class="arithmatex">\(\theta\)</span> when observing an input data point <span class="arithmatex">\(x\)</span> generated from the <code>simulator model</code> with <span class="arithmatex">\(r = 0.70\)</span> and <span class="arithmatex">\(\theta = \pi/4\)</span>.</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># generate posterior samples</span>
-<span class="n">true_parameter</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="mf">0.70</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">pi</span> <span class="o">/</span> <span class="mi">4</span><span class="p">])</span>
+<span class="n">true_parameter</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="mf">0.50</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">pi</span> <span class="o">/</span> <span class="mi">4</span><span class="p">])</span>
 <span class="n">x_observed</span> <span class="o">=</span> <span class="n">simulator_model</span><span class="p">(</span><span class="n">true_parameter</span><span class="p">)</span>
 <span class="n">samples</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">set_default_x</span><span class="p">(</span><span class="n">x_observed</span><span class="p">)</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">50000</span><span class="p">,))</span>
 </code></pre></div>
@@ -1378,7 +1638,7 @@
 <span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">analysis</span><span class="o">.</span><span class="n">pairplot</span><span class="p">(</span>
     <span class="n">samples</span><span class="p">,</span>
     <span class="n">points</span><span class="o">=</span><span class="n">true_parameter</span><span class="p">,</span>
-    <span class="n">labels</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;r&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;$\theta$&quot;</span><span class="p">],</span>
+    <span class="n">labels</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;r&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;$\phi$&quot;</span><span class="p">],</span>
     <span class="n">limits</span><span class="o">=</span><span class="p">[[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">pi</span><span class="p">]],</span>
     <span class="n">points_colors</span><span class="o">=</span><span class="s2">&quot;r&quot;</span><span class="p">,</span>
     <span class="n">points_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;markersize&quot;</span><span class="p">:</span> <span class="mi">6</span><span class="p">},</span>
@@ -1386,7 +1646,28 @@
 <span class="p">)</span>
 </code></pre></div>
 <p><img alt="png" src="../05_embedding_net_files/05_embedding_net_18_0.png" /></p>
-<div class="highlight"><pre><span></span><code>
+<h2 id="defining-custom-embedding-networks">Defining custom embedding networks<a class="headerlink" href="#defining-custom-embedding-networks" title="Permanent link">&para;</a></h2>
+<p>It is also possible to define custom embedding networks and pass those to neural density estimator. For example, we could have defined our own architecture for the CNN as per</p>
+<div class="highlight"><pre><span></span><code><span class="k">class</span> <span class="nc">SummaryNet</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="c1"># 2D convolutional layer</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">conv1</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Conv2d</span><span class="p">(</span><span class="n">in_channels</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">out_channels</span><span class="o">=</span><span class="mi">6</span><span class="p">,</span> <span class="n">kernel_size</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">padding</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+        <span class="c1"># Maxpool layer that reduces 32x32 image to 4x4</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">pool</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">MaxPool2d</span><span class="p">(</span><span class="n">kernel_size</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">stride</span><span class="o">=</span><span class="mi">8</span><span class="p">)</span>
+        <span class="c1"># Fully connected layer taking as input the 6 flattened output arrays</span>
+        <span class="c1"># from the maxpooling layer</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fc</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="n">in_features</span><span class="o">=</span><span class="mi">6</span> <span class="o">*</span> <span class="mi">4</span> <span class="o">*</span> <span class="mi">4</span><span class="p">,</span> <span class="n">out_features</span><span class="o">=</span><span class="mi">8</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">x</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">32</span><span class="p">,</span> <span class="mi">32</span><span class="p">)</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">pool</span><span class="p">(</span><span class="n">F</span><span class="o">.</span><span class="n">relu</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">conv1</span><span class="p">(</span><span class="n">x</span><span class="p">)))</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">x</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">6</span> <span class="o">*</span> <span class="mi">4</span> <span class="o">*</span> <span class="mi">4</span><span class="p">)</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">F</span><span class="o">.</span><span class="n">relu</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fc</span><span class="p">(</span><span class="n">x</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">x</span>
+
+<span class="c1"># instantiate the custom embedding_net</span>
+<span class="n">embedding_net_custom</span> <span class="o">=</span> <span class="n">SummaryNet</span><span class="p">()</span>
 </code></pre></div>
 
 
@@ -1449,10 +1730,10 @@
     </div>
     
     
-    <script id="__config" type="application/json">{"base": "../..", "features": [], "search": "../../assets/javascripts/workers/search.b8dbb3d2.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    <script id="__config" type="application/json">{"base": "../..", "features": ["content.code.copy"], "search": "../../assets/javascripts/workers/search.b8dbb3d2.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.a7c05c9e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.dd8806f2.min.js"></script>
       
         <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-MML-AM_CHTML"></script>
       
