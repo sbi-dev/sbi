@@ -24,7 +24,6 @@ nav:
       - Analysis:
         - Conditional distributions: tutorial/07_conditional_distributions.md
         - Posterior sensitivity analysis: tutorial/09_sensitivity_analysis.md
-        - Pair and marginal plots: tutorial/19_plotting_functionality.md
       - Examples:
         - Hodgkin-Huxley example: examples/00_HH_simulator.md
         - Decision making model: examples/01_decision_making_model.md
