@@ -578,7 +578,7 @@ def simulate_for_sbi(
     proposal: Any,
     num_simulations: int,
     num_workers: int = 1,
-    simulation_batch_size: int = 1,
+    simulation_batch_size: int | None = 1,
     seed: Optional[int] = None,
     show_progress_bar: bool = True,
 ) -> Tuple[Tensor, Tensor]:
@@ -598,13 +598,12 @@ def simulate_for_sbi(
             from.
         num_simulations: Number of simulations that are run.
         num_workers: Number of parallel workers to use for simulations.
-        simulation_batch_size: Size of the parameter batch that the simulator
-            receives per call. If simulation_batch_size = None or
-            simulation_batch_size >= num_simulations, we simulate all parameter
-            sets at the same time. If 1 < simulation_batch_size <
-            num_simulations, we construct parameter set batches of size
-            (simulation_batch_size, parameter_dimension) and distribute them
-            among num_workers.
+        simulation_batch_size: Number of parameter sets of shape
+            (simulation_batch_size, parameter_dimension) that the simulator
+            receives per call. If None, we set
+            simulation_batch_size=num_simulations and simulate all parameter
+            sets with one call. Otherwise, we construct batches of parameter
+            sets and distribute them among num_workers.
         seed: Seed for reproducibility.
         show_progress_bar: Whether to show a progress bar for simulating. This will not
             affect whether there will be a progressbar while drawing samples from the
@@ -613,66 +612,56 @@ def simulate_for_sbi(
     Returns: Sampled parameters $\theta$ and simulation-outputs $x$.
     """
 
-    # 0. if no simulations
     if num_simulations == 0:
         theta = torch.tensor([], dtype=float32)
         x = torch.tensor([], dtype=float32)
 
-    # 0. if some simulations
     else:
         # Cast theta to numpy for better joblib performance (seee #1175)
         seed_all_backends(seed)
         theta = proposal.sample((num_simulations,)).numpy()
 
-        # 1. if meaningful batching
-        if (
-            simulation_batch_size is not None
-            and simulation_batch_size < num_simulations
-        ):
-            # The batch size will be an approximation, since np.array_split does
-            # not take as argument the size of the batch but their total.
-            num_batches = num_simulations // simulation_batch_size
-
-            batches = np.array_split(theta, num_batches, axis=0)
-
-            # 2. if multiprocessing
-            if num_workers != 1:
-                batch_seeds = np.random.randint(
-                    low=0, high=1_000_000, size=(len(batches),)
-                )
-
-                # define seeded simulator.
-                def simulator_seeded(theta: ndarray, seed: int) -> Tensor:
-                    seed_all_backends(seed)
-                    return simulator(theta)
-
-                simulation_outputs: list[Tensor] = [
-                    xx
-                    for xx in tqdm(
-                        Parallel(return_as="generator", n_jobs=num_workers)(
-                            delayed(simulator_seeded)(batch, seed)
-                            for batch, seed in zip(batches, batch_seeds)
-                        ),
-                        total=num_simulations,
-                        disable=not show_progress_bar,
-                    )
-                ]
-
-            # 2. if not multiprocessing (sequential)
-            else:
-                simulation_outputs: list[Tensor] = []
-
-                for batch in tqdm(batches, disable=not show_progress_bar):
-                    simulation_outputs.append(simulator(batch))
-
-            # Correctly format the output
-            x = torch.cat(simulation_outputs, dim=0)
-            theta = torch.as_tensor(theta, dtype=float32)
-
-        # If no meaningful batching (vectorization)
+        # Parse the simulation_batch_size logic
+        if simulation_batch_size == None:
+            simulation_batch_size = num_simulations
         else:
-            x = simulator(theta)
-            theta = torch.as_tensor(theta, dtype=float32)
+            simulation_batch_size = min(simulation_batch_size, num_simulations)
+
+        # The batch size will be an approximation, since np.array_split does
+        # not take as argument the size of the batch but their total.
+        num_batches = num_simulations // simulation_batch_size
+
+        batches = np.array_split(theta, num_batches, axis=0)
+
+        if num_workers != 1:
+            batch_seeds = np.random.randint(low=0, high=1_000_000, size=(len(batches),))
+
+            # define seeded simulator.
+            def simulator_seeded(theta: ndarray, seed: int) -> Tensor:
+                seed_all_backends(seed)
+                return simulator(theta)
+
+            simulation_outputs: list[Tensor] = [  # pyright: ignore
+                xx
+                for xx in tqdm(
+                    Parallel(return_as="generator", n_jobs=num_workers)(
+                        delayed(simulator_seeded)(batch, seed)
+                        for batch, seed in zip(batches, batch_seeds)
+                    ),
+                    total=num_simulations,
+                    disable=not show_progress_bar,
+                )
+            ]
+
+        else:
+            simulation_outputs: list[Tensor] = []
+
+            for batch in tqdm(batches, disable=not show_progress_bar):
+                simulation_outputs.append(simulator(batch))
+
+        # Correctly format the output
+        x = torch.cat(simulation_outputs, dim=0)
+        theta = torch.as_tensor(theta, dtype=float32)
 
     return theta, x
 
