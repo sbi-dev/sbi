@@ -347,10 +347,9 @@ def test_nograd_after_inference_train(inference_method) -> None:
         show_progress_bars=False,
     )
 
-    prior, _, prior_returns_numpy = process_prior(prior)
-    simulator = process_simulator(simulator, prior, prior_returns_numpy)
-
-    theta, x = simulate_for_sbi(simulator, prior, 32)
+    num_simulations = 32
+    theta = prior.sample((num_simulations,))
+    x = simulator(theta)
     inference = inference.append_simulations(theta, x)
 
     posterior_estimator = inference.train(max_num_epochs=2)
