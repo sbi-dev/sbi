@@ -74,14 +74,13 @@ class RatioBasedPotential(BasePotential):
 
         Args:
             theta: The parameter set at which to evaluate the potential function.
-            x_is_iid: Whether the observed data is iid.
             track_gradients: Whether to track the gradients.
 
         Returns:
             The potential.
         """
         if self.x_is_iid:
-            # Calculate likelihood ratios over trials and in one batch.
+            # For each theta, calculate likelihood ratio sum over all x in batch.
             log_ratio_trial_sum = _log_ratios_over_trials(
                 x=self.x_o,
                 theta=theta.to(self.device),
@@ -92,6 +91,8 @@ class RatioBasedPotential(BasePotential):
             # Move to cpu for comparison with prior.
             return log_ratio_trial_sum + self.prior.log_prob(theta)  # type: ignore
         else:
+            # Calculate likelihood ratio for each (theta,x) pair separately
+
             theta_batch_size = theta.shape[0]
             x_batch_size = self.x_o.shape[0]
             assert (

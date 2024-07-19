@@ -30,7 +30,6 @@ def transformed_potential(
         device: The device to which to move the parameters before evaluation.
         track_gradients: Whether to track the gradients of the `potential_fn`
             evaluation.
-        x_is_iid: Whether the observed data is iid.
     """
 
     # Device is the same for net and prior.

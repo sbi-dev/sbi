@@ -32,7 +32,6 @@ from sbi.samplers.mcmc import (
     sir_init,
 )
 from sbi.sbi_types import Shape, TorchTransform
-from sbi.simulators.simutils import tqdm_joblib
 from sbi.utils.potentialutils import pyro_potential_wrapper, transformed_potential
 from sbi.utils.torchutils import ensure_theta_batched, tensor2numpy
 
@@ -247,6 +246,18 @@ class MCMCPosterior(NeuralPosterior):
         Returns:
             Samples from posterior.
         """
+
+        try:
+            x_o_is_iid = self.potential_fn.x_is_iid
+        except AttributeError:
+            x_o_is_iid = True
+        if not x_o_is_iid:
+            warn(
+                "The default `x_o` has `x_is_iid = False`, but you are now sampling "
+                "with a batch `x` with `x_is_iid = True`. If you want to sample non-iid"
+                "`x`, please reset `x_is_iid = False` in the potential function.",
+                stacklevel=2,
+            )
         self.potential_fn.set_x(self._x_else_default_x(x))
 
         # Replace arguments that were not passed with their default.
@@ -408,6 +419,10 @@ class MCMCPosterior(NeuralPosterior):
             else init_strategy_parameters
         )
 
+        assert (
+            method == "slice_np_vectorized"
+        ), "Batched sampling only supported for vectorized samplers!"
+
         # custom shape handling to make sure to match the batch size of x and theta
         # without unnecessary combinations.
         if len(x.shape) == 1:
@@ -416,9 +431,23 @@ class MCMCPosterior(NeuralPosterior):
 
         x = reshape_to_batch_event(x, event_shape=x.shape[1:])
 
+        # For batched sampling, we want `num_chains` for each observation in the batch.
+        # Here we repeat the observations ABC -> AAABBBCCC, so that the chains are
+        # in the order of the observations.
         x_ = x.repeat_interleave(num_chains, dim=0)
 
-        self.potential_fn.set_x(x_, interpret_as_iid=False)
+        try:
+            x_o_is_iid = self.potential_fn.x_is_iid
+        except AttributeError:
+            x_o_is_iid = False
+        if x_o_is_iid:
+            warn(
+                "The default `x_o` has `x_is_iid = True`, but you are now sampling with"
+                "a batch `x` with `x_is_iid = False`. If you want to sample with iid "
+                "`x`, please reset `x_is_iid = True` in the potential function.",
+                stacklevel=2,
+            )
+        self.potential_fn.set_x(x_, x_is_iid=False)
         self.potential_ = self._prepare_potential(method)  # type: ignore
 
         # For each observation in the batch, we have num_chains independent chains.
@@ -435,10 +464,6 @@ class MCMCPosterior(NeuralPosterior):
         # We need num_samples from each posterior in the batch
         num_samples = torch.Size(sample_shape).numel() * batch_size
 
-        assert (
-            method == "slice_np_vectorized"
-        ), "Batched sampling only supported for vectorized samplers!"
-
         with torch.set_grad_enabled(False):
             transformed_samples = self._slice_np_mcmc(
                 num_samples=num_samples,
@@ -454,8 +479,13 @@ class MCMCPosterior(NeuralPosterior):
 
         samples = self.theta_transform.inv(transformed_samples)
         sample_shape_len = len(sample_shape)
-        # Samples are of shape (num_samples, num_chains_extended, *input_shape)
-        # concatenate all chains the chains per x together and return.
+        # The MCMC sampler returns the samples per chain, of shape
+        # (num_samples, num_chains_extended, *input_shape). We return the samples as `
+        # (*sample_shape, x_batch_size, *input_shape). This means we want to combine
+        # all the chains that belong to the same x. However, using
+        # samples.reshape(*sample_shape,batch_size,-1) does not combine the samples in
+        #  the right order, since this mixes samples that belong to different `x`.
+        # This is a workaround to reshape the samples in the right order.
         return samples.reshape((batch_size, *sample_shape, -1)).permute(  # type: ignore
             tuple(range(1, sample_shape_len + 1))
             + (
@@ -525,7 +555,7 @@ class MCMCPosterior(NeuralPosterior):
     ) -> Tensor:
         """Return initial parameters for MCMC obtained with given init strategy.
 
-        Parallelizes across CPU cores only for SIR.
+        Parallelizes across CPU cores only for resample and SIR.
 
         Args:
             init_strategy: Specifies the initialization method. Either of
@@ -557,25 +587,22 @@ class MCMCPosterior(NeuralPosterior):
             seeds = torch.randint(high=2**31, size=(num_chains,))
 
             # Generate initial params parallelized over num_workers.
-            with tqdm_joblib(
+            initial_params = list(
                 tqdm(
-                    range(num_chains),  # type: ignore
-                    disable=not show_progress_bars,
-                    desc=f"""Generating {num_chains} MCMC inits with {num_workers}
-                         workers.""",
-                    total=num_chains,
-                )
-            ):
-                initial_params = torch.cat(
-                    Parallel(n_jobs=num_workers)(  # pyright: ignore[reportArgumentType]
+                    Parallel(return_as="generator", n_jobs=num_workers)(
                         delayed(seeded_init_fn)(seed) for seed in seeds
-                    )
+                    ),
+                    total=len(seeds),
+                    desc=f"""Generating {num_chains} MCMC inits with
+                            {num_workers} workers.""",
+                    disable=not show_progress_bars,
                 )
+            )
+            initial_params = torch.cat(initial_params)  # type: ignore
         else:
             initial_params = torch.cat(
                 [init_fn() for _ in range(num_chains)]  # type: ignore
             )
-            # initial_params = init_fn()
         return initial_params
 
     def _get_initial_params_batched(
@@ -587,9 +614,10 @@ class MCMCPosterior(NeuralPosterior):
         show_progress_bars: bool,
         **kwargs,
     ) -> Tensor:
-        """Return initial parameters for MCMC obtained with given init strategy.
+        """Return initial parameters for MCMC for a batch of `x`, obtained with given
+           init strategy.
 
-        Parallelizes across CPU cores only for SIR.
+        Parallelizes across CPU cores only for resample and SIR.
 
         Args:
             x: Batch of observations to create different initial parameters for.
@@ -618,7 +646,7 @@ class MCMCPosterior(NeuralPosterior):
             # Build init function
             potential_.set_x(xi)
 
-            # Parallelize inits for resampling only.
+            # Parallelize inits for resampling or sir.
             if num_workers > 1 and (
                 init_strategy == "resample" or init_strategy == "sir"
             ):
@@ -630,25 +658,18 @@ class MCMCPosterior(NeuralPosterior):
                 seeds = torch.randint(high=2**31, size=(num_chains_per_x,))
 
                 # Generate initial params parallelized over num_workers.
-                with tqdm_joblib(
+                initial_params = initial_params + list(
                     tqdm(
-                        range(num_chains_per_x),  # type: ignore
-                        disable=not show_progress_bars,
+                        Parallel(return_as="generator", n_jobs=num_workers)(
+                            delayed(seeded_init_fn)(seed) for seed in seeds
+                        ),
+                        total=len(seeds),
                         desc=f"""Generating {num_chains_per_x} MCMC inits with
                                 {num_workers} workers.""",
-                        total=num_chains_per_x,
+                        disable=not show_progress_bars,
                     )
-                ):
-                    initial_params = (
-                        initial_params
-                        + [
-                            Parallel(n_jobs=num_workers)(
-                                # pyright: ignore[reportArgumentType]
-                                delayed(seeded_init_fn)(seed)
-                                for seed in seeds
-                            )
-                        ][0]
-                    )  # type: ignore
+                )
+
             else:
                 initial_params = initial_params + [
                     init_fn() for _ in range(num_chains_per_x)

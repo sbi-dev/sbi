@@ -46,12 +46,12 @@ class BasePotential(metaclass=ABCMeta):
                 "No observed data is available. Use `potential_fn.set_x(x_o)`."
             )
 
-    def set_x(self, x_o: Optional[Tensor], interpret_as_iid: Optional[bool] = True):
+    def set_x(self, x_o: Optional[Tensor], x_is_iid: Optional[bool] = True):
         """Check the shape of the observed data and, if valid, set it."""
         if x_o is not None:
             x_o = process_x(x_o).to(self.device)
         self._x_o = x_o
-        self._x_is_iid = interpret_as_iid
+        self._x_is_iid = x_is_iid
 
     @property
     def x_o(self) -> Tensor:
