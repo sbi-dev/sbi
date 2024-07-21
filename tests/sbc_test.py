@@ -132,7 +132,7 @@ def test_consistent_sbc_results(inference_method, cov_method, model="mdn"):
     ).all(), f"KS test of coverage stats must not be significant: {cov_stats}"
     assert (
         cov_stats["c2st_ranks"] < 0.6
-    ).all(), f"Coverage ranks must be close to uniform.: {cov_stats["c2st_ranks"]}"
+    ).all(), f"Coverage ranks must be close to uniform.: {cov_stats}"
 
 
 def test_sbc_accuracy():
