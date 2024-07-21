@@ -47,8 +47,7 @@ def get_posterior_samples_on_batch(
             ),
             disable=not show_progress_bar,
             total=len(xs),
-            desc=f"""Sampling {batch_size} times {num_samples}
-                    posterior samples using {num_workers} workers.""",
+            desc=f"""Sampling {batch_size} times {num_samples} posterior samples.""",
         )
     )
     # Transpose to sample_batched shape convention:
