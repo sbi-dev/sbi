@@ -84,15 +84,16 @@ def test_running_sbc(
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize("method", [SNPE])
-def test_consistent_sbc_results(method, model="mdn"):
+@pytest.mark.parametrize("inference_method", [SNPE])
+@pytest.mark.parametrize("cov_method", ("sbc", "coverage"))
+def test_consistent_sbc_results(inference_method, cov_method, model="mdn"):
     """Tests running inference and then SBC and obtaining nltp."""
 
     num_dim = 2
     prior = BoxUniform(-torch.ones(num_dim), torch.ones(num_dim))
 
-    num_simulations = 1000
-    max_num_epochs = 20
+    num_simulations = 2000
+    num_posterior_samples = 1000
     num_sbc_runs = 100
 
     likelihood_shift = -1.0 * ones(num_dim)
@@ -101,16 +102,13 @@ def test_consistent_sbc_results(method, model="mdn"):
     def simulator(theta):
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    inferer = method(prior, show_progress_bars=False, density_estimator=model)
+    inferer = inference_method(prior, show_progress_bars=True, density_estimator=model)
 
     theta, x = simulate_for_sbi(simulator, prior, num_simulations)
 
-    _ = inferer.append_simulations(theta, x).train(
-        training_batch_size=100, max_num_epochs=max_num_epochs
-    )
+    inferer.append_simulations(theta, x).train(training_batch_size=100)
 
     posterior = inferer.build_posterior()
-    num_posterior_samples = 1000
     thetas = prior.sample((num_sbc_runs,))
     xs = simulator(thetas)
 
@@ -120,30 +118,23 @@ def test_consistent_sbc_results(method, model="mdn"):
         posterior,
         num_workers=1,
         num_posterior_samples=num_posterior_samples,
+        # switch between SBC and expected coverage.
+        reduce_fns="marginals" if cov_method == "sbc" else posterior.log_prob,
     )
-    mstats = check_sbc(
+    cov_stats = check_sbc(
         mranks, thetas, mdaps, num_posterior_samples=num_posterior_samples
     )
-    lranks, ldaps = run_sbc(
-        thetas,
-        xs,
-        posterior,
-        num_workers=1,
-        num_posterior_samples=num_posterior_samples,
-        reduce_fns=posterior.log_prob,
-    )
-    lstats = check_sbc(
-        lranks, thetas, ldaps, num_posterior_samples=num_posterior_samples
-    )
 
-    assert lstats["ks_pvals"] > 0.05
-    assert (mstats["ks_pvals"] > 0.05).all()
-
-    assert lstats["c2st_ranks"] < 0.75
-    assert (mstats["c2st_ranks"] < 0.75).all()
+    assert (
+        cov_stats["ks_pvals"] > 0.05
+    ).all(), f"KS test of coverage stats must not be significant: {cov_stats}"
+    assert (
+        cov_stats["c2st_ranks"] < 0.6
+    ).all(), f"Coverage ranks must be close to uniform.: {cov_stats["c2st_ranks"]}"
 
 
 def test_sbc_accuracy():
+    """Test SBC with prior as posterior."""
     num_dim = 2
     # Gaussian toy problem, set posterior = prior
     simulator = lambda theta: torch.randn_like(theta) + theta
@@ -164,7 +155,6 @@ def test_sbc_accuracy():
         posterior,
         num_workers=1,
         num_posterior_samples=L,
-        reduce_fns="marginals",
     )
 
     pvals, c2st_ranks, _ = check_sbc(
