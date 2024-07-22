@@ -578,7 +578,7 @@ def simulate_for_sbi(
     proposal: Any,
     num_simulations: int,
     num_workers: int = 1,
-    simulation_batch_size: int | None = 1,
+    simulation_batch_size: Union[int, None] = 1,
     seed: Optional[int] = None,
     show_progress_bar: bool = True,
 ) -> Tuple[Tensor, Tensor]:
