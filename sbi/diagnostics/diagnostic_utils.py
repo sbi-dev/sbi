@@ -27,31 +27,35 @@ def get_posterior_samples_on_batch(
     Returns:
         posterior_samples: of shape (num_samples, batch_size, dim_parameters).
     """
-
-    # TODO: Use batched sampling when implemented.
-    # try sample_batched except, NotImplementedError.
     batch_size = len(xs)
 
-    # We need a function with extra training step for new x for VIPosterior.
-    def sample_fun(posterior: NeuralPosterior, sample_shape, x: Tensor) -> Tensor:
-        if isinstance(posterior, VIPosterior):
-            posterior.set_default_x(x)
-            posterior.train()
-        return posterior.sample(sample_shape, x=x, show_progress_bars=False)
-
-    # Run in parallel with progress bar.
-    outputs = list(
-        tqdm(
-            Parallel(return_as="generator", n_jobs=num_workers)(
-                delayed(sample_fun)(posterior, (num_samples,), x=x) for x in xs
-            ),
-            disable=not show_progress_bar,
-            total=len(xs),
-            desc=f"""Sampling {batch_size} times {num_samples} posterior samples.""",
+    # Try to batched sampling when implemented.
+    try:
+        # has shape (num_samples, batch_size, dim_parameters)
+        posterior_samples = posterior.sample_batched(
+            (num_samples,), xs, show_progress_bars=show_progress_bar
         )
-    )
-    # Transpose to sample_batched shape convention:
-    posterior_samples = torch.stack(outputs).transpose(0, 1)  # type: ignore
+    except NotImplementedError:
+        # We need a function with extra training step for new x for VIPosterior.
+        def sample_fun(posterior: NeuralPosterior, sample_shape, x: Tensor) -> Tensor:
+            if isinstance(posterior, VIPosterior):
+                posterior.set_default_x(x)
+                posterior.train()
+            return posterior.sample(sample_shape, x=x, show_progress_bars=False)
+
+        # Run in parallel with progress bar.
+        outputs = list(
+            tqdm(
+                Parallel(return_as="generator", n_jobs=num_workers)(
+                    delayed(sample_fun)(posterior, (num_samples,), x=x) for x in xs
+                ),
+                disable=not show_progress_bar,
+                total=len(xs),
+                desc=f"Sampling {batch_size} times {num_samples} posterior samples.",
+            )
+        )
+        # Transpose to sample_batched shape convention:
+        posterior_samples = torch.stack(outputs).transpose(0, 1)  # type: ignore
 
     assert posterior_samples.shape[:2] == (
         num_samples,

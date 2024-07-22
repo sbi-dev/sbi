@@ -87,6 +87,12 @@ def run_sbc(
     # for calibration methods its handy to have len(xs) in first dim.
     posterior_samples = posterior_samples.transpose(0, 1)
 
+    assert posterior_samples.shape == (
+        num_sbc_samples,
+        num_posterior_samples,
+        thetas.shape[1],
+    ), "Wrong posterior samples shape for SBC."
+
     # take a random draw from each posterior to get data averaged posterior samples.
     dap_samples = posterior_samples[:, 0, :]
     assert dap_samples.shape == (num_sbc_samples, thetas.shape[1]), "Wrong dap shape."
@@ -106,7 +112,19 @@ def _run_sbc(
     reduce_fns: Union[str, Callable, List[Callable]] = "marginals",
     show_progress_bar: bool = True,
 ) -> Tensor:
-    """Calculate ranks for SBC or expected coverage."""
+    """Calculate ranks for SBC or expected coverage.
+
+    Args:
+        thetas: ground-truth parameters for sbc, simulated from the prior.
+        xs: observed data for sbc, simulated from thetas.
+        posterior_samples: samples from the posterior.
+        posterior: a posterior obtained from sbi.
+        reduce_fns: Function used to reduce the parameter space into 1D.
+            Simulation-based calibration can be recovered by setting this to the
+            string `marginals`. Sample-based expected coverage can be recovered
+            by setting it to `posterior.log_prob` (as a Callable).
+        show_progress_bar: whether to display a progress over sbc runs.
+    """
     num_sbc_samples = thetas.shape[0]
 
     # construct reduce functions for SBC or expected coverage
