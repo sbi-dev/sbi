@@ -15,10 +15,8 @@ from sbi.inference import (
     SNRE_B,
     SNRE_C,
     DirectPosterior,
-    simulate_for_sbi,
 )
 from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
-from sbi.utils.user_input_checks import process_prior, process_simulator
 
 
 @pytest.mark.parametrize("snpe_method", [SNPE_A, SNPE_C])
@@ -32,14 +30,14 @@ from sbi.utils.user_input_checks import process_prior, process_simulator
 )
 def test_log_prob_with_different_x(snpe_method: type, x_o_batch_dim: bool):
     num_dim = 2
+    num_simulations = 1000
 
     prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
     simulator = diagonal_linear_gaussian
 
     inference = snpe_method(prior=prior)
-    prior, _, prior_returns_numpy = process_prior(prior)
-    simulator = process_simulator(simulator, prior, prior_returns_numpy)
-    theta, x = simulate_for_sbi(simulator, prior, 1000)
+    theta = prior.sample((num_simulations,))
+    x = simulator(theta)
     posterior_estimator = inference.append_simulations(theta, x).train(max_num_epochs=3)
 
     if x_o_batch_dim == 0:
@@ -63,14 +61,14 @@ def test_log_prob_with_different_x(snpe_method: type, x_o_batch_dim: bool):
 )
 def test_importance_posterior_sample_log_prob(snplre_method: type):
     num_dim = 2
+    num_simulations = 1000
 
     prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
     simulator = diagonal_linear_gaussian
 
     inference = snplre_method(prior=prior)
-    prior, _, prior_returns_numpy = process_prior(prior)
-    simulator = process_simulator(simulator, prior, prior_returns_numpy)
-    theta, x = simulate_for_sbi(simulator, prior, 1000)
+    theta = prior.sample((num_simulations,))
+    x = simulator(theta)
     _ = inference.append_simulations(theta, x).train(max_num_epochs=3)
 
     posterior = inference.build_posterior(sample_with="importance")
@@ -93,14 +91,14 @@ def test_batched_sample_log_prob_with_different_x(
     snpe_method: type, x_o_batch_dim: bool
 ):
     num_dim = 2
+    num_simulations = 1000
 
     prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
     simulator = diagonal_linear_gaussian
 
     inference = snpe_method(prior=prior)
-    prior, _, prior_returns_numpy = process_prior(prior)
-    simulator = process_simulator(simulator, prior, prior_returns_numpy)
-    theta, x = simulate_for_sbi(simulator, prior, 1000)
+    theta = prior.sample((num_simulations,))
+    x = simulator(theta)
     posterior_estimator = inference.append_simulations(theta, x).train(max_num_epochs=3)
 
     x_o = ones(num_dim) if x_o_batch_dim == 0 else ones(x_o_batch_dim, num_dim)
@@ -133,15 +131,15 @@ def test_batched_mcmc_sample_log_prob_with_different_x(
     snlre_method: type, x_o_batch_dim: bool, mcmc_params_fast: dict
 ):
     num_dim = 2
+    num_simulations = 1000
 
     prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
     simulator = diagonal_linear_gaussian
 
     inference = snlre_method(prior=prior)
-    prior, _, prior_returns_numpy = process_prior(prior)
-    simulator = process_simulator(simulator, prior, prior_returns_numpy)
-    theta, x = simulate_for_sbi(simulator, prior, 1000)
-    _ = inference.append_simulations(theta, x).train(max_num_epochs=3)
+    theta = prior.sample((num_simulations,))
+    x = simulator(theta)
+    inference.append_simulations(theta, x).train(max_num_epochs=3)
 
     x_o = ones(num_dim) if x_o_batch_dim == 0 else ones(x_o_batch_dim, num_dim)
 

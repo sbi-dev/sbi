@@ -31,7 +31,6 @@ from sbi.simulators.linear_gaussian import (
     true_posterior_linear_gaussian_mvn_prior,
 )
 from sbi.utils import RestrictedPrior, get_density_thresholder
-from sbi.utils.user_input_checks import process_prior, process_simulator
 
 from .sbiutils_test import conditional_of_mvn
 from .test_utils import (
@@ -81,12 +80,9 @@ def test_c2st_snpe_on_linearGaussian(snpe_method, num_dim: int, prior_str: str):
 
     inference = snpe_method(prior, show_progress_bars=False)
 
-    prior, _, prior_returns_numpy = process_prior(prior)
-    simulator = process_simulator(simulator, prior, prior_returns_numpy)
+    theta = prior.sample((num_simulations,))
+    x = simulator(theta)
 
-    theta, x = simulate_for_sbi(
-        simulator, prior, num_simulations, simulation_batch_size=1000
-    )
     posterior_estimator = inference.append_simulations(theta, x).train(
         training_batch_size=100
     )
@@ -238,12 +234,8 @@ def test_c2st_snpe_on_linearGaussian_different_dims(density_estimator="maf"):
         show_progress_bars=False,
     )
 
-    # type: ignore
-    prior, _, prior_returns_numpy = process_prior(prior)
-    simulator = process_simulator(simulator, prior, prior_returns_numpy)
-    theta, x = simulate_for_sbi(
-        simulator, prior, num_simulations, simulation_batch_size=num_simulations
-    )
+    theta = prior.sample((num_simulations,))
+    x = simulator(theta)
 
     inference = inference.append_simulations(theta, x)
     posterior_estimator = inference.train(
@@ -473,6 +465,7 @@ def test_api_force_first_round_loss(
 
     num_dim = 2
     x_o = zeros(1, num_dim)
+    num_simulations = 1000
 
     # likelihood_mean will be likelihood_shift+theta
     likelihood_shift = -1.0 * ones(num_dim)
@@ -483,13 +476,12 @@ def test_api_force_first_round_loss(
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     inference = SNPE_C(prior, show_progress_bars=False)
-    prior, _, prior_returns_numpy = process_prior(prior)
-    simulator = process_simulator(simulator, prior, prior_returns_numpy)
 
     proposal = prior
     for _ in range(2):
         train_proposal = proposal if pass_proposal_to_append else None
-        theta, x = simulate_for_sbi(simulator, proposal, 1000)
+        theta = proposal.sample((num_simulations,))
+        x = simulator(theta)
         _ = inference.append_simulations(theta, x, proposal=train_proposal).train(
             force_first_round_loss=force_first_round_loss, max_num_epochs=2
         )
@@ -662,12 +654,9 @@ def test_mdn_conditional_density(num_dim: int = 3, cond_dim: int = 1):
 
     inference = SNPE_C(density_estimator="mdn", show_progress_bars=False)
 
-    prior, _, prior_returns_numpy = process_prior(prior)
-    simulator = process_simulator(simulator, prior, prior_returns_numpy)
+    theta = prior.sample((num_simulations,))
+    x = simulator(theta)
 
-    theta, x = simulate_for_sbi(
-        simulator, prior, num_simulations, simulation_batch_size=1000
-    )
     posterior_mdn = inference.append_simulations(theta, x).train(
         training_batch_size=100
     )
@@ -703,16 +692,8 @@ def test_example_posterior(snpe_method: type):
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     inference = snpe_method(prior, show_progress_bars=False)
-    prior, _, prior_returns_numpy = process_prior(prior)
-    simulator = process_simulator(simulator, prior, prior_returns_numpy)
-
-    theta, x = simulate_for_sbi(
-        simulator,
-        prior,
-        num_simulations,
-        simulation_batch_size=num_simulations,
-        num_workers=6,
-    )
+    theta = prior.sample((num_simulations,))
+    x = simulator(theta)
     posterior_estimator = inference.append_simulations(theta, x).train(
         max_num_epochs=2, **extra_kwargs
     )

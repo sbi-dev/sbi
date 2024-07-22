@@ -14,13 +14,11 @@ from sbi.inference import (
     DirectPosterior,
     MCMCPosterior,
     likelihood_estimator_based_potential,
-    simulate_for_sbi,
 )
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
     true_posterior_linear_gaussian_mvn_prior,
 )
-from sbi.utils.user_input_checks import process_prior, process_simulator
 from tests.test_utils import check_c2st
 
 
@@ -50,9 +48,9 @@ def test_mdn_inference_with_different_methods(method, mcmc_params_accurate: dict
 
     inference = method(density_estimator="mdn")
 
-    prior, _, prior_returns_numpy = process_prior(prior)
-    simulator = process_simulator(simulator, prior, prior_returns_numpy)
-    theta, x = simulate_for_sbi(simulator, prior, num_simulations)
+    theta = prior.sample((num_simulations,))
+    x = simulator(theta)
+
     estimator = inference.append_simulations(theta, x).train()
     if method == SNPE:
         posterior = DirectPosterior(posterior_estimator=estimator, prior=prior)
@@ -84,6 +82,7 @@ def test_mdn_with_1D_uniform_prior():
     """
     num_dim = 1
     x_o = torch.tensor([[1.0]])
+    num_simulations = 100
     num_samples = 100
 
     # likelihood_mean will be likelihood_shift+theta
@@ -97,9 +96,9 @@ def test_mdn_with_1D_uniform_prior():
 
     inference = SNPE(density_estimator="mdn")
 
-    prior, _, prior_returns_numpy = process_prior(prior)
-    simulator = process_simulator(simulator, prior, prior_returns_numpy)
-    theta, x = simulate_for_sbi(simulator, prior, 100)
+    theta = prior.sample((num_simulations,))
+    x = simulator(theta)
+
     posterior_estimator = inference.append_simulations(theta, x).train()
     posterior = DirectPosterior(posterior_estimator=posterior_estimator, prior=prior)
     samples = posterior.sample((num_samples,), x=x_o)
