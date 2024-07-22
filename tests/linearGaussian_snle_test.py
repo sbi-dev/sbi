@@ -28,6 +28,7 @@ from sbi.simulators.linear_gaussian import (
 from sbi.utils import BoxUniform
 from sbi.utils.user_input_checks import (
     process_prior,
+    process_simulator,
 )
 
 from .test_utils import check_c2st, get_prob_outside_uniform_prior
@@ -51,6 +52,8 @@ def test_api_snle_multiple_trials_and_rounds_map(
         prior = BoxUniform(-2.0 * ones(num_dim), 2.0 * ones(num_dim))
 
     simulator = diagonal_linear_gaussian
+    prior, _, prior_returns_numpy = process_prior(prior)
+    simulator = process_simulator(simulator, prior, prior_returns_numpy)
     inference = SNLE(prior=prior, density_estimator="mdn", show_progress_bars=False)
 
     proposals = [prior]
@@ -116,8 +119,14 @@ def test_c2st_snl_on_linear_gaussian_different_dims(
     density_estimator = likelihood_nn(model=model_str, num_transforms=3)
     inference = SNLE(density_estimator=density_estimator, show_progress_bars=False)
 
+    prior, _, prior_returns_numpy = process_prior(prior)
+    simulator = process_simulator(simulator, prior, prior_returns_numpy)
     theta, x = simulate_for_sbi(
-        simulator, prior, num_simulations, simulation_batch_size=num_simulations
+        simulator,
+        prior,
+        num_simulations,
+        simulation_batch_size=num_simulations,
+        seed=1,
     )
     likelihood_estimator = inference.append_simulations(theta, x).train()
     potential_fn, theta_transform = likelihood_estimator_based_potential(

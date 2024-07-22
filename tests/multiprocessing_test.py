@@ -26,7 +26,7 @@ def slow_linear_gaussian(theta):
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize("num_workers", [2])
+@pytest.mark.parametrize("num_workers", [4])
 @pytest.mark.parametrize("sim_batch_size", ((1, 10, 100)))
 def test_benchmarking_parallel_simulation(sim_batch_size, num_workers):
     """Test whether joblib is faster than serial processing."""

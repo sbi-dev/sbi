@@ -462,15 +462,32 @@ def process_simulator(
 
     assert isinstance(user_simulator, Callable), "Simulator must be a function."
 
-    pytorch_simulator = wrap_as_pytorch_simulator(
+    joblib_simulator = wrap_as_joblib_efficient_simulator(
         user_simulator, prior, is_numpy_simulator
     )
 
-    batch_simulator = ensure_batched_simulator(pytorch_simulator, prior)
+    batch_simulator = ensure_batched_simulator(joblib_simulator, prior)
 
     return batch_simulator
 
 
+# New simulator wrapper, deriving from #1175 refactoring of simulate_for_sbi.
+# For now it just blindly applies a cast to tensor to the input and the output
+# of the simulator. This is not efficient (~3 times slowdown), but is compatible
+# with the new joblib and, importantly, does not break previous code. It should
+# be removed with a future restructuring of the simulation pipeline.
+def wrap_as_joblib_efficient_simulator(
+    simulator: Callable, prior, is_numpy_simulator
+) -> Callable:
+    """Return a simulator that accepts `ndarray` and returns `Tensor` arguments."""
+
+    def joblib_simulator(theta: ndarray) -> Tensor:
+        return torch.as_tensor(simulator(torch.as_tensor(theta)), dtype=float32)
+
+    return joblib_simulator
+
+
+# Probably not used anymore
 def wrap_as_pytorch_simulator(
     simulator: Callable, prior, is_numpy_simulator
 ) -> Callable:
