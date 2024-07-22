@@ -1409,8 +1409,8 @@ def _arrange_grid(
                         if callable(lower_f):
                             lower_f(
                                 ax,
-                                sample[:, row],
                                 sample[:, col],
+                                sample[:, row],
                                 limits[row],
                                 limits[col],
                                 lower_kwargs[sample_ind],
