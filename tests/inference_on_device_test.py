@@ -22,7 +22,6 @@ from sbi.inference import (
     VIPosterior,
     likelihood_estimator_based_potential,
     ratio_estimator_based_potential,
-    simulate_for_sbi,
 )
 from sbi.inference.posteriors.importance_posterior import ImportanceSamplingPosterior
 from sbi.inference.potentials.base_potential import BasePotential
@@ -36,8 +35,6 @@ from sbi.neural_nets.factory import (
 from sbi.simulators import diagonal_linear_gaussian, linear_gaussian
 from sbi.utils.torchutils import BoxUniform, gpu_available, process_device
 from sbi.utils.user_input_checks import (
-    process_prior,
-    process_simulator,
     validate_theta_and_x,
 )
 

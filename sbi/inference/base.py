@@ -622,7 +622,7 @@ def simulate_for_sbi(
         theta = proposal.sample((num_simulations,)).numpy()
 
         # Parse the simulation_batch_size logic
-        if simulation_batch_size == None:
+        if simulation_batch_size is None:
             simulation_batch_size = num_simulations
         else:
             simulation_batch_size = min(simulation_batch_size, num_simulations)
