@@ -8,7 +8,7 @@ from math import pi
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Type, Union
 
 import numpy as np
-import pyknos.nflows.transforms as transforms
+import pyknos.nflows.transforms as nflows_tf
 import torch
 import torch.distributions.transforms as torch_tf
 import zuko
@@ -22,7 +22,6 @@ from torch.distributions import (
     biject_to,
     constraints,
 )
-from zuko.flows import UnconditionalTransform
 
 from sbi.sbi_types import TorchTransform
 from sbi.utils.torchutils import atleast_2d
@@ -146,7 +145,7 @@ def standardizing_transform(
     batch_t: Tensor,
     structured_dims: bool = False,
     min_std: float = 1e-14,
-) -> transforms.AffineTransform:
+) -> nflows_tf.PointwiseAffineTransform:
     """Builds standardizing transform for nflows
 
     Args:
@@ -163,14 +162,15 @@ def standardizing_transform(
         Affine transform for z-scoring
     """
     t_mean, t_std = z_standardization(batch_t, structured_dims, min_std)
-    return transforms.AffineTransform(shift=-t_mean / t_std, scale=1 / t_std)
+    return nflows_tf.PointwiseAffineTransform(shift=-t_mean / t_std, scale=1 / t_std)
 
 
+# NOTE: we need a separate function for zuko to return the precise type for pyright.
 def standardizing_transform_zuko(
     batch_t: Tensor,
     structured_dims: bool = False,
     min_std: float = 1e-14,
-) -> zuko.flows.LazyTransform:
+) -> zuko.flows.UnconditionalTransform:
     """Builds standardizing transform for Zuko flows
 
     Args:
@@ -187,7 +187,7 @@ def standardizing_transform_zuko(
         Affine transform for z-scoring
     """
     t_mean, t_std = z_standardization(batch_t, structured_dims, min_std)
-    return UnconditionalTransform(
+    return zuko.flows.UnconditionalTransform(
         AffineTransform,
         loc=-t_mean / t_std,
         scale=1 / t_std,
@@ -211,6 +211,7 @@ def z_standardization(
             batch, or independent (default), which z-scores dimensions independently.
         min_std:  Minimum value of the standard deviation to use when z-scoring to
             avoid division by zero.
+        backend: Whether to use nflows or zuko backend
 
     Returns:
         Mean and standard deviation for z-scoring
