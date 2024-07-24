@@ -5,11 +5,12 @@ import warnings
 from typing import Optional
 
 import torch
-from torch import Tensor
+from torch import Tensor, nn
 
 from sbi.neural_nets.categorial import build_categoricalmassestimator
 from sbi.neural_nets.density_estimators import MixedDensityEstimator
 from sbi.neural_nets.density_estimators.mixed_density_estimator import _separate_input
+from sbi.neural_nets.embedding_nets import PartialEmbedding
 from sbi.neural_nets.flow import (
     build_made,
     build_maf,
@@ -26,7 +27,6 @@ from sbi.neural_nets.flow import (
     build_zuko_unaf,
 )
 from sbi.neural_nets.mdn import build_mdn
-from sbi.utils.sbiutils import standardizing_net
 from sbi.utils.user_input_checks import check_data_device
 
 model_builders = {
@@ -53,7 +53,9 @@ def build_mnle(
     z_score_x: Optional[str] = "independent",
     z_score_y: Optional[str] = "independent",
     flow_model: str = "nsf",
+    embedding_net: nn.Module = nn.Identity(),
     num_transforms: int = 2,
+    num_components: int = 5,
     num_bins: int = 5,
     hidden_features: int = 50,
     hidden_layers: int = 2,
@@ -63,15 +65,27 @@ def build_mnle(
 ):
     """Returns a density estimator for mixed data types.
 
-    Uses a categorical net to model the discrete part and a neural spline flow (NSF) to
-    model the continuous part of the data.
+    Uses a categorical net to model the discrete part and a conditional density
+    estimator to model the continuous part of the data.
 
     Args:
-        batch_x: batch of data
-        batch_y: batch of parameters
-        z_score_x: whether to z-score x.
-        z_score_y: whether to z-score y.
-        num_transforms: number of transforms in the NSF
+        batch_x: Batch of xs, used to infer dimensionality. batch_y: Batch of
+        ys, used to infer dimensionality and (optional) z-scoring. z_score_x:
+        Whether to z-score xs passing into the network, can be one of:
+            - `none`, or None: do not z-score.
+            - `independent`: z-score each dimension independently.
+            - `structured`: treat dimensions as related, therefore compute mean
+              and std
+            over the entire batch, instead of per-dimension. Should be used when
+            each sample is, for example, a time series or an image. For MNLE,
+            this applies to the continuous part of the data only.
+        z_score_y: Whether to z-score ys passing into the network, same options
+            as z_score_x.
+        flow_model: type of flow model to use for the continuous part of the
+            data.
+        embedding_net: Optional embedding network for y.
+        num_transforms: number of transforms in the flow model.
+        num_components: number of components in the mixture model.
         num_bins: bins per spline for NSF.
         hidden_features: number of hidden features used in both nets.
         hidden_layers: number of hidden layers in the categorical net.
@@ -84,7 +98,6 @@ def build_mnle(
     """
 
     check_data_device(batch_x, batch_y)
-    embedding_net = standardizing_net(batch_y) if z_score_y == "independent" else None
 
     warnings.warn(
         """The mixed neural likelihood estimator assumes that x contains
@@ -100,10 +113,17 @@ def build_mnle(
     discrete_net = build_categoricalmassestimator(
         disc_x,
         batch_y,
+        z_score_x="none",  # discrete data should not be z-scored.
+        z_score_y=z_score_y,
         num_hidden=hidden_features,
         num_layers=hidden_layers,
         embedding_net=embedding_net,
     )
+
+    # for the continuous part, we need to construct a new embedding net for the
+    # condition which takes both the discrete part disc_x and the parameters in
+    # batch_y, but embeds only the parameters in batch_y.
+    mixed_embedding = PartialEmbedding(embedding_net, num_dims_skipped=disc_x.shape[1])
 
     # Set up a flow for modelling the continuous data, conditioned on the discrete data.
     continuous_net = model_builders[flow_model](
@@ -113,8 +133,10 @@ def build_mnle(
         batch_y=torch.cat((batch_y, disc_x), dim=1),  # condition on discrete data too.
         z_score_y=z_score_y,
         z_score_x=z_score_x,
+        embedding_net=mixed_embedding,
         num_bins=num_bins,
         num_transforms=num_transforms,
+        num_components=num_components,
         tail_bound=tail_bound,
         hidden_features=hidden_features,
     )

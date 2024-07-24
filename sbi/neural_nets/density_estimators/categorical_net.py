@@ -31,7 +31,7 @@ class CategoricalNet(nn.Module):
             num_categories: number of output units, i.e., number of categories.
             num_hidden: number of hidden units per layer.
             num_layers: number of hidden layers.
-            embedding_net: emebedding net for parameters, e.g., a z-scoring transform.
+            embedding_net: emebedding net for input.
         """
         super().__init__()
 
@@ -41,7 +41,7 @@ class CategoricalNet(nn.Module):
         self.softmax = Softmax(dim=1)
         self.num_categories = num_categories
 
-        # Maybe add z-score embedding for parameters.
+        # Maybe add embedding net in front.
         if embedding_net is not None:
             self.input_layer = nn.Sequential(
                 embedding_net, nn.Linear(num_input, num_hidden)

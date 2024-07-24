@@ -6,6 +6,8 @@ from typing import List, Optional, Tuple, Union
 import torch
 from torch import Tensor, nn
 
+from sbi.neural_nets.density_estimators.mixed_density_estimator import _separate_input
+
 
 class FCEmbedding(nn.Module):
     def __init__(
@@ -309,3 +311,29 @@ class PermutationInvariantEmbedding(nn.Module):
 
         # add number of trials as additional input
         return self.fc_subnet(torch.cat([combined_embedding, trial_counts], dim=1))
+
+
+class PartialEmbedding(nn.Module):
+    """Embedding network to embed only parts of the input."""
+
+    def __init__(
+        self, embedding_net: nn.Module, num_dims_skipped: int, **kwargs
+    ) -> None:
+        """Embed only parts of the input.
+
+        Args:
+            embedding_net: Embedding network to embed the continuous data.
+            num_dims_skipped: Number of dimensions to skip.
+        """
+        super().__init__(**kwargs)
+
+        self.embedding_net = embedding_net
+        self.num_dims_skipped = num_dims_skipped
+
+    def forward(self, x: Tensor) -> Tensor:
+        """Embed parts of the input and return concatenated with the rest."""
+        x_to_embed, x_to_skip = _separate_input(
+            x, num_discrete_columns=self.num_dims_skipped
+        )
+        embebbed_x = self.embedding_net(x_to_embed)
+        return torch.cat((embebbed_x, x_to_skip), dim=1)

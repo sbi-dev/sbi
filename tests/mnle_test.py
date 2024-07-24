@@ -14,6 +14,7 @@ from sbi.inference.potentials.likelihood_based_potential import (
     MixedLikelihoodBasedPotential,
 )
 from sbi.neural_nets import likelihood_nn
+from sbi.neural_nets.embedding_nets import FCEmbedding
 from sbi.utils import BoxUniform, mcmc_transform
 from sbi.utils.conditional_density_utils import ConditionedPotential
 from sbi.utils.torchutils import atleast_2d, process_device
@@ -79,7 +80,8 @@ def test_mnle_on_device(
     "sampler", (pytest.param("mcmc", marks=pytest.mark.mcmc), "rejection", "vi")
 )
 @pytest.mark.parametrize("flow_model", ("mdn", "maf", "nsf", "zuko_nsf", "zuko_bpf"))
-def test_mnle_api(flow_model: str, sampler, mcmc_params_fast: dict):
+@pytest.mark.parametrize("z_score_theta", ("independent", "none"))
+def test_mnle_api(flow_model: str, sampler, mcmc_params_fast: dict, z_score_theta: str):
     """Test MNLE API."""
     # Generate mixed data.
     num_simulations = 100
@@ -96,7 +98,13 @@ def test_mnle_api(flow_model: str, sampler, mcmc_params_fast: dict):
     prior = BoxUniform(torch.zeros(2), torch.ones(2))
     x_o = x[0]
     # Build estimator manually.
-    density_estimator = likelihood_nn(model="mnle", flow_model=flow_model)
+    theta_embedding = FCEmbedding(2, 2)  # simple embedding net
+    density_estimator = likelihood_nn(
+        model="mnle",
+        flow_model=flow_model,
+        z_score_theta=z_score_theta,
+        embedding_net=theta_embedding,
+    )
     trainer = MNLE(density_estimator=density_estimator)
     trainer.append_simulations(theta, x).train(max_num_epochs=5)
 
