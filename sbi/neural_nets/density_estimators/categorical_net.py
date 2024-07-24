@@ -18,8 +18,8 @@ class CategoricalNet(nn.Module):
 
     def __init__(
         self,
-        num_input: int = 4,
-        num_categories: int = 2,
+        num_input: int,
+        num_categories: int,
         num_hidden: int = 20,
         num_layers: int = 2,
         embedding_net: Optional[nn.Module] = None,
@@ -27,7 +27,7 @@ class CategoricalNet(nn.Module):
         """Initialize the neural net.
 
         Args:
-            num_input: number of input units, i.e., dimensionality of context.
+            num_input: number of input units, i.e., dimensionality of the features.
             num_categories: number of output units, i.e., number of categories.
             num_hidden: number of hidden units per layer.
             num_layers: number of hidden layers.
@@ -86,9 +86,9 @@ class CategoricalNet(nn.Module):
         """
         # Predict categorical ps and evaluate.
         ps = self.forward(condition)
-        # Squeeze dim=1 because `Categorical` has `event_shape=()` but our data usually
-        # has an event_shape of `(1,)`.
-        return Categorical(probs=ps).log_prob(input.squeeze(dim=1))
+        # Squeeze the last dimension (event dim) because `Categorical` has
+        # `event_shape=()` but our data usually has an event_shape of `(1,)`.
+        return Categorical(probs=ps).log_prob(input.squeeze(dim=-1))
 
     def sample(self, sample_shape: torch.Size, condition: Tensor) -> Tensor:
         """Returns samples from categorical random variable with probs predicted from
@@ -116,6 +116,13 @@ class CategoricalMassEstimator(ConditionalDensityEstimator):
     def __init__(
         self, net: CategoricalNet, input_shape: torch.Size, condition_shape: torch.Size
     ) -> None:
+        """Initialize the mass estimator.
+
+        Args:
+            net: CategoricalNet.
+            input_shape: Shape of the input data.
+            condition_shape: Shape of the condition data
+        """
         super().__init__(
             net=net, input_shape=input_shape, condition_shape=condition_shape
         )
@@ -134,27 +141,17 @@ class CategoricalMassEstimator(ConditionalDensityEstimator):
         Returns:
             Log-probabilities of shape `(sample_dim, batch_dim)`.
         """
-        input_sample_dim = input.shape[0]
         input_batch_dim = input.shape[1]
         condition_batch_dim = condition.shape[0]
-        condition_event_dims = len(condition.shape[1:])
 
         assert condition_batch_dim == input_batch_dim, (
             f"Batch shape of condition {condition_batch_dim} and input "
             f"{input_batch_dim} do not match."
         )
 
-        # `CategoricalNet` needs a single batch dimension for condition and input.
-        input = input.reshape((input_batch_dim * input_sample_dim, -1))
-
-        # Repeat the condition to match `input_batch_dim * input_sample_dim`.
-        ones_for_event_dims = (1,) * condition_event_dims  # Tuple of 1s, e.g. (1, 1, 1)
-        condition = condition.repeat(input_sample_dim, *ones_for_event_dims)
-
-        return self.net.log_prob(input, condition, **kwargs).reshape((
-            input_sample_dim,
-            input_batch_dim,
-        ))
+        # The CatetoricalNet can actually handle torch shape conventions and
+        # just returns log-probabilities of shape `(sample_dim, batch_dim)`.
+        return self.net.log_prob(input, condition, **kwargs)
 
     def sample(self, sample_shape: torch.Size, condition: Tensor, **kwargs) -> Tensor:
         """Return samples from the conditional categorical distribution.
