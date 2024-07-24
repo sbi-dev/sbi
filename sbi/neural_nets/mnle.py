@@ -10,9 +10,41 @@ from torch import Tensor
 from sbi.neural_nets.categorial import build_categoricalmassestimator
 from sbi.neural_nets.density_estimators import MixedDensityEstimator
 from sbi.neural_nets.density_estimators.mixed_density_estimator import _separate_input
-from sbi.neural_nets.flow import build_nsf
+from sbi.neural_nets.flow import (
+    build_made,
+    build_maf,
+    build_maf_rqs,
+    build_nsf,
+    build_zuko_bpf,
+    build_zuko_gf,
+    build_zuko_maf,
+    build_zuko_naf,
+    build_zuko_ncsf,
+    build_zuko_nice,
+    build_zuko_nsf,
+    build_zuko_sospf,
+    build_zuko_unaf,
+)
+from sbi.neural_nets.mdn import build_mdn
 from sbi.utils.sbiutils import standardizing_net
 from sbi.utils.user_input_checks import check_data_device
+
+model_builders = {
+    "mdn": build_mdn,
+    "made": build_made,
+    "maf": build_maf,
+    "maf_rqs": build_maf_rqs,
+    "nsf": build_nsf,
+    "zuko_nice": build_zuko_nice,
+    "zuko_maf": build_zuko_maf,
+    "zuko_nsf": build_zuko_nsf,
+    "zuko_ncsf": build_zuko_ncsf,
+    "zuko_sospf": build_zuko_sospf,
+    "zuko_naf": build_zuko_naf,
+    "zuko_unaf": build_zuko_unaf,
+    "zuko_gf": build_zuko_gf,
+    "zuko_bpf": build_zuko_bpf,
+}
 
 
 def build_mnle(
@@ -20,6 +52,7 @@ def build_mnle(
     batch_y: Tensor,
     z_score_x: Optional[str] = "independent",
     z_score_y: Optional[str] = "independent",
+    flow_model: str = "nsf",
     num_transforms: int = 2,
     num_bins: int = 5,
     hidden_features: int = 50,
@@ -64,7 +97,7 @@ def build_mnle(
     cont_x, disc_x = _separate_input(batch_x)
 
     # Set up a categorical RV neural net for modelling the discrete data.
-    disc_nle = build_categoricalmassestimator(
+    discrete_net = build_categoricalmassestimator(
         disc_x,
         batch_y,
         num_hidden=hidden_features,
@@ -72,8 +105,8 @@ def build_mnle(
         embedding_net=embedding_net,
     )
 
-    # Set up a NSF for modelling the continuous data, conditioned on the discrete data.
-    cont_nle = build_nsf(
+    # Set up a flow for modelling the continuous data, conditioned on the discrete data.
+    continuous_net = model_builders[flow_model](
         batch_x=(
             torch.log(cont_x) if log_transform_x else cont_x
         ),  # log transform manually.
@@ -87,8 +120,8 @@ def build_mnle(
     )
 
     return MixedDensityEstimator(
-        discrete_net=disc_nle,
-        continuous_net=cont_nle,
+        discrete_net=discrete_net,
+        continuous_net=continuous_net,
         log_transform_input=log_transform_x,
         input_shape=batch_x[0].shape,
         condition_shape=batch_y[0].shape,
