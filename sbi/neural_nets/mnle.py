@@ -27,6 +27,7 @@ from sbi.neural_nets.flow import (
     build_zuko_unaf,
 )
 from sbi.neural_nets.mdn import build_mdn
+from sbi.utils.nn_utils import concatenate_input_and_condition
 from sbi.utils.user_input_checks import check_data_device
 
 model_builders = {
@@ -120,17 +121,29 @@ def build_mnle(
         embedding_net=embedding_net,
     )
 
+    # if the discrete data has fewer event dimensions than condition data, we
+    # need to expand it to match the condition data. E.g., the condition data
+    # has shape (batch_dim, 7, 7) and the discrete data has shape (batch_dim,
+    # 1)
+    combined_condition, dims_repeated = concatenate_input_and_condition(disc_x, batch_y)
+
     # for the continuous part, we need to construct a new embedding net for the
     # condition which takes both the discrete part disc_x and the parameters in
     # batch_y, but embeds only the parameters in batch_y.
-    mixed_embedding = PartialEmbedding(embedding_net, num_dims_skipped=disc_x.shape[1])
+    # We need to be able to reconstruct the original event dim of disc_x, so we
+    # pass the number of dimensions in disc_x to the PartialEmbedding.
+    mixed_embedding = PartialEmbedding(
+        embedding_net,
+        num_dims_to_skip=len(disc_x.shape[1:]),
+        dims_repeated=dims_repeated,
+    )
 
     # Set up a flow for modelling the continuous data, conditioned on the discrete data.
     continuous_net = model_builders[flow_model](
         batch_x=(
             torch.log(cont_x) if log_transform_x else cont_x
         ),  # log transform manually.
-        batch_y=torch.cat((batch_y, disc_x), dim=1),  # condition on discrete data too.
+        batch_y=combined_condition,
         z_score_y=z_score_y,
         z_score_x=z_score_x,
         embedding_net=mixed_embedding,

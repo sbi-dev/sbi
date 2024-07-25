@@ -39,6 +39,8 @@ def build_categoricalmassestimator(
         raise ValueError("Categorical input should not be z-scored.")
 
     check_data_device(batch_x, batch_y)
+    if batch_x.shape[1] > 1:
+        raise NotImplementedError("CategoricalMassEstimator only supports 1D input.")
     num_categories = unique(batch_x).numel()
     dim_condition = get_numel(batch_y, embedding_net=embedding_net)
 

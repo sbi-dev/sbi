@@ -8,6 +8,7 @@ from torch import Tensor
 
 from sbi.neural_nets.density_estimators.base import ConditionalDensityEstimator
 from sbi.neural_nets.density_estimators.categorical_net import CategoricalMassEstimator
+from sbi.utils.nn_utils import concatenate_input_and_condition
 
 
 class MixedDensityEstimator(ConditionalDensityEstimator):
@@ -84,13 +85,16 @@ class MixedDensityEstimator(ConditionalDensityEstimator):
             # repeat the single condition to match number of sampled choices.
             repeated_condition = condition.repeat(num_samples, *ones_for_event_dims)
 
+            # Combine discrete and continuous data and prepare for embedding.
+            combined_condition = concatenate_input_and_condition(
+                input=discrete_samples, condition=repeated_condition
+            )[0]
+
             # Sample continuous data conditioned on parameters and discrete data.
             # Pass num_samples=1 because the choices in the condition contains
             # num_samples elements already.
             continuous_samples = self.continuous_net.sample(
-                sample_shape=torch.Size([]),
-                # sample_shape[0] is the sample dimension.
-                condition=torch.cat((repeated_condition, discrete_samples), dim=1),
+                sample_shape=torch.Size([]), condition=combined_condition
             )
 
             # In case input was log-transformed, move them to linear space.
@@ -103,36 +107,57 @@ class MixedDensityEstimator(ConditionalDensityEstimator):
             return joined_samples.reshape(*sample_shape, batch_dim, -1)
 
     def log_prob(self, input: Tensor, condition: Tensor) -> Tensor:
-        """Return log-probability of samples under the learned MNLE.
+        r"""Return the log probabilities of the inputs given a condition or multiple
+        i.e. batched conditions.
 
-        For a fixed data point input this returns the value of the likelihood function
-        evaluated at condition, L(condition, input=input).
-
-        Alternatively, it can be interpreted as the log-prob of the density
-        p(input | condition).
-
-        It evaluates the separate density estimator for the discrete and continous part
-        of the data and then combines them into one evaluation.
 
         Args:
-            input: data (containing continuous and discrete data).
-            condition: parameters for which to evaluate the likelihod function, or for
-                which to condition p(input | condition).
+            input: Inputs to evaluate the log probability on. Of shape
+                `(sample_dim, batch_dim, *event_shape)`.
+            condition: Conditions of shape `(sample_dim, batch_dim, *event_shape)`.
+
+        Raises:
+            NotImplementedError: If `input` has a sample shape > 1. The reason
+                is that in MLE, discrete and continuous data are combined into one
+                condition, creating a mismatch if sample shapes are present because
+                the condition cannot have a sample shape.
+            AssertionError: If `input_batch_dim != condition_batch_dim`.
 
         Returns:
-            Tensor: log_prob of p(input | condition).
+            Sample-wise log probabilities, shape `(input_sample_dim, input_batch_dim)`.
         """
+
+        assert (
+            input.dim() > 2
+        ), "Input must be of shape (sample_dim, batch_dim, *event_shape)."
+        if input.shape[0] > 1:
+            raise NotImplementedError(
+                """Input values with sample shape are not supported for mixed
+                    density estimation because discrete inputs are combined
+                    continuous condition, which cannot have a sample shape.
+                    Please pass a inputs with sample_dim=1."""
+            )
+        input_sample_dim = input.shape[0]  # will be 1
+        input_batch_dim = input.shape[1]
+        condition_batch_dim = condition.shape[0]
+
+        assert condition_batch_dim == input_batch_dim, (
+            f"Batch shape of condition {condition_batch_dim} and input "
+            f"{input_batch_dim} do not match."
+        )
+
         cont_input, disc_input = _separate_input(input)
 
+        # Get log probs from discrete data. Pass with singleton sample dim.
         disc_log_prob = self.discrete_net.log_prob(
             input=disc_input, condition=condition
         )
 
-        # Pass parameters and discrete input as condition.
-        repeats = disc_input.shape[0]
-        disc_input_repeated = disc_input.reshape((repeats * disc_input.shape[1], -1))
-        condition_repeated = condition.repeat((repeats, 1))
-        condition_reshaped = torch.cat((condition_repeated, disc_input_repeated), dim=1)
+        # Expand and repeat the discrete data to match the condition data.
+        # Pass without sample dim.
+        combined_condition = concatenate_input_and_condition(
+            input=disc_input[0], condition=condition
+        )[0]  # return only the combined condition.
 
         cont_input_reshaped = cont_input.reshape((
             1,
@@ -146,7 +171,7 @@ class MixedDensityEstimator(ConditionalDensityEstimator):
                 if self.log_transform_input
                 else cont_input_reshaped
             ),
-            condition=condition_reshaped,
+            condition=combined_condition,
         )
         cont_log_prob = cont_log_prob.reshape(disc_log_prob.shape)
 
@@ -157,7 +182,7 @@ class MixedDensityEstimator(ConditionalDensityEstimator):
         if self.log_transform_input:
             log_probs_combined -= torch.log(cont_input).sum(-1)
 
-        return log_probs_combined
+        return log_probs_combined.reshape((input_sample_dim, input_batch_dim))
 
     def loss(self, input: Tensor, condition: Tensor, **kwargs) -> Tensor:
         r"""Return the loss for training the density estimator.
