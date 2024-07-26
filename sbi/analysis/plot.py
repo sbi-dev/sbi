@@ -1562,7 +1562,7 @@ def _sbc_rank_plot(
     for idx, rank in enumerate(ranks_list):
         assert isinstance(rank, (Tensor, np.ndarray))
         if isinstance(rank, Tensor):
-            ranks_list[idx] = rank.numpy()
+            ranks_list[idx]: np.ndarray = rank.numpy()  # type: ignore
 
     plot_types = ["hist", "cdf"]
     assert (

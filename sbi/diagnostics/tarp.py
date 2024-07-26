@@ -366,7 +366,7 @@ def check_tarp(
     midindex = nentries // 2
     atc = float((ecp[midindex:, ...] - alpha[midindex:, ...]).sum())
 
-    kstest_pvals = kstest(ecp.numpy(), alpha.numpy())[1]
+    kstest_pvals: float = kstest(ecp.numpy(), alpha.numpy())[1]  # type: ignore
 
     return atc, kstest_pvals
 

@@ -13,7 +13,7 @@ import torch
 import torch.distributions.transforms as torch_tf
 import zuko
 from pyro.distributions import Empirical
-from torch import Tensor, ones, optim, zeros
+from torch import Tensor, ones, zeros
 from torch import nn as nn
 from torch.distributions import (
     AffineTransform,
@@ -22,6 +22,7 @@ from torch.distributions import (
     biject_to,
     constraints,
 )
+from torch.optim.adam import Adam
 from zuko.flows import UnconditionalTransform
 
 from sbi.sbi_types import TorchTransform
@@ -935,7 +936,7 @@ def gradient_ascent(
 
     optimize_inits = theta_transform(optimize_inits)
     optimize_inits.requires_grad_(True)  # type: ignore
-    optimizer = optim.Adam([optimize_inits], lr=learning_rate)  # type: ignore
+    optimizer = Adam([optimize_inits], lr=learning_rate)  # type: ignore
 
     iter_ = 0
 
