@@ -12,7 +12,7 @@ from torch.distributions import Uniform
 from tqdm.auto import tqdm
 
 from sbi.inference import DirectPosterior
-from sbi.inference.posteriors.base_posterior import NeuralPosterior
+from sbi.inference.posteriors.base_posterior import NeuralPotentialPosterior
 from sbi.inference.posteriors.vi_posterior import VIPosterior
 from sbi.simulators.simutils import tqdm_joblib
 from sbi.utils.metrics import c2st
@@ -21,7 +21,7 @@ from sbi.utils.metrics import c2st
 def run_sbc(
     thetas: Tensor,
     xs: Tensor,
-    posterior: NeuralPosterior,
+    posterior: NeuralPotentialPosterior,
     num_posterior_samples: int = 1000,
     reduce_fns: Union[str, Callable, List[Callable]] = "marginals",
     num_workers: int = 1,
@@ -133,7 +133,7 @@ def run_sbc(
 def sbc_on_batch(
     thetas: Tensor,
     xs: Tensor,
-    posterior: NeuralPosterior,
+    posterior: NeuralPotentialPosterior,
     num_posterior_samples: int,
     reduce_fns: Union[str, Callable, List[Callable]],
 ) -> Tuple[Tensor, Tensor]:
@@ -200,7 +200,7 @@ def sbc_on_batch(
     return ranks, dap_samples
 
 
-def get_nltp(thetas: Tensor, xs: Tensor, posterior: NeuralPosterior) -> Tensor:
+def get_nltp(thetas: Tensor, xs: Tensor, posterior: NeuralPotentialPosterior) -> Tensor:
     """Return negative log prob of true parameters under the posterior.
 
     NLTP: negative log probs of true parameters under the approximate posterior.

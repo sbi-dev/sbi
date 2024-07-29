@@ -14,7 +14,7 @@ from pyknos.nflows.transforms.splines import (
 )
 from torch import Tensor, nn, relu, tanh, tensor, uint8
 
-from sbi.neural_nets.density_estimators import NFlowsFlow, ZukoFlow
+from sbi.neural_nets.estimators import NFlowsFlow, ZukoFlow
 from sbi.utils.nn_utils import get_numel
 from sbi.utils.sbiutils import (
     standardizing_net,

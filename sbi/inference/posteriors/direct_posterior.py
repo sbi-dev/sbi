@@ -7,12 +7,12 @@ import torch
 from torch import Tensor, log
 from torch.distributions import Distribution
 
-from sbi.inference.posteriors.base_posterior import NeuralPosterior
+from sbi.inference.posteriors.base_posterior import NeuralPotentialPosterior
 from sbi.inference.potentials.posterior_based_potential import (
     posterior_estimator_based_potential,
 )
-from sbi.neural_nets.density_estimators.base import ConditionalDensityEstimator
-from sbi.neural_nets.density_estimators.shape_handling import (
+from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
+from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
     reshape_to_sample_batch_event,
 )
@@ -23,7 +23,7 @@ from sbi.utils.torchutils import ensure_theta_batched
 from sbi.utils.user_input_checks import check_prior
 
 
-class DirectPosterior(NeuralPosterior):
+class DirectPosterior(NeuralPotentialPosterior):
     r"""Posterior $p(\theta|x_o)$ with `log_prob()` and `sample()` methods, only
     applicable to SNPE.<br/><br/>
     SNPE trains a neural network to directly approximate the posterior distribution.

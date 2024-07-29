@@ -5,9 +5,11 @@ from sbi.inference.base import (
     infer,
     simulate_for_sbi,
 )
+from sbi.inference.nspe.nspe import NSPE
 from sbi.inference.snle import MNLE, SNLE_A
 from sbi.inference.snpe import SNPE_A, SNPE_B, SNPE_C  # noqa: F401
 from sbi.inference.snre import BNRE, SNRE, SNRE_A, SNRE_B, SNRE_C  # noqa: F401
+from sbi.utils.user_input_checks import prepare_for_sbi
 
 SNL = SNLE = SNLE_A
 _snle_family = ["SNL"]

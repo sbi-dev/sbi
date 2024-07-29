@@ -5,7 +5,7 @@ from torch import Tensor, nn
 from torch.distributions import Categorical
 from torch.nn import Sigmoid, Softmax
 
-from sbi.neural_nets.density_estimators.base import ConditionalDensityEstimator
+from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
 
 
 class CategoricalNet(nn.Module):

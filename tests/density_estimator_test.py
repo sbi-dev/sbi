@@ -12,10 +12,10 @@ from torch.distributions import MultivariateNormal
 
 from sbi.neural_nets import build_mnle
 from sbi.neural_nets.categorial import build_categoricalmassestimator
-from sbi.neural_nets.density_estimators.shape_handling import (
+from sbi.neural_nets.embedding_nets import CNNEmbedding
+from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_sample_batch_event,
 )
-from sbi.neural_nets.embedding_nets import CNNEmbedding
 from sbi.neural_nets.flow import (
     build_maf,
     build_maf_rqs,

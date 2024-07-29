@@ -9,7 +9,10 @@ import torch
 from torch import Tensor
 from torch.distributions import Distribution
 
-from sbi.inference.posteriors.base_posterior import NeuralPosterior
+from sbi.inference.posteriors.base_posterior import (
+    NeuralPosterior,
+    NeuralPotentialPosterior,
+)
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.sbi_types import Shape, TorchTransform
@@ -89,7 +92,7 @@ def get_dkl_gaussian_prior(
 
 
 def get_prob_outside_uniform_prior(
-    posterior: NeuralPosterior, prior: BoxUniform, num_dim: int
+    posterior: NeuralPotentialPosterior, prior: BoxUniform, num_dim: int
 ) -> Tensor:
     """
     Return posterior probability for a parameter set outside of the prior support.
@@ -211,7 +214,7 @@ class PosteriorPotential(BasePotential):
         return posterior_log_prob
 
 
-class TractablePosterior(NeuralPosterior):
+class TractablePosterior(NeuralPotentialPosterior):
     r"""Posterior $p(\theta|x_o)$ with `log_prob()` and `sample()` methods, built from a
     potential function with tractable posterior distribution.<br/><br/>"""
 

@@ -16,7 +16,7 @@ from scipy.stats import kstest
 from torch import Tensor
 from tqdm.auto import tqdm
 
-from sbi.inference.posteriors.base_posterior import NeuralPosterior
+from sbi.inference.posteriors.base_posterior import NeuralPotentialPosterior
 from sbi.inference.posteriors.vi_posterior import VIPosterior
 from sbi.utils.metrics import l2
 
@@ -24,7 +24,7 @@ from sbi.utils.metrics import l2
 # TODO: can be replaced by batched sampling for DirectPosterior.
 def _infer_posterior_on_batch(
     xs: Tensor,
-    posterior: NeuralPosterior,
+    posterior: NeuralPotentialPosterior,
     num_posterior_samples: int = 1000,
 ) -> Tensor:
     """
@@ -73,7 +73,7 @@ def _infer_posterior_on_batch(
 # TODO: Can be integrated into tarp method loop, and into sbc function.
 def _prepare_estimates(
     xs: Tensor,
-    posterior: NeuralPosterior,
+    posterior: NeuralPotentialPosterior,
     num_posterior_samples: int = 1000,
     num_workers: int = 1,
     infer_batch_size: int = 1,
@@ -269,7 +269,7 @@ def _run_tarp(
 def run_tarp(
     thetas: Tensor,
     xs: Tensor,
-    posterior: NeuralPosterior,
+    posterior: NeuralPotentialPosterior,
     num_posterior_samples: int = 1000,
     num_workers: int = 1,
     show_progress_bar: bool = True,
