@@ -22,9 +22,13 @@ classifiers = [
     "Natural Language :: English",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "Development Status :: 3 - Alpha",
 ]
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 dynamic = ["version"]
 readme = "README.md"
 keywords = ["Bayesian inference", "simulation-based inference", "PyTorch"]
@@ -58,7 +62,7 @@ dev = [
     # Lint
     "pre-commit == 3.5.0",
     "pyyaml",
-    "pyright == 1.1.355",
+    "pyright",
     "ruff>=0.3.3",
     # Test
     "pytest",
@@ -130,7 +134,7 @@ xfail_strict = true
 [tool.pyright]
 include = ["sbi", "tests"]
 exclude = ["**/__pycache__", "**/__node_modules__", ".git", "docs", "examples", "tutorials", "tests"]
-python_version = "3.8"
+python_version = "3.9"
 reportUnsupportedDunderAll = false
 reportGeneralTypeIssues = false
 reportInvalidTypeForm = false
