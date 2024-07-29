@@ -5,7 +5,8 @@
 [![GitHub license](https://img.shields.io/github/license/sbi-dev/sbi)](https://github.com/sbi-dev/sbi/blob/master/LICENSE.txt)
 [![DOI](https://joss.theoj.org/papers/10.21105/joss.02505/status.svg)](https://doi.org/10.21105/joss.02505)
 
-## sbi: simulation-based inference
+
+# `sbi`: simulation-based inference
 
 [Getting Started](https://sbi-dev.github.io/sbi/tutorial/00_getting_started/) | [Documentation](https://sbi-dev.github.io/sbi/)
 
@@ -34,7 +35,7 @@ posterior = inference.build_posterior()
 
 ## Installation
 
-`sbi` requires Python 3.9 or higher. A GPU is not required, but can lead to
+`sbi` requires Python 3.10 or higher. A GPU is not required, but can lead to
 speed-up in some cases. We recommend using a
 [`conda`](https://docs.conda.io/en/latest/miniconda.html) virtual environment
 ([Miniconda installation
@@ -43,7 +44,7 @@ installed on the system, an environment for installing `sbi` can be created as
 follows:
 
 ```commandline
-# Create an environment for sbi (indicate Python 3.9 or higher); activate it
+# Create an environment for sbi (indicate Python 3.10 or higher); activate it
 $ conda create -n sbi_env python && conda activate sbi_env
 ```
 
