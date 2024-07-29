@@ -132,9 +132,9 @@ xfail_strict = true
 
 # Pyright configuration
 [tool.pyright]
-include = ["sbi", "tests"]
+include = ["sbi"]
 exclude = ["**/__pycache__", "**/__node_modules__", ".git", "docs", "examples", "tutorials", "tests"]
-python_version = "3.9"
+python_version = "3.12"
 reportUnsupportedDunderAll = false
 reportGeneralTypeIssues = false
 reportInvalidTypeForm = false

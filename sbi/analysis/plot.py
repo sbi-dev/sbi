@@ -183,10 +183,10 @@ def plt_kde_2d(
     ax.imshow(
         Z,
         extent=(
-            limits_col[0],
-            limits_col[1],
-            limits_row[0],
-            limits_row[1],
+            limits_col[0].item(),
+            limits_col[1].item(),
+            limits_row[0].item(),
+            limits_row[1].item(),
         ),
         **offdiag_kwargs["mpl_kwargs"],
     )
@@ -388,6 +388,8 @@ def _format_subplot(
     ):
         ax.set_facecolor(fig_kwargs["fig_bg_colors"][current])
     # Limits
+    if isinstance(limits, torch.Tensor):
+        limits = limits.tolist()
     if current == "diag":
         eps = fig_kwargs["x_lim_add_eps"]
         ax.set_xlim((limits[col][0] - eps, limits[col][1] + eps))
@@ -398,6 +400,8 @@ def _format_subplot(
         ax.set_ylim((limits[row][0], limits[row][1]))
 
     # Ticks
+    if isinstance(ticks, torch.Tensor):
+        ticks = ticks.tolist()
     if ticks is not None:
         ax.set_xticks((ticks[col][0], ticks[col][1]))  # pyright: ignore[reportCallIssue]
         if current != "diag":
@@ -1996,7 +2000,7 @@ def marginal_plot_with_probs_intensity(
         weights = np.array([np.mean(w) for w in weights])
         # remove empty bins
         id = list(set(range(n_bins)) - set(probs_per_marginal["bins"]))
-        patches = np.delete(patches, id)
+        patches = np.delete(np.array(patches), id)
         bins = np.delete(bins, id)
 
         # normalize color intensity
