@@ -9,15 +9,17 @@
 
 [Getting Started](https://sbi-dev.github.io/sbi/tutorial/00_getting_started/) | [Documentation](https://sbi-dev.github.io/sbi/)
 
-`sbi` is a PyTorch package for simulation-based inference. Simulation-based inference is
-the process of finding parameters of a simulator from observations.
+`sbi` is a PyTorch package for simulation-based inference. Simulation-based
+inference is the process of inferring the parameters of a simulator from
+observations.
 
-`sbi` takes a Bayesian approach and returns a full posterior distribution over the
-parameters of the simulator, conditional on the observations. The package implements a
-variety of inference algorithms, including _amortized_ and _sequential_ methods.
-Amortized methods return a posterior that can be applied to many different observations
-without retraining; sequential methods focus the inference on one particular observation
-to be more simulation-efficient. See below for an overview of implemented methods.
+`sbi` takes a Bayesian approach and returns the full posterior distribution over
+the parameters of the simulator, conditional on the observations. The package
+implements a variety of inference algorithms, including _amortized_ and
+_sequential_ methods. Amortized methods return a posterior that can be applied
+to many different observations without retraining; sequential methods focus the
+inference on one particular observation to be more simulation-efficient. See
+below for an overview of implemented methods.
 
 `sbi` offers a simple interface for posterior inference in a few lines of code
 
@@ -32,21 +34,27 @@ posterior = inference.build_posterior()
 
 ## Installation
 
-`sbi` requires Python 3.8 or higher. A GPU is not required, but can lead to speed-up in some cases. We recommend to use a [`conda`](https://docs.conda.io/en/latest/miniconda.html) virtual
-environment ([Miniconda installation instructions](https://docs.conda.io/en/latest/miniconda.html)). If `conda` is installed on the system, an environment for installing `sbi` can be created as follows:
+`sbi` requires Python 3.9 or higher. A GPU is not required, but can lead to
+speed-up in some cases. We recommend using a
+[`conda`](https://docs.conda.io/en/latest/miniconda.html) virtual environment
+([Miniconda installation
+instructions](https://docs.conda.io/en/latest/miniconda.html)). If `conda` is
+installed on the system, an environment for installing `sbi` can be created as
+follows:
 
 ```commandline
-# Create an environment for sbi (indicate Python 3.8 or higher); activate it
-$ conda create -n sbi_env python=3.10 && conda activate sbi_env
+# Create an environment for sbi (indicate Python 3.9 or higher); activate it
+$ conda create -n sbi_env python && conda activate sbi_env
 ```
 
-Independent of whether you are using `conda` or not, `sbi` can be installed using `pip`:
+Independent of whether you are using `conda` or not, `sbi` can be installed
+using `pip`:
 
 ```commandline
 pip install sbi
 ```
 
-To test the installation, drop into a python prompt and run
+To test the installation, drop into a Python prompt and run
 
 ```python
 from sbi.examples.minimal import simple
@@ -67,7 +75,9 @@ Jupyter notebooks.
 
 ## Inference Algorithms
 
-The following inference algorithms are currently available. You can find instructions on how to run each of these methods [here](https://sbi-dev.github.io/sbi/tutorial/16_implemented_methods/).
+The following inference algorithms are currently available. You can find
+instructions on how to run each of these methods
+[here](https://sbi-dev.github.io/sbi/tutorial/16_implemented_methods/).
 
 ### Neural Posterior Estimation: amortized (NPE) and sequential (SNPE)
 
@@ -105,23 +115,25 @@ The following inference algorithms are currently available. You can find instruc
 ## Feedback and Contributions
 
 We welcome any feedback on how `sbi` is working for your inference problems (see
-[Discussions](https://github.com/sbi-dev/sbi/discussions)) and are happy to receive bug
-reports, pull requests, and other feedback (see
-[contribute](http://sbi-dev.github.io/sbi/contribute/)). We wish to maintain a positive
-community; please read our [Code of Conduct](CODE_OF_CONDUCT.md).
+[Discussions](https://github.com/sbi-dev/sbi/discussions)) and are happy to
+receive bug reports, pull requests, and other feedback (see
+[contribute](http://sbi-dev.github.io/sbi/contribute/)). We wish to maintain a
+positive community; please read our [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Acknowledgments
 
 `sbi` is the successor (using PyTorch) of the
-[`delfi`](https://github.com/mackelab/delfi) package. It started as a fork of Conor M.
-Durkan's `lfi`. `sbi` runs as a community project. See also
+[`delfi`](https://github.com/mackelab/delfi) package. It started as a fork of
+Conor M. Durkan's `lfi`. `sbi` runs as a community project. See also
 [credits](https://github.com/sbi-dev/sbi/blob/master/docs/docs/credits.md).
 
 ## Support
 
-`sbi` has been supported by the German Federal Ministry of Education and Research (BMBF)
-through project ADIMEM (FKZ 01IS18052 A-D), project SiMaLeSAM (FKZ 01IS21055A) and the
-Tübingen AI Center (FKZ 01IS18039A).
+`sbi` has been supported by the German Federal Ministry of Education and
+Research (BMBF) through project ADIMEM (FKZ 01IS18052 A-D), project SiMaLeSAM
+(FKZ 01IS21055A) and the Tübingen AI Center (FKZ 01IS18039A). Since 2024,
+@janfb's contributions to the package have been supported by the appliedAI
+Institute for Europe.
 
 ## License
 
@@ -129,7 +141,9 @@ Tübingen AI Center (FKZ 01IS18039A).
 
 ## Citation
 
-If you use `sbi` consider citing the [sbi software paper](https://doi.org/10.21105/joss.02505), in addition to the original research articles describing the specific sbi-algorithm(s) you are using.
+If you use `sbi` consider citing the [sbi software
+paper](https://doi.org/10.21105/joss.02505), in addition to the original
+research articles describing the specific sbi-algorithm(s) you are using.
 
 ```latex
 @article{tejero-cantero2020sbi,
