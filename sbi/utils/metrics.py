@@ -168,13 +168,10 @@ def c2st_scores(
         X += noise_scale * torch.randn(X.shape)
         Y += noise_scale * torch.randn(Y.shape)
 
-    X = X.cpu().numpy()
-    Y = Y.cpu().numpy()
-
     clf = clf_class(random_state=seed, **clf_kwargs or {})
 
-    # prepare data
-    data = np.concatenate((X, Y))
+    # prepare data, convert to numpy
+    data = np.concatenate((X.cpu().numpy(), Y.cpu().numpy()))
     # labels
     target = np.concatenate((np.zeros((X.shape[0],)), np.ones((Y.shape[0],))))
 
@@ -183,7 +180,7 @@ def c2st_scores(
         clf, data, target, cv=shuffle, scoring=metric, verbose=verbosity
     )
 
-    return scores
+    return torch.from_numpy(scores).mean()
 
 
 def unbiased_mmd_squared(x: Tensor, y: Tensor, scale: Optional[float] = None):
