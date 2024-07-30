@@ -11,7 +11,7 @@ from sbi.diagnostics.tarp import (
     check_tarp,
     run_tarp,
 )
-from sbi.inference import SNPE, simulate_for_sbi
+from sbi.inference import SNPE
 from sbi.simulators import linear_gaussian
 from sbi.utils import BoxUniform
 from sbi.utils.metrics import l1, l2
@@ -312,7 +312,8 @@ def test_batched_prepare_estimates(method, model="mdn"):
 
     inferer = method(prior, show_progress_bars=False, density_estimator=model)
 
-    theta, x = simulate_for_sbi(simulator, prior, num_simulations)
+    theta = prior.sample((num_simulations,))
+    x = simulator(theta)
 
     _ = inferer.append_simulations(theta, x).train(
         training_batch_size=100, max_num_epochs=max_num_epochs
