@@ -247,17 +247,6 @@ class MCMCPosterior(NeuralPosterior):
             Samples from posterior.
         """
 
-        try:
-            x_o_is_iid = self.potential_fn.x_is_iid
-        except AttributeError:
-            x_o_is_iid = True
-        if not x_o_is_iid:
-            warn(
-                "The default `x_o` has `x_is_iid = False`, but you are now sampling "
-                "with a batch `x` with `x_is_iid = True`. If you want to sample non-iid"
-                "`x`, please reset `x_is_iid = False` in the potential function.",
-                stacklevel=2,
-            )
         self.potential_fn.set_x(self._x_else_default_x(x))
 
         # Replace arguments that were not passed with their default.
@@ -436,17 +425,6 @@ class MCMCPosterior(NeuralPosterior):
         # in the order of the observations.
         x_ = x.repeat_interleave(num_chains, dim=0)
 
-        try:
-            x_o_is_iid = self.potential_fn.x_is_iid
-        except AttributeError:
-            x_o_is_iid = False
-        if x_o_is_iid:
-            warn(
-                "The default `x_o` has `x_is_iid = True`, but you are now sampling with"
-                "a batch `x` with `x_is_iid = False`. If you want to sample with iid "
-                "`x`, please reset `x_is_iid = True` in the potential function.",
-                stacklevel=2,
-            )
         self.potential_fn.set_x(x_, x_is_iid=False)
         self.potential_ = self._prepare_potential(method)  # type: ignore
 

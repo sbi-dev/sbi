@@ -399,12 +399,12 @@ def nle_nre_apt_msg_on_invalid_x(
             )
 
 
-def warn_on_iid_x(num_trials):
+def warn_on_batched_x(batch_size):
     """Warn if more than one x was passed."""
 
-    if num_trials > 1:
+    if batch_size > 1:
         warnings.warn(
-            f"An x with a batch size of {num_trials} was passed. "
+            f"An x with a batch size of {batch_size} was passed. "
             + """Unless you are using `sample_batched` or `log_prob_batched`, this will
             be interpreted as a batch of independent and identically distributed data
             X={x_1, ..., x_n}, i.e., data generated based on the same underlying

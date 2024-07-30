@@ -15,6 +15,7 @@ from sbi.neural_nets.density_estimators.shape_handling import (
 )
 from sbi.sbi_types import TorchTransform
 from sbi.utils.sbiutils import mcmc_transform, within_support
+from sbi.utils.torchutils import ensure_theta_batched
 
 
 def posterior_estimator_based_potential(
@@ -119,6 +120,7 @@ class PosteriorBasedPotential(BasePotential):
             x = reshape_to_batch_event(
                 self.x_o, event_shape=self.posterior_estimator.condition_shape
             )
+            theta = ensure_theta_batched(torch.as_tensor(theta)).to(self.device)
             theta_batch_size = theta.shape[0]
             x_batch_size = x.shape[0]
 
