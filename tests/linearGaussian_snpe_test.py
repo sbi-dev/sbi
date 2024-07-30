@@ -21,7 +21,6 @@ from sbi.inference import (
     MCMCPosterior,
     RejectionPosterior,
     posterior_estimator_based_potential,
-    simulate_for_sbi,
 )
 from sbi.neural_nets import posterior_nn
 from sbi.simulators.linear_gaussian import (
@@ -176,9 +175,8 @@ def test_density_estimators_on_linearGaussian(density_estimator):
 
     inference = SNPE_C(prior, density_estimator=density_estimator)
 
-    theta, x = simulate_for_sbi(
-        simulator, prior, num_simulations, simulation_batch_size=1000
-    )
+    theta = prior.sample((num_simulations,))
+    x = simulator(theta)
     posterior_estimator = inference.append_simulations(theta, x).train(
         training_batch_size=100
     )
@@ -315,14 +313,14 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str):
 
     if method_str == "snpe_b":
         inference = SNPE_B(**creation_args)
-        theta, x = simulate_for_sbi(simulator, prior, 500, simulation_batch_size=10)
+        theta = prior.sample((500,))
+        x = simulator(theta)
         posterior_estimator = inference.append_simulations(theta, x).train()
         posterior1 = DirectPosterior(
             prior=prior, posterior_estimator=posterior_estimator
         ).set_default_x(x_o)
-        theta, x = simulate_for_sbi(
-            simulator, posterior1, 1000, simulation_batch_size=10
-        )
+        theta = posterior1.sample((1000,))
+        x = simulator(theta)
         posterior_estimator = inference.append_simulations(
             theta, x, proposal=posterior1
         ).train()
@@ -331,7 +329,8 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str):
         ).set_default_x(x_o)
     elif method_str == "snpe_c":
         inference = SNPE_C(**creation_args)
-        theta, x = simulate_for_sbi(simulator, prior, 900, simulation_batch_size=50)
+        theta = prior.sample((900,))
+        x = simulator(theta)
         posterior_estimator = inference.append_simulations(theta, x).train()
         posterior1 = DirectPosterior(
             prior=prior, posterior_estimator=posterior_estimator
@@ -348,9 +347,8 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str):
         for r in range(num_rounds):
             if r == 2:
                 final_round = True
-            theta, x = simulate_for_sbi(
-                simulator, proposal, 500, simulation_batch_size=50
-            )
+            theta = proposal.sample((500,))
+            x = simulator(theta)
             inference = inference.append_simulations(theta, x, proposal=proposal)
             _ = inference.train(max_num_epochs=200, final_round=final_round)
             posterior = inference.build_posterior().set_default_x(x_o)
@@ -358,7 +356,8 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str):
     elif method_str.startswith("tsnpe"):
         sample_method = "rejection" if method_str == "tsnpe_rejection" else "sir"
         inference = SNPE_C(**creation_args)
-        theta, x = simulate_for_sbi(simulator, prior, 900, simulation_batch_size=50)
+        theta = prior.sample((900,))
+        x = simulator(theta)
         posterior_estimator = inference.append_simulations(theta, x).train()
         posterior1 = DirectPosterior(
             prior=prior, posterior_estimator=posterior_estimator
@@ -418,7 +417,8 @@ def test_api_snpe_c_posterior_correction(
 
     inference = SNPE_C(prior, show_progress_bars=False)
 
-    theta, x = simulate_for_sbi(simulator, prior, 1000)
+    theta = prior.sample((1000,))
+    x = simulator(theta)
     posterior_estimator = inference.append_simulations(theta, x).train()
     potential_fn, theta_transform = posterior_estimator_based_potential(
         posterior_estimator, prior, x_o
@@ -533,12 +533,8 @@ def test_sample_conditional(mcmc_params_accurate: dict):
     inference = SNPE_C(prior, density_estimator=net, show_progress_bars=True)
 
     # We need a pretty big dataset to properly model the bimodality.
-    theta, x = simulate_for_sbi(
-        simulator,
-        prior,
-        num_simulations,
-        simulation_batch_size=num_simulations,
-    )
+    theta = prior.sample((num_simulations,))
+    x = simulator(theta)
     posterior_estimator = inference.append_simulations(theta, x).train(
         training_batch_size=1000, max_num_epochs=60
     )
@@ -721,7 +717,8 @@ def test_multiround_mog_training():
     inference = SNPE_C(prior, density_estimator="mdn")
 
     for _ in range(3):
-        theta, x = simulate_for_sbi(simulator, proposal, 200)
+        theta = proposal.sample((200,))
+        x = simulator(theta)
         _ = inference.append_simulations(theta, x, proposal=proposal).train()
         posterior = inference.build_posterior().set_default_x(x_o)
         proposal = posterior
