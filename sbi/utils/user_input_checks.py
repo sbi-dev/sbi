@@ -12,7 +12,7 @@ from torch import Tensor, float32, nn
 from torch.distributions import Distribution, Uniform
 
 from sbi.sbi_types import Array
-from sbi.utils.sbiutils import warn_on_iid_x, within_support
+from sbi.utils.sbiutils import warn_on_batched_x, within_support
 from sbi.utils.torchutils import BoxUniform, atleast_2d
 from sbi.utils.user_input_checks_utils import (
     CustomPriorWrapper,
@@ -551,9 +551,7 @@ def get_batch_loop_simulator(simulator: Callable) -> Callable:
     return batch_loop_simulator
 
 
-def process_x(
-    x: Array, x_event_shape: Optional[torch.Size] = None, allow_iid_x: bool = False
-) -> Tensor:
+def process_x(x: Array, x_event_shape: Optional[torch.Size] = None) -> Tensor:
     """Return observed data adapted to match sbi's shape and type requirements.
 
     This means that `x` is returned with a `batch_dim`.
@@ -565,7 +563,6 @@ def process_x(
         x_event_shape: Prescribed shape - either directly provided by the user at init
             or inferred by sbi by running a simulation and checking the output. Does not
             contain a batch dimension.
-        allow_iid_x: Whether multiple trials in x are allowed.
 
     Returns:
         x: Observed data with shape ready for usage in sbi.
@@ -585,10 +582,7 @@ def process_x(
         x = x.unsqueeze(0)
 
     input_x_shape = x.shape
-    if not allow_iid_x:
-        check_for_possibly_batched_x_shape(input_x_shape)
-    else:
-        warn_on_iid_x(num_trials=input_x_shape[0])
+    warn_on_batched_x(batch_size=input_x_shape[0])
 
     if x_event_shape is not None:
         # Number of trials can change for every new x, but single trial x shape must

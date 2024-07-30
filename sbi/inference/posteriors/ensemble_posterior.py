@@ -265,9 +265,7 @@ class EnsemblePosterior(NeuralPosterior):
             `EnsemblePosterior` that will use a default `x` when not explicitly
             passed.
         """
-        self._x = process_x(
-            x, x_event_shape=None, allow_iid_x=self.potential_fn.allow_iid_x
-        ).to(self._device)
+        self._x = process_x(x, x_event_shape=None).to(self._device)
 
         for posterior in self.posteriors:
             posterior.set_default_x(x)
@@ -433,7 +431,7 @@ class EnsemblePotential(BasePotential):
     def set_x(self, x_o: Optional[Tensor]):
         """Check the shape of the observed data and, if valid, set it."""
         if x_o is not None:
-            x_o = process_x(x_o, allow_iid_x=self.allow_iid_x).to(  # type: ignore
+            x_o = process_x(x_o).to(  # type: ignore
                 self.device
             )
         self._x_o = x_o
