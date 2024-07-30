@@ -41,7 +41,7 @@ Then, check out our material:
 
 -  :rocket: [__Tutorials and Examples__](tutorials/index.md)
    <br/><br/>
-   *Various examples illustrating how to use the `sbi` package.*
+   *Various examples illustrating how to<br/> [get started](tutorials/00_getting_started_flexible/) or use the `sbi` package.*
 
 -  :building_construction: [__Reference API__](reference/index.md)
    <br/><br/>
@@ -142,9 +142,8 @@ methods](tutorials/16_implemented_methods.ipynb).
   <br>[[Paper]](https://arxiv.org/abs/2210.04815)
 
 - **BayesFlow: Learning complex stochastic models with invertible neural
-  networks**<br> by Radev, S. T., Mertens, U. K., Voss, A., Ardizzone, L., & Köthe,
-  U. (2020) (IEEE transactions on neural networks and learning systems 2020)<br>
-  [Paper](https://ieeexplore.ieee.org/abstract/document/9298920)
+  networks**<br> by Radev, S. T., Mertens, U. K., Voss, A., Ardizzone, L., & Köthe, U. (IEEE transactions on neural networks and learning systems 2020)<br>
+  [[Paper]](https://ieeexplore.ieee.org/abstract/document/9298920)
 
 ### Likelihood-estimation (`(S)NLE`)
 
