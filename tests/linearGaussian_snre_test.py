@@ -29,7 +29,6 @@ from sbi.simulators.linear_gaussian import (
     samples_true_posterior_linear_gaussian_uniform_prior,
     true_posterior_linear_gaussian_mvn_prior,
 )
-from sbi.utils.user_input_checks import process_prior, process_simulator
 from tests.test_utils import (
     check_c2st,
     get_dkl_gaussian_prior,
@@ -54,17 +53,10 @@ def test_api_snre_multiple_trials_and_rounds_map(
     simulator = diagonal_linear_gaussian
     inference = snre_method(prior=prior, classifier="mlp", show_progress_bars=False)
 
-    prior, _, prior_returns_numpy = process_prior(prior)
-    simulator = process_simulator(simulator, prior, prior_returns_numpy)
-
     proposals = [prior]
     for _ in range(num_rounds):
-        theta, x = simulate_for_sbi(
-            simulator,
-            proposals[-1],
-            num_simulations,
-            simulation_batch_size=num_simulations,
-        )
+        theta = proposals[-1].sample((num_simulations,))
+        x = simulator(theta)
         inference.append_simulations(theta, x).train(
             training_batch_size=100, max_num_epochs=2
         )
@@ -113,12 +105,8 @@ def test_c2st_sre_on_linearGaussian(
 
     inference = snre_method(classifier="resnet", show_progress_bars=False)
 
-    prior, _, prior_returns_numpy = process_prior(prior)
-    simulator = process_simulator(simulator, prior, prior_returns_numpy)
-
-    theta, x = simulate_for_sbi(
-        simulator, prior, num_simulations, simulation_batch_size=100
-    )
+    theta = prior.sample((num_simulations,))
+    x = simulator(theta)
     ratio_estimator = inference.append_simulations(theta, x).train()
 
     x_o = zeros(1, x_dim)

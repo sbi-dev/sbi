@@ -249,6 +249,7 @@ def test_validate_theta_and_x_device(training_device: str, data_device: str) -> 
     )
 
 
+@pytest.mark.gpu
 @pytest.mark.parametrize(
     "inference_method", [SNPE_A, SNPE_C, SNRE_A, SNRE_B, SNRE_C, SNLE]
 )

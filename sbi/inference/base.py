@@ -593,7 +593,9 @@ def simulate_for_sbi(
         simulator: A function that takes parameters $\theta$ and maps them to
             simulations, or observations, `x`, $\text{sim}(\theta)\to x$. Any
             regular Python callable (i.e. function or class with `__call__` method)
-            can be used.
+            can be used. Note that the simulator should be able to handle numpy
+            arrays for efficient parallelization. You can use
+            `process_simulator` to ensure this.
         proposal: Probability distribution that the parameters $\theta$ are sampled
             from.
         num_simulations: Number of simulations that are run.

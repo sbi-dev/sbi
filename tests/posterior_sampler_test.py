@@ -12,11 +12,9 @@ from sbi.inference import (
     SNL,
     MCMCPosterior,
     likelihood_estimator_based_potential,
-    simulate_for_sbi,
 )
 from sbi.samplers.mcmc import PyMCSampler, SliceSamplerSerial, SliceSamplerVectorized
 from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
-from sbi.utils.user_input_checks import process_prior, process_simulator
 
 
 @pytest.mark.mcmc
@@ -52,11 +50,8 @@ def test_api_posterior_sampler_set(
 
     inference = SNL(prior, show_progress_bars=False)
 
-    prior, _, prior_returns_numpy = process_prior(prior)
-    simulator = process_simulator(simulator, prior, prior_returns_numpy)
-    theta, x = simulate_for_sbi(
-        simulator, prior, num_simulations, simulation_batch_size=10
-    )
+    theta = prior.sample((num_simulations,))
+    x = simulator(theta)
     estimator = inference.append_simulations(theta, x).train(max_num_epochs=5)
     potential_fn, transform = likelihood_estimator_based_potential(
         estimator, prior, x_o
