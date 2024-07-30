@@ -356,7 +356,7 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str):
     elif method_str.startswith("tsnpe"):
         sample_method = "rejection" if method_str == "tsnpe_rejection" else "sir"
         inference = SNPE_C(**creation_args)
-        theta = prior.sample((900,))
+        theta = prior.sample((1000,))
         x = simulator(theta)
         posterior_estimator = inference.append_simulations(theta, x).train()
         posterior1 = DirectPosterior(
