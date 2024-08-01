@@ -1,6 +1,6 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
-
+import warnings
 from copy import deepcopy
 from functools import partial
 from math import ceil
@@ -387,7 +387,18 @@ class MCMCPosterior(NeuralPosterior):
             sample_shape: Desired shape of samples that are drawn from the posterior
                 given every observation.
             x: A batch of observations, of shape `(batch_dim, event_shape_x)`.
-                `batch_dim` corresponds to the number of observations to be drawn.
+                `batch_dim` corresponds to the number of observations to be
+                drawn.
+            method: Method used for MCMC sampling, e.g., "slice_np_vectorized".
+            thin: The thinning factor for the chain, default 1 (no thinning).
+            warmup_steps: The initial number of samples to discard.
+            num_chains: The number of chains used for each `x` passed in the batch.
+            init_strategy: The initialisation strategy for chains.
+            init_strategy_parameters: Dictionary of keyword arguments passed to
+                the init strategy.
+            num_workers: number of cpu cores used to parallelize initial
+                parameter generation and mcmc sampling.
+            mp_context: Multiprocessing start method, either `"fork"` or `"spawn"`
             show_progress_bars: Whether to show sampling progress monitor.
 
         Returns:
@@ -412,6 +423,16 @@ class MCMCPosterior(NeuralPosterior):
             method == "slice_np_vectorized"
         ), "Batched sampling only supported for vectorized samplers!"
 
+        # warn if num_chains is larger than num requested samples
+        if num_chains > torch.Size(sample_shape).numel():
+            warnings.warn(
+                f"""Passed num_chains {num_chains} is larger than the number of
+                requested samples {torch.Size(sample_shape).numel()}, resetting
+                it to {torch.Size(sample_shape).numel()}.""",
+                stacklevel=2,
+            )
+            num_chains = torch.Size(sample_shape).numel()
+
         # custom shape handling to make sure to match the batch size of x and theta
         # without unnecessary combinations.
         if len(x.shape) == 1:
@@ -430,6 +451,16 @@ class MCMCPosterior(NeuralPosterior):
 
         # For each observation in the batch, we have num_chains independent chains.
         num_chains_extended = batch_size * num_chains
+        if num_chains_extended > 100:
+            warnings.warn(
+                f"""Note that for batched sampling, we use {num_chains} for each
+                 x in the batch. With the given settings, this results in a
+                 large number of chains ({num_chains_extended}),  This can be
+                 large number of chains ({num_chains_extended}), which can be
+                 slow and memory-intensive. Consider reducing the number of
+                 chains.""",
+                stacklevel=2,
+            )
         init_strategy_parameters["num_return_samples"] = num_chains_extended
         initial_params = self._get_initial_params_batched(
             x,
@@ -455,22 +486,29 @@ class MCMCPosterior(NeuralPosterior):
                 show_progress_bars=show_progress_bars,
             )
 
-        samples = self.theta_transform.inv(transformed_samples)
-        sample_shape_len = len(sample_shape)
-        # The MCMC sampler returns the samples per chain, of shape
-        # (num_samples, num_chains_extended, *input_shape). We return the samples as `
-        # (*sample_shape, x_batch_size, *input_shape). This means we want to combine
-        # all the chains that belong to the same x. However, using
-        # samples.reshape(*sample_shape,batch_size,-1) does not combine the samples in
-        #  the right order, since this mixes samples that belong to different `x`.
-        # This is a workaround to reshape the samples in the right order.
-        return samples.reshape((batch_size, *sample_shape, -1)).permute(  # type: ignore
-            tuple(range(1, sample_shape_len + 1))
-            + (
-                0,
-                -1,
-            )
-        )
+        # (num_chains_extended, samples_per_chain, *input_shape)
+        samples_per_chain: Tensor = self.theta_transform.inv(transformed_samples)  # type: ignore
+        dim_theta = samples_per_chain.shape[-1]
+        # We need to collect samples for each x from the respective chains.
+        # However, using samples.reshape(*sample_shape, batch_size, dim_theta)
+        # does not combine the samples in the right order, since this mixes
+        # samples that belong to different `x`. The following permute is a
+        # workaround to reshape the samples in the right order.
+        samples_per_x = samples_per_chain.reshape((
+            batch_size,
+            # We are flattening the sample shape here using -1 because we might have
+            # generated more samples than requested (more chains, or multiple of
+            # chains not matching sample_shape)
+            -1,
+            dim_theta,
+        )).permute(1, 0, -1)
+
+        # Shape is now (-1, batch_size, dim_theta)
+        # We can now select the number of requested samples
+        samples = samples_per_x[: torch.Size(sample_shape).numel()]
+        # and reshape into (*sample_shape, batch_size, dim_theta)
+        samples = samples.reshape((*sample_shape, batch_size, dim_theta))
+        return samples
 
     def _build_mcmc_init_fn(
         self,

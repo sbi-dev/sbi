@@ -121,11 +121,24 @@ def test_batched_sample_log_prob_with_different_x(
 @pytest.mark.parametrize("snlre_method", [SNLE_A, SNRE_A, SNRE_B, SNRE_C, SNPE_C])
 @pytest.mark.parametrize("x_o_batch_dim", (0, 1, 2))
 @pytest.mark.parametrize("init_strategy", ["proposal", "resample"])
+@pytest.mark.parametrize(
+    "sample_shape",
+    (
+        (5,),  # less than num_chains
+        (4, 2),  # 2D batch
+        (15,),  # not divisible by num_chains
+    ),
+)
 def test_batched_mcmc_sample_log_prob_with_different_x(
-    snlre_method: type, x_o_batch_dim: bool, mcmc_params_fast: dict, init_strategy: str
+    snlre_method: type,
+    x_o_batch_dim: bool,
+    mcmc_params_fast: dict,
+    init_strategy: str,
+    sample_shape: torch.Size,
 ):
     num_dim = 2
-    num_simulations = 1000
+    num_simulations = 100
+    num_chains = 10
 
     prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
     simulator = diagonal_linear_gaussian
@@ -133,7 +146,7 @@ def test_batched_mcmc_sample_log_prob_with_different_x(
     inference = snlre_method(prior=prior)
     theta = prior.sample((num_simulations,))
     x = simulator(theta)
-    inference.append_simulations(theta, x).train(max_num_epochs=3)
+    inference.append_simulations(theta, x).train(max_num_epochs=2)
 
     x_o = ones(num_dim) if x_o_batch_dim == 0 else ones(x_o_batch_dim, num_dim)
 
@@ -144,19 +157,20 @@ def test_batched_mcmc_sample_log_prob_with_different_x(
     )
 
     samples = posterior.sample_batched(
-        (10,),
+        sample_shape,
         x_o,
         init_strategy=init_strategy,
-        num_chains=2,
+        num_chains=num_chains,
     )
 
     assert (
-        samples.shape == (10, x_o_batch_dim, num_dim)
+        samples.shape == (*sample_shape, x_o_batch_dim, num_dim)
         if x_o_batch_dim > 0
-        else (10, num_dim)
+        else (*sample_shape, num_dim)
     ), "Sample shape wrong"
 
-    if x_o_batch_dim > 1:
+    # test only for 1 sample_shape case to avoid repeating this test.
+    if x_o_batch_dim > 1 and sample_shape == (5,):
         assert samples.shape[1] == x_o_batch_dim, "Batch dimension wrong"
         inference = snlre_method(prior=prior)
         _ = inference.append_simulations(theta, x).train()
@@ -167,14 +181,18 @@ def test_batched_mcmc_sample_log_prob_with_different_x(
         )
 
         x_o = torch.stack([0.5 * ones(num_dim), -0.5 * ones(num_dim)], dim=0)
-        # test with multiple chains to test whether correct chains are concatenated.
-        samples = posterior.sample_batched((1000,), x_o, num_chains=2, warmup_steps=500)
+        # test with multiple chains to test whether correct chains are
+        # concatenated.
+        sample_shape = (1000,)  # use enough samples for accuracy comparison
+        samples = posterior.sample_batched(
+            sample_shape, x_o, num_chains=num_chains, warmup_steps=500
+        )
 
         samples_separate1 = posterior.sample(
-            (1000,), x_o[0], num_chains=2, warmup_steps=500
+            sample_shape, x_o[0], num_chains=num_chains, warmup_steps=500
         )
         samples_separate2 = posterior.sample(
-            (1000,), x_o[1], num_chains=2, warmup_steps=500
+            sample_shape, x_o[1], num_chains=num_chains, warmup_steps=500
         )
 
         # Check if means are approx. same
