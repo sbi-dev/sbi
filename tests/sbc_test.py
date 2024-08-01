@@ -92,8 +92,7 @@ def test_consistent_sbc_results(method, model="mdn"):
     num_dim = 2
     prior = BoxUniform(-torch.ones(num_dim), torch.ones(num_dim))
 
-    num_simulations = 1000
-    max_num_epochs = 20
+    num_simulations = 2000
     num_sbc_runs = 100
 
     likelihood_shift = -1.0 * ones(num_dim)
@@ -107,9 +106,7 @@ def test_consistent_sbc_results(method, model="mdn"):
     theta = prior.sample((num_simulations,))
     x = simulator(theta)
 
-    _ = inferer.append_simulations(theta, x).train(
-        training_batch_size=100, max_num_epochs=max_num_epochs
-    )
+    _ = inferer.append_simulations(theta, x).train(training_batch_size=100)
 
     posterior = inferer.build_posterior()
     num_posterior_samples = 1000
