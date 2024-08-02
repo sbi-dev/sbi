@@ -125,14 +125,19 @@ def test_distances(accurate_samples):
 
 
 @pytest.mark.parametrize("distance", (l1, l2))
-@pytest.mark.parametrize("do_norm", (True, False))
-def test_run_tarp_correct(distance, do_norm, accurate_samples):
+@pytest.mark.parametrize("z_score_theta", (True, False))
+def test_run_tarp_correct(distance, z_score_theta, accurate_samples):
     theta, samples = accurate_samples
 
     references = get_tarp_references(theta)
 
     ecp, alpha = _run_tarp(
-        samples, theta, references, distance=distance, do_norm=do_norm, num_bins=30
+        samples,
+        theta,
+        references,
+        distance=distance,
+        z_score_theta=z_score_theta,
+        num_bins=30,
     )
 
     assert allclose((ecp - alpha).abs().max(), Tensor([0.0]), atol=1e-1)
@@ -147,7 +152,7 @@ def test_run_tarp_detect_overdispersed(distance, overdispersed_samples):
     references = get_tarp_references(theta)
 
     ecp, alpha = _run_tarp(
-        samples, theta, references, num_bins=30, do_norm=True, distance=distance
+        samples, theta, references, num_bins=30, z_score_theta=True, distance=distance
     )
 
     # TARP detects that this is NOT a correct representation of the posterior
@@ -162,7 +167,7 @@ def test_run_tarp_detect_underdispersed(distance, underdispersed_samples):
     references = get_tarp_references(theta)
 
     ecp, alpha = _run_tarp(
-        samples, theta, references, num_bins=30, do_norm=True, distance=distance
+        samples, theta, references, num_bins=30, z_score_theta=True, distance=distance
     )
 
     # TARP detects that this is NOT a correct representation of the posterior
@@ -177,7 +182,7 @@ def test_run_tarp_detect_bias(distance, biased_samples):
     references = get_tarp_references(theta)
 
     ecp, alpha = _run_tarp(
-        samples, theta, references, distance=distance, num_bins=30, do_norm=True
+        samples, theta, references, distance=distance, num_bins=30, z_score_theta=True
     )
 
     # TARP detects that this is NOT a correct representation of the posterior
@@ -216,7 +221,7 @@ def test_check_tarp_overdispersed(overdispersed_samples):
     theta, samples = overdispersed_samples
     references = get_tarp_references(theta)
 
-    ecp, alpha = _run_tarp(samples, theta, references, num_bins=50, do_norm=False)
+    ecp, alpha = _run_tarp(samples, theta, references, num_bins=50, z_score_theta=False)
     atc, kspvals = check_tarp(ecp, alpha)
 
     assert atc != 0.0
@@ -229,7 +234,7 @@ def test_check_tarp_detect_bias(biased_samples):
     theta, samples = biased_samples
     references = get_tarp_references(theta)
 
-    ecp, alpha = _run_tarp(samples, theta, references, num_bins=30, do_norm=True)
+    ecp, alpha = _run_tarp(samples, theta, references, num_bins=30, z_score_theta=True)
     atc, kspvals = check_tarp(ecp, alpha)
 
     assert atc != 0.0

@@ -13,7 +13,7 @@ from tqdm.auto import tqdm
 from sbi.inference import DirectPosterior
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.posteriors.vi_posterior import VIPosterior
-from sbi.utils.diagnostic_utils import get_posterior_samples_on_batch
+from sbi.utils.diagnostics_utils import get_posterior_samples_on_batch
 from sbi.utils.metrics import c2st
 
 

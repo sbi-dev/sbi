@@ -16,7 +16,7 @@ from scipy.stats import kstest
 from torch import Tensor
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
-from sbi.utils.diagnostic_utils import get_posterior_samples_on_batch
+from sbi.utils.diagnostics_utils import get_posterior_samples_on_batch
 from sbi.utils.metrics import l2
 
 
