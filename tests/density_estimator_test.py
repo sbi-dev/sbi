@@ -156,7 +156,7 @@ def test_density_estimator_loss_shapes(
 @pytest.mark.parametrize("input_sample_dim", (1, 2))
 @pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
 # This mimics the shape of a 2D image and is used for testing CNN embeddings.
-@pytest.mark.parametrize("condition_event_shape", ((1, 1), (1, 7), (7, 1), (7, 7)))
+@pytest.mark.parametrize("condition_event_shape", ((2, 1), (2, 7), (7, 2), (7, 7)))
 @pytest.mark.parametrize("batch_dim", (1, 10))
 def test_density_estimator_log_prob_shapes_with_embedding(
     density_estimator_build_fn,
@@ -305,20 +305,24 @@ def _build_density_estimator_and_tensors(
     batch_condition = torch.randn((1000, *condition_event_shape))
     if len(condition_event_shape) > 1:
         embedding_net = CNNEmbedding(condition_event_shape, kernel_size=1)
+        z_score_y = "structured"
     else:
         embedding_net = torch.nn.Identity()
+        z_score_y = "independent"
 
     if density_estimator_build_fn in [build_mnle, build_categoricalmassestimator]:
         density_estimator = density_estimator_build_fn(
             batch_x=batch_input,
             batch_y=batch_condition,
             embedding_net=embedding_net,
+            z_score_y=z_score_y,
         )
     else:
         density_estimator = density_estimator_build_fn(
             torch.randn_like(batch_input),
             torch.randn_like(batch_condition),
             embedding_net=embedding_net,
+            z_score_y=z_score_y,
         )
 
     inputs = batch_input[:batch_dim]
@@ -343,8 +347,8 @@ def _build_density_estimator_and_tensors(
         (build_mnle, 1, (2,), (7,), 10),
         # Test with 2D condition with embedding net.
         [build_mnle, 1, (2,), (7, 7), 10],
-        [build_mnle, 1, (2,), (1, 7), 10],
-        [build_mnle, 1, (2,), (7, 1), 10],
+        [build_mnle, 1, (2,), (2, 7), 10],
+        [build_mnle, 1, (2,), (7, 2), 10],
         [build_categoricalmassestimator, 1, (1,), (7, 7), 10],
         [build_categoricalmassestimator, 2, (1,), (7, 7), 10],
         pytest.param(

@@ -6,8 +6,6 @@ from typing import List, Optional, Tuple, Union
 import torch
 from torch import Tensor, nn
 
-from sbi.neural_nets.density_estimators.mixed_density_estimator import _separate_input
-
 
 class FCEmbedding(nn.Module):
     def __init__(
@@ -311,50 +309,3 @@ class PermutationInvariantEmbedding(nn.Module):
 
         # add number of trials as additional input
         return self.fc_subnet(torch.cat([combined_embedding, trial_counts], dim=1))
-
-
-class PartialEmbedding(nn.Module):
-    """Embedding network to embed only parts of the input."""
-
-    def __init__(
-        self,
-        embedding_net: nn.Module,
-        num_dims_to_skip: int,
-        # We need those to reconstruct the original event dim of the input.
-        dims_repeated: List[int],
-        **kwargs,
-    ) -> None:
-        """Embed only parts of the input.
-
-        Args:
-            embedding_net: Embedding network to embed the continuous data.
-            num_dims_skipped: Number of dimensions to skip.
-        """
-        super().__init__(**kwargs)
-
-        self.embedding_net = embedding_net
-        self.num_dims_to_skip = num_dims_to_skip
-        self.dims_repeated = dims_repeated
-
-    def forward(self, x: Tensor) -> Tensor:
-        """Embed parts of the input and return concatenated with the rest."""
-
-        x_to_embed, x_to_skip = _separate_input(
-            x, num_discrete_columns=self.num_dims_to_skip
-        )
-        embebbed_x = self.embedding_net(x_to_embed)
-        # x_to_skip has been repeated along the additional dimensions to match
-        # the shape of x_to_embed. We need to remove these additional
-        # dimensions, as many as the difference in event shape between x and
-        # x_to_skip.
-        # Create a list of slices for indexing
-        indexing_slices = [
-            slice(None) if i not in self.dims_repeated else 0
-            for i in range(x_to_skip.dim())
-        ]
-        # Use the list of slices to index x_to_skip
-        x_to_skip = x_to_skip[tuple(indexing_slices)]
-        # Reshape to original shape (batch, num_dims_to_skip)
-        x_to_skip = x_to_skip.reshape(-1, self.num_dims_to_skip)
-
-        return torch.cat((embebbed_x, x_to_skip), dim=1)

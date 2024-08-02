@@ -4,11 +4,10 @@
 from typing import Tuple
 
 import torch
-from torch import Tensor
+from torch import Tensor, nn
 
 from sbi.neural_nets.density_estimators.base import ConditionalDensityEstimator
 from sbi.neural_nets.density_estimators.categorical_net import CategoricalMassEstimator
-from sbi.utils.nn_utils import concatenate_input_and_condition
 
 
 class MixedDensityEstimator(ConditionalDensityEstimator):
@@ -24,6 +23,7 @@ class MixedDensityEstimator(ConditionalDensityEstimator):
         continuous_net: ConditionalDensityEstimator,
         input_shape: torch.Size,
         condition_shape: torch.Size,
+        embedding_net: nn.Module = nn.Identity(),
         log_transform_input: bool = False,
     ):
         """Initialize class for combining density estimators for MNLE.
@@ -35,6 +35,7 @@ class MixedDensityEstimator(ConditionalDensityEstimator):
                 evaluated (and which is also the event_shape of samples).
             condition_shape: Shape of the condition. If not provided, it will assume a
                 1D input.
+            embedding_net: Embedding net for the condition.
             log_transform_input: whether to transform the continous part of the data
                 into logarithmic domain before training. This is helpful for bounded
                 data, e.g.,for reaction times.
@@ -45,6 +46,7 @@ class MixedDensityEstimator(ConditionalDensityEstimator):
 
         self.discrete_net = discrete_net
         self.continuous_net = continuous_net
+        self.condition_embedding = embedding_net
         self.log_transform_input = log_transform_input
 
     def forward(self, input: Tensor):
@@ -70,7 +72,7 @@ class MixedDensityEstimator(ConditionalDensityEstimator):
         """
         num_samples = torch.Size(sample_shape).numel()
         batch_dim = condition.shape[0]
-        condition_event_dim = condition.dim() - 1
+        embedded_condition = self.condition_embedding(condition)
 
         with torch.set_grad_enabled(track_gradients):
             # Sample discrete data given parameters.
@@ -81,18 +83,22 @@ class MixedDensityEstimator(ConditionalDensityEstimator):
             # Trailing `1` because `Categorical` has event_shape `()`.
             discrete_samples = discrete_samples.reshape(num_samples * batch_dim, 1)
 
+            # repeat the batch of embedded condition to match number of choices.
+            condition_event_dim = embedded_condition.dim() - 1
             ones_for_event_dims = (1,) * condition_event_dim
-            # repeat the single condition to match number of sampled choices.
-            repeated_condition = condition.repeat(num_samples, *ones_for_event_dims)
-
+            repeated_condition = embedded_condition.repeat(
+                num_samples, *ones_for_event_dims
+            )
             # Combine discrete and continuous data and prepare for embedding.
-            combined_condition = concatenate_input_and_condition(
-                input=discrete_samples, condition=repeated_condition
-            )[0]
+            combined_condition = torch.cat(
+                (discrete_samples, repeated_condition), dim=-1
+            )
 
             # Sample continuous data conditioned on parameters and discrete data.
             # Pass num_samples=1 because the choices in the condition contains
             # num_samples elements already.
+            # The continuous net has an embedding that combines the discrete and
+            # the (already embedded) continuous data.
             continuous_samples = self.continuous_net.sample(
                 sample_shape=torch.Size([]), condition=combined_condition
             )
@@ -114,7 +120,7 @@ class MixedDensityEstimator(ConditionalDensityEstimator):
         Args:
             input: Inputs to evaluate the log probability on. Of shape
                 `(sample_dim, batch_dim, *event_shape)`.
-            condition: Conditions of shape `(sample_dim, batch_dim, *event_shape)`.
+            condition: Conditions of shape `(batch_dim, *event_shape)`.
 
         Raises:
             NotImplementedError: If `input` has a sample shape > 1. The reason
@@ -130,16 +136,9 @@ class MixedDensityEstimator(ConditionalDensityEstimator):
         assert (
             input.dim() > 2
         ), "Input must be of shape (sample_dim, batch_dim, *event_shape)."
-        if input.shape[0] > 1:
-            raise NotImplementedError(
-                """Input values with sample shape are not supported for mixed
-                    density estimation because discrete inputs are combined
-                    continuous condition, which cannot have a sample shape.
-                    Please pass a inputs with sample_dim=1."""
-            )
-        input_sample_dim = input.shape[0]  # will be 1
-        input_batch_dim = input.shape[1]
+        input_sample_dim, input_batch_dim = input.shape[:2]
         condition_batch_dim = condition.shape[0]
+        combined_batch_size = input_sample_dim * input_batch_dim
 
         assert condition_batch_dim == input_batch_dim, (
             f"Batch shape of condition {condition_batch_dim} and input "
@@ -147,23 +146,23 @@ class MixedDensityEstimator(ConditionalDensityEstimator):
         )
 
         cont_input, disc_input = _separate_input(input)
+        # Embed continuous condition
+        embedded_condition = self.condition_embedding(condition)
+        # expand and repeat to match batch of inputs.
+        embedded_condition = embedded_condition.unsqueeze(0).repeat(
+            input_sample_dim, 1, 1
+        )
+        combined_condition = torch.cat((disc_input, embedded_condition), dim=-1)
+        # reshape to match requirement that condition has no sample dim.
+        combined_condition = combined_condition.reshape(combined_batch_size, -1)
 
         # Get log probs from discrete data. Pass with singleton sample dim.
         disc_log_prob = self.discrete_net.log_prob(
             input=disc_input, condition=condition
         )
 
-        # Expand and repeat the discrete data to match the condition data.
-        # Pass without sample dim.
-        combined_condition = concatenate_input_and_condition(
-            input=disc_input[0], condition=condition
-        )[0]  # return only the combined condition.
+        cont_input_reshaped = cont_input.reshape((1, combined_batch_size, -1))
 
-        cont_input_reshaped = cont_input.reshape((
-            1,
-            cont_input.shape[0] * cont_input.shape[1],
-            -1,
-        ))
         cont_log_prob = self.continuous_net.log_prob(
             # Transform to log-space if needed.
             (
