@@ -15,8 +15,8 @@ from matplotlib.figure import Figure
 from scipy.stats import kstest
 from torch import Tensor
 
-from sbi.diagnostics.diagnostic_utils import get_posterior_samples_on_batch
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
+from sbi.utils.diagnostic_utils import get_posterior_samples_on_batch
 from sbi.utils.metrics import l2
 
 
@@ -30,7 +30,7 @@ def run_tarp(
     show_progress_bar: bool = True,
     distance: Callable = l2,
     num_bins: Optional[int] = 30,
-    do_norm: bool = True,
+    z_score_theta: bool = True,
     rng_seed: Optional[int] = None,
 ) -> Tuple[Tensor, Tensor]:
     """
@@ -57,7 +57,7 @@ def run_tarp(
             ``sbi.utils.metrics.l2``. ``l2`` is the default.
         num_bins: number of bins to use for the credibility values.
             If ``None``, then ``num_sims // 10`` bins are used.
-        do_norm : whether to normalize parameters before coverage test
+        z_score_theta : whether to normalize parameters before coverage test
             (Default = True)
         rng_seed : whether to set the seed of torch.random, no seed is set
                 if None is received
@@ -86,7 +86,9 @@ def run_tarp(
     if references is None:
         references = get_tarp_references(thetas, rng_seed)
 
-    return _run_tarp(posterior_samples, thetas, references, distance, num_bins, do_norm)
+    return _run_tarp(
+        posterior_samples, thetas, references, distance, num_bins, z_score_theta
+    )
 
 
 def _run_tarp(

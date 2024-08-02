@@ -10,10 +10,10 @@ from torch import Tensor, ones, zeros
 from torch.distributions import Uniform
 from tqdm.auto import tqdm
 
-from sbi.diagnostics.diagnostic_utils import get_posterior_samples_on_batch
 from sbi.inference import DirectPosterior
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.posteriors.vi_posterior import VIPosterior
+from sbi.utils.diagnostic_utils import get_posterior_samples_on_batch
 from sbi.utils.metrics import c2st
 
 
@@ -36,17 +36,16 @@ def run_sbc(
       coverage as proposed in Deistler et al., https://arxiv.org/abs/2210.04815.
 
     Args:
-        thetas: ground-truth parameters for sbc, simulated from the prior. xs:
-        observed data for sbc, simulated from thetas. posterior: a posterior
-        obtained from sbi. num_posterior_samples: number of approximate
-        posterior samples used for ranking. reduce_fns: Function used to reduce
-        the parameter space into 1D.
+        thetas: ground-truth parameters for sbc, simulated from the prior.
+        xs: observed data for sbc, simulated from thetas.
+        posterior: a posterior obtained from sbi. num_posterior_samples: number
+            of approximate posterior samples used for ranking.
+        reduce_fns: Function used to reduce the parameter space into 1D.
             Simulation-based calibration can be recovered by setting this to the
             string `marginals`. Sample-based expected coverage can be recovered
             by setting it to `posterior.log_prob` (as a Callable).
         num_workers: number of CPU cores to use in parallel for running
-        num_sbc_samples
-            inferences.
+            `num_sbc_samples` inferences.
         show_progress_bar: whether to display a progress over sbc runs.
 
     Returns:
