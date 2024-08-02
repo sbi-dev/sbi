@@ -31,7 +31,6 @@ def run_tarp(
     distance: Callable = l2,
     num_bins: Optional[int] = 30,
     z_score_theta: bool = True,
-    rng_seed: Optional[int] = None,
 ) -> Tuple[Tensor, Tensor]:
     """
     Estimates coverage of samples given true values thetas with the TARP method.
@@ -57,11 +56,7 @@ def run_tarp(
             ``sbi.utils.metrics.l2``. ``l2`` is the default.
         num_bins: number of bins to use for the credibility values.
             If ``None``, then ``num_sims // 10`` bins are used.
-        z_score_theta : whether to normalize parameters before coverage test
-            (Default = True)
-        rng_seed : whether to set the seed of torch.random, no seed is set
-                if None is received
-                (Default = None)
+        z_score_theta : whether to normalize parameters before coverage test.
 
     Returns:
         ecp: Expected coverage probability (``ecp``), see equation 4 of the paper
@@ -84,7 +79,7 @@ def run_tarp(
 
     # Sample reference points uniformly if not provided
     if references is None:
-        references = get_tarp_references(thetas, rng_seed)
+        references = get_tarp_references(thetas)
 
     return _run_tarp(
         posterior_samples, thetas, references, distance, num_bins, z_score_theta
@@ -97,7 +92,7 @@ def _run_tarp(
     references: Tensor,
     distance: Callable = l2,
     num_bins: Optional[int] = 30,
-    do_norm: bool = False,
+    z_score_theta: bool = False,
 ) -> Tuple[Tensor, Tensor]:
     """
     Estimates coverage of samples given true values theta with the TARP method.
@@ -129,11 +124,7 @@ def _run_tarp(
                 ``sbi.utils.metrics.l2``. ``l2`` is the default.
         num_bins: number of bins to use for the credibility values.
                 If ``None``, then ``num_sims // 10`` bins are used.
-        do_norm : whether to normalize parameters before coverage test
-                (Default = True)
-        rng_seed : whether to set the seed of torch.random, no seed is set
-                if None is received
-                (Default = None)
+        z_score_theta : whether to normalize parameters before coverage test.
 
     Returns:
         ecp: Expected coverage probability (``ecp``), see equation 4 of the paper
@@ -149,7 +140,7 @@ def _run_tarp(
     if num_bins is None:
         num_bins = num_tarp_samples // 10
 
-    if do_norm:
+    if z_score_theta:
         lo = thetas.min(dim=0, keepdim=True).values  # min over batch
         hi = thetas.max(dim=0, keepdim=True).values  # max over batch
         posterior_samples = (posterior_samples - lo) / (hi - lo + 1e-10)
@@ -174,10 +165,8 @@ def _run_tarp(
     return ecp, alpha_grid
 
 
-def get_tarp_references(thetas: Tensor, rng_seed: Optional[int] = None) -> Tensor:
+def get_tarp_references(thetas: Tensor) -> Tensor:
     """Returns reference points for the TARP diagnostic, sampled from a uniform."""
-    if not isinstance(rng_seed, type(None)):
-        torch.random.manual_seed(rng_seed)
 
     # obtain min/max per dimension of theta
     lo = thetas.min(dim=0).values  # min for each theta dimension
