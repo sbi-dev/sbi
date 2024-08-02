@@ -176,7 +176,9 @@ def test_run_tarp_detect_bias(distance, biased_samples):
     theta, samples = biased_samples
     references = get_tarp_references(theta)
 
-    ecp, alpha = _run_tarp(samples, theta, references, num_bins=30, do_norm=True)
+    ecp, alpha = _run_tarp(
+        samples, theta, references, distance=distance, num_bins=30, do_norm=True
+    )
 
     # TARP detects that this is NOT a correct representation of the posterior
     # hence we test for not allclose
@@ -185,38 +187,29 @@ def test_run_tarp_detect_bias(distance, biased_samples):
 
 
 def test_check_tarp_correct(accurate_samples):
+    """Test TARP on correct samples."""
     theta, samples = accurate_samples
     references = get_tarp_references(theta)
 
-    ecp, alpha = _run_tarp(samples, theta, references, num_bins=30, do_norm=False)
-    print("onsamples")
-    print("tarp results", ecp, alpha)
+    ecp, alpha = _run_tarp(samples, theta, references)
     atc, kspvals = check_tarp(ecp, alpha)
 
-    print("tarp checks", atc, kspvals)
-    assert atc != 0.0
-    assert atc < 1.0
-
-    assert kspvals > 0.05  # samples are likely from the same PDF
+    assert -0.75 < atc < 0.75, "TARP should not detect bias"
+    assert kspvals > 0.5  # samples are likely from the same PDF
 
 
 def test_check_tarp_underdispersed(underdispersed_samples):
+    """Test TARP on underdispersed samples."""
     theta, samples = underdispersed_samples
     references = get_tarp_references(theta)
 
-    ecp, alpha = _run_tarp(samples, theta, references, num_bins=30, do_norm=False)
-    print("underdispersed")
-    print("tarp results", ecp, alpha)
+    ecp, alpha = _run_tarp(samples, theta, references, num_bins=30)
     atc, kspvals = check_tarp(ecp, alpha)
 
-    print("tarp checks", atc, kspvals)
-
-    assert atc != 0.0
+    # TARP should detect that the posterior is underdispersed (atc < -1.0)
     assert atc < -2.0
-    # assert atc < -1.0 # TODO: need to check why this breaks
-
-    # TODO: need to check why this breaks
-    assert kspvals < 0.2  # samples are unlikely from the same PDF
+    # and p-values should be relatively small
+    assert kspvals < 0.05
 
 
 def test_check_tarp_overdispersed(overdispersed_samples):
@@ -224,11 +217,7 @@ def test_check_tarp_overdispersed(overdispersed_samples):
     references = get_tarp_references(theta)
 
     ecp, alpha = _run_tarp(samples, theta, references, num_bins=50, do_norm=False)
-    print("overdispersed")
-    print("tarp results", ecp, alpha)
     atc, kspvals = check_tarp(ecp, alpha)
-
-    print("tarp checks", atc, kspvals)
 
     assert atc != 0.0
     assert atc > 2.0
@@ -241,11 +230,8 @@ def test_check_tarp_detect_bias(biased_samples):
     references = get_tarp_references(theta)
 
     ecp, alpha = _run_tarp(samples, theta, references, num_bins=30, do_norm=True)
-    print("biased")
-    print("tarp results", ecp, alpha)
     atc, kspvals = check_tarp(ecp, alpha)
 
-    print("tarp checks", atc, kspvals)
     assert atc != 0.0
     assert atc > 1.0
 
@@ -264,8 +250,8 @@ def test_consistent_run_tarp_results_with_posterior(method):
     num_dim = 2
     prior = BoxUniform(-ones(num_dim), ones(num_dim))
 
-    num_simulations = 6000
-    num_tarp_sims = 200
+    num_simulations = 1000
+    num_tarp_sims = 500
     num_posterior_samples = 1000
 
     likelihood_shift = -1.0 * ones(num_dim)
@@ -274,12 +260,12 @@ def test_consistent_run_tarp_results_with_posterior(method):
     def simulator(theta):
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    inferer = method(prior, show_progress_bars=False, density_estimator="maf")
+    inferer = method(prior, show_progress_bars=True, density_estimator="maf")
 
     theta = prior.sample((num_simulations,))
     x = simulator(theta)
 
-    inferer.append_simulations(theta, x).train()
+    inferer.append_simulations(theta, x).train(training_batch_size=200)
     posterior = inferer.build_posterior()
 
     thetas = prior.sample((num_tarp_sims,))
@@ -293,6 +279,5 @@ def test_consistent_run_tarp_results_with_posterior(method):
     )
 
     atc, kspvals = check_tarp(ecp, alpha)
-    print(atc, kspvals)
     assert -0.5 < atc < 0.5
     assert kspvals > 0.05
