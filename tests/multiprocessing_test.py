@@ -26,11 +26,11 @@ def slow_linear_gaussian(theta):
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize("num_workers", [4])
+@pytest.mark.parametrize("num_workers", [2])  # GitHub Actions has 2 cores
 @pytest.mark.parametrize("sim_batch_size", ((1, 10, 100)))
 def test_benchmarking_parallel_simulation(sim_batch_size, num_workers):
     """Test whether joblib is faster than serial processing."""
-    num_simulations = 100
+    num_simulations = 1000
     theta = torch.zeros(num_simulations, 2)
     show_pbar = True
 

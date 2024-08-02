@@ -154,7 +154,7 @@ def test_c2st_snre_variants_on_linearGaussian_with_multiple_trials(
     """
 
     num_dim = 2
-    num_simulations = 1750
+    num_simulations = 2000
     num_samples = 500
     x_o = zeros(num_trials, num_dim)
 

@@ -271,7 +271,7 @@ def test_mnle_with_experimental_conditions(mcmc_params_accurate: dict):
     potential_fn = MixedLikelihoodBasedPotential(estimator, proposal, x_o)
 
     conditioned_potential_fn = ConditionedPotential(
-        potential_fn, condition=theta_o, dims_to_sample=[0, 1], allow_iid_x=True
+        potential_fn, condition=theta_o, dims_to_sample=[0, 1]
     )
 
     # True posterior samples
