@@ -56,14 +56,14 @@ def run_sbc(
 
     if num_sbc_samples < 100:
         warnings.warn(
-            """Number of SBC samples should be on the order of 100s to give realiable
-            results.""",
+            "Number of SBC samples should be on the order of 100s to give realiable "
+            "results.",
             stacklevel=2,
         )
     if num_posterior_samples < 100:
         warnings.warn(
-            """Number of posterior samples for ranking should be on the order
-            of 100s to give reliable SBC results.""",
+            "Number of posterior samples for ranking should be on the order "
+            "of 100s to give reliable SBC results.",
             stacklevel=2,
         )
 
@@ -73,8 +73,8 @@ def run_sbc(
 
     if "sbc_batch_size" in kwargs:
         warnings.warn(
-            """`sbc_batch_size` is deprecated and will be removed in future versions.
-            Use `num_workers` instead.""",
+            "`sbc_batch_size` is deprecated and will be removed in future versions."
+            " Use `num_workers` instead.",
             DeprecationWarning,
             stacklevel=2,
         )
@@ -182,8 +182,8 @@ def get_nltp(thetas: Tensor, xs: Tensor, posterior: NeuralPosterior) -> Tensor:
 
     if unnormalized_log_prob:
         warnings.warn(
-            """Note that log probs of the true parameters under the posteriors
-        are not normalized because the posterior used is likelihood-based.""",
+            "Note that log probs of the true parameters under the posteriors are not "
+            "normalized because the posterior used is likelihood-based.",
             stacklevel=2,
         )
 
@@ -216,9 +216,9 @@ def check_sbc(
     """
     if ranks.shape[0] < 100:
         warnings.warn(
-            """You are computing SBC checks with less than 100 samples. These checks
-            should be based on a large number of test samples theta_o, x_o. We
-            recommend using at least 100.""",
+            "You are computing SBC checks with less than 100 samples. These checks"
+            " should be based on a large number of test samples theta_o, x_o. We"
+            " recommend using at least 100.",
             stacklevel=2,
         )
 
@@ -315,9 +315,8 @@ def check_uniformity_c2st(
     c2st_std = c2st_scores.std(0, correction=0 if num_repetitions == 1 else 1)
     if (c2st_std > 0.05).any():
         warnings.warn(
-            f"""C2ST score variability is larger than {0.05}: std={c2st_scores.std(0)},
-            result may be unreliable. Consider increasing the number of samples.
-            """,
+            f"C2ST score variability is larger than {0.05}: std={c2st_scores.std(0)}, "
+            "result may be unreliable. Consider increasing the number of samples.",
             stacklevel=2,
         )
 

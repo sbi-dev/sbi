@@ -124,10 +124,10 @@ def build_mnle(
     check_data_device(batch_x, batch_y)
 
     warnings.warn(
-        """The mixed neural likelihood estimator assumes that x contains
-        continuous data in the first n-1 columns (e.g., reaction times) and
-        categorical data in the last column (e.g., corresponding choices). If
-        this is not the case for the passed `x` do not use this function.""",
+        "The mixed neural likelihood estimator assumes that x contains "
+        "continuous data in the first n-1 columns (e.g., reaction times) and "
+        "categorical data in the last column (e.g., corresponding choices). If "
+        "this is not the case for the passed `x` do not use this function.",
         stacklevel=2,
     )
     # Separate continuous and discrete data.

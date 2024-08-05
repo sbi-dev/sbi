@@ -136,9 +136,9 @@ class MCMCPosterior(NeuralPosterior):
 
         if init_strategy_num_candidates is not None:
             warn(
-                """Passing `init_strategy_num_candidates` is deprecated as of sbi
-                v0.19.0. Instead, use e.g.,
-                `init_strategy_parameters={"num_candidate_samples": 1000}`""",
+                "Passing `init_strategy_num_candidates` is deprecated as of sbi "
+                "v0.19.0. Instead, use e.g., `init_strategy_parameters "
+                f"={'num_candidate_samples': 1000}`",
                 stacklevel=2,
             )
             self.init_strategy_parameters["num_candidate_samples"] = (
@@ -194,9 +194,8 @@ class MCMCPosterior(NeuralPosterior):
             `len($\theta$)`-shaped log-probability.
         """
         warn(
-            """`.log_prob()` is deprecated for methods that can only evaluate the
-            log-probability up to a normalizing constant. Use `.potential()`
-            instead.""",
+            "`.log_prob()` is deprecated for methods that can only evaluate the "
+            "log-probability up to a normalizing constant. Use `.potential()` instead.",
             stacklevel=2,
         )
         warn("The log-probability is unnormalized!", stacklevel=2)
@@ -264,9 +263,9 @@ class MCMCPosterior(NeuralPosterior):
         )
         if init_strategy_num_candidates is not None:
             warn(
-                """Passing `init_strategy_num_candidates` is deprecated as of sbi
-                v0.19.0. Instead, use e.g.,
-                `init_strategy_parameters={"num_candidate_samples": 1000}`""",
+                "Passing `init_strategy_num_candidates` is deprecated as of sbi "
+                "v0.19.0. Instead, use e.g., "
+                f"`init_strategy_parameters={'num_candidate_samples': 1000}`",
                 stacklevel=2,
             )
             self.init_strategy_parameters["num_candidate_samples"] = (
@@ -275,7 +274,7 @@ class MCMCPosterior(NeuralPosterior):
         if sample_with is not None:
             raise ValueError(
                 f"You set `sample_with={sample_with}`. As of sbi v0.18.0, setting "
-                f"`sample_with` is no longer supported. You have to rerun "
+                "`sample_with` is no longer supported. You have to rerun "
                 f"`.build_posterior(sample_with={sample_with}).`"
             )
         if mcmc_method is not None:
@@ -426,9 +425,9 @@ class MCMCPosterior(NeuralPosterior):
         # warn if num_chains is larger than num requested samples
         if num_chains > torch.Size(sample_shape).numel():
             warnings.warn(
-                f"""Passed num_chains {num_chains} is larger than the number of
-                requested samples {torch.Size(sample_shape).numel()}, resetting
-                it to {torch.Size(sample_shape).numel()}.""",
+                "The passed number of MCMC chains is larger than the number of "
+                f"requested samples: {num_chains} > {torch.Size(sample_shape).numel()},"
+                f" resetting it to {torch.Size(sample_shape).numel()}.",
                 stacklevel=2,
             )
             num_chains = torch.Size(sample_shape).numel()
@@ -453,12 +452,11 @@ class MCMCPosterior(NeuralPosterior):
         num_chains_extended = batch_size * num_chains
         if num_chains_extended > 100:
             warnings.warn(
-                f"""Note that for batched sampling, we use {num_chains} for each
-                 x in the batch. With the given settings, this results in a
-                 large number of chains ({num_chains_extended}),  This can be
-                 large number of chains ({num_chains_extended}), which can be
-                 slow and memory-intensive. Consider reducing the number of
-                 chains.""",
+                "Note that for batched sampling, we use num_chains many chains for each"
+                " x in the batch. With the given settings, this results in a large "
+                f"number large number of chains ({num_chains_extended}), which can be "
+                "slow and memory-intensive for vectorized MCMC. Consider reducing the "
+                "number of chains.",
                 stacklevel=2,
             )
         init_strategy_parameters["num_return_samples"] = num_chains_extended
@@ -905,8 +903,8 @@ class MCMCPosterior(NeuralPosterior):
         else:
             if "hmc" in method or "nuts" in method:
                 warn(
-                    """The kwargs "hmc" and "nuts" are deprecated. Use "hmc_pyro",
-                    "nuts_pyro", "hmc_pymc", or "nuts_pymc" instead.""",
+                    "The kwargs 'hmc' and 'nuts' are deprecated. Use 'hmc_pyro', "
+                    "'nuts_pyro', 'hmc_pymc', or 'nuts_pymc' instead.",
                     DeprecationWarning,
                     stacklevel=2,
                 )
