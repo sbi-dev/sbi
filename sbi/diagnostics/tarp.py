@@ -8,10 +8,7 @@ trained posterior against a set of true values of theta.
 
 from typing import Callable, Optional, Tuple
 
-import matplotlib.pyplot as plt
 import torch
-from matplotlib.axes import Axes
-from matplotlib.figure import Figure
 from scipy.stats import kstest
 from torch import Tensor
 
@@ -216,38 +213,3 @@ def check_tarp(
     kstest_pvals: float = kstest(ecp.numpy(), alpha.numpy())[1]  # type: ignore
 
     return atc, kstest_pvals
-
-
-def plot_tarp(ecp: Tensor, alpha: Tensor, title="") -> Tuple[Figure, Axes]:
-    """
-    Plots the expected coverage probability (ECP) against the credibility
-    level,alpha, for a given alpha grid.
-
-    Args:
-        ecp : numpy.ndarray
-            Array of expected coverage probabilities.
-        alpha : numpy.ndarray
-            Array of credibility levels.
-        title : str, optional
-            Title for the plot. The default is "".
-
-     Returns
-        fig : matplotlib.figure.Figure
-            The figure object.
-        ax : matplotlib.axes.Axes
-            The axes object.
-
-    """
-
-    fig = plt.figure(figsize=(6, 6))
-    ax: Axes = plt.gca()
-
-    ax.plot(alpha, ecp, color="blue", label="TARP")
-    ax.plot(alpha, alpha, color="black", linestyle="--", label="ideal")
-    ax.set_xlabel(r"Credibility Level $\alpha$")
-    ax.set_ylabel(r"Expected Coverage Probility")
-    ax.set_xlim(0.0, 1.0)
-    ax.set_ylim(0.0, 1.0)
-    ax.set_title(title)
-    ax.legend()
-    return fig, ax  # type: ignore
