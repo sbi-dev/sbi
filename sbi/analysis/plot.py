@@ -1510,7 +1510,6 @@ def _sbc_rank_plot(
     line_alpha: float = 0.8,
     show_uniform_region: bool = True,
     uniform_region_alpha: float = 0.3,
-    uniform_region_color: str = "gray",
     xlim_offset_factor: float = 0.1,
     num_cols: int = 4,
     params_in_subplots: bool = False,
@@ -1571,7 +1570,7 @@ def _sbc_rank_plot(
     ), "plot type {plot_type} not implemented, use one in {plot_types}."
 
     if legend_kwargs is None:
-        legend_kwargs = dict(loc=1, handlelength=0.8)
+        legend_kwargs = dict(loc="best", handlelength=0.8)
 
     num_sbc_runs, num_parameters = ranks_list[0].shape
     num_ranks = len(ranks_list)
@@ -2093,6 +2092,41 @@ def pp_plot_lc2st(
         conf_alpha=conf_alpha,
         **kwargs,
     )
+
+
+def plot_tarp(ecp: Tensor, alpha: Tensor, title="") -> Tuple[Figure, Axes]:
+    """
+    Plots the expected coverage probability (ECP) against the credibility
+    level,alpha, for a given alpha grid.
+
+    Args:
+        ecp : numpy.ndarray
+            Array of expected coverage probabilities.
+        alpha : numpy.ndarray
+            Array of credibility levels.
+        title : str, optional
+            Title for the plot. The default is "".
+
+     Returns
+        fig : matplotlib.figure.Figure
+            The figure object.
+        ax : matplotlib.axes.Axes
+            The axes object.
+
+    """
+
+    fig = plt.figure(figsize=(6, 6))
+    ax: Axes = plt.gca()
+
+    ax.plot(alpha, ecp, color="blue", label="TARP")
+    ax.plot(alpha, alpha, color="black", linestyle="--", label="ideal")
+    ax.set_xlabel(r"Credibility Level $\alpha$")
+    ax.set_ylabel(r"Expected Coverage Probility")
+    ax.set_xlim(0.0, 1.0)
+    ax.set_ylim(0.0, 1.0)
+    ax.set_title(title)
+    ax.legend()
+    return fig, ax  # type: ignore
 
 
 # TO BE DEPRECATED
