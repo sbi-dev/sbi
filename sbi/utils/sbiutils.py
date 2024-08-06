@@ -43,9 +43,9 @@ def warn_if_zscoring_changes_data(x: Tensor, duplicate_tolerance: float = 0.1) -
     # Check we do have different data in the batch
     if num_unique == 1:
         warnings.warn(
-            """Beware that there is only a single unique element in the simulated data.
-            If this is intended, make sure to set `z_score_x='none'` as z-scoring would
-            result in NaNs""",
+            "Beware that there is only a single unique element in the simulated data. "
+            "If this is intended, make sure to set `z_score_x='none'` as z-scoring "
+            "would result in NaNs",
             UserWarning,
             stacklevel=2,
         )
@@ -61,13 +61,14 @@ def warn_if_zscoring_changes_data(x: Tensor, duplicate_tolerance: float = 0.1) -
 
         if num_unique_z < num_unique * (1 - duplicate_tolerance):
             warnings.warn(
-                """Z-scoring these simulation outputs resulted in {num_unique_z} unique
-                datapoints. Before z-scoring, it had been {num_unique}. This can occur
-                due to numerical inaccuracies when the data covers a large range of
-                values. Consider either setting `z_score_x=False` (but beware that this
-                can be problematic for training the NN) or exclude outliers from your
-                dataset. Note: if you have already set `z_score_x=False`, this warning
-                will still be displayed, but you can ignore it.""",
+                "Z-scoring these simulation outputs resulted in {num_unique_z} unique "
+                "datapoints. Before z-scoring, it had been {num_unique}. This can "
+                "occur due to numerical inaccuracies when the data covers a large "
+                "range of values. Consider either setting `z_score_x=False` (but "
+                "beware that this can be problematic for training the NN) or exclude "
+                "outliers from your dataset. Note: if you have already set "
+                "`z_score_x=False`, this warning will still be displayed, but you can"
+                " ignore it.",
                 UserWarning,
                 stacklevel=2,
             )
@@ -406,11 +407,11 @@ def warn_on_batched_x(batch_size):
     if batch_size > 1:
         warnings.warn(
             f"An x with a batch size of {batch_size} was passed. "
-            + """Unless you are using `sample_batched` or `log_prob_batched`, this will
-            be interpreted as a batch of independent and identically distributed data
-            X={x_1, ..., x_n}, i.e., data generated based on the same underlying
-            (unknown) parameter. The resulting posterior will be with respect to entire
-            batch, i.e,. p(theta | X).""",
+            "Unless you are using `sample_batched` or `log_prob_batched`, this will "
+            "be interpreted as a batch of independent and identically distributed data"
+            " X={x_1, ..., x_n}, i.e., data generated based on the same underlying"
+            "(unknown) parameter. The resulting posterior will be with respect to"
+            " the entire batch, i.e,. p(theta | X).",
             stacklevel=2,
         )
 
@@ -714,9 +715,9 @@ def mcmc_transform(
             # does not implement support.
             # AttributeError -> Custom distribution that has no support attribute.
             warnings.warn(
-                """The passed prior has no support property, transform will be
-                constructed from mean and std. If the passed prior is supposed to be
-                bounded consider implementing the prior.support property.""",
+                "The passed prior has no support property, transform will be "
+                "constructed from mean and std. If the passed prior is supposed to be "
+                "bounded consider implementing the prior.support property.",
                 stacklevel=2,
             )
             has_support = False
@@ -749,9 +750,8 @@ def mcmc_transform(
                 # does not implement mean, e.g., TransformedDistribution.
                 # AttributeError -> Custom distribution that has no mean/std attribute.
                 warnings.warn(
-                    """The passed prior has no mean or stddev attribute, estimating
-                    them from samples to build affimed standardizing
-                    transform.""",
+                    "The passed prior has no mean or stddev attribute, estimating "
+                    "them from samples to build affimed standardizing transform.",
                     stacklevel=2,
                 )
                 theta = prior.sample(torch.Size((num_prior_samples_for_zscoring,)))

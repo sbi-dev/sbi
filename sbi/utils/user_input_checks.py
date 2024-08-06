@@ -71,9 +71,9 @@ def process_prior(
     # If prior is a sequence, assume independent components and check as PyTorch prior.
     if isinstance(prior, Sequence):
         warnings.warn(
-            f"""Prior was provided as a sequence of {len(prior)} priors. They will be
-            interpreted as independent of each other and matched in order to the
-            components of the parameter.""",
+            f"Prior was provided as a sequence of {len(prior)} priors. They will be "
+            "interpreted as independent of each other and matched in order to the "
+            "components of the parameter.",
             stacklevel=2,
         )
         # process individual priors

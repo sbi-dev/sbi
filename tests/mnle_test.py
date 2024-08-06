@@ -135,7 +135,7 @@ def test_mnle_accuracy_with_different_samplers_and_trials(
 ):
     """Test MNLE c2st accuracy for different samplers and number of trials."""
 
-    num_simulations = 3000
+    num_simulations = 3200
     num_samples = 500
 
     prior = MultipleIndependent(
@@ -152,7 +152,7 @@ def test_mnle_accuracy_with_different_samplers_and_trials(
     # MNLE
     density_estimator = likelihood_nn(model="mnle", flow_model=flow_model)
     trainer = MNLE(prior, density_estimator=density_estimator)
-    trainer.append_simulations(theta, x).train()
+    trainer.append_simulations(theta, x).train(training_batch_size=200)
     posterior = trainer.build_posterior()
 
     theta_o = prior.sample((1,))
