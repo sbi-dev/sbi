@@ -18,8 +18,6 @@ inference.
 - [Getting started](00_getting_started_flexible)
 - [Amortized inference](01_gaussian_amortized)
 - [Implemented algorithms](16_implemented_methods)
-- [Example application with a simulator from neuroscience
-  (Hodgkin-Huxley)](../examples/00_HH_simulator)
 </div>
 
 ## Advanced
