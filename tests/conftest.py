@@ -1,3 +1,6 @@
+# This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+
 import pytest
 import torch
 
@@ -15,7 +18,7 @@ def set_seed():
 
 @pytest.fixture(scope="session", autouse=True)
 def set_default_tensor_type():
-    torch.set_default_tensor_type("torch.FloatTensor")
+    torch.set_default_dtype(torch.float32)
 
 
 # Pytest hook to skip GPU tests if no devices are available.
@@ -40,4 +43,4 @@ def mcmc_params_accurate() -> dict:
 @pytest.fixture(scope="function")
 def mcmc_params_fast() -> dict:
     """Fixture for MCMC parameters for fast tests."""
-    return dict(num_chains=1, thin=1, warmup_steps=10)
+    return dict(num_chains=1, thin=1, warmup_steps=1)

@@ -28,6 +28,7 @@ from sbi.neural_nets.flow import (
 )
 from sbi.neural_nets.mdn import build_mdn
 from sbi.neural_nets.mnle import build_mnle
+from sbi.utils.nn_utils import check_net_device
 
 model_builders = {
     "mdn": build_mdn,
@@ -46,6 +47,9 @@ model_builders = {
     "zuko_gf": build_zuko_gf,
     "zuko_bpf": build_zuko_bpf,
 }
+
+embedding_net_warn_msg = """The passed embedding net will be moved to cpu for
+                        constructing the net building function."""
 
 
 def classifier_nn(
@@ -98,8 +102,8 @@ def classifier_nn(
                 z_score_theta,
                 z_score_x,
                 hidden_features,
-                embedding_net_theta,
-                embedding_net_x,
+                check_net_device(embedding_net_theta, "cpu", embedding_net_warn_msg),
+                check_net_device(embedding_net_x, "cpu", embedding_net_warn_msg),
             ),
         ),
         **kwargs,
@@ -180,7 +184,7 @@ def likelihood_nn(
                 hidden_features,
                 num_transforms,
                 num_bins,
-                embedding_net,
+                check_net_device(embedding_net, "cpu", embedding_net_warn_msg),
                 num_components,
             ),
         ),
@@ -256,7 +260,7 @@ def posterior_nn(
                 hidden_features,
                 num_transforms,
                 num_bins,
-                embedding_net,
+                check_net_device(embedding_net, "cpu", embedding_net_warn_msg),
                 num_components,
             ),
         ),

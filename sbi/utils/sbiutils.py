@@ -1,5 +1,5 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import logging
 import random
@@ -13,7 +13,7 @@ import torch
 import torch.distributions.transforms as torch_tf
 import zuko
 from pyro.distributions import Empirical
-from torch import Tensor, ones, optim, zeros
+from torch import Tensor, ones, zeros
 from torch import nn as nn
 from torch.distributions import (
     AffineTransform,
@@ -22,11 +22,11 @@ from torch.distributions import (
     biject_to,
     constraints,
 )
+from torch.optim.adam import Adam
+from zuko.flows import UnconditionalTransform
 
-from sbi import utils as utils
 from sbi.sbi_types import TorchTransform
 from sbi.utils.torchutils import atleast_2d
-from sbi.utils.zukoutils import UnconditionalLazyTransform
 
 
 def warn_if_zscoring_changes_data(x: Tensor, duplicate_tolerance: float = 0.1) -> None:
@@ -188,7 +188,7 @@ def standardizing_transform_zuko(
         Affine transform for z-scoring
     """
     t_mean, t_std = z_standardization(batch_t, structured_dims, min_std)
-    return UnconditionalLazyTransform(
+    return UnconditionalTransform(
         AffineTransform,
         loc=-t_mean / t_std,
         scale=1 / t_std,
@@ -400,16 +400,17 @@ def nle_nre_apt_msg_on_invalid_x(
             )
 
 
-def warn_on_iid_x(num_trials):
+def warn_on_batched_x(batch_size):
     """Warn if more than one x was passed."""
 
-    if num_trials > 1:
+    if batch_size > 1:
         warnings.warn(
-            f"An x with a batch size of {num_trials} was passed. "
-            + """It will be interpreted as a batch of independent and identically
-            distributed data X={x_1, ..., x_n}, i.e., data generated based on the
-            same underlying (unknown) parameter. The resulting posterior will be with
-            respect to entire batch, i.e,. p(theta | X).""",
+            f"An x with a batch size of {batch_size} was passed. "
+            + """Unless you are using `sample_batched` or `log_prob_batched`, this will
+            be interpreted as a batch of independent and identically distributed data
+            X={x_1, ..., x_n}, i.e., data generated based on the same underlying
+            (unknown) parameter. The resulting posterior will be with respect to entire
+            batch, i.e,. p(theta | X).""",
             stacklevel=2,
         )
 
@@ -857,7 +858,7 @@ def mog_log_prob(
     constant = -(output_dim / 2.0) * torch.log(torch.tensor([2 * pi]))
     log_det = 0.5 * torch.log(torch.det(precisions_pp))
     theta_minus_mean = theta.expand_as(means_pp) - means_pp
-    exponent = -0.5 * utils.batched_mixture_vmv(precisions_pp, theta_minus_mean)
+    exponent = -0.5 * batched_mixture_vmv(precisions_pp, theta_minus_mean)
 
     return torch.logsumexp(weights + constant + log_det + exponent, dim=-1)
 
@@ -936,7 +937,7 @@ def gradient_ascent(
 
     optimize_inits = theta_transform(optimize_inits)
     optimize_inits.requires_grad_(True)  # type: ignore
-    optimizer = optim.Adam([optimize_inits], lr=learning_rate)  # type: ignore
+    optimizer = Adam([optimize_inits], lr=learning_rate)  # type: ignore
 
     iter_ = 0
 

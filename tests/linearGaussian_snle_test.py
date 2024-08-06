@@ -1,5 +1,5 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from __future__ import annotations
 
@@ -15,7 +15,6 @@ from sbi.inference import (
     RejectionPosterior,
     VIPosterior,
     likelihood_estimator_based_potential,
-    simulate_for_sbi,
 )
 from sbi.neural_nets import likelihood_nn
 from sbi.simulators.linear_gaussian import (
@@ -26,9 +25,7 @@ from sbi.simulators.linear_gaussian import (
     true_posterior_linear_gaussian_mvn_prior,
 )
 from sbi.utils import BoxUniform
-from sbi.utils.user_input_checks import (
-    process_prior,
-)
+from sbi.utils.user_input_checks import process_prior
 
 from .test_utils import check_c2st, get_prob_outside_uniform_prior
 
@@ -41,7 +38,7 @@ def test_api_snle_multiple_trials_and_rounds_map(
     """Test SNLE API with 2 rounds, different priors num trials and MAP."""
     num_rounds = 2
     num_samples = 1
-    num_simulations = 100
+    num_simulations_per_round = 100
 
     if prior_str == "gaussian":
         prior_mean = zeros(num_dim)
@@ -55,12 +52,8 @@ def test_api_snle_multiple_trials_and_rounds_map(
 
     proposals = [prior]
     for _ in range(num_rounds):
-        theta, x = simulate_for_sbi(
-            simulator,
-            proposals[-1],
-            num_simulations,
-            simulation_batch_size=num_simulations,
-        )
+        theta = proposals[-1].sample((num_simulations_per_round,))
+        x = simulator(theta)
         inference.append_simulations(theta, x).train(
             training_batch_size=100, max_num_epochs=2
         )
@@ -85,8 +78,8 @@ def test_c2st_snl_on_linear_gaussian_different_dims(
     discard_dims = theta_dim - x_dim
 
     x_o = zeros(1, x_dim)
-    num_samples = 500
-    num_simulations = 1000
+    num_samples = 1000
+    num_simulations = 2000
 
     # likelihood_mean will be likelihood_shift+theta
     likelihood_shift = -1.0 * ones(x_dim)
@@ -116,9 +109,9 @@ def test_c2st_snl_on_linear_gaussian_different_dims(
     density_estimator = likelihood_nn(model=model_str, num_transforms=3)
     inference = SNLE(density_estimator=density_estimator, show_progress_bars=False)
 
-    theta, x = simulate_for_sbi(
-        simulator, prior, num_simulations, simulation_batch_size=num_simulations
-    )
+    theta = prior.sample((num_simulations,))
+    x = simulator(theta)
+
     likelihood_estimator = inference.append_simulations(theta, x).train()
     potential_fn, theta_transform = likelihood_estimator_based_potential(
         prior=prior, likelihood_estimator=likelihood_estimator, x_o=x_o
@@ -172,9 +165,9 @@ def test_c2st_and_map_snl_on_linearGaussian_different(
     density_estimator = likelihood_nn(model_str, num_transforms=3)
     inference = SNLE(density_estimator=density_estimator, show_progress_bars=False)
 
-    theta, x = simulate_for_sbi(
-        simulator, prior, num_simulations, simulation_batch_size=num_simulations
-    )
+    theta = prior.sample((num_simulations,))
+    x = simulator(theta)
+
     likelihood_estimator = inference.append_simulations(theta, x).train()
 
     # Test inference amortized over trials.
@@ -298,9 +291,9 @@ def test_c2st_multi_round_snl_on_linearGaussian(
 
     inference = SNLE(show_progress_bars=False)
 
-    theta, x = simulate_for_sbi(
-        simulator, prior, num_simulations_per_round, simulation_batch_size=50
-    )
+    theta = prior.sample((num_simulations_per_round,))
+    x = simulator(theta)
+
     likelihood_estimator = inference.append_simulations(theta, x).train()
     potential_fn, theta_transform = likelihood_estimator_based_potential(
         prior=prior, likelihood_estimator=likelihood_estimator, x_o=x_o
@@ -313,12 +306,9 @@ def test_c2st_multi_round_snl_on_linearGaussian(
         **mcmc_params_accurate,
     )
 
-    theta, x = simulate_for_sbi(
-        simulator,
-        posterior1,
-        num_simulations_per_round,
-        simulation_batch_size=50,
-    )
+    theta = posterior1.sample((num_simulations_per_round,))
+    x = simulator(theta)
+
     likelihood_estimator = inference.append_simulations(theta, x).train()
     potential_fn, theta_transform = likelihood_estimator_based_potential(
         prior=prior, likelihood_estimator=likelihood_estimator, x_o=x_o
@@ -364,9 +354,9 @@ def test_c2st_multi_round_snl_on_linearGaussian_vi(num_trials: int):
 
     inference = SNLE(show_progress_bars=False)
 
-    theta, x = simulate_for_sbi(
-        simulator, prior, num_simulations_per_round, simulation_batch_size=50
-    )
+    theta = prior.sample((num_simulations_per_round,))
+    x = simulator(theta)
+
     likelihood_estimator = inference.append_simulations(theta, x).train()
     potential_fn, theta_transform = likelihood_estimator_based_potential(
         prior=prior, likelihood_estimator=likelihood_estimator, x_o=x_o
@@ -377,12 +367,9 @@ def test_c2st_multi_round_snl_on_linearGaussian_vi(num_trials: int):
     )
     posterior1.train()
 
-    theta, x = simulate_for_sbi(
-        simulator,
-        posterior1,
-        num_simulations_per_round,
-        simulation_batch_size=50,
-    )
+    theta = posterior1.sample((num_simulations_per_round,))
+    x = simulator(theta)
+
     likelihood_estimator = inference.append_simulations(theta, x).train()
     potential_fn, theta_transform = likelihood_estimator_based_potential(
         prior=prior, likelihood_estimator=likelihood_estimator, x_o=x_o
@@ -462,9 +449,8 @@ def test_api_snl_sampling_methods(
 
     inference = SNLE(show_progress_bars=False)
 
-    theta, x = simulate_for_sbi(
-        simulator, prior, num_simulations, simulation_batch_size=1000
-    )
+    theta = prior.sample((num_simulations,))
+    x = simulator(theta)
     likelihood_estimator = inference.append_simulations(theta, x).train(
         max_num_epochs=5
     )

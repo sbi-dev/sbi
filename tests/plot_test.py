@@ -1,17 +1,78 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import numpy as np
 import pytest
 import torch
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
-from matplotlib.pyplot import subplots
+from matplotlib.pyplot import close, subplots
 from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi.analysis import pairplot, plot_summary, sbc_rank_plot
-from sbi.inference import SNLE, SNPE, SNRE, simulate_for_sbi
+from sbi.inference import SNLE, SNPE, SNRE
 from sbi.utils import BoxUniform
+
+
+@pytest.mark.parametrize("samples", (torch.randn(100, 1),))
+@pytest.mark.parametrize("limits", ([(-1, 1)],))
+def test_pairplot1D(samples, limits):
+    fig, axs = pairplot(**{k: v for k, v in locals().items() if v is not None})
+    assert isinstance(fig, Figure)
+    assert isinstance(axs, Axes)
+    close()
+
+
+@pytest.mark.parametrize("samples", (torch.randn(100, 2),))
+@pytest.mark.parametrize("limits", ([(-1, 1)],))
+def test_nan_inf(samples, limits):
+    samples[0, 0] = np.nan
+    samples[5, 1] = np.inf
+    samples[3, 0] = -np.inf
+    fig, axs = pairplot(**{k: v for k, v in locals().items() if v is not None})
+    assert isinstance(fig, Figure)
+    assert isinstance(axs[0, 0], Axes)
+    close()
+
+
+@pytest.mark.parametrize("samples", (torch.randn(100, 2), [torch.randn(100, 3)] * 2))
+@pytest.mark.parametrize("points", (torch.ones(1, 3),))
+@pytest.mark.parametrize("limits", ([(-3, 3)],))
+@pytest.mark.parametrize("subset", (None, [0, 1]))
+@pytest.mark.parametrize("upper", ("scatter",))
+@pytest.mark.parametrize(
+    "lower,lower_kwargs", [(None, None), ("scatter", {"mpl_kwargs": {"s": 10}})]
+)
+@pytest.mark.parametrize("diag", ("hist",))
+@pytest.mark.parametrize("figsize", ((5, 5),))
+@pytest.mark.parametrize("labels", (None, ["a", "b", "c"]))
+@pytest.mark.parametrize("ticks", (None, [[-3, 0, 3], [-3, 0, 3], [0, 1, 2, 3]]))
+@pytest.mark.parametrize("offdiag", (None,))
+@pytest.mark.parametrize("diag_kwargs", (None, {"mpl_kwargs": {"bins": 10}}))
+@pytest.mark.parametrize("upper_kwargs", (None,))
+@pytest.mark.parametrize("fig_kwargs", (None, {"points_labels": ["a"], "legend": True}))
+def test_pairplot(
+    samples,
+    points,
+    limits,
+    subset,
+    upper,
+    lower,
+    diag,
+    figsize,
+    labels,
+    ticks,
+    offdiag,
+    diag_kwargs,
+    upper_kwargs,
+    lower_kwargs,
+    fig_kwargs,
+):
+    fig, axs = pairplot(**{k: v for k, v in locals().items() if v is not None})
+    assert isinstance(fig, Figure)
+    assert isinstance(axs, np.ndarray)
+    assert isinstance(axs[0, 0], Axes)
+    close()
 
 
 @pytest.mark.parametrize("samples", (torch.randn(100, 2), [torch.randn(100, 2)] * 2))
@@ -21,16 +82,23 @@ from sbi.utils import BoxUniform
 @pytest.mark.parametrize("samples_labels", (["a", "b"], None))
 @pytest.mark.parametrize("points_labels", (["a", "b"], None))
 @pytest.mark.parametrize("points", (None, torch.ones(2)))
-def test_pairplot(
+def test_pairplot_dep(
     samples, labels, legend, offdiag, samples_labels, points_labels, points
 ):
-    pairplot(**{k: v for k, v in locals().items() if v is not None})
+    # uses old style keywords, checks backward compatibility
+    fig, axs = pairplot(**{k: v for k, v in locals().items() if v is not None})
+
+    assert isinstance(fig, Figure)
+    assert isinstance(axs, np.ndarray)
+    assert isinstance(axs[0, 0], Axes)
+    close()
 
 
 @pytest.mark.parametrize("method", (SNPE, SNLE, SNRE))
 def test_plot_summary(method, tmp_path):
     num_dim = 1
     prior = BoxUniform(low=-2 * torch.ones(num_dim), high=2 * torch.ones(num_dim))
+    num_simulations = 6
 
     summary_writer = SummaryWriter(tmp_path)
 
@@ -38,7 +106,10 @@ def test_plot_summary(method, tmp_path):
         return theta + 1.0 + torch.randn_like(theta) * 0.1
 
     inference = method(prior=prior, summary_writer=summary_writer)
-    theta, x = simulate_for_sbi(simulator, proposal=prior, num_simulations=6)
+
+    theta = prior.sample((num_simulations,))
+    x = simulator(theta)
+
     train_kwargs = (
         dict(max_num_epochs=5, validation_fraction=0.5, num_atoms=2)
         if method == SNRE
@@ -47,6 +118,7 @@ def test_plot_summary(method, tmp_path):
     _ = inference.append_simulations(theta, x).train(**train_kwargs)
     fig, axes = plot_summary(inference)
     assert isinstance(fig, Figure) and isinstance(axes[0], Axes)
+    close()
 
 
 @pytest.mark.parametrize("num_parameters", (2, 4, 10))
@@ -85,3 +157,4 @@ def test_sbc_rank_plot(num_parameters, num_cols, custom_figure, plot_type):
             )
         else:
             assert ax.shape == (num_parameters,)
+    close()

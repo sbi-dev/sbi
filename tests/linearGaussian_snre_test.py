@@ -1,5 +1,5 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from __future__ import annotations
 
@@ -19,7 +19,6 @@ from sbi.inference import (
     RejectionPosterior,
     VIPosterior,
     ratio_estimator_based_potential,
-    simulate_for_sbi,
 )
 from sbi.inference.snre.snre_base import RatioEstimator
 from sbi.simulators.linear_gaussian import (
@@ -55,12 +54,8 @@ def test_api_snre_multiple_trials_and_rounds_map(
 
     proposals = [prior]
     for _ in range(num_rounds):
-        theta, x = simulate_for_sbi(
-            simulator,
-            proposals[-1],
-            num_simulations,
-            simulation_batch_size=num_simulations,
-        )
+        theta = proposals[-1].sample((num_simulations,))
+        x = simulator(theta)
         inference.append_simulations(theta, x).train(
             training_batch_size=100, max_num_epochs=2
         )
@@ -109,9 +104,8 @@ def test_c2st_sre_on_linearGaussian(
 
     inference = snre_method(classifier="resnet", show_progress_bars=False)
 
-    theta, x = simulate_for_sbi(
-        simulator, prior, num_simulations, simulation_batch_size=100
-    )
+    theta = prior.sample((num_simulations,))
+    x = simulator(theta)
     ratio_estimator = inference.append_simulations(theta, x).train()
 
     x_o = zeros(1, x_dim)
@@ -160,7 +154,7 @@ def test_c2st_snre_variants_on_linearGaussian_with_multiple_trials(
     """
 
     num_dim = 2
-    num_simulations = 1750
+    num_simulations = 2000
     num_samples = 500
     x_o = zeros(num_trials, num_dim)
 
@@ -190,9 +184,8 @@ def test_c2st_snre_variants_on_linearGaussian_with_multiple_trials(
     inference = snre_method(**kwargs)
 
     # Should use default `num_atoms=10` for SRE; `num_atoms=2` for AALR
-    theta, x = simulate_for_sbi(
-        simulator, prior, num_simulations, simulation_batch_size=num_simulations
-    )
+    theta = prior.sample((num_simulations,))
+    x = simulator(theta)
     ratio_estimator = inference.append_simulations(theta, x).train(**train_kwargs)
     potential_fn, theta_transform = ratio_estimator_based_potential(
         ratio_estimator=ratio_estimator, prior=prior, x_o=x_o
@@ -285,9 +278,8 @@ def test_c2st_multi_round_snr_on_linearGaussian_vi(
 
     inference = snre_method(show_progress_bars=False)
 
-    theta, x = simulate_for_sbi(
-        simulator, prior, num_simulations_per_round, simulation_batch_size=50
-    )
+    theta = prior.sample((num_simulations_per_round,))
+    x = simulator(theta)
     ratio_estimator = inference.append_simulations(theta, x).train()
     potential_fn, theta_transform = ratio_estimator_based_potential(
         prior=prior, ratio_estimator=ratio_estimator, x_o=x_o
@@ -298,9 +290,8 @@ def test_c2st_multi_round_snr_on_linearGaussian_vi(
     )
     posterior1.train()
 
-    theta, x = simulate_for_sbi(
-        simulator, posterior1, num_simulations_per_round, simulation_batch_size=50
-    )
+    theta = posterior1.sample((num_simulations_per_round,))
+    x = simulator(theta)
     ratio_estimator = inference.append_simulations(theta, x).train()
     potential_fn, theta_transform = ratio_estimator_based_potential(
         prior=prior, ratio_estimator=ratio_estimator, x_o=x_o
@@ -382,9 +373,8 @@ def test_api_sre_sampling_methods(
 
     inference = SNRE_B(classifier="resnet", show_progress_bars=False)
 
-    theta, x = simulate_for_sbi(
-        simulator, prior, num_simulations, simulation_batch_size=num_simulations
-    )
+    theta = prior.sample((num_simulations,))
+    x = simulator(theta)
     ratio_estimator = inference.append_simulations(theta, x).train(max_num_epochs=5)
     potential_fn, theta_transform = ratio_estimator_based_potential(
         ratio_estimator=ratio_estimator, prior=prior, x_o=x_o

@@ -1,0 +1,23 @@
+{
+    "name": "Codespace for the SBI Toolkit.",
+
+    "image": "ghcr.io/sbi-dev/sbi/base-image-codespaces:latest",
+
+    "customizations": {
+        "vscode": {
+            "terminal": {
+                "integrated.shell.linux": "/bin/bash"
+            },
+            "extensions": [
+                "GitHub.copilot",
+                "ms-python.python",
+                "ms-toolsai.jupyter",
+                "stkb.rewrap",
+                "streetsidesoftware.code-spell-checker"
+            ]
+        }
+    },
+
+    // open the default port for jupyter notebook
+	"forwardPorts": [8888]
+}

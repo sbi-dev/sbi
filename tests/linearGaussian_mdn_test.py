@@ -1,5 +1,5 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from __future__ import annotations
 
@@ -14,7 +14,6 @@ from sbi.inference import (
     DirectPosterior,
     MCMCPosterior,
     likelihood_estimator_based_potential,
-    simulate_for_sbi,
 )
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
@@ -49,7 +48,9 @@ def test_mdn_inference_with_different_methods(method, mcmc_params_accurate: dict
 
     inference = method(density_estimator="mdn")
 
-    theta, x = simulate_for_sbi(simulator, prior, num_simulations)
+    theta = prior.sample((num_simulations,))
+    x = simulator(theta)
+
     estimator = inference.append_simulations(theta, x).train()
     if method == SNPE:
         posterior = DirectPosterior(posterior_estimator=estimator, prior=prior)
@@ -81,6 +82,7 @@ def test_mdn_with_1D_uniform_prior():
     """
     num_dim = 1
     x_o = torch.tensor([[1.0]])
+    num_simulations = 100
     num_samples = 100
 
     # likelihood_mean will be likelihood_shift+theta
@@ -94,7 +96,9 @@ def test_mdn_with_1D_uniform_prior():
 
     inference = SNPE(density_estimator="mdn")
 
-    theta, x = simulate_for_sbi(simulator, prior, 100)
+    theta = prior.sample((num_simulations,))
+    x = simulator(theta)
+
     posterior_estimator = inference.append_simulations(theta, x).train()
     posterior = DirectPosterior(posterior_estimator=posterior_estimator, prior=prior)
     samples = posterior.sample((num_samples,), x=x_o)

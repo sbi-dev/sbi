@@ -1,5 +1,5 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from __future__ import annotations
 
@@ -21,7 +21,6 @@ from sbi.inference import (
     MCMCPosterior,
     RejectionPosterior,
     posterior_estimator_based_potential,
-    simulate_for_sbi,
 )
 from sbi.neural_nets import posterior_nn
 from sbi.simulators.linear_gaussian import (
@@ -80,9 +79,9 @@ def test_c2st_snpe_on_linearGaussian(snpe_method, num_dim: int, prior_str: str):
 
     inference = snpe_method(prior, show_progress_bars=False)
 
-    theta, x = simulate_for_sbi(
-        simulator, prior, num_simulations, simulation_batch_size=1000
-    )
+    theta = prior.sample((num_simulations,))
+    x = simulator(theta)
+
     posterior_estimator = inference.append_simulations(theta, x).train(
         training_batch_size=100
     )
@@ -176,9 +175,8 @@ def test_density_estimators_on_linearGaussian(density_estimator):
 
     inference = SNPE_C(prior, density_estimator=density_estimator)
 
-    theta, x = simulate_for_sbi(
-        simulator, prior, num_simulations, simulation_batch_size=1000
-    )
+    theta = prior.sample((num_simulations,))
+    x = simulator(theta)
     posterior_estimator = inference.append_simulations(theta, x).train(
         training_batch_size=100
     )
@@ -234,10 +232,8 @@ def test_c2st_snpe_on_linearGaussian_different_dims(density_estimator="maf"):
         show_progress_bars=False,
     )
 
-    # type: ignore
-    theta, x = simulate_for_sbi(
-        simulator, prior, num_simulations, simulation_batch_size=num_simulations
-    )
+    theta = prior.sample((num_simulations,))
+    x = simulator(theta)
 
     inference = inference.append_simulations(theta, x)
     posterior_estimator = inference.train(
@@ -317,14 +313,14 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str):
 
     if method_str == "snpe_b":
         inference = SNPE_B(**creation_args)
-        theta, x = simulate_for_sbi(simulator, prior, 500, simulation_batch_size=10)
+        theta = prior.sample((500,))
+        x = simulator(theta)
         posterior_estimator = inference.append_simulations(theta, x).train()
         posterior1 = DirectPosterior(
             prior=prior, posterior_estimator=posterior_estimator
         ).set_default_x(x_o)
-        theta, x = simulate_for_sbi(
-            simulator, posterior1, 1000, simulation_batch_size=10
-        )
+        theta = posterior1.sample((1000,))
+        x = simulator(theta)
         posterior_estimator = inference.append_simulations(
             theta, x, proposal=posterior1
         ).train()
@@ -333,7 +329,8 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str):
         ).set_default_x(x_o)
     elif method_str == "snpe_c":
         inference = SNPE_C(**creation_args)
-        theta, x = simulate_for_sbi(simulator, prior, 900, simulation_batch_size=50)
+        theta = prior.sample((900,))
+        x = simulator(theta)
         posterior_estimator = inference.append_simulations(theta, x).train()
         posterior1 = DirectPosterior(
             prior=prior, posterior_estimator=posterior_estimator
@@ -350,9 +347,8 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str):
         for r in range(num_rounds):
             if r == 2:
                 final_round = True
-            theta, x = simulate_for_sbi(
-                simulator, proposal, 500, simulation_batch_size=50
-            )
+            theta = proposal.sample((500,))
+            x = simulator(theta)
             inference = inference.append_simulations(theta, x, proposal=proposal)
             _ = inference.train(max_num_epochs=200, final_round=final_round)
             posterior = inference.build_posterior().set_default_x(x_o)
@@ -360,7 +356,8 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str):
     elif method_str.startswith("tsnpe"):
         sample_method = "rejection" if method_str == "tsnpe_rejection" else "sir"
         inference = SNPE_C(**creation_args)
-        theta, x = simulate_for_sbi(simulator, prior, 900, simulation_batch_size=50)
+        theta = prior.sample((1000,))
+        x = simulator(theta)
         posterior_estimator = inference.append_simulations(theta, x).train()
         posterior1 = DirectPosterior(
             prior=prior, posterior_estimator=posterior_estimator
@@ -420,7 +417,8 @@ def test_api_snpe_c_posterior_correction(
 
     inference = SNPE_C(prior, show_progress_bars=False)
 
-    theta, x = simulate_for_sbi(simulator, prior, 1000)
+    theta = prior.sample((1000,))
+    x = simulator(theta)
     posterior_estimator = inference.append_simulations(theta, x).train()
     potential_fn, theta_transform = posterior_estimator_based_potential(
         posterior_estimator, prior, x_o
@@ -467,6 +465,7 @@ def test_api_force_first_round_loss(
 
     num_dim = 2
     x_o = zeros(1, num_dim)
+    num_simulations = 1000
 
     # likelihood_mean will be likelihood_shift+theta
     likelihood_shift = -1.0 * ones(num_dim)
@@ -481,7 +480,8 @@ def test_api_force_first_round_loss(
     proposal = prior
     for _ in range(2):
         train_proposal = proposal if pass_proposal_to_append else None
-        theta, x = simulate_for_sbi(simulator, proposal, 1000)
+        theta = proposal.sample((num_simulations,))
+        x = simulator(theta)
         _ = inference.append_simulations(theta, x, proposal=train_proposal).train(
             force_first_round_loss=force_first_round_loss, max_num_epochs=2
         )
@@ -493,51 +493,63 @@ def test_api_force_first_round_loss(
 @pytest.mark.mcmc
 def test_sample_conditional(mcmc_params_accurate: dict):
     """
-    Test whether sampling from the conditional gives the same results as evaluating.
+    Test whether sampling from the conditional gives the same results as
+    evaluating.
 
-    This compares samples that get smoothed with a Gaussian kde to evaluating the
-    conditional log-probability with `eval_conditional_density`.
+    This compares samples that get smoothed with a Gaussian kde to evaluating
+    the conditional log-probability with `eval_conditional_density`.
 
-    `eval_conditional_density` is itself tested in `sbiutils_test.py`. Here, we use
-    a bimodal posterior to test the conditional.
+    `eval_conditional_density` is itself tested in `sbiutils_test.py`. Here, we
+    use a bimodal posterior to test the conditional.
+
+    NOTE: The comparison between conditional log_probs obtained from the MCMC
+    posterior and from analysis.eval_conditional_density can be gamed by
+    underfitting the posterior estimator, i.e., by using a small number of
+    simulations.
     """
 
     num_dim = 3
     dim_to_sample_1 = 0
     dim_to_sample_2 = 2
-    num_simulations = 6000
-    num_conditional_samples = 500
+    num_simulations = 5500
+    num_conditional_samples = 1000
+    num_conditions = 50
 
     x_o = zeros(1, num_dim)
 
     likelihood_shift = -1.0 * ones(num_dim)
-    likelihood_cov = 0.1 * eye(num_dim)
+    likelihood_cov = 0.05 * eye(num_dim)
 
     prior = utils.BoxUniform(-2.0 * ones(num_dim), 2.0 * ones(num_dim))
 
+    # TODO: janfb does not see how this setup results in a bi-model posterior.
     def simulator(theta):
-        if torch.rand(1) > 0.5:
-            return linear_gaussian(theta, likelihood_shift, likelihood_cov)
-        else:
-            return linear_gaussian(theta, -likelihood_shift, likelihood_cov)
+        batch_size, _ = theta.shape
+        # create -1 1 mask for bimodality
+        mask = torch.ones(batch_size, 1)
+        # set mask to -1 randomly across the batch
+        mask = mask * 2 * (torch.rand(batch_size, 1) > 0.5) - 1
+
+        # Sample bi-modally by applying a 1-(-1) mask to the likelihood shift.
+        return linear_gaussian(theta, mask * likelihood_shift, likelihood_cov)
 
     # Test whether SNPE works properly with structured z-scoring.
     net = posterior_nn("maf", z_score_x="structured", hidden_features=20)
 
-    inference = SNPE_C(prior, density_estimator=net, show_progress_bars=False)
+    inference = SNPE_C(prior, density_estimator=net, show_progress_bars=True)
 
     # We need a pretty big dataset to properly model the bimodality.
-    theta, x = simulate_for_sbi(
-        simulator, prior, num_simulations, simulation_batch_size=num_simulations
-    )
+    theta = prior.sample((num_simulations,))
+    x = simulator(theta)
     posterior_estimator = inference.append_simulations(theta, x).train(
-        max_num_epochs=60
+        training_batch_size=1000, max_num_epochs=60
     )
 
+    # generate conditions
     posterior = DirectPosterior(
         prior=prior, posterior_estimator=posterior_estimator
     ).set_default_x(x_o)
-    samples = posterior.sample((50,))
+    samples = posterior.sample((num_conditions,))
 
     # Evaluate the conditional density be drawing samples and smoothing with a Gaussian
     # kde.
@@ -562,19 +574,11 @@ def test_sample_conditional(mcmc_params_accurate: dict):
         method="slice_np_vectorized",
         **mcmc_params_accurate,
     )
-    mcmc_posterior.set_default_x(x_o)  # TODO: This test has a bug? Needed to add this
-    cond_samples = mcmc_posterior.sample((num_conditional_samples,))
-
-    _ = analysis.pairplot(
-        cond_samples,
-        limits=[[-2, 2], [-2, 2], [-2, 2]],
-        figsize=(2, 2),
-        diag="kde",
-        offdiag="kde",
-    )
+    cond_samples = mcmc_posterior.sample((num_conditional_samples,), x=x_o)
 
     limits = [[-2, 2], [-2, 2], [-2, 2]]
 
+    # Fit a Gaussian KDE to the conditional samples and get log-probs.
     density = gaussian_kde(cond_samples.numpy().T, bw_method="scott")
 
     X, Y = np.meshgrid(
@@ -584,7 +588,7 @@ def test_sample_conditional(mcmc_params_accurate: dict):
     positions = np.vstack([X.ravel(), Y.ravel()])
     sample_kde_grid = np.reshape(density(positions).T, X.shape)
 
-    # Evaluate the conditional with eval_conditional_density.
+    # Get conditional log probs eval_conditional_density.
     eval_grid = analysis.eval_conditional_density(
         posterior,
         condition=samples[0],
@@ -601,6 +605,7 @@ def test_sample_conditional(mcmc_params_accurate: dict):
 
     max_err = np.max(error)
     assert max_err < 0.0027
+    print(f"Max error: {max_err}")
 
 
 def test_mdn_conditional_density(num_dim: int = 3, cond_dim: int = 1):
@@ -653,9 +658,9 @@ def test_mdn_conditional_density(num_dim: int = 3, cond_dim: int = 1):
 
     inference = SNPE_C(density_estimator="mdn", show_progress_bars=False)
 
-    theta, x = simulate_for_sbi(
-        simulator, prior, num_simulations, simulation_batch_size=1000
-    )
+    theta = prior.sample((num_simulations,))
+    x = simulator(theta)
+
     posterior_mdn = inference.append_simulations(theta, x).train(
         training_batch_size=100
     )
@@ -691,14 +696,8 @@ def test_example_posterior(snpe_method: type):
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     inference = snpe_method(prior, show_progress_bars=False)
-
-    theta, x = simulate_for_sbi(
-        simulator,
-        prior,
-        num_simulations,
-        simulation_batch_size=num_simulations,
-        num_workers=6,
-    )
+    theta = prior.sample((num_simulations,))
+    x = simulator(theta)
     posterior_estimator = inference.append_simulations(theta, x).train(
         max_num_epochs=2, **extra_kwargs
     )
@@ -726,7 +725,8 @@ def test_multiround_mog_training():
     inference = SNPE_C(prior, density_estimator="mdn")
 
     for _ in range(3):
-        theta, x = simulate_for_sbi(simulator, proposal, 200)
+        theta = proposal.sample((200,))
+        x = simulator(theta)
         _ = inference.append_simulations(theta, x, proposal=proposal).train()
         posterior = inference.build_posterior().set_default_x(x_o)
         proposal = posterior

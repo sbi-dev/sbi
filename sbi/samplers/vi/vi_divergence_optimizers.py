@@ -8,7 +8,12 @@ import numpy as np
 import torch
 from torch import Tensor, nn
 from torch.distributions import Distribution
-from torch.optim import ASGD, SGD, Adadelta, Adagrad, Adam, AdamW, Adamax, RMSprop
+from torch.optim.adadelta import Adadelta
+from torch.optim.adagrad import Adagrad
+from torch.optim.adam import Adam
+from torch.optim.adamax import Adamax
+from torch.optim.adamw import AdamW
+from torch.optim.asgd import ASGD
 from torch.optim.lr_scheduler import (
     CosineAnnealingLR,
     CosineAnnealingWarmRestarts,
@@ -17,6 +22,8 @@ from torch.optim.lr_scheduler import (
     LambdaLR,
     StepLR,
 )
+from torch.optim.rmsprop import RMSprop
+from torch.optim.sgd import SGD
 
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.samplers.vi.vi_utils import (
@@ -25,7 +32,7 @@ from sbi.samplers.vi.vi_utils import (
     move_all_tensor_to_device,
 )
 from sbi.sbi_types import Array, PyroTransformedDistribution
-from sbi.utils import check_prior
+from sbi.utils.user_input_checks import check_prior
 
 _VI_method = {}
 

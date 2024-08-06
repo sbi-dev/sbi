@@ -9,12 +9,15 @@
 
 [Getting Started](https://sbi-dev.github.io/sbi/tutorial/00_getting_started/) | [Documentation](https://sbi-dev.github.io/sbi/)
 
-`sbi` is a PyTorch package for simulation-based inference. Simulation-based inference is the process of finding parameters of a simulator from observations.
+`sbi` is a PyTorch package for simulation-based inference. Simulation-based inference is
+the process of finding parameters of a simulator from observations.
 
-`sbi` takes a Bayesian approach and returns a full posterior distribution over the parameters of the simulator, conditional on the observations.
-The package implements a variety of inference algorithms, including _amortized_ and _sequential_ methods.
-Amortized methods return a posterior that can be applied to many different observations without retraining; sequential methods focus the inference on one particular observation to be more simulation-efficient.
-See below for an overview of implemented methods.
+`sbi` takes a Bayesian approach and returns a full posterior distribution over the
+parameters of the simulator, conditional on the observations. The package implements a
+variety of inference algorithms, including _amortized_ and _sequential_ methods.
+Amortized methods return a posterior that can be applied to many different observations
+without retraining; sequential methods focus the inference on one particular observation
+to be more simulation-efficient. See below for an overview of implemented methods.
 
 `sbi` offers a simple interface for posterior inference in a few lines of code
 
@@ -53,7 +56,14 @@ print(posterior)
 
 ## Tutorials
 
-For first time users, you can now head over to the turorials and get going with [Getting Started](https://sbi-dev.github.io/sbi/tutorial/00_getting_started/).
+If you're new to `sbi`, we recommend starting with our [Getting
+Started](https://sbi-dev.github.io/sbi/tutorial/00_getting_started/) tutorial.
+
+You can easily access and run these tutorials by opening a
+[Codespace](https://docs.github.com/en/codespaces/overview) on this repo. To do
+so, click on the green "Code" button and select "Open with Codespaces". This will
+provide you with a fully functional environment where you can run the tutorials as
+Jupyter notebooks.
 
 ## Inference Algorithms
 
@@ -94,23 +104,28 @@ The following inference algorithms are currently available. You can find instruc
 
 ## Feedback and Contributions
 
-We welcome any feedback on how `sbi` is working for your inference problems (see [Discussions](https://github.com/sbi-dev/sbi/discussions)) and are happy to receive bug reports, pull requests and other feedback (see
-[contribute](http://sbi-dev.github.io/sbi/contribute/)).
-We wish to maintain a positive community, please read our [Code of Conduct](CODE_OF_CONDUCT.md).
+We welcome any feedback on how `sbi` is working for your inference problems (see
+[Discussions](https://github.com/sbi-dev/sbi/discussions)) and are happy to receive bug
+reports, pull requests, and other feedback (see
+[contribute](http://sbi-dev.github.io/sbi/contribute/)). We wish to maintain a positive
+community; please read our [Code of Conduct](CODE_OF_CONDUCT.md).
 
-## Acknowledgements
+## Acknowledgments
 
 `sbi` is the successor (using PyTorch) of the
-[`delfi`](https://github.com/mackelab/delfi) package. It was started as a fork of Conor
-M. Durkan's `lfi`. `sbi` runs as a community project. See also [credits](https://github.com/sbi-dev/sbi/blob/master/docs/docs/credits.md).
+[`delfi`](https://github.com/mackelab/delfi) package. It started as a fork of Conor M.
+Durkan's `lfi`. `sbi` runs as a community project. See also
+[credits](https://github.com/sbi-dev/sbi/blob/master/docs/docs/credits.md).
 
 ## Support
 
-`sbi` has been supported by the German Federal Ministry of Education and Research (BMBF) through project ADIMEM (FKZ 01IS18052 A-D), project SiMaLeSAM (FKZ 01IS21055A) and the Tübingen AI Center (FKZ 01IS18039A).
+`sbi` has been supported by the German Federal Ministry of Education and Research (BMBF)
+through project ADIMEM (FKZ 01IS18052 A-D), project SiMaLeSAM (FKZ 01IS21055A) and the
+Tübingen AI Center (FKZ 01IS18039A).
 
 ## License
 
-[Affero General Public License v3 (AGPLv3)](https://www.gnu.org/licenses/)
+[Apache License Version 2.0 (Apache-2.0)](https://www.apache.org/licenses/LICENSE-2.0)
 
 ## Citation
 

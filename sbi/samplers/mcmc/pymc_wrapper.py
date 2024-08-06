@@ -6,7 +6,7 @@ import pytensor.tensor as pt
 import torch
 from arviz.data import InferenceData
 
-from sbi.utils import tensor2numpy
+from sbi.utils.torchutils import tensor2numpy
 
 
 class PyMCPotential(pt.Op):  # type: ignore

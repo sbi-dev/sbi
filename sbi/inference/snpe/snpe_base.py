@@ -1,5 +1,6 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+
 import time
 from abc import ABC, abstractmethod
 from copy import deepcopy
@@ -7,13 +8,13 @@ from typing import Any, Callable, Dict, Optional, Union
 from warnings import warn
 
 import torch
-from torch import Tensor, ones, optim
+from torch import Tensor, ones
 from torch.distributions import Distribution
 from torch.nn.utils.clip_grad import clip_grad_norm_
+from torch.optim.adam import Adam
 from torch.utils.tensorboard.writer import SummaryWriter
 
-from sbi import utils as utils
-from sbi.inference import NeuralInference, check_if_proposal_has_default_x
+from sbi.inference.base import NeuralInference, check_if_proposal_has_default_x
 from sbi.inference.posteriors import (
     DirectPosterior,
     MCMCPosterior,
@@ -21,8 +22,9 @@ from sbi.inference.posteriors import (
     VIPosterior,
 )
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
+from sbi.inference.posteriors.importance_posterior import ImportanceSamplingPosterior
 from sbi.inference.potentials import posterior_estimator_based_potential
-from sbi.neural_nets import DensityEstimator, posterior_nn
+from sbi.neural_nets import ConditionalDensityEstimator, posterior_nn
 from sbi.neural_nets.density_estimators.shape_handling import (
     reshape_to_batch_event,
     reshape_to_sample_batch_event,
@@ -30,13 +32,13 @@ from sbi.neural_nets.density_estimators.shape_handling import (
 from sbi.utils import (
     RestrictedPrior,
     check_estimator_arg,
+    check_prior,
     handle_invalid_x,
     nle_nre_apt_msg_on_invalid_x,
     npe_msg_on_invalid_x,
     test_posterior_net_for_multi_d_x,
     validate_theta_and_x,
     warn_if_zscoring_changes_data,
-    x_shape_from_simulation,
 )
 from sbi.utils.sbiutils import ImproperEmpirical, mask_sims_from_prior
 
@@ -220,7 +222,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[dict] = None,
-    ) -> DensityEstimator:
+    ) -> ConditionalDensityEstimator:
         r"""Return density estimator that approximates the distribution $p(\theta|x)$.
 
         Args:
@@ -320,10 +322,11 @@ class PosteriorEstimator(NeuralInference, ABC):
                 theta[self.train_indices].to("cpu"),
                 x[self.train_indices].to("cpu"),
             )
-            self._x_shape = x_shape_from_simulation(x.to("cpu"))
 
-            theta = reshape_to_sample_batch_event(theta.to("cpu"), theta.shape[1:])
-            x = reshape_to_batch_event(x.to("cpu"), self._x_shape[1:])
+            theta = reshape_to_sample_batch_event(
+                theta.to("cpu"), self._neural_net.input_shape
+            )
+            x = reshape_to_batch_event(x.to("cpu"), self._neural_net.condition_shape)
             test_posterior_net_for_multi_d_x(self._neural_net, theta, x)
 
             del theta, x
@@ -332,9 +335,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         self._neural_net.to(self._device)
 
         if not resume_training:
-            self.optimizer = optim.Adam(
-                list(self._neural_net.parameters()), lr=learning_rate
-            )
+            self.optimizer = Adam(list(self._neural_net.parameters()), lr=learning_rate)
             self.epoch, self._val_log_prob = 0, float("-Inf")
 
         while self.epoch <= max_num_epochs and not self._converged(
@@ -431,7 +432,7 @@ class PosteriorEstimator(NeuralInference, ABC):
 
     def build_posterior(
         self,
-        density_estimator: Optional[DensityEstimator] = None,
+        density_estimator: Optional[ConditionalDensityEstimator] = None,
         prior: Optional[Distribution] = None,
         sample_with: str = "direct",
         mcmc_method: str = "slice_np",
@@ -440,7 +441,14 @@ class PosteriorEstimator(NeuralInference, ABC):
         mcmc_parameters: Optional[Dict[str, Any]] = None,
         vi_parameters: Optional[Dict[str, Any]] = None,
         rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
-    ) -> Union[MCMCPosterior, RejectionPosterior, VIPosterior, DirectPosterior]:
+        importance_sampling_parameters: Optional[Dict[str, Any]] = None,
+    ) -> Union[
+        MCMCPosterior,
+        RejectionPosterior,
+        VIPosterior,
+        DirectPosterior,
+        ImportanceSamplingPosterior,
+    ]:
         r"""Build posterior from the neural density estimator.
 
         For SNPE, the posterior distribution that is returned here implements the
@@ -482,7 +490,7 @@ class PosteriorEstimator(NeuralInference, ABC):
             )
             prior = self._prior
         else:
-            utils.check_prior(prior)
+            check_prior(prior)
 
         if density_estimator is None:
             posterior_estimator = self._neural_net
@@ -491,7 +499,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         else:
             posterior_estimator = density_estimator
             # Otherwise, infer it from the device of the net parameters.
-            device = next(density_estimator.parameters()).device.type
+            device = str(next(density_estimator.parameters()).device)
 
         potential_fn, theta_transform = posterior_estimator_based_potential(
             posterior_estimator=posterior_estimator,
@@ -503,7 +511,6 @@ class PosteriorEstimator(NeuralInference, ABC):
             self._posterior = DirectPosterior(
                 posterior_estimator=posterior_estimator,  # type: ignore
                 prior=prior,
-                x_shape=self._x_shape,
                 device=device,
                 **direct_sampling_parameters or {},
             )
@@ -520,7 +527,6 @@ class PosteriorEstimator(NeuralInference, ABC):
             self._posterior = RejectionPosterior(
                 potential_fn=potential_fn,
                 device=device,
-                x_shape=self._x_shape,
                 **rejection_sampling_parameters,
             )
         elif sample_with == "mcmc":
@@ -530,7 +536,6 @@ class PosteriorEstimator(NeuralInference, ABC):
                 proposal=prior,
                 method=mcmc_method,
                 device=device,
-                x_shape=self._x_shape,
                 **mcmc_parameters or {},
             )
         elif sample_with == "vi":
@@ -540,8 +545,14 @@ class PosteriorEstimator(NeuralInference, ABC):
                 prior=prior,  # type: ignore
                 vi_method=vi_method,
                 device=device,
-                x_shape=self._x_shape,
                 **vi_parameters or {},
+            )
+        elif sample_with == "importance":
+            self._posterior = ImportanceSamplingPosterior(
+                potential_fn=potential_fn,
+                proposal=prior,
+                device=device,
+                **importance_sampling_parameters or {},
             )
         else:
             raise NotImplementedError
@@ -582,8 +593,10 @@ class PosteriorEstimator(NeuralInference, ABC):
                 distribution different from the prior.
         """
         if self._round == 0 or force_first_round_loss:
-            theta = reshape_to_sample_batch_event(theta, event_shape=theta.shape[1:])
-            x = reshape_to_batch_event(x, event_shape=self._x_shape[1:])
+            theta = reshape_to_batch_event(
+                theta, event_shape=self._neural_net.input_shape
+            )
+            x = reshape_to_batch_event(x, event_shape=self._neural_net.condition_shape)
             # Use posterior log prob (without proposal correction) for first round.
             loss = self._neural_net.loss(theta, x)
         else:

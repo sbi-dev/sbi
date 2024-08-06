@@ -1,5 +1,5 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from typing import Callable, Optional, Tuple
 
@@ -8,19 +8,18 @@ from torch import Tensor
 from torch.distributions import Distribution
 
 from sbi.inference.potentials.base_potential import BasePotential
-from sbi.neural_nets.density_estimators import DensityEstimator
+from sbi.neural_nets.density_estimators import ConditionalDensityEstimator
 from sbi.neural_nets.density_estimators.shape_handling import (
     reshape_to_batch_event,
     reshape_to_sample_batch_event,
 )
 from sbi.sbi_types import TorchTransform
-from sbi.utils import mcmc_transform
-from sbi.utils.sbiutils import within_support
+from sbi.utils.sbiutils import mcmc_transform, within_support
 from sbi.utils.torchutils import ensure_theta_batched
 
 
 def posterior_estimator_based_potential(
-    posterior_estimator: DensityEstimator,
+    posterior_estimator: ConditionalDensityEstimator,
     prior: Distribution,
     x_o: Optional[Tensor],
     enable_transform: bool = True,
@@ -59,11 +58,9 @@ def posterior_estimator_based_potential(
 
 
 class PosteriorBasedPotential(BasePotential):
-    allow_iid_x = False  # type: ignore
-
     def __init__(
         self,
-        posterior_estimator: DensityEstimator,
+        posterior_estimator: ConditionalDensityEstimator,
         prior: Distribution,
         x_o: Optional[Tensor],
         device: str = "cpu",
@@ -85,6 +82,21 @@ class PosteriorBasedPotential(BasePotential):
         self.posterior_estimator = posterior_estimator
         self.posterior_estimator.eval()
 
+    def set_x(self, x_o: Optional[Tensor], x_is_iid: Optional[bool] = False):
+        """
+        Check the shape of the observed data and, if valid, set it.
+        For posterior-based methods, `x_o` is not allowed to be iid, as we assume that
+        iid `x` is handled by a Permutation Invariant embedding net.
+        """
+        if x_is_iid:
+            raise NotImplementedError(
+                "For NPE, iid `x` must be handled by a Permutation Invariant embedding \
+                    net. Therefore, the iid dimension of `x` is added to the event\
+                        dimension of `x`. Please set `x_is_iid=False`."
+            )
+        else:
+            super().set_x(x_o, x_is_iid=False)
+
     def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
         r"""Returns the potential for posterior-based methods.
 
@@ -102,28 +114,44 @@ class PosteriorBasedPotential(BasePotential):
                 the potential or manually set self._x_o."
             )
 
-        theta = ensure_theta_batched(torch.as_tensor(theta)).to(self.device)
-
         with torch.set_grad_enabled(track_gradients):
             # Force probability to be zero outside prior support.
             in_prior_support = within_support(self.prior, theta)
-
-            x = reshape_to_batch_event(self.x_o, event_shape=self.x_o.shape[1:])
-            assert (
-                x.shape[0] == 1
-            ), f"`x` has batchsize {x.shape[0]}. Only `batchsize == 1` is supported."
-            theta = reshape_to_sample_batch_event(
-                theta, event_shape=theta.shape[1:], leading_is_sample=True
+            x = reshape_to_batch_event(
+                self.x_o, event_shape=self.posterior_estimator.condition_shape
             )
-            # We assume that a single `x` is passed (i.e. batchsize==1), so we squeeze
-            # the batch dimension of the log-prob with `.squeeze(dim=1)`.
-            posterior_log_prob = self.posterior_estimator.log_prob(
-                theta, condition=x
-            ).squeeze(dim=1)
+            theta = ensure_theta_batched(torch.as_tensor(theta)).to(self.device)
+            theta_batch_size = theta.shape[0]
+            x_batch_size = x.shape[0]
 
+            assert (
+                theta_batch_size == x_batch_size or x_batch_size == 1
+            ), f"Batch size mismatch: {theta_batch_size} and {x_batch_size}.\
+                When performing batched sampling for multiple `x`, the batch size of\
+                `theta` must match the batch size of `x`."
+
+            if x_batch_size == 1:
+                # If a single `x` is passed (i.e. batchsize==1), we squeeze
+                # the batch dimension of the log-prob with `.squeeze(dim=1)`.
+                theta = reshape_to_sample_batch_event(
+                    theta, event_shape=theta.shape[1:], leading_is_sample=True
+                )
+
+                posterior_log_prob = self.posterior_estimator.log_prob(
+                    theta, condition=x
+                )
+                posterior_log_prob = posterior_log_prob.squeeze(1)
+            else:
+                # If multiple `x` are passed, we return the log-probs for each (x,theta)
+                # pair, and do not squeeze the batch dimension.
+                theta = theta.unsqueeze(0)
+                posterior_log_prob = self.posterior_estimator.log_prob(
+                    theta, condition=x
+                )
             posterior_log_prob = torch.where(
                 in_prior_support,
                 posterior_log_prob,
                 torch.tensor(float("-inf"), dtype=torch.float32, device=self.device),
             )
+
         return posterior_log_prob

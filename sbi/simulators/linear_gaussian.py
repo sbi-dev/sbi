@@ -1,5 +1,5 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 
 from typing import Tuple, Union
@@ -8,7 +8,7 @@ import torch
 from torch import Tensor
 from torch.distributions import Independent, MultivariateNormal, Uniform
 
-from sbi.utils import within_support
+from sbi.utils.sbiutils import within_support
 from sbi.utils.torchutils import atleast_2d
 
 

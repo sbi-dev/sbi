@@ -1,5 +1,5 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import pytest
 import torch
@@ -23,6 +23,7 @@ from sbi.utils import RestrictionEstimator
 from sbi.utils.sbiutils import handle_invalid_x
 from sbi.utils.user_input_checks import (
     check_sbi_inputs,
+    process_prior,
     process_simulator,
 )
 
@@ -187,6 +188,9 @@ def test_restricted_prior_log_prob(prior):
         prior = utils.BoxUniform(-2 * torch.ones(2), 2 * torch.ones(2))
     else:
         prior = MultivariateNormal(torch.zeros(2), torch.eye(2))
+
+    prior, _, prior_returns_numpy = process_prior(prior)
+    simulator = process_simulator(simulator, prior, prior_returns_numpy)
     theta, x = simulate_for_sbi(simulator, prior, 1000)
 
     restriction_estimator = RestrictionEstimator(prior=prior)

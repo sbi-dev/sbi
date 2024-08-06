@@ -1,5 +1,5 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from __future__ import annotations
 
@@ -12,7 +12,6 @@ from sbi.inference import (
     SNL,
     MCMCPosterior,
     likelihood_estimator_based_potential,
-    simulate_for_sbi,
 )
 from sbi.samplers.mcmc import PyMCSampler, SliceSamplerSerial, SliceSamplerVectorized
 from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
@@ -51,9 +50,8 @@ def test_api_posterior_sampler_set(
 
     inference = SNL(prior, show_progress_bars=False)
 
-    theta, x = simulate_for_sbi(
-        simulator, prior, num_simulations, simulation_batch_size=10
-    )
+    theta = prior.sample((num_simulations,))
+    x = simulator(theta)
     estimator = inference.append_simulations(theta, x).train(max_num_epochs=5)
     potential_fn, transform = likelihood_estimator_based_potential(
         estimator, prior, x_o

@@ -1,5 +1,5 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import logging
 from copy import deepcopy
@@ -8,9 +8,10 @@ from warnings import warn
 
 import torch
 from pyknos.nflows.nn import nets
-from torch import Tensor, nn, optim, relu
+from torch import Tensor, nn, relu
 from torch.nn import MSELoss
 from torch.nn.utils.clip_grad import clip_grad_norm_
+from torch.optim.adam import Adam
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
 
@@ -286,7 +287,7 @@ class ActiveSubspace:
                 self._device
             )
 
-        optimizer = optim.Adam(
+        optimizer = Adam(
             list(self._regression_net.parameters()),
             lr=learning_rate,
         )

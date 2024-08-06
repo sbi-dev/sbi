@@ -1,5 +1,5 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from typing import Callable, Optional, Tuple
 
@@ -8,18 +8,18 @@ from torch import Tensor
 from torch.distributions import Distribution
 
 from sbi.inference.potentials.base_potential import BasePotential
-from sbi.neural_nets.density_estimators import DensityEstimator
+from sbi.neural_nets.density_estimators import ConditionalDensityEstimator
 from sbi.neural_nets.density_estimators.shape_handling import (
     reshape_to_batch_event,
     reshape_to_sample_batch_event,
 )
 from sbi.neural_nets.mnle import MixedDensityEstimator
 from sbi.sbi_types import TorchTransform
-from sbi.utils import mcmc_transform
+from sbi.utils.sbiutils import mcmc_transform
 
 
 def likelihood_estimator_based_potential(
-    likelihood_estimator: DensityEstimator,
+    likelihood_estimator: ConditionalDensityEstimator,
     prior: Distribution,
     x_o: Optional[Tensor],
     enable_transform: bool = True,
@@ -54,11 +54,9 @@ def likelihood_estimator_based_potential(
 
 
 class LikelihoodBasedPotential(BasePotential):
-    allow_iid_x = True  # type: ignore
-
     def __init__(
         self,
-        likelihood_estimator: DensityEstimator,
+        likelihood_estimator: ConditionalDensityEstimator,
         prior: Distribution,
         x_o: Optional[Tensor],
         device: str = "cpu",
@@ -90,20 +88,37 @@ class LikelihoodBasedPotential(BasePotential):
         Returns:
             The potential $\log(p(x_o|\theta)p(\theta))$.
         """
-
-        # Calculate likelihood over trials and in one batch.
-        log_likelihood_trial_sum = _log_likelihoods_over_trials(
-            x=self.x_o,
-            theta=theta.to(self.device),
-            estimator=self.likelihood_estimator,
-            track_gradients=track_gradients,
-        )
-
-        return log_likelihood_trial_sum + self.prior.log_prob(theta)  # type: ignore
+        if self.x_is_iid:
+            # For each theta, calculate the likelihood sum over all x in batch.
+            log_likelihood_trial_sum = _log_likelihoods_over_trials(
+                x=self.x_o,
+                theta=theta.to(self.device),
+                estimator=self.likelihood_estimator,
+                track_gradients=track_gradients,
+            )
+            return log_likelihood_trial_sum + self.prior.log_prob(theta)  # type: ignore
+        else:
+            # Calculate likelihood for each (theta,x) pair separately
+            theta_batch_size = theta.shape[0]
+            x_batch_size = self.x_o.shape[0]
+            assert (
+                theta_batch_size == x_batch_size
+            ), f"Batch size mismatch: {theta_batch_size} and {x_batch_size}.\
+                When performing batched sampling for multiple `x`, the batch size of\
+                `theta` must match the batch size of `x`."
+            x = self.x_o.unsqueeze(0)
+            with torch.set_grad_enabled(track_gradients):
+                log_likelihood_batches = self.likelihood_estimator.log_prob(
+                    x, condition=theta
+                )
+            return log_likelihood_batches + self.prior.log_prob(theta)  # type: ignore
 
 
 def _log_likelihoods_over_trials(
-    x: Tensor, theta: Tensor, estimator: DensityEstimator, track_gradients: bool = False
+    x: Tensor,
+    theta: Tensor,
+    estimator: ConditionalDensityEstimator,
+    track_gradients: bool = False,
 ) -> Tensor:
     r"""Return log likelihoods summed over iid trials of `x`.
 

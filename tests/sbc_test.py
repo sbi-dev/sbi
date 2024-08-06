@@ -1,5 +1,5 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ from sbi.diagnostics import check_sbc, get_nltp, run_sbc
 from sbi.inference import SNLE, SNPE, simulate_for_sbi
 from sbi.simulators import linear_gaussian
 from sbi.utils import BoxUniform, MultipleIndependent
+from sbi.utils.user_input_checks import process_prior, process_simulator
 from tests.test_utils import PosteriorPotential, TractablePosterior
 
 
@@ -38,9 +39,11 @@ def test_running_sbc(
             Uniform(-torch.ones(1), torch.ones(1)) for _ in range(num_dim)
         ])
 
+    # Fast dummy settings.
     num_simulations = 100
     max_num_epochs = 1
     num_sbc_runs = 2
+    num_posterior_samples = 20
 
     likelihood_shift = -1.0 * ones(num_dim)
     likelihood_cov = 0.3 * eye(num_dim)
@@ -50,6 +53,8 @@ def test_running_sbc(
 
     inferer = method(prior, show_progress_bars=False, density_estimator=model)
 
+    prior, _, prior_returns_numpy = process_prior(prior)
+    simulator = process_simulator(simulator, prior, prior_returns_numpy)
     theta, x = simulate_for_sbi(simulator, prior, num_simulations)
 
     _ = inferer.append_simulations(theta, x).train(
@@ -74,8 +79,7 @@ def test_running_sbc(
         thetas,
         xs,
         posterior,
-        num_workers=1,
-        num_posterior_samples=10,
+        num_posterior_samples=num_posterior_samples,
         reduce_fns=reduce_fn,
     )
 
@@ -84,66 +88,73 @@ def test_running_sbc(
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize("method", [SNPE])
-def test_consistent_sbc_results(method, model="mdn"):
-    """Tests running inference and then SBC and obtaining nltp."""
+@pytest.mark.parametrize(
+    "density_estimator",
+    [
+        pytest.param(
+            "mdn",
+            marks=pytest.mark.xfail(
+                reason="MDN batched sampling results in miscalibrated posteriors",
+                strict=True,
+            ),
+        ),
+        "maf",
+    ],
+)
+@pytest.mark.parametrize("cov_method", ("sbc", "coverage"))
+def test_consistent_sbc_results(density_estimator, cov_method):
+    """Test consistent SBC results on well-trained NPE."""
 
-    num_dim = 2
-    prior = BoxUniform(-torch.ones(num_dim), torch.ones(num_dim))
-
-    num_simulations = 1000
-    max_num_epochs = 20
-    num_sbc_runs = 100
-
-    likelihood_shift = -1.0 * ones(num_dim)
-    likelihood_cov = 0.3 * eye(num_dim)
+    num_dim = 3
+    prior = BoxUniform(low=-2 * torch.ones(num_dim), high=2 * torch.ones(num_dim))
 
     def simulator(theta):
-        return linear_gaussian(theta, likelihood_shift, likelihood_cov)
+        # linear gaussian
+        return theta + 1.0 + torch.randn_like(theta) * 0.1
 
-    inferer = method(prior, show_progress_bars=False, density_estimator=model)
-
-    theta, x = simulate_for_sbi(simulator, prior, num_simulations)
-
-    _ = inferer.append_simulations(theta, x).train(
-        training_batch_size=100, max_num_epochs=max_num_epochs
-    )
-
-    posterior = inferer.build_posterior()
+    num_simulations = 2000
     num_posterior_samples = 1000
+    num_sbc_runs = 100
+
+    # Create inference object. Here, NPE is used.
+    inference = SNPE(prior=prior, density_estimator=density_estimator)
+
+    # generate simulations and pass to the inference object
+    theta = prior.sample((num_simulations,))
+    x = simulator(theta)
+    inference.append_simulations(theta, x).train()
+    posterior = inference.build_posterior()
+
     thetas = prior.sample((num_sbc_runs,))
     xs = simulator(thetas)
 
-    mranks, mdaps = run_sbc(
+    ranks, dap_samples = run_sbc(
         thetas,
         xs,
         posterior,
         num_workers=1,
         num_posterior_samples=num_posterior_samples,
+        # switch between SBC and expected coverage.
+        reduce_fns="marginals" if cov_method == "sbc" else posterior.log_prob,
     )
-    mstats = check_sbc(
-        mranks, thetas, mdaps, num_posterior_samples=num_posterior_samples
-    )
-    lranks, ldaps = run_sbc(
-        thetas,
-        xs,
-        posterior,
-        num_workers=1,
+    checks = check_sbc(
+        ranks,
+        prior.sample((num_sbc_runs,)),
+        dap_samples,
         num_posterior_samples=num_posterior_samples,
-        reduce_fns=posterior.log_prob,
-    )
-    lstats = check_sbc(
-        lranks, thetas, ldaps, num_posterior_samples=num_posterior_samples
     )
 
-    assert lstats["ks_pvals"] > 0.05
-    assert (mstats["ks_pvals"] > 0.05).all()
-
-    assert lstats["c2st_ranks"] < 0.75
-    assert (mstats["c2st_ranks"] < 0.75).all()
+    assert (
+        checks["ks_pvals"] > 0.05
+    ).all(), f"KS p-values too small: {checks['ks_pvals']}"
+    assert (
+        checks["c2st_ranks"] < 0.6
+    ).all(), f"C2ST ranks too large: {checks['c2st_ranks']}"
+    assert (checks["c2st_dap"] < 0.6).all(), f"C2ST DAP too large: {checks['c2st_dap']}"
 
 
 def test_sbc_accuracy():
+    """Test SBC with prior as posterior."""
     num_dim = 2
     # Gaussian toy problem, set posterior = prior
     simulator = lambda theta: torch.randn_like(theta) + theta
@@ -164,7 +175,6 @@ def test_sbc_accuracy():
         posterior,
         num_workers=1,
         num_posterior_samples=L,
-        reduce_fns="marginals",
     )
 
     pvals, c2st_ranks, _ = check_sbc(

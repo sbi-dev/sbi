@@ -1,14 +1,17 @@
+# This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+
 from typing import Tuple
 
 import torch
 from torch import Tensor, nn
 from zuko.flows.core import Flow
 
-from sbi.neural_nets.density_estimators.base import DensityEstimator
+from sbi.neural_nets.density_estimators.base import ConditionalDensityEstimator
 from sbi.sbi_types import Shape
 
 
-class ZukoFlow(DensityEstimator):
+class ZukoFlow(ConditionalDensityEstimator):
     r"""`zuko`- based normalizing flow density estimator.
 
     Flow type objects already have a .log_prob() and .sample() method, so here we just
@@ -16,17 +19,25 @@ class ZukoFlow(DensityEstimator):
     """
 
     def __init__(
-        self, net: Flow, embedding_net: nn.Module, condition_shape: torch.Size
+        self,
+        net: Flow,
+        embedding_net: nn.Module,
+        input_shape: torch.Size,
+        condition_shape: torch.Size,
     ):
         r"""Initialize the density estimator.
 
         Args:
             flow: Flow object.
-            condition_shape: Shape of the condition.
+            input_shape: Event shape of the input at which the density is being
+                evaluated (and which is also the event_shape of samples).
+            condition_shape: Event shape of the condition.
         """
 
         # assert len(condition_shape) == 1, "Zuko Flows require 1D conditions."
-        super().__init__(net=net, condition_shape=condition_shape)
+        super().__init__(
+            net=net, input_shape=input_shape, condition_shape=condition_shape
+        )
         self._embedding_net = embedding_net
 
     @property
@@ -67,7 +78,7 @@ class ZukoFlow(DensityEstimator):
         """
 
         self._check_condition_shape(condition)
-        condition_dims = len(self._condition_shape)
+        condition_dims = len(self.condition_shape)
 
         # PyTorch's automatic broadcasting
         batch_shape_in = input.shape[:-1]
@@ -90,6 +101,8 @@ class ZukoFlow(DensityEstimator):
         Args:
             input: Inputs to evaluate the log probability on. Of shape
                 `(sample_dim, batch_dim, *event_shape)`.
+            # TODO: the docstring is not correct here. in the code it seems we
+            do not have a sample_dim for the condition.
             condition: Conditions of shape `(sample_dim, batch_dim, *event_shape)`.
 
         Raises:
@@ -113,18 +126,17 @@ class ZukoFlow(DensityEstimator):
         return log_probs
 
     def loss(self, input: Tensor, condition: Tensor) -> Tensor:
-        r"""Return the loss for training the density estimator.
+        r"""Return the negative log-probability for training the density estimator.
 
         Args:
-            input: Inputs to evaluate the loss on of shape
-                `(sample_dim, batch_dim, *event_shape)`.
-            condition: Conditions of shape `(sample_dim, batch_dim, *event_dim)`.
+            input: Inputs of shape `(batch_dim, *input_event_shape)`.
+            condition: Conditions of shape `(batch_dim, *condition_event_shape)`.
 
         Returns:
-            Negative log_probability of shape `(input_sample_dim, condition_batch_dim)`.
+            Negative log-probability of shape `(batch_dim,)`.
         """
 
-        return -self.log_prob(input, condition)
+        return -self.log_prob(input.unsqueeze(0), condition)[0]
 
     def sample(self, sample_shape: Shape, condition: Tensor) -> Tensor:
         r"""Return samples from the density estimator.

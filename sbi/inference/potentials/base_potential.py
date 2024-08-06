@@ -1,3 +1,6 @@
+# This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+
 from abc import ABCMeta, abstractmethod
 from typing import Optional
 
@@ -33,15 +36,22 @@ class BasePotential(metaclass=ABCMeta):
         raise NotImplementedError
 
     @property
-    @abstractmethod
-    def allow_iid_x(self) -> bool:
-        raise NotImplementedError
+    def x_is_iid(self) -> bool:
+        """If x has batch dimension greater than 1, whether to intepret the batch as iid
+        samples or batch of data points."""
+        if self._x_is_iid is not None:
+            return self._x_is_iid
+        else:
+            raise ValueError(
+                "No observed data is available. Use `potential_fn.set_x(x_o)`."
+            )
 
-    def set_x(self, x_o: Optional[Tensor]):
+    def set_x(self, x_o: Optional[Tensor], x_is_iid: Optional[bool] = True):
         """Check the shape of the observed data and, if valid, set it."""
         if x_o is not None:
-            x_o = process_x(x_o, allow_iid_x=self.allow_iid_x).to(self.device)
+            x_o = process_x(x_o).to(self.device)
         self._x_o = x_o
+        self._x_is_iid = x_is_iid
 
     @property
     def x_o(self) -> Tensor:

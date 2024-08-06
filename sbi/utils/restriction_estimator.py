@@ -1,3 +1,6 @@
+# This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+
 from copy import deepcopy
 from math import floor
 from typing import Any, Callable, Optional, Tuple, Union
@@ -5,9 +8,10 @@ from typing import Any, Callable, Optional, Tuple, Union
 import torch
 import torch.nn.functional as F
 from pyknos.nflows.nn import nets
-from torch import Tensor, nn, optim, relu
+from torch import Tensor, nn, relu
 from torch.distributions import Distribution
 from torch.nn.utils.clip_grad import clip_grad_norm_
+from torch.optim.adam import Adam
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler, WeightedRandomSampler
 
@@ -322,7 +326,7 @@ class RestrictionEstimator:
             self._first_round_validation_theta = theta[val_indices]
             self._first_round_validation_label = label[val_indices]
 
-        optimizer = optim.Adam(
+        optimizer = Adam(
             list(self._classifier.parameters()),
             lr=learning_rate,
         )

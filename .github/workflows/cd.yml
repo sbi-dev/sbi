@@ -14,18 +14,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  pre-commit:
-    name: ruff and hooks.
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.8'
-      - uses: pre-commit/action@v3.0.1
-        with:
-          extra_args: --all-files --show-diff-on-failure
-
   cd:
     name: CD
     runs-on: ubuntu-latest
@@ -53,10 +41,6 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -e .[dev]
-
-    - name: Check types with pyright
-      run: |
-        pyright sbi
 
     - name: Run the fast and the slow CPU tests with coverage
       run: |

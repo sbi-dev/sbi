@@ -1,6 +1,5 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
-
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from typing import Callable, Optional, Union
 
@@ -8,7 +7,7 @@ from torch.distributions import Distribution
 
 from sbi.inference.snle.snle_base import LikelihoodEstimator
 from sbi.sbi_types import TensorboardSummaryWriter
-from sbi.utils import del_entries
+from sbi.utils.sbiutils import del_entries
 
 
 class SNLE_A(LikelihoodEstimator):

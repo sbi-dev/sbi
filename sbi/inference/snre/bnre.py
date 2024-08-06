@@ -1,3 +1,6 @@
+# This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+
 from typing import Callable, Dict, Optional, Union
 
 import torch
@@ -6,7 +9,7 @@ from torch.distributions import Distribution
 
 from sbi.inference.snre.snre_a import SNRE_A
 from sbi.sbi_types import TensorboardSummaryWriter
-from sbi.utils import del_entries
+from sbi.utils.sbiutils import del_entries
 
 
 class BNRE(SNRE_A):

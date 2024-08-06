@@ -1,22 +1,36 @@
+# This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+
 from typing import Tuple
 
 import torch
 from pyknos.nflows.flows import Flow
 from torch import Tensor, nn
 
-from sbi.neural_nets.density_estimators.base import DensityEstimator
+from sbi.neural_nets.density_estimators.base import ConditionalDensityEstimator
 from sbi.sbi_types import Shape
 
 
-class NFlowsFlow(DensityEstimator):
+class NFlowsFlow(ConditionalDensityEstimator):
     r"""`nflows`- based normalizing flow density estimator.
 
     Flow type objects already have a .log_prob() and .sample() method, so here we just
     wrap them and add the .loss() method.
     """
 
-    def __init__(self, net: Flow, condition_shape: torch.Size) -> None:
-        super().__init__(net, condition_shape)
+    def __init__(
+        self, net: Flow, input_shape: torch.Size, condition_shape: torch.Size
+    ) -> None:
+        """Initialize density estimator which wraps flows from the `nflows` library.
+
+        Args:
+            net: The raw `nflows` flow.
+            input_shape: Event shape of the input at which the density is being
+                evaluated (and which is also the event_shape of samples).
+            condition_shape: Shape of the condition. If not provided, it will assume a
+                1D input.
+        """
+        super().__init__(net, input_shape=input_shape, condition_shape=condition_shape)
         # TODO: Remove as soon as DensityEstimator becomes abstract
         self.net: Flow
 
@@ -41,23 +55,9 @@ class NFlowsFlow(DensityEstimator):
 
         Returns:
             noise: Transformed inputs.
-
-        Note:
-            This function should support PyTorch's automatic broadcasting. This means
-            the function should behave as follows for different input and condition
-            shapes:
-            - (input_size,) + (batch_size,*condition_shape) -> (batch_size,)
-            - (batch_size, input_size) + (*condition_shape) -> (batch_size,)
-            - (batch_size, input_size) + (batch_size, *condition_shape) -> (batch_size,)
-            - (batch_size1, input_size) + (batch_size2, *condition_shape)
-                                                  -> RuntimeError i.e. not broadcastable
-            - (batch_size1,1, input_size) + (batch_size2, *condition_shape)
-                                                  -> (batch_size1,batch_size2)
-            - (batch_size1, input_size) + (batch_size2,1, *condition_shape)
-                                                  -> (batch_size2,batch_size1)
         """
         self._check_condition_shape(condition)
-        condition_dims = len(self._condition_shape)
+        condition_dims = len(self.condition_shape)
 
         # PyTorch's automatic broadcasting
         batch_shape_in = input.shape[:-1]
@@ -65,10 +65,10 @@ class NFlowsFlow(DensityEstimator):
         batch_shape = torch.broadcast_shapes(batch_shape_in, batch_shape_cond)
         # Expand the input and condition to the same batch shape
         input = input.expand(batch_shape + (input.shape[-1],))
-        condition = condition.expand(batch_shape + self._condition_shape)
+        condition = condition.expand(batch_shape + self.condition_shape)
         # Flatten required by nflows, but now both have the same batch shape
         input = input.reshape(-1, input.shape[-1])
-        condition = condition.reshape(-1, *self._condition_shape)
+        condition = condition.reshape(-1, *self.condition_shape)
 
         noise, _ = self.net._transorm(input, context=condition)
         noise = noise.reshape(batch_shape)
@@ -110,17 +110,16 @@ class NFlowsFlow(DensityEstimator):
         return log_probs.reshape((input_sample_dim, input_batch_dim))
 
     def loss(self, input: Tensor, condition: Tensor) -> Tensor:
-        r"""Return the loss for training the density estimator.
+        r"""Return the negative log-probability for training the density estimator.
 
         Args:
-            input: Inputs to evaluate the loss on of shape
-                `(sample_dim, batch_dim, *event_shape)`.
-            condition: Conditions of shape `(sample_dim, batch_dim, *event_dim)`.
+            input: Inputs of shape `(batch_dim, *input_event_shape)`.
+            condition: Conditions of shape `(batch_dim, *condition_event_shape)`.
 
         Returns:
-            Negative log_probability of shape `(input_sample_dim, condition_batch_dim)`.
+            Negative log-probability of shape `(batch_dim,)`.
         """
-        return -self.log_prob(input, condition)
+        return -self.log_prob(input.unsqueeze(0), condition)[0]
 
     def sample(self, sample_shape: Shape, condition: Tensor) -> Tensor:
         r"""Return samples from the density estimator.
@@ -136,12 +135,10 @@ class NFlowsFlow(DensityEstimator):
         num_samples = torch.Size(sample_shape).numel()
 
         samples = self.net.sample(num_samples, context=condition)
-
-        return samples.reshape((
-            *sample_shape,
-            condition_batch_dim,
-            -1,
-        ))
+        # Change from Nflows' convention of (batch_dim, sample_dim, *event_shape) to
+        # (sample_dim, batch_dim, *event_shape) (PyTorch + SBI).
+        samples = samples.transpose(0, 1)
+        return samples.reshape((*sample_shape, condition_batch_dim, *self.input_shape))
 
     def sample_and_log_prob(
         self, sample_shape: torch.Size, condition: Tensor, **kwargs

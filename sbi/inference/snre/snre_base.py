@@ -1,16 +1,20 @@
+# This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from typing import Any, Callable, Dict, Optional, Union
 
 import torch
-from torch import Tensor, eye, nn, ones, optim
+from torch import Tensor, eye, nn, ones
 from torch.distributions import Distribution
 from torch.nn.utils.clip_grad import clip_grad_norm_
+from torch.optim.adam import Adam
 from torch.utils.tensorboard.writer import SummaryWriter
 
-from sbi import utils as utils
 from sbi.inference.base import NeuralInference
 from sbi.inference.posteriors import MCMCPosterior, RejectionPosterior, VIPosterior
+from sbi.inference.posteriors.importance_posterior import ImportanceSamplingPosterior
 from sbi.inference.potentials import ratio_estimator_based_potential
 from sbi.neural_nets import classifier_nn
 from sbi.utils import (
@@ -19,6 +23,7 @@ from sbi.utils import (
     clamp_and_warn,
     x_shape_from_simulation,
 )
+from sbi.utils.torchutils import repeat_rows
 
 
 class RatioEstimator(NeuralInference, ABC):
@@ -203,7 +208,7 @@ class RatioEstimator(NeuralInference, ABC):
         self._neural_net.to(self._device)
 
         if not resume_training:
-            self.optimizer = optim.Adam(
+            self.optimizer = Adam(
                 list(self._neural_net.parameters()),
                 lr=learning_rate,
             )
@@ -290,7 +295,7 @@ class RatioEstimator(NeuralInference, ABC):
         The logits are obtained from atomic sets of (theta,x) pairs.
         """
         batch_size = theta.shape[0]
-        repeated_x = utils.repeat_rows(x, num_atoms)
+        repeated_x = repeat_rows(x, num_atoms)
 
         # Choose `1` or `num_atoms - 1` thetas from the rest of the batch for each x.
         probs = ones(batch_size, batch_size) * (1 - eye(batch_size)) / (batch_size - 1)
@@ -303,7 +308,7 @@ class RatioEstimator(NeuralInference, ABC):
             batch_size * num_atoms, -1
         )
 
-        return self._neural_net([atomic_theta, repeated_x])
+        return self._neural_net(atomic_theta, repeated_x)
 
     @abstractmethod
     def _loss(self, theta: Tensor, x: Tensor, num_atoms: int) -> Tensor:
@@ -319,7 +324,10 @@ class RatioEstimator(NeuralInference, ABC):
         mcmc_parameters: Optional[Dict[str, Any]] = None,
         vi_parameters: Optional[Dict[str, Any]] = None,
         rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
-    ) -> Union[MCMCPosterior, RejectionPosterior, VIPosterior]:
+        importance_sampling_parameters: Optional[Dict[str, Any]] = None,
+    ) -> Union[
+        MCMCPosterior, RejectionPosterior, VIPosterior, ImportanceSamplingPosterior
+    ]:
         r"""Build posterior from the neural density estimator.
 
         SNRE trains a neural network to approximate likelihood ratios. The
@@ -369,7 +377,7 @@ class RatioEstimator(NeuralInference, ABC):
         else:
             ratio_estimator = density_estimator
             # Otherwise, infer it from the device of the net parameters.
-            device = next(density_estimator.parameters()).device.type
+            device = str(next(density_estimator.parameters()).device)
 
         potential_fn, theta_transform = ratio_estimator_based_potential(
             ratio_estimator=ratio_estimator,
@@ -384,7 +392,6 @@ class RatioEstimator(NeuralInference, ABC):
                 proposal=prior,
                 method=mcmc_method,
                 device=device,
-                x_shape=self._x_shape,
                 **mcmc_parameters or {},
             )
         elif sample_with == "rejection":
@@ -392,7 +399,6 @@ class RatioEstimator(NeuralInference, ABC):
                 potential_fn=potential_fn,
                 proposal=prior,
                 device=device,
-                x_shape=self._x_shape,
                 **rejection_sampling_parameters or {},
             )
         elif sample_with == "vi":
@@ -402,8 +408,14 @@ class RatioEstimator(NeuralInference, ABC):
                 prior=prior,  # type: ignore
                 vi_method=vi_method,
                 device=device,
-                x_shape=self._x_shape,
                 **vi_parameters or {},
+            )
+        elif sample_with == "importance":
+            self._posterior = ImportanceSamplingPosterior(
+                potential_fn=potential_fn,
+                proposal=prior,
+                device=device,
+                **importance_sampling_parameters or {},
             )
         else:
             raise NotImplementedError
