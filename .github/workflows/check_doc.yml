@@ -1,11 +1,11 @@
-name: "docs"
+name: "build docs"
 on:
-  pull_request:
-    branches: [ main ]
+  release:
+    types: [ published ]
 
 jobs:
   docs:
-    name: Check Documentation
+    name: Build Documentation
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
@@ -31,10 +31,17 @@ jobs:
         python -m pip install --upgrade pip
         python -m pip install .[doc]
 
-    - name: Build documentation
+    - name: convert notebooks to markdown
       run: |
         cd docs
-        mkdocs build
+        mkdir -p docs/examples/ && mkdir -p docs/tutorials/
+        jupyter nbconvert --to markdown ../examples/*.ipynb --output-dir docs/examples/
+        jupyter nbconvert --to markdown ../tutorials/*.ipynb --output-dir docs/tutorials/
+
+    - name: Build and deploy documentation
+      run: |
+        cd docs
+        mkdocs gh-deploy
 
     - uses: actions/upload-artifact@v1
       with:
