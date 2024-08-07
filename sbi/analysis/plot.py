@@ -2094,7 +2094,7 @@ def pp_plot_lc2st(
     )
 
 
-def plot_tarp(ecp: Tensor, alpha: Tensor, title="") -> Tuple[Figure, Axes]:
+def plot_tarp(ecp: Tensor, alpha: Tensor, title: Optional[str]) -> Tuple[Figure, Axes]:
     """
     Plots the expected coverage probability (ECP) against the credibility
     level,alpha, for a given alpha grid.
@@ -2117,6 +2117,8 @@ def plot_tarp(ecp: Tensor, alpha: Tensor, title="") -> Tuple[Figure, Axes]:
 
     fig = plt.figure(figsize=(6, 6))
     ax: Axes = plt.gca()
+    if title is None:
+        title = ""
 
     ax.plot(alpha, ecp, color="blue", label="TARP")
     ax.plot(alpha, alpha, color="black", linestyle="--", label="ideal")

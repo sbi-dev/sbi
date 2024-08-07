@@ -3,11 +3,14 @@
 
 from __future__ import annotations
 
+from typing import Union
+
 import pytest
 import torch
 from torch import eye, ones, zeros
 from torch.distributions import MultivariateNormal, Uniform
 
+from sbi.analysis import sbc_rank_plot
 from sbi.diagnostics import check_sbc, get_nltp, run_sbc
 from sbi.inference import SNLE, SNPE, simulate_for_sbi
 from sbi.simulators import linear_gaussian
@@ -208,3 +211,32 @@ def test_sbc_checks():
     assert (checks["ks_pvals"] > 0.05).all()
     assert (checks["c2st_ranks"] < 0.55).all()
     assert (checks["c2st_dap"] < 0.55).all()
+
+
+# add test for sbc plotting
+@pytest.mark.parametrize("num_bins", (None, 30))
+@pytest.mark.parametrize("plot_type", ("cdf", "hist"))
+@pytest.mark.parametrize("legend_kwargs", (None, {"loc": "upper left"}))
+@pytest.mark.parametrize("num_rank_sets", (1, 2))
+def test_sbc_plotting(
+    num_bins: int, plot_type: str, legend_kwargs: Union[None, dict], num_rank_sets: int
+):
+    """Test the uniformity checks for SBC."""
+
+    num_dim = 2
+    num_posterior_samples = 1000
+
+    # Ranks should be distributed uniformly in [0, num_posterior_samples]
+    ranks = [
+        torch.distributions.Uniform(
+            zeros(num_dim), num_posterior_samples * ones(num_dim)
+        ).sample((num_posterior_samples,))
+    ] * num_rank_sets
+
+    sbc_rank_plot(
+        ranks,
+        num_posterior_samples,
+        num_bins=num_bins,
+        plot_type=plot_type,
+        legend_kwargs=legend_kwargs,
+    )

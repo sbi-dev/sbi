@@ -4,6 +4,7 @@ from torch import Tensor, allclose, exp, eye, ones
 from torch.distributions import Normal, Uniform
 from torch.nn import L1Loss
 
+from sbi.analysis.plot import plot_tarp
 from sbi.diagnostics.tarp import _run_tarp, check_tarp, get_tarp_references, run_tarp
 from sbi.inference import SNPE
 from sbi.simulators import linear_gaussian
@@ -286,3 +287,14 @@ def test_consistent_run_tarp_results_with_posterior(method):
     atc, kspvals = check_tarp(ecp, alpha)
     assert -0.5 < atc < 0.5
     assert kspvals > 0.05
+
+
+# Test tarp plotting
+@pytest.mark.parametrize("title", ["Correct", None])
+def test_tarp_plotting(title: str, accurate_samples):
+    theta, samples = accurate_samples
+    references = get_tarp_references(theta)
+
+    ecp, alpha = _run_tarp(samples, theta, references)
+
+    plot_tarp(ecp, alpha, title=title)
