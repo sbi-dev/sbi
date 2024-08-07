@@ -66,10 +66,6 @@ markdown_extensions:
 
 plugins:
   - search
-  - mkdocs-jupyter:
-      include: ["*.ipynb"] # Default: ["*.py", "*.ipynb"]
-      ignore: [".ipynb_checkpoints/*.ipynb"]
-      no_input: True
   - mkdocstrings:
       default_handler: python
       handlers:

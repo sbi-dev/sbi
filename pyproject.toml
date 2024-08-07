@@ -56,7 +56,6 @@ doc = [
     "mkdocs-material",
     "markdown-include",
     "mkdocs-redirects",
-    "mkdocs-jupyter",
     "mkdocstrings[python] >= 0.18",
 ]
 dev = [
