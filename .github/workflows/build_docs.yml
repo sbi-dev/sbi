@@ -1,5 +1,8 @@
-name: "build docs"
+name: "Build docs and deploy"
 on:
+  push:
+    branches:
+      - main
   release:
     types: [ published ]
 
@@ -17,7 +20,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v2
       with:
-        python-version: '3.8'
+        python-version: '3.10'
 
     - name: Cache dependency
       id: cache-dependencies
@@ -34,16 +37,17 @@ jobs:
     - name: convert notebooks to markdown
       run: |
         cd docs
-        mkdir -p docs/examples/ && mkdir -p docs/tutorials/
         jupyter nbconvert --to markdown ../examples/*.ipynb --output-dir docs/examples/
         jupyter nbconvert --to markdown ../tutorials/*.ipynb --output-dir docs/tutorials/
 
-    - name: Build and deploy documentation
+    - name: Build and deploy dev documentation
+      if: ${{ github.event_name == 'push' }}
       run: |
         cd docs
-        mkdocs gh-deploy
+        mike deploy dev --push
 
-    - uses: actions/upload-artifact@v1
-      with:
-        name: DocumentationHTML
-        path: docs/site/
+    - name: Build and deploy the lastest documentation
+      if: ${{ github.event_name == 'release' }}
+      run: |
+        cd docs
+        mike deploy ${{ github.event.release.name }} latest -u --push

@@ -210,8 +210,15 @@ fails (xfailed).
 ## Contributing to the documentation
 Most of the documentation for `sbi` is written in markdown and the website is
 generated using `mkdocs` with `mkdocstrings`. To work on improvements of the
-documentation, you should first run the command on your terminal
+documentation, you should first  install the `doc` dependencies:
 ```
+pip install -e ".[doc]"
+```
+Then, you can run the command on your terminal
+```
+cd docs
+jupyter nbconvert --to markdown ../examples/*.ipynb --output-dir docs/examples/
+jupyter nbconvert --to markdown ../tutorials/*.ipynb --output-dir docs/tutorials/
 mkdocs serve
 ```
 and open a browser on the page proposed by `mkdocs`. Now, whenever you

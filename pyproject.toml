@@ -57,6 +57,7 @@ doc = [
     "markdown-include",
     "mkdocs-redirects",
     "mkdocstrings[python] >= 0.18",
+    "mike"
 ]
 dev = [
     # Lint
