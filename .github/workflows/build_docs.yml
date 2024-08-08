@@ -40,13 +40,18 @@ jobs:
         jupyter nbconvert --to markdown ../examples/*.ipynb --output-dir docs/examples/
         jupyter nbconvert --to markdown ../tutorials/*.ipynb --output-dir docs/tutorials/
 
-    - name: Build and deploy dev documentation
+    - name: Configure Git user for bot
+      run: |
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+
+    - name: Build and deploy dev documentation upon push to main
       if: ${{ github.event_name == 'push' }}
       run: |
         cd docs
         mike deploy dev --push
 
-    - name: Build and deploy the lastest documentation
+    - name: Build and deploy the lastest documentation upon new release
       if: ${{ github.event_name == 'release' }}
       run: |
         cd docs
