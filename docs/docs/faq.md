@@ -7,3 +7,7 @@
 5. [How should I save and load objects in `sbi`?](faq/question_05_pickling.md)
 6. [Can I stop neural network training and resume it later?](faq/question_06_resume_training.md)
 7. [How can I use a prior that is not defined in PyTorch?](faq/question_07_custom_prior.md)
+
+See also [discussion page](https://github.com/sbi-dev/sbi/discussions) and [issue
+tracker](https://github.com/sbi-dev/sbi/issues) on the `sbi` GitHub repository for
+recent questions and problems.

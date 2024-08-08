@@ -45,7 +45,7 @@ Then, check out our material:
 -  :rocket: [__Tutorials and Examples__](tutorials/index.md)
    <br/><br/>
    *Various examples illustrating how to<br/> [get
-   started](tutorials/00_getting_started_flexible/) or use the `sbi` package.*
+   started](tutorials/00_getting_started_flexible.md) or use the `sbi` package.*
 
 -  :building_construction: [__Reference API__](reference/index.md)
    <br/><br/>
@@ -124,7 +124,7 @@ the inference on one particular observation to be more simulation-efficient
 Below, we list all implemented methods and the corresponding publications. To see
 how to access these methods in `sbi`, check out our [Inference API's reference](
 reference/inference.md) and the [tutorial on implemented
-methods](tutorials/16_implemented_methods.ipynb).
+methods](tutorials/16_implemented_methods.md).
 
 ### Posterior estimation (`(S)NPE`)
 

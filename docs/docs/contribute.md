@@ -179,19 +179,22 @@ to also run them without `-n auto`.
 When you create a PR onto `main`, our Continuous Integration (CI) actions on
 GitHub will perform the following checks:
 
-- **`ruff`** for linting and formatting (including `black`, `isort`, and `flake8`)
+- **[`ruff`](https://docs.astral.sh/ruff/formatter/)** for linting and formatting
+  (including `black`, `isort`, and `flake8`)
 - **[`pyright`](https://github.com/Microsoft/pyright)** for static type checking.
-- **`pytest`** for running a subset of fast tests from our test suite.
+- **[`pytest`](https://docs.pytest.org/en/stable/index.html)** for running a subset of
+  fast tests from our test suite.
 
 If any of these fail, try reproducing and solving the error locally:
 
-- **`ruff`**: Make sure you have `pre-commit` installed locally with the same
- version as specified in the [requirements](pyproject.toml). Execute it
- using `pre-commit run --all-files`. `ruff` tends to give informative error
-  messages that help you fix the problem. Note that pre-commit only detects
-  problems with `ruff` linting and formatting, but does not fix them. You can
-  fix them either by running `ruff check . --fix(linting)`, followed by
-  `ruff format . --fix(formatting)`, or by hand.
+- **`ruff`**: Make sure you have `pre-commit` installed locally with the same version as
+ specified in the
+ [`pyproject.toml`](https://github.com/sbi-dev/sbi/blob/main/pyproject.toml). Execute it
+  using `pre-commit run --all-files`. `ruff` tends to give informative error messages
+  that help you fix the problem. Note that pre-commit only detects problems with `ruff`
+  linting and formatting, but does not fix them. You can fix them either by running
+  `ruff check . --fix(linting)`, followed by `ruff format . --fix(formatting)`, or by
+  hand.
 - **`pyright`**: Run it locally using `pyright sbi/` and ensure you are using
 the same
   `pyright` version as used in the CI (which is the case if you have installed
