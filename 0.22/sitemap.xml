@@ -86,12 +86,17 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
-         <loc>https://sbi-dev.github.io/sbi/0.22/tutorials/00_getting_started_flexible/</loc>
+         <loc>https://sbi-dev.github.io/sbi/0.22/tutorials/00_getting_started/</loc>
          <lastmod>2024-08-08</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://sbi-dev.github.io/sbi/0.22/tutorials/01_gaussian_amortized/</loc>
+         <lastmod>2024-08-08</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
+         <loc>https://sbi-dev.github.io/sbi/0.22/tutorials/02_flexible_interface/</loc>
          <lastmod>2024-08-08</lastmod>
          <changefreq>daily</changefreq>
     </url>
@@ -157,21 +162,6 @@
     </url>
     <url>
          <loc>https://sbi-dev.github.io/sbi/0.22/tutorials/16_implemented_methods/</loc>
-         <lastmod>2024-08-08</lastmod>
-         <changefreq>daily</changefreq>
-    </url>
-    <url>
-         <loc>https://sbi-dev.github.io/sbi/0.22/tutorials/17_importance_sampled_posteriors/</loc>
-         <lastmod>2024-08-08</lastmod>
-         <changefreq>daily</changefreq>
-    </url>
-    <url>
-         <loc>https://sbi-dev.github.io/sbi/0.22/tutorials/18_diagnostics_lc2st/</loc>
-         <lastmod>2024-08-08</lastmod>
-         <changefreq>daily</changefreq>
-    </url>
-    <url>
-         <loc>https://sbi-dev.github.io/sbi/0.22/tutorials/19_plotting_functionality/</loc>
          <lastmod>2024-08-08</lastmod>
          <changefreq>daily</changefreq>
     </url>

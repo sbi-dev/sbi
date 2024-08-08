@@ -1129,8 +1129,8 @@
 <span class="kn">from</span> <span class="nn">torch.distributions</span> <span class="kn">import</span> <span class="n">MultivariateNormal</span>
 
 <span class="kn">from</span> <span class="nn">sbi.analysis</span> <span class="kn">import</span> <span class="n">ActiveSubspace</span><span class="p">,</span> <span class="n">pairplot</span>
-<span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">infer</span><span class="p">,</span> <span class="n">simulate_for_sbi</span>
 <span class="kn">from</span> <span class="nn">sbi.simulators</span> <span class="kn">import</span> <span class="n">linear_gaussian</span>
+<span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">simulate_for_sbi</span><span class="p">,</span> <span class="n">infer</span>
 
 <span class="n">_</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
 </code></pre></div>
@@ -1151,7 +1151,7 @@
 <div class="codehilite"><pre><span></span><code>Running 2000 simulations.:   0%|          | 0/2000 [00:00&lt;?, ?it/s]
 
 
- Neural network successfully converged after 86 epochs.
+ Neural network successfully converged after 117 epochs.
 </code></pre></div>
 
 <div class="highlight"><pre><span></span><code><span class="n">posterior_samples</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">2000</span><span class="p">,))</span>
@@ -1170,19 +1170,19 @@
 </code></pre></div>
 
 <p>The method <code>.find_active()</code> returns eigenvalues and the corresponding eigenvectors. It does so by computing the matrix:</p>
-<p><span class="arithmatex">\(M = \mathbb{E}_{p(\theta|x_o)}[\nabla_{\theta}p(\theta|x_o)^T \nabla_{\theta}p(\theta|x_o)\)</span>]</p>
+<p><span class="arithmatex">\(M = \mathbb{E}_{p(\theta|x_o)}[\nabla_{\theta}p(\theta|x_o)^T \nabla_{\theta}p(\theta|x_o)\)</span>]  </p>
 <p>It then does an eigendecomposition:
-<span class="arithmatex">\(M = Q \Lambda Q^{-1}\)</span></p>
+<span class="arithmatex">\(M = Q \Lambda Q^{-1}\)</span>  </p>
 <p>A strong eigenvalue indicates that the gradient of the posterior density is large, i.e. the system output is sensitive to changes along the direction of the corresponding eigenvector (or <code>active</code>). The eigenvalue corresponding to the vector <code>[0.68, -0.73]</code> is much larger than the eigenvalue of <code>[0.73, 0.67]</code>. This matches the intuition we developed above.</p>
 <div class="highlight"><pre><span></span><code><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Eigenvalues: </span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">e_vals</span><span class="p">,</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Eigenvectors: </span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">e_vecs</span><span class="p">)</span>
 </code></pre></div>
 <div class="codehilite"><pre><span></span><code>Eigenvalues: 
- tensor([2.5892e-06, 9.2593e-05])
+ tensor([2.3552e-06, 7.0754e-05])
 
 Eigenvectors: 
- tensor([[-0.7012, -0.7130],
-        [-0.7130,  0.7012]])
+ tensor([[-0.7066, -0.7076],
+        [-0.7076,  0.7066]])
 </code></pre></div>
 
 <p>Lastly, we can project the data into the active dimensions. In this case, we will just use one active dimension:</p>
@@ -1211,7 +1211,7 @@ Eigenvectors:
 <div class="codehilite"><pre><span></span><code>Running 2000 simulations.:   0%|          | 0/2000 [00:00&lt;?, ?it/s]
 
 
- Neural network successfully converged after 74 epochs.
+ Neural network successfully converged after 139 epochs.
 </code></pre></div>
 
 <div class="highlight"><pre><span></span><code><span class="n">_</span> <span class="o">=</span> <span class="n">pairplot</span><span class="p">(</span><span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">10_000</span><span class="p">,)),</span> <span class="n">limits</span><span class="o">=</span><span class="p">[[</span><span class="o">-</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">]],</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">4</span><span class="p">))</span>
@@ -1234,12 +1234,12 @@ Running 5000 simulations.:   0%|          | 0/5000 [00:00&lt;?, ?it/s]
 </code></pre></div>
 
 <p>To investigate the sensitivity of a given parameter, we train a neural network to predict the <code>property_</code> from the parameters and then analyse the neural network as above:</p>
-<p><span class="arithmatex">\(M = \mathbb{E}_{p(\theta|x_o)}[\nabla_{\theta}f(\theta)^T \nabla_{\theta}f(\theta)\)</span>]</p>
+<p><span class="arithmatex">\(M = \mathbb{E}_{p(\theta|x_o)}[\nabla_{\theta}f(\theta)^T \nabla_{\theta}f(\theta)\)</span>]  </p>
 <p>where <span class="arithmatex">\(f(\cdot)\)</span> is the trained neural network.</p>
 <div class="highlight"><pre><span></span><code><span class="n">_</span> <span class="o">=</span> <span class="n">sensitivity</span><span class="o">.</span><span class="n">add_property</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">property_</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
 <span class="n">e_vals</span><span class="p">,</span> <span class="n">e_vecs</span> <span class="o">=</span> <span class="n">sensitivity</span><span class="o">.</span><span class="n">find_directions</span><span class="p">()</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code> Training neural network. Epochs trained:  67
+<div class="codehilite"><pre><span></span><code> Training neural network. Epochs trained:  24
 
 
 Drawing 1000 posterior samples:   0%|          | 0/1000 [00:00&lt;?, ?it/s]
@@ -1249,11 +1249,11 @@ Drawing 1000 posterior samples:   0%|          | 0/1000 [00:00&lt;?, ?it/s]
 <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Eigenvectors: </span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">e_vecs</span><span class="p">)</span>
 </code></pre></div>
 <div class="codehilite"><pre><span></span><code>Eigenvalues: 
- tensor([4.6135e-07, 3.3536e-05])
+ tensor([2.8801e-06, 6.1131e-05])
 
 Eigenvectors: 
- tensor([[ 0.0457,  0.9990],
-        [ 0.9990, -0.0457]])
+ tensor([[ 0.0362,  0.9993],
+        [ 0.9993, -0.0362]])
 </code></pre></div>
 
 <p>As we can see, one of the eigenvalues is much smaller than the other one. The larger eigenvalue represents (approximately) the vector <code>[1.0, 0.0]</code>. This makes sense, because only the <code>property_</code> is influenced only by the first output which, in turn, is influenced only by the first parameter.</p>

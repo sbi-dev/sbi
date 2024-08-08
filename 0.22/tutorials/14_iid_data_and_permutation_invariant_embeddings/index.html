@@ -1182,47 +1182,43 @@
 
 
 <h1 id="sbi-with-iid-data-and-permutation-invariant-embeddings">SBI with iid data and permutation-invariant embeddings<a class="headerlink" href="#sbi-with-iid-data-and-permutation-invariant-embeddings" title="Permanent link">&para;</a></h1>
-<p>There are scenarios in which we observe multiple data points per experiment and we can assume that they are independent and identically distributed (iid, i.e., they are assumed to have the same underlying model parameters).
-For example, in decision-making experiments, the experiment is often repeated in trials with the same experimental settings and conditions. The corresponding set of trials is then assumed to be &ldquo;iid&rdquo; given a single parameter set.
-In such a scenario, we may want to obtain the posterior given a set of observation <span class="arithmatex">\(p(\theta | X=\{x_i\}_i^N)\)</span>.</p>
+<p>There are scenarios in which we observe multiple data points per experiment and we can assume that they are independent and identically distributed (iid, i.e., they are assumed to have the same underlying model parameters). 
+For example, in decision-making experiments, the experiment is often repeated in trials with the same experimental settings and conditions. The corresponding set of trials is then assumed to be &ldquo;iid&rdquo; given a single parameter set. 
+In such a scenario, we may want to obtain the posterior given a set of observation <span class="arithmatex">\(p(\theta | X=\{x_i\}_i^N)\)</span>. </p>
 <h3 id="amortization-of-neural-network-training-iid-inference-with-nle-nre">Amortization of neural network training: iid-inference with NLE / NRE<a class="headerlink" href="#amortization-of-neural-network-training-iid-inference-with-nle-nre" title="Permanent link">&para;</a></h3>
-<p>For some SBI variants the iid assumption can be exploited: when using a likelihood-based SBI method (<code>SNLE</code>, <code>SNRE</code>) one can train the density or ratio estimator on single-trial data, and then perform inference with <code>MCMC</code> or variational inference (<code>VI</code>). Crucially, because the data is iid and the estimator is trained on single-trial data, one can repeat the inference with a different <code>x_o</code> (a different set of trials, or different number of trials) without having to retrain the density estimator. One can interpet this as amortization of the SBI training: we can obtain a neural likelihood, or likelihood-ratio estimate for new <code>x_o</code>s without retraining, but we still have to run <code>MCMC</code> or <code>VI</code> to do inference.</p>
-<p>In addition, one cannot only change the number of trials of a new <code>x_o</code>, but also the entire inference setting.
+<p>For some SBI variants the iid assumption can be exploited: when using a likelihood-based SBI method (<code>SNLE</code>, <code>SNRE</code>) one can train the density or ratio estimator on single-trial data, and then perform inference with <code>MCMC</code> or variational inference (<code>VI</code>). Crucially, because the data is iid and the estimator is trained on single-trial data, one can repeat the inference with a different <code>x_o</code> (a different set of trials, or different number of trials) without having to retrain the density estimator. One can interpet this as amortization of the SBI training: we can obtain a neural likelihood, or likelihood-ratio estimate for new <code>x_o</code>s without retraining, but we still have to run <code>MCMC</code> or <code>VI</code> to do inference. </p>
+<p>In addition, one cannot only change the number of trials of a new <code>x_o</code>, but also the entire inference setting. 
 For example, one can apply hierarchical inference with changing hierarchical denpendencies between the model parameters&ndash;all without having to retrain the density estimator because it estimates single-trail likelihoods.</p>
 <h3 id="full-amortization-iid-inference-with-npe-and-permutation-invariant-embedding-nets">Full amortization: iid-inference with NPE and permutation-invariant embedding nets<a class="headerlink" href="#full-amortization-iid-inference-with-npe-and-permutation-invariant-embedding-nets" title="Permanent link">&para;</a></h3>
-<p>When performing neural posterior estimation (<code>SNPE</code>) we cannot exploit the iid assumption directly.
-Thus, the underlying neural network takes <code>x</code> as input and predicts the parameters of the density estimator.
+<p>When performing neural posterior estimation (<code>SNPE</code>) we cannot exploit the iid assumption directly. 
+Thus, the underlying neural network takes <code>x</code> as input and predicts the parameters of the density estimator. 
 As a consequence, if <code>x</code> is a set of iid observations <span class="arithmatex">\(X=\{x_i\}_i^N\)</span> then the neural network has to be invariant to permutations of this set, i.e., it has to be permutation invariant. In addition, the neural network has to be able to consume a varying number of iid datapoints in order to be amortized over the number of trials.
-Therefore, in order to use <code>SNPE</code> for inference on iid data, we need to provide a corresponding embedding network that handles the iid-data.
-This will likely require some hyperparameter tuning and more training data for inference to work accurately. But once we have this, inference is fully amortized, i.e., we can get new posterior samples almost instantly without retraining and without running <code>MCMC</code> or <code>VI</code>.</p>
+Therefore, in order to use <code>SNPE</code> for inference on iid data, we need to provide a corresponding embedding network that handles the iid-data. 
+This will likely require some hyperparameter tuning and more training data for inference to work accurately. But once we have this, inference is fully amortized, i.e., we can get new posterior samples almost instantly without retraining and without running <code>MCMC</code> or <code>VI</code>. </p>
 <h2 id="sbi-with-trial-based-data">SBI with trial-based data<a class="headerlink" href="#sbi-with-trial-based-data" title="Permanent link">&para;</a></h2>
-<p>For illustration, we use a simple linear Gaussian simulator, as in previous tutorials. The simulator takes a single parameter (vector) which is the mean of a Gaussian. The simulator then adds noise with a fixed variance (set to one).
-We define a Gaussian prior over the mean and perform inference.</p>
-<p>The observed data is also sampled from a Gaussian with some fixed &ldquo;ground-truth&rdquo; parameter <span class="arithmatex">\(\theta_o\)</span>.
-Crucially, the observed data <code>x_o</code> can consist of multiple samples given the same ground-truth parameters and these samples are iid given <span class="arithmatex">\(\theta\)</span>:</p>
-<div class="arithmatex">\[
+<p>For illustration, we use a simple linear Gaussian simulator, as in previous tutorials. The simulator takes a single parameter (vector) which is the mean of a Gaussian. The simulator then adds noise with a fixed variance (set to one). 
+We define a Gaussian prior over the mean and perform inference. </p>
+<p>The observed data is also sampled from a Gaussian with some fixed &ldquo;ground-truth&rdquo; parameter <span class="arithmatex">\(\theta_o\)</span>. 
+Crucially, the observed data <code>x_o</code> can consist of multiple samples given the same ground-truth parameters and these samples are iid given <span class="arithmatex">\(\theta\)</span>: </p>
+<div class="arithmatex">\[ 
 \theta \sim \mathcal{N}(\mu_0,\; \Sigma_0) \\
 x | \theta \sim \mathcal{N}(\theta,\; \Sigma=I) \\
 \mathbf{x_o} = \{x_o^i\}_{i=1}^N \sim  \mathcal{N}(\theta_o,\; \Sigma=I)
 \]</div>
 <p>For this toy problem, the ground-truth posterior is well defined, it is again a Gaussian, centered on the mean of <span class="arithmatex">\(\mathbf{x_o}\)</span> and with variance scaled by the number of trials <span class="arithmatex">\(N\)</span>, i.e., the more trials we observe, the more information about the underlying <span class="arithmatex">\(\theta_o\)</span> we have and the more concentrated the posteriors becomes.</p>
 <p>We will illustrate this below:</p>
-<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
-<span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">from</span> <span class="nn">torch</span> <span class="kn">import</span> <span class="n">eye</span><span class="p">,</span> <span class="n">zeros</span>
-<span class="kn">from</span> <span class="nn">torch.distributions</span> <span class="kn">import</span> <span class="n">MultivariateNormal</span>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
 
+<span class="kn">from</span> <span class="nn">torch</span> <span class="kn">import</span> <span class="n">zeros</span><span class="p">,</span> <span class="n">ones</span><span class="p">,</span> <span class="n">eye</span>
+<span class="kn">from</span> <span class="nn">torch.distributions</span> <span class="kn">import</span> <span class="n">MultivariateNormal</span>
+<span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">SNLE</span><span class="p">,</span> <span class="n">SNPE</span><span class="p">,</span> <span class="n">prepare_for_sbi</span><span class="p">,</span> <span class="n">simulate_for_sbi</span>
 <span class="kn">from</span> <span class="nn">sbi.analysis</span> <span class="kn">import</span> <span class="n">pairplot</span>
-<span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">SNLE</span><span class="p">,</span> <span class="n">SNPE</span><span class="p">,</span> <span class="n">simulate_for_sbi</span>
+<span class="kn">from</span> <span class="nn">sbi.utils.metrics</span> <span class="kn">import</span> <span class="n">c2st</span>
+
 <span class="kn">from</span> <span class="nn">sbi.simulators.linear_gaussian</span> <span class="kn">import</span> <span class="p">(</span>
     <span class="n">linear_gaussian</span><span class="p">,</span>
     <span class="n">true_posterior_linear_gaussian_mvn_prior</span><span class="p">,</span>
-<span class="p">)</span>
-<span class="kn">from</span> <span class="nn">sbi.utils.metrics</span> <span class="kn">import</span> <span class="n">c2st</span>
-<span class="kn">from</span> <span class="nn">sbi.utils.user_input_checks</span> <span class="kn">import</span> <span class="p">(</span>
-    <span class="n">check_sbi_inputs</span><span class="p">,</span>
-    <span class="n">process_prior</span><span class="p">,</span>
-    <span class="n">process_simulator</span><span class="p">,</span>
 <span class="p">)</span>
 
 <span class="c1"># Seeding</span>
@@ -1241,13 +1237,9 @@ x | \theta \sim \mathcal{N}(\theta,\; \Sigma=I) \\
 <span class="n">prior</span> <span class="o">=</span> <span class="n">MultivariateNormal</span><span class="p">(</span><span class="n">loc</span><span class="o">=</span><span class="n">prior_mean</span><span class="p">,</span> <span class="n">covariance_matrix</span><span class="o">=</span><span class="n">prior_cov</span><span class="p">)</span>
 
 <span class="c1"># Define Gaussian simulator</span>
-<span class="n">prior</span><span class="p">,</span> <span class="n">num_parameters</span><span class="p">,</span> <span class="n">prior_returns_numpy</span> <span class="o">=</span> <span class="n">process_prior</span><span class="p">(</span><span class="n">prior</span><span class="p">)</span>
-<span class="n">simulator</span> <span class="o">=</span> <span class="n">process_simulator</span><span class="p">(</span>
-    <span class="k">lambda</span> <span class="n">theta</span><span class="p">:</span> <span class="n">linear_gaussian</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">likelihood_shift</span><span class="p">,</span> <span class="n">likelihood_cov</span><span class="p">),</span>
-    <span class="n">prior</span><span class="p">,</span>
-    <span class="n">prior_returns_numpy</span><span class="p">,</span>
+<span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span> <span class="o">=</span> <span class="n">prepare_for_sbi</span><span class="p">(</span>
+    <span class="k">lambda</span> <span class="n">theta</span><span class="p">:</span> <span class="n">linear_gaussian</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">likelihood_shift</span><span class="p">,</span> <span class="n">likelihood_cov</span><span class="p">),</span> <span class="n">prior</span>
 <span class="p">)</span>
-<span class="n">check_sbi_inputs</span><span class="p">(</span><span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">)</span>
 
 
 <span class="c1"># Use built-in function to obtain ground-truth posterior given x_o</span>
@@ -1264,7 +1256,7 @@ x | \theta \sim \mathcal{N}(\theta,\; \Sigma=I) \\
 <span class="n">xos</span> <span class="o">=</span> <span class="p">[</span><span class="n">theta_o</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="n">nt</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">nt</span> <span class="ow">in</span> <span class="n">num_trials</span><span class="p">]</span>
 
 <span class="c1"># Obtain analytical posterior samples for each of them.</span>
-<span class="n">true_samples</span> <span class="o">=</span> <span class="p">[</span><span class="n">get_true_posterior_samples</span><span class="p">(</span><span class="n">xo</span><span class="p">,</span> <span class="mi">1000</span><span class="p">)</span> <span class="k">for</span> <span class="n">xo</span> <span class="ow">in</span> <span class="n">xos</span><span class="p">]</span>
+<span class="n">true_samples</span> <span class="o">=</span> <span class="p">[</span><span class="n">get_true_posterior_samples</span><span class="p">(</span><span class="n">xo</span><span class="p">,</span> <span class="mi">5000</span><span class="p">)</span> <span class="k">for</span> <span class="n">xo</span> <span class="ow">in</span> <span class="n">xos</span><span class="p">]</span>
 </code></pre></div>
 <div class="highlight"><pre><span></span><code><span class="c1"># Plot them in one pairplot as contours (obtained via KDE on the samples).</span>
 <span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">pairplot</span><span class="p">(</span>
@@ -1286,10 +1278,7 @@ x | \theta \sim \mathcal{N}(\theta,\; \Sigma=I) \\
     <span class="n">fontsize</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span>
 <span class="p">);</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>WARNING:root:upper is deprecated, use offdiag instead.
-</code></pre></div>
-
-<p><img alt="png" src="../14_iid_data_and_permutation_invariant_embeddings_files/14_iid_data_and_permutation_invariant_embeddings_6_1.png" /></p>
+<p><img alt="png" src="../14_iid_data_and_permutation_invariant_embeddings_files/14_iid_data_and_permutation_invariant_embeddings_6_0.png" /></p>
 <p>Indeed, with increasing number of trials the posterior density concentrates around the true underlying parameter.</p>
 <h2 id="iid-inference-with-nle">IID inference with NLE<a class="headerlink" href="#iid-inference-with-nle" title="Permanent link">&para;</a></h2>
 <p>(S)NLE and (S)NRE can perform inference given multiple IID obserations by using only single-trial training data (i.e., for training, we run the simulator only once per parameter set). Once the likelihood is learned on single trials (i.e., a neural network that predicts the likelihood of a single observation given a parameter set), one can sample the posterior for any number of trials. This works because, given a single-trial neural likelihood from (S)NLE or (S)NRE, we can calculate the joint likelihoods of all trials by multiplying them together (or adding them in log-space). The joint likelihood can then be plugged into <code>MCMC</code> or <code>VI</code>. <code>sbi</code> takes care of all of these steps, so you do not have to implement anything yourself:</p>
@@ -1301,17 +1290,17 @@ x | \theta \sim \mathcal{N}(\theta,\; \Sigma=I) \\
 <div class="codehilite"><pre><span></span><code>Running 10000 simulations.:   0%|          | 0/10000 [00:00&lt;?, ?it/s]
 
 
- Neural network successfully converged after 40 epochs.
+ Neural network successfully converged after 43 epochs.
 </code></pre></div>
 
 <div class="highlight"><pre><span></span><code><span class="c1"># Obtain posterior samples for different number of iid xos.</span>
 <span class="n">nle_samples</span> <span class="o">=</span> <span class="p">[]</span>
-<span class="n">num_samples</span> <span class="o">=</span> <span class="mi">1000</span>
+<span class="n">num_samples</span> <span class="o">=</span> <span class="mi">5000</span>
 
 <span class="n">mcmc_parameters</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
     <span class="n">num_chains</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>
-    <span class="n">thin</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
-    <span class="n">warmup_steps</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span>
+    <span class="n">thin</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+    <span class="n">warmup_steps</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>
     <span class="n">init_strategy</span><span class="o">=</span><span class="s2">&quot;proposal&quot;</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="n">mcmc_method</span> <span class="o">=</span> <span class="s2">&quot;slice_np_vectorized&quot;</span>
@@ -1325,40 +1314,40 @@ x | \theta \sim \mathcal{N}(\theta,\; \Sigma=I) \\
 <span class="k">for</span> <span class="n">xo</span> <span class="ow">in</span> <span class="n">xos</span><span class="p">:</span>
     <span class="n">nle_samples</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">sample_shape</span><span class="o">=</span><span class="p">(</span><span class="n">num_samples</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">xo</span><span class="p">))</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>Running vectorized MCMC with 50 chains:   0%|          | 0/12500 [00:00&lt;?, ?it/s]
+<div class="codehilite"><pre><span></span><code>Running vectorized MCMC with 50 chains:   0%|          | 0/75000 [00:00&lt;?, ?it/s]
 
 
-C:\Users\zina\Desktop\Documents\repos\sbi\sbi\utils\user_input_checks.py:600: UserWarning: An x with a batch size of 5 was passed. It will be interpreted as a batch of independent and identically
+/Users/janbolts/qode/sbi/sbi/utils/sbiutils.py:342: UserWarning: An x with a batch size of 5 was passed. It will be interpreted as a batch of independent and identically
             distributed data X={x_1, ..., x_n}, i.e., data generated based on the
             same underlying (unknown) parameter. The resulting posterior will be with
             respect to entire batch, i.e,. p(theta | X).
-  warn_on_iid_x(num_trials=input_x_shape[0])
+  warnings.warn(
 
 
 
-Running vectorized MCMC with 50 chains:   0%|          | 0/12500 [00:00&lt;?, ?it/s]
+Running vectorized MCMC with 50 chains:   0%|          | 0/75000 [00:00&lt;?, ?it/s]
 
 
-C:\Users\zina\Desktop\Documents\repos\sbi\sbi\utils\user_input_checks.py:600: UserWarning: An x with a batch size of 15 was passed. It will be interpreted as a batch of independent and identically
+/Users/janbolts/qode/sbi/sbi/utils/sbiutils.py:342: UserWarning: An x with a batch size of 15 was passed. It will be interpreted as a batch of independent and identically
             distributed data X={x_1, ..., x_n}, i.e., data generated based on the
             same underlying (unknown) parameter. The resulting posterior will be with
             respect to entire batch, i.e,. p(theta | X).
-  warn_on_iid_x(num_trials=input_x_shape[0])
+  warnings.warn(
 
 
 
-Running vectorized MCMC with 50 chains:   0%|          | 0/12500 [00:00&lt;?, ?it/s]
+Running vectorized MCMC with 50 chains:   0%|          | 0/75000 [00:00&lt;?, ?it/s]
 
 
-C:\Users\zina\Desktop\Documents\repos\sbi\sbi\utils\user_input_checks.py:600: UserWarning: An x with a batch size of 20 was passed. It will be interpreted as a batch of independent and identically
+/Users/janbolts/qode/sbi/sbi/utils/sbiutils.py:342: UserWarning: An x with a batch size of 20 was passed. It will be interpreted as a batch of independent and identically
             distributed data X={x_1, ..., x_n}, i.e., data generated based on the
             same underlying (unknown) parameter. The resulting posterior will be with
             respect to entire batch, i.e,. p(theta | X).
-  warn_on_iid_x(num_trials=input_x_shape[0])
+  warnings.warn(
 
 
 
-Running vectorized MCMC with 50 chains:   0%|          | 0/12500 [00:00&lt;?, ?it/s]
+Running vectorized MCMC with 50 chains:   0%|          | 0/75000 [00:00&lt;?, ?it/s]
 </code></pre></div>
 
 <p>Note that <code>sbi</code> warns about <code>iid-x</code> with increasing number of trial here. We ignore the warning because that&rsquo;s exactly what we want to do.</p>
@@ -1382,11 +1371,8 @@ Running vectorized MCMC with 50 chains:   0%|          | 0/12500 [00:00&lt;?, ?i
     <span class="n">fontsize</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span>
 <span class="p">);</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>WARNING:root:upper is deprecated, use offdiag instead.
-</code></pre></div>
-
-<p><img alt="png" src="../14_iid_data_and_permutation_invariant_embeddings_files/14_iid_data_and_permutation_invariant_embeddings_12_1.png" /></p>
-<p>The pairplot above already indicates that (S)NLE is well able to obtain accurate posterior samples also for increasing number of trials (note that we trained the single-round version of SNLE so that we did not have to re-train it for new <span class="arithmatex">\(x_o\)</span>).</p>
+<p><img alt="png" src="../14_iid_data_and_permutation_invariant_embeddings_files/14_iid_data_and_permutation_invariant_embeddings_12_0.png" /></p>
+<p>The pairplot above already indicates that (S)NLE is well able to obtain accurate posterior samples also for increasing number of trials (note that we trained the single-round version of SNLE so that we did not have to re-train it for new <span class="arithmatex">\(x_o\)</span>). </p>
 <p>Quantitatively we can measure the accuracy of SNLE by calculating the <code>c2st</code> score between SNLE and the true posterior samples, where the best accuracy is perfect for <code>0.5</code>:</p>
 <div class="highlight"><pre><span></span><code><span class="n">cs</span> <span class="o">=</span> <span class="p">[</span>
     <span class="n">c2st</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">s1</span><span class="p">),</span> <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">s2</span><span class="p">))</span>
@@ -1396,15 +1382,15 @@ Running vectorized MCMC with 50 chains:   0%|          | 0/12500 [00:00&lt;?, ?i
 <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">num_trials</span><span class="p">)):</span>
     <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;c2st score for num_trials=</span><span class="si">{</span><span class="n">num_trials</span><span class="p">[</span><span class="n">_</span><span class="p">]</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">cs</span><span class="p">[</span><span class="n">_</span><span class="p">]</span><span class="o">.</span><span class="n">item</span><span class="p">()</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>c2st score for num_trials=1: 0.52
-c2st score for num_trials=5: 0.48
-c2st score for num_trials=15: 0.49
+<div class="codehilite"><pre><span></span><code>c2st score for num_trials=1: 0.50
+c2st score for num_trials=5: 0.51
+c2st score for num_trials=15: 0.51
 c2st score for num_trials=20: 0.51
 </code></pre></div>
 
 <h2 id="iid-inference-with-npe-using-permutation-invariant-embedding-nets">IID inference with NPE using permutation-invariant embedding nets<a class="headerlink" href="#iid-inference-with-npe-using-permutation-invariant-embedding-nets" title="Permanent link">&para;</a></h2>
-<p>For NPE we need to define an embedding net that handles the set-like structure of iid-data, i.e., that it permutation invariant and can handle different number of trials.</p>
-<p>We implemented several embedding net classes that allow to construct such a permutation- and number-of-trials invariant embedding net.</p>
+<p>For NPE we need to define an embedding net that handles the set-like structure of iid-data, i.e., that it permutation invariant and can handle different number of trials.  </p>
+<p>We implemented several embedding net classes that allow to construct such a permutation- and number-of-trials invariant embedding net. </p>
 <p>To become permutation invariant, the neural net first learns embeddings for single trials and then performs a permutation invariant operation on those embeddings, e.g., by taking the sum or the mean (Chen et al. 2018, Radev et al. 2021).</p>
 <p>To become invariant w.r.t. the number-of-trials, we train the net with varying number of trials for each parameter setting. This means that, unlike for (S)NLE and (S)NRE, (S)NPE requires to run the simulator multiple times for individual parameter sets to generate the training data.</p>
 <p>In order to implement this in <code>sbi</code>, &ldquo;unobserved&rdquo; trials in the training dataset have to be masked by NaNs (and ignore the resulting SBI warning about NaNs in the training data).</p>
@@ -1414,7 +1400,7 @@ c2st score for num_trials=20: 0.51
 
 <span class="c1"># construct training data set: we want to cover the full range of possible number of</span>
 <span class="c1"># trials</span>
-<span class="n">num_training_samples</span> <span class="o">=</span> <span class="mi">1000</span>
+<span class="n">num_training_samples</span> <span class="o">=</span> <span class="mi">5000</span>
 <span class="n">theta</span> <span class="o">=</span> <span class="n">prior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_training_samples</span><span class="p">,))</span>
 
 <span class="c1"># there are certainly smarter ways to construct the training data set, but we go with a</span>
@@ -1430,8 +1416,11 @@ c2st score for num_trials=20: 0.51
 <span class="n">theta</span> <span class="o">=</span> <span class="n">theta</span><span class="o">.</span><span class="n">repeat_interleave</span><span class="p">(</span><span class="n">max_num_trials</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
 </code></pre></div>
 <h3 id="build-embedding-net">Build embedding net<a class="headerlink" href="#build-embedding-net" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi.neural_nets.embedding_nets</span> <span class="kn">import</span> <span class="n">FCEmbedding</span><span class="p">,</span> <span class="n">PermutationInvariantEmbedding</span>
-<span class="kn">from</span> <span class="nn">sbi.neural_nets</span> <span class="kn">import</span> <span class="n">posterior_nn</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi.neural_nets.embedding_nets</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="n">FCEmbedding</span><span class="p">,</span>
+    <span class="n">PermutationInvariantEmbedding</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span> <span class="nn">sbi.utils</span> <span class="kn">import</span> <span class="n">posterior_nn</span>
 
 <span class="c1"># embedding</span>
 <span class="n">latent_dim</span> <span class="o">=</span> <span class="mi">10</span>
@@ -1464,17 +1453,17 @@ c2st score for num_trials=20: 0.51
 <span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">(</span><span class="n">training_batch_size</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
 <span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">()</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>WARNING:root:Found 19000 NaN simulations and 0 Inf simulations. They are not excluded from training due to `exclude_invalid_x=False`.Training will likely fail, we strongly recommend `exclude_invalid_x=True` for Single-round NPE.
+<div class="codehilite"><pre><span></span><code>WARNING:root:Found 95000 NaN simulations and 0 Inf simulations. They are not excluded from training due to `exclude_invalid_x=False`.Training will likely fail, we strongly recommend `exclude_invalid_x=True` for Single-round NPE.
 
 
- Neural network successfully converged after 244 epochs.
+ Neural network successfully converged after 168 epochs.
 </code></pre></div>
 
 <h3 id="amortized-inference">Amortized inference<a class="headerlink" href="#amortized-inference" title="Permanent link">&para;</a></h3>
-<p>Comparing runtimes, we see that the NPE training takes a bit longer than the training on single trials for <code>NLE</code> above.</p>
-<p>However, we trained the density estimator such that it can handle multiple and changing number of iid trials (up to 20).</p>
+<p>Comparing runtimes, we see that the NPE training takes a bit longer than the training on single trials for <code>NLE</code> above. </p>
+<p>However, we trained the density estimator such that it can handle multiple and changing number of iid trials (up to 20). </p>
 <p>Thus, we can obtain posterior samples for different <code>x_o</code> with just a single forward pass instead of having to run <code>MCMC</code> for each new observation.</p>
-<p>As you can see below, the c2st score for increasing number of observed trials remains close to the ideal <code>0.5</code>.</p>
+<p>As you can see below, the c2st score for increasing number of observed trials remains close to the ideal <code>0.5</code>. </p>
 <div class="highlight"><pre><span></span><code><span class="n">npe_samples</span> <span class="o">=</span> <span class="p">[]</span>
 <span class="k">for</span> <span class="n">xo</span> <span class="ow">in</span> <span class="n">xos</span><span class="p">:</span>
     <span class="c1"># we need to pad the x_os with NaNs to match the shape of the training data.</span>
@@ -1487,25 +1476,25 @@ c2st score for num_trials=20: 0.51
 <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">num_trials</span><span class="p">)):</span>
     <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;c2st score for num_trials=</span><span class="si">{</span><span class="n">num_trials</span><span class="p">[</span><span class="n">_</span><span class="p">]</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">cs</span><span class="p">[</span><span class="n">_</span><span class="p">]</span><span class="o">.</span><span class="n">item</span><span class="p">()</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>Drawing 1000 posterior samples:   0%|          | 0/1000 [00:00&lt;?, ?it/s]
+<div class="codehilite"><pre><span></span><code>Drawing 5000 posterior samples:   0%|          | 0/5000 [00:00&lt;?, ?it/s]
 
 
 
-Drawing 1000 posterior samples:   0%|          | 0/1000 [00:00&lt;?, ?it/s]
+Drawing 5000 posterior samples:   0%|          | 0/5000 [00:00&lt;?, ?it/s]
 
 
 
-Drawing 1000 posterior samples:   0%|          | 0/1000 [00:00&lt;?, ?it/s]
+Drawing 5000 posterior samples:   0%|          | 0/5000 [00:00&lt;?, ?it/s]
 
 
 
-Drawing 1000 posterior samples:   0%|          | 0/1000 [00:00&lt;?, ?it/s]
+Drawing 5000 posterior samples:   0%|          | 0/5000 [00:00&lt;?, ?it/s]
 
 
-c2st score for num_trials=1: 0.52
-c2st score for num_trials=5: 0.54
-c2st score for num_trials=15: 0.53
-c2st score for num_trials=20: 0.54
+c2st score for num_trials=1: 0.50
+c2st score for num_trials=5: 0.50
+c2st score for num_trials=15: 0.52
+c2st score for num_trials=20: 0.55
 </code></pre></div>
 
 <div class="highlight"><pre><span></span><code><span class="n">num_trials</span> <span class="o">=</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">15</span><span class="p">,</span> <span class="mi">20</span><span class="p">]</span>
@@ -1539,27 +1528,23 @@ c2st score for num_trials=20: 0.54
     <span class="n">fontsize</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span>
 <span class="p">);</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>Drawing 1000 posterior samples:   0%|          | 0/1000 [00:00&lt;?, ?it/s]
+<div class="codehilite"><pre><span></span><code>Drawing 5000 posterior samples:   0%|          | 0/5000 [00:00&lt;?, ?it/s]
 
 
 
-Drawing 1000 posterior samples:   0%|          | 0/1000 [00:00&lt;?, ?it/s]
+Drawing 5000 posterior samples:   0%|          | 0/5000 [00:00&lt;?, ?it/s]
 
 
 
-Drawing 1000 posterior samples:   0%|          | 0/1000 [00:00&lt;?, ?it/s]
+Drawing 5000 posterior samples:   0%|          | 0/5000 [00:00&lt;?, ?it/s]
 
 
 
-Drawing 1000 posterior samples:   0%|          | 0/1000 [00:00&lt;?, ?it/s]
-
-
-WARNING:root:upper is deprecated, use offdiag instead.
+Drawing 5000 posterior samples:   0%|          | 0/5000 [00:00&lt;?, ?it/s]
 </code></pre></div>
 
-<p><img alt="png" src="../14_iid_data_and_permutation_invariant_embeddings_files/14_iid_data_and_permutation_invariant_embeddings_23_5.png" /></p>
-<div class="highlight"><pre><span></span><code><span class="c1"># We can easily obtain posteriors for many different x_os, instantly, because</span>
-<span class="c1"># NPE is fully amortized:</span>
+<p><img alt="png" src="../14_iid_data_and_permutation_invariant_embeddings_files/14_iid_data_and_permutation_invariant_embeddings_23_4.png" /></p>
+<div class="highlight"><pre><span></span><code><span class="c1"># We can easily obtain posteriors for many different x_os, instantly, because NPE is fully amortized:</span>
 <span class="n">num_trials</span> <span class="o">=</span> <span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">6</span><span class="p">,</span> <span class="mi">8</span><span class="p">,</span> <span class="mi">12</span><span class="p">,</span> <span class="mi">14</span><span class="p">,</span> <span class="mi">18</span><span class="p">]</span>
 <span class="n">npe_samples</span> <span class="o">=</span> <span class="p">[]</span>
 <span class="k">for</span> <span class="n">xo</span> <span class="ow">in</span> <span class="n">xos</span><span class="p">:</span>
@@ -1589,25 +1574,22 @@ WARNING:root:upper is deprecated, use offdiag instead.
     <span class="n">fontsize</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span>
 <span class="p">);</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>Drawing 1000 posterior samples:   0%|          | 0/1000 [00:00&lt;?, ?it/s]
+<div class="codehilite"><pre><span></span><code>Drawing 5000 posterior samples:   0%|          | 0/5000 [00:00&lt;?, ?it/s]
 
 
 
-Drawing 1000 posterior samples:   0%|          | 0/1000 [00:00&lt;?, ?it/s]
+Drawing 5000 posterior samples:   0%|          | 0/5000 [00:00&lt;?, ?it/s]
 
 
 
-Drawing 1000 posterior samples:   0%|          | 0/1000 [00:00&lt;?, ?it/s]
+Drawing 5000 posterior samples:   0%|          | 0/5000 [00:00&lt;?, ?it/s]
 
 
 
-Drawing 1000 posterior samples:   0%|          | 0/1000 [00:00&lt;?, ?it/s]
-
-
-WARNING:root:upper is deprecated, use offdiag instead.
+Drawing 5000 posterior samples:   0%|          | 0/5000 [00:00&lt;?, ?it/s]
 </code></pre></div>
 
-<p><img alt="png" src="../14_iid_data_and_permutation_invariant_embeddings_files/14_iid_data_and_permutation_invariant_embeddings_24_5.png" /></p>
+<p><img alt="png" src="../14_iid_data_and_permutation_invariant_embeddings_files/14_iid_data_and_permutation_invariant_embeddings_24_4.png" /></p>
 <div class="highlight"><pre><span></span><code>
 </code></pre></div>
 

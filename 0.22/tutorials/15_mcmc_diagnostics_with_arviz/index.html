@@ -1131,20 +1131,20 @@
 
 
 <h1 id="mcmc-diagnostics-with-arviz">MCMC diagnostics with <a href="https://python.arviz.org/">Arviz</a><a class="headerlink" href="#mcmc-diagnostics-with-arviz" title="Permanent link">&para;</a></h1>
-<p>This tutorial shows how to evaluate the quality of MCMC samples generated via <code>sbi</code> using the <code>arviz</code> package.</p>
+<p>This tutorial shows how to evaluate the quality of MCMC samples generated via <code>sbi</code> using the <code>arviz</code> package. </p>
 <p>Outline:</p>
-<ol>
-<li>Train MNLE to approximate the likelihood underlying the simulator</li>
-<li>Run MCMC using <code>pyro</code> MCMC samplers via <code>sbi</code> interface</li>
-<li>Use <code>arviz</code> to visualize the posterior, predictive distributions and MCMC diagnostics.</li>
-</ol>
+<p>1) Train MNLE to approximate the likelihood underlying the simulator<br />
+2) Run MCMC using <code>pyro</code> MCMC samplers via <code>sbi</code> interface<br />
+3) Use <code>arviz</code> to visualize the posterior, predictive distributions and MCMC diagnostics. </p>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">arviz</span> <span class="k">as</span> <span class="nn">az</span>
 <span class="kn">import</span> <span class="nn">torch</span>
+
+<span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">MNLE</span><span class="p">,</span> <span class="n">likelihood_estimator_based_potential</span>
 <span class="kn">from</span> <span class="nn">pyro.distributions</span> <span class="kn">import</span> <span class="n">InverseGamma</span>
 <span class="kn">from</span> <span class="nn">torch.distributions</span> <span class="kn">import</span> <span class="n">Beta</span><span class="p">,</span> <span class="n">Binomial</span><span class="p">,</span> <span class="n">Gamma</span>
-
-<span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">MNLE</span><span class="p">,</span> <span class="n">MCMCPosterior</span><span class="p">,</span> <span class="n">likelihood_estimator_based_potential</span>
 <span class="kn">from</span> <span class="nn">sbi.utils</span> <span class="kn">import</span> <span class="n">MultipleIndependent</span>
+
+<span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">MCMCPosterior</span>
 
 <span class="c1"># Seeding</span>
 <span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span>
@@ -1169,8 +1169,8 @@
 <span class="p">)</span>
 </code></pre></div>
 <h2 id="train-mnle-to-approximate-the-likelihood">Train MNLE to approximate the likelihood<a class="headerlink" href="#train-mnle-to-approximate-the-likelihood" title="Permanent link">&para;</a></h2>
-<p>For this tutorial, we will use a simple simulator with two parameters. For details see the <a href="https://sbi-dev.github.io/sbi/examples/01_decision_making_model/">example on the decision making model</a>.</p>
-<p>Here, we pass <code>mcmc_method="nuts"</code> in order to use the underlying <a href="https://docs.pyro.ai/en/1.8.1/mcmc.html#nuts"><code>pyro</code> No-U-turn sampler</a>, but it would work as well with other samplers (e.g. &ldquo;slice_np_vectorized&rdquo;, &ldquo;hmc&rdquo;).</p>
+<p>For this tutorial, we will use a simple simulator with two parameters. For details see the <a href="https://sbi-dev.github.io/sbi/examples/01_decision_making_model/">example on the decision making model</a>. </p>
+<p>Here, we pass <code>mcmc_method="nuts"</code> in order to use the underlying <a href="https://docs.pyro.ai/en/1.8.1/mcmc.html#nuts"><code>pyro</code> No-U-turn sampler</a>, but it would work as well with other samplers (e.g. &ldquo;slice_np_vectorized&rdquo;, &ldquo;hmc&rdquo;). </p>
 <p>Additionally, when calling <code>posterior.sample(...)</code> we pass <code>return_arviz=True</code> so that the <a href="https://arviz-devs.github.io/arviz/api/generated/arviz.InferenceData.html#arviz.InferenceData"><code>Arviz InferenceData</code></a> object is returned. This object gives us access to the wealth of MCMC diagnostics tool provided by <code>arviz</code>.</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># Generate training data and train MNLE.</span>
 <span class="n">num_simulations</span> <span class="o">=</span> <span class="mi">10000</span>
@@ -1180,7 +1180,7 @@
 <span class="n">trainer</span> <span class="o">=</span> <span class="n">MNLE</span><span class="p">(</span><span class="n">prior</span><span class="p">)</span>
 <span class="n">likelihood_estimator</span> <span class="o">=</span> <span class="n">trainer</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>/Users/janteusen/qode/sbi/sbi/neural_nets/mnle.py:60: UserWarning: The mixed neural likelihood estimator assumes that x contains
+<div class="codehilite"><pre><span></span><code>/Users/janbolts/qode/sbi/sbi/neural_nets/mnle.py:60: UserWarning: The mixed neural likelihood estimator assumes that x contains
         continuous data in the first n-1 columns (e.g., reaction times) and
         categorical data in the last column (e.g., corresponding choices). If
         this is not the case for the passed `x` do not use this function.
@@ -1221,25 +1221,17 @@
 <span class="c1"># get arviz InferenceData object from posterior</span>
 <span class="n">inference_data</span> <span class="o">=</span> <span class="n">mnle_posterior</span><span class="o">.</span><span class="n">get_arviz_inference_data</span><span class="p">()</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>/Users/janteusen/qode/sbi/sbi/utils/sbiutils.py:341: UserWarning: An x with a batch size of 100 was passed. It will be interpreted as a batch of independent and identically
+<div class="codehilite"><pre><span></span><code>/Users/janbolts/qode/sbi/sbi/utils/sbiutils.py:280: UserWarning: An x with a batch size of 100 was passed. It will be interpreted as a batch of independent and identically
             distributed data X={x_1, ..., x_n}, i.e., data generated based on the
             same underlying (unknown) parameter. The resulting posterior will be with
             respect to entire batch, i.e,. p(theta | X).
   warnings.warn(
-/Users/janteusen/miniconda3/envs/sbi/lib/python3.8/site-packages/torch/__init__.py:690: UserWarning: torch.set_default_tensor_type() is deprecated as of PyTorch 2.1, please use torch.set_default_dtype() and torch.set_default_device() as alternatives. (Triggered internally at /Users/runner/work/pytorch/pytorch/pytorch/torch/csrc/tensor/python_tensor.cpp:453.)
-  _C._set_default_tensor_type(t)
-/Users/janteusen/miniconda3/envs/sbi/lib/python3.8/site-packages/torch/__init__.py:690: UserWarning: torch.set_default_tensor_type() is deprecated as of PyTorch 2.1, please use torch.set_default_dtype() and torch.set_default_device() as alternatives. (Triggered internally at /Users/runner/work/pytorch/pytorch/pytorch/torch/csrc/tensor/python_tensor.cpp:453.)
-  _C._set_default_tensor_type(t)
-/Users/janteusen/miniconda3/envs/sbi/lib/python3.8/site-packages/torch/__init__.py:690: UserWarning: torch.set_default_tensor_type() is deprecated as of PyTorch 2.1, please use torch.set_default_dtype() and torch.set_default_device() as alternatives. (Triggered internally at /Users/runner/work/pytorch/pytorch/pytorch/torch/csrc/tensor/python_tensor.cpp:453.)
-  _C._set_default_tensor_type(t)
-/Users/janteusen/miniconda3/envs/sbi/lib/python3.8/site-packages/torch/__init__.py:690: UserWarning: torch.set_default_tensor_type() is deprecated as of PyTorch 2.1, please use torch.set_default_dtype() and torch.set_default_device() as alternatives. (Triggered internally at /Users/runner/work/pytorch/pytorch/pytorch/torch/csrc/tensor/python_tensor.cpp:453.)
-  _C._set_default_tensor_type(t)
 </code></pre></div>
 
 <h2 id="generate-arviz-plots">Generate <code>arviz</code> plots<a class="headerlink" href="#generate-arviz-plots" title="Permanent link">&para;</a></h2>
 <p>The resulting <code>InferenceData</code> object can be passed to most <code>arviz</code> plotting functions, and there are plenty see <a href="https://arviz-devs.github.io/arviz/examples/index.html#">here</a> for an overview.</p>
-<p>To get a better understanding of the <code>InferenceData</code> object see <a href="https://arviz-devs.github.io/arviz/schema/schema.html">here</a>.</p>
-<p>Below and overview of common MCMC diagnostics plot, see the corresponding <code>arviz</code> documentation for interpretation of the plots.</p>
+<p>To get a better understanding of the <code>InferenceData</code> object see <a href="https://arviz-devs.github.io/arviz/schema/schema.html">here</a>. </p>
+<p>Below and overview of common MCMC diagnostics plot, see the corresponding <code>arviz</code> documentation for interpretation of the plots. </p>
 <p>We will a full use-case using the SBI-MCMC-arviz workflow soon.</p>
 <div class="highlight"><pre><span></span><code><span class="nb">print</span><span class="p">(</span><span class="n">inference_data</span><span class="o">.</span><span class="n">posterior</span><span class="p">)</span>
 </code></pre></div>
@@ -1250,18 +1242,18 @@ Coordinates:
   * draw         (draw) int64 0 1 2 3 4 5 6 ... 1248 1249 1250 1251 1252 1253
   * theta_dim_0  (theta_dim_0) int64 0 1
 Data variables:
-    theta        (chain, draw, theta_dim_0) float32 2.195 0.8838 ... 2.593 0.806
+    theta        (chain, draw, theta_dim_0) float32 2.125 0.8092 ... 0.8088
 Attributes:
-    created_at:     2024-03-06T13:33:00.426835
-    arviz_version:  0.15.1
+    created_at:     2022-08-10T14:02:41.300799
+    arviz_version:  0.11.2
 </code></pre></div>
 
 <h3 id="diagnostic-plots">Diagnostic plots<a class="headerlink" href="#diagnostic-plots" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code><span class="n">az</span><span class="o">.</span><span class="n">style</span><span class="o">.</span><span class="n">use</span><span class="p">(</span><span class="s2">&quot;arviz-darkgrid&quot;</span><span class="p">)</span>
 <span class="n">az</span><span class="o">.</span><span class="n">plot_rank</span><span class="p">(</span><span class="n">inference_data</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>array([&lt;Axes: title={&#39;center&#39;: &#39;theta\n0&#39;}, xlabel=&#39;Rank (all chains)&#39;, ylabel=&#39;Chain&#39;&gt;,
-       &lt;Axes: title={&#39;center&#39;: &#39;theta\n1&#39;}, xlabel=&#39;Rank (all chains)&#39;, ylabel=&#39;Chain&#39;&gt;],
+<div class="codehilite"><pre><span></span><code>array([&lt;AxesSubplot:title={&#39;center&#39;:&#39;theta\n0&#39;}, xlabel=&#39;Rank (all chains)&#39;, ylabel=&#39;Chain&#39;&gt;,
+       &lt;AxesSubplot:title={&#39;center&#39;:&#39;theta\n1&#39;}, xlabel=&#39;Rank (all chains)&#39;, ylabel=&#39;Chain&#39;&gt;],
       dtype=object)
 </code></pre></div>
 
@@ -1275,26 +1267,24 @@ Attributes:
 <div class="highlight"><pre><span></span><code><span class="n">az</span><span class="o">.</span><span class="n">plot_ess</span><span class="p">(</span><span class="n">inference_data</span><span class="p">,</span> <span class="n">kind</span><span class="o">=</span><span class="s2">&quot;evolution&quot;</span><span class="p">);</span>
 </code></pre></div>
 <p><img alt="png" src="../15_mcmc_diagnostics_with_arviz_files/15_mcmc_diagnostics_with_arviz_13_0.png" /></p>
-<h3 id="posterior-density-plots">Posterior density plots<a class="headerlink" href="#posterior-density-plots" title="Permanent link">&para;</a></h3>
+<h3 id="posterior-density-plots">Posterior density  plots<a class="headerlink" href="#posterior-density-plots" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code><span class="n">az</span><span class="o">.</span><span class="n">plot_posterior</span><span class="p">(</span><span class="n">inference_data</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>array([&lt;Axes: title={&#39;center&#39;: &#39;theta\n0&#39;}&gt;,
-       &lt;Axes: title={&#39;center&#39;: &#39;theta\n1&#39;}&gt;], dtype=object)
+<div class="codehilite"><pre><span></span><code>array([&lt;AxesSubplot:title={&#39;center&#39;:&#39;theta\n0&#39;}&gt;,
+       &lt;AxesSubplot:title={&#39;center&#39;:&#39;theta\n1&#39;}&gt;], dtype=object)
 </code></pre></div>
 
 <p><img alt="png" src="../15_mcmc_diagnostics_with_arviz_files/15_mcmc_diagnostics_with_arviz_15_1.png" /></p>
 <div class="highlight"><pre><span></span><code><span class="nb">print</span><span class="p">(</span>
-    <span class="sa">f</span><span class="s2">&quot;&quot;&quot;Given the </span><span class="si">{</span><span class="n">num_trials</span><span class="si">}</span><span class="s2"> we observed, the posterior is centered around</span>
-<span class="s2">    true underlying parameters theta_o: </span><span class="si">{</span><span class="n">theta_o</span><span class="si">}</span><span class="s2">&quot;&quot;&quot;</span>
+    <span class="sa">f</span><span class="s2">&quot;Given the </span><span class="si">{</span><span class="n">num_trials</span><span class="si">}</span><span class="s2"> we observed, the posterior is centered around true underlying parameters theta_o: </span><span class="si">{</span><span class="n">theta_o</span><span class="si">}</span><span class="s2">&quot;</span>
 <span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>Given the 100 we observed, the posterior is centered around
-    true underlying parameters theta_o: tensor([[1.9622, 0.7550]])
+<div class="codehilite"><pre><span></span><code>Given the 100 we observed, the posterior is centered around true underlying parameters theta_o: tensor([[1.9622, 0.7550]])
 </code></pre></div>
 
 <div class="highlight"><pre><span></span><code><span class="n">az</span><span class="o">.</span><span class="n">plot_pair</span><span class="p">(</span><span class="n">inference_data</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>&lt;Axes: xlabel=&#39;theta\n0&#39;, ylabel=&#39;theta\n1&#39;&gt;
+<div class="codehilite"><pre><span></span><code>&lt;AxesSubplot:xlabel=&#39;theta\n0&#39;, ylabel=&#39;theta\n1&#39;&gt;
 </code></pre></div>
 
 <p><img alt="png" src="../15_mcmc_diagnostics_with_arviz_files/15_mcmc_diagnostics_with_arviz_17_1.png" /></p>
@@ -1306,9 +1296,9 @@ Attributes:
     <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">10</span><span class="p">),</span>
 <span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>array([[&lt;Axes: &gt;, None],
-       [&lt;Axes: xlabel=&#39;theta\n0&#39;, ylabel=&#39;theta\n1&#39;&gt;, &lt;Axes: &gt;]],
-      dtype=object)
+<div class="codehilite"><pre><span></span><code>array([[&lt;AxesSubplot:&gt;, None],
+       [&lt;AxesSubplot:xlabel=&#39;theta\n0&#39;, ylabel=&#39;theta\n1&#39;&gt;,
+        &lt;AxesSubplot:&gt;]], dtype=object)
 </code></pre></div>
 
 <p><img alt="png" src="../15_mcmc_diagnostics_with_arviz_files/15_mcmc_diagnostics_with_arviz_18_1.png" /></p>
