@@ -38,12 +38,13 @@ the end of every year. Additionally, we mention all contributors in the releases
     propose and then working on your pull request after getting some feedback from
     others.
 
-### How to contribute
+### Contribution workflow
 
-The following steps describe all parts of the workflow for doing a contribution such as
-installing locally `sbi` from source, creating a `conda` environment, setting up
-your `git` repository, etc. We've taken strong inspiration from the guides for
-contribution of [`scikit-learn`](https://scikit-learn.org/stable/developers/contributing.html)
+The following steps describe all parts of the workflow for doing a contribution
+such as installing locally `sbi` from source, creating a `conda` environment,
+setting up your `git` repository, etc. We've taken strong inspiration from the
+contribution guides of
+[`scikit-learn`](https://scikit-learn.org/stable/developers/contributing.html)
 and [`mne`](https://mne.tools/stable/development/contributing.html):
 
 **Step 1**: [Create an account](https://github.com/) on GitHub if you do not
@@ -178,19 +179,22 @@ to also run them without `-n auto`.
 When you create a PR onto `main`, our Continuous Integration (CI) actions on
 GitHub will perform the following checks:
 
-- **`ruff`** for linting and formatting (including `black`, `isort`, and `flake8`)
+- **[`ruff`](https://docs.astral.sh/ruff/formatter/)** for linting and formatting
+  (including `black`, `isort`, and `flake8`)
 - **[`pyright`](https://github.com/Microsoft/pyright)** for static type checking.
-- **`pytest`** for running a subset of fast tests from our test suite.
+- **[`pytest`](https://docs.pytest.org/en/stable/index.html)** for running a subset of
+  fast tests from our test suite.
 
 If any of these fail, try reproducing and solving the error locally:
 
-- **`ruff`**: Make sure you have `pre-commit` installed locally with the same
- version as specified in the [requirements](pyproject.toml). Execute it
- using `pre-commit run --all-files`. `ruff` tends to give informative error
-  messages that help you fix the problem. Note that pre-commit only detects
-  problems with `ruff` linting and formatting, but does not fix them. You can
-  fix them either by running `ruff check . --fix(linting)`, followed by
-  `ruff format . --fix(formatting)`, or by hand.
+- **`ruff`**: Make sure you have `pre-commit` installed locally with the same version as
+ specified in the
+ [`pyproject.toml`](https://github.com/sbi-dev/sbi/blob/main/pyproject.toml). Execute it
+  using `pre-commit run --all-files`. `ruff` tends to give informative error messages
+  that help you fix the problem. Note that pre-commit only detects problems with `ruff`
+  linting and formatting, but does not fix them. You can fix them either by running
+  `ruff check . --fix(linting)`, followed by `ruff format . --fix(formatting)`, or by
+  hand.
 - **`pyright`**: Run it locally using `pyright sbi/` and ensure you are using
 the same
   `pyright` version as used in the CI (which is the case if you have installed
@@ -209,17 +213,17 @@ fails (xfailed).
 ## Contributing to the documentation
 Most of the documentation for `sbi` is written in markdown and the website is
 generated using `mkdocs` with `mkdocstrings`. To work on improvements of the
-documentation, you should first run the command on your terminal
+documentation, you should first  install the `doc` dependencies:
 ```
+pip install -e ".[doc]"
+```
+Then, you can run the command on your terminal
+```
+cd docs
+jupyter nbconvert --to markdown ../examples/*.ipynb --output-dir docs/examples/
+jupyter nbconvert --to markdown ../tutorials/*.ipynb --output-dir docs/tutorials/
 mkdocs serve
 ```
 and open a browser on the page proposed by `mkdocs`. Now, whenever you
 make changes to the markdown files of the documentation, you can see the results
 almost immediately in the browser.
-
-Note that the tutorials and examples are initially written in jupyter notebooks
-and then converted to markdown programatically. To do so locally, you should run
-```
-jupyter nbconvert --to markdown ../tutorials/*.ipynb --output-dir docs/tutorial/
-jupyter nbconvert --to markdown ../examples/*.ipynb --output-dir docs/examples/
-```

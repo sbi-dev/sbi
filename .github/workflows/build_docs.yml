@@ -1,0 +1,58 @@
+name: "Build docs and deploy"
+on:
+  push:
+    branches:
+      - main
+  release:
+    types: [ published ]
+
+jobs:
+  docs:
+    name: Build Documentation
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        lfs: false
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.10'
+
+    - name: Cache dependency
+      id: cache-dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip
+
+    - name: Install sbi and dependencies
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install .[doc]
+
+    - name: convert notebooks to markdown
+      run: |
+        cd docs
+        jupyter nbconvert --to markdown ../examples/*.ipynb --output-dir docs/examples/
+        jupyter nbconvert --to markdown ../tutorials/*.ipynb --output-dir docs/tutorials/
+
+    - name: Configure Git user for bot
+      run: |
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+
+    - name: Build and deploy dev documentation upon push to main
+      if: ${{ github.event_name == 'push' }}
+      run: |
+        cd docs
+        mike deploy dev --push
+
+    - name: Build and deploy the lastest documentation upon new release
+      if: ${{ github.event_name == 'release' }}
+      run: |
+        cd docs
+        mike deploy ${{ github.event.release.name }} latest -u --push

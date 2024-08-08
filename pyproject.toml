@@ -46,15 +46,20 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = [
+doc = [
     # Documentation
+    "jupyter_contrib_nbextensions",
+    "notebook <= 6.4.12",
+    "traitlets <= 5.9.0",
+    "ipython <= 8.9.0",
     "mkdocs",
     "mkdocs-material",
     "markdown-include",
     "mkdocs-redirects",
     "mkdocstrings[python] >= 0.18",
-    "jupyter",
-    "nbconvert",
+    "mike"
+]
+dev = [
     # Lint
     "pre-commit == 3.5.0",
     "pyyaml",
