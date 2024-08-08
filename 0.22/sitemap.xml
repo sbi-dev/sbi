@@ -36,6 +36,11 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
+         <loc>https://sbi-dev.github.io/sbi/0.22/reference/</loc>
+         <lastmod>2024-08-08</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
          <loc>https://sbi-dev.github.io/sbi/0.22/examples/00_HH_simulator/</loc>
          <lastmod>2024-08-08</lastmod>
          <changefreq>daily</changefreq>
@@ -46,67 +51,37 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
-         <loc>https://sbi-dev.github.io/sbi/0.22/faq/question_01_leakage/</loc>
+         <loc>https://sbi-dev.github.io/sbi/0.22/faq/question_01/</loc>
          <lastmod>2024-08-08</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
-         <loc>https://sbi-dev.github.io/sbi/0.22/faq/question_02_nans/</loc>
+         <loc>https://sbi-dev.github.io/sbi/0.22/faq/question_02/</loc>
          <lastmod>2024-08-08</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
-         <loc>https://sbi-dev.github.io/sbi/0.22/faq/question_03_pickling_error/</loc>
+         <loc>https://sbi-dev.github.io/sbi/0.22/faq/question_03/</loc>
          <lastmod>2024-08-08</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
-         <loc>https://sbi-dev.github.io/sbi/0.22/faq/question_04_gpu/</loc>
+         <loc>https://sbi-dev.github.io/sbi/0.22/faq/question_04/</loc>
          <lastmod>2024-08-08</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
-         <loc>https://sbi-dev.github.io/sbi/0.22/faq/question_05_pickling/</loc>
+         <loc>https://sbi-dev.github.io/sbi/0.22/faq/question_05/</loc>
          <lastmod>2024-08-08</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
-         <loc>https://sbi-dev.github.io/sbi/0.22/faq/question_06_resume_training/</loc>
+         <loc>https://sbi-dev.github.io/sbi/0.22/faq/question_06/</loc>
          <lastmod>2024-08-08</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
-         <loc>https://sbi-dev.github.io/sbi/0.22/faq/question_07_custom_prior/</loc>
-         <lastmod>2024-08-08</lastmod>
-         <changefreq>daily</changefreq>
-    </url>
-    <url>
-         <loc>https://sbi-dev.github.io/sbi/0.22/reference/</loc>
-         <lastmod>2024-08-08</lastmod>
-         <changefreq>daily</changefreq>
-    </url>
-    <url>
-         <loc>https://sbi-dev.github.io/sbi/0.22/reference/analysis/</loc>
-         <lastmod>2024-08-08</lastmod>
-         <changefreq>daily</changefreq>
-    </url>
-    <url>
-         <loc>https://sbi-dev.github.io/sbi/0.22/reference/inference/</loc>
-         <lastmod>2024-08-08</lastmod>
-         <changefreq>daily</changefreq>
-    </url>
-    <url>
-         <loc>https://sbi-dev.github.io/sbi/0.22/reference/models/</loc>
-         <lastmod>2024-08-08</lastmod>
-         <changefreq>daily</changefreq>
-    </url>
-    <url>
-         <loc>https://sbi-dev.github.io/sbi/0.22/reference/posteriors/</loc>
-         <lastmod>2024-08-08</lastmod>
-         <changefreq>daily</changefreq>
-    </url>
-    <url>
-         <loc>https://sbi-dev.github.io/sbi/0.22/reference/potentials/</loc>
+         <loc>https://sbi-dev.github.io/sbi/0.22/faq/question_07/</loc>
          <lastmod>2024-08-08</lastmod>
          <changefreq>daily</changefreq>
     </url>
@@ -187,11 +162,6 @@
     </url>
     <url>
          <loc>https://sbi-dev.github.io/sbi/0.22/tutorial/16_implemented_methods/</loc>
-         <lastmod>2024-08-08</lastmod>
-         <changefreq>daily</changefreq>
-    </url>
-    <url>
-         <loc>https://sbi-dev.github.io/sbi/0.22/tutorials/</loc>
          <lastmod>2024-08-08</lastmod>
          <changefreq>daily</changefreq>
     </url>
