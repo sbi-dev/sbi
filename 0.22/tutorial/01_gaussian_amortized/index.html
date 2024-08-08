@@ -8,9 +8,13 @@
       
       
       
-        <link rel="canonical" href="https://sbi-dev.github.io/sbi/0.22/faq/question_02/">
+        <link rel="canonical" href="https://sbi-dev.github.io/sbi/0.22/tutorial/01_gaussian_amortized/">
       
       
+        <link rel="prev" href="../02_flexible_interface/">
+      
+      
+        <link rel="next" href="../16_implemented_methods/">
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
@@ -18,7 +22,7 @@
     
     
       
-        <title>Can the algorithms deal with invalid data, e.g. NaN or inf? - sbi</title>
+        <title>Amortized inference - sbi</title>
       
     
     
@@ -72,7 +76,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#can-the-algorithms-deal-with-invalid-data-eg-nan-or-inf" class="md-skip">
+        <a href="#amortized-posterior-inference-on-gaussian-example" class="md-skip">
           Skip to content
         </a>
       
@@ -107,7 +111,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Can the algorithms deal with invalid data, e.g. NaN or inf?
+              Amortized inference
             
           </span>
         </div>
@@ -260,17 +264,19 @@
       
   
   
+    
   
   
+  
     
     
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
         
           
           <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
@@ -284,7 +290,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
             Tutorials and Examples
@@ -295,17 +301,19 @@
                 
   
   
+    
   
   
+  
     
     
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_1" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_1" checked>
         
           
           <label class="md-nav__link" for="__nav_3_1" id="__nav_3_1_label" tabindex="0">
@@ -319,7 +327,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_1_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_1_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_3_1">
             <span class="md-nav__icon md-icon"></span>
             Introduction
@@ -333,7 +341,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tutorial/00_getting_started/" class="md-nav__link">
+      <a href="../00_getting_started/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -354,7 +362,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tutorial/02_flexible_interface/" class="md-nav__link">
+      <a href="../02_flexible_interface/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -372,10 +380,30 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../tutorial/01_gaussian_amortized/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    Amortized inference
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   <span class="md-ellipsis">
@@ -384,6 +412,44 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#defining-prior-simulator-and-running-inference" class="md-nav__link">
+    <span class="md-ellipsis">
+      Defining prior, simulator, and running inference
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#amortized-inference" class="md-nav__link">
+    <span class="md-ellipsis">
+      Amortized inference
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -396,7 +462,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tutorial/16_implemented_methods/" class="md-nav__link">
+      <a href="../16_implemented_methods/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -460,7 +526,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tutorial/03_multiround_inference/" class="md-nav__link">
+      <a href="../03_multiround_inference/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -481,7 +547,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tutorial/11_sampler_interface/" class="md-nav__link">
+      <a href="../11_sampler_interface/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -502,7 +568,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tutorial/04_density_estimators/" class="md-nav__link">
+      <a href="../04_density_estimators/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -523,7 +589,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tutorial/05_embedding_net/" class="md-nav__link">
+      <a href="../05_embedding_net/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -544,7 +610,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tutorial/14_iid_data_and_permutation_invariant_embeddings/" class="md-nav__link">
+      <a href="../14_iid_data_and_permutation_invariant_embeddings/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -565,7 +631,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tutorial/08_restriction_estimator/" class="md-nav__link">
+      <a href="../08_restriction_estimator/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -586,7 +652,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tutorial/10_crafting_summary_statistics/" class="md-nav__link">
+      <a href="../10_crafting_summary_statistics/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -650,7 +716,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tutorial/12_diagnostics_posterior_predictive_check/" class="md-nav__link">
+      <a href="../12_diagnostics_posterior_predictive_check/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -671,7 +737,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tutorial/13_diagnostics_simulation_based_calibration/" class="md-nav__link">
+      <a href="../13_diagnostics_simulation_based_calibration/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -692,7 +758,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tutorial/15_mcmc_diagnostics_with_arviz/" class="md-nav__link">
+      <a href="../15_mcmc_diagnostics_with_arviz/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -756,7 +822,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tutorial/07_conditional_distributions/" class="md-nav__link">
+      <a href="../07_conditional_distributions/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -777,7 +843,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tutorial/09_sensitivity_analysis/" class="md-nav__link">
+      <a href="../09_sensitivity_analysis/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1002,7 +1068,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../" class="md-nav__link">
+      <a href="../../faq/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1055,6 +1121,32 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#defining-prior-simulator-and-running-inference" class="md-nav__link">
+    <span class="md-ellipsis">
+      Defining prior, simulator, and running inference
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#amortized-inference" class="md-nav__link">
+    <span class="md-ellipsis">
+      Amortized inference
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -1071,23 +1163,61 @@
   
 
 
-<h1 id="can-the-algorithms-deal-with-invalid-data-eg-nan-or-inf">Can the algorithms deal with invalid data, e.g. NaN or inf?<a class="headerlink" href="#can-the-algorithms-deal-with-invalid-data-eg-nan-or-inf" title="Permanent link">&para;</a></h1>
-<p>Yes. By default, whenever a simulation returns at least one <code>NaN</code> or <code>inf</code>, it is 
-completely excluded from the training data. In other words, the simulation is simply 
-discarded.</p>
-<p>In cases where a very large fraction of simulations return <code>NaN</code> or <code>inf</code>, discarding many simulations can be wasteful. There are two options to deal with this: Either, you use the <code>RestrictionEstimator</code> to learn regions in parameter space that do not produce <code>NaN</code> or <code>inf</code>, see <a href="https://sbi-dev.github.io/sbi/tutorial/08_restriction_estimator/">here</a>. Alternatively, you can manually substitute the &lsquo;invalid&rsquo; values with a reasonable replacement. 
-I.e., at the end of your simulation code, you search for invalid entries and replace 
-them with a floating point number. Importantly, in order for neural network training 
-work well, the floating point number should still be in a reasonable range, i.e. maybe a
- few standard deviations outside of &lsquo;good&rsquo; values.</p>
-<p>If you are running <strong>multi-round</strong> SNPE, however, things can go fully wrong if invalid
- data are encountered. In that case, you will get the following warning
-<div class="highlight"><pre><span></span><code>When invalid simulations are excluded, multi-round SNPE-C can leak into the regions where parameters led to invalid simulations. This can lead to poor results.
+<h1 id="amortized-posterior-inference-on-gaussian-example">Amortized posterior inference on Gaussian example<a class="headerlink" href="#amortized-posterior-inference-on-gaussian-example" title="Permanent link">&para;</a></h1>
+<p>Note, you can find the original version of this notebook at <a href="https://github.com/sbi-dev/sbi/blob/main/tutorials/01_gaussian_amortized.ipynb">https://github.com/sbi-dev/sbi/blob/main/tutorials/01_gaussian_amortized.ipynb</a> in the <code>sbi</code> repository.</p>
+<p>In this tutorial, we will demonstrate how <code>sbi</code> can infer an amortized posterior for a simple toy model with a uniform prior and Gaussian likelihood.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+
+<span class="kn">from</span> <span class="nn">sbi</span> <span class="kn">import</span> <span class="n">utils</span> <span class="k">as</span> <span class="n">utils</span>
+<span class="kn">from</span> <span class="nn">sbi</span> <span class="kn">import</span> <span class="n">analysis</span> <span class="k">as</span> <span class="n">analysis</span>
+<span class="kn">from</span> <span class="nn">sbi.inference.base</span> <span class="kn">import</span> <span class="n">infer</span>
 </code></pre></div>
-Hence, if you are running multi-round SNPE and a significant fraction of simulations
-returns at least one invalid number, we strongly recommend to manually replace the value
- in your simulation code as described above (or resort to single-round SNPE or use a 
- different method).</p>
+<h2 id="defining-prior-simulator-and-running-inference">Defining prior, simulator, and running inference<a class="headerlink" href="#defining-prior-simulator-and-running-inference" title="Permanent link">&para;</a></h2>
+<p>Say we have a 3-dimensional parameter space, and the prior is uniformly distributed between <code>-2</code> and <code>2</code> in each dimension, i.e. <span class="arithmatex">\(\theta \in [-2,2], y\in [-2,2], z \in [-2,2]\)</span>.</p>
+<div class="highlight"><pre><span></span><code><span class="n">num_dim</span> <span class="o">=</span> <span class="mi">3</span>
+<span class="n">prior</span> <span class="o">=</span> <span class="n">utils</span><span class="o">.</span><span class="n">BoxUniform</span><span class="p">(</span><span class="n">low</span><span class="o">=-</span><span class="mi">2</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">num_dim</span><span class="p">),</span> <span class="n">high</span><span class="o">=</span><span class="mi">2</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">num_dim</span><span class="p">))</span>
+</code></pre></div>
+<p>Our simulator takes the input parameters, adds <code>1.0</code> in each dimension, and then adds some Gaussian noise:</p>
+<div class="highlight"><pre><span></span><code><span class="k">def</span> <span class="nf">linear_gaussian</span><span class="p">(</span><span class="n">theta</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">theta</span> <span class="o">+</span> <span class="mf">1.0</span> <span class="o">+</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn_like</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span> <span class="o">*</span> <span class="mf">0.1</span>
+</code></pre></div>
+<p>We can then run inference (either with the simple interface or with the flexible interface):</p>
+<div class="highlight"><pre><span></span><code><span class="n">posterior</span> <span class="o">=</span> <span class="n">infer</span><span class="p">(</span><span class="n">linear_gaussian</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="s2">&quot;SNPE&quot;</span><span class="p">,</span> <span class="n">num_simulations</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
+</code></pre></div>
+<h2 id="amortized-inference">Amortized inference<a class="headerlink" href="#amortized-inference" title="Permanent link">&para;</a></h2>
+<p>Note that we have not yet provided an observation to the inference procedure. In fact, we can evaluate the posterior for different observations without having to re-run inference. This is called amortization. An amortized posterior is one that is not focused on any particular observation. Naturally, if the diversity of observations is large, any of the inference methods will need to run a sufficient number of simulations for the resulting posterior to perform well across these diverse observations.</p>
+<p>Let&rsquo;s say we have two observations <code>x_o_1 = [0,0,0]</code> and <code>x_o_2 = [2,2,2]</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="n">x_o_1</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">3</span><span class="p">,)</span>
+<span class="n">x_o_2</span> <span class="o">=</span> <span class="mf">2.0</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">3</span><span class="p">,)</span>
+</code></pre></div>
+<p>We can draw samples from the posterior given <code>x_o_1</code> and then plot them:</p>
+<div class="highlight"><pre><span></span><code><span class="n">posterior_samples_1</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">10000</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_o_1</span><span class="p">)</span>
+
+<span class="c1"># plot posterior samples</span>
+<span class="n">_</span> <span class="o">=</span> <span class="n">analysis</span><span class="o">.</span><span class="n">pairplot</span><span class="p">(</span>
+    <span class="n">posterior_samples_1</span><span class="p">,</span> <span class="n">limits</span><span class="o">=</span><span class="p">[[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">]],</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span>
+<span class="p">)</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>Drawing 10000 posterior samples:   0%|          | 0/10000 [00:00&lt;?, ?it/s]
+</code></pre></div>
+
+<p><img alt="png" src="../01_gaussian_amortized_files/01_gaussian_amortized_14_1.png" /></p>
+<p>As it can be seen, the posterior samples are centered around <code>[-1,-1,-1]</code> in each dimension. 
+This makes sense because the simulator always adds <code>1.0</code> in each dimension and we have observed <code>x_o_1 = [0,0,0]</code>.</p>
+<p>Since the learned posterior is amortized, we can also draw samples from the posterior given the second observation without having to re-run inference:</p>
+<div class="highlight"><pre><span></span><code><span class="n">posterior_samples_2</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">10000</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_o_2</span><span class="p">)</span>
+
+<span class="c1"># plot posterior samples</span>
+<span class="n">_</span> <span class="o">=</span> <span class="n">analysis</span><span class="o">.</span><span class="n">pairplot</span><span class="p">(</span>
+    <span class="n">posterior_samples_2</span><span class="p">,</span> <span class="n">limits</span><span class="o">=</span><span class="p">[[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">]],</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span>
+<span class="p">)</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>Drawing 10000 posterior samples:   0%|          | 0/10000 [00:00&lt;?, ?it/s]
+</code></pre></div>
+
+<p><img alt="png" src="../01_gaussian_amortized_files/01_gaussian_amortized_17_1.png" /></p>
+<p>So, if we observed <code>x_o_2 = [2,2,2]</code>, the posterior is centered around <code>[1,1,1]</code> &ndash; again, this makes sense because the simulator adds <code>1.0</code> in each dimension.</p>
 
 
 

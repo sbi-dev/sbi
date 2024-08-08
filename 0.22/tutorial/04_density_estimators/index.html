@@ -8,9 +8,13 @@
       
       
       
-        <link rel="canonical" href="https://sbi-dev.github.io/sbi/0.22/faq/question_02/">
+        <link rel="canonical" href="https://sbi-dev.github.io/sbi/0.22/tutorial/04_density_estimators/">
       
       
+        <link rel="prev" href="../11_sampler_interface/">
+      
+      
+        <link rel="next" href="../05_embedding_net/">
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
@@ -18,7 +22,7 @@
     
     
       
-        <title>Can the algorithms deal with invalid data, e.g. NaN or inf? - sbi</title>
+        <title>Custom density estimators - sbi</title>
       
     
     
@@ -72,7 +76,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#can-the-algorithms-deal-with-invalid-data-eg-nan-or-inf" class="md-skip">
+        <a href="#customizing-the-density-estimator" class="md-skip">
           Skip to content
         </a>
       
@@ -107,7 +111,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Can the algorithms deal with invalid data, e.g. NaN or inf?
+              Custom density estimators
             
           </span>
         </div>
@@ -260,17 +264,19 @@
       
   
   
+    
   
   
+  
     
     
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
         
           
           <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
@@ -284,7 +290,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
             Tutorials and Examples
@@ -333,7 +339,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tutorial/00_getting_started/" class="md-nav__link">
+      <a href="../00_getting_started/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -354,7 +360,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tutorial/02_flexible_interface/" class="md-nav__link">
+      <a href="../02_flexible_interface/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -375,7 +381,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tutorial/01_gaussian_amortized/" class="md-nav__link">
+      <a href="../01_gaussian_amortized/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -396,7 +402,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tutorial/16_implemented_methods/" class="md-nav__link">
+      <a href="../16_implemented_methods/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -422,17 +428,19 @@
                 
   
   
+    
   
   
+  
     
     
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2" checked>
         
           
           <label class="md-nav__link" for="__nav_3_2" id="__nav_3_2_label" tabindex="0">
@@ -446,7 +454,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_2_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_2_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_3_2">
             <span class="md-nav__icon md-icon"></span>
             Advanced
@@ -460,7 +468,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tutorial/03_multiround_inference/" class="md-nav__link">
+      <a href="../03_multiround_inference/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -481,7 +489,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tutorial/11_sampler_interface/" class="md-nav__link">
+      <a href="../11_sampler_interface/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -499,10 +507,30 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../tutorial/04_density_estimators/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    Custom density estimators
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   <span class="md-ellipsis">
@@ -511,6 +539,53 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#changing-the-type-of-density-estimator" class="md-nav__link">
+    <span class="md-ellipsis">
+      Changing the type of density estimator
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#changing-hyperparameters-of-density-estimators" class="md-nav__link">
+    <span class="md-ellipsis">
+      Changing hyperparameters of density estimators
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#building-new-density-estimators-from-scratch" class="md-nav__link">
+    <span class="md-ellipsis">
+      Building new density estimators from scratch
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -523,7 +598,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tutorial/05_embedding_net/" class="md-nav__link">
+      <a href="../05_embedding_net/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -544,7 +619,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tutorial/14_iid_data_and_permutation_invariant_embeddings/" class="md-nav__link">
+      <a href="../14_iid_data_and_permutation_invariant_embeddings/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -565,7 +640,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tutorial/08_restriction_estimator/" class="md-nav__link">
+      <a href="../08_restriction_estimator/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -586,7 +661,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tutorial/10_crafting_summary_statistics/" class="md-nav__link">
+      <a href="../10_crafting_summary_statistics/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -650,7 +725,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tutorial/12_diagnostics_posterior_predictive_check/" class="md-nav__link">
+      <a href="../12_diagnostics_posterior_predictive_check/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -671,7 +746,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tutorial/13_diagnostics_simulation_based_calibration/" class="md-nav__link">
+      <a href="../13_diagnostics_simulation_based_calibration/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -692,7 +767,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tutorial/15_mcmc_diagnostics_with_arviz/" class="md-nav__link">
+      <a href="../15_mcmc_diagnostics_with_arviz/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -756,7 +831,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tutorial/07_conditional_distributions/" class="md-nav__link">
+      <a href="../07_conditional_distributions/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -777,7 +852,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tutorial/09_sensitivity_analysis/" class="md-nav__link">
+      <a href="../09_sensitivity_analysis/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1002,7 +1077,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../" class="md-nav__link">
+      <a href="../../faq/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1055,6 +1130,41 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#changing-the-type-of-density-estimator" class="md-nav__link">
+    <span class="md-ellipsis">
+      Changing the type of density estimator
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#changing-hyperparameters-of-density-estimators" class="md-nav__link">
+    <span class="md-ellipsis">
+      Changing hyperparameters of density estimators
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#building-new-density-estimators-from-scratch" class="md-nav__link">
+    <span class="md-ellipsis">
+      Building new density estimators from scratch
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -1071,23 +1181,31 @@
   
 
 
-<h1 id="can-the-algorithms-deal-with-invalid-data-eg-nan-or-inf">Can the algorithms deal with invalid data, e.g. NaN or inf?<a class="headerlink" href="#can-the-algorithms-deal-with-invalid-data-eg-nan-or-inf" title="Permanent link">&para;</a></h1>
-<p>Yes. By default, whenever a simulation returns at least one <code>NaN</code> or <code>inf</code>, it is 
-completely excluded from the training data. In other words, the simulation is simply 
-discarded.</p>
-<p>In cases where a very large fraction of simulations return <code>NaN</code> or <code>inf</code>, discarding many simulations can be wasteful. There are two options to deal with this: Either, you use the <code>RestrictionEstimator</code> to learn regions in parameter space that do not produce <code>NaN</code> or <code>inf</code>, see <a href="https://sbi-dev.github.io/sbi/tutorial/08_restriction_estimator/">here</a>. Alternatively, you can manually substitute the &lsquo;invalid&rsquo; values with a reasonable replacement. 
-I.e., at the end of your simulation code, you search for invalid entries and replace 
-them with a floating point number. Importantly, in order for neural network training 
-work well, the floating point number should still be in a reasonable range, i.e. maybe a
- few standard deviations outside of &lsquo;good&rsquo; values.</p>
-<p>If you are running <strong>multi-round</strong> SNPE, however, things can go fully wrong if invalid
- data are encountered. In that case, you will get the following warning
-<div class="highlight"><pre><span></span><code>When invalid simulations are excluded, multi-round SNPE-C can leak into the regions where parameters led to invalid simulations. This can lead to poor results.
+<h1 id="customizing-the-density-estimator">Customizing the density estimator<a class="headerlink" href="#customizing-the-density-estimator" title="Permanent link">&para;</a></h1>
+<p><code>sbi</code> allows to specify a custom density estimator for each of the implemented methods. For all options, check the API reference <a href="https://www.mackelab.org/sbi/reference/#models">here</a>.</p>
+<h2 id="changing-the-type-of-density-estimator">Changing the type of density estimator<a class="headerlink" href="#changing-the-type-of-density-estimator" title="Permanent link">&para;</a></h2>
+<p>One option is to use one of set of preconfigured density estimators by passing a string in the <code>density_estimator</code> keyword argument to the inference object (<code>SNPE</code> or <code>SNLE</code>), e.g., &ldquo;maf&rdquo; to use a Masked Autoregressive Flow, of &ldquo;nsf&rdquo; to use a Neural Spline Flow with default hyperparameters.</p>
+<div class="highlight"><pre><span></span><code><span class="n">inference</span> <span class="o">=</span> <span class="n">SNPE</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span> <span class="n">density_estimator</span><span class="o">=</span><span class="s2">&quot;maf&quot;</span><span class="p">)</span>
 </code></pre></div>
-Hence, if you are running multi-round SNPE and a significant fraction of simulations
-returns at least one invalid number, we strongly recommend to manually replace the value
- in your simulation code as described above (or resort to single-round SNPE or use a 
- different method).</p>
+<p>In the case of <code>SNRE</code>, the argument is called <code>classifier</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="n">inference</span> <span class="o">=</span> <span class="n">SNRE</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span> <span class="n">classifier</span><span class="o">=</span><span class="s2">&quot;resnet&quot;</span><span class="p">)</span>
+</code></pre></div>
+<h2 id="changing-hyperparameters-of-density-estimators">Changing hyperparameters of density estimators<a class="headerlink" href="#changing-hyperparameters-of-density-estimators" title="Permanent link">&para;</a></h2>
+<p>Alternatively, you can use a set of utils functions to configure a density estimator yourself, e.g., use a MAF with hyperparameters chosen for your problem at hand.</p>
+<p>Here, because we want to use SN*P*E, we specifiy a neural network targeting the <em>posterior</em> (using the utils function <code>posterior_nn</code>). In this example, we will create a neural spline flow (<code>'nsf'</code>) with <code>60</code> hidden units and <code>3</code> transform layers:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi.utils.get_nn_models</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="n">posterior_nn</span><span class="p">,</span>
+<span class="p">)</span>  <span class="c1"># For SNLE: likelihood_nn(). For SNRE: classifier_nn()</span>
+
+<span class="n">density_estimator_build_fun</span> <span class="o">=</span> <span class="n">posterior_nn</span><span class="p">(</span>
+    <span class="n">model</span><span class="o">=</span><span class="s2">&quot;nsf&quot;</span><span class="p">,</span> <span class="n">hidden_features</span><span class="o">=</span><span class="mi">60</span><span class="p">,</span> <span class="n">num_transforms</span><span class="o">=</span><span class="mi">3</span>
+<span class="p">)</span>
+<span class="n">inference</span> <span class="o">=</span> <span class="n">SNPE</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span> <span class="n">density_estimator</span><span class="o">=</span><span class="n">density_estimator_build_fun</span><span class="p">)</span>
+</code></pre></div>
+<p>It is also possible to pass an <code>embedding_net</code> to <code>posterior_nn()</code> which learn summary statistics from high-dimensional simulation outputs. You can find a more detailed tutorial on this <a href="https://sbi-dev.github.io/sbi/tutorial/05_embedding_net/">here</a>.</p>
+<h2 id="building-new-density-estimators-from-scratch">Building new density estimators from scratch<a class="headerlink" href="#building-new-density-estimators-from-scratch" title="Permanent link">&para;</a></h2>
+<p>Finally, it is also possible to implement your own density estimator from scratch, e.g., including embedding nets to preprocess data, or to a density estimator architecture of your choice. </p>
+<p>For this, the <code>density_estimator</code> argument needs to be a function that takes <code>theta</code> and <code>x</code> batches as arguments to then construct the density estimator after the first set of simulations was generated. Our utils functions in <code>sbi/utils/get_nn_models.py</code> return such a function. </p>
 
 
 
