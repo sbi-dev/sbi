@@ -135,7 +135,7 @@ class FMPE(NeuralInference):
             self.optimizer = optim.Adam(
                 list(self._neural_net.net.parameters()), lr=learning_rate
             )
-            self.epoch, self._val_loss = 0, float("-Inf")
+            self.epoch, self._val_loss = 0, float("Inf")
 
         while self.epoch <= max_num_epochs and not self._converged(
             self.epoch, stop_after_epochs
