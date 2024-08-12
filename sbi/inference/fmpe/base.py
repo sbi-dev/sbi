@@ -68,6 +68,7 @@ class FMPE(NeuralInference):
 
     # todo: this is not correct, the method should return a vector field
     # estimator and not a density est.
+    # todo: (maternus) elaborate more on what's the plane ... 
     def train(
         self,
         training_batch_size: int = 50,
@@ -212,6 +213,7 @@ class FMPE(NeuralInference):
         self,
         density_estimator: Optional[ConditionalDensityEstimator] = None,
         prior: Optional[Distribution] = None,
+        sample_with: str = "direct",
         direct_sampling_parameters: Optional[Dict[str, Any]] = None,
     ) -> DirectPosterior:
         """Build the posterior distribution.
@@ -224,6 +226,11 @@ class FMPE(NeuralInference):
         Returns:
             DirectPosterior: Posterior distribution.
         """
+        if sample_with is not "direct": 
+            raise NotImplementedError(
+                "Currently, only direct sampling is supported for FMPE."
+            )
+        
         if prior is None:
             assert self._prior is not None, (
                 "You did not pass a prior. You have to pass the prior either at "
@@ -235,8 +242,6 @@ class FMPE(NeuralInference):
             utils.check_prior(prior)
 
         if density_estimator is None:
-            # todo: what we call density estimator is often saved as _neural_net in
-            # other classes
             posterior_estimator = self._neural_net
             # If internal net is used device is defined.
             device = self._device
@@ -244,14 +249,6 @@ class FMPE(NeuralInference):
             posterior_estimator = density_estimator
             # Otherwise, infer it from the device of the net parameters.
             device = next(density_estimator.parameters()).device.type
-
-        # todo: what's the `posterior_estimator_based_potential` ???
-        # in the super SNPE class, there's the following block:
-        # potential_fn, theta_transform = posterior_estimator_based_potential(
-        #     posterior_estimator=posterior_estimator,
-        #     prior=prior,
-        #     x_o=None,
-        # )
 
         self._posterior = DirectPosterior(
             posterior_estimator=posterior_estimator,  # type: ignore
@@ -303,15 +300,13 @@ class FMPE(NeuralInference):
 
         # Check for problematic z-scoring
         warn_if_zscoring_changes_data(x)
-        # todo: check what this does exactly
-        npe_msg_on_invalid_x(num_nans, num_infs, exclude_invalid_x, "Single-round FMPE")
+        # Check whether there are NaNs or Infs in the data and remove accordingly.
+        npe_msg_on_invalid_x(num_nans=num_nans, num_infs=num_infs, exclude_invalid_x=exclude_invalid_x, algorithm="Single-round FMPE")
 
         prior_masks = mask_sims_from_prior(int(current_round > 0), theta.size(0))
 
         self._theta_roundwise.append(theta)
         self._x_roundwise.append(x)
         self._prior_masks.append(prior_masks)
-
-        # self._proposal_roundwise.append(proposal)
 
         return self
