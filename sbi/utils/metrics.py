@@ -2,7 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from logging import warning
-from typing import Any, Dict, Optional, Union
+from typing import Any, Callable, Dict, Optional, Union
 
 import numpy as np
 import torch
@@ -18,55 +18,74 @@ def c2st(
     seed: int = 1,
     n_folds: int = 5,
     metric: str = "accuracy",
-    classifier: str = "rf",
+    classifier: Union[str, Callable] = "rf",
+    classifier_kwargs: Optional[Dict[str, Any]] = None,
+    z_score: bool = True,
+    noise_scale: Optional[float] = None,
+    verbosity: int = 0,
 ) -> Tensor:
     """
-    Return accuracy of classifier trained to distinguish samples from supposedly two
-    distributions <X> and <Y>. For details on the method, see [1,2]. If the returned
-    accuracy is 0.5, <X> and <Y> are considered to be from the same generating PDF, i.e.
-    they can not be differentiated. If the returned accuracy is around 1., <X> and <Y>
-    are considered to be from two different generating PDFs.
+    Return classifier based two-sample test accuracy between X and Y.
 
-    Training of the classifier with N-fold cross-validation [3] using sklearn. By
-    default, a `RandomForestClassifier` by from `sklearn.ensemble` is used (<classifier>
-    = 'rf'). Alternatively, a multi-layer perceptron is available (<classifier> =
-    'mlp'). For a small study on the pros and cons for this choice see [4]. Before both
-    samples are ingested, they are normalized (z scored) under the assumption that each
-    dimension in X follows a normal distribution, i.e. the mean(X) is subtracted from X
-    and this difference is divided by std(X) for every dimension.
+    For details on the method, see [1,2]. If the returned accuracy is 0.5, <X>
+    and <Y> are considered to be from the same generating PDF, i.e. they can not
+    be differentiated. If the returned accuracy is around 1., <X> and <Y> are
+    considered to be from two different generating PDFs.
 
-    If you need a more flexible interface which is able to take a sklearn compatible
-    classifier and more, see the `c2st_` method in this module.
+    Training of the classifier with N-fold cross-validation [3] using sklearn.
+    By default, a `RandomForestClassifier` by from `sklearn.ensemble` is used
+    (<classifier> = 'rf'). Alternatively, a multi-layer perceptron is available
+    (<classifier> = 'mlp'). For a small study on the pros and cons for this
+    choice see [4].
+
+    Note: Both set of samples are normalized (z scored) using the mean and std
+    of the samples in <X>. If <z_score> is set to False, no normalization is
+    done. If features in <X> are close to constant with std close to zero, the
+    std is set to 1 to avoud division by zero.
+
+    If you need a more flexible interface which is able to take a sklearn
+    compatible classifier and more, see the `c2st_` method in this module.
 
     Args:
-        X: Samples from one distribution. Y: Samples from another distribution. seed:
-        Seed for the sklearn classifier and the KFold cross-validation n_folds: Number
-        of folds to use metric: sklearn compliant metric to use for the scoring
-        parameter of cross_val_score classifier: classification architecture to use,
-        possible values: 'rf' or 'mlp'
+        X: Samples from one distribution. Y: Samples from another distribution.
+        seed: Seed for the sklearn classifier and the KFold cross-validation
+        n_folds: Number of folds to use metric: sklearn compliant metric to use
+        for the scoring parameter of
+            cross_val_score
+        classifier: classification architecture to use. Defaults to "rf" for a
+            RandomForestClassifier. Should be a sklearn classifier, or a
+            Callable that behaves like one.
+        z_score: Z-scoring using X, i.e. mean and std deviation of X is
+            used to normalize X and Y, i.e. Y=(Y - mean)/std
+        noise_scale: If passed, will add Gaussian noise with standard deviation
+            <noise_scale> to samples of X and of Y
+        verbosity: control the verbosity of
+        sklearn.model_selection.cross_val_score
 
     Return:
         torch.tensor containing the mean accuracy score over the test sets from
         cross-validation
 
-    Example: ``` py > c2st(X,Y) [0.51904464] #X and Y likely come from the same PDF or
-    ensemble > c2st(P,Q) [0.998456] #P and Q likely come from two different PDFs or
-    ensembles ```
+    Example: ``` py > c2st(X,Y) [0.51904464] #X and Y likely come from the same
+    PDF or ensemble > c2st(P,Q) [0.998456] #P and Q likely come from two
+    different PDFs or ensembles ```
 
     References:
-        [1]: http://arxiv.org/abs/1610.06545 [2]: https://www.osti.gov/biblio/826696/
-        [3]: https://scikit-learn.org/stable/modules/cross_validation.html [4]:
+        [1]: http://arxiv.org/abs/1610.06545 [2]:
+        https://www.osti.gov/biblio/826696/ [3]:
+        https://scikit-learn.org/stable/modules/cross_validation.html [4]:
         https://github.com/psteinb/c2st/
     """
 
     # the default configuration
-    clf_class = RandomForestClassifier
-    clf_kwargs = {}
-
-    if "mlp" in classifier.lower():
+    if classifier == "rf":
+        clf_class = RandomForestClassifier
+        clf_kwargs = classifier_kwargs or {}  # use sklearn defaults
+    elif classifier == "mlp":
         ndim = X.shape[-1]
         clf_class = MLPClassifier
-        clf_kwargs = {
+        # set defaults for the MLP
+        clf_kwargs = classifier_kwargs or {
             "activation": "relu",
             "hidden_layer_sizes": (10 * ndim, 10 * ndim),
             "max_iter": 1000,
@@ -75,92 +94,11 @@ def c2st(
             "n_iter_no_change": 50,
         }
 
-    noise_scale = None
-    z_score = True
-    verbosity = 0
-
-    scores_ = c2st_scores(
-        X,
-        Y,
-        seed=seed,
-        n_folds=n_folds,
-        metric=metric,
-        z_score=z_score,
-        noise_scale=noise_scale,
-        verbosity=verbosity,
-        clf_class=clf_class,
-        clf_kwargs=clf_kwargs,
-    )
-
-    # TODO: unclear why np.asarray needs to be used here
-    scores = np.asarray(np.mean(scores_)).astype(np.float32)
-    value = torch.from_numpy(np.atleast_1d(scores))
-    return value
-
-
-def c2st_scores(
-    X: Tensor,
-    Y: Tensor,
-    seed: int = 1,
-    n_folds: int = 5,
-    metric: str = "accuracy",
-    z_score: bool = True,
-    noise_scale: Optional[float] = None,
-    verbosity: int = 0,
-    clf_class: Any = RandomForestClassifier,
-    clf_kwargs: Optional[Dict[str, Any]] = None,
-) -> Tensor:
-    """
-    Return accuracy of classifier trained to distinguish samples from supposedly two
-    distributions <X> and <Y>. For details on the method, see [1,2]. If the returned
-    accuracy is 0.5, <X> and <Y> are considered to be from the same generating PDF, i.e.
-    they can not be differentiated. If the returned accuracy is around 1., <X> and <Y>
-    are considered to be from two different generating PDFs.
-
-    This function performs training of the classifier with N-fold cross-validation [3]
-    using sklearn. By default, a `RandomForestClassifier` by from `sklearn.ensemble` is
-    used which is recommended based on the study performed in [4]. This can be changed
-    using <clf_class>. This class is used in the following fashion:
-
-    ``` py clf = clf_class(random_state=seed, **clf_kwargs) #... scores =
-    cross_val_score(
-        clf, data, target, cv=shuffle, scoring=scoring, verbose=verbosity
-    )
-    ```
-    Further configuration of the classifier can be performed using <clf_kwargs>. If you
-    like to provide a custom class for training, it has to satisfy the internal
-    requirements of `sklearn.model_selection.cross_val_score`.
-
-    Args:
-        X: Samples from one distribution. Y: Samples from another distribution. seed:
-        Seed for the sklearn classifier and the KFold cross validation n_folds: Number
-        of folds to use for cross validation metric: sklearn compliant metric to use for
-        the scoring parameter of cross_val_score z_score: Z-scoring using X, i.e. mean
-        and std deviation of X is used to normalize Y, i.e. Y=(Y - mean)/std
-        noise_scale: If passed, will add Gaussian noise with standard deviation
-        <noise_scale> to samples of X and of Y verbosity: control the verbosity of
-        sklearn.model_selection.cross_val_score clf_class: a scikit-learn classifier
-        class clf_kwargs: key-value arguments dictionary to the class specified by
-        clf_class, e.g. sklearn.ensemble.RandomForestClassifier
-
-    Return:
-        np.ndarray containing the calculated <metric> scores over the test set folds
-        from cross-validation
-
-    Example: ``` py > c2st_scores(X,Y)
-    [0.51904464,0.5309201,0.4959452,0.5487709,0.50682926] #X and Y likely come from the
-    same PDF or ensemble > c2st_scores(P,Q)
-    [0.998456,0.9982912,0.9980476,0.9980488,0.99805826] #P and Q likely come from two
-    different PDFs or ensembles ```
-
-    References:
-        [1]: http://arxiv.org/abs/1610.06545 [2]: https://www.osti.gov/biblio/826696/
-        [3]: https://scikit-learn.org/stable/modules/cross_validation.html [4]:
-        https://github.com/psteinb/c2st/
-    """
     if z_score:
         X_mean = torch.mean(X, dim=0)
         X_std = torch.std(X, dim=0)
+        # Set std to 1 if it is close to zero.
+        X_std[X_std < 1e-14] = 1
         X = (X - X_mean) / X_std
         Y = (Y - X_mean) / X_std
 
@@ -168,13 +106,10 @@ def c2st_scores(
         X += noise_scale * torch.randn(X.shape)
         Y += noise_scale * torch.randn(Y.shape)
 
-    X = X.cpu().numpy()
-    Y = Y.cpu().numpy()
+    clf = clf_class(random_state=seed, **clf_kwargs)
 
-    clf = clf_class(random_state=seed, **clf_kwargs or {})
-
-    # prepare data
-    data = np.concatenate((X, Y))
+    # prepare data, convert to numpy
+    data = np.concatenate((X.cpu().numpy(), Y.cpu().numpy()))
     # labels
     target = np.concatenate((np.zeros((X.shape[0],)), np.ones((Y.shape[0],))))
 
@@ -183,7 +118,7 @@ def c2st_scores(
         clf, data, target, cv=shuffle, scoring=metric, verbose=verbosity
     )
 
-    return scores
+    return torch.from_numpy(scores).mean()
 
 
 def unbiased_mmd_squared(x: Tensor, y: Tensor, scale: Optional[float] = None):

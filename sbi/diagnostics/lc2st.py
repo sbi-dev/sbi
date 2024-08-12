@@ -670,15 +670,9 @@ def train_lc2st(
     Returns:
         Trained classifier.
     """
-    # cpu and numpy
-    theta_p = theta_p.cpu().numpy()
-    theta_q = theta_q.cpu().numpy()
-    x_p = x_p.cpu().numpy()
-    x_q = x_q.cpu().numpy()
-
     # concatenate to get joint data
-    joint_p = np.concatenate([theta_p, x_p], axis=1)
-    joint_q = np.concatenate([theta_q, x_q], axis=1)
+    joint_p = np.concatenate([theta_p.cpu().numpy(), x_p.cpu().numpy()], axis=1)
+    joint_q = np.concatenate([theta_q.cpu().numpy(), x_q.cpu().numpy()], axis=1)
 
     # prepare data
     data = np.concatenate((joint_p, joint_q))

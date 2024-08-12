@@ -12,7 +12,7 @@ from torch import Tensor, float32, nn
 from torch.distributions import Distribution, Uniform
 
 from sbi.sbi_types import Array
-from sbi.utils.sbiutils import warn_on_iid_x, within_support
+from sbi.utils.sbiutils import warn_on_batched_x, within_support
 from sbi.utils.torchutils import BoxUniform, atleast_2d
 from sbi.utils.user_input_checks_utils import (
     CustomPriorWrapper,
@@ -71,9 +71,9 @@ def process_prior(
     # If prior is a sequence, assume independent components and check as PyTorch prior.
     if isinstance(prior, Sequence):
         warnings.warn(
-            f"""Prior was provided as a sequence of {len(prior)} priors. They will be
-            interpreted as independent of each other and matched in order to the
-            components of the parameter.""",
+            f"Prior was provided as a sequence of {len(prior)} priors. They will be "
+            "interpreted as independent of each other and matched in order to the "
+            "components of the parameter.",
             stacklevel=2,
         )
         # process individual priors
@@ -462,15 +462,32 @@ def process_simulator(
 
     assert isinstance(user_simulator, Callable), "Simulator must be a function."
 
-    pytorch_simulator = wrap_as_pytorch_simulator(
+    joblib_simulator = wrap_as_joblib_efficient_simulator(
         user_simulator, prior, is_numpy_simulator
     )
 
-    batch_simulator = ensure_batched_simulator(pytorch_simulator, prior)
+    batch_simulator = ensure_batched_simulator(joblib_simulator, prior)
 
     return batch_simulator
 
 
+# New simulator wrapper, deriving from #1175 refactoring of simulate_for_sbi.
+# For now it just blindly applies a cast to tensor to the input and the output
+# of the simulator. This is not efficient (~3 times slowdown), but is compatible
+# with the new joblib and, importantly, does not break previous code. It should
+# be removed with a future restructuring of the simulation pipeline.
+def wrap_as_joblib_efficient_simulator(
+    simulator: Callable, prior, is_numpy_simulator
+) -> Callable:
+    """Return a simulator that accepts `ndarray` and returns `Tensor` arguments."""
+
+    def joblib_simulator(theta: ndarray) -> Tensor:
+        return torch.as_tensor(simulator(torch.as_tensor(theta)), dtype=float32)
+
+    return joblib_simulator
+
+
+# Probably not used anymore
 def wrap_as_pytorch_simulator(
     simulator: Callable, prior, is_numpy_simulator
 ) -> Callable:
@@ -534,9 +551,7 @@ def get_batch_loop_simulator(simulator: Callable) -> Callable:
     return batch_loop_simulator
 
 
-def process_x(
-    x: Array, x_event_shape: Optional[torch.Size] = None, allow_iid_x: bool = False
-) -> Tensor:
+def process_x(x: Array, x_event_shape: Optional[torch.Size] = None) -> Tensor:
     """Return observed data adapted to match sbi's shape and type requirements.
 
     This means that `x` is returned with a `batch_dim`.
@@ -548,7 +563,6 @@ def process_x(
         x_event_shape: Prescribed shape - either directly provided by the user at init
             or inferred by sbi by running a simulation and checking the output. Does not
             contain a batch dimension.
-        allow_iid_x: Whether multiple trials in x are allowed.
 
     Returns:
         x: Observed data with shape ready for usage in sbi.
@@ -568,10 +582,7 @@ def process_x(
         x = x.unsqueeze(0)
 
     input_x_shape = x.shape
-    if not allow_iid_x:
-        check_for_possibly_batched_x_shape(input_x_shape)
-    else:
-        warn_on_iid_x(num_trials=input_x_shape[0])
+    warn_on_batched_x(batch_size=input_x_shape[0])
 
     if x_event_shape is not None:
         # Number of trials can change for every new x, but single trial x shape must

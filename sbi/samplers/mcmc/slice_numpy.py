@@ -394,8 +394,8 @@ class SliceSamplerVectorized:
         # TODO: implement parallelization across batches of chains.
         if num_workers > 1:
             warn(
-                """Parallelization of vectorized slice sampling not implement, running
-                serially.""",
+                "Parallelization of vectorized slice sampling not implement, running "
+                "serially.",
                 stacklevel=2,
             )
         self._reset()

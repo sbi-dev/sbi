@@ -12,26 +12,25 @@ from torch.distributions import MultivariateNormal
 
 from sbi import analysis as analysis
 from sbi import utils as utils
-from sbi.analysis import ConditionedMDN, conditional_potential
+from sbi.analysis import conditional_potential
 from sbi.inference import (
     DirectPosterior,
     MCMCPosterior,
-    RejectionPosterior,
     posterior_estimator_based_potential,
     simulate_for_sbi,
 )
 
 # TODO import this from inference
 from sbi.inference.fmpe.base import FMPE
+from sbi.neural_nets.factory import flowmatching_nn
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
     samples_true_posterior_linear_gaussian_mvn_prior_different_dims,
     samples_true_posterior_linear_gaussian_uniform_prior,
     true_posterior_linear_gaussian_mvn_prior,
 )
-from sbi.utils import RestrictedPrior, get_density_thresholder
+from sbi.utils.user_input_checks import process_simulator
 
-from .sbiutils_test import conditional_of_mvn
 from .test_utils import (
     check_c2st,
     get_dkl_gaussian_prior,
@@ -73,14 +72,11 @@ def test_c2st_fmpe_on_linearGaussian(num_dim: int, prior_str: str):
             num_samples=num_samples,
         )
 
-    def simulator(theta):
-        return linear_gaussian(theta, likelihood_shift, likelihood_cov)
+    theta = prior.sample((num_simulations,))
+    x = linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     inference = FMPE(prior, show_progress_bars=False)
 
-    theta, x = simulate_for_sbi(
-        simulator, prior, num_simulations, simulation_batch_size=1000
-    )
     posterior_estimator = inference.append_simulations(theta, x).train(
         training_batch_size=100
     )
@@ -142,15 +138,14 @@ def test_c2st_fmpe_on_linearGaussian(num_dim: int, prior_str: str):
         assert ((map_ - ones(num_dim)) ** 2).sum() < 0.5
 
 
+# TODO: add more architectures, e.g., zuko mlp vs. resnet?
 @pytest.mark.slow
-@pytest.mark.parametrize(
-    "density_estimator", ["mdn", "maf", "maf_rqs", "nsf", "zuko_maf"]
-)
-def test_density_estimators_on_linearGaussian(density_estimator):
-    """Test fmpe with different density estimators on linear Gaussian example."""
+@pytest.mark.parametrize("estimators", ["mlp"])
+def test_fmpe_with_different_estimators(model):
+    """Test fmpe with different vector field estimators on linear Gaussian."""
 
-    theta_dim = 4
-    x_dim = 4
+    theta_dim = 3
+    x_dim = 3
 
     x_o = zeros(1, x_dim)
     num_samples = 1000
@@ -169,16 +164,13 @@ def test_density_estimators_on_linearGaussian(density_estimator):
     )
     target_samples = gt_posterior.sample((num_samples,))
 
-    simulator, prior = prepare_for_sbi(
-        lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov),
-        prior,
-    )
+    theta = prior.sample((num_simulations,))
+    x = linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    inference = FMPE(prior, density_estimator=density_estimator)
+    estimator_build_fun = flowmatching_nn(model=model)
 
-    theta, x = simulate_for_sbi(
-        simulator, prior, num_simulations, simulation_batch_size=1000
-    )
+    inference = FMPE(prior, density_estimator=estimator_build_fun)
+
     posterior_estimator = inference.append_simulations(theta, x).train(
         training_batch_size=100
     )
@@ -188,7 +180,7 @@ def test_density_estimators_on_linearGaussian(density_estimator):
     samples = posterior.sample((num_samples,))
 
     # Compute the c2st and assert it is near chance level of 0.5.
-    check_c2st(samples, target_samples, alg=f"fmpe_{density_estimator}")
+    check_c2st(samples, target_samples, alg=f"fmpe_{model}")
 
 
 def test_c2st_fmpe_on_linearGaussian_different_dims(density_estimator="maf"):
@@ -196,7 +188,7 @@ def test_c2st_fmpe_on_linearGaussian_different_dims(density_estimator="maf"):
 
     theta_dim = 3
     x_dim = 2
-    discard_dims = theta_dim - x_dim
+    discarded_dims = theta_dim - x_dim
 
     x_o = zeros(1, x_dim)
     num_samples = 1000
@@ -215,29 +207,20 @@ def test_c2st_fmpe_on_linearGaussian_different_dims(density_estimator="maf"):
         likelihood_cov,
         prior_mean,
         prior_cov,
-        num_discarded_dims=discard_dims,
+        num_discarded_dims=discarded_dims,
         num_samples=num_samples,
     )
 
-    simulator, prior = prepare_for_sbi(
-        lambda theta: linear_gaussian(
-            theta,
-            likelihood_shift,
-            likelihood_cov,
-            num_discarded_dims=discard_dims,
-        ),
-        prior,
+    theta = prior.sample((num_simulations,))
+    x = linear_gaussian(
+        theta, likelihood_shift, likelihood_cov, num_discarded_dims=discarded_dims
     )
+
     # Test whether prior can be `None`.
     inference = FMPE(
         prior=None,
         density_estimator=density_estimator,
         show_progress_bars=False,
-    )
-
-    # type: ignore
-    theta, x = simulate_for_sbi(
-        simulator, prior, num_simulations, simulation_batch_size=num_simulations
     )
 
     inference = inference.append_simulations(theta, x)
@@ -254,48 +237,6 @@ def test_c2st_fmpe_on_linearGaussian_different_dims(density_estimator="maf"):
 
     # Compute the c2st and assert it is near chance level of 0.5.
     check_c2st(samples, target_samples, alg="fmpe_different_dims")
-
-
-@pytest.mark.parametrize(
-    "force_first_round_loss, pass_proposal_to_append",
-    (
-        (True, True),
-        (True, False),
-        (False, True),
-        pytest.param(False, False, marks=pytest.mark.xfail),
-    ),
-)
-def test_api_force_first_round_loss(
-    force_first_round_loss: bool, pass_proposal_to_append: bool
-):
-    """Test that leakage correction applied to sampling works, with both MCMC and
-    rejection.
-
-    """
-
-    num_dim = 2
-    x_o = zeros(1, num_dim)
-
-    # likelihood_mean will be likelihood_shift+theta
-    likelihood_shift = -1.0 * ones(num_dim)
-    likelihood_cov = 0.3 * eye(num_dim)
-    prior = utils.BoxUniform(-2.0 * ones(num_dim), 2.0 * ones(num_dim))
-
-    simulator, prior = prepare_for_sbi(
-        lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov),
-        prior,
-    )
-    inference = FMPE(prior, show_progress_bars=False)
-
-    proposal = prior
-    for _ in range(2):
-        train_proposal = proposal if pass_proposal_to_append else None
-        theta, x = simulate_for_sbi(simulator, proposal, 1000)
-        _ = inference.append_simulations(theta, x, proposal=train_proposal).train(
-            force_first_round_loss=force_first_round_loss, max_num_epochs=2
-        )
-        posterior = inference.build_posterior().set_default_x(x_o)
-        proposal = posterior
 
 
 @pytest.mark.slow
@@ -333,17 +274,20 @@ def test_sample_conditional():
         else:
             return linear_gaussian(theta, -likelihood_shift, likelihood_cov)
 
-    # Test whether fmpe works properly with structured z-scoring.
-    net = utils.posterior_nn("maf", z_score_x="structured", hidden_features=20)
-
-    simulator, prior = prepare_for_sbi(simulator, prior)
-
-    inference = FMPE(prior, density_estimator=net, show_progress_bars=False)
+    simulator = process_simulator(simulator, prior, False)
 
     # We need a pretty big dataset to properly model the bimodality.
     theta, x = simulate_for_sbi(
-        simulator, prior, num_simulations, simulation_batch_size=num_simulations
+        simulator,
+        prior,
+        num_simulations,
+        simulation_batch_size=10,  # choose small batch size to ensure bimoality.
     )
+
+    # Test whether fmpe works properly with structured z-scoring.
+    net = utils.posterior_nn("maf", z_score_x="structured", hidden_features=20)
+
+    inference = FMPE(prior, density_estimator=net, show_progress_bars=False)
     posterior_estimator = inference.append_simulations(theta, x).train(
         max_num_epochs=60
     )
@@ -414,40 +358,3 @@ def test_sample_conditional():
 
     max_err = np.max(error)
     assert max_err < 0.0027
-
-
-@pytest.mark.parametrize("fmpe_method", [FMPE])
-def test_example_posterior(fmpe_method: type):
-    """Return an inferred `NeuralPosterior` for interactive examination."""
-    num_dim = 2
-    x_o = zeros(1, num_dim)
-    num_simulations = 100
-
-    # likelihood_mean will be likelihood_shift+theta
-    likelihood_shift = -1.0 * ones(num_dim)
-    likelihood_cov = 0.3 * eye(num_dim)
-
-    prior_mean = zeros(num_dim)
-    prior_cov = eye(num_dim)
-    prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
-
-    simulator, prior = prepare_for_sbi(
-        lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov),
-        prior,
-    )
-    inference = fmpe_method(prior, show_progress_bars=False)
-
-    theta, x = simulate_for_sbi(
-        simulator,
-        prior,
-        num_simulations,
-        simulation_batch_size=num_simulations,
-        num_workers=6,
-    )
-    posterior_estimator = inference.append_simulations(theta, x).train(
-        max_num_epochs=2
-    )
-    posterior = DirectPosterior(
-        prior=prior, posterior_estimator=posterior_estimator
-    ).set_default_x(x_o)
-    assert posterior is not None

@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+
 from functools import partial
 from typing import List, Optional, Sequence, Union
 
@@ -25,7 +26,7 @@ from sbi.utils.sbiutils import (
 from sbi.utils.torchutils import create_alternating_binary_mask
 from sbi.utils.user_input_checks import check_data_device
 
-nflow_specific_kwargs = ["num_bins", "num_components"]
+nflow_specific_kwargs = ["num_bins", "num_components", "tail_bound"]
 
 
 def build_made(

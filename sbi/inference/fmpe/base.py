@@ -16,7 +16,6 @@ from sbi import utils as utils
 from sbi.inference.base import NeuralInference
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.neural_nets import ConditionalDensityEstimator, flowmatching_nn
-from sbi.neural_nets.density_estimators.zuko_flow import FlowMatchingEstimator
 from sbi.utils import (
     RestrictedPrior,
     handle_invalid_x,
@@ -68,7 +67,7 @@ class FMPE(NeuralInference):
 
     # todo: this is not correct, the method should return a vector field
     # estimator and not a density est.
-    # todo: (maternus) elaborate more on what's the plane ... 
+    # todo: (maternus) elaborate more on what's the plane ...
     def train(
         self,
         training_batch_size: int = 50,
@@ -226,11 +225,11 @@ class FMPE(NeuralInference):
         Returns:
             DirectPosterior: Posterior distribution.
         """
-        if sample_with != "direct": 
+        if sample_with != "direct":
             raise NotImplementedError(
                 "Currently, only direct sampling is supported for FMPE."
             )
-        
+
         if prior is None:
             assert self._prior is not None, (
                 "You did not pass a prior. You have to pass the prior either at "
@@ -301,7 +300,12 @@ class FMPE(NeuralInference):
         # Check for problematic z-scoring
         warn_if_zscoring_changes_data(x)
         # Check whether there are NaNs or Infs in the data and remove accordingly.
-        npe_msg_on_invalid_x(num_nans=num_nans, num_infs=num_infs, exclude_invalid_x=exclude_invalid_x, algorithm="Single-round FMPE")
+        npe_msg_on_invalid_x(
+            num_nans=num_nans,
+            num_infs=num_infs,
+            exclude_invalid_x=exclude_invalid_x,
+            algorithm="Single-round FMPE",
+        )
 
         prior_masks = mask_sims_from_prior(int(current_round > 0), theta.size(0))
 

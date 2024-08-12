@@ -54,8 +54,6 @@ def likelihood_estimator_based_potential(
 
 
 class LikelihoodBasedPotential(BasePotential):
-    allow_iid_x = True  # type: ignore
-
     def __init__(
         self,
         likelihood_estimator: ConditionalDensityEstimator,
@@ -90,16 +88,30 @@ class LikelihoodBasedPotential(BasePotential):
         Returns:
             The potential $\log(p(x_o|\theta)p(\theta))$.
         """
-
-        # Calculate likelihood over trials and in one batch.
-        log_likelihood_trial_sum = _log_likelihoods_over_trials(
-            x=self.x_o,
-            theta=theta.to(self.device),
-            estimator=self.likelihood_estimator,
-            track_gradients=track_gradients,
-        )
-
-        return log_likelihood_trial_sum + self.prior.log_prob(theta)  # type: ignore
+        if self.x_is_iid:
+            # For each theta, calculate the likelihood sum over all x in batch.
+            log_likelihood_trial_sum = _log_likelihoods_over_trials(
+                x=self.x_o,
+                theta=theta.to(self.device),
+                estimator=self.likelihood_estimator,
+                track_gradients=track_gradients,
+            )
+            return log_likelihood_trial_sum + self.prior.log_prob(theta)  # type: ignore
+        else:
+            # Calculate likelihood for each (theta,x) pair separately
+            theta_batch_size = theta.shape[0]
+            x_batch_size = self.x_o.shape[0]
+            assert (
+                theta_batch_size == x_batch_size
+            ), f"Batch size mismatch: {theta_batch_size} and {x_batch_size}.\
+                When performing batched sampling for multiple `x`, the batch size of\
+                `theta` must match the batch size of `x`."
+            x = self.x_o.unsqueeze(0)
+            with torch.set_grad_enabled(track_gradients):
+                log_likelihood_batches = self.likelihood_estimator.log_prob(
+                    x, condition=theta
+                )
+            return log_likelihood_batches + self.prior.log_prob(theta)  # type: ignore
 
 
 def _log_likelihoods_over_trials(

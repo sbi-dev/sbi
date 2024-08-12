@@ -75,9 +75,13 @@ def test_embedding_net_api(
     _ = posterior.potential(s)
 
 
+@pytest.mark.parametrize("num_xo_batch", [1, 2])
 @pytest.mark.parametrize("num_trials", [1, 2])
 @pytest.mark.parametrize("num_dim", [1, 2])
-def test_embedding_api_with_multiple_trials(num_trials, num_dim):
+@pytest.mark.parametrize("posterior_method", ["direct", "mcmc"])
+def test_embedding_api_with_multiple_trials(
+    num_xo_batch, num_trials, num_dim, posterior_method
+):
     """Tests the API when using iid trial-based data."""
     prior = utils.BoxUniform(-2.0 * ones(num_dim), 2.0 * ones(num_dim))
 
@@ -87,7 +91,7 @@ def test_embedding_api_with_multiple_trials(num_trials, num_dim):
     # simulate iid x.
     iid_theta = theta.reshape(num_thetas, 1, num_dim).repeat(1, num_trials, 1)
     x = torch.randn_like(iid_theta) + iid_theta
-    x_o = zeros(1, num_trials, num_dim)
+    x_o = zeros(num_xo_batch, num_trials, num_dim)
 
     output_dim = 5
     single_trial_net = FCEmbedding(input_dim=num_dim, output_dim=output_dim)
@@ -101,10 +105,21 @@ def test_embedding_api_with_multiple_trials(num_trials, num_dim):
 
     _ = inference.append_simulations(theta, x).train(max_num_epochs=5)
 
-    posterior = inference.build_posterior().set_default_x(x_o)
-
-    s = posterior.sample((1,))
-    _ = posterior.potential(s)
+    if posterior_method == "direct":
+        posterior = inference.build_posterior().set_default_x(x_o)
+    elif posterior_method == "mcmc":
+        posterior = inference.build_posterior(
+            sample_with=posterior_method,
+            mcmc_method="slice_np_vectorized",
+        ).set_default_x(x_o)
+    if num_xo_batch == 1:
+        s = posterior.sample((1,), x=x_o)
+        _ = posterior.potential(s)
+    else:
+        s = posterior.sample_batched((1,), x=x_o).squeeze(0)
+        # potentials take `theta` as (batch_shape, event_shape), so squeeze sample_dim
+        s = s.squeeze(0)
+        _ = posterior.potential(s)
 
 
 @pytest.mark.parametrize("input_shape", [(32,), (32, 32), (32, 64)])

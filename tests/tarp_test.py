@@ -4,14 +4,9 @@ from torch import Tensor, allclose, exp, eye, ones
 from torch.distributions import Normal, Uniform
 from torch.nn import L1Loss
 
-from sbi.diagnostics.tarp import (
-    _infer_posterior_on_batch,
-    _prepare_estimates,
-    _run_tarp,
-    check_tarp,
-    run_tarp,
-)
-from sbi.inference import SNPE, simulate_for_sbi
+from sbi.analysis.plot import plot_tarp
+from sbi.diagnostics.tarp import _run_tarp, check_tarp, get_tarp_references, run_tarp
+from sbi.inference import SNPE
 from sbi.simulators import linear_gaussian
 from sbi.utils import BoxUniform
 from sbi.utils.metrics import l1, l2
@@ -58,7 +53,7 @@ def biased_toy_gaussian(nsamples=100, nsims=100, ndims=5, covfactor=1.0):
 
 
 @pytest.fixture
-def onsamples():
+def accurate_samples():
     nsamples = 100  # samples per simulation
     nsims = 100
     ndims = 5
@@ -67,7 +62,7 @@ def onsamples():
 
 
 @pytest.fixture
-def undersamples():
+def underdispersed_samples():
     # taken from the paper page 7, section 4.1 Gaussian Toy Model underconfident case
 
     nsamples = 100  # samples per simulation
@@ -78,7 +73,7 @@ def undersamples():
 
 
 @pytest.fixture
-def oversamples():
+def overdispersed_samples():
     # taken from the paper page 7, section 4.1 Gaussian Toy Model overconfident case
 
     nsamples = 100  # samples per simulation
@@ -89,7 +84,7 @@ def oversamples():
 
 
 @pytest.fixture
-def biased():
+def biased_samples():
     nsamples = 100  # samples per simulation
     nsims = 100
     ndims = 5
@@ -97,33 +92,12 @@ def biased():
     return biased_toy_gaussian(nsamples, nsims, ndims, covfactor=2.0)
 
 
-def test_onsamples(onsamples):
-    theta, samples = onsamples
-
-    assert theta.shape == (100, 5) or theta.shape == (1, 100, 5)
-    assert samples.shape == (100, 100, 5)
-
-
-def test_undersamples(undersamples):
-    theta, samples = undersamples
-
-    assert theta.shape == (100, 5) or theta.shape == (1, 100, 5)
-    assert samples.shape == (100, 100, 5)
-
-
-def test_biased(biased):
-    theta, samples = biased
-
-    assert theta.shape == (100, 5) or theta.shape == (1, 100, 5)
-    assert samples.shape == (100, 100, 5)
-
-
 ######################################################################
 ## test TARP library
 
 
-def test_distances(onsamples):
-    theta, samples = onsamples
+def test_distances(accurate_samples):
+    theta, samples = accurate_samples
 
     obs = l2(theta, samples)
 
@@ -151,121 +125,105 @@ def test_distances(onsamples):
 ## Reproduce Toy Examples in paper, see Section 4.1
 
 
-def test_run_tarp_correct(onsamples):
-    theta, samples = onsamples
+@pytest.mark.parametrize("distance", (l1, l2))
+@pytest.mark.parametrize("z_score_theta", (True, False))
+def test_run_tarp_correct(distance, z_score_theta, accurate_samples):
+    theta, samples = accurate_samples
 
-    ecp, alpha = _run_tarp(samples, theta, num_bins=30)
+    references = get_tarp_references(theta)
 
-    assert allclose((ecp - alpha).abs().max(), Tensor([0.0]), atol=1e-1)
-
-    ecp, alpha = _run_tarp(samples, theta, distance=l1, num_bins=30)
-
-    assert allclose((ecp - alpha).abs().max(), Tensor([0.0]), atol=1e-1)
-
-
-def test_run_tarp_correct_using_norm(onsamples):
-    theta, samples = onsamples
-
-    ecp, alpha = _run_tarp(samples, theta, num_bins=30, do_norm=False)
+    ecp, alpha = _run_tarp(
+        samples,
+        theta,
+        references,
+        distance=distance,
+        z_score_theta=z_score_theta,
+        num_bins=30,
+    )
 
     assert allclose((ecp - alpha).abs().max(), Tensor([0.0]), atol=1e-1)
     assert (
         ecp - alpha
     ).abs().sum() < 1.0  # integral of residuals should vanish, fig.2 in paper
 
-    ecp, alpha = _run_tarp(samples, theta, num_bins=30, do_norm=False, distance=l1)
 
-    # TARP detects that this is a correct representation of the posterior
-    assert allclose((ecp - alpha).abs().max(), Tensor([0.0]), atol=1e-1)
+@pytest.mark.parametrize("distance", (l1, l2))
+def test_run_tarp_detect_overdispersed(distance, overdispersed_samples):
+    theta, samples = overdispersed_samples
+    references = get_tarp_references(theta)
 
-
-def test_run_tarp_detect_overdispersed(oversamples):
-    theta, samples = oversamples
-
-    ecp, alpha = _run_tarp(samples, theta, num_bins=30, do_norm=True)
-
-    assert not allclose((ecp - alpha).abs().max(), Tensor([0.0]), atol=1e-1)
-    assert (ecp - alpha).abs().sum() > 3.0  # integral is nonzero, fig.2 in paper
-
-    ecp, alpha = _run_tarp(samples, theta, num_bins=30, do_norm=True, distance=l1)
+    ecp, alpha = _run_tarp(
+        samples, theta, references, num_bins=30, z_score_theta=True, distance=distance
+    )
 
     # TARP detects that this is NOT a correct representation of the posterior
     # hence we test for not allclose
     assert not allclose((ecp - alpha).abs().max(), Tensor([0.0]), atol=1e-1)
-
-
-def test_run_tarp_detect_underdispersed(undersamples):
-    theta, samples = undersamples
-
-    ecp, alpha = _run_tarp(samples, theta, num_bins=30, do_norm=True)
-
-    assert not allclose((ecp - alpha).abs().max(), Tensor([0.0]), atol=1e-1)
     assert (ecp - alpha).abs().sum() > 3.0  # integral is nonzero, fig.2 in paper
 
-    ecp, alpha = _run_tarp(samples, theta, num_bins=30, do_norm=True, distance=l1)
+
+@pytest.mark.parametrize("distance", (l1, l2))
+def test_run_tarp_detect_underdispersed(distance, underdispersed_samples):
+    theta, samples = underdispersed_samples
+    references = get_tarp_references(theta)
+
+    ecp, alpha = _run_tarp(
+        samples, theta, references, num_bins=30, z_score_theta=True, distance=distance
+    )
 
     # TARP detects that this is NOT a correct representation of the posterior
     # hence we test for not allclose
     assert not allclose((ecp - alpha).abs().max(), Tensor([0.0]), atol=1e-1)
-
-
-def test_run_tarp_detect_bias(biased):
-    theta, samples = biased
-
-    ecp, alpha = _run_tarp(samples, theta, num_bins=30, do_norm=True)
-
-    assert not allclose((ecp - alpha).abs().max(), Tensor([0.0]), atol=1e-1)
     assert (ecp - alpha).abs().sum() > 3.0  # integral is nonzero, fig.2 in paper
 
-    ecp, alpha = _run_tarp(samples, theta, num_bins=30, do_norm=True, distance=l1)
+
+@pytest.mark.parametrize("distance", (l1, l2))
+def test_run_tarp_detect_bias(distance, biased_samples):
+    theta, samples = biased_samples
+    references = get_tarp_references(theta)
+
+    ecp, alpha = _run_tarp(
+        samples, theta, references, distance=distance, num_bins=30, z_score_theta=True
+    )
 
     # TARP detects that this is NOT a correct representation of the posterior
     # hence we test for not allclose
     assert not allclose((ecp - alpha).abs().max(), Tensor([0.0]), atol=1e-1)
+    assert (ecp - alpha).abs().sum() > 3.0  # integral is nonzero, fig.2 in paper
 
 
-def test_check_tarp_correct(onsamples):
-    theta, samples = onsamples
+def test_check_tarp_correct(accurate_samples):
+    """Test TARP on correct samples."""
+    theta, samples = accurate_samples
+    references = get_tarp_references(theta)
 
-    ecp, alpha = _run_tarp(samples, theta, num_bins=30, do_norm=False)
-    print("onsamples")
-    print("tarp results", ecp, alpha)
+    ecp, alpha = _run_tarp(samples, theta, references)
     atc, kspvals = check_tarp(ecp, alpha)
 
-    print("tarp checks", atc, kspvals)
-    assert atc != 0.0
-    assert atc < 1.0
-
-    assert kspvals > 0.05  # samples are likely from the same PDF
+    assert -0.75 < atc < 0.75, "TARP should not detect bias"
+    assert kspvals > 0.5  # samples are likely from the same PDF
 
 
-def test_check_tarp_underdispersed(undersamples):
-    theta, samples = undersamples
+def test_check_tarp_underdispersed(underdispersed_samples):
+    """Test TARP on underdispersed samples."""
+    theta, samples = underdispersed_samples
+    references = get_tarp_references(theta)
 
-    ecp, alpha = _run_tarp(samples, theta, num_bins=30, do_norm=False)
-    print("underdispersed")
-    print("tarp results", ecp, alpha)
+    ecp, alpha = _run_tarp(samples, theta, references, num_bins=30)
     atc, kspvals = check_tarp(ecp, alpha)
 
-    print("tarp checks", atc, kspvals)
-
-    assert atc != 0.0
+    # TARP should detect that the posterior is underdispersed (atc < -1.0)
     assert atc < -2.0
-    # assert atc < -1.0 # TODO: need to check why this breaks
-
-    # TODO: need to check why this breaks
-    assert kspvals < 0.2  # samples are unlikely from the same PDF
+    # and p-values should be relatively small
+    assert kspvals < 0.05
 
 
-def test_check_tarp_overdispersed(oversamples):
-    theta, samples = oversamples
+def test_check_tarp_overdispersed(overdispersed_samples):
+    theta, samples = overdispersed_samples
+    references = get_tarp_references(theta)
 
-    ecp, alpha = _run_tarp(samples, theta, num_bins=50, do_norm=False)
-    print("overdispersed")
-    print("tarp results", ecp, alpha)
+    ecp, alpha = _run_tarp(samples, theta, references, num_bins=50, z_score_theta=False)
     atc, kspvals = check_tarp(ecp, alpha)
-
-    print("tarp checks", atc, kspvals)
 
     assert atc != 0.0
     assert atc > 2.0
@@ -273,15 +231,13 @@ def test_check_tarp_overdispersed(oversamples):
     assert kspvals < 0.05  # samples are unlikely from the same PDF
 
 
-def test_check_tarp_detect_bias(biased):
-    theta, samples = biased
+def test_check_tarp_detect_bias(biased_samples):
+    theta, samples = biased_samples
+    references = get_tarp_references(theta)
 
-    ecp, alpha = _run_tarp(samples, theta, num_bins=30, do_norm=True)
-    print("biased")
-    print("tarp results", ecp, alpha)
+    ecp, alpha = _run_tarp(samples, theta, references, num_bins=30, z_score_theta=True)
     atc, kspvals = check_tarp(ecp, alpha)
 
-    print("tarp checks", atc, kspvals)
     assert atc != 0.0
     assert atc > 1.0
 
@@ -294,61 +250,14 @@ def test_check_tarp_detect_bias(biased):
 
 @pytest.mark.slow
 @pytest.mark.parametrize("method", [SNPE])
-def test_batched_prepare_estimates(method, model="mdn"):
+def test_consistent_run_tarp_results_with_posterior(method):
     """Tests running inference and checking samples with tarp."""
 
     num_dim = 2
     prior = BoxUniform(-ones(num_dim), ones(num_dim))
 
     num_simulations = 1000
-    max_num_epochs = 20
-    num_tarp_runs = 100
-
-    likelihood_shift = -1.0 * ones(num_dim)
-    likelihood_cov = 0.3 * eye(num_dim)
-
-    def simulator(theta):
-        return linear_gaussian(theta, likelihood_shift, likelihood_cov)
-
-    inferer = method(prior, show_progress_bars=False, density_estimator=model)
-
-    theta, x = simulate_for_sbi(simulator, prior, num_simulations)
-
-    _ = inferer.append_simulations(theta, x).train(
-        training_batch_size=100, max_num_epochs=max_num_epochs
-    )
-
-    posterior = inferer.build_posterior()
-    num_posterior_samples = 256
-    thetas = prior.sample((num_tarp_runs,))
-    xs = simulator(thetas)
-
-    samples = _infer_posterior_on_batch(xs, posterior, num_posterior_samples)
-
-    assert samples.shape != thetas.shape
-    assert samples.shape[1:] == thetas.shape
-    assert samples.shape[0] == num_posterior_samples
-
-    samples_ = _prepare_estimates(
-        xs, posterior, num_posterior_samples, infer_batch_size=32
-    )
-
-    assert samples_.shape != thetas.shape
-    assert samples_.shape[1:] == thetas.shape
-    assert samples_.shape[0] == num_posterior_samples
-    assert samples_.shape == samples.shape
-
-
-@pytest.mark.slow
-@pytest.mark.parametrize("method", [SNPE])
-def test_consistent_run_tarp_results_with_posterior(method, model="mdn"):
-    """Tests running inference and checking samples with tarp."""
-
-    num_dim = 2
-    prior = BoxUniform(-ones(num_dim), ones(num_dim))
-
-    num_simulations = 6000
-    num_tarp_sims = 1000
+    num_tarp_sims = 500
     num_posterior_samples = 1000
 
     likelihood_shift = -1.0 * ones(num_dim)
@@ -357,13 +266,12 @@ def test_consistent_run_tarp_results_with_posterior(method, model="mdn"):
     def simulator(theta):
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    inferer = method(prior, show_progress_bars=True, density_estimator=model)
+    inferer = method(prior, show_progress_bars=True, density_estimator="maf")
 
     theta = prior.sample((num_simulations,))
     x = simulator(theta)
 
-    _ = inferer.append_simulations(theta, x).train(training_batch_size=1000)
-
+    inferer.append_simulations(theta, x).train(training_batch_size=200)
     posterior = inferer.build_posterior()
 
     thetas = prior.sample((num_tarp_sims,))
@@ -374,12 +282,19 @@ def test_consistent_run_tarp_results_with_posterior(method, model="mdn"):
         xs,
         posterior=posterior,
         num_posterior_samples=num_posterior_samples,
-        num_bins=30,
-        do_norm=True,
-        rng_seed=41,
     )
 
     atc, kspvals = check_tarp(ecp, alpha)
-    print(atc, kspvals)
     assert -0.5 < atc < 0.5
     assert kspvals > 0.05
+
+
+# Test tarp plotting
+@pytest.mark.parametrize("title", ["Correct", None])
+def test_tarp_plotting(title: str, accurate_samples):
+    theta, samples = accurate_samples
+    references = get_tarp_references(theta)
+
+    ecp, alpha = _run_tarp(samples, theta, references)
+
+    plot_tarp(ecp, alpha, title=title)

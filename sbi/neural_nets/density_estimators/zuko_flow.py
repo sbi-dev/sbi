@@ -108,6 +108,8 @@ class ZukoFlow(ConditionalDensityEstimator):
         Args:
             input: Inputs to evaluate the log probability on. Of shape
                 `(sample_dim, batch_dim, *event_shape)`.
+            # TODO: the docstring is not correct here. in the code it seems we
+            do not have a sample_dim for the condition.
             condition: Conditions of shape `(sample_dim, batch_dim, *event_shape)`.
 
         Raises:
