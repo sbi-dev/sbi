@@ -140,7 +140,7 @@ def test_c2st_fmpe_on_linearGaussian(num_dim: int, prior_str: str):
 
 # TODO: add more architectures, e.g., zuko mlp vs. resnet?
 @pytest.mark.slow
-@pytest.mark.parametrize("estimators", ["mlp"])
+@pytest.mark.parametrize("model", ["mlp"])
 def test_fmpe_with_different_estimators(model):
     """Test fmpe with different vector field estimators on linear Gaussian."""
 
