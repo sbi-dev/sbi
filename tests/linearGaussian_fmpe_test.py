@@ -183,7 +183,7 @@ def test_fmpe_with_different_estimators(model):
     check_c2st(samples, target_samples, alg=f"fmpe_{model}")
 
 
-def test_c2st_fmpe_on_linearGaussian_different_dims(density_estimator="maf"):
+def test_c2st_fmpe_on_linearGaussian_different_dims(density_estimator="mlp"):
     """Test fmpe on linear Gaussian with different theta and x dimensionality."""
 
     theta_dim = 3
