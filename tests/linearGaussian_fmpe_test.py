@@ -73,10 +73,8 @@ def test_c2st_fmpe_on_linearGaussian(num_dim: int, prior_str: str):
             num_samples=num_samples,
         )
 
-    simulator, prior = prepare_for_sbi(
-        lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov),
-        prior,
-    )
+    def simulator(theta):
+        return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     inference = FMPE(prior, show_progress_bars=False)
 
