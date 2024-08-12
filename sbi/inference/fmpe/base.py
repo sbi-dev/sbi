@@ -226,7 +226,7 @@ class FMPE(NeuralInference):
         Returns:
             DirectPosterior: Posterior distribution.
         """
-        if sample_with is not "direct": 
+        if sample_with != "direct": 
             raise NotImplementedError(
                 "Currently, only direct sampling is supported for FMPE."
             )
