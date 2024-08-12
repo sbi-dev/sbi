@@ -6,6 +6,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 import torch
+import warnings
 from scipy.stats import gaussian_kde
 from torch import eye, ones, zeros
 from torch.distributions import MultivariateNormal
@@ -232,6 +233,8 @@ def test_c2st_fmpe_on_linearGaussian_different_dims(density_estimator="mlp"):
     # posterior_estimator = inference.train(
     #     resume_training=True, force_first_round_loss=True
     # )
+    warnings.warn("We're currently not testing whether training can be continued.")
+    
     posterior = DirectPosterior(
         prior=prior, posterior_estimator=posterior_estimator
     ).set_default_x(x_o)
