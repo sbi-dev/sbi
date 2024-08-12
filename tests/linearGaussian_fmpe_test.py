@@ -329,7 +329,7 @@ def test_sample_conditional():
         limits=[[-2, 2], [-2, 2], [-2, 2]],
         figsize=(2, 2),
         diag="kde",
-        offdiag="kde",
+        upper="kde",
     )
 
     limits = [[-2, 2], [-2, 2], [-2, 2]]
