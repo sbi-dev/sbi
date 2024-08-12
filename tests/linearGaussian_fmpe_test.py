@@ -233,8 +233,11 @@ def test_c2st_fmpe_on_linearGaussian_different_dims(density_estimator="mlp"):
     # posterior_estimator = inference.train(
     #     resume_training=True, force_first_round_loss=True
     # )
-    warnings.warn("We're currently not testing whether training can be continued.")
-    
+    warnings.warn(
+        "We're currently not testing whether training can be continued. "
+        "This is due to the feature not being implemented in FMPE, yet."
+    )
+
     posterior = DirectPosterior(
         prior=prior, posterior_estimator=posterior_estimator
     ).set_default_x(x_o)
