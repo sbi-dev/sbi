@@ -285,7 +285,7 @@ def test_sample_conditional():
     )
 
     # Test whether fmpe works properly with structured z-scoring.
-    net = utils.posterior_nn("maf", z_score_x="structured", hidden_features=20)
+    net = flowmatching_nn("mlp", z_score_x="structured", hidden_features=[65] * 5)
 
     inference = FMPE(prior, density_estimator=net, show_progress_bars=False)
     posterior_estimator = inference.append_simulations(theta, x).train(
