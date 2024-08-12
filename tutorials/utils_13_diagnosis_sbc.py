@@ -31,6 +31,19 @@ class BiasedPosterior:
             + self.shift
         )
 
+    def sample_batched(
+        self,
+        sample_shape: Shape,
+        x: Optional[torch.Tensor] = None,
+        show_progress_bars: bool = False,
+    ):
+        return (
+            self.posterior.sample_batched(
+                sample_shape, x, show_progress_bars=show_progress_bars
+            )
+            + self.shift
+        )
+
 
 class DispersedPosterior:
     def __init__(self, posterior: Callable, dispersion: float = 1.05):
@@ -63,6 +76,32 @@ class DispersedPosterior:
         # obtain the median of all samples before applying
         # the dispersion to them (use median for more robust estimate)
         median = torch.median(value, dim=0)  # dim 0 is the batch dimension
+
+        # disperse the samples
+        dispersed = value * self.dispersion
+
+        # obtain the new median after the dispersion
+        median_ = torch.median(dispersed, dim=0)
+
+        # shift to obtain the original expectation values
+        # (we only want to disperse the samples, not offset)
+        shift = median.values - median_.values
+
+        return dispersed + shift
+
+    def sample_batched(
+        self,
+        sample_shape: Shape,
+        x: Optional[torch.Tensor] = None,
+        show_progress_bars: bool = False,
+    ):
+        value = self.posterior.sample_batched(
+            sample_shape, x, show_progress_bars=show_progress_bars
+        )
+
+        # obtain the median of all samples before applying
+        # the dispersion to them (use median for more robust estimate)
+        median = torch.median(value, dim=0)
 
         # disperse the samples
         dispersed = value * self.dispersion

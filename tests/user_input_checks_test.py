@@ -181,19 +181,17 @@ def test_process_prior(prior):
 
 
 @pytest.mark.parametrize(
-    "x, x_shape, allow_iid",
+    "x, x_shape",
     (
-        (ones(3), torch.Size([3]), False),
-        (ones(1, 3), torch.Size([3]), False),
-        (ones(10, 3), torch.Size([10, 3]), False),  # 2D data / iid SNPE
-        pytest.param(
-            ones(10, 3), None, False, marks=pytest.mark.xfail
-        ),  # 2D data / iid SNPE without x_shape
-        (ones(10, 10), torch.Size([10]), True),  # iid likelihood based
+        (ones(3), torch.Size([3])),
+        (ones(1, 3), torch.Size([3])),
+        (ones(10, 3), torch.Size([10, 3])),  # 2D data / iid SNPE
+        pytest.param(ones(10, 3), None),  # 2D data / iid SNPE without x_shape
+        (ones(10, 10), torch.Size([10])),  # iid likelihood based
     ),
 )
-def test_process_x(x, x_shape, allow_iid):
-    process_x(x, x_shape, allow_iid_x=allow_iid)
+def test_process_x(x, x_shape):
+    process_x(x, x_shape)
 
 
 @pytest.mark.parametrize(

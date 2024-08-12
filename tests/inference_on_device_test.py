@@ -22,7 +22,6 @@ from sbi.inference import (
     VIPosterior,
     likelihood_estimator_based_potential,
     ratio_estimator_based_potential,
-    simulate_for_sbi,
 )
 from sbi.inference.posteriors.importance_posterior import ImportanceSamplingPosterior
 from sbi.inference.potentials.base_potential import BasePotential
@@ -250,6 +249,7 @@ def test_validate_theta_and_x_device(training_device: str, data_device: str) -> 
     )
 
 
+@pytest.mark.gpu
 @pytest.mark.parametrize(
     "inference_method", [SNPE_A, SNPE_C, SNRE_A, SNRE_B, SNRE_C, SNLE]
 )
@@ -345,7 +345,9 @@ def test_nograd_after_inference_train(inference_method) -> None:
         show_progress_bars=False,
     )
 
-    theta, x = simulate_for_sbi(simulator, prior, 32)
+    num_simulations = 32
+    theta = prior.sample((num_simulations,))
+    x = simulator(theta)
     inference = inference.append_simulations(theta, x)
 
     posterior_estimator = inference.train(max_num_epochs=2)

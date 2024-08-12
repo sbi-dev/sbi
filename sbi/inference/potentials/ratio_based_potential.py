@@ -47,8 +47,6 @@ def ratio_estimator_based_potential(
 
 
 class RatioBasedPotential(BasePotential):
-    allow_iid_x = True  # type: ignore
-
     def __init__(
         self,
         ratio_estimator: nn.Module,
@@ -81,17 +79,31 @@ class RatioBasedPotential(BasePotential):
         Returns:
             The potential.
         """
+        if self.x_is_iid:
+            # For each theta, calculate likelihood ratio sum over all x in batch.
+            log_ratio_trial_sum = _log_ratios_over_trials(
+                x=self.x_o,
+                theta=theta.to(self.device),
+                net=self.ratio_estimator,
+                track_gradients=track_gradients,
+            )
 
-        # Calculate likelihood over trials and in one batch.
-        log_likelihood_trial_sum = _log_ratios_over_trials(
-            x=self.x_o,
-            theta=theta.to(self.device),
-            net=self.ratio_estimator,
-            track_gradients=track_gradients,
-        )
+            # Move to cpu for comparison with prior.
+            return log_ratio_trial_sum + self.prior.log_prob(theta)  # type: ignore
+        else:
+            # Calculate likelihood ratio for each (theta,x) pair separately
 
-        # Move to cpu for comparison with prior.
-        return log_likelihood_trial_sum + self.prior.log_prob(theta)  # type: ignore
+            theta_batch_size = theta.shape[0]
+            x_batch_size = self.x_o.shape[0]
+            assert (
+                theta_batch_size == x_batch_size
+            ), f"Batch size mismatch: {theta_batch_size} and {x_batch_size}.\
+                When performing batched sampling for multiple `x`, the batch size of\
+                `theta` must match the batch size of `x`."
+            with torch.set_grad_enabled(track_gradients):
+                log_ratio_batches = self.ratio_estimator(theta, self.x_o)
+                log_ratio_batches = log_ratio_batches.reshape(-1)
+            return log_ratio_batches + self.prior.log_prob(theta)  # type: ignore
 
 
 def _log_ratios_over_trials(
@@ -128,7 +140,7 @@ def _log_ratios_over_trials(
 
     # Calculate ratios in one batch.
     with torch.set_grad_enabled(track_gradients):
-        log_ratio_trial_batch = net([theta_repeated, x_repeated])
+        log_ratio_trial_batch = net(theta_repeated, x_repeated)
         # Reshape to (x-trials x parameters), sum over trial-log likelihoods.
         log_ratio_trial_sum = log_ratio_trial_batch.reshape(x.shape[0], -1).sum(0)
 

@@ -116,10 +116,10 @@ def test_lc2st_true_negativ_rate(method):
     num_runs = 100
     confidence_level = 0.95
 
-    # bad estimator :small training and num_epochs
+    # use little training data and num_epochs to obtain "bad" estimator.
     # (no convergence to the true posterior)
-    num_train = 1_000
-    num_epochs = 5
+    num_train = 100
+    num_epochs = 2
 
     num_cal = 1_000
     num_eval = 10_000

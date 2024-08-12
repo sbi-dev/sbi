@@ -77,8 +77,8 @@ class CustomPriorWrapper(Distribution):
                 ** 2
             )
             warnings.warn(
-                """Prior is lacking variance attribute, estimating prior variance from
-                samples...""",
+                "Prior is lacking variance attribute, estimating prior variance from "
+                "samples.",
                 UserWarning,
                 stacklevel=2,
             )
@@ -333,8 +333,8 @@ def build_support(
     if lower_bound is None and upper_bound is None:
         support = constraints.real
         warnings.warn(
-            """No prior bounds were passed, consider passing lower_bound
-            and / or upper_bound if your prior has bounded support.""",
+            "No prior bounds were passed, consider passing lower_bound "
+            "and / or upper_bound if your prior has bounded support.",
             stacklevel=2,
         )
     # Only lower bound is specified.

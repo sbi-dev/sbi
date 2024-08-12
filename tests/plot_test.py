@@ -10,7 +10,7 @@ from matplotlib.pyplot import close, subplots
 from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi.analysis import pairplot, plot_summary, sbc_rank_plot
-from sbi.inference import SNLE, SNPE, SNRE, simulate_for_sbi
+from sbi.inference import SNLE, SNPE, SNRE
 from sbi.utils import BoxUniform
 
 
@@ -98,6 +98,7 @@ def test_pairplot_dep(
 def test_plot_summary(method, tmp_path):
     num_dim = 1
     prior = BoxUniform(low=-2 * torch.ones(num_dim), high=2 * torch.ones(num_dim))
+    num_simulations = 6
 
     summary_writer = SummaryWriter(tmp_path)
 
@@ -105,7 +106,10 @@ def test_plot_summary(method, tmp_path):
         return theta + 1.0 + torch.randn_like(theta) * 0.1
 
     inference = method(prior=prior, summary_writer=summary_writer)
-    theta, x = simulate_for_sbi(simulator, proposal=prior, num_simulations=6)
+
+    theta = prior.sample((num_simulations,))
+    x = simulator(theta)
+
     train_kwargs = (
         dict(max_num_epochs=5, validation_fraction=0.5, num_atoms=2)
         if method == SNRE

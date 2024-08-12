@@ -13,7 +13,6 @@ from sbi.inference import (
     SNLE,
     MCMCPosterior,
     likelihood_estimator_based_potential,
-    simulate_for_sbi,
 )
 from sbi.neural_nets import likelihood_nn
 from sbi.samplers.mcmc.pymc_wrapper import PyMCSampler
@@ -202,14 +201,12 @@ def test_getting_inference_diagnostics(method, mcmc_params_fast: dict):
         Uniform(low=-ones(1), high=ones(1)),
     ]
 
-    prior, _, _ = process_prior(prior)
     simulator = diagonal_linear_gaussian
     density_estimator = likelihood_nn("maf", num_transforms=3)
     inference = SNLE(density_estimator=density_estimator, show_progress_bars=False)
-
-    theta, x = simulate_for_sbi(
-        simulator, prior, num_simulations, simulation_batch_size=num_simulations
-    )
+    prior, *_ = process_prior(prior)
+    theta = prior.sample((num_simulations,))
+    x = simulator(theta)
     likelihood_estimator = inference.append_simulations(theta, x).train(
         training_batch_size=num_simulations, max_num_epochs=2
     )
