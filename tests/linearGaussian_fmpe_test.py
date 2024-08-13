@@ -6,7 +6,6 @@ from __future__ import annotations
 import numpy as np
 import pytest
 import torch
-import warnings
 from scipy.stats import gaussian_kde
 from torch import eye, ones, zeros
 from torch.distributions import MultivariateNormal
@@ -42,7 +41,7 @@ from .test_utils import (
 
 @pytest.mark.parametrize(
     "num_dim, prior_str",
-    ((2, "gaussian"), (2, "uniform"), (1, "gaussian")),
+    ((2, "gaussian"), (2, "uniform"), (1, "gaussian"), (1, "uniform")),
 )
 def test_c2st_fmpe_on_linearGaussian(num_dim: int, prior_str: str):
     """Test whether fmpe infers well a simple example with available ground truth."""
@@ -87,9 +86,7 @@ def test_c2st_fmpe_on_linearGaussian(num_dim: int, prior_str: str):
     samples = posterior.sample((num_samples,))
 
     # Compute the c2st and assert it is near chance level of 0.5.
-    check_c2st(samples, target_samples, alg="fmpe")
-
-    map_ = posterior.map(num_init_samples=1_000, show_progress_bars=False)
+    check_c2st(samples, target_samples, alg=f"fmpe-{prior_str}-prior-{num_dim}D")
 
     # Checks for log_prob()
     if prior_str == "gaussian":
@@ -108,8 +105,6 @@ def test_c2st_fmpe_on_linearGaussian(num_dim: int, prior_str: str):
         assert (
             dkl < max_dkl
         ), f"D-KL={dkl} is more than 2 stds above the average performance."
-
-        assert ((map_ - gt_posterior.mean) ** 2).sum() < 0.5
 
     elif prior_str == "uniform":
         # Check whether the returned probability outside of the support is zero.
@@ -136,13 +131,9 @@ def test_c2st_fmpe_on_linearGaussian(num_dim: int, prior_str: str):
             < acceptance_prob * 1.01
         ), "Normalizing the posterior density using the acceptance probability failed."
 
-        assert ((map_ - ones(num_dim)) ** 2).sum() < 0.5
 
-
-# TODO: add more architectures, e.g., zuko mlp vs. resnet?
-@pytest.mark.slow
-@pytest.mark.parametrize("model", ["mlp"])
-def test_fmpe_with_different_estimators(model):
+@pytest.mark.parametrize("model", ["mlp", "resnet"])
+def test_fmpe_with_different_models(model):
     """Test fmpe with different vector field estimators on linear Gaussian."""
 
     theta_dim = 3
@@ -184,7 +175,10 @@ def test_fmpe_with_different_estimators(model):
     check_c2st(samples, target_samples, alg=f"fmpe_{model}")
 
 
-def test_c2st_fmpe_on_linearGaussian_different_dims(density_estimator="mlp"):
+@pytest.mark.xfail(
+    reason="Currently not implemented.", strict=True, raises=NotImplementedError
+)
+def test_c2st_fmpe_for_different_dims_and_resume_training(density_estimator="mlp"):
     """Test fmpe on linear Gaussian with different theta and x dimensionality."""
 
     theta_dim = 3
@@ -225,18 +219,9 @@ def test_c2st_fmpe_on_linearGaussian_different_dims(density_estimator="mlp"):
     )
 
     inference = inference.append_simulations(theta, x)
-    posterior_estimator = inference.train(
-        max_num_epochs=10
-    )  
-    # todo: implement resume training in fmpe train function
-    # # Test whether we can stop and resume.
-    # posterior_estimator = inference.train(
-    #     resume_training=True, force_first_round_loss=True
-    # )
-    warnings.warn(
-        "We're currently not testing whether training can be continued. "
-        "This is due to the feature not being implemented in FMPE, yet."
-    )
+    posterior_estimator = inference.train(max_num_epochs=10)
+    # Test whether we can stop and resume.
+    posterior_estimator = inference.train(resume_training=True)
 
     posterior = DirectPosterior(
         prior=prior, posterior_estimator=posterior_estimator
@@ -244,7 +229,7 @@ def test_c2st_fmpe_on_linearGaussian_different_dims(density_estimator="mlp"):
     samples = posterior.sample((num_samples,))
 
     # Compute the c2st and assert it is near chance level of 0.5.
-    check_c2st(samples, target_samples, alg="fmpe_different_dims")
+    check_c2st(samples, target_samples, alg="fmpe_different_dims_and_resume_training")
 
 
 @pytest.mark.slow
@@ -366,3 +351,39 @@ def test_sample_conditional():
 
     max_err = np.max(error)
     assert max_err < 0.0027
+
+
+@pytest.mark.slow
+def test_fmpe_map():
+    """Test whether fmpe can find the MAP of a simple linear Gaussian example."""
+
+    num_dim = 3
+    x_o = zeros(1, num_dim)
+    num_simulations = 2000
+
+    likelihood_shift = -1.0 * ones(num_dim)
+    likelihood_cov = 0.3 * eye(num_dim)
+
+    prior_mean = zeros(num_dim)
+    prior_cov = eye(num_dim)
+    prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
+    gt_posterior = true_posterior_linear_gaussian_mvn_prior(
+        x_o, likelihood_shift, likelihood_cov, prior_mean, prior_cov
+    )
+
+    theta = prior.sample((num_simulations,))
+    x = linear_gaussian(theta, likelihood_shift, likelihood_cov)
+
+    inference = FMPE(prior, show_progress_bars=False)
+
+    posterior_estimator = inference.append_simulations(theta, x).train(
+        training_batch_size=100
+    )
+    posterior = DirectPosterior(
+        prior=prior, posterior_estimator=posterior_estimator
+    ).set_default_x(x_o)
+
+    map_ = posterior.map(num_init_samples=1_000, show_progress_bars=True)
+
+    # Check whether the MAP is close to the ground truth.
+    assert torch.allclose(map_, gt_posterior.mean, atol=0.1)
