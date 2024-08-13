@@ -8,7 +8,8 @@ direct contributions to the codebase have been instrumental in the development o
 
 ## License
 
-`sbi` is licensed under the [Apache License (Apache-2.0)](https://www.apache.org/licenses/LICENSE-2.0) and
+`sbi` is licensed under the [Apache License
+(Apache-2.0)](https://www.apache.org/licenses/LICENSE-2.0) and
 
 > Copyright (C) 2020 Álvaro Tejero-Cantero, Jakob H. Macke, Jan-Matthis Lückmann,
 > Michael Deistler, Jan F. Bölts.
@@ -20,35 +21,23 @@ direct contributions to the codebase have been instrumental in the development o
 ## Support
 
 `sbi` has been supported by the German Federal Ministry of Education and Research (BMBF)
-through the project ADIMEM (FKZ 01IS18052 A-D).
-[ADIMEM](https://fit.uni-tuebingen.de/Project/Details?id=9199) is a collaborative
-project between the groups of Jakob Macke (Uni Tübingen), Philipp Berens (Uni Tübingen),
-Philipp Hennig (Uni Tübingen), and Marcel Oberlaender (caesar Bonn), which aims to develop
-inference methods for mechanistic models.
+through project ADIMEM (FKZ 01IS18052 A-D), project SiMaLeSAM (FKZ 01IS21055A) and the
+Tübingen AI Center (FKZ 01IS18039A). Since 2024, `sbi` has been supported by the
+appliedAI Institute for Europe gGmbH.
 
 ![](static/logo_bmbf.svg)
 
 ## Important dependencies and prior art
 
-* `sbi` is the successor to [`delfi`](https://github.com/mackelab/delfi), a Theano-based
-  toolbox for sequential neural posterior estimation developed at [mackelab](https://uni-tuebingen.de/en/research/core-research/cluster-of-excellence-machine-learning/research/research/cluster-research-groups/professorships/machine-learning-in-science/). If you were
-  using `delfi`, we strongly recommend to move your inference over to `sbi`. Please open
-  issues if you find unexpected behaviour or missing features. We will consider these
-  bugs and give them priority.
-
-* `sbi` as a PyTorch-based toolbox started as a fork of
+- `sbi` is the successor to [`delfi`](https://github.com/mackelab/delfi), a Theano-based
+  toolbox for sequential neural posterior estimation developed at
+  [mackelab](https://www.mackelab.org).If you were using `delfi`, we strongly recommend
+  moving your inference over to `sbi`. Please open issues if you find unexpected
+  behavior or missing features. We will consider these bugs and give them priority.
+- `sbi` as a PyTorch-based toolbox started as a fork of
   [conormdurkan/lfi](https://github.com/conormdurkan/lfi), by [Conor
   M.Durkan](https://conormdurkan.github.io/).
-
-* `sbi` uses density estimators from
-[bayesiains/nflows](https://github.com/bayesiains/nsf) by [Conor
-M.Durkan](https://conormdurkan.github.io/), [George
-Papamakarios](https://gpapamak.github.io/) and [Artur
-Bekasov](https://arturbekasov.github.io/). These are proxied through
-[`pyknos`](https://github.com/mackelab/pyknos), a package focused on density estimation.
-
-* `sbi` uses `PyTorch` and tries to align with the interfaces (e.g. for probability
+- `sbi` uses `PyTorch` and tries to align with the interfaces (e.g. for probability
   distributions) adopted by `PyTorch`.
-
-* See [README.md](https://github.com/mackelab/sbi/blob/master/README.md) for a list of
-  publications describing the methods implemented in `sbi`.
+- See [README.md](https://github.com/mackelab/sbi/blob/master/README.md) for a
+  list of publications describing the methods implemented in `sbi`.
