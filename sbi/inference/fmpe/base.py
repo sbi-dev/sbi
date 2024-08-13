@@ -7,9 +7,9 @@ from copy import deepcopy
 from typing import Any, Callable, Dict, Optional, Union
 
 import torch
-from torch import optim
 from torch.distributions import Distribution
 from torch.nn.utils.clip_grad import clip_grad_norm_
+from torch.optim.adam import Adam
 from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi import utils as utils
@@ -129,7 +129,7 @@ class FMPE(NeuralInference):
 
         # initialize optimizer and training parameters
         if not resume_training:
-            self.optimizer = optim.Adam(
+            self.optimizer = Adam(
                 list(self._neural_net.net.parameters()), lr=learning_rate
             )
             self.epoch, self._val_loss = 0, float("Inf")
