@@ -4,8 +4,7 @@
 from typing import Tuple
 
 import torch
-import torch.nn as nn
-from torch import Tensor
+from torch import Tensor, nn
 from zuko.flows.core import Flow
 
 from sbi.neural_nets.density_estimators.base import ConditionalDensityEstimator
