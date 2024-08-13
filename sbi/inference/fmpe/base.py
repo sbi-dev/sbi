@@ -76,7 +76,6 @@ class FMPE(NeuralInference):
         stop_after_epochs: int = 20,
         max_num_epochs: int = 2**31 - 1,
         clip_max_norm: Optional[float] = 5.0,
-        discard_prior_samples: bool = False,
         resume_training: bool = False,
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[dict] = None,
@@ -90,7 +89,6 @@ class FMPE(NeuralInference):
             stop_after_epochs: Number of epochs to train for. Defaults to 20.
             max_num_epochs: Maximum number of epochs to train for.
             clip_max_norm: Maximum norm for gradient clipping. Defaults to 5.0.
-            discard_prior_samples: Whether to discard prior samples. Defaults to False.
             resume_training: Whether to resume training. Defaults to False.
             show_train_summary: Whether to show the training summary. Defaults to False.
             dataloader_kwargs: Additional keyword arguments for the dataloader.
@@ -214,6 +212,7 @@ class FMPE(NeuralInference):
         prior: Optional[Distribution] = None,
         sample_with: str = "direct",
         direct_sampling_parameters: Optional[Dict[str, Any]] = None,
+        **kwargs,
     ) -> DirectPosterior:
         """Build the posterior distribution.
 
