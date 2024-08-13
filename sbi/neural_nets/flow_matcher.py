@@ -155,7 +155,7 @@ def build_resnet_flowmatcher(
         num_blocks=num_blocks,
         # we condition on theta and embedded time using GLUs
         condition_dim=(x_numel + 2 * num_freqs),
-        output_dim=y_numel,
+        output_dim=x_numel,
     )
 
     # input data is only z-scored, not embedded.
