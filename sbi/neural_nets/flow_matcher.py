@@ -11,13 +11,13 @@ import torch
 import torch.nn as nn
 import zuko
 from torch import Tensor
+from torch.nn import functional as F
 from zuko.nn import MLP as ZukoMLP
 
 from sbi.neural_nets.density_estimators.flowmatching_estimator import (
     FlowMatchingEstimator,
     VectorFieldNet,
 )
-from sbi.neural_nets.embedding_nets import ResNetBlock
 from sbi.utils.nn_utils import get_numel
 from sbi.utils.sbiutils import (
     standardizing_net,
@@ -187,8 +187,26 @@ def build_resnet_flowmatcher(
     )
 
 
+class VectorFieldMLP(VectorFieldNet):
+    """MLP for the vector field regressor."""
+
+    def __init__(self, net: ZukoMLP):
+        super(VectorFieldMLP, self).__init__()
+        self.net = net
+
+    def forward(self, theta: Tensor, x: Tensor, t: Tensor) -> Tensor:
+        # concatenate theta, x, and t
+        return self.net(torch.cat([theta, x, t], dim=-1))
+
+
 class ResNetWithGLUConditioning(VectorFieldNet):
-    """ResNet with GLU units for additional conditioning."""
+    """ResNet with GLU units for additional conditioning.
+
+    Used for flow matching to encode high-dimensional data in the main network and add
+    contet of theta and t using GLU units on each layer, as proposed in Daxberger et al.
+    "Flow Matching for Scalable SBI" (2023)", https://arxiv.org/abs/2305.17161.
+
+    """
 
     def __init__(
         self,
@@ -218,13 +236,45 @@ class ResNetWithGLUConditioning(VectorFieldNet):
         return out
 
 
-class VectorFieldMLP(VectorFieldNet):
-    """MLP for the vector field regressor."""
+class GLU(nn.Module):
+    """Gated Linear Unit (GLU) block to combined input and condition."""
 
-    def __init__(self, net: ZukoMLP):
-        super(VectorFieldMLP, self).__init__()
-        self.net = net
+    def __init__(self, input_dim: int, condition_dim: int):
+        super(GLU, self).__init__()
+        self.fc = nn.Linear(input_dim + condition_dim, input_dim)
+        self.gate = nn.Linear(input_dim + condition_dim, input_dim)
 
-    def forward(self, theta: Tensor, x: Tensor, t: Tensor) -> Tensor:
-        # concatenate theta, x, and t
-        return self.net(torch.cat([theta, x, t], dim=-1))
+    def forward(self, x: Tensor, condition: Tensor) -> Tensor:
+        # x and condition must match in all dimensions except the last one
+        assert x.size()[:-1] == condition.size()[:-1]
+        combined_input = torch.cat([x, condition], dim=-1)
+        return self.fc(combined_input) * torch.sigmoid(self.gate(combined_input))
+
+
+class ResNetBlock(nn.Module):
+    """ResNet block with GLU units for additional conditioning."""
+
+    def __init__(self, input_dim: int, hidden_units: int, condition_dim: int):
+        """Initialize ResNet block.
+
+        The block consists of two fully connected layers with GLU units in between.
+
+        Args:
+            input_dim: Dimensionality of the input.
+            hidden_dim: Dimensionality of the hidden layer.
+            condition_dim: Dimensionality of the condition.
+        """
+        super(ResNetBlock, self).__init__()
+        self.fc1 = nn.Linear(input_dim, hidden_units)
+        self.glu1 = GLU(hidden_units, condition_dim)
+        self.fc2 = nn.Linear(hidden_units, input_dim)
+        self.glu2 = GLU(input_dim, condition_dim)
+
+    def forward(self, x: Tensor, condition: Tensor) -> Tensor:
+        """Pass x through the ResNet block, condition with GLU units, add residual."""
+        residual = x
+        out = F.relu(self.fc1(x))
+        out = self.glu1(out, condition)
+        out = F.relu(self.fc2(out))
+        out = self.glu2(out, condition)
+        return out + residual
