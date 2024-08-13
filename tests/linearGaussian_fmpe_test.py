@@ -387,3 +387,34 @@ def test_fmpe_map():
 
     # Check whether the MAP is close to the ground truth.
     assert torch.allclose(map_, gt_posterior.mean, atol=0.1)
+
+
+def test_multi_round_handling_fmpe():
+    """Test whether we can append data and train multiple times with FMPE."""
+
+    num_dim = 3
+    num_simulations = 100
+
+    likelihood_shift = -1.0 * ones(num_dim)
+    likelihood_cov = 0.3 * eye(num_dim)
+
+    prior_mean = zeros(num_dim)
+    prior_cov = eye(num_dim)
+    prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
+
+    theta = prior.sample((num_simulations,))
+    x = linear_gaussian(theta, likelihood_shift, likelihood_cov)
+
+    inference = FMPE(prior, show_progress_bars=False)
+    inference.append_simulations(theta, x).train(max_num_epochs=2)
+
+    # Append new data without passing a proposal.
+    theta_new = prior.sample((num_simulations,))
+    x_new = linear_gaussian(theta_new, likelihood_shift, likelihood_cov)
+    with pytest.raises(AssertionError, match="You have already trained*"):
+        inference.append_simulations(theta_new, x_new).train()
+
+    # Append new data with a proposal. This should work without any issues.
+    inference.append_simulations(theta_new, x_new).train(
+        max_num_epochs=2, train_with_proposal_without_correction=True
+    )

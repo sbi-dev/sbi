@@ -67,6 +67,63 @@ class FMPE(NeuralInference):
             show_progress_bars=show_progress_bars,
         )
 
+    def append_simulations(
+        self,
+        theta: torch.Tensor,
+        x: torch.Tensor,
+        proposal: Optional[DirectPosterior] = None,
+        exclude_invalid_x: Optional[bool] = None,
+        data_device: Optional[str] = None,
+    ) -> NeuralInference:
+        if (
+            proposal is None
+            or proposal is self._prior
+            or (
+                isinstance(proposal, RestrictedPrior) and proposal._prior is self._prior
+            )
+        ):
+            current_round = 0
+        else:
+            raise NotImplementedError(
+                "Sequential FMPE with proposal different from prior is not implemented."
+            )
+
+        if exclude_invalid_x is None:
+            exclude_invalid_x = current_round == 0
+
+        if data_device is None:
+            data_device = self._device
+
+        theta, x = validate_theta_and_x(
+            theta, x, data_device=data_device, training_device=self._device
+        )
+
+        is_valid_x, num_nans, num_infs = handle_invalid_x(
+            x, exclude_invalid_x=exclude_invalid_x
+        )
+
+        x = x[is_valid_x]
+        theta = theta[is_valid_x]
+
+        # Check for problematic z-scoring
+        warn_if_zscoring_changes_data(x)
+        # Check whether there are NaNs or Infs in the data and remove accordingly.
+        npe_msg_on_invalid_x(
+            num_nans=num_nans,
+            num_infs=num_infs,
+            exclude_invalid_x=exclude_invalid_x,
+            algorithm="Single-round FMPE",
+        )
+
+        self._data_round_index.append(current_round)
+        prior_masks = mask_sims_from_prior(int(current_round > 0), theta.size(0))
+
+        self._theta_roundwise.append(theta)
+        self._x_roundwise.append(x)
+        self._prior_masks.append(prior_masks)
+
+        return self
+
     def train(
         self,
         training_batch_size: int = 50,
@@ -76,6 +133,7 @@ class FMPE(NeuralInference):
         max_num_epochs: int = 2**31 - 1,
         clip_max_norm: Optional[float] = 5.0,
         resume_training: bool = False,
+        train_with_proposal_without_correction: bool = False,
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[dict] = None,
     ) -> ConditionalDensityEstimator:
@@ -89,6 +147,10 @@ class FMPE(NeuralInference):
             max_num_epochs: Maximum number of epochs to train for.
             clip_max_norm: Maximum norm for gradient clipping. Defaults to 5.0.
             resume_training: Whether to resume training. Defaults to False.
+            train_with_proposal_without_correction: Whether to allow training with
+                simulations that have not been sampled from the prior, e.g., in a
+                sequential inference setting. Note that can lead to biased inference
+                results.
             show_train_summary: Whether to show the training summary. Defaults to False.
             dataloader_kwargs: Additional keyword arguments for the dataloader.
 
@@ -96,9 +158,23 @@ class FMPE(NeuralInference):
             DensityEstimator: Trained flow matching estimator.
         """
 
+        # Load data from most recent round.
+        self._round = max(self._data_round_index)
+
+        if self._round == 0 and self._neural_net is not None:
+            assert train_with_proposal_without_correction or resume_training, (
+                "You have already trained this neural network and now appended new "
+                "simulations with `append_simulations(theta, x)` without providing a "
+                "proposal. If the new simulations are sampled from the prior, you "
+                "can avoid this error by passing "
+                "`train_with_proposal_without_correction=True` to `train(...)` "
+                "However, if the new simulations were not "
+                "sampled from the prior, the result of FMPE will not be the true "
+                "posterior. Instead, it will be the proposal posterior, which "
+                "(usually) is more narrow than the true posterior. ",
+            )
+
         start_idx = 0  # as there is no multi-round FMPE yet
-        current_round = 1  # as there is no multi-round FMPE yet
-        self._data_round_index.append(current_round)
 
         train_loader, val_loader = self.get_dataloaders(
             start_idx,
@@ -130,7 +206,7 @@ class FMPE(NeuralInference):
                 list(self._neural_net.net.parameters()), lr=learning_rate
             )
             self.epoch = 0
-            # NOTE: we deal with losses, not log probs here.
+            # NOTE: in the FMPE context we use MSE loss, not log probs.
             self._val_loss = float("Inf")
 
         while self.epoch <= max_num_epochs and not self._converged(
@@ -223,7 +299,7 @@ class FMPE(NeuralInference):
         Args:
             density_estimator: Density estimator for the posterior.
             prior: Prior distribution.
-            sample_with: Sampling method.
+            sample_with: Sampling method, currently only "direct" is supported.
             direct_sampling_parameters: kwargs for DirectPosterior.
 
         Returns:
@@ -261,57 +337,3 @@ class FMPE(NeuralInference):
         )
 
         return deepcopy(self._posterior)
-
-    def append_simulations(
-        self,
-        theta: torch.Tensor,
-        x: torch.Tensor,
-        proposal: Optional[DirectPosterior] = None,
-        exclude_invalid_x: Optional[bool] = None,
-        data_device: Optional[str] = None,
-    ) -> NeuralInference:
-        if (
-            proposal is None
-            or proposal is self._prior
-            or (
-                isinstance(proposal, RestrictedPrior) and proposal._prior is self._prior
-            )
-        ):
-            current_round = 0
-        else:
-            raise NotImplementedError("Mutli-round FMPE is currently not supported.")
-
-        if exclude_invalid_x is None:
-            exclude_invalid_x = current_round == 0
-
-        if data_device is None:
-            data_device = self._device
-
-        theta, x = validate_theta_and_x(
-            theta, x, data_device=data_device, training_device=self._device
-        )
-
-        is_valid_x, num_nans, num_infs = handle_invalid_x(
-            x, exclude_invalid_x=exclude_invalid_x
-        )
-
-        x = x[is_valid_x]
-        theta = theta[is_valid_x]
-
-        # Check for problematic z-scoring
-        warn_if_zscoring_changes_data(x)
-        # Check whether there are NaNs or Infs in the data and remove accordingly.
-        npe_msg_on_invalid_x(
-            num_nans=num_nans,
-            num_infs=num_infs,
-            exclude_invalid_x=exclude_invalid_x,
-            algorithm="Single-round FMPE",
-        )
-
-        prior_masks = mask_sims_from_prior(int(current_round > 0), theta.size(0))
-
-        self._theta_roundwise.append(theta)
-        self._x_roundwise.append(x)
-        self._prior_masks.append(prior_masks)
-
-        return self
