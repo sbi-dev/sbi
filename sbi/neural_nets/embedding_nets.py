@@ -5,6 +5,7 @@ from typing import List, Optional, Tuple, Union
 
 import torch
 from torch import Tensor, nn
+from torch.nn import functional as F
 
 
 class FCEmbedding(nn.Module):
@@ -309,3 +310,47 @@ class PermutationInvariantEmbedding(nn.Module):
 
         # add number of trials as additional input
         return self.fc_subnet(torch.cat([combined_embedding, trial_counts], dim=1))
+
+
+class GLU(nn.Module):
+    """Gated Linear Unit (GLU) block to combined input and condition."""
+
+    def __init__(self, input_dim: int, condition_dim: int):
+        super(GLU, self).__init__()
+        self.fc = nn.Linear(input_dim + condition_dim, input_dim)
+        self.gate = nn.Linear(input_dim + condition_dim, input_dim)
+
+    def forward(self, x: Tensor, condition: Tensor) -> Tensor:
+        # x and condition must match in all dimensions except the last one
+        assert x.size()[:-1] == condition.size()[:-1]
+        combined_input = torch.cat([x, condition], dim=-1)
+        return self.fc(combined_input) * torch.sigmoid(self.gate(combined_input))
+
+
+class ResNetBlock(nn.Module):
+    """ResNet block with GLU units for additional conditioning."""
+
+    def __init__(self, input_dim: int, hidden_units: int, condition_dim: int):
+        """Initialize ResNet block.
+
+        The block consists of two fully connected layers with GLU units in between.
+
+        Args:
+            input_dim: Dimensionality of the input.
+            hidden_dim: Dimensionality of the hidden layer.
+            condition_dim: Dimensionality of the condition.
+        """
+        super(ResNetBlock, self).__init__()
+        self.fc1 = nn.Linear(input_dim, hidden_units)
+        self.glu1 = GLU(hidden_units, condition_dim)
+        self.fc2 = nn.Linear(hidden_units, input_dim)
+        self.glu2 = GLU(input_dim, condition_dim)
+
+    def forward(self, x: Tensor, condition: Tensor) -> Tensor:
+        """Pass x through the ResNet block, condition with GLU units, add residual."""
+        residual = x
+        out = F.relu(self.fc1(x))
+        out = self.glu1(out, condition)
+        out = F.relu(self.fc2(out))
+        out = self.glu2(out, condition)
+        return out + residual

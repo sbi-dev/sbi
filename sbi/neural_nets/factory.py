@@ -26,7 +26,10 @@ from sbi.neural_nets.flow import (
     build_zuko_sospf,
     build_zuko_unaf,
 )
-from sbi.neural_nets.flow_matcher import build_mlp_flow_matcher
+from sbi.neural_nets.flow_matcher import (
+    build_mlp_flowmatcher,
+    build_resnet_flowmatcher,
+)
 from sbi.neural_nets.mdn import build_mdn
 from sbi.neural_nets.mnle import build_mnle
 from sbi.utils.nn_utils import check_net_device
@@ -47,6 +50,8 @@ model_builders = {
     "zuko_unaf": build_zuko_unaf,
     "zuko_gf": build_zuko_gf,
     "zuko_bpf": build_zuko_bpf,
+    "mlp_flowmatcher": build_mlp_flowmatcher,
+    "resnet_flowmatcher": build_resnet_flowmatcher,
 }
 
 embedding_net_warn_msg = """The passed embedding net will be moved to cpu for
@@ -206,10 +211,10 @@ def flowmatching_nn(
     z_score_theta: Optional[str] = "independent",
     z_score_x: Optional[str] = "independent",
     hidden_features: int = 64,
-    hidden_layers: int = 5,
+    num_layers: int = 5,
+    num_blocks: int = 5,
     num_frequencies: int = 3,
-    embedding_net_theta: nn.Module = nn.Identity(),
-    embedding_net_x: nn.Module = nn.Identity(),
+    embedding_net: nn.Module = nn.Identity(),
     **kwargs: Any,
 ) -> Callable:
     r"""Returns a function that builds a neural net that can act as
@@ -229,32 +234,35 @@ def flowmatching_nn(
         z_score_x: Whether to z-score simulation outputs $x$ before passing them into
             the network, same options as z_score_theta.
         hidden_features: Number of hidden features.
-        num_transforms: Number of transforms when a flow is used. Only relevant if
+        num_layers: Number of transforms when a flow is used. Only relevant if
             density estimator is a normalizing flow (i.e. currently either a `maf` or a
             `nsf`). Ignored if density estimator is a `mdn` or `made`.
-        num_bins: Number of bins used for the splines in `nsf`. Ignored if density
-            estimator not `nsf`.
-        embedding_net: Optional embedding network for parameters $\theta$.
+        num_blocks: Number of blocks if a ResNet is used.
+        embedding_net: Optional embedding network for x.
         num_components: Number of mixture components for a mixture of Gaussians.
             Ignored if density estimator is not an mdn.
         kwargs: additional custom arguments passed to downstream build functions.
     """
-    implemented_models = ["mlp"]
+    implemented_models = ["mlp", "resnet"]
 
     if model not in implemented_models:
-        raise NotImplementedError(f"Model {model} in not implemented")
+        raise NotImplementedError(f"Model {model} in not implemented for FMPE")
+
+    model_str = model + "_flowmatcher"
 
     def build_fn(batch_theta, batch_x):
-        return build_mlp_flow_matcher(
+        return model_builders[model_str](
             batch_x=batch_theta,
             batch_y=batch_x,
             z_score_x=z_score_theta,
             z_score_y=z_score_x,
             hidden_features=hidden_features,
-            num_transforms=hidden_layers,
+            num_layers=num_layers,
+            num_blocks=num_blocks,
             num_freqs=num_frequencies,
-            embedding_net_x=embedding_net_theta,
-            embedding_net=embedding_net_x,
+            embedding_net=check_net_device(
+                embedding_net, "cpu", embedding_net_warn_msg
+            ),
             **kwargs,
         )
 

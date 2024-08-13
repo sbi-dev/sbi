@@ -2,6 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import math
+from abc import ABC, abstractmethod
 from typing import Optional, Tuple
 
 import torch
@@ -182,28 +183,35 @@ class ZukoFlow(ConditionalDensityEstimator):
         return samples, log_probs
 
 
+# abstract class to ensure forward signature for flow matching networks
+class VectorFieldNet(nn.Module, ABC):
+    @abstractmethod
+    def forward(self, theta: Tensor, x: Tensor, t: Tensor) -> Tensor: ...
+
+
 class FlowMatchingEstimator(ConditionalDensityEstimator):
     def __init__(
         self,
-        net: nn.Module,
+        net: VectorFieldNet,
         input_shape: torch.Size,
         condition_shape: torch.Size,
-        embedding_net_input: nn.Module,
-        embedding_net_condition: nn.Module,
+        embedding_net: nn.Module,
         zscore_transform_input: Optional[Transform] = None,
         num_freqs: int = 3,
         noise_scale: float = 1e-3,
+        **kwargs,
     ) -> None:
         """Creates a vector field estimator for Flow Matching.
 
         Args:
             net: Neural network that estimates the vector field.
-            input_shape: Shape of the input.
-            condition_shape: Shape of the condition.
+            input_shape: Shape of the input, e.g., the parameters.
+            condition_shape: Shape of the condition, e.g., the data.
             noise_scale: Scale of the noise added to the vector field.
-            embedding_net_input: Embedding network for the input.
-            embedding_net_condition: Embedding network for the condition.
+            embedding_net: Embedding network for the condition.
+            zscore_transform_input: Transform to z-score the input.
             num_freqs: Number of frequencies to use for the positional time encoding.
+            noise_scale: Scale of the noise added to the vector field.
         """
 
         super().__init__(
@@ -215,8 +223,7 @@ class FlowMatchingEstimator(ConditionalDensityEstimator):
         if zscore_transform_input is None:
             zscore_transform_input = zuko.transforms.IdentityTransform()
         self.zscore_transform_input: Transform = zscore_transform_input
-        self._embedding_net = embedding_net_input
-        self._embedding_net_condition = embedding_net_condition
+        self._embedding_net = embedding_net
 
         self.register_buffer("freqs", torch.arange(1, num_freqs + 1) * math.pi)
         self.register_buffer('zeros', torch.zeros(input_shape))
@@ -245,7 +252,7 @@ class FlowMatchingEstimator(ConditionalDensityEstimator):
         )
 
         # return the estimated vector field
-        return self.net(torch.cat((zscored_input, embedded_condition, t), dim=-1))
+        return self.net(theta=zscored_input, x=embedded_condition, t=t)
 
     def loss(self, input: Tensor, condition: Tensor, **kwargs) -> Tensor:
         """Return the loss for training the density estimator. More precisely,
