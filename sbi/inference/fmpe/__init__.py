@@ -1,1 +1,1 @@
-from sbi.inference.fmpe.base import FMPE
+from sbi.inference.fmpe.fmpe_base import FMPE

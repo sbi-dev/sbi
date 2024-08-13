@@ -14,14 +14,12 @@ from sbi import analysis as analysis
 from sbi import utils as utils
 from sbi.analysis import conditional_potential
 from sbi.inference import (
+    FMPE,
     DirectPosterior,
     MCMCPosterior,
     posterior_estimator_based_potential,
     simulate_for_sbi,
 )
-
-# TODO import this from inference
-from sbi.inference.fmpe.base import FMPE
 from sbi.neural_nets.factory import flowmatching_nn
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,

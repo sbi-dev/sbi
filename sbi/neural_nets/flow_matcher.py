@@ -13,7 +13,7 @@ import zuko
 from torch import Tensor
 from zuko.nn import MLP as ZukoMLP
 
-from sbi.neural_nets.density_estimators.zuko_flow import (
+from sbi.neural_nets.density_estimators.flowmatching_estimator import (
     FlowMatchingEstimator,
     VectorFieldNet,
 )

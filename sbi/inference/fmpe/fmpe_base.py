@@ -45,11 +45,13 @@ class FMPE(NeuralInference):
 
         Args:
             prior: Prior distribution.
-            density_estimator: Density estimator for the FMPE. Defaults to None.
-            device: Device to use for training. Defaults to "cpu".
-            logging_level: Logging level. Defaults to "WARNING".
-            summary_writer: Summary writer for tensorboard. Defaults to None.
-            show_progress_bars: Whether to show progress bars. Defaults to True.
+            density_estimator: Neural network architecture used to learn the vector
+                field for flow matching. Can be a string, e.g., 'mlp' or 'resnet', or a
+                `Callable` that builds a corresponding neural network.
+            device: Device to use for training.
+            logging_level: Logging level.
+            summary_writer: Summary writer for tensorboard.
+            show_progress_bars: Whether to show progress bars.
         """
         # obtain the shape of the prior samples
         if isinstance(density_estimator, str):
@@ -65,9 +67,6 @@ class FMPE(NeuralInference):
             show_progress_bars=show_progress_bars,
         )
 
-    # todo: this is not correct, the method should return a vector field
-    # estimator and not a density est.
-    # todo: (maternus) elaborate more on what's the plane ...
     def train(
         self,
         training_batch_size: int = 50,
@@ -80,7 +79,7 @@ class FMPE(NeuralInference):
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[dict] = None,
     ) -> ConditionalDensityEstimator:
-        """Train the density estimator.
+        """Train the flow matching estimator.
 
         Args:
             training_batch_size: Batch size for training. Defaults to 50.
@@ -94,10 +93,8 @@ class FMPE(NeuralInference):
             dataloader_kwargs: Additional keyword arguments for the dataloader.
 
         Returns:
-            DensityEstimator: Trained density estimator.
+            DensityEstimator: Trained flow matching estimator.
         """
-        # if resume_training:
-        #     raise NotImplementedError("Resume training is not yet implemented.")
 
         start_idx = 0  # as there is no multi-round FMPE yet
         current_round = 1  # as there is no multi-round FMPE yet
@@ -133,6 +130,7 @@ class FMPE(NeuralInference):
                 list(self._neural_net.net.parameters()), lr=learning_rate
             )
             self.epoch = 0
+            # NOTE: we deal with losses, not log probs here.
             self._val_loss = float("Inf")
 
         while self.epoch <= max_num_epochs and not self._converged(
@@ -162,7 +160,8 @@ class FMPE(NeuralInference):
             self.epoch += 1
 
             train_loss_average = train_loss_sum / len(train_loader)  # type: ignore
-            self._summary["training_loss"].append(train_loss_average)
+            # TODO: rename to loss once renaming is done in base class.
+            self._summary["training_log_probs"].append(-train_loss_average)
 
             # Calculate validation performance.
             self._neural_net.eval()
@@ -185,7 +184,8 @@ class FMPE(NeuralInference):
             # TODO: remove this once renaming to loss in base class is done.
             self._val_log_prob = -self._val_loss
             # Log validation log prob for every epoch.
-            self._summary["validation_loss"].append(self._val_loss)
+            # TODO: rename to loss and fix sign once renaming in base is done.
+            self._summary["validation_log_probs"].append(-self._val_loss)
             self._summary["epoch_durations_sec"].append(time.time() - epoch_start_time)
 
             self._maybe_show_progress(self._show_progress_bars, self.epoch)
@@ -194,7 +194,8 @@ class FMPE(NeuralInference):
 
         # Update summary.
         self._summary["epochs_trained"].append(self.epoch)
-        self._summary["best_validation_loss"].append(-self._best_val_log_prob)
+        # TODO: rename to loss once renaming is done in base class.
+        self._summary["best_validation_log_prob"].append(self._best_val_log_prob)
 
         # Update tensorboard and summary dict.
         self._summarize(round_=self._round)
@@ -220,9 +221,10 @@ class FMPE(NeuralInference):
         """Build the posterior distribution.
 
         Args:
-            density_estimator: Density estimator for the posterior. Defaults to None.
-            prior: Prior distribution. Defaults to None.
-            direct_sampling_parameters: Direct sampling parameters. Defaults to None.
+            density_estimator: Density estimator for the posterior.
+            prior: Prior distribution.
+            sample_with: Sampling method.
+            direct_sampling_parameters: kwargs for DirectPosterior.
 
         Returns:
             DirectPosterior: Posterior distribution.
@@ -275,9 +277,6 @@ class FMPE(NeuralInference):
                 isinstance(proposal, RestrictedPrior) and proposal._prior is self._prior
             )
         ):
-            # The `_data_round_index` will later be used to infer if one should train
-            # with MLE loss or with atomic loss (see, in `train()`:
-            # self._round = max(self._data_round_index))
             current_round = 0
         else:
             raise NotImplementedError("Mutli-round FMPE is currently not supported.")
