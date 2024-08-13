@@ -30,7 +30,10 @@ from sbi.neural_nets.flow import (
     build_zuko_sospf,
     build_zuko_unaf,
 )
-from sbi.neural_nets.flow_matcher import build_mlp_flow_matcher
+from sbi.neural_nets.flow_matcher import (
+    build_mlp_flowmatcher,
+    build_resnet_flowmatcher,
+)
 from sbi.neural_nets.mdn import build_mdn
 
 # List of all density estimator builders for testing.
@@ -51,7 +54,8 @@ model_builders = [
 ]
 
 flowmatching_build_functions = [
-    build_mlp_flow_matcher,
+    build_mlp_flowmatcher,
+    build_resnet_flowmatcher,
 ]
 
 

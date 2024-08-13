@@ -96,8 +96,8 @@ class FMPE(NeuralInference):
         Returns:
             DensityEstimator: Trained density estimator.
         """
-        if resume_training:
-            raise NotImplementedError("Resume training is not yet implemented.")
+        # if resume_training:
+        #     raise NotImplementedError("Resume training is not yet implemented.")
 
         start_idx = 0  # as there is no multi-round FMPE yet
         current_round = 1  # as there is no multi-round FMPE yet
@@ -107,7 +107,7 @@ class FMPE(NeuralInference):
             start_idx,
             training_batch_size,
             validation_fraction,
-            resume_training=False,
+            resume_training=resume_training,
             dataloader_kwargs=dataloader_kwargs,
         )
 
@@ -132,7 +132,8 @@ class FMPE(NeuralInference):
             self.optimizer = Adam(
                 list(self._neural_net.net.parameters()), lr=learning_rate
             )
-            self.epoch, self._val_loss = 0, float("Inf")
+            self.epoch = 0
+            self._val_loss = float("Inf")
 
         while self.epoch <= max_num_epochs and not self._converged(
             self.epoch, stop_after_epochs
