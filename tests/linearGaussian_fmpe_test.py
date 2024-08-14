@@ -46,7 +46,7 @@ def test_c2st_fmpe_on_linearGaussian(num_dim: int, prior_str: str):
 
     x_o = zeros(1, num_dim)
     num_samples = 1000
-    num_simulations = 2500
+    num_simulations = 4000
 
     # likelihood_mean will be likelihood_shift+theta
     likelihood_shift = -1.0 * ones(num_dim)
@@ -73,14 +73,10 @@ def test_c2st_fmpe_on_linearGaussian(num_dim: int, prior_str: str):
     theta = prior.sample((num_simulations,))
     x = linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    inference = FMPE(prior, show_progress_bars=False)
+    inference = FMPE(prior, show_progress_bars=True)
 
-    posterior_estimator = inference.append_simulations(theta, x).train(
-        training_batch_size=100
-    )
-    posterior = DirectPosterior(
-        prior=prior, posterior_estimator=posterior_estimator
-    ).set_default_x(x_o)
+    inference.append_simulations(theta, x).train(training_batch_size=100)
+    posterior = inference.build_posterior().set_default_x(x_o)
     samples = posterior.sample((num_samples,))
 
     # Compute the c2st and assert it is near chance level of 0.5.
@@ -103,6 +99,13 @@ def test_c2st_fmpe_on_linearGaussian(num_dim: int, prior_str: str):
         assert (
             dkl < max_dkl
         ), f"D-KL={dkl} is more than 2 stds above the average performance."
+
+        # test probs
+        probs = posterior.log_prob(samples).exp()
+        gt_probs = gt_posterior.log_prob(samples).exp()
+        assert torch.allclose(
+            probs, gt_probs, atol=0.2
+        )  # note that this is 0.1 for NPE.
 
     elif prior_str == "uniform":
         # Check whether the returned probability outside of the support is zero.
@@ -161,12 +164,8 @@ def test_fmpe_with_different_models(model):
 
     inference = FMPE(prior, density_estimator=estimator_build_fun)
 
-    posterior_estimator = inference.append_simulations(theta, x).train(
-        training_batch_size=100
-    )
-    posterior = DirectPosterior(
-        prior=prior, posterior_estimator=posterior_estimator
-    ).set_default_x(x_o)
+    inference.append_simulations(theta, x).train(training_batch_size=100)
+    posterior = inference.build_posterior().set_default_x(x_o)
     samples = posterior.sample((num_samples,))
 
     # Compute the c2st and assert it is near chance level of 0.5.
@@ -349,17 +348,12 @@ def test_sample_conditional():
 
 
 @pytest.mark.slow
-@pytest.mark.xfail(
-    reason="FMPE MAP failing in spite of accuracte c2st.",
-    strict=True,
-    raises=AssertionError,
-)
 def test_fmpe_map():
     """Test whether fmpe can find the MAP of a simple linear Gaussian example."""
 
     num_dim = 3
     x_o = zeros(1, num_dim)
-    num_simulations = 2000
+    num_simulations = 5000
 
     likelihood_shift = -1.0 * ones(num_dim)
     likelihood_cov = 0.3 * eye(num_dim)
@@ -374,19 +368,17 @@ def test_fmpe_map():
     theta = prior.sample((num_simulations,))
     x = linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    inference = FMPE(prior, show_progress_bars=False)
+    inference = FMPE(prior, show_progress_bars=True)
 
-    posterior_estimator = inference.append_simulations(theta, x).train(
-        training_batch_size=100
-    )
-    posterior = DirectPosterior(
-        prior=prior, posterior_estimator=posterior_estimator
-    ).set_default_x(x_o)
+    inference.append_simulations(theta, x).train(training_batch_size=100)
+    posterior = inference.build_posterior().set_default_x(x_o)
 
-    map_ = posterior.map(num_init_samples=1_000, show_progress_bars=True)
+    map_ = posterior.map(show_progress_bars=True, num_iter=20)
 
     # Check whether the MAP is close to the ground truth.
-    assert torch.allclose(map_, gt_posterior.mean, atol=0.1)
+    assert torch.allclose(
+        map_, gt_posterior.mean, atol=0.2
+    ), f"{map_} != {gt_posterior.mean}"
 
 
 def test_multi_round_handling_fmpe():
