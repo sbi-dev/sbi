@@ -133,7 +133,7 @@ class FMPE(NeuralInference):
         max_num_epochs: int = 2**31 - 1,
         clip_max_norm: Optional[float] = 5.0,
         resume_training: bool = False,
-        train_with_proposal_without_correction: bool = False,
+        force_first_round_loss: bool = False,
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[dict] = None,
     ) -> ConditionalDensityEstimator:
@@ -146,8 +146,11 @@ class FMPE(NeuralInference):
             stop_after_epochs: Number of epochs to train for. Defaults to 20.
             max_num_epochs: Maximum number of epochs to train for.
             clip_max_norm: Maximum norm for gradient clipping. Defaults to 5.0.
-            resume_training: Whether to resume training. Defaults to False.
-            train_with_proposal_without_correction: Whether to allow training with
+            resume_training: Can be used in case training time is limited, e.g. on a
+                cluster. If `True`, the split between train and validation set, the
+                optimizer, the number of epochs, and the best validation log-prob will
+                be restored from the last time `.train()` was called.
+            force_first_round_loss: Whether to allow training with
                 simulations that have not been sampled from the prior, e.g., in a
                 sequential inference setting. Note that can lead to biased inference
                 results.
@@ -162,16 +165,18 @@ class FMPE(NeuralInference):
         self._round = max(self._data_round_index)
 
         if self._round == 0 and self._neural_net is not None:
-            assert train_with_proposal_without_correction or resume_training, (
-                "You have already trained this neural network and now appended new "
-                "simulations with `append_simulations(theta, x)` without providing a "
-                "proposal. If the new simulations are sampled from the prior, you "
-                "can avoid this error by passing "
-                "`train_with_proposal_without_correction=True` to `train(...)` "
-                "However, if the new simulations were not "
-                "sampled from the prior, the result of FMPE will not be the true "
-                "posterior. Instead, it will be the proposal posterior, which "
-                "(usually) is more narrow than the true posterior. ",
+            assert force_first_round_loss or resume_training, (
+                "You have already trained this neural network. After you had trained "
+                "the network, you again appended simulations with `append_simulations"
+                "(theta, x)`, but you did not provide a proposal. If the new "
+                "simulations are sampled from the prior, you can set "
+                "`.train(..., force_first_round_loss=True`). However, if the new "
+                "simulations were not sampled from the prior, you should pass the "
+                "proposal, i.e. `append_simulations(theta, x, proposal)`. If "
+                "your samples are not sampled from the prior and you do not pass a "
+                "proposal and you set `force_first_round_loss=True`, the result of "
+                "FMPE will not be the true posterior. Instead, it will be the proposal "
+                "posterior, which (usually) is more narrow than the true posterior."
             )
 
         start_idx = 0  # as there is no multi-round FMPE yet

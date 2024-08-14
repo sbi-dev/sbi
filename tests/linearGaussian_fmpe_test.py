@@ -214,7 +214,7 @@ def test_c2st_fmpe_for_different_dims_and_resume_training(density_estimator="mlp
     )
 
     inference = inference.append_simulations(theta, x)
-    posterior_estimator = inference.train(max_num_epochs=10)
+    posterior_estimator = inference.train(max_num_epochs=2)
     # Test whether we can stop and resume.
     posterior_estimator = inference.train(resume_training=True)
 
@@ -416,5 +416,5 @@ def test_multi_round_handling_fmpe():
 
     # Append new data with a proposal. This should work without any issues.
     inference.append_simulations(theta_new, x_new).train(
-        max_num_epochs=2, train_with_proposal_without_correction=True
+        max_num_epochs=2, force_first_round_loss=True
     )
