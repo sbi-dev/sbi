@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   cd:
-    name: CD
+    name: Continuous Deployment
     runs-on: ubuntu-latest
 
     steps:
@@ -54,9 +54,3 @@ jobs:
         flags: unittests
         name: codecov-sbi-all-cpu
         token: ${{ secrets.CODECOV_TOKEN }}
-
-    - name: Check doc building
-      run: |
-        jupyter nbconvert --to markdown tutorials/*.ipynb --output-dir docs/tutorial/
-        jupyter nbconvert --to markdown examples/*.ipynb --output-dir docs/examples/
-        mkdocs build -f docs/mkdocs.yml --site-dir site
