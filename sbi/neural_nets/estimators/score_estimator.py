@@ -120,7 +120,7 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         score_gaussian = (input - mean) / std**2
 
         # Score prediction by the network
-        score_pred = self.net([input_enc, condition, time_enc])
+        score_pred = self.net(input_enc, condition, time_enc)
 
         # Output pre-conditioned score
         # The learnable part will be largly scaled at the beginning of the diffusion

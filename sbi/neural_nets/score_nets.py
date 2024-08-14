@@ -34,27 +34,21 @@ class EmbedInputs(nn.Module):
         self.embedding_net_y = embedding_net_y
         self.embedding_net_t = embedding_net_t
 
-    def forward(self, inputs: list) -> list[Tensor]:
+    def forward(self, x: Tensor, y: Tensor, t: Tensor) -> tuple:
         """Forward pass of the input layer.
 
         Args:
-            inputs: List containing raw theta, x, and diffusion time.
+            inputs: theta (x), x (y), and diffusion time (t).
 
         Returns:
             Potentially standardized and/or embedded output.
         """
 
-        assert (
-            isinstance(inputs, list) and len(inputs) == 3
-        ), """Inputs to network must be a list containing raw theta, x, and 1d time."""
-
-        embeddings = [
-            self.embedding_net_x(inputs[0]),
-            self.embedding_net_y(inputs[1]),
-            self.embedding_net_t(inputs[2]),
-        ]
-
-        return embeddings
+        return (
+            self.embedding_net_x(x),
+            self.embedding_net_y(y),
+            self.embedding_net_t(t),
+        )
 
 
 def build_input_handler(
@@ -92,12 +86,12 @@ def build_input_handler(
             standardizing_net(batch_y, structured_y), embedding_net_y
         )
     embedding_net_t = GaussianFourierTimeEmbedding(t_embedding_dim)
-    input_layer = EmbedInputs(
+    input_handler = EmbedInputs(
         embedding_net_x,
         embedding_net_y,
         embedding_net_t,
     )
-    return input_layer
+    return input_handler
 
 
 def build_score_estimator(
@@ -248,11 +242,11 @@ class MLP(nn.Module):
         # Output layer
         self.layers.append(nn.Linear(hidden_dim, output_dim))
 
-    def forward(self, xyt_ls: list[Tensor]) -> Tensor:
-        embeddings = self.input_handler(xyt_ls)
-        x = torch.cat(embeddings, dim=-1)
+    def forward(self, x: Tensor, y: Tensor, t: Tensor) -> Tensor:
+        x, y, t = self.input_handler(x, y, t)
+        xyt = torch.cat([x, y, t], dim=-1)
 
-        h = self.activation(self.layers[0](x))
+        h = self.activation(self.layers[0](xyt))
 
         # Forward pass through hidden layers
         for i in range(1, self.num_layers - 1):
@@ -300,7 +294,7 @@ class AdaMLPBlock(nn.Module):
             nn.Linear(hidden_dim * mlp_ratio, hidden_dim),
         )
 
-    def forward(self, x: Tensor, t: Tensor) -> Tensor:
+    def forward(self, x: Tensor, yt: Tensor) -> Tensor:
         """
         Arguments:
             x: The input tensor, with shape (B, D_x).
@@ -310,7 +304,7 @@ class AdaMLPBlock(nn.Module):
             The output tensor, with shape (B, D_x).
         """
 
-        a, b, c = self.ada_ln(t).chunk(3, dim=-1)
+        a, b, c = self.ada_ln(yt).chunk(3, dim=-1)
 
         y = (a + 1) * x + b
         y = self.block(y)
@@ -353,12 +347,11 @@ class AdaMLP(nn.Module):
         self.input_layer = nn.Linear(x_dim, hidden_dim)
         self.output_layer = nn.Linear(hidden_dim, x_dim)
 
-    def forward(self, xyt_ls: list[Tensor]) -> Tensor:
-        embeddings = self.input_handler(xyt_ls)
-        x = embeddings[0]
-        t = torch.cat(embeddings[1:], dim=-1)
+    def forward(self, x: Tensor, y: Tensor, t: Tensor) -> Tensor:
+        x, y, t = self.input_handler(x, y, t)
+        yt = torch.cat([y, t], dim=-1)
 
         h = self.input_layer(x)
         for i in range(self.num_layers):
-            h = self.ada_blocks[i](h, t)
+            h = self.ada_blocks[i](h, yt)
         return self.output_layer(h)
