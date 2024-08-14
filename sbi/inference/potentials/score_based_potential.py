@@ -115,11 +115,11 @@ class PosteriorScoreBasedPotential(BasePotential):
         )
 
         with torch.set_grad_enabled(track_gradients):
-            eps_samples, logabsdet = transform.inv.call_and_ladj(  # type: ignore
+            eps_samples, logabsdet = transform.call_and_ladj(  # type: ignore
                 theta_density_estimator
             )
             base_log_prob = base_density.log_prob(eps_samples)
-            log_probs = base_log_prob - logabsdet
+            log_probs = base_log_prob + logabsdet
             log_probs = log_probs.squeeze(-1)
 
             # Force probability to be zero outside prior support.
