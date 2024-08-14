@@ -486,6 +486,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#flow-matching-posterior-estimation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Flow Matching Posterior Estimation
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#diagnostics-and-utilities" class="md-nav__link">
     <span class="md-ellipsis">
       Diagnostics and utilities
@@ -683,6 +692,18 @@ implemented in <code>sbi</code> as well, under <code>sbi.neural_nets.embedding_n
     <span class="n">num_classes</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>  <span class="c1"># sees `2 * num_classes - 1` marginally drawn contrastive pairs.</span>
     <span class="n">gamma</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>  <span class="c1"># controls the weight between terms in its loss function.</span>
 <span class="p">)</span>
+<span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">()</span><span class="o">.</span><span class="n">set_default_x</span><span class="p">(</span><span class="n">x_o</span><span class="p">)</span>
+</code></pre></div>
+<h2 id="flow-matching-posterior-estimation">Flow Matching Posterior Estimation<a class="headerlink" href="#flow-matching-posterior-estimation" title="Permanent link">&para;</a></h2>
+<p><strong>Flow Matching for Scalable Simulation-Based Inference</strong> <br> by Dax, Wildberger, Buchholz, Green, Macke,
+Schölkopf (NeurIPS 2023) <br> <a href="https://arxiv.org/abs/2305.17161">[Paper]</a></p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">FMPE</span>
+
+<span class="n">inference</span> <span class="o">=</span> <span class="n">FMPE</span><span class="p">(</span><span class="n">prior</span><span class="p">)</span>
+<span class="c1"># FMPE does support multiple rounds of inference</span>
+<span class="n">theta</span> <span class="o">=</span> <span class="n">prior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_sims</span><span class="p">,))</span>
+<span class="n">x</span> <span class="o">=</span> <span class="n">simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
+<span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
 <span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">()</span><span class="o">.</span><span class="n">set_default_x</span><span class="p">(</span><span class="n">x_o</span><span class="p">)</span>
 </code></pre></div>
 <h2 id="diagnostics-and-utilities">Diagnostics and utilities<a class="headerlink" href="#diagnostics-and-utilities" title="Permanent link">&para;</a></h2>
