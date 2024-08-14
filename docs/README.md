@@ -1,28 +1,45 @@
 # Documentation
 
-The documentation is available at: <http://sbi-dev.github.io/sbi>
+The documentation is available at: [sbi-dev.github.io/sbi](http://sbi-dev.github.io/sbi)
 
 ## Building the Documentation
 
-You can build the docs locally by running the following command from this subfolder:
+We use [`mike`](https://github.com/jimporter/mike) to manage, build, and deploy our
+documentation with [`mkdocs`](https://www.mkdocs.org/). To build the documentation
+locally, follow these steps:
 
-```bash
-jupyter nbconvert --to markdown ../tutorials/*.ipynb --output-dir docs/tutorial/
-jupyter nbconvert --to markdown ../examples/*.ipynb --output-dir docs/examples/
-mkdocs serve
-```
+1. Install the documentation dependencies:
 
-The docs can be updated to GitHub using:
+    ```bash
+    python -m pip install .[doc]
+    ```
 
-```bash
-jupyter nbconvert --to markdown ../tutorials/*.ipynb --output-dir docs/tutorial/
-jupyter nbconvert --to markdown ../examples/*.ipynb --output-dir docs/examples/
-mkdocs gh-deploy
-```
+2. Convert the current version of the documentation notebooks to markdown and build the
+   website locally using `mike`:
+
+    ```bash
+    jupyter nbconvert --to markdown ../tutorials/*.ipynb --output-dir docs/tutorials/
+    jupyter nbconvert --to markdown ../examples/*.ipynb --output-dir docs/examples/
+    mike serve
+    ```
+
+### Deployment
+
+Website deployment is managed with `mike` and happens automatically:
+
+- With every push to `main`, a `dev` version of the most recent documentation is built.
+- With every new published **release**, the current documentation is deployed on the
+  website.
+
+Thus, the documentation on the website always refers to the latest release, and not
+necessarily to the version on `main`.
 
 ## Contributing FAQ
 
-Create a new markdown file named `question_XX.md` in the `docs/faq` folder, where `XX`
-is a running index for the questions. The file should start with the question as title
-(i.e. starting with a `#`) and then have the answer below. Additionally, you need to
-add a link to your question in the markdown file `docs/faq.md`.
+We welcome contributions to our list of frequently asked questions. To contribute:
+
+1. Create a new markdown file named `question_XX.md` in the `docs/faq` folder, where
+   `XX` is a running index for the questions.
+2. The file should start with the question as the title (i.e. starting with a `#`) and
+   then have the answer below.
+3. Add a link to your question in the [`docs/faq.md`] file using the same index.

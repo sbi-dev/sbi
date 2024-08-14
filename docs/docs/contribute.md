@@ -211,19 +211,31 @@ fails (xfailed).
   commenting on the PR.
 
 ## Contributing to the documentation
-Most of the documentation for `sbi` is written in markdown and the website is
-generated using `mkdocs` with `mkdocstrings`. To work on improvements of the
-documentation, you should first  install the `doc` dependencies:
-```
+
+Most of the documentation for `sbi` is written in markdown and the website is generated
+using `mkdocs` with `mkdocstrings` and `mike`. The tutorials and examples are converted
+from jupyter notebooks into markdown files to be shown on the website. To work on
+improvements of the documentation, you should first  install the `doc` dependencies:
+
+```bash
 pip install -e ".[doc]"
 ```
-Then, you can run the command on your terminal
+
+Then, you can build the website locally by executing in the `docs` folder
+
+```bash
+mike serve
 ```
+
+This will build the website on a local host address shown in the terminal. Changes to
+the website files or a browser refresh will immediately rebuild the website.
+
+If you want to build the latest version of the tutorial notebooks, you need to convert
+them to markdown first:
+
+```bash
 cd docs
 jupyter nbconvert --to markdown ../examples/*.ipynb --output-dir docs/examples/
 jupyter nbconvert --to markdown ../tutorials/*.ipynb --output-dir docs/tutorials/
-mkdocs serve
+mike serve
 ```
-and open a browser on the page proposed by `mkdocs`. Now, whenever you
-make changes to the markdown files of the documentation, you can see the results
-almost immediately in the browser.
