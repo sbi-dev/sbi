@@ -16,13 +16,13 @@ from sbi.utils.user_input_checks import check_data_device
 
 
 class EmbedInputs(nn.Module):
-    """Constructs input layer that concatenates (and optionally standardizes and/or
-    embeds) the input and conditioning variables, as well as the diffusion time
+    """Constructs input handler that optionally standardizes and/or
+    embeds the input and conditioning variables, as well as the diffusion time
     embedding.
     """
 
     def __init__(self, embedding_net_x, embedding_net_y, embedding_net_t):
-        """Initializes the input layer.
+        """Initializes the input handler.
 
         Args:
             embedding_net_x: Embedding network for x.
@@ -34,14 +34,14 @@ class EmbedInputs(nn.Module):
         self.embedding_net_y = embedding_net_y
         self.embedding_net_t = embedding_net_t
 
-    def forward(self, inputs: list) -> Tensor:
+    def forward(self, inputs: list) -> list[Tensor]:
         """Forward pass of the input layer.
 
         Args:
             inputs: List containing raw theta, x, and diffusion time.
 
         Returns:
-            Concatenated and potentially standardized and/or embedded output.
+            Potentially standardized and/or embedded output.
         """
 
         assert (
@@ -53,14 +53,11 @@ class EmbedInputs(nn.Module):
             self.embedding_net_y(inputs[1]),
             self.embedding_net_t(inputs[2]),
         ]
-        out = torch.cat(
-            embeddings,
-            dim=-1,
-        )
-        return out
+
+        return embeddings
 
 
-def build_input_layer(
+def build_input_handler(
     batch_y: Tensor,
     t_embedding_dim: int,
     z_score_y: Optional[str] = "independent",
@@ -86,7 +83,7 @@ def build_input_layer(
         embedding_net_y: Optional embedding network for y.
 
     Returns:
-        Input layer that concatenates x, y, and time embedding, optionally z-scores.
+        Input handler that provides x, y, and time embedding, and optionally z-scores.
     """
 
     z_score_y_bool, structured_y = z_score_parser(z_score_y)
@@ -158,7 +155,7 @@ def build_score_estimator(
 
     mean_0, std_0 = z_standardization(batch_x, z_score_x == "structured")
 
-    input_layer = build_input_layer(
+    input_handler = build_input_handler(
         batch_y,
         t_embedding_dim,
         z_score_y,
@@ -174,6 +171,15 @@ def build_score_estimator(
         score_net = MLP(
             x_numel + y_numel + t_embedding_dim,
             x_numel,
+            input_handler,
+            hidden_dim=hidden_features,
+            num_layers=num_layers,
+        )
+    elif score_net == "ada_mlp":
+        score_net = AdaMLP(
+            x_numel,
+            t_embedding_dim + y_numel,
+            input_handler,
             hidden_dim=hidden_features,
             num_layers=num_layers,
         )
@@ -184,20 +190,19 @@ def build_score_estimator(
     else:
         raise ValueError(f"Invalid score network: {score_net}")
 
-    if sde_type == 'vp':
+    if sde_type == "vp":
         estimator = VPScoreEstimator
-    elif sde_type == 've':
+    elif sde_type == "ve":
         estimator = VEScoreEstimator
-    elif sde_type == 'subvp':
+    elif sde_type == "subvp":
         estimator = subVPScoreEstimator
     else:
         raise ValueError(f"SDE type: {sde_type} not supported.")
 
-    neural_net = nn.Sequential(input_layer, score_net)
     input_shape = batch_x.shape[1:]
     condition_shape = batch_y.shape[1:]
     return estimator(
-        neural_net, input_shape, condition_shape, mean_0=mean_0, std_0=std_0, **kwargs
+        score_net, input_shape, condition_shape, mean_0=mean_0, std_0=std_0, **kwargs
     )
 
 
@@ -208,6 +213,7 @@ class MLP(nn.Module):
         self,
         input_dim,
         output_dim,
+        input_handler,
         hidden_dim=100,
         num_layers=5,
         activation=nn.GELU(),
@@ -216,6 +222,7 @@ class MLP(nn.Module):
     ):
         super().__init__()
 
+        self.input_handler = input_handler
         self.num_layers = num_layers
         self.activation = activation
         self.skip_connection = skip_connection
@@ -241,7 +248,10 @@ class MLP(nn.Module):
         # Output layer
         self.layers.append(nn.Linear(hidden_dim, output_dim))
 
-    def forward(self, x):
+    def forward(self, xyt_ls: list[Tensor]) -> Tensor:
+        embeddings = self.input_handler(xyt_ls)
+        x = torch.cat(embeddings, dim=-1)
+
         h = self.activation(self.layers[0](x))
 
         # Forward pass through hidden layers
@@ -253,3 +263,102 @@ class MLP(nn.Module):
         output = self.layers[-1](h)
 
         return output
+
+
+class AdaMLPBlock(nn.Module):
+    r"""Creates a residual MLP block module with adaptive layer norm for conditioning.
+
+    Arguments:
+        hidden_dim: The dimensionality of the MLP block.
+        cond_dim: The number of embedding features.
+    """
+
+    def __init__(
+        self,
+        hidden_dim: int,
+        cond_dim: int,
+        mlp_ratio: int = 1,
+    ):
+        super().__init__()
+
+        self.ada_ln = nn.Sequential(
+            nn.Linear(cond_dim, hidden_dim),
+            nn.SiLU(),
+            nn.Linear(hidden_dim, 3 * hidden_dim),
+        )
+
+        # Initialize the last layer to zero
+        self.ada_ln[-1].weight.data.zero_()
+        self.ada_ln[-1].bias.data.zero_()
+
+        # MLP block
+        # NOTE: This can be made more flexible to support layer types.
+        self.block = nn.Sequential(
+            nn.LayerNorm(hidden_dim, elementwise_affine=False),
+            nn.Linear(hidden_dim, hidden_dim * mlp_ratio),
+            nn.GELU(),
+            nn.Linear(hidden_dim * mlp_ratio, hidden_dim),
+        )
+
+    def forward(self, x: Tensor, t: Tensor) -> Tensor:
+        """
+        Arguments:
+            x: The input tensor, with shape (B, D_x).
+            t: The embedding vector, with shape (B, D_t).
+
+        Returns:
+            The output tensor, with shape (B, D_x).
+        """
+
+        a, b, c = self.ada_ln(t).chunk(3, dim=-1)
+
+        y = (a + 1) * x + b
+        y = self.block(y)
+        y = x + c * y
+        y = y / torch.sqrt(1 + c * c)
+
+        return y
+
+
+class AdaMLP(nn.Module):
+    """
+    MLP denoising network using adaptive layer normalization for conditioning.
+
+    Arguments:
+        x_dim: The dimensionality of the input tensor.
+        emb_dim: The number of embedding features.
+        input_handler: The input handler module.
+        hidden_dim: The dimensionality of the MLP block.
+        num_layers: The number of MLP blocks.
+        **kwargs: Key word arguments handed to the AdaMLPBlock.
+    """
+
+    def __init__(
+        self,
+        x_dim,
+        emb_dim,
+        input_handler,
+        hidden_dim=100,
+        num_layers=3,
+        **kwargs,
+    ):
+        super().__init__()
+        self.input_handler = input_handler
+        self.num_layers = num_layers
+
+        self.ada_blocks = nn.ModuleList()
+        for _i in range(num_layers):
+            self.ada_blocks.append(AdaMLPBlock(hidden_dim, emb_dim, **kwargs))
+
+        self.input_layer = nn.Linear(x_dim, hidden_dim)
+        self.output_layer = nn.Linear(hidden_dim, x_dim)
+
+    def forward(self, xyt_ls: list[Tensor]) -> Tensor:
+        embeddings = self.input_handler(xyt_ls)
+        x = embeddings[0]
+        t = torch.cat(embeddings[1:], dim=-1)
+
+        h = self.input_layer(x)
+        for i in range(self.num_layers):
+            h = self.ada_blocks[i](h, t)
+        return self.output_layer(h)

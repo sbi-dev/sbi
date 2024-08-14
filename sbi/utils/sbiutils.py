@@ -962,7 +962,8 @@ def gradient_ascent(
             with torch.no_grad():
                 if iter_ % save_best_every + 1 == 0 or iter_ == num_iter - 1:
                     # Evaluate the optimized locations and pick the best one.
-                    log_probs_of_optimized = potential_fn(optimize_inits).detach()
+                    log_probs_of_optimized = potential_fn(optimize_inits).detach().squeeze()
+                    print("log_probs_of_optimized", log_probs_of_optimized)
                     best_theta_iter = optimize_inits[  # type: ignore
                         torch.argmax(log_probs_of_optimized)
                     ].view(1, -1)
@@ -990,6 +991,7 @@ def gradient_ascent(
         print(interruption + interruption_note)
         return argmax_, max_val  # type: ignore
 
+    print("max_val", max_val)
     return best_theta_overall, max_val  # type: ignore
 
 
