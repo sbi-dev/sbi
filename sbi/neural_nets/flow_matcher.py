@@ -203,7 +203,7 @@ class ResNetWithGLUConditioning(VectorFieldNet):
     """ResNet with GLU units for additional conditioning.
 
     Used for flow matching to encode high-dimensional data in the main network and add
-    contet of theta and t using GLU units on each layer, as proposed in Daxberger et al.
+    contet of theta and t using GLU units on each layer, as proposed in Dax et al.
     "Flow Matching for Scalable SBI" (2023)", https://arxiv.org/abs/2305.17161.
 
     """
