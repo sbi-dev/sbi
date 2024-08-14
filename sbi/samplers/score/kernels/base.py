@@ -2,7 +2,9 @@ from abc import abstractmethod
 
 from torch import Tensor
 
-from sbi.inference.potentials.score_based_potential import ScoreFunction
+from sbi.inference.potentials.score_based_potential import (
+    PosteriorScoreBasedPotentialGradient,
+)
 
 
 class State:
@@ -12,7 +14,7 @@ class State:
 
 
 class Kernel:
-    def __init__(self, score_fn: ScoreFunction) -> None:
+    def __init__(self, score_fn: PosteriorScoreBasedPotentialGradient) -> None:
         self.score_fn = score_fn
 
     @abstractmethod

@@ -265,9 +265,7 @@ class EnsemblePosterior(NeuralPotentialPosterior):
             `EnsemblePosterior` that will use a default `x` when not explicitly
             passed.
         """
-        self._x = process_x(
-            x, x_event_shape=None, allow_iid_x=self.potential_fn.allow_iid_x
-        ).to(self._device)
+        self._x = process_x(x, x_event_shape=None).to(self._device)
 
         for posterior in self.posteriors:
             posterior.set_default_x(x)

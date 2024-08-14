@@ -19,7 +19,7 @@ from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard.writer import SummaryWriter
 from tqdm.auto import tqdm
 
-from sbi.inference.posteriors.base_posterior import NeuralPotentialPosterior
+from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.utils import (
     check_prior,
     get_log_root,
@@ -47,7 +47,7 @@ def infer(
     init_kwargs: Optional[Dict] = None,
     train_kwargs: Optional[Dict] = None,
     build_posterior_kwargs: Optional[Dict] = None,
-) -> NeuralPotentialPosterior:
+) -> NeuralPosterior:
     r"""Runs simulation-based inference and returns the posterior.
 
     This function provides a simple interface to run sbi. Inference is run for a single
@@ -306,7 +306,7 @@ class NeuralInference(ABC):
         discard_prior_samples: bool = False,
         retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
-    ) -> NeuralPotentialPosterior:
+    ) -> NeuralPosterior:
         raise NotImplementedError
 
     def get_dataloaders(
@@ -680,7 +680,7 @@ def check_if_proposal_has_default_x(proposal: Any):
     If the proposal is a `NeuralPosterior`, we check if the default_x is set and
     if it matches the `_x_o_training_focused_on`.
     """
-    if isinstance(proposal, NeuralPotentialPosterior) and proposal.default_x is None:
+    if isinstance(proposal, NeuralPosterior) and proposal.default_x is None:
         raise ValueError(
             "`proposal.default_x` is None, i.e. there is no "
             "x_o for training. Set it with "

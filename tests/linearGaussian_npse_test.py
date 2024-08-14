@@ -5,7 +5,7 @@ from torch.distributions import MultivariateNormal
 from sbi import analysis as analysis
 from sbi import utils as utils
 from sbi.inference.base import simulate_for_sbi
-from sbi.inference.nspe.nspe import NSPE
+from sbi.inference.npse.npse import NPSE
 from sbi.simulators import linear_gaussian
 from sbi.simulators.linear_gaussian import (
     samples_true_posterior_linear_gaussian_uniform_prior,
@@ -22,8 +22,8 @@ from .test_utils import check_c2st
     "num_dim, prior_str",
     ((2, "gaussian"), (2, "uniform"), (1, "gaussian")),
 )
-def test_c2st_snpe_on_linearGaussian(sde_type, num_dim: int, prior_str: str):
-    """Test whether SNPE infers well a simple example with available ground truth."""
+def test_c2st_npse_on_linearGaussian(sde_type, num_dim: int, prior_str: str):
+    """Test whether NPSE infers well a simple example with available ground truth."""
 
     x_o = zeros(1, num_dim)
     num_samples = 1000
@@ -56,7 +56,7 @@ def test_c2st_snpe_on_linearGaussian(sde_type, num_dim: int, prior_str: str):
         prior,
     )
 
-    inference = NSPE(prior, sde_type=sde_type, show_progress_bars=False)
+    inference = NPSE(prior, sde_type=sde_type, show_progress_bars=False)
 
     theta, x = simulate_for_sbi(
         simulator, prior, num_simulations, simulation_batch_size=1000
@@ -69,7 +69,7 @@ def test_c2st_snpe_on_linearGaussian(sde_type, num_dim: int, prior_str: str):
     samples = posterior.sample((num_samples,))
 
     # Compute the c2st and assert it is near chance level of 0.5.
-    check_c2st(samples, target_samples, alg="nspe")
+    check_c2st(samples, target_samples, alg="npse")
 
     # map_ = posterior.map(num_init_samples=1_000, show_progress_bars=False)
     # assert ((map_ - gt_posterior.mean) ** 2).sum() < 0.5

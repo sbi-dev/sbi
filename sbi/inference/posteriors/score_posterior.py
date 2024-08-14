@@ -37,7 +37,6 @@ class ScorePosterior(NeuralPosterior):
 
     NOTE: The `log_prob()` method is not implemented yet. It will be implemented in a
     future release using the probability flow ODEs.
-
     """
 
     def __init__(
@@ -234,7 +233,6 @@ class ScorePosterior(NeuralPosterior):
                 log_probs,
                 torch.tensor(float("-inf"), dtype=torch.float32, device=self._device),
             )
-
             return masked_log_prob
 
     def sample_batched(

@@ -3,19 +3,21 @@ from abc import abstractmethod
 import torch
 from torch import Tensor
 
-from sbi.inference.potentials.score_based_potential import ScoreFunction
+from sbi.inference.potentials.score_based_potential import (
+    PosteriorScoreBasedPotentialGradient,
+)
 from sbi.samplers.score.kernels.base import Kernel, State
 
 
 class EulerMaruyama(Kernel):
-    def __init__(self, score_fn: ScoreFunction, eta=1.0) -> None:
+    def __init__(self, score_fn: PosteriorScoreBasedPotentialGradient, eta=1.0) -> None:
         self.score_fn = score_fn
         self.drift_forward = score_fn.score_estimator.drift_fn
         self.diffusion_forward = score_fn.score_estimator.diffusion_fn
         self.eta = eta
 
     @abstractmethod
-    def __call__(self, state: State, time: Tensor) -> Tensor:
+    def __call__(self, state: State, time: Tensor) -> State:
         time_old = state.time
         input_old = state.input
         delta_t = time - time_old

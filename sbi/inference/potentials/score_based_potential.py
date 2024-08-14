@@ -18,7 +18,7 @@ def score_estimator_based_potential_gradient(
     prior: Optional[Distribution],
     x_o: Optional[Tensor],
     enable_transform: bool = False,
-) -> Tuple["ScoreFunction", TorchTransform]:
+) -> Tuple["PosteriorScoreBasedPotentialGradient", TorchTransform]:
     r"""Returns the potential function gradient for score estimators.
 
     Args:
@@ -30,7 +30,9 @@ def score_estimator_based_potential_gradient(
     """
     device = str(next(score_estimator.parameters()).device)
 
-    potential_fn = ScoreFunction(score_estimator, prior, x_o, device=device)
+    potential_fn = PosteriorScoreBasedPotentialGradient(
+        score_estimator, prior, x_o, device=device
+    )
 
     # TODO Add issue
     assert (
@@ -47,14 +49,13 @@ def score_estimator_based_potential_gradient(
     return potential_fn, theta_transform
 
 
-class ScoreFunction(BasePotentialGradient):
+class PosteriorScoreBasedPotentialGradient(BasePotentialGradient):
     def __init__(
         self,
         score_estimator: ConditionalScoreEstimator,
         prior: Optional[Distribution],
         x_o: Optional[Tensor],
-        interpret_as_iid: bool = False,
-        iid_method: str = "geffner",
+        iid_method: str = "iid_bridge",
         device: str = "cpu",
     ):
         r"""Returns the score function for score-based methods.
@@ -64,18 +65,15 @@ class ScoreFunction(BasePotentialGradient):
             prior: The prior distribution.
             x_o: The observed data at which to evaluate the posterior.
             x_o_shape: The shape of the observed data.
+            iid_method: Which method to use for computing the score. Currently, only
+                `iid_bridge` as proposed in Geffner et al. is implemented.
             device: The device on which to evaluate the potential.
         """
 
         super().__init__(prior, x_o, device=device)
         self.score_estimator = score_estimator
         self.score_estimator.eval()
-        self.interpret_as_iid = interpret_as_iid  # TODO: Replace with what Guy did
         self.iid_method = iid_method
-
-    def allow_iid_x(self) -> bool:
-        # TODO: Implement multiple iid observations when potential is changed by Guy
-        return True
 
     def __call__(
         self, theta: Tensor, time: Tensor, track_gradients: bool = True
@@ -97,7 +95,7 @@ class ScoreFunction(BasePotentialGradient):
             )
 
         with torch.set_grad_enabled(track_gradients):
-            if not self.interpret_as_iid:
+            if not self.x_is_iid or self._x_o.shape[0] == 1:
                 score = self.score_estimator.forward(
                     input=theta, condition=self.x_o, time=time
                 )
@@ -107,7 +105,7 @@ class ScoreFunction(BasePotentialGradient):
                         "Prior must be provided when interpreting the data as IID."
                     )
 
-                if self.iid_method == "geffner":
+                if self.iid_method == "iid_bridge":
                     score = _iid_bridge(
                         theta=theta,
                         xos=self.x_o,
