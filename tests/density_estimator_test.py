@@ -30,6 +30,10 @@ from sbi.neural_nets.flow import (
     build_zuko_sospf,
     build_zuko_unaf,
 )
+from sbi.neural_nets.flow_matcher import (
+    build_mlp_flowmatcher,
+    build_resnet_flowmatcher,
+)
 from sbi.neural_nets.mdn import build_mdn
 
 # List of all density estimator builders for testing.
@@ -47,6 +51,11 @@ model_builders = [
     build_zuko_nsf,
     build_zuko_sospf,
     build_zuko_unaf,
+]
+
+flowmatching_build_functions = [
+    build_mlp_flowmatcher,
+    build_resnet_flowmatcher,
 ]
 
 
@@ -127,7 +136,9 @@ def test_shape_handling_utility_for_density_estimator(
     )
 
 
-@pytest.mark.parametrize("density_estimator_build_fn", model_builders)
+@pytest.mark.parametrize(
+    "density_estimator_build_fn", model_builders + flowmatching_build_functions
+)
 @pytest.mark.parametrize("input_sample_dim", (1, 2))
 @pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
 @pytest.mark.parametrize("condition_event_shape", ((1,), (7,)))
@@ -230,7 +241,9 @@ def test_correctness_of_density_estimator_log_prob(
     assert torch.allclose(log_probs[0, :], log_probs[1, :], rtol=1e-4)
 
 
-@pytest.mark.parametrize("density_estimator_build_fn", model_builders)
+@pytest.mark.parametrize(
+    "density_estimator_build_fn", model_builders + flowmatching_build_functions
+)
 @pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
 @pytest.mark.parametrize("condition_event_shape", ((1,), (7,)))
 @pytest.mark.parametrize("sample_shape", ((1000,), (500, 2)))

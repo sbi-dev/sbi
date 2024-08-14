@@ -263,7 +263,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         self._round = max(self._data_round_index)
 
         if self._round == 0 and self._neural_net is not None:
-            assert force_first_round_loss, (
+            assert force_first_round_loss or resume_training, (
                 "You have already trained this neural network. After you had trained "
                 "the network, you again appended simulations with `append_simulations"
                 "(theta, x)`, but you did not provide a proposal. If the new "

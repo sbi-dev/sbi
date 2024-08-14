@@ -138,7 +138,7 @@ class EnsemblePosterior(NeuralPosterior):
             self._weights = torch.tensor([
                 1.0 / self.num_components for _ in range(self.num_components)
             ])
-        elif type(weights) == Tensor or type(weights) == List:
+        elif weights is Tensor or weights is List:
             self._weights = torch.tensor(weights) / sum(weights)
         else:
             raise TypeError
