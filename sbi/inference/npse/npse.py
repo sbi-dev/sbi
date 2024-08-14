@@ -46,7 +46,7 @@ class NPSE(NeuralInference):
         show_progress_bars: bool = True,
         **kwargs,
     ):
-        """Base class for Neural Score Posterior Estimation methods.
+        """Base class for Neural Posterior Score Estimation methods.
 
         Instead of performing conditonal *density* estimation, NSPE methods perform
         conditional *score* estimation i.e. they estimate the gradient of the log
