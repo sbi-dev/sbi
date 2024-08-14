@@ -12,7 +12,7 @@ import torch
 from scipy.stats import kstest
 from torch import Tensor
 
-from sbi.inference.posteriors.base_posterior import NeuralPotentialPosterior
+from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.utils.diagnostics_utils import get_posterior_samples_on_batch
 from sbi.utils.metrics import l2
 
@@ -20,7 +20,7 @@ from sbi.utils.metrics import l2
 def run_tarp(
     thetas: Tensor,
     xs: Tensor,
-    posterior: NeuralPotentialPosterior,
+    posterior: NeuralPosterior,
     references: Optional[Tensor] = None,
     num_posterior_samples: int = 1000,
     num_workers: int = 1,

@@ -10,7 +10,7 @@ import torch
 from torch import Tensor
 
 from sbi.inference.potentials.score_based_potential import (
-    score_estimator_based_potential_gradient,
+    score_estimator_based_potential,
 )
 from sbi.neural_nets.score_nets import build_score_estimator
 from sbi.samplers.score.score import Diffuser
@@ -78,7 +78,7 @@ def _build_gaussian_score_estimator(
         score_net=DummyNet(),
     )
 
-    score_fn, _ = score_estimator_based_potential_gradient(
+    score_fn, _ = score_estimator_based_potential(
         score_estimator, prior=None, x_o=torch.ones((1,))
     )
 

@@ -6,7 +6,7 @@ from typing import Any, Callable, Optional, Tuple, Union
 import torch
 from torch import Tensor
 
-from sbi.inference.posteriors.base_posterior import NeuralPotentialPosterior
+from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.samplers.importance.importance_sampling import importance_sample
 from sbi.samplers.importance.sir import sampling_importance_resampling
@@ -14,7 +14,7 @@ from sbi.sbi_types import Shape, TorchTransform
 from sbi.utils.torchutils import ensure_theta_batched
 
 
-class ImportanceSamplingPosterior(NeuralPotentialPosterior):
+class ImportanceSamplingPosterior(NeuralPosterior):
     r"""Provides importance sampling to sample from the posterior.<br/><br/>
     SNLE or SNRE train neural networks to approximate the likelihood(-ratios).
     `ImportanceSamplingPosterior` allows to estimate the posterior log-probability by

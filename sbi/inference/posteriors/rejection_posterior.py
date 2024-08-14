@@ -8,14 +8,14 @@ from warnings import warn
 import torch
 from torch import Tensor
 
-from sbi.inference.posteriors.base_posterior import NeuralPotentialPosterior
+from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.samplers.rejection.rejection import rejection_sample
 from sbi.sbi_types import Shape, TorchTransform
 from sbi.utils.torchutils import ensure_theta_batched
 
 
-class RejectionPosterior(NeuralPotentialPosterior):
+class RejectionPosterior(NeuralPosterior):
     r"""Provides rejection sampling to sample from the posterior.<br/><br/>
     SNLE or SNRE train neural networks to approximate the likelihood(-ratios).
     `RejectionPosterior` allows to sample from the posterior with rejection sampling.

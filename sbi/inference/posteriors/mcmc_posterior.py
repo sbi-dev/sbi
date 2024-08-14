@@ -19,7 +19,7 @@ from torch import Tensor
 from torch import multiprocessing as mp
 from tqdm.auto import tqdm
 
-from sbi.inference.posteriors.base_posterior import NeuralPotentialPosterior
+from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.neural_nets.estimators.shape_handling import reshape_to_batch_event
 from sbi.samplers.mcmc import (
@@ -36,7 +36,7 @@ from sbi.utils.potentialutils import pyro_potential_wrapper, transformed_potenti
 from sbi.utils.torchutils import ensure_theta_batched, tensor2numpy
 
 
-class MCMCPosterior(NeuralPotentialPosterior):
+class MCMCPosterior(NeuralPosterior):
     r"""Provides MCMC to sample from the posterior.<br/><br/>
     SNLE or SNRE train neural networks to approximate the likelihood(-ratios).
     `MCMCPosterior` allows to sample from the posterior with MCMC.
@@ -167,7 +167,7 @@ class MCMCPosterior(NeuralPotentialPosterior):
         """Returns sampler created by `sample`."""
         return self._posterior_sampler
 
-    def set_mcmc_method(self, method: str) -> "NeuralPotentialPosterior":
+    def set_mcmc_method(self, method: str) -> "NeuralPosterior":
         """Sets sampling method to for MCMC and returns `NeuralPosterior`.
 
         Args:

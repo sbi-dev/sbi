@@ -73,7 +73,6 @@ def rejection_sample(
     _, max_log_ratio = gradient_ascent(
         potential_fn=potential_over_proposal,
         inits=samples_to_find_max,
-        theta_transform=theta_transform,
         num_iter=num_iter_to_find_max,
         learning_rate=0.01,
         num_to_optimize=max(1, int(num_samples_to_find_max / 10)),

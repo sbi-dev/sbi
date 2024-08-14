@@ -5,7 +5,7 @@ from torch import Tensor
 from tqdm.auto import tqdm
 
 from sbi.inference.potentials.score_based_potential import (
-    PosteriorScoreBasedPotentialGradient,
+    PosteriorScoreBasedPotential,
 )
 from sbi.samplers.score.correctors import Corrector, get_corrector
 from sbi.samplers.score.predictors import Predictor, get_predictor
@@ -17,7 +17,7 @@ class Diffuser:
 
     def __init__(
         self,
-        score_based_potential_gradient: PosteriorScoreBasedPotentialGradient,
+        score_based_potential: PosteriorScoreBasedPotential,
         predictor: Union[str, Predictor],
         corrector: Optional[Union[str, Corrector]] = None,
         predictor_params: Optional[dict] = None,
@@ -38,31 +38,31 @@ class Diffuser:
         """
         # Set predictor and corrector
         self.set_predictor(
-            predictor, score_based_potential_gradient, **(predictor_params or {})
+            predictor, score_based_potential, **(predictor_params or {})
         )
         self.set_corrector(corrector, **(corrector_params or {}))
         self.device = self.predictor.device
 
         # Extract time limits from the score function
-        self.T_min = score_based_potential_gradient.score_estimator.T_min
-        self.T_max = score_based_potential_gradient.score_estimator.T_max
+        self.T_min = score_based_potential.score_estimator.T_min
+        self.T_max = score_based_potential.score_estimator.T_max
 
         # Extract initial moments
-        self.init_mean = score_based_potential_gradient.score_estimator.mean_T
-        self.init_std = score_based_potential_gradient.score_estimator.std_T
+        self.init_mean = score_based_potential.score_estimator.mean_T
+        self.init_std = score_based_potential.score_estimator.std_T
 
         # Extract relevant shapes from the score function
-        self.input_shape = score_based_potential_gradient.score_estimator.input_shape
+        self.input_shape = score_based_potential.score_estimator.input_shape
         self.condition_shape = (
-            score_based_potential_gradient.score_estimator.condition_shape
+            score_based_potential.score_estimator.condition_shape
         )
         condition_dim = len(self.condition_shape)
-        self.batch_shape = score_based_potential_gradient.x_o.shape[:-condition_dim]
+        self.batch_shape = score_based_potential.x_o.shape[:-condition_dim]
 
     def set_predictor(
         self,
         predictor: Union[str, Predictor],
-        score_based_potential: PosteriorScoreBasedPotentialGradient,
+        score_based_potential: PosteriorScoreBasedPotential,
         **kwargs,
     ):
         """Set the predictor for the diffusion-based sampler."""

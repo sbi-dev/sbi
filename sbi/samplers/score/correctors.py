@@ -54,7 +54,7 @@ class Corrector(ABC):
             predictor (Predictor): The associated predictor.
         """
         self.predictor = predictor
-        self.score_fn = predictor.score_fn
+        self.potential_fn = predictor.potential_fn
         self.device = predictor.device
 
     def __call__(
@@ -92,7 +92,7 @@ class LangevinCorrector(Corrector):
 
     def correct(self, theta: Tensor, t0: Tensor, t1: Optional[Tensor] = None) -> Tensor:
         for _ in range(self.num_steps):
-            score = self.score_fn(theta, t0)
+            score = self.potential_fn.gradient(theta, t0)
             eps = self.std * torch.randn_like(theta, device=self.device)
             theta = theta + self.step_size * score + eps
 

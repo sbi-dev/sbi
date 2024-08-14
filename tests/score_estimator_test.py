@@ -14,22 +14,9 @@ from sbi.neural_nets.score_nets import build_score_estimator
 # TODO: Test different build options for score estimators!
 
 
-@pytest.mark.parametrize(
-    "sde_type",
-    [
-        "vp",
-        "ve",
-        "subvp",
-    ],
-)
+@pytest.mark.parametrize("sde_type", ["vp", "ve", "subvp"])
 @pytest.mark.parametrize("input_sample_dim", (1, 2))
-@pytest.mark.parametrize(
-    "input_event_shape",
-    (
-        (1,),
-        (4,),
-    ),
-)
+@pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
 @pytest.mark.parametrize("condition_event_shape", ((1,), (7,)))
 @pytest.mark.parametrize("batch_dim", (1, 10))
 def test_score_estimator_loss_shapes(
@@ -75,24 +62,13 @@ def test_score_estimator_on_device(sde_type, device):
     assert str(loss.device).split(":")[0] == device, "Loss device mismatch."
 
 
-@pytest.mark.parametrize(
-    "sde_type",
-    [
-        "vp",
-        "ve",
-        "subvp",
-    ],
-)
+@pytest.mark.parametrize("sde_type", ["vp", "ve", "subvp"])
 @pytest.mark.parametrize("input_sample_dim", (1, 2))
 @pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
 @pytest.mark.parametrize("condition_event_shape", ((1,), (7,)))
 @pytest.mark.parametrize("batch_dim", (1, 10))
 def test_score_estimator_forward_shapes(
-    sde_type,
-    input_sample_dim,
-    input_event_shape,
-    condition_event_shape,
-    batch_dim,
+    sde_type, input_sample_dim, input_event_shape, condition_event_shape, batch_dim
 ):
     """Test whether `forward` of DensityEstimators follow the shape convention."""
     score_estimator, inputs, conditions = _build_score_estimator_and_tensors(

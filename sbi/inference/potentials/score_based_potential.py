@@ -1,24 +1,31 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Union
 
 import torch
 from torch import Tensor
 from torch.distributions import Distribution
 
-from sbi.inference.potentials.base_potential import BasePotentialGradient
+from sbi.inference.potentials.base_potential import BasePotential
 from sbi.neural_nets.estimators.score_estimator import ConditionalScoreEstimator
 from sbi.sbi_types import TorchTransform
 from sbi.utils import mcmc_transform
+from sbi.neural_nets.estimators.shape_handling import (
+    reshape_to_batch_event,
+    reshape_to_sample_batch_event,
+)
+from sbi.utils.sbiutils import within_support
+from sbi.utils.torchutils import ensure_theta_batched
+from zuko.transforms import FreeFormJacobianTransform
 
 
-def score_estimator_based_potential_gradient(
+def score_estimator_based_potential(
     score_estimator: ConditionalScoreEstimator,
     prior: Optional[Distribution],
     x_o: Optional[Tensor],
     enable_transform: bool = False,
-) -> Tuple["PosteriorScoreBasedPotentialGradient", TorchTransform]:
+) -> Tuple["PosteriorScoreBasedPotential", TorchTransform]:
     r"""Returns the potential function gradient for score estimators.
 
     Args:
@@ -26,11 +33,10 @@ def score_estimator_based_potential_gradient(
         prior: The prior distribution.
         x_o: The observed data at which to evaluate the score.
         enable_transform: Whether to enable transforms. Not supported yet.
-
     """
     device = str(next(score_estimator.parameters()).device)
 
-    potential_fn = PosteriorScoreBasedPotentialGradient(
+    potential_fn = PosteriorScoreBasedPotential(
         score_estimator, prior, x_o, device=device
     )
 
@@ -49,7 +55,7 @@ def score_estimator_based_potential_gradient(
     return potential_fn, theta_transform
 
 
-class PosteriorScoreBasedPotentialGradient(BasePotentialGradient):
+class PosteriorScoreBasedPotential(BasePotential):
     def __init__(
         self,
         score_estimator: ConditionalScoreEstimator,
@@ -76,18 +82,74 @@ class PosteriorScoreBasedPotentialGradient(BasePotentialGradient):
         self.iid_method = iid_method
 
     def __call__(
-        self, theta: Tensor, time: Tensor, track_gradients: bool = True
+        self,
+        theta: Tensor,
+        track_gradients: bool = True,
+        atol: float = 1e-5,
+        rtol: float = 1e-6,
+        exact: bool = True,
+    ):
+        """Return the potential via probability flow ODE."""
+        theta = ensure_theta_batched(torch.as_tensor(theta))
+        theta_density_estimator = reshape_to_sample_batch_event(
+            theta, theta.shape[1:], leading_is_sample=True
+        )
+        x_density_estimator = reshape_to_batch_event(
+            self.x_o, event_shape=self.score_estimator.condition_shape
+        )
+        assert (
+            x_density_estimator.shape[0] == 1
+        ), ".log_prob() supports only `batchsize == 1`."
+
+        self.score_estimator.eval()
+
+        # Compute the base density
+        mean_T = self.score_estimator.mean_T
+        std_T = self.score_estimator.std_T
+        base_density = torch.distributions.Normal(mean_T, std_T)
+        for _ in range(len(self.score_estimator.input_shape)):
+            base_density = torch.distributions.Independent(base_density, 1)
+        # Build the freeform jacobian transformation by probability flow ODEs
+        transform = build_freeform_jacobian_transform(
+            self.score_estimator, x_density_estimator, atol=atol, rtol=rtol, exact=exact
+        )
+
+        with torch.set_grad_enabled(track_gradients):
+            eps_samples, logabsdet = transform.inv.call_and_ladj(  # type: ignore
+                theta_density_estimator
+            )
+            base_log_prob = base_density.log_prob(eps_samples)
+            log_probs = base_log_prob - logabsdet
+            log_probs = log_probs.squeeze(-1)
+
+            # Force probability to be zero outside prior support.
+            in_prior_support = within_support(self.prior, theta)
+
+            masked_log_prob = torch.where(
+                in_prior_support,
+                log_probs,
+                torch.tensor(float("-inf"), dtype=torch.float32, device=self.device),
+            )
+            return masked_log_prob
+
+    def gradient(
+        self, theta: Tensor, time: Optional[Tensor] = None, track_gradients: bool = True
     ) -> Tensor:
         r"""Returns the potential function gradient for score-based methods.
 
         Args:
             theta: The parameters at which to evaluate the potential.
-            diffusion_time: The diffusion time.
+            diffusion_time: The diffusion time. If None, then `T_min` of the
+                self.score_estimator is used (i.e. we evaluate the gradient of the
+                actual data distribution).
             track_gradients: Whether to track gradients.
 
         Returns:
             The potential function.
         """
+        if time is None:
+            time=torch.tensor([self.score_estimator.T_min])
+
         if self._x_o is None:
             raise ValueError(
                 "No observed data x_o is available. Please reinitialize \
@@ -119,6 +181,32 @@ class PosteriorScoreBasedPotentialGradient(BasePotentialGradient):
                     )
 
         return score
+    
+
+def build_freeform_jacobian_transform(
+    score_estimator, x_o: Tensor, atol: float = 1e-5, rtol: float = 1e-6, exact: bool = True
+):
+    # Create a freeform jacobian transformation
+    phi = score_estimator.parameters()
+
+    def f(t, x):
+        score = score_estimator(input=x, condition=x_o, time=t)
+        f = score_estimator.drift_fn(x, t)
+        g = score_estimator.diffusion_fn(x, t)
+        v = f - 0.5 * g**2 * score
+        return v
+
+    transform = FreeFormJacobianTransform(
+        f=f,
+        t0=score_estimator.T_min,
+        t1=score_estimator.T_max,
+        phi=phi,
+        atol=atol,
+        rtol=rtol,
+        exact=exact,
+    )
+
+    return transform
 
 
 def _iid_bridge(

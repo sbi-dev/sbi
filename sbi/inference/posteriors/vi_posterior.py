@@ -11,7 +11,7 @@ from torch import Tensor
 from torch.distributions import Distribution
 from tqdm.auto import tqdm
 
-from sbi.inference.posteriors.base_posterior import NeuralPotentialPosterior
+from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.samplers.vi import (
     adapt_variational_distribution,
@@ -33,7 +33,7 @@ from sbi.utils.sbiutils import mcmc_transform
 from sbi.utils.torchutils import atleast_2d_float32_tensor, ensure_theta_batched
 
 
-class VIPosterior(NeuralPotentialPosterior):
+class VIPosterior(NeuralPosterior):
     r"""Provides VI (Variational Inference) to sample from the posterior.<br/><br/>
     SNLE or SNRE train neural networks to approximate the likelihood(-ratios).
     `VIPosterior` allows to learn a tractable variational posterior $q(\theta)$ which

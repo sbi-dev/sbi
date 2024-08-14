@@ -34,6 +34,9 @@ class BasePotential(metaclass=ABCMeta):
     @abstractmethod
     def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
         raise NotImplementedError
+    
+    def gradient(self, theta: Tensor, time: Optional[Tensor] = None, track_gradients: bool = True) -> Tensor:
+        raise NotImplementedError
 
     @property
     def x_is_iid(self) -> bool:
@@ -75,24 +78,6 @@ class BasePotential(metaclass=ABCMeta):
         `self._x_o` is `None`.
         """
         return self._x_o
-
-
-class BasePotentialGradient(BasePotential):
-    def __init__(
-        self,
-        prior: Optional[Distribution],
-        x_o: Optional[Tensor] = None,
-        device: str = "cpu",
-    ):
-        """Conceptually the same as `BasePotential`, but does not return a scalar
-        potential value, but the gradient of a scalar potential function.
-
-        Args:
-            prior: Prior distribution.
-            x_o: Observed data.
-            device: Device on which to evaluate the potential function.
-        """
-        super().__init__(prior, x_o, device)
 
 
 class CallablePotentialWrapper(BasePotential):

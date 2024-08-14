@@ -5,7 +5,7 @@ import torch
 from torch import Tensor
 
 from sbi.inference.potentials.score_based_potential import (
-    PosteriorScoreBasedPotentialGradient,
+    PosteriorScoreBasedPotential,
 )
 from sbi.neural_nets.estimators.score_estimator import (
     VEScoreEstimator,
@@ -15,7 +15,7 @@ PREDICTORS = {}
 
 
 def get_predictor(
-    name: str, score_based_potential: PosteriorScoreBasedPotentialGradient, **kwargs
+    name: str, score_based_potential: PosteriorScoreBasedPotential, **kwargs
 ) -> "Predictor":
     """Helper function to get predictor by name.
 
@@ -49,14 +49,14 @@ def register_predictor(name: str) -> Callable:
 class Predictor(ABC):
     def __init__(
         self,
-        score_fn: PosteriorScoreBasedPotentialGradient,
+        potential_fn: PosteriorScoreBasedPotential,
     ):
-        self.score_fn = score_fn
-        self.device = score_fn.device
+        self.potential_fn = potential_fn
+        self.device = potential_fn.device
 
         # Extract relevant functions from the score function
-        self.drift = self.score_fn.score_estimator.drift_fn
-        self.diffusion = self.score_fn.score_estimator.diffusion_fn
+        self.drift = self.potential_fn.score_estimator.drift_fn
+        self.diffusion = self.potential_fn.score_estimator.diffusion_fn
 
     def __call__(self, theta: Tensor, t1: Tensor, t0: Tensor) -> Tensor:
         return self.predict(theta, t1, t0)
@@ -70,20 +70,20 @@ class Predictor(ABC):
 class EulerMaruyama(Predictor):
     def __init__(
         self,
-        score_fn: PosteriorScoreBasedPotentialGradient,
+        potential_fn: PosteriorScoreBasedPotential,
         eta: float = 1.0,
     ):
         """Simple Euler-Maruyama discretization of the associated family of reverse
         SDEs.
 
         Args:
-            score_fn (ScoreBasedPotential): Score-based potential to predict.
+            potential_fn (ScoreBasedPotential): Score-based potential to predict.
             eta (float, optional): Mediates how much noise is added during sampling i.e.
                 for values approaching 0 this becomes the deterministic probabilifty
                 flow ODE. For large values it becomes a more stochastic reverse SDE.
                 Defaults to 1.0.
         """
-        super().__init__(score_fn)
+        super().__init__(potential_fn)
         assert eta > 0, "eta must be positive."
         self.eta = eta
 
@@ -92,7 +92,7 @@ class EulerMaruyama(Predictor):
         dt_sqrt = torch.sqrt(dt)
         f = self.drift(theta, t1)
         g = self.diffusion(theta, t1)
-        score = self.score_fn(theta, t1)
+        score = self.potential_fn.gradient(theta, t1)
         f_backward = f - (1 + self.eta**2) / 2 * g**2 * score
         g_backward = self.eta * g
         return theta - f_backward * dt + g_backward * torch.randn_like(theta) * dt_sqrt
@@ -112,18 +112,18 @@ def ve_default_bridge(alpha, alpha_new, std, std_new, t1, t0):
 class DDIM(Predictor):
     def __init__(
         self,
-        score_fn: PosteriorScoreBasedPotentialGradient,
+        potential_fn: PosteriorScoreBasedPotential,
         std_bridge: Optional[Callable] = None,
         eta: float = 1.0,
     ):
-        super().__init__(score_fn)
-        self.alpha_fn = score_fn.score_estimator.mean_t_fn
-        self.std_fn = score_fn.score_estimator.std_fn
+        super().__init__(potential_fn)
+        self.alpha_fn = potential_fn.score_estimator.mean_t_fn
+        self.std_fn = potential_fn.score_estimator.std_fn
         self.eta = eta
 
         if std_bridge is not None:
             self.std_bridge = std_bridge
-        elif isinstance(self.score_fn.score_estimator, VEScoreEstimator):
+        elif isinstance(self.potential_fn.score_estimator, VEScoreEstimator):
             self.std_bridge = ve_default_bridge
         else:
             self.std_bridge = vp_default_bridge
@@ -139,7 +139,7 @@ class DDIM(Predictor):
         # We require that std_bridge >= std! Otherwise NANs will be produced
         std_bridge = torch.clip(std_bridge, max=std_new)
 
-        score = self.score_fn(theta, t1)
+        score = self.potential_fn.gradient(theta, t1)
         # Predicted Gaussian noise
         eps_pred = -std * score
         # Predicted clean sample (without noise, Tweedie's formula)
