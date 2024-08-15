@@ -412,7 +412,7 @@ def posterior_score_nn(
             nn.Identity().
 
     Returns:
-        Constructor function for NSPE.
+        Constructor function for NPSE.
     """
 
     kwargs = dict(

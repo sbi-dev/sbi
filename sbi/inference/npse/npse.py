@@ -48,12 +48,12 @@ class NPSE(NeuralInference):
     ):
         """Base class for Neural Posterior Score Estimation methods.
 
-        Instead of performing conditonal *density* estimation, NSPE methods perform
+        Instead of performing conditonal *density* estimation, NPSE methods perform
         conditional *score* estimation i.e. they estimate the gradient of the log
         density using denoising score matching loss. We not only estimate the score
         of the posterior, but a family of distributions analogous to diffusion models.
 
-        NOTE: Single-round NSPE is currently the only supported mode.
+        NOTE: Single-round NPSE is currently the only supported mode.
 
         Args:
             prior: Prior distribution.
@@ -146,7 +146,7 @@ class NPSE(NeuralInference):
             current_round = 0
         else:
             raise NotImplementedError(
-                "Multi-round NSPE is not yet implemented. Please use single-round NSPE."
+                "Multi-round NPSE is not yet implemented. Please use single-round NPSE."
             )
 
         if exclude_invalid_x is None:
@@ -477,34 +477,20 @@ class NPSE(NeuralInference):
         prior: Optional[Distribution] = None,
         sample_with: str = "sde",
     ) -> Union[ScorePosterior, DirectPosterior]:
-        r"""Build posterior from the neural density estimator.
+        r"""Build posterior from the score estimator.
 
-        For SNPE, the posterior distribution that is returned here implements the
+        For NPSE, the posterior distribution that is returned here implements the
         following functionality over the raw neural density estimator:
         - correct the calculation of the log probability such that it compensates for
             the leakage.
         - reject samples that lie outside of the prior bounds.
-        - alternatively, if leakage is very high (which can happen for multi-round
-            SNPE), sample from the posterior with MCMC.
-
+        
         Args:
-            estimator: The density estimator that the posterior is based on.
-                If `None`, use the latest neural density estimator that was trained.
+            score_estimator: The score estimator that the posterior is based on.
+                If `None`, use the latest neural score estimator that was trained.
             prior: Prior distribution.
-            sample_with: Method to use for sampling from the posterior. Must be one of
-                [`direct` | `mcmc` | `rejection` | `vi`].
-            mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`,
-                `hmc`, `nuts`. Currently defaults to `slice_np` for a custom numpy
-                implementation of slice sampling; select `hmc`, `nuts` or `slice` for
-                Pyro-based sampling.
-            vi_method: Method used for VI, one of [`rKL`, `fKL`, `IW`, `alpha`]. Note
-                some of the methods admit a `mode seeking` property (e.g. rKL) whereas
-                some admit a `mass covering` one (e.g fKL).
-            direct_sampling_parameters: Additional kwargs passed to `DirectPosterior`.
-            mcmc_parameters: Additional kwargs passed to `MCMCPosterior`.
-            vi_parameters: Additional kwargs passed to `VIPosterior`.
-            rejection_sampling_parameters: Additional kwargs passed to
-                `RejectionPosterior`.
+            sample_with: Method to use for sampling from the posterior. Currently only
+                sampling via 'sde' is available.                
 
         Returns:
             Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods
@@ -513,7 +499,7 @@ class NPSE(NeuralInference):
         if prior is None:
             assert self._prior is not None, (
                 "You did not pass a prior. You have to pass the prior either at "
-                "initialization `inference = SNPE(prior)` or to "
+                "initialization `inference = NPSE(prior)` or to "
                 "`.build_posterior(prior=prior)`."
             )
             prior = self._prior
@@ -527,7 +513,7 @@ class NPSE(NeuralInference):
         else:
             assert score_estimator is not None, (
                 "You did not pass a score estimator. You have to pass the score "
-                "estimator either at initialization `inference = SNPE(score_estimator)`"
+                "estimator either at initialization `inference = NPSE(score_estimator)`"
                 "or to `.build_posterior(score_estimator=score_estimator)`."
             )
             score_estimator = score_estimator
@@ -558,7 +544,7 @@ class NPSE(NeuralInference):
         masks: Tensor,
         proposal: Optional[Any],
     ) -> Tensor:
-        raise NotImplementedError("Multi-round NSPE is not yet implemented.")
+        raise NotImplementedError("Multi-round NPSE is not yet implemented.")
 
     def _loss(
         self,
@@ -569,7 +555,8 @@ class NPSE(NeuralInference):
         calibration_kernel: Callable,
         force_first_round_loss: bool = False,
     ) -> Tensor:
-        """Return loss with proposal correction (`round_>0`) or without it (`round_=0`).
+        """Return loss from score estimator. Currently only single-round NPSE
+         is implemented, i.e., no proposal correction is applied for later rounds.
 
         The loss is the negative log prob. Irrespective of the round or SNPE method
         (A, B, or C), it can be weighted with a calibration kernel.
@@ -584,7 +571,7 @@ class NPSE(NeuralInference):
             # First round loss.
             loss = self._neural_net.loss(theta, x)
         else:
-            # TODO: Implement proposal correction for multi-round SNSPE.
+            # TODO: Implement proposal correction for multi-round SNPSE.
             loss = self._loss_proposal_posterior(theta, x, masks, proposal)
 
         return calibration_kernel(x) * loss
