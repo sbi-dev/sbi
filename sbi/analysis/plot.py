@@ -2,6 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import collections
+import copy
 import logging
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union, cast
 from warnings import warn
@@ -81,7 +82,7 @@ def plt_hist_1d(
     diag_kwargs: Dict,
 ) -> None:
     """Plot 1D histogram."""
-    hist_kwargs = diag_kwargs["mpl_kwargs"].copy()
+    hist_kwargs = copy.deepcopy(diag_kwargs["mpl_kwargs"])
     if "bins" not in hist_kwargs or hist_kwargs["bins"] is None:
         if diag_kwargs["bin_heuristic"] == "Freedman-Diaconis":
             # The Freedman-Diaconis heuristic
@@ -127,7 +128,7 @@ def plt_hist_2d(
     limits_row: torch.Tensor,
     offdiag_kwargs: Dict,
 ):
-    hist_kwargs = offdiag_kwargs.copy()
+    hist_kwargs = copy.deepcopy(offdiag_kwargs)
     """Plot 2D histogram."""
     if (
         "bins" not in hist_kwargs["np_hist_kwargs"]
@@ -931,7 +932,6 @@ def _get_default_offdiag_kwargs(offdiag: Optional[str], i: int = 0) -> Dict:
                 "edgecolor": "white",
                 "alpha": 0.5,
                 "rasterized": False,
-                "aspect": "auto",
             }
         }
     elif offdiag == "contour" or offdiag == "contourf":
@@ -942,7 +942,6 @@ def _get_default_offdiag_kwargs(offdiag: Optional[str], i: int = 0) -> Dict:
             "percentile": True,
             "mpl_kwargs": {
                 "colors": plt.rcParams["axes.prop_cycle"].by_key()["color"][i * 2],  # pyright: ignore[reportOptionalMemberAccess]
-                "aspect": "auto",
             },
         }
     elif offdiag == "plot":
