@@ -99,6 +99,8 @@ def c2st(
         X_std = torch.std(X, dim=0)
         # Set std to 1 if it is close to zero.
         X_std[X_std < 1e-14] = 1
+        assert not torch.any(torch.isnan(X_mean)), "X_mean contains NaNs"
+        assert not torch.any(torch.isnan(X_std)), "X_std contains NaNs"
         X = (X - X_mean) / X_std
         Y = (Y - X_mean) / X_std
 

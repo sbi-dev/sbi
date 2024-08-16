@@ -1,23 +1,23 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
-from typing import Optional, Tuple, Union
+from typing import Optional, Tuple
 
 import torch
 from torch import Tensor
 from torch.distributions import Distribution
+from zuko.transforms import FreeFormJacobianTransform
 
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.neural_nets.estimators.score_estimator import ConditionalScoreEstimator
-from sbi.sbi_types import TorchTransform
-from sbi.utils import mcmc_transform
 from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
     reshape_to_sample_batch_event,
 )
+from sbi.sbi_types import TorchTransform
+from sbi.utils import mcmc_transform
 from sbi.utils.sbiutils import within_support
 from sbi.utils.torchutils import ensure_theta_batched
-from zuko.transforms import FreeFormJacobianTransform
 
 
 def score_estimator_based_potential(
@@ -148,7 +148,7 @@ class PosteriorScoreBasedPotential(BasePotential):
             The potential function.
         """
         if time is None:
-            time=torch.tensor([self.score_estimator.T_min])
+            time = torch.tensor([self.score_estimator.T_min])
 
         if self._x_o is None:
             raise ValueError(
@@ -181,10 +181,14 @@ class PosteriorScoreBasedPotential(BasePotential):
                     )
 
         return score
-    
+
 
 def build_freeform_jacobian_transform(
-    score_estimator, x_o: Tensor, atol: float = 1e-5, rtol: float = 1e-6, exact: bool = True
+    score_estimator,
+    x_o: Tensor,
+    atol: float = 1e-5,
+    rtol: float = 1e-6,
+    exact: bool = True,
 ):
     # Create a freeform jacobian transformation
     phi = score_estimator.parameters()

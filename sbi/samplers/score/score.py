@@ -37,9 +37,7 @@ class Diffuser:
             corrector_params (optional): _description_. Defaults to None.
         """
         # Set predictor and corrector
-        self.set_predictor(
-            predictor, score_based_potential, **(predictor_params or {})
-        )
+        self.set_predictor(predictor, score_based_potential, **(predictor_params or {}))
         self.set_corrector(corrector, **(corrector_params or {}))
         self.device = self.predictor.device
 
@@ -53,10 +51,10 @@ class Diffuser:
 
         # Extract relevant shapes from the score function
         self.input_shape = score_based_potential.score_estimator.input_shape
-        self.condition_shape = (
-            score_based_potential.score_estimator.condition_shape
-        )
+        self.condition_shape = score_based_potential.score_estimator.condition_shape
         condition_dim = len(self.condition_shape)
+        # TODO: this is the iid setting and we don't want to generate num_obs samples,
+        # but only one sample given the condition.
         self.batch_shape = score_based_potential.x_o.shape[:-condition_dim]
 
     def set_predictor(
@@ -92,10 +90,17 @@ class Diffuser:
         Returns:
             Tensor: _description_
         """
-        num_batch = self.batch_shape.numel()
-        eps = torch.randn(
-            (num_batch, num_samples) + self.input_shape, device=self.device
-        )
+        # TODO: for iid setting, self.batch_shape.numel() will be the iid-batch. But we
+        # don't want to generate num_obs samples, but only one sample given the the iid
+        # batch.
+        # TODO: this fixes the iid setting shape problems, but iid inference via
+        # iid_bridge is not accurate.
+        # num_batch = self.batch_shape.numel()
+        # init_shape = (num_batch, num_samples) + self.input_shape
+        init_shape = (
+            num_samples,
+        ) + self.input_shape  # just use num_samples, not num_batch
+        eps = torch.randn(init_shape, device=self.device)
         mean, std, eps = torch.broadcast_tensors(self.init_mean, self.init_std, eps)
         return mean + std * eps
 

@@ -1,7 +1,6 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
-from functools import partial
 from typing import Dict, Optional, Union
 
 import torch
@@ -10,13 +9,12 @@ from torch.distributions import Distribution
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials.score_based_potential import (
+    PosteriorScoreBasedPotential,
     score_estimator_based_potential,
-    PosteriorScoreBasedPotential
 )
 from sbi.neural_nets.estimators.score_estimator import ConditionalScoreEstimator
 from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
-    reshape_to_sample_batch_event,
 )
 from sbi.samplers.score.correctors import Corrector
 from sbi.samplers.score.predictors import Predictor
@@ -32,11 +30,15 @@ class ScorePosterior(NeuralPosterior):
     outside of the prior bounds.
 
     The posterior is defined by a score estimator and a prior. The score estimator
-    provides the gradient of the log-posterior with respect to the parameters. The
-    prior is used to reject samples that lie outside of the prior bounds.
+    provides the gradient of the log-posterior with respect to the parameters. The prior
+    is used to reject samples that lie outside of the prior bounds.
 
-    NOTE: The `log_prob()` method is not implemented yet. It will be implemented in a
-    future release using the probability flow ODEs.
+    Sampling is done by running a diffusion process with a predictor and optionally a
+    corrector.
+
+    Log probabilities are obtained by calling the potential function, which in turn uses
+    zuko probabilistic ODEs to compute the log-probability.
+
     """
 
     def __init__(
@@ -45,7 +47,6 @@ class ScorePosterior(NeuralPosterior):
         prior: Distribution,
         max_sampling_batch_size: int = 10_000,
         device: Optional[str] = None,
-        x_shape: Optional[torch.Size] = None,
         enable_transform: bool = False,
     ):
         """
@@ -56,8 +57,6 @@ class ScorePosterior(NeuralPosterior):
                 the proposal at every iteration.
             device: Training device, e.g., "cpu", "cuda" or "cuda:0". If None,
                 `potential_fn.device` is used.
-            x_shape: Shape of a single simulator output. If passed, it is used to check
-                the shape of the observed data and give a descriptive error.
             enable_transform: Whether to transform parameters to unconstrained space
                 during MAP optimization. When False, an identity transform will be
                 returned for `theta_transform`. True is not supported yet.
@@ -74,8 +73,9 @@ class ScorePosterior(NeuralPosterior):
             potential_fn=potential_fn,
             theta_transform=theta_transform,
             device=device,
-            x_shape=x_shape,
         )
+        # Set the potential function type.
+        self.potential_fn: PosteriorScoreBasedPotential = potential_fn
 
         self.prior = prior
         self.score_estimator = score_estimator
@@ -104,9 +104,13 @@ class ScorePosterior(NeuralPosterior):
         Args:
             sample_shape: Shape of the samples to be drawn.
             x: Deprecated - use `.set_default_x()` prior to `.sample()`.
-            method: Method to use for sampling. Currently, only "euler_maruyma" is
-                supported.
+            predictor: The predictor for the diffusion-based sampler. Can be a string or
+                a custom predictor following the API in `sbi.samplers.score.predictors`.
+            corrector: The corrector for the diffusion-based sampler. Can be None or a
+                custom corrector following the API in `sbi.samplers.score.correctors`.
             steps: Number of steps to take for the Euler-Maruyama method.
+            ts: Time points at which to evaluate the diffusion process. If None, a
+                linear grid between T_max and T_min is used.
             max_sampling_batch_size: Maximum batch size for sampling.
             sample_with: Deprecated - use `.build_posterior(sample_with=...)` prior to
                 `.sample()`.
@@ -138,7 +142,11 @@ class ScorePosterior(NeuralPosterior):
             ts = torch.linspace(T_max, T_min, steps)
 
         diffuser = Diffuser(
-            self.potential_fn, predictor=predictor, corrector=corrector
+            self.potential_fn,
+            predictor=predictor,
+            corrector=corrector,
+            predictor_params=predictor_params,
+            corrector_params=corrector_params,
         )
         max_sampling_batch_size = min(max_sampling_batch_size, num_samples)
         samples = []
@@ -158,7 +166,7 @@ class ScorePosterior(NeuralPosterior):
 
         return samples.reshape(sample_shape + self.score_estimator.input_shape)
 
-    def log_prob( 
+    def log_prob(
         self,
         theta: Tensor,
         x: Optional[Tensor] = None,
@@ -188,7 +196,11 @@ class ScorePosterior(NeuralPosterior):
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
         return self.potential_fn(
-            theta.to(self._device), track_gradients=track_gradients, atol=atol, rtol=rtol, exact=exact
+            theta.to(self._device),
+            track_gradients=track_gradients,
+            atol=atol,
+            rtol=rtol,
+            exact=exact,
         )
 
     def sample_batched(
@@ -201,7 +213,6 @@ class ScorePosterior(NeuralPosterior):
         raise NotImplementedError(
             "Batched sampling is not implemented for ScorePosterior."
         )
-
 
     def map(
         self,
@@ -234,6 +245,9 @@ class ScorePosterior(NeuralPosterior):
             x: Deprecated - use `.set_default_x()` prior to `.map()`.
             num_iter: Number of optimization steps that the algorithm takes
                 to find the MAP.
+            num_to_optimize: From the drawn `num_init_samples`, use the
+                `num_to_optimize` with highest log-probability as the initial points
+                for the optimization.
             learning_rate: Learning rate of the optimizer.
             init_method: How to select the starting parameters for the optimization. If
                 it is a string, it can be either [`posterior`, `prior`], which samples
@@ -241,9 +255,6 @@ class ScorePosterior(NeuralPosterior):
                 tensor, the tensor will be used as init locations.
             num_init_samples: Draw this number of samples from the posterior and
                 evaluate the log-probability of all of them.
-            num_to_optimize: From the drawn `num_init_samples`, use the
-                `num_to_optimize` with highest log-probability as the initial points
-                for the optimization.
             save_best_every: The best log-probability is computed, saved in the
                 `map`-attribute, and printed every `save_best_every`-th iteration.
                 Computing the best log-probability creates a significant overhead
@@ -252,8 +263,6 @@ class ScorePosterior(NeuralPosterior):
                 the posterior.
             force_update: Whether to re-calculate the MAP when x is unchanged and
                 have a cached value.
-            log_prob_kwargs: Will be empty for SNLE and SNRE. Will contain
-                {'norm_posterior': True} for SNPE.
 
         Returns:
             The MAP estimate.

@@ -48,7 +48,7 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         gradient of the density p(xt|x0).
 
         Args:
-            net: Score estimator neural network, should take a list [input, condition,
+            net: Score estimator neural network with call signature: input, condition,
                 and time (in [0,1])].
             condition_shape: Shape of the conditioning variable.
             weight_fn: Function to compute the weights over time. Can be one of the
@@ -88,8 +88,8 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         at a given time.
 
         Args:
-            input: Original data, x0.
-            condition: Conditioning variable.
+            input: Original data, x0. (input_batch_shape, *input_shape)
+            condition: Conditioning variable. (condition_batch_shape, *condition_shape)
             times: SDE time variable in [0,1].
 
         Returns:

@@ -12,12 +12,12 @@ from torch.distributions import MultivariateNormal, Uniform
 
 from sbi.analysis import sbc_rank_plot
 from sbi.diagnostics import check_sbc, get_nltp, run_sbc
-from sbi.inference import SNLE, SNPE, simulate_for_sbi
+from sbi.inference import NPSE, SNLE, SNPE
+from sbi.simulators import linear_gaussian
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
 )
 from sbi.utils import BoxUniform, MultipleIndependent
-from sbi.utils.user_input_checks import process_prior, process_simulator
 from tests.test_utils import PosteriorPotential, TractablePosterior
 
 
@@ -29,11 +29,10 @@ from tests.test_utils import PosteriorPotential, TractablePosterior
         (SNPE, None),
         pytest.param(SNLE, "mcmc", marks=pytest.mark.mcmc),
         pytest.param(SNLE, "vi", marks=pytest.mark.mcmc),
+        (NPSE, None),
     ),
 )
-def test_running_sbc(
-    method, prior, reduce_fn_str, sampler, mcmc_params_accurate: dict, model="mdn"
-):
+def test_running_sbc(method, prior, reduce_fn_str, sampler, mcmc_params_accurate: dict):
     """Tests running inference and then SBC and obtaining nltp."""
 
     num_dim = 2
@@ -53,18 +52,12 @@ def test_running_sbc(
     likelihood_shift = -1.0 * ones(num_dim)
     likelihood_cov = 0.3 * eye(num_dim)
 
-    def simulator(theta):
-        return linear_gaussian(theta, likelihood_shift, likelihood_cov)
+    theta = prior.sample((num_simulations,))
+    x = linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    inferer = method(prior, show_progress_bars=False, density_estimator=model)
+    inferer = method(prior, show_progress_bars=False)
 
-    prior, _, prior_returns_numpy = process_prior(prior)
-    simulator = process_simulator(simulator, prior, prior_returns_numpy)
-    theta, x = simulate_for_sbi(simulator, prior, num_simulations)
-
-    _ = inferer.append_simulations(theta, x).train(
-        training_batch_size=100, max_num_epochs=max_num_epochs
-    )
+    inferer.append_simulations(theta, x).train(max_num_epochs=max_num_epochs)
     if method == SNLE:
         posterior_kwargs = {
             "sample_with": "mcmc" if sampler == "mcmc" else "vi",
@@ -77,7 +70,7 @@ def test_running_sbc(
     posterior = inferer.build_posterior(**posterior_kwargs)
 
     thetas = prior.sample((num_sbc_runs,))
-    xs = simulator(thetas)
+    xs = linear_gaussian(thetas, likelihood_shift, likelihood_cov)
 
     reduce_fn = "marginals" if reduce_fn_str == "marginals" else posterior.log_prob
     run_sbc(

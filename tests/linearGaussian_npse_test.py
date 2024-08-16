@@ -18,10 +18,8 @@ from .test_utils import check_c2st, get_dkl_gaussian_prior
 
 @pytest.mark.slow
 @pytest.mark.parametrize("sde_type", ["vp", "ve", "subvp"])
-@pytest.mark.parametrize(
-    "num_dim, prior_str",
-    ((2, "gaussian"), (2, "uniform"), (1, "gaussian")),
-)
+@pytest.mark.parametrize("prior_str", ["gaussian", "uniform"])
+@pytest.mark.parametrize("num_dim", [1, 2])
 def test_c2st_npse_on_linearGaussian(sde_type, num_dim: int, prior_str: str):
     """Test whether NPSE infers well a simple example with available ground truth."""
 
@@ -65,9 +63,6 @@ def test_c2st_npse_on_linearGaussian(sde_type, num_dim: int, prior_str: str):
 
     # Compute the c2st and assert it is near chance level of 0.5.
     check_c2st(samples, target_samples, alg=f"npse-{sde_type}-{prior_str}-{num_dim}D")
-
-    map_ = posterior.map(show_progress_bars=True)
-    assert torch.allclose(map_, gt_posterior.mean, atol=0.2)
 
     # Checks for log_prob()
     if prior_str == "gaussian":
@@ -145,120 +140,75 @@ def test_c2st_npse_on_linearGaussian_different_dims():
     check_c2st(samples, target_samples, alg="npse_different_dims_and_resume_training")
 
 
-# @pytest.mark.slow
-# @pytest.mark.mcmc
-# def test_sample_conditional(mcmc_params_accurate: dict):
-#     """
-#     Test whether sampling from the conditional gives the same results as
-#     evaluating.
+@pytest.mark.xfail(reason="iid_bridge not working.")
+@pytest.mark.parametrize("num_trials", [2, 10])
+def test_npse_iid_inference(num_trials):
+    """Test whether NPSE infers well a simple example with available ground truth."""
 
-#     This compares samples that get smoothed with a Gaussian kde to evaluating
-#     the conditional log-probability with `eval_conditional_density`.
+    num_dim = 2
+    x_o = zeros(num_trials, num_dim)
+    num_samples = 1000
+    num_simulations = 3000
 
-#     `eval_conditional_density` is itself tested in `sbiutils_test.py`. Here, we
-#     use a bimodal posterior to test the conditional.
+    # likelihood_mean will be likelihood_shift+theta
+    likelihood_shift = -1.0 * ones(num_dim)
+    likelihood_cov = 0.3 * eye(num_dim)
 
-#     NOTE: The comparison between conditional log_probs obtained from the MCMC
-#     posterior and from analysis.eval_conditional_density can be gamed by
-#     underfitting the posterior estimator, i.e., by using a small number of
-#     simulations.
-#     """
+    prior_mean = zeros(num_dim)
+    prior_cov = eye(num_dim)
+    prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
+    gt_posterior = true_posterior_linear_gaussian_mvn_prior(
+        x_o, likelihood_shift, likelihood_cov, prior_mean, prior_cov
+    )
+    target_samples = gt_posterior.sample((num_samples,))
 
-#     num_dim = 3
-#     dim_to_sample_1 = 0
-#     dim_to_sample_2 = 2
-#     num_simulations = 5500
-#     num_conditional_samples = 1000
-#     num_conditions = 50
+    inference = NPSE(prior, show_progress_bars=True)
 
-#     x_o = zeros(1, num_dim)
+    theta = prior.sample((num_simulations,))
+    x = linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-#     likelihood_shift = -1.0 * ones(num_dim)
-#     likelihood_cov = 0.05 * eye(num_dim)
+    score_estimator = inference.append_simulations(theta, x).train(
+        training_batch_size=100,
+    )
+    posterior = inference.build_posterior(score_estimator)
+    posterior.set_default_x(x_o)
+    samples = posterior.sample((num_samples,))
 
-#     prior = utils.BoxUniform(-2.0 * ones(num_dim), 2.0 * ones(num_dim))
+    # Compute the c2st and assert it is near chance level of 0.5.
+    check_c2st(
+        samples, target_samples, alg=f"npse-vp-gaussian-1D-{num_trials}iid-trials"
+    )
 
-#     # TODO: janfb does not see how this setup results in a bi-model posterior.
-#     def simulator(theta):
-#         batch_size, _ = theta.shape
-#         # create -1 1 mask for bimodality
-#         mask = ones(batch_size, 1)
-#         # set mask to -1 randomly across the batch
-#         mask = mask * 2 * (rand(batch_size, 1) > 0.5) - 1
 
-#         # Sample bi-modally by applying a 1-(-1) mask to the likelihood shift.
-#         return linear_gaussian(theta, mask * likelihood_shift, likelihood_cov)
+@pytest.mark.slow
+@pytest.mark.xfail(
+    raises=AssertionError, reason="MAP optimization via score not working accurately."
+)
+def test_npse_map():
+    num_dim = 2
+    x_o = zeros(num_dim)
+    num_simulations = 3000
 
-# # Test whether SNPE works properly with structured z-scoring.
-# net = posterior_nn("maf", z_score_x="structured", hidden_features=20)
+    # likelihood_mean will be likelihood_shift+theta
+    likelihood_shift = -1.0 * ones(num_dim)
+    likelihood_cov = 0.3 * eye(num_dim)
 
-# inference = SNPE_C(prior, density_estimator=net, show_progress_bars=True)
+    prior_mean = zeros(num_dim)
+    prior_cov = eye(num_dim)
+    prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
+    gt_posterior = true_posterior_linear_gaussian_mvn_prior(
+        x_o, likelihood_shift, likelihood_cov, prior_mean, prior_cov
+    )
+    inference = NPSE(prior, show_progress_bars=True)
 
-# # We need a pretty big dataset to properly model the bimodality.
-# theta = prior.sample((num_simulations,))
-# x = simulator(theta)
-# posterior_estimator = inference.append_simulations(theta, x).train(
-#     training_batch_size=1000, max_num_epochs=60
-# )
+    theta = prior.sample((num_simulations,))
+    x = linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-# # generate conditions
-# posterior = DirectPosterior(
-#     prior=prior, posterior_estimator=posterior_estimator
-# ).set_default_x(x_o)
-# samples = posterior.sample((num_conditions,))
+    inference.append_simulations(theta, x).train(
+        training_batch_size=100, max_num_epochs=10
+    )
+    posterior = inference.build_posterior().set_default_x(x_o)
 
-# # Evaluate the conditional density be drawing samples and smoothing with a Gaussian
-# # kde.
-# potential_fn, theta_transform = posterior_estimator_based_potential(
-#     posterior_estimator, prior=prior, x_o=x_o
-# )
-# (
-#     conditioned_potential_fn,
-#     restricted_tf,
-#     restricted_prior,
-# ) = conditional_potential(
-#     potential_fn=potential_fn,
-#     theta_transform=theta_transform,
-#     prior=prior,
-#     condition=samples[0],
-#     dims_to_sample=[dim_to_sample_1, dim_to_sample_2],
-# )
-# mcmc_posterior = MCMCPosterior(
-#     potential_fn=conditioned_potential_fn,
-#     theta_transform=restricted_tf,
-#     proposal=restricted_prior,
-#     method="slice_np_vectorized",
-#     **mcmc_params_accurate,
-# )
-# cond_samples = mcmc_posterior.sample((num_conditional_samples,), x=x_o)
+    map_ = posterior.map(show_progress_bars=True)
 
-# limits = [[-2, 2], [-2, 2], [-2, 2]]
-
-# # Fit a Gaussian KDE to the conditional samples and get log-probs.
-# density = gaussian_kde(cond_samples.numpy().T, bw_method="scott")
-
-# X, Y = np.meshgrid(
-#     np.linspace(limits[0][0], limits[0][1], 50),
-#     np.linspace(limits[1][0], limits[1][1], 50),
-# )
-# positions = np.vstack([X.ravel(), Y.ravel()])
-# sample_kde_grid = np.reshape(density(positions).T, X.shape)
-
-# # Get conditional log probs eval_conditional_density.
-# eval_grid = analysis.eval_conditional_density(
-#     posterior,
-#     condition=samples[0],
-#     dim1=dim_to_sample_1,
-#     dim2=dim_to_sample_2,
-#     limits=torch.tensor([[-2, 2], [-2, 2], [-2, 2]]),
-# )
-
-# # Compare the two densities.
-# sample_kde_grid = sample_kde_grid / np.sum(sample_kde_grid)
-# eval_grid = eval_grid / torch.sum(eval_grid)
-
-# error = np.abs(sample_kde_grid - eval_grid.numpy())
-
-# max_err = np.max(error)
-# assert max_err < 0.0027
-# print(f"Max error: {max_err}")
+    assert torch.allclose(map_, gt_posterior.mean, atol=0.2), "MAP is not close to GT."

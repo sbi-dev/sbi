@@ -484,13 +484,13 @@ class NPSE(NeuralInference):
         - correct the calculation of the log probability such that it compensates for
             the leakage.
         - reject samples that lie outside of the prior bounds.
-        
+
         Args:
             score_estimator: The score estimator that the posterior is based on.
                 If `None`, use the latest neural score estimator that was trained.
             prior: Prior distribution.
             sample_with: Method to use for sampling from the posterior. Currently only
-                sampling via 'sde' is available.                
+                sampling via 'sde' is available.
 
         Returns:
             Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods
@@ -511,23 +511,19 @@ class NPSE(NeuralInference):
             # If internal net is used device is defined.
             device = self._device
         else:
-            assert score_estimator is not None, (
-                "You did not pass a score estimator. You have to pass the score "
-                "estimator either at initialization `inference = NPSE(score_estimator)`"
-                "or to `.build_posterior(score_estimator=score_estimator)`."
-            )
+            # TODO: Add protocol for checking if the score estimator has forward and
+            # loss methods with the correct signature.
             score_estimator = score_estimator
             # Otherwise, infer it from the device of the net parameters.
-            device = next(score_estimator.parameters()).device.type
+            device = str(next(score_estimator.parameters()).device)
 
         if sample_with == "ode":
-            # NOTE: Build similar to Flow matching stuff
+            # TODO: Add option for ODE-based sampling via zuko.
             raise NotImplementedError("ODE-based sampling is not yet implemented.")
         elif sample_with == "sde":
             posterior = ScorePosterior(
                 score_estimator,  # type: ignore
                 prior,
-                x_shape=self._x_shape,  # type: ignore # NOTE: Deprectated (not used)
                 device=device,
             )
 

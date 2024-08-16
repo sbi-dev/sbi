@@ -2,7 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import inspect
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from typing import Any, Callable, Dict, Optional, Union
 from warnings import warn
 
@@ -195,7 +195,7 @@ class NeuralPosterior:
         force_update: bool = False,
     ) -> Tensor:
         r"""Returns the maximum-a-posteriori estimate (MAP).
-        
+
         The MAP is obtained by running gradient
         ascent from a given number of starting positions (samples from the posterior
         with the highest log-probability). After the optimization is done, we select the
@@ -229,9 +229,6 @@ class NeuralPosterior:
                 the posterior.
             force_update: Whether to re-calculate the MAP when x is unchanged and
                 have a cached value.
-            log_prob_kwargs: Will be empty for SNLE and SNRE. Will contain
-                {'norm_posterior': True} for SNPE.
-
         Returns:
             The MAP estimate.
         """
