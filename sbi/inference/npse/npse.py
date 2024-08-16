@@ -517,15 +517,12 @@ class NPSE(NeuralInference):
             # Otherwise, infer it from the device of the net parameters.
             device = str(next(score_estimator.parameters()).device)
 
-        if sample_with == "ode":
-            # TODO: Add option for ODE-based sampling via zuko.
-            raise NotImplementedError("ODE-based sampling is not yet implemented.")
-        elif sample_with == "sde":
-            posterior = ScorePosterior(
-                score_estimator,  # type: ignore
-                prior,
-                device=device,
-            )
+        posterior = ScorePosterior(
+            score_estimator,  # type: ignore
+            prior,
+            device=device,
+            sample_with=sample_with,
+        )
 
         self._posterior = posterior
         # Store models at end of each round.

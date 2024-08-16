@@ -48,6 +48,7 @@ class ScorePosterior(NeuralPosterior):
         max_sampling_batch_size: int = 10_000,
         device: Optional[str] = None,
         enable_transform: bool = False,
+        sample_with: str = "sde",
     ):
         """
         Args:
@@ -80,6 +81,8 @@ class ScorePosterior(NeuralPosterior):
         self.prior = prior
         self.score_estimator = score_estimator
 
+        self.sample_with = sample_with
+        assert self.sample_with in ["ode", "sde"], "sample_with must be 'ode' or 'sde'."
         self.max_sampling_batch_size = max_sampling_batch_size
 
         self._purpose = """It samples from the diffusion model given the \
@@ -117,24 +120,71 @@ class ScorePosterior(NeuralPosterior):
             show_progress_bars: Whether to show a progress bar during sampling.
         """
 
-        num_samples = torch.Size(sample_shape).numel()
-
-        x = self._x_else_default_x(x)
-        x = reshape_to_batch_event(x, self.score_estimator.condition_shape)
-        self.potential_fn.set_x(x)
-
-        max_sampling_batch_size = (
-            self.max_sampling_batch_size
-            if max_sampling_batch_size is None
-            else max_sampling_batch_size
-        )
-
         if sample_with is not None:
             raise ValueError(
                 f"You set `sample_with={sample_with}`. As of sbi v0.18.0, setting "
                 f"`sample_with` is no longer supported. You have to rerun "
                 f"`.build_posterior(sample_with={sample_with}).`"
             )
+
+        x = self._x_else_default_x(x)
+        x = reshape_to_batch_event(x, self.score_estimator.condition_shape)
+        self.potential_fn.set_x(x)
+
+        if self.sample_with == "ode":
+            samples = self.sample_via_zuko(sample_shape=sample_shape, x=x)
+        elif self.sample_with == "sde":
+            samples = self._sample_via_diffusion(
+                sample_shape=sample_shape,
+                predictor=predictor,
+                corrector=corrector,
+                predictor_params=predictor_params,
+                corrector_params=corrector_params,
+                steps=steps,
+                ts=ts,
+                max_sampling_batch_size=max_sampling_batch_size,
+                show_progress_bars=show_progress_bars,
+            )
+
+        return samples
+
+    def _sample_via_diffusion(
+        self,
+        sample_shape: Shape = torch.Size(),
+        predictor: Union[str, Predictor] = "euler_maruyama",
+        corrector: Optional[Union[str, Corrector]] = None,
+        predictor_params: Optional[Dict] = None,
+        corrector_params: Optional[Dict] = None,
+        steps: int = 500,
+        ts: Optional[Tensor] = None,
+        max_sampling_batch_size: int = 10_000,
+        show_progress_bars: bool = True,
+    ) -> Tensor:
+        r"""Return samples from posterior distribution $p(\theta|x)$.
+
+        Args:
+            sample_shape: Shape of the samples to be drawn.
+            x: Deprecated - use `.set_default_x()` prior to `.sample()`.
+            predictor: The predictor for the diffusion-based sampler. Can be a string or
+                a custom predictor following the API in `sbi.samplers.score.predictors`.
+            corrector: The corrector for the diffusion-based sampler. Can be None or a
+                custom corrector following the API in `sbi.samplers.score.correctors`.
+            steps: Number of steps to take for the Euler-Maruyama method.
+            ts: Time points at which to evaluate the diffusion process. If None, a
+                linear grid between T_max and T_min is used.
+            max_sampling_batch_size: Maximum batch size for sampling.
+            sample_with: Deprecated - use `.build_posterior(sample_with=...)` prior to
+                `.sample()`.
+            show_progress_bars: Whether to show a progress bar during sampling.
+        """
+
+        num_samples = torch.Size(sample_shape).numel()
+
+        max_sampling_batch_size = (
+            self.max_sampling_batch_size
+            if max_sampling_batch_size is None
+            else max_sampling_batch_size
+        )
 
         if ts is None:
             T_max = self.score_estimator.T_max
@@ -163,6 +213,20 @@ class ScorePosterior(NeuralPosterior):
                 )
             )
         samples = torch.cat(samples, dim=0)[:num_samples]
+
+        return samples.reshape(sample_shape + self.score_estimator.input_shape)
+
+    def sample_via_zuko(
+        self,
+        x: Tensor,
+        sample_shape: Shape = torch.Size(),
+    ) -> Tensor:
+        r"""Return samples from posterior distribution $p(\theta|x)$."""
+
+        num_samples = torch.Size(sample_shape).numel()
+
+        flow = self.potential_fn.get_zuko_flow(condition=x)
+        samples = flow.sample(torch.Size((num_samples,)))
 
         return samples.reshape(sample_shape + self.score_estimator.input_shape)
 

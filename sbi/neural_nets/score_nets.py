@@ -149,6 +149,10 @@ def build_score_estimator(
 
     mean_0, std_0 = z_standardization(batch_x, z_score_x == "structured")
 
+    # Default to variance-preserving SDE
+    if sde_type is None:
+        sde_type = "vp"
+
     input_handler = build_input_handler(
         batch_y,
         t_embedding_dim,

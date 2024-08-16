@@ -16,16 +16,27 @@ from sbi.simulators.linear_gaussian import (
 from .test_utils import check_c2st, get_dkl_gaussian_prior
 
 
-@pytest.mark.slow
-@pytest.mark.parametrize("sde_type", ["vp", "ve", "subvp"])
-@pytest.mark.parametrize("prior_str", ["gaussian", "uniform"])
-@pytest.mark.parametrize("num_dim", [1, 2])
-def test_c2st_npse_on_linearGaussian(sde_type, num_dim: int, prior_str: str):
+# We always test num_dim and sample_with with defaults and mark the rests as slow.
+@pytest.mark.parametrize("num_dim", [1, 3])
+@pytest.mark.parametrize(
+    "sde_type, prior_str, sample_with",
+    [
+        pytest.param("vp", "uniform", ["sde", "ode"]),
+        pytest.param("vp", "gaussian", ["sde", "ode"], marks=pytest.mark.slow),
+        pytest.param("ve", "gaussian", ["sde", "ode"], marks=pytest.mark.slow),
+        pytest.param("ve", "uniform", ["sde", "ode"], marks=pytest.mark.slow),
+        pytest.param("subvp", "gaussian", ["sde", "ode"], marks=pytest.mark.slow),
+        pytest.param("subvp", "uniform", ["sde", "ode"], marks=pytest.mark.slow),
+    ],
+)
+def test_c2st_npse_on_linearGaussian(
+    sde_type, num_dim: int, prior_str: str, sample_with: list[str]
+):
     """Test whether NPSE infers well a simple example with available ground truth."""
 
     x_o = zeros(1, num_dim)
     num_samples = 1000
-    num_simulations = 3000
+    num_simulations = 4000
 
     # likelihood_mean will be likelihood_shift+theta
     likelihood_shift = -1.0 * ones(num_dim)
@@ -49,7 +60,7 @@ def test_c2st_npse_on_linearGaussian(sde_type, num_dim: int, prior_str: str):
             num_samples=num_samples,
         )
 
-    inference = NPSE(prior, sde_type=sde_type, show_progress_bars=False)
+    inference = NPSE(prior, sde_type=sde_type, show_progress_bars=True)
 
     theta = prior.sample((num_simulations,))
     x = linear_gaussian(theta, likelihood_shift, likelihood_cov)
@@ -57,12 +68,18 @@ def test_c2st_npse_on_linearGaussian(sde_type, num_dim: int, prior_str: str):
     score_estimator = inference.append_simulations(theta, x).train(
         training_batch_size=100
     )
-    posterior = inference.build_posterior(score_estimator)
-    posterior.set_default_x(x_o)
-    samples = posterior.sample((num_samples,))
+    # amortize the training when testing sample_with.
+    for method in sample_with:
+        posterior = inference.build_posterior(score_estimator, sample_with=method)
+        posterior.set_default_x(x_o)
+        samples = posterior.sample((num_samples,))
 
-    # Compute the c2st and assert it is near chance level of 0.5.
-    check_c2st(samples, target_samples, alg=f"npse-{sde_type}-{prior_str}-{num_dim}D")
+        # Compute the c2st and assert it is near chance level of 0.5.
+        check_c2st(
+            samples,
+            target_samples,
+            alg=f"npse-{sde_type or "vp"}-{prior_str}-{num_dim}D-{method}",
+        )
 
     # Checks for log_prob()
     if prior_str == "gaussian":

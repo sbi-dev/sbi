@@ -6,6 +6,7 @@ from typing import Optional, Tuple
 import torch
 from torch import Tensor
 from torch.distributions import Distribution
+from zuko.distributions import NormalizingFlow
 from zuko.transforms import FreeFormJacobianTransform
 
 from sbi.inference.potentials.base_potential import BasePotential
@@ -70,7 +71,6 @@ class PosteriorScoreBasedPotential(BasePotential):
             score_estimator: The neural network modelling the score.
             prior: The prior distribution.
             x_o: The observed data at which to evaluate the posterior.
-            x_o_shape: The shape of the observed data.
             iid_method: Which method to use for computing the score. Currently, only
                 `iid_bridge` as proposed in Geffner et al. is implemented.
             device: The device on which to evaluate the potential.
@@ -88,8 +88,19 @@ class PosteriorScoreBasedPotential(BasePotential):
         atol: float = 1e-5,
         rtol: float = 1e-6,
         exact: bool = True,
-    ):
-        """Return the potential via probability flow ODE."""
+    ) -> Tensor:
+        """Return the potential (posterior log prob) via probability flow ODE.
+
+        Args:
+            theta: The parameters at which to evaluate the potential.
+            track_gradients: Whether to track gradients.
+            atol: Absolute tolerance for the ODE solver.
+            rtol: Relative tolerance for the ODE solver.
+            exact: Whether to use the exact ODE solver.
+
+        Returns:
+            The potential function, i.e., the log probability of the posterior.
+        """
         theta = ensure_theta_batched(torch.as_tensor(theta))
         theta_density_estimator = reshape_to_sample_batch_event(
             theta, theta.shape[1:], leading_is_sample=True
@@ -103,25 +114,12 @@ class PosteriorScoreBasedPotential(BasePotential):
 
         self.score_estimator.eval()
 
-        # Compute the base density
-        mean_T = self.score_estimator.mean_T
-        std_T = self.score_estimator.std_T
-        base_density = torch.distributions.Normal(mean_T, std_T)
-        for _ in range(len(self.score_estimator.input_shape)):
-            base_density = torch.distributions.Independent(base_density, 1)
-        # Build the freeform jacobian transformation by probability flow ODEs
-        transform = build_freeform_jacobian_transform(
-            self.score_estimator, x_density_estimator, atol=atol, rtol=rtol, exact=exact
+        flow = self.get_zuko_flow(
+            condition=x_density_estimator, atol=atol, rtol=rtol, exact=exact
         )
 
         with torch.set_grad_enabled(track_gradients):
-            eps_samples, logabsdet = transform.call_and_ladj(  # type: ignore
-                theta_density_estimator
-            )
-            base_log_prob = base_density.log_prob(eps_samples)
-            log_probs = base_log_prob + logabsdet
-            log_probs = log_probs.squeeze(-1)
-
+            log_probs = flow.log_prob(theta_density_estimator).squeeze(-1)
             # Force probability to be zero outside prior support.
             in_prior_support = within_support(self.prior, theta)
 
@@ -139,13 +137,13 @@ class PosteriorScoreBasedPotential(BasePotential):
 
         Args:
             theta: The parameters at which to evaluate the potential.
-            diffusion_time: The diffusion time. If None, then `T_min` of the
+            time: The diffusion time. If None, then `T_min` of the
                 self.score_estimator is used (i.e. we evaluate the gradient of the
                 actual data distribution).
             track_gradients: Whether to track gradients.
 
         Returns:
-            The potential function.
+            The gradient of the potential function.
         """
         if time is None:
             time = torch.tensor([self.score_estimator.T_min])
@@ -182,6 +180,30 @@ class PosteriorScoreBasedPotential(BasePotential):
 
         return score
 
+    def get_zuko_flow(
+        self,
+        condition: Tensor,
+        atol: float = 1e-5,
+        rtol: float = 1e-6,
+        exact: bool = True,
+    ) -> NormalizingFlow:
+        r"""Returns the normalizing flow for the score-based estimator."""
+
+        # Compute the base density
+        mean_T = self.score_estimator.mean_T
+        std_T = self.score_estimator.std_T
+        base_density = torch.distributions.Normal(mean_T, std_T)
+        # TODO: is this correct? should we use append base_density for each dimension?
+        for _ in range(len(self.score_estimator.input_shape)):
+            base_density = torch.distributions.Independent(base_density, 1)
+
+        # Build the freeform jacobian transformation by probability flow ODEs
+        transform = build_freeform_jacobian_transform(
+            self.score_estimator, condition, atol=atol, rtol=rtol, exact=exact
+        )
+        # Use zuko to build the normalizing flow.
+        return NormalizingFlow(transform, base=base_density)
+
 
 def build_freeform_jacobian_transform(
     score_estimator,
@@ -191,7 +213,7 @@ def build_freeform_jacobian_transform(
     exact: bool = True,
 ):
     # Create a freeform jacobian transformation
-    phi = score_estimator.parameters()
+    phi = (x_o, *score_estimator.parameters())
 
     def f(t, x):
         score = score_estimator(input=x, condition=x_o, time=t)
@@ -219,6 +241,7 @@ def _iid_bridge(
     time: Tensor,
     score_estimator: ConditionalScoreEstimator,
     prior: Distribution,
+    t_max: float = 1.0,
 ):
     r"""
     Returns the score-based potential for multiple IID observations. This can require a
@@ -244,12 +267,27 @@ def _iid_bridge(
     num_obs = xos.shape[-len(condition_shape) - 1]
 
     # Calculate likelihood in one batch.
+    # xos is of shape (num_obs, *condition_shape).
+    # theta is of shape (num_samples, *parameter_shape).
 
-    score_trial_batch = score_estimator.forward(input=theta, condition=xos, time=time)
+    # we need to combine the batch shapes of num_obs and num_samples for both
+    # theta and xos.
+    # TODO: janfb adapted this to fix the iid setting shape problems, but iid inference
+    # is not working correctly.
+    theta_per_xo = theta.repeat(num_obs, 1)
+    xos_per_theta = xos.repeat_interleave(theta.shape[0], dim=0)
 
+    score_trial_batch = score_estimator.forward(
+        input=theta_per_xo,
+        condition=xos_per_theta,
+        time=time,
+    ).reshape(num_obs, theta.shape[0], -1)
+
+    # Sum over m observations, as in Geffner et al., equation (7).
     score_trial_sum = score_trial_batch.sum(0)
+    prior_contribution = _get_prior_contribution(time, prior, theta, num_obs, t_max)
 
-    return score_trial_sum + _get_prior_contribution(time, prior, theta, num_obs)
+    return score_trial_sum + prior_contribution
 
 
 def _get_prior_contribution(
@@ -257,6 +295,7 @@ def _get_prior_contribution(
     prior: Distribution,
     theta: Tensor,
     num_obs: int,
+    t_max: float = 1.0,
 ):
     r"""
     Returns the prior contribution for multiple IID observations.
@@ -273,6 +312,8 @@ def _get_prior_contribution(
 
     # TODO Check if prior has the grad property else use torch autograd.
     # For now just use autograd.
+    # Ensure theta requires gradients
+    theta.requires_grad_(True)
 
     log_prob_theta = prior.log_prob(theta)
 
@@ -283,4 +324,4 @@ def _get_prior_contribution(
         create_graph=True,
     )[0]
 
-    return ((1 - num_obs) * (1.0 - diffusion_time)) * grad_log_prob_theta
+    return ((1 - num_obs) * (t_max - diffusion_time)) / t_max * grad_log_prob_theta

@@ -93,6 +93,8 @@ class Diffuser:
         # TODO: for iid setting, self.batch_shape.numel() will be the iid-batch. But we
         # don't want to generate num_obs samples, but only one sample given the the iid
         # batch.
+        # TODO: the solution will probably be to distinguish between the iid setting and
+        # batched sampling setting with a flag.
         # TODO: this fixes the iid setting shape problems, but iid inference via
         # iid_bridge is not accurate.
         # num_batch = self.batch_shape.numel()
@@ -100,7 +102,8 @@ class Diffuser:
         init_shape = (
             num_samples,
         ) + self.input_shape  # just use num_samples, not num_batch
-        eps = torch.randn(init_shape, device=self.device)
+        # NOTE: for the IID setting we need to scale the noise with iid batch size
+        eps = torch.randn(init_shape, device=self.device) / self.batch_shape.numel()
         mean, std, eps = torch.broadcast_tensors(self.init_mean, self.init_std, eps)
         return mean + std * eps
 
