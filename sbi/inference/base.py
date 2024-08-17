@@ -295,7 +295,7 @@ class NeuralInference(ABC):
     @abstractmethod
     def train(
         self,
-        training_batch_size: int = 50,
+        training_batch_size: int = 200,
         learning_rate: float = 5e-4,
         validation_fraction: float = 0.1,
         stop_after_epochs: int = 20,
@@ -312,7 +312,7 @@ class NeuralInference(ABC):
     def get_dataloaders(
         self,
         starting_round: int = 0,
-        training_batch_size: int = 50,
+        training_batch_size: int = 200,
         validation_fraction: float = 0.1,
         resume_training: bool = False,
         dataloader_kwargs: Optional[dict] = None,

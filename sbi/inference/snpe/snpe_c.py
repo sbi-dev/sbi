@@ -90,7 +90,7 @@ class SNPE_C(PosteriorEstimator):
     def train(
         self,
         num_atoms: int = 10,
-        training_batch_size: int = 50,
+        training_batch_size: int = 200,
         learning_rate: float = 5e-4,
         validation_fraction: float = 0.1,
         stop_after_epochs: int = 20,

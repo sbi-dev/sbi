@@ -209,7 +209,7 @@ class PosteriorEstimator(NeuralInference, ABC):
 
     def train(
         self,
-        training_batch_size: int = 50,
+        training_batch_size: int = 200,
         learning_rate: float = 5e-4,
         validation_fraction: float = 0.1,
         stop_after_epochs: int = 20,
@@ -435,7 +435,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         density_estimator: Optional[ConditionalDensityEstimator] = None,
         prior: Optional[Distribution] = None,
         sample_with: str = "direct",
-        mcmc_method: str = "slice_np",
+        mcmc_method: str = "slice_np_vectorized",
         vi_method: str = "rKL",
         direct_sampling_parameters: Optional[Dict[str, Any]] = None,
         mcmc_parameters: Optional[Dict[str, Any]] = None,
