@@ -66,7 +66,7 @@ class MNLE(LikelihoodEstimator):
 
     def train(
         self,
-        training_batch_size: int = 50,
+        training_batch_size: int = 200,
         learning_rate: float = 5e-4,
         validation_fraction: float = 0.1,
         stop_after_epochs: int = 20,
@@ -92,7 +92,7 @@ class MNLE(LikelihoodEstimator):
         density_estimator: Optional[TorchModule] = None,
         prior: Optional[Distribution] = None,
         sample_with: str = "mcmc",
-        mcmc_method: str = "slice_np",
+        mcmc_method: str = "slice_np_vectorized",
         vi_method: str = "rKL",
         mcmc_parameters: Optional[Dict[str, Any]] = None,
         vi_parameters: Optional[Dict[str, Any]] = None,
