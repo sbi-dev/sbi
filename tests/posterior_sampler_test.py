@@ -15,7 +15,6 @@ from sbi.inference import (
 )
 from sbi.samplers.mcmc import PyMCSampler, SliceSamplerSerial, SliceSamplerVectorized
 from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
-from sbi.utils.user_input_checks import process_prior, process_simulator
 
 
 @pytest.mark.mcmc

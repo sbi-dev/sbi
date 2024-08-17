@@ -12,68 +12,6 @@ from torch.utils.tensorboard.writer import SummaryWriter
 from sbi.analysis import pairplot, plot_summary, sbc_rank_plot
 from sbi.inference import SNLE, SNPE, SNRE
 from sbi.utils import BoxUniform
-from sbi.utils.user_input_checks import process_prior, process_simulator
-
-
-@pytest.mark.parametrize("samples", (torch.randn(100, 1),))
-@pytest.mark.parametrize("limits", ([(-1, 1)],))
-def test_pairplot1D(samples, limits):
-    fig, axs = pairplot(**{k: v for k, v in locals().items() if v is not None})
-    assert isinstance(fig, Figure)
-    assert isinstance(axs, Axes)
-    close()
-
-
-@pytest.mark.parametrize("samples", (torch.randn(100, 2),))
-@pytest.mark.parametrize("limits", ([(-1, 1)],))
-def test_nan_inf(samples, limits):
-    samples[0, 0] = np.nan
-    samples[5, 1] = np.inf
-    samples[3, 0] = -np.inf
-    fig, axs = pairplot(**{k: v for k, v in locals().items() if v is not None})
-    assert isinstance(fig, Figure)
-    assert isinstance(axs[0, 0], Axes)
-    close()
-
-
-@pytest.mark.parametrize("samples", (torch.randn(100, 2), [torch.randn(100, 3)] * 2))
-@pytest.mark.parametrize("points", (torch.ones(1, 3),))
-@pytest.mark.parametrize("limits", ([(-3, 3)],))
-@pytest.mark.parametrize("subset", (None, [0, 1]))
-@pytest.mark.parametrize("upper", ("scatter",))
-@pytest.mark.parametrize(
-    "lower,lower_kwargs", [(None, None), ("scatter", {"mpl_kwargs": {"s": 10}})]
-)
-@pytest.mark.parametrize("diag", ("hist",))
-@pytest.mark.parametrize("figsize", ((5, 5),))
-@pytest.mark.parametrize("labels", (None, ["a", "b", "c"]))
-@pytest.mark.parametrize("ticks", (None, [[-3, 0, 3], [-3, 0, 3], [0, 1, 2, 3]]))
-@pytest.mark.parametrize("offdiag", (None,))
-@pytest.mark.parametrize("diag_kwargs", (None, {"mpl_kwargs": {"bins": 10}}))
-@pytest.mark.parametrize("upper_kwargs", (None,))
-@pytest.mark.parametrize("fig_kwargs", (None, {"points_labels": ["a"], "legend": True}))
-def test_pairplot(
-    samples,
-    points,
-    limits,
-    subset,
-    upper,
-    lower,
-    diag,
-    figsize,
-    labels,
-    ticks,
-    offdiag,
-    diag_kwargs,
-    upper_kwargs,
-    lower_kwargs,
-    fig_kwargs,
-):
-    fig, axs = pairplot(**{k: v for k, v in locals().items() if v is not None})
-    assert isinstance(fig, Figure)
-    assert isinstance(axs, np.ndarray)
-    assert isinstance(axs[0, 0], Axes)
-    close()
 
 
 @pytest.mark.parametrize("samples", (torch.randn(100, 1),))

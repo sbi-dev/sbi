@@ -3,14 +3,12 @@ from abc import abstractmethod
 import torch
 from torch import Tensor
 
-from sbi.inference.potentials.score_based_potential import (
-    PosteriorScoreBasedPotentialGradient,
-)
+from sbi.inference.potentials.score_based_potential import PosteriorScoreBasedPotential
 from sbi.samplers.score.kernels.base import Kernel, State
 
 
 class EulerMaruyama(Kernel):
-    def __init__(self, score_fn: PosteriorScoreBasedPotentialGradient, eta=1.0) -> None:
+    def __init__(self, score_fn: PosteriorScoreBasedPotential, eta=1.0) -> None:
         self.score_fn = score_fn
         self.drift_forward = score_fn.score_estimator.drift_fn
         self.diffusion_forward = score_fn.score_estimator.diffusion_fn
@@ -23,7 +21,8 @@ class EulerMaruyama(Kernel):
         delta_t = time - time_old
         f = self.drift_forward(input_old, time_old)
         g = self.eta * self.diffusion_forward(input_old, time_old)
-        score = self.score_fn(input_old, time_old)
+        # Call the gradient of the score.
+        score = self.score_fn.gradient(input_old, time_old)
         f_backward = f - (1 + self.eta**2) / 2 * g**2 * score
 
         new_input = (

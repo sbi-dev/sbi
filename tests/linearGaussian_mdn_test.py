@@ -19,7 +19,6 @@ from sbi.simulators.linear_gaussian import (
     linear_gaussian,
     true_posterior_linear_gaussian_mvn_prior,
 )
-from sbi.utils.user_input_checks import process_prior, process_simulator
 from tests.test_utils import check_c2st
 
 

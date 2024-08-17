@@ -102,8 +102,9 @@ class Diffuser:
         init_shape = (
             num_samples,
         ) + self.input_shape  # just use num_samples, not num_batch
-        # NOTE: for the IID setting we need to scale the noise with iid batch size
-        eps = torch.randn(init_shape, device=self.device) / self.batch_shape.numel()
+        # NOTE: for the IID setting we might need to scale the noise with iid batch
+        # size, as in equation (7) in the paper.
+        eps = torch.randn(init_shape, device=self.device)
         mean, std, eps = torch.broadcast_tensors(self.init_mean, self.init_std, eps)
         return mean + std * eps
 
