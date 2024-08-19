@@ -11,6 +11,7 @@ from pyknos.nflows.flows import Flow
 from torch import Tensor
 from torch.distributions import Distribution
 
+from sbi.inference.potentials.base_potential import BasePotential
 from sbi.utils.torchutils import ensure_theta_batched
 from sbi.utils.user_input_checks import process_x
 
@@ -273,7 +274,7 @@ def condition_mog(
 class ConditionedPotential:
     def __init__(
         self,
-        potential_fn: Callable,
+        potential_fn: BasePotential,
         condition: Tensor,
         dims_to_sample: List[int],
     ):

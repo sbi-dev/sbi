@@ -10,6 +10,7 @@ from pyknos.mdn.mdn import MultivariateGaussianMDN
 from torch import Tensor
 from torch.distributions import Distribution
 
+from sbi.inference.potentials.base_potential import BasePotential
 from sbi.sbi_types import Shape, TorchTransform
 from sbi.utils.conditional_density_utils import (
     ConditionedPotential,
@@ -234,7 +235,7 @@ class ConditionedMDN:
 
 
 def conditonal_potential(
-    potential_fn: Callable,
+    potential_fn: BasePotential,
     theta_transform: TorchTransform,
     prior: Distribution,
     condition: Tensor,
@@ -257,7 +258,7 @@ def conditonal_potential(
 
 
 def conditional_potential(
-    potential_fn: Callable,
+    potential_fn: BasePotential,
     theta_transform: TorchTransform,
     prior: Distribution,
     condition: Tensor,
