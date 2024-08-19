@@ -41,7 +41,6 @@ def score_estimator_based_potential(
         score_estimator, prior, x_o, device=device
     )
 
-    # TODO Add issue
     assert (
         enable_transform is False
     ), "Transforms are not yet supported for score estimators."
@@ -110,11 +109,11 @@ class PosteriorScoreBasedPotential(BasePotential):
         )
         assert (
             x_density_estimator.shape[0] == 1
-        ), ".log_prob() supports only `batchsize == 1`."
+        ), "PosteriorScoreBasedPotential supports only x batchsize of 1`."
 
         self.score_estimator.eval()
 
-        flow = self.get_zuko_flow(
+        flow = self.get_continuous_normalizing_flow(
             condition=x_density_estimator, atol=atol, rtol=rtol, exact=exact
         )
 
@@ -137,7 +136,7 @@ class PosteriorScoreBasedPotential(BasePotential):
 
         Args:
             theta: The parameters at which to evaluate the potential.
-            time: The diffusion time. If None, then `T_min` of the
+            time: The diffusion time. If None, then `t_min` of the
                 self.score_estimator is used (i.e. we evaluate the gradient of the
                 actual data distribution).
             track_gradients: Whether to track gradients.
@@ -146,7 +145,7 @@ class PosteriorScoreBasedPotential(BasePotential):
             The gradient of the potential function.
         """
         if time is None:
-            time = torch.tensor([self.score_estimator.T_min])
+            time = torch.tensor([self.score_estimator.t_min])
 
         if self._x_o is None:
             raise ValueError(
@@ -160,6 +159,9 @@ class PosteriorScoreBasedPotential(BasePotential):
                     input=theta, condition=self.x_o, time=time
                 )
             else:
+                raise NotImplementedError(
+                    "Score accumulation for IID data is not yet implemented."
+                )
                 if self.prior is None:
                     raise ValueError(
                         "Prior must be provided when interpreting the data as IID."
@@ -180,7 +182,7 @@ class PosteriorScoreBasedPotential(BasePotential):
 
         return score
 
-    def get_zuko_flow(
+    def get_continuous_normalizing_flow(
         self,
         condition: Tensor,
         atol: float = 1e-5,
@@ -206,12 +208,24 @@ class PosteriorScoreBasedPotential(BasePotential):
 
 
 def build_freeform_jacobian_transform(
-    score_estimator,
+    score_estimator: ConditionalScoreEstimator,
     x_o: Tensor,
     atol: float = 1e-5,
     rtol: float = 1e-6,
     exact: bool = True,
-):
+) -> FreeFormJacobianTransform:
+    """Builds the free-form Jacobian for the probability flow ODE, used for log-prob.
+    
+    Args:
+        score_estimator: The neural network estimating the score.
+        x_o: Observation.
+        atol: Absolute tolerance for the ODE solver.
+        rtol: Relative tolerance for the ODE solver.
+        exact: Whether to use the exact ODE solver.
+
+    Returns:
+        Transformation of probability flow ODE.
+    """
     # Create a freeform jacobian transformation
     phi = (x_o, *score_estimator.parameters())
 
@@ -224,14 +238,13 @@ def build_freeform_jacobian_transform(
 
     transform = FreeFormJacobianTransform(
         f=f,
-        t0=score_estimator.T_min,
-        t1=score_estimator.T_max,
+        t0=score_estimator.t_min,
+        t1=score_estimator.t_max,
         phi=phi,
         atol=atol,
         rtol=rtol,
         exact=exact,
     )
-
     return transform
 
 
@@ -244,8 +257,9 @@ def _iid_bridge(
     t_max: float = 1.0,
 ):
     r"""
-    Returns the score-based potential for multiple IID observations. This can require a
-    special solver to obtain the correct tall posterior.
+    Returns the score-based potential for multiple IID observations.
+    
+    This can require a special solver to obtain the correct tall posterior.
 
     Args:
         input: The parameter values at which to evaluate the potential.
@@ -297,8 +311,7 @@ def _get_prior_contribution(
     num_obs: int,
     t_max: float = 1.0,
 ):
-    r"""
-    Returns the prior contribution for multiple IID observations.
+    r"""Returns the prior contribution for multiple IID observations.
 
     Args:
         diffusion_time: The diffusion time.

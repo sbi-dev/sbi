@@ -30,7 +30,6 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
     NOTE: This will follow the "noise matching" approach, we could also train a
     "denoising" network aiming to predict the original input given the noised input. We
     can still approx. the score by Tweedie's formula, but training might be easier.
-    Ideally, both should be supported.
     """
 
     def __init__(
@@ -41,8 +40,8 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         weight_fn: Union[str, Callable] = "max_likelihood",
         mean_0: Union[Tensor, float] = 0.0,
         std_0: Union[Tensor, float] = 1.0,
-        T_min: float = 1e-3,
-        T_max: float = 1.0,
+        t_min: float = 1e-3,
+        t_max: float = 1.0,
     ) -> None:
         r"""Score estimator class that estimates the conditional score function, i.e.,
         gradient of the density p(xt|x0).
@@ -64,8 +63,8 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         self._set_weight_fn(weight_fn)
 
         # Min time for diffusion (0 can be numerically unstable).
-        self.T_min = T_min
-        self.T_max = T_max
+        self.t_min = t_min
+        self.t_max = t_max
 
         # Starting mean and std of the target distribution (otherwise assumes 0,1).
         # This will be used to precondition the score network to improve training.
@@ -77,9 +76,9 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         self.register_buffer("mean_0", mean_0.clone().detach())
         self.register_buffer("std_0", std_0.clone().detach())
 
-        # We estimate the mean and std of the source distribution at time T_max.
-        mean_T = self.approx_marginal_mean(torch.tensor([T_max]))
-        std_T = self.approx_marginal_std(torch.tensor([T_max]))
+        # We estimate the mean and std of the source distribution at time t_max.
+        mean_T = self.approx_marginal_mean(torch.tensor([t_max]))
+        std_T = self.approx_marginal_std(torch.tensor([t_max]))
         self.register_buffer("mean_T", mean_T)
         self.register_buffer("std_T", std_T)
 
@@ -116,7 +115,7 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         # Time dependent z-scoring! Keeps input at similar scales
         input_enc = (input - mean) / std
 
-        # Approximate score becoming exact for t -> T_max, "skip connection"
+        # Approximate score becoming exact for t -> t_max, "skip connection"
         score_gaussian = (input - mean) / std**2
 
         # Score prediction by the network
@@ -148,7 +147,7 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         Args:
             input: Input variable i.e. theta.
             condition: Conditioning variable.
-            times: SDE time variable in [T_min, T_max]. Uniformly sampled if None.
+            times: SDE time variable in [t_min, t_max]. Uniformly sampled if None.
             control_variate: Whether to use a control variate to reduce the variance of
                 the stochastic loss estimator.
             control_variate_threshold: Threshold for the control variate. If the std
@@ -162,8 +161,8 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         if times is None:
             times = (
                 torch.rand(input.shape[0], device=input.device)
-                * (self.T_max - self.T_min)
-                + self.T_min
+                * (self.t_max - self.t_min)
+                + self.t_min
             )
 
         # Sample noise.
@@ -360,8 +359,8 @@ class VPScoreEstimator(ConditionalScoreEstimator):
         beta_max: float = 10.0,
         mean_0: Union[Tensor, float] = 0.0,
         std_0: Union[Tensor, float] = 1.0,
-        T_min: float = 1e-5,
-        T_max: float = 1.0,
+        t_min: float = 1e-5,
+        t_max: float = 1.0,
     ) -> None:
         self.beta_min = beta_min
         self.beta_max = beta_max
@@ -372,8 +371,8 @@ class VPScoreEstimator(ConditionalScoreEstimator):
             mean_0=mean_0,
             std_0=std_0,
             weight_fn=weight_fn,
-            T_min=T_min,
-            T_max=T_max,
+            t_min=t_min,
+            t_max=t_max,
         )
 
     def mean_t_fn(self, times: Tensor) -> Tensor:
@@ -449,7 +448,7 @@ class VPScoreEstimator(ConditionalScoreEstimator):
         return g
 
 
-class subVPScoreEstimator(ConditionalScoreEstimator):
+class SubVPScoreEstimator(ConditionalScoreEstimator):
     """Class for score estimators with sub-variance preserving SDEs."""
 
     def __init__(
@@ -462,8 +461,8 @@ class subVPScoreEstimator(ConditionalScoreEstimator):
         beta_max: float = 10.0,
         mean_0: float = 0.0,
         std_0: float = 1.0,
-        T_min: float = 1e-2,
-        T_max: float = 1.0,
+        t_min: float = 1e-2,
+        t_max: float = 1.0,
     ) -> None:
         self.beta_min = beta_min
         self.beta_max = beta_max
@@ -474,8 +473,8 @@ class subVPScoreEstimator(ConditionalScoreEstimator):
             weight_fn=weight_fn,
             mean_0=mean_0,
             std_0=std_0,
-            T_min=T_min,
-            T_max=T_max,
+            t_min=t_min,
+            t_max=t_max,
         )
 
     def mean_t_fn(self, times: Tensor) -> Tensor:

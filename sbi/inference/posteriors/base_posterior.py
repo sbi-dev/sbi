@@ -52,9 +52,8 @@ class NeuralPosterior:
                 stacklevel=2,
             )
 
-        if not isinstance(potential_fn, BasePotential) and not isinstance(
-            potential_fn, BasePotential
-        ):
+        # Wrap as `CallablePotentialWrapper` if `potential_fn` is a Callable.
+        if not isinstance(potential_fn, BasePotential):
             kwargs_of_callable = list(inspect.signature(potential_fn).parameters.keys())
             for key in ["theta", "x_o"]:
                 assert key in kwargs_of_callable, (

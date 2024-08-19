@@ -111,9 +111,11 @@ class ScorePosterior(NeuralPosterior):
                 a custom predictor following the API in `sbi.samplers.score.predictors`.
             corrector: The corrector for the diffusion-based sampler. Can be None or a
                 custom corrector following the API in `sbi.samplers.score.correctors`.
+            predictor_params: Additional parameters passed to predictor.
+            corrector_params: Additional parameters passed to corrector.
             steps: Number of steps to take for the Euler-Maruyama method.
             ts: Time points at which to evaluate the diffusion process. If None, a
-                linear grid between T_max and T_min is used.
+                linear grid between t_max and t_min is used.
             max_sampling_batch_size: Maximum batch size for sampling.
             sample_with: Deprecated - use `.build_posterior(sample_with=...)` prior to
                 `.sample()`.
@@ -171,7 +173,7 @@ class ScorePosterior(NeuralPosterior):
                 custom corrector following the API in `sbi.samplers.score.correctors`.
             steps: Number of steps to take for the Euler-Maruyama method.
             ts: Time points at which to evaluate the diffusion process. If None, a
-                linear grid between T_max and T_min is used.
+                linear grid between t_max and t_min is used.
             max_sampling_batch_size: Maximum batch size for sampling.
             sample_with: Deprecated - use `.build_posterior(sample_with=...)` prior to
                 `.sample()`.
@@ -187,9 +189,9 @@ class ScorePosterior(NeuralPosterior):
         )
 
         if ts is None:
-            T_max = self.score_estimator.T_max
-            T_min = self.score_estimator.T_min
-            ts = torch.linspace(T_max, T_min, steps)
+            t_max = self.score_estimator.t_max
+            t_min = self.score_estimator.t_min
+            ts = torch.linspace(t_max, t_min, steps)
 
         diffuser = Diffuser(
             self.potential_fn,
@@ -221,11 +223,21 @@ class ScorePosterior(NeuralPosterior):
         x: Tensor,
         sample_shape: Shape = torch.Size(),
     ) -> Tensor:
-        r"""Return samples from posterior distribution $p(\theta|x)$."""
+        r"""Return samples from posterior distribution with probability flow ODE.
 
+        This build the probability flow ODE and then samples from the corresponding
+        flow. This is implemented via the zuko library.
+        
+        Args:
+            x: Condition.
+            sample_shape: The shape of the samples to be returned.
+
+        Returns:
+            Samples.
+        """
         num_samples = torch.Size(sample_shape).numel()
 
-        flow = self.potential_fn.get_zuko_flow(condition=x)
+        flow = self.potential_fn.get_continuous_normalizing_flow(condition=x)
         samples = flow.sample(torch.Size((num_samples,)))
 
         return samples.reshape(sample_shape + self.score_estimator.input_shape)
@@ -240,6 +252,8 @@ class ScorePosterior(NeuralPosterior):
         exact: bool = True,
     ) -> Tensor:
         r"""Returns the log-probability of the posterior $p(\theta|x)$.
+
+        This requires building and evaluating the probability flow ODE.
 
         Args:
             theta: Parameters $\theta$.
@@ -331,6 +345,9 @@ class ScorePosterior(NeuralPosterior):
         Returns:
             The MAP estimate.
         """
+        raise NotImplementedError(
+            "MAP estimation is currently not working accurately for ScorePosterior."
+        )
         return super().map(
             x=x,
             num_iter=num_iter,

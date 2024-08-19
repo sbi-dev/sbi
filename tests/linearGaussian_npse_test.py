@@ -1,3 +1,5 @@
+from typing import List
+
 import pytest
 import torch
 from torch import eye, ones, zeros
@@ -30,13 +32,13 @@ from .test_utils import check_c2st, get_dkl_gaussian_prior
     ],
 )
 def test_c2st_npse_on_linearGaussian(
-    sde_type, num_dim: int, prior_str: str, sample_with: list[str]
+    sde_type, num_dim: int, prior_str: str, sample_with: List[str]
 ):
     """Test whether NPSE infers well a simple example with available ground truth."""
 
     x_o = zeros(1, num_dim)
     num_samples = 1000
-    num_simulations = 4000
+    num_simulations = 5000
 
     # likelihood_mean will be likelihood_shift+theta
     likelihood_shift = -1.0 * ones(num_dim)
@@ -78,7 +80,7 @@ def test_c2st_npse_on_linearGaussian(
         check_c2st(
             samples,
             target_samples,
-            alg=f"npse-{sde_type or "vp"}-{prior_str}-{num_dim}D-{method}",
+            alg=f"npse-{sde_type or 'vp'}-{prior_str}-{num_dim}D-{method}",
         )
 
     # Checks for log_prob()
@@ -157,7 +159,12 @@ def test_c2st_npse_on_linearGaussian_different_dims():
     check_c2st(samples, target_samples, alg="npse_different_dims_and_resume_training")
 
 
-@pytest.mark.xfail(reason="iid_bridge not working.")
+@pytest.mark.xfail(
+    reason="iid_bridge not working.",
+    raises=NotImplementedError,
+    strict=True,
+    match="Score accumulation*",
+)
 @pytest.mark.parametrize("num_trials", [2, 10])
 def test_npse_iid_inference(num_trials):
     """Test whether NPSE infers well a simple example with available ground truth."""
@@ -199,7 +206,8 @@ def test_npse_iid_inference(num_trials):
 
 @pytest.mark.slow
 @pytest.mark.xfail(
-    raises=AssertionError, reason="MAP optimization via score not working accurately."
+    raises=NotImplementedError,
+    reason="MAP optimization via score not working accurately.",
 )
 def test_npse_map():
     num_dim = 2

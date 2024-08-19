@@ -13,10 +13,7 @@ from torch.distributions import MultivariateNormal, Uniform
 from sbi.analysis import sbc_rank_plot
 from sbi.diagnostics import check_sbc, get_nltp, run_sbc
 from sbi.inference import NPSE, SNLE, SNPE
-from sbi.simulators import linear_gaussian
-from sbi.simulators.linear_gaussian import (
-    linear_gaussian,
-)
+from sbi.simulators.linear_gaussian import linear_gaussian
 from sbi.utils import BoxUniform, MultipleIndependent
 from tests.test_utils import PosteriorPotential, TractablePosterior
 
@@ -102,7 +99,7 @@ def test_consistent_sbc_results(density_estimator, cov_method):
     def simulator(theta):
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    num_simulations = 2000
+    num_simulations = 4000
     num_posterior_samples = 1000
     num_sbc_runs = 100
 

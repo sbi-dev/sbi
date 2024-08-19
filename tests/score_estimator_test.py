@@ -11,8 +11,6 @@ import torch
 from sbi.neural_nets.embedding_nets import CNNEmbedding
 from sbi.neural_nets.score_nets import build_score_estimator
 
-# TODO: Test different build options for score estimators!
-
 
 @pytest.mark.parametrize("sde_type", ["vp", "ve", "subvp"])
 @pytest.mark.parametrize("input_sample_dim", (1, 2))

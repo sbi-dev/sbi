@@ -50,10 +50,11 @@ class NPSE(NeuralInference):
 
         Instead of performing conditonal *density* estimation, NPSE methods perform
         conditional *score* estimation i.e. they estimate the gradient of the log
-        density using denoising score matching loss. We not only estimate the score
-        of the posterior, but a family of distributions analogous to diffusion models.
+        density using denoising score matching loss.
 
-        NOTE: Single-round NPSE is currently the only supported mode.
+        NOTE: NPSE does not support multi-round inference with flexible proposals yet.
+        You can try to run multi-round with truncated proposals, but note that this is
+        not tested yet.
 
         Args:
             prior: Prior distribution.
@@ -69,11 +70,9 @@ class NPSE(NeuralInference):
 
         References:
             - Geffner, Tomas, George Papamakarios, and Andriy Mnih. "Score modeling for
-              simulation-based inference." NeurIPS 2022 Workshop on Score-Based Methods.
-              2022.
+              simulation-based inference." ICML 2023.
             - Sharrock, Louis, et al. "Sequential neural score estimation: Likelihood-
-              free inference with conditional score based diffusion models." arXiv
-              preprint arXiv:2210.04872 (2022).
+              free inference with conditional score based diffusion models." ICML 2024.
         """
 
         super().__init__(
@@ -252,7 +251,7 @@ class NPSE(NeuralInference):
                 and validation dataloaders (like, e.g., a collate_fn)
 
         Returns:
-            Density estimator that approximates the distribution $p(\theta|x)$.
+            Score estimator that approximates the posterior score.
         """
         # Load data from most recent round.
         self._round = max(self._data_round_index)
@@ -493,8 +492,7 @@ class NPSE(NeuralInference):
                 sampling via 'sde' is available.
 
         Returns:
-            Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods
-            (the returned log-probability is unnormalized).
+            Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods.
         """
         if prior is None:
             assert self._prior is not None, (
@@ -564,8 +562,9 @@ class NPSE(NeuralInference):
             # First round loss.
             loss = self._neural_net.loss(theta, x)
         else:
-            # TODO: Implement proposal correction for multi-round SNPSE.
-            loss = self._loss_proposal_posterior(theta, x, masks, proposal)
+            raise NotImplementedError(
+                "Multi-round NPSE with arbitrary proposals is not implemented"
+            )
 
         return calibration_kernel(x) * loss
 

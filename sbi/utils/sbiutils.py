@@ -945,13 +945,13 @@ def gradient_ascent(
             try:
                 optimize_inits.requires_grad_(False)  # type: ignore
                 gradient = potential_fn.gradient(optimize_inits)
-            except NotImplementedError:
+            except (NotImplementedError, AttributeError):
                 optimize_inits.requires_grad_(True)  # type: ignore
                 probs = potential_fn(optimize_inits).squeeze()
                 loss = probs.sum()
                 loss.backward()
                 gradient = optimize_inits.grad
-                assert gradient is Tensor, "Gradient must be a tensor."
+                assert isinstance(gradient, Tensor), "Gradient must be a tensor."
 
             # Update the parameters with gradient descent.
             # See https://discuss.pytorch.org/t/updatation-of-parameters-without-using-optimizer-step/34244/2

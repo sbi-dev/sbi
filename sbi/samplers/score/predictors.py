@@ -47,10 +47,20 @@ def register_predictor(name: str) -> Callable:
 
 
 class Predictor(ABC):
+    """Predictor base class.
+    
+    See child classes for more detail.
+    """
     def __init__(
         self,
         potential_fn: PosteriorScoreBasedPotential,
     ):
+        """Initialize predictor.
+        
+        Args:
+            potential_fn: The potential from which to sample. Must have 
+                `.gradient()` implemented.
+        """
         self.potential_fn = potential_fn
         self.device = potential_fn.device
 
@@ -59,10 +69,24 @@ class Predictor(ABC):
         self.diffusion = self.potential_fn.score_estimator.diffusion_fn
 
     def __call__(self, theta: Tensor, t1: Tensor, t0: Tensor) -> Tensor:
+        """Run prediction.
+        
+        Args:
+            theta: Parameters.
+            t1: Time.
+            t0: Time.
+        """
         return self.predict(theta, t1, t0)
 
     @abstractmethod
     def predict(self, theta: Tensor, t1: Tensor, t0: Tensor) -> Tensor:
+        """Run prediction.
+        
+        Args:
+            theta: Parameters.
+            t1: Time.
+            t0: Time.
+        """
         pass
 
 
@@ -128,7 +152,6 @@ class DDIM(Predictor):
         else:
             self.std_bridge = vp_default_bridge
 
-    # @torch.compile(fullgraph=True, dynamic=True)
     def predict(self, theta: Tensor, t1: Tensor, t0: Tensor) -> Tensor:
         alpha = self.alpha_fn(t1)
         std = self.std_fn(t1)

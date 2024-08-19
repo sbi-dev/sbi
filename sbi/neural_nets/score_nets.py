@@ -9,7 +9,7 @@ from sbi.neural_nets.estimators.score_estimator import (
     ConditionalScoreEstimator,
     VEScoreEstimator,
     VPScoreEstimator,
-    subVPScoreEstimator,
+    SubVPScoreEstimator,
 )
 from sbi.utils.sbiutils import standardizing_net, z_score_parser, z_standardization
 from sbi.utils.user_input_checks import check_data_device
@@ -193,7 +193,7 @@ def build_score_estimator(
     elif sde_type == "ve":
         estimator = VEScoreEstimator
     elif sde_type == "subvp":
-        estimator = subVPScoreEstimator
+        estimator = SubVPScoreEstimator
     else:
         raise ValueError(f"SDE type: {sde_type} not supported.")
 
