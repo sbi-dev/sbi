@@ -13,7 +13,9 @@ from torch.distributions import MultivariateNormal, Uniform
 from sbi.analysis import sbc_rank_plot
 from sbi.diagnostics import check_sbc, get_nltp, run_sbc
 from sbi.inference import SNLE, SNPE, simulate_for_sbi
-from sbi.simulators import linear_gaussian
+from sbi.simulators.linear_gaussian import (
+    linear_gaussian,
+)
 from sbi.utils import BoxUniform, MultipleIndependent
 from sbi.utils.user_input_checks import process_prior, process_simulator
 from tests.test_utils import PosteriorPotential, TractablePosterior
@@ -91,29 +93,21 @@ def test_running_sbc(
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize(
-    "density_estimator",
-    [
-        pytest.param(
-            "mdn",
-            marks=pytest.mark.xfail(
-                reason="MDN batched sampling results in miscalibrated posteriors",
-                strict=True,
-            ),
-        ),
-        "maf",
-    ],
-)
+@pytest.mark.parametrize("density_estimator", ["mdn", "maf"])
 @pytest.mark.parametrize("cov_method", ("sbc", "coverage"))
 def test_consistent_sbc_results(density_estimator, cov_method):
     """Test consistent SBC results on well-trained NPE."""
 
-    num_dim = 3
-    prior = BoxUniform(low=-2 * torch.ones(num_dim), high=2 * torch.ones(num_dim))
+    num_dim = 2
+
+    likelihood_shift = -1.0 * ones(num_dim)
+    likelihood_cov = 0.3 * eye(num_dim)
+    prior_mean = zeros(num_dim)
+    prior_cov = eye(num_dim)
+    prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
 
     def simulator(theta):
-        # linear gaussian
-        return theta + 1.0 + torch.randn_like(theta) * 0.1
+        return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     num_simulations = 2000
     num_posterior_samples = 1000

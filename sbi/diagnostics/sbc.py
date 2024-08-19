@@ -25,6 +25,7 @@ def run_sbc(
     reduce_fns: Union[str, Callable, List[Callable]] = "marginals",
     num_workers: int = 1,
     show_progress_bar: bool = True,
+    use_batched_sampling: bool = True,
     **kwargs,
 ):
     """Run simulation-based calibration (SBC) (parallelized across sbc runs).
@@ -47,6 +48,8 @@ def run_sbc(
         num_workers: number of CPU cores to use in parallel for running
             `num_sbc_samples` inferences.
         show_progress_bar: whether to display a progress over sbc runs.
+        use_batched_sampling: whether to use batched sampling for posterior
+            samples.
 
     Returns:
         ranks: ranks of the ground truth parameters under the inferred
@@ -81,13 +84,16 @@ def run_sbc(
 
     # Get posterior samples, batched or parallelized.
     posterior_samples = get_posterior_samples_on_batch(
-        xs, posterior, num_posterior_samples, num_workers, show_progress_bar
+        xs,
+        posterior,
+        (num_posterior_samples,),
+        num_workers,
+        show_progress_bar,
+        use_batched_sampling=use_batched_sampling,
     )
-    # for calibration methods its handy to have len(xs) in first dim.
-    posterior_samples = posterior_samples.transpose(0, 1)
 
     # take a random draw from each posterior to get data averaged posterior samples.
-    dap_samples = posterior_samples[:, 0, :]
+    dap_samples = posterior_samples[0, :, :]
     assert dap_samples.shape == (num_sbc_samples, thetas.shape[1]), "Wrong dap shape."
 
     ranks = _run_sbc(
@@ -126,8 +132,8 @@ def _run_sbc(
 
     ranks = torch.zeros((num_sbc_samples, len(reduce_fns)))
     # Iterate over all sbc samples and calculate ranks.
-    for sbc_idx, (ths, theta_i, x_i) in tqdm(
-        enumerate(zip(posterior_samples, thetas, xs)),
+    for sbc_idx, (true_theta, x_i) in tqdm(
+        enumerate(zip(thetas, xs)),
         total=num_sbc_samples,
         disable=not show_progress_bar,
         desc=f"Calculating ranks for {num_sbc_samples} sbc samples.",
@@ -139,8 +145,12 @@ def _run_sbc(
 
         # For each reduce_fn (e.g., per marginal for SBC)
         for dim_idx, reduce_fn in enumerate(reduce_fns):
+            # rank posterior samples against true parameter, reduced to 1D.
             ranks[sbc_idx, dim_idx] = (
-                (reduce_fn(ths, x_i) < reduce_fn(theta_i.unsqueeze(0), x_i))
+                (
+                    reduce_fn(posterior_samples[:, sbc_idx, :], x_i)
+                    < reduce_fn(true_theta.unsqueeze(0), x_i)
+                )
                 .sum()
                 .item()
             )

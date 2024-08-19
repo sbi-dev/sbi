@@ -64,7 +64,7 @@ def run_tarp(
     posterior_samples = get_posterior_samples_on_batch(
         xs,
         posterior,
-        num_posterior_samples,
+        (num_posterior_samples,),
         num_workers,
         show_progress_bar=show_progress_bar,
     )
