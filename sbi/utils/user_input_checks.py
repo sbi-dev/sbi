@@ -715,7 +715,7 @@ def validate_theta_and_x(
     assert theta.dtype == float32, "Type of parameters must be float32."
     assert x.dtype == float32, "Type of simulator outputs must be float32."
 
-    if str(x.device) != data_device:
+    if str(x.device) != str(data_device):
         warnings.warn(
             f"Data x has device '{x.device}'. "
             f"Moving x to the data_device '{data_device}'. "
@@ -724,7 +724,7 @@ def validate_theta_and_x(
         )
         x = x.to(data_device)
 
-    if str(theta.device) != data_device:
+    if str(theta.device) != str(data_device):
         warnings.warn(
             f"Parameters theta has device '{theta.device}'. "
             f"Moving theta to the data_device '{data_device}'. "

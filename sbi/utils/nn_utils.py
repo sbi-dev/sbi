@@ -54,7 +54,7 @@ def check_net_device(
 
     if isinstance(net, nn.Identity):
         return net
-    if str(next(net.parameters()).device) != device:
+    if str(next(net.parameters()).device) != str(device):
         warn(
             message or f"Network is not on the correct device. Moving it to {device}.",
             stacklevel=2,
