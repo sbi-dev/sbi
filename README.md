@@ -57,7 +57,7 @@ print(posterior)
 ## Tutorials
 
 If you're new to `sbi`, we recommend starting with our [Getting
-Started](https://sbi-dev.github.io/sbi/tutorial/00_getting_started/) tutorial.
+Started](https://sbi-dev.github.io/sbi/latest/tutorial/00_getting_started/) tutorial.
 
 You can easily access and run these tutorials by opening a
 [Codespace](https://docs.github.com/en/codespaces/overview) on this repo. To do
@@ -67,7 +67,7 @@ Jupyter notebooks.
 
 ## Inference Algorithms
 
-The following inference algorithms are currently available. You can find instructions on how to run each of these methods [here](https://sbi-dev.github.io/sbi/tutorial/16_implemented_methods/).
+The following inference algorithms are currently available. You can find instructions on how to run each of these methods [here](https://sbi-dev.github.io/sbi/latest/tutorial/16_implemented_methods/).
 
 ### Neural Posterior Estimation: amortized (NPE) and sequential (SNPE)
 
