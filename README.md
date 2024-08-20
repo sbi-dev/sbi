@@ -7,7 +7,7 @@
 
 ## sbi: simulation-based inference
 
-[Getting Started](https://sbi-dev.github.io/sbi/tutorial/00_getting_started/) | [Documentation](https://sbi-dev.github.io/sbi/)
+[Getting Started](https://sbi-dev.github.io/sbi/latest/tutorial/00_getting_started/) | [Documentation](https://sbi-dev.github.io/sbi/)
 
 `sbi` is a PyTorch package for simulation-based inference. Simulation-based inference is
 the process of finding parameters of a simulator from observations.
