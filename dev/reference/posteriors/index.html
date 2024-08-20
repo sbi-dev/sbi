@@ -6487,10 +6487,10 @@ SNLE or SNRE train neural networks to approximate the likelihood(-ratios).
         <span class="n">potential_fn</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Callable</span><span class="p">,</span> <span class="n">BasePotential</span><span class="p">],</span>
         <span class="n">proposal</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
         <span class="n">theta_transform</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TorchTransform</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;slice_np&quot;</span><span class="p">,</span>
+        <span class="n">method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;slice_np_vectorized&quot;</span><span class="p">,</span>
         <span class="n">thin</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span>
         <span class="n">warmup_steps</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">200</span><span class="p">,</span>
-        <span class="n">num_chains</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
+        <span class="n">num_chains</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">20</span><span class="p">,</span>
         <span class="n">init_strategy</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;resample&quot;</span><span class="p">,</span>
         <span class="n">init_strategy_parameters</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">init_strategy_num_candidates</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -7550,7 +7550,7 @@ SNLE or SNRE train neural networks to approximate the likelihood(-ratios).
 
 
 <h3 id="sbi.inference.posteriors.mcmc_posterior.MCMCPosterior.__init__" class="doc doc-heading">
-            <code class=" language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">potential_fn</span><span class="p">,</span> <span class="n">proposal</span><span class="p">,</span> <span class="n">theta_transform</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s1">&#39;slice_np&#39;</span><span class="p">,</span> <span class="n">thin</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span> <span class="n">warmup_steps</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">num_chains</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">init_strategy</span><span class="o">=</span><span class="s1">&#39;resample&#39;</span><span class="p">,</span> <span class="n">init_strategy_parameters</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">init_strategy_num_candidates</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_workers</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">mp_context</span><span class="o">=</span><span class="s1">&#39;spawn&#39;</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">x_shape</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+            <code class=" language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">potential_fn</span><span class="p">,</span> <span class="n">proposal</span><span class="p">,</span> <span class="n">theta_transform</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s1">&#39;slice_np_vectorized&#39;</span><span class="p">,</span> <span class="n">thin</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span> <span class="n">warmup_steps</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">num_chains</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">init_strategy</span><span class="o">=</span><span class="s1">&#39;resample&#39;</span><span class="p">,</span> <span class="n">init_strategy_parameters</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">init_strategy_num_candidates</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_workers</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">mp_context</span><span class="o">=</span><span class="s1">&#39;spawn&#39;</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">x_shape</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 <a href="#sbi.inference.posteriors.mcmc_posterior.MCMCPosterior.__init__" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -7632,7 +7632,7 @@ likewise the samplers ending on <code>_pymc</code> are using PyMC.</p>
               </div>
             </td>
             <td>
-                  <code>&#39;slice_np&#39;</code>
+                  <code>&#39;slice_np_vectorized&#39;</code>
             </td>
           </tr>
           <tr class="doc-section-item">
@@ -7675,7 +7675,7 @@ likewise the samplers ending on <code>_pymc</code> are using PyMC.</p>
               </div>
             </td>
             <td>
-                  <code>1</code>
+                  <code>20</code>
             </td>
           </tr>
           <tr class="doc-section-item">
@@ -7910,10 +7910,10 @@ faster than <code>"spawn"</code> but is only supported on POSIX-based systems
     <span class="n">potential_fn</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Callable</span><span class="p">,</span> <span class="n">BasePotential</span><span class="p">],</span>
     <span class="n">proposal</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
     <span class="n">theta_transform</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TorchTransform</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;slice_np&quot;</span><span class="p">,</span>
+    <span class="n">method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;slice_np_vectorized&quot;</span><span class="p">,</span>
     <span class="n">thin</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span>
     <span class="n">warmup_steps</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">200</span><span class="p">,</span>
-    <span class="n">num_chains</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
+    <span class="n">num_chains</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">20</span><span class="p">,</span>
     <span class="n">init_strategy</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;resample&quot;</span><span class="p">,</span>
     <span class="n">init_strategy_parameters</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">init_strategy_num_candidates</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
