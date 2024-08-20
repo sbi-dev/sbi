@@ -213,19 +213,7 @@ def test_batched_mcmc_sample_log_prob_with_different_x(
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize(
-    "density_estimator",
-    [
-        pytest.param(
-            "mdn",
-            marks=pytest.mark.xfail(
-                raises=AssertionError, reason="Due to MDN bug in pyknos", strict=True
-            ),
-        ),
-        "maf",
-        "zuko_nsf",
-    ],
-)
+@pytest.mark.parametrize("density_estimator", ["mdn", "maf", "zuko_nsf"])
 def test_batched_sampling_and_logprob_accuracy(density_estimator: str):
     """Test with two different observations and compare to sequential methods."""
     num_dim = 2
