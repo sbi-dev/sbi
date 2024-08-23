@@ -14,7 +14,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.0, mkdocs-material-9.5.32">
+      <meta name="generator" content="mkdocs-1.6.0, mkdocs-material-9.5.33">
     
     
       
@@ -13767,7 +13767,13 @@ proposal.</p>
 <span class="normal">665</span>
 <span class="normal">666</span>
 <span class="normal">667</span>
-<span class="normal">668</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">simulate_for_sbi</span><span class="p">(</span>
+<span class="normal">668</span>
+<span class="normal">669</span>
+<span class="normal">670</span>
+<span class="normal">671</span>
+<span class="normal">672</span>
+<span class="normal">673</span>
+<span class="normal">674</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">simulate_for_sbi</span><span class="p">(</span>
     <span class="n">simulator</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span>
     <span class="n">proposal</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
     <span class="n">num_simulations</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
@@ -13815,7 +13821,7 @@ proposal.</p>
     <span class="k">else</span><span class="p">:</span>
         <span class="c1"># Cast theta to numpy for better joblib performance (seee #1175)</span>
         <span class="n">seed_all_backends</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
-        <span class="n">theta</span> <span class="o">=</span> <span class="n">proposal</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_simulations</span><span class="p">,))</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span>
+        <span class="n">theta</span> <span class="o">=</span> <span class="n">proposal</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_simulations</span><span class="p">,))</span>
 
         <span class="c1"># Parse the simulation_batch_size logic</span>
         <span class="k">if</span> <span class="n">simulation_batch_size</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
@@ -13823,13 +13829,12 @@ proposal.</p>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">simulation_batch_size</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">simulation_batch_size</span><span class="p">,</span> <span class="n">num_simulations</span><span class="p">)</span>
 
-        <span class="c1"># The batch size will be an approximation, since np.array_split does</span>
-        <span class="c1"># not take as argument the size of the batch but their total.</span>
-        <span class="n">num_batches</span> <span class="o">=</span> <span class="n">num_simulations</span> <span class="o">//</span> <span class="n">simulation_batch_size</span>
-
-        <span class="n">batches</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array_split</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">num_batches</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
-
         <span class="k">if</span> <span class="n">num_workers</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="c1"># For multiprocessing, we want to switch to numpy arrays.</span>
+            <span class="c1"># The batch size will be an approximation, since np.array_split does</span>
+            <span class="c1"># not take as argument the size of the batch but their total.</span>
+            <span class="n">num_batches</span> <span class="o">=</span> <span class="n">num_simulations</span> <span class="o">//</span> <span class="n">simulation_batch_size</span>
+            <span class="n">batches</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array_split</span><span class="p">(</span><span class="n">theta</span><span class="o">.</span><span class="n">numpy</span><span class="p">(),</span> <span class="n">num_batches</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
             <span class="n">batch_seeds</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="n">low</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">high</span><span class="o">=</span><span class="mi">1_000_000</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">batches</span><span class="p">),))</span>
 
             <span class="c1"># define seeded simulator.</span>
@@ -13837,21 +13842,28 @@ proposal.</p>
                 <span class="n">seed_all_backends</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
                 <span class="k">return</span> <span class="n">simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
 
-            <span class="n">simulation_outputs</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span>  <span class="c1"># pyright: ignore</span>
-                <span class="n">xx</span>
-                <span class="k">for</span> <span class="n">xx</span> <span class="ow">in</span> <span class="n">tqdm</span><span class="p">(</span>
-                    <span class="n">Parallel</span><span class="p">(</span><span class="n">return_as</span><span class="o">=</span><span class="s2">&quot;generator&quot;</span><span class="p">,</span> <span class="n">n_jobs</span><span class="o">=</span><span class="n">num_workers</span><span class="p">)(</span>
-                        <span class="n">delayed</span><span class="p">(</span><span class="n">simulator_seeded</span><span class="p">)(</span><span class="n">batch</span><span class="p">,</span> <span class="n">seed</span><span class="p">)</span>
-                        <span class="k">for</span> <span class="n">batch</span><span class="p">,</span> <span class="n">seed</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">batches</span><span class="p">,</span> <span class="n">batch_seeds</span><span class="p">)</span>
-                    <span class="p">),</span>
-                    <span class="n">total</span><span class="o">=</span><span class="n">num_simulations</span><span class="p">,</span>
-                    <span class="n">disable</span><span class="o">=</span><span class="ow">not</span> <span class="n">show_progress_bar</span><span class="p">,</span>
-                <span class="p">)</span>
-            <span class="p">]</span>
+            <span class="k">try</span><span class="p">:</span>  <span class="c1"># catch TypeError to give more informative error message</span>
+                <span class="n">simulation_outputs</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span>  <span class="c1"># pyright: ignore</span>
+                    <span class="n">xx</span>
+                    <span class="k">for</span> <span class="n">xx</span> <span class="ow">in</span> <span class="n">tqdm</span><span class="p">(</span>
+                        <span class="n">Parallel</span><span class="p">(</span><span class="n">return_as</span><span class="o">=</span><span class="s2">&quot;generator&quot;</span><span class="p">,</span> <span class="n">n_jobs</span><span class="o">=</span><span class="n">num_workers</span><span class="p">)(</span>
+                            <span class="n">delayed</span><span class="p">(</span><span class="n">simulator_seeded</span><span class="p">)(</span><span class="n">batch</span><span class="p">,</span> <span class="n">seed</span><span class="p">)</span>
+                            <span class="k">for</span> <span class="n">batch</span><span class="p">,</span> <span class="n">seed</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">batches</span><span class="p">,</span> <span class="n">batch_seeds</span><span class="p">)</span>
+                        <span class="p">),</span>
+                        <span class="n">total</span><span class="o">=</span><span class="n">num_simulations</span><span class="p">,</span>
+                        <span class="n">disable</span><span class="o">=</span><span class="ow">not</span> <span class="n">show_progress_bar</span><span class="p">,</span>
+                    <span class="p">)</span>
+                <span class="p">]</span>
+            <span class="k">except</span> <span class="ne">TypeError</span> <span class="k">as</span> <span class="n">err</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+                    <span class="s2">&quot;For multiprocessing, we switch to numpy arrays. Make sure to &quot;</span>
+                    <span class="s2">&quot;preprocess your simulator with `process_simulator` to handle numpy&quot;</span>
+                    <span class="s2">&quot; arrays.&quot;</span>
+                <span class="p">)</span> <span class="kn">from</span> <span class="nn">err</span>
 
         <span class="k">else</span><span class="p">:</span>
             <span class="n">simulation_outputs</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
-
+            <span class="n">batches</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">simulation_batch_size</span><span class="p">)</span>
             <span class="k">for</span> <span class="n">batch</span> <span class="ow">in</span> <span class="n">tqdm</span><span class="p">(</span><span class="n">batches</span><span class="p">,</span> <span class="n">disable</span><span class="o">=</span><span class="ow">not</span> <span class="n">show_progress_bar</span><span class="p">):</span>
                 <span class="n">simulation_outputs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">simulator</span><span class="p">(</span><span class="n">batch</span><span class="p">))</span>
 
@@ -14345,7 +14357,7 @@ of parameters.</p>
     <script id="__config" type="application/json">{"base": "../..", "features": ["content.code.copy"], "search": "../../assets/javascripts/workers/search.b8dbb3d2.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.471ce7a9.min.js"></script>
+      <script src="../../assets/javascripts/bundle.af256bd8.min.js"></script>
       
         <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-MML-AM_CHTML"></script>
       

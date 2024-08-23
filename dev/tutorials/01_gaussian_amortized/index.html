@@ -14,7 +14,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.0, mkdocs-material-9.5.32">
+      <meta name="generator" content="mkdocs-1.6.0, mkdocs-material-9.5.33">
     
     
       
@@ -495,7 +495,7 @@
 
 
 <h1 id="amortized-posterior-inference-on-gaussian-example">Amortized posterior inference on Gaussian example<a class="headerlink" href="#amortized-posterior-inference-on-gaussian-example" title="Permanent link">&para;</a></h1>
-<p>Note, you can find the original version of this notebook at <a href="https://github.com/sbi-dev/sbi/blob/main/tutorials/01_gaussian_amortized.ipynb">https://github.com/sbi-dev/sbi/blob/main/tutorials/01_gaussian_amortized.ipynb</a> in the <code>sbi</code> repository.</p>
+<p>Note, you can find the original version of this notebook at <a href="https://github.com/sbi-dev/sbi/blob/main/tutorials/01_gaussian_amortized.ipynb">tutorials/01_gaussian_amortized.ipynb</a> in the <code>sbi</code> repository.</p>
 <p>In this tutorial, we introduce <strong>amortization</strong> that is the capability to evaluate the posterior for different observations without having to re-run inference.</p>
 <p>We will demonstrate how <code>sbi</code> can infer an amortized posterior for the illustrative linear Gaussian example introduced in <a href="https://sbi-dev.github.io/sbi/tutorial/00_getting_started_flexible/">Getting Started</a>, that takes in 3 parameters (<span class="arithmatex">\(\theta\)</span>). </p>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">torch</span>
@@ -509,6 +509,9 @@
     <span class="n">process_simulator</span><span class="p">,</span>
 <span class="p">)</span>
 </code></pre></div>
+<div class="codehilite"><pre><span></span><code>WARNING (pytensor.tensor.blas): Using NumPy C-API based implementation for BLAS functions.
+</code></pre></div>
+
 <h2 id="defining-simulator-prior-and-running-inference">Defining simulator, prior, and running inference<a class="headerlink" href="#defining-simulator-prior-and-running-inference" title="Permanent link">&para;</a></h2>
 <p>Our  <em>simulator</em> (model) takes in 3 parameters (<span class="arithmatex">\(\theta\)</span>) and outputs simulations of the same dimensionality. It adds 1.0 and some Gaussian noise to the parameter set. For each dimension of <span class="arithmatex">\(\theta\)</span>, we consider a uniform <em>prior</em> between [-2,2].</p>
 <div class="highlight"><pre><span></span><code><span class="n">num_dim</span> <span class="o">=</span> <span class="mi">3</span>
@@ -534,10 +537,10 @@
 <span class="n">density_estimator</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
 <span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">(</span><span class="n">density_estimator</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>Running 2000 simulations.:   0%|          | 0/2000 [00:00&lt;?, ?it/s]
+<div class="codehilite"><pre><span></span><code>  0%|          | 0/2000 [00:00&lt;?, ?it/s]
 
 
- Neural network successfully converged after 70 epochs.
+ Neural network successfully converged after 68 epochs.
 </code></pre></div>
 
 <h2 id="amortized-inference">Amortized inference<a class="headerlink" href="#amortized-inference" title="Permanent link">&para;</a></h2>
@@ -585,8 +588,8 @@
 <p>The inferred distirbutions over the parameters given the <strong>second</strong> observation  <span class="arithmatex">\(x_{obs~2}\)</span> also match the ground truth parameters <span class="arithmatex">\(\theta_{2}\)</span> we used to generate our second test observation  <span class="arithmatex">\(x_{obs~2}\)</span>.</p>
 <p>This in a nutshell demonstrates the benefit of amortized methods. </p>
 <h1 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h1>
-<p>Now that you got familiar with amortization and are probably good to go and have a first shot at applying <code>sbi</code> to your own inference problem. If you want to learn more, we recommend checking out our tutorial on
-<a href="https://sbi-dev.github.io/sbi/tutorial/03_multiround_inference/">multiround inference </a> which aims to make inference for a single observation more sampling efficient.</p>
+<p>Now that you got familiar with amortization and are probably good to go and have a first shot at applying <code>sbi</code> to your own inference problem. If you want to learn more, we recommend checking out our tutorial
+<a href="../02_multiround_inference/">02_multiround_inference</a> which aims to make inference for a single observation more sampling efficient.</p>
 
 
 
@@ -651,7 +654,7 @@
     <script id="__config" type="application/json">{"base": "../..", "features": ["content.code.copy"], "search": "../../assets/javascripts/workers/search.b8dbb3d2.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.471ce7a9.min.js"></script>
+      <script src="../../assets/javascripts/bundle.af256bd8.min.js"></script>
       
         <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-MML-AM_CHTML"></script>
       

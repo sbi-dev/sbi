@@ -18,7 +18,7 @@
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.0, mkdocs-material-9.5.32">
+      <meta name="generator" content="mkdocs-1.6.0, mkdocs-material-9.5.33">
     
     
       
@@ -811,16 +811,14 @@ improvements of the documentation, you should first  install the <code>doc</code
 <div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[doc]&quot;</span>
 </code></pre></div>
 <p>Then, you can build the website locally by executing in the <code>docs</code> folder</p>
-<div class="highlight"><pre><span></span><code>mike<span class="w"> </span>serve
+<div class="highlight"><pre><span></span><code>mkdocs<span class="w"> </span>serve
 </code></pre></div>
 <p>This will build the website on a local host address shown in the terminal. Changes to
 the website files or a browser refresh will immediately rebuild the website.</p>
-<p>If you want to build the latest version of the tutorial notebooks, you need to convert
-them to markdown first:</p>
+<p>If you updated the tutorials or examples, you need to convert them to markdown first:</p>
 <div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>docs
-jupyter<span class="w"> </span>nbconvert<span class="w"> </span>--to<span class="w"> </span>markdown<span class="w"> </span>../examples/*.ipynb<span class="w"> </span>--output-dir<span class="w"> </span>docs/examples/
 jupyter<span class="w"> </span>nbconvert<span class="w"> </span>--to<span class="w"> </span>markdown<span class="w"> </span>../tutorials/*.ipynb<span class="w"> </span>--output-dir<span class="w"> </span>docs/tutorials/
-mike<span class="w"> </span>serve
+mkdocs<span class="w"> </span>serve
 </code></pre></div>
 
 
@@ -886,7 +884,7 @@ mike<span class="w"> </span>serve
     <script id="__config" type="application/json">{"base": "..", "features": ["content.code.copy"], "search": "../assets/javascripts/workers/search.b8dbb3d2.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
-      <script src="../assets/javascripts/bundle.471ce7a9.min.js"></script>
+      <script src="../assets/javascripts/bundle.af256bd8.min.js"></script>
       
         <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-MML-AM_CHTML"></script>
       
