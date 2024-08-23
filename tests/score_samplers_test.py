@@ -24,8 +24,8 @@ from sbi.samplers.score.score import Diffuser
         "subvp",
     ],
 )
-@pytest.mark.parametrize("predictor", ("euler_maruyama", "ddim"))
-@pytest.mark.parametrize("corrector", (None, "langevin", "gibbs"))
+@pytest.mark.parametrize("predictor", ("euler_maruyama",))
+@pytest.mark.parametrize("corrector", (None,))
 @pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
 @pytest.mark.parametrize("mu", (-1.0, 0.0, 1.0))
 @pytest.mark.parametrize("std", (1.0, 0.1))
@@ -39,9 +39,9 @@ def test_score_estimator_forward_shapes(
 
     sampler = Diffuser(score_fn, predictor, corrector)
 
-    T_min = score_fn.score_estimator.T_min
-    T_max = score_fn.score_estimator.T_max
-    ts = torch.linspace(T_max, T_min, 500)
+    t_min = score_fn.score_estimator.t_min
+    t_max = score_fn.score_estimator.t_max
+    ts = torch.linspace(t_max, t_min, 500)
     samples = sampler.run(10_000, ts)
 
     mean_est = samples[0].mean(0)

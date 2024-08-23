@@ -38,7 +38,6 @@ class ScorePosterior(NeuralPosterior):
 
     Log probabilities are obtained by calling the potential function, which in turn uses
     zuko probabilistic ODEs to compute the log-probability.
-
     """
 
     def __init__(
@@ -61,6 +60,7 @@ class ScorePosterior(NeuralPosterior):
             enable_transform: Whether to transform parameters to unconstrained space
                 during MAP optimization. When False, an identity transform will be
                 returned for `theta_transform`. True is not supported yet.
+            sample_with: The method with which to sample. Either of [`ode`, `sde`].
         """
 
         check_prior(prior)
@@ -109,8 +109,9 @@ class ScorePosterior(NeuralPosterior):
             x: Deprecated - use `.set_default_x()` prior to `.sample()`.
             predictor: The predictor for the diffusion-based sampler. Can be a string or
                 a custom predictor following the API in `sbi.samplers.score.predictors`.
-            corrector: The corrector for the diffusion-based sampler. Can be None or a
-                custom corrector following the API in `sbi.samplers.score.correctors`.
+                Currently, only `euler_maruyama` is implemented.
+            corrector: The corrector for the diffusion-based sampler. No correctors
+                are implemented yet, therefore this has to be `None` at the moment.
             predictor_params: Additional parameters passed to predictor.
             corrector_params: Additional parameters passed to corrector.
             steps: Number of steps to take for the Euler-Maruyama method.
@@ -169,8 +170,9 @@ class ScorePosterior(NeuralPosterior):
             x: Deprecated - use `.set_default_x()` prior to `.sample()`.
             predictor: The predictor for the diffusion-based sampler. Can be a string or
                 a custom predictor following the API in `sbi.samplers.score.predictors`.
-            corrector: The corrector for the diffusion-based sampler. Can be None or a
-                custom corrector following the API in `sbi.samplers.score.correctors`.
+                Currently, only `euler_maruyama` is implemented.
+            corrector: The corrector for the diffusion-based sampler. No correctors
+                are implemented yet, therefore this has to be `None` at the moment.
             steps: Number of steps to take for the Euler-Maruyama method.
             ts: Time points at which to evaluate the diffusion process. If None, a
                 linear grid between t_max and t_min is used.

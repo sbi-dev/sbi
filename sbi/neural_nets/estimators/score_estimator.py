@@ -77,10 +77,10 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         self.register_buffer("std_0", std_0.clone().detach())
 
         # We estimate the mean and std of the source distribution at time t_max.
-        mean_T = self.approx_marginal_mean(torch.tensor([t_max]))
-        std_T = self.approx_marginal_std(torch.tensor([t_max]))
-        self.register_buffer("mean_T", mean_T)
-        self.register_buffer("std_T", std_T)
+        mean_t = self.approx_marginal_mean(torch.tensor([t_max]))
+        std_t = self.approx_marginal_std(torch.tensor([t_max]))
+        self.register_buffer("mean_t", mean_t)
+        self.register_buffer("std_t", std_t)
 
     def forward(self, input: Tensor, condition: Tensor, time: Tensor) -> Tensor:
         r"""Forward pass of the score estimator network to compute the conditional score

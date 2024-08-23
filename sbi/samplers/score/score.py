@@ -42,12 +42,12 @@ class Diffuser:
         self.device = self.predictor.device
 
         # Extract time limits from the score function
-        self.T_min = score_based_potential.score_estimator.T_min
-        self.T_max = score_based_potential.score_estimator.T_max
+        self.t_min = score_based_potential.score_estimator.t_min
+        self.t_max = score_based_potential.score_estimator.t_max
 
         # Extract initial moments
-        self.init_mean = score_based_potential.score_estimator.mean_T
-        self.init_std = score_based_potential.score_estimator.std_T
+        self.init_mean = score_based_potential.score_estimator.mean_t
+        self.init_std = score_based_potential.score_estimator.std_t
 
         # Extract relevant shapes from the score function
         self.input_shape = score_based_potential.score_estimator.input_shape
