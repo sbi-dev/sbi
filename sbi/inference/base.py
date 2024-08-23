@@ -621,7 +621,7 @@ def simulate_for_sbi(
     else:
         # Cast theta to numpy for better joblib performance (seee #1175)
         seed_all_backends(seed)
-        theta = proposal.sample((num_simulations,)).numpy()
+        theta = proposal.sample((num_simulations,))
 
         # Parse the simulation_batch_size logic
         if simulation_batch_size is None:
@@ -629,13 +629,12 @@ def simulate_for_sbi(
         else:
             simulation_batch_size = min(simulation_batch_size, num_simulations)
 
-        # The batch size will be an approximation, since np.array_split does
-        # not take as argument the size of the batch but their total.
-        num_batches = num_simulations // simulation_batch_size
-
-        batches = np.array_split(theta, num_batches, axis=0)
-
         if num_workers != 1:
+            # For multiprocessing, we want to switch to numpy arrays.
+            # The batch size will be an approximation, since np.array_split does
+            # not take as argument the size of the batch but their total.
+            num_batches = num_simulations // simulation_batch_size
+            batches = np.array_split(theta.numpy(), num_batches, axis=0)
             batch_seeds = np.random.randint(low=0, high=1_000_000, size=(len(batches),))
 
             # define seeded simulator.
@@ -643,21 +642,28 @@ def simulate_for_sbi(
                 seed_all_backends(seed)
                 return simulator(theta)
 
-            simulation_outputs: list[Tensor] = [  # pyright: ignore
-                xx
-                for xx in tqdm(
-                    Parallel(return_as="generator", n_jobs=num_workers)(
-                        delayed(simulator_seeded)(batch, seed)
-                        for batch, seed in zip(batches, batch_seeds)
-                    ),
-                    total=num_simulations,
-                    disable=not show_progress_bar,
-                )
-            ]
+            try:  # catch TypeError to give more informative error message
+                simulation_outputs: list[Tensor] = [  # pyright: ignore
+                    xx
+                    for xx in tqdm(
+                        Parallel(return_as="generator", n_jobs=num_workers)(
+                            delayed(simulator_seeded)(batch, seed)
+                            for batch, seed in zip(batches, batch_seeds)
+                        ),
+                        total=num_simulations,
+                        disable=not show_progress_bar,
+                    )
+                ]
+            except TypeError as err:
+                raise TypeError(
+                    "For multiprocessing, we switch to numpy arrays. Make sure to "
+                    "preprocess your simulator with `process_simulator` to handle numpy"
+                    " arrays."
+                ) from err
 
         else:
             simulation_outputs: list[Tensor] = []
-
+            batches = torch.split(theta, simulation_batch_size)
             for batch in tqdm(batches, disable=not show_progress_bar):
                 simulation_outputs.append(simulator(batch))
 
