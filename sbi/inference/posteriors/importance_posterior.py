@@ -247,7 +247,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         sample_shape: Shape = torch.Size(),
         oversampling_factor: int = 32,
         max_sampling_batch_size: int = 10_000,
-        show_progress_bars: bool = True,
+        show_progress_bars: bool = False,
     ):
         r"""Returns approximate samples from posterior $p(\theta|x)$ via SIR.
 
