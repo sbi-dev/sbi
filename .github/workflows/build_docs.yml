@@ -37,7 +37,6 @@ jobs:
     - name: convert notebooks to markdown
       run: |
         cd docs
-        jupyter nbconvert --to markdown ../examples/*.ipynb --output-dir docs/examples/
         jupyter nbconvert --to markdown ../tutorials/*.ipynb --output-dir docs/tutorials/
 
     - name: Configure Git user for bot
