@@ -712,8 +712,8 @@ def pairplot(
     # Backwards compatibility
     if len(kwargs) > 0:
         warn(
-            "**kwargs are deprecated, use fig_kwargs instead. \n \
-              Calling the to be deprecated pairplot function",
+            f"you passed deprecated arguments **kwargs: {[key for key in kwargs]}, use "
+            "fig_kwargs instead. We continue calling the deprecated pairplot function",
             DeprecationWarning,
             stacklevel=2,
         )
@@ -851,8 +851,8 @@ def marginal_plot(
     # backwards compatibility
     if len(kwargs) > 0:
         warn(
-            "**kwargs are deprecated, use fig_kwargs instead.\n\
-              calling the to be deprecated marginal_plot function",
+            "**kwargs are deprecated, use fig_kwargs instead. "
+            "calling the to be deprecated marginal_plot function",
             DeprecationWarning,
             stacklevel=2,
         )
@@ -2091,7 +2091,9 @@ def pp_plot_lc2st(
     )
 
 
-def plot_tarp(ecp: Tensor, alpha: Tensor, title: Optional[str]) -> Tuple[Figure, Axes]:
+def plot_tarp(
+    ecp: Tensor, alpha: Tensor, title: Optional[str] = None
+) -> Tuple[Figure, Axes]:
     """
     Plots the expected coverage probability (ECP) against the credibility
     level,alpha, for a given alpha grid.
@@ -2114,8 +2116,6 @@ def plot_tarp(ecp: Tensor, alpha: Tensor, title: Optional[str]) -> Tuple[Figure,
 
     fig = plt.figure(figsize=(6, 6))
     ax: Axes = plt.gca()
-    if title is None:
-        title = ""
 
     ax.plot(alpha, ecp, color="blue", label="TARP")
     ax.plot(alpha, alpha, color="black", linestyle="--", label="ideal")
@@ -2123,7 +2123,7 @@ def plot_tarp(ecp: Tensor, alpha: Tensor, title: Optional[str]) -> Tuple[Figure,
     ax.set_ylabel(r"Expected Coverage Probility")
     ax.set_xlim(0.0, 1.0)
     ax.set_ylim(0.0, 1.0)
-    ax.set_title(title)
+    ax.set_title(title or "")
     ax.legend()
     return fig, ax  # type: ignore
 
@@ -2660,8 +2660,8 @@ def _arrange_plots(
 
 def _get_default_opts():
     warn(
-        "_get_default_opts will be deprecated, use _get_default_fig_kwargs,\
-              get_default_diag_kwargs, get_default_offdiag_kwargs instead",
+        "_get_default_opts will be deprecated, use _get_default_fig_kwargs,"
+        "get_default_diag_kwargs, get_default_offdiag_kwargs instead",
         PendingDeprecationWarning,
         stacklevel=2,
     )
