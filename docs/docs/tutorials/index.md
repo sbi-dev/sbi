@@ -23,37 +23,36 @@ inference.
 ## Advanced
 
 <div class="grid cards" markdown>
-- [Multi-round inference](03_multiround_inference.md)
-- [Sampling algorithms in sbi](11_sampler_interface.md)
-- [Custom density estimators](04_density_estimators.md)
-- [Embedding nets for observations](05_embedding_net.md)
-- [SBI with trial-based data](14_iid_data_and_permutation_invariant_embeddings.md)
-- [Handling invalid simulations](08_restriction_estimator.md)
-- [Crafting summary statistics](10_crafting_summary_statistics.md)
-- [Importance sampling posteriors](17_importance_sampled_posteriors.md)
+- [Multi-round inference](02_multiround_inference.md)
+- [Sampling algorithms in sbi](09_sampler_interface.md)
+- [Custom density estimators](03_density_estimators.md)
+- [Embedding nets for observations](04_embedding_networks.md)
+- [SBI with trial-based data](12_iid_data_and_permutation_invariant_embeddings.md)
+- [Handling invalid simulations](06_restriction_estimator.md)
+- [Crafting summary statistics](08_crafting_summary_statistics.md)
+- [Importance sampling posteriors](15_importance_sampled_posteriors.md)
 </div>
 
 ## Diagnostics
 
 <div class="grid cards" markdown>
-- [Posterior predictive checks](12_diagnostics_posterior_predictive_check.md)
-- [Simulation-based calibration](13_diagnostics_simulation_based_calibration.md)
-- [Density plots and MCMC diagnostics with ArviZ](15_mcmc_diagnostics_with_arviz.md)
-- [Local-C2ST coverage checks](18_diagnostics_lc2st.md)
+- [Posterior predictive checks](10_diagnostics_posterior_predictive_checks.md)
+- [Simulation-based calibration](11_diagnostics_simulation_based_calibration.md)
+- [Local-C2ST coverage checks](13_diagnostics_lc2st.md)
+- [Density plots and MCMC diagnostics with ArviZ](14_mcmc_diagnostics_with_arviz.md)
 </div>
-
 
 ## Analysis
 
 <div class="grid cards" markdown>
-- [Conditional distributions](07_conditional_distributions.md)
-- [Posterior sensitivity analysis](09_sensitivity_analysis.md)
-- [Plotting functionality](19_plotting_functionality.md)
+- [Conditional distributions](05_conditional_distributions.md)
+- [Posterior sensitivity analysis](07_sensitivity_analysis.md)
+- [Plotting functionality](17_plotting_functionality.md)
 </div>
 
 ## Examples
 
 <div class="grid cards" markdown>
-- [Hodgkin-Huxley model](../examples/00_HH_simulator.md)
-- [Decision-making model](../examples/01_decision_making_model.md)
+- [Hodgkin-Huxley model](Example_00_HodgkinHuxleyModel.md)
+- [Decision-making model](Example_01_DecisionMakingModel.md)
 </div>

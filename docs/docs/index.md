@@ -149,6 +149,15 @@ methods](tutorials/16_implemented_methods.md).
   inference** <br> by Deistler, Goncalves & Macke (NeurIPS 2022)
   <br>[[Paper]](https://arxiv.org/abs/2210.04815)
 
+- **Flow matching for scalable simulation-based inference**<br> by Dax, M., Wildberger,
+  J., Buchholz, S., Green, S. R., Macke, J. H., & Schölkopf, B. (NeurIPS, 2023)<br>
+  [[Paper]](https://arxiv.org/abs/2305.17161)
+
+- **Compositional Score Modeling for Simulation-Based Inference**<br> by Geffner, T.,
+  Papamakarios, G., & Mnih, A. (2023, July). Compositional score modeling for
+  simulation-based inference. (ICML 2023)<br>
+  [[Paper]](https://proceedings.mlr.press/v202/geffner23a.html)
+
 ### Likelihood-estimation (`(S)NLE`)
 
 - **Sequential neural likelihood: Fast likelihood-free inference with
