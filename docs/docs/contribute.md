@@ -224,18 +224,16 @@ pip install -e ".[doc]"
 Then, you can build the website locally by executing in the `docs` folder
 
 ```bash
-mike serve
+mkdocs serve
 ```
 
 This will build the website on a local host address shown in the terminal. Changes to
 the website files or a browser refresh will immediately rebuild the website.
 
-If you want to build the latest version of the tutorial notebooks, you need to convert
-them to markdown first:
+If you updated the tutorials or examples, you need to convert them to markdown first:
 
 ```bash
 cd docs
-jupyter nbconvert --to markdown ../examples/*.ipynb --output-dir docs/examples/
 jupyter nbconvert --to markdown ../tutorials/*.ipynb --output-dir docs/tutorials/
-mike serve
+mkdocs serve
 ```

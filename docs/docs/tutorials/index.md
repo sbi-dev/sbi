@@ -54,6 +54,6 @@ inference.
 ## Examples
 
 <div class="grid cards" markdown>
-- [Hodgkin-Huxley model](../examples/00_HH_simulator.md)
-- [Decision-making model](../examples/01_decision_making_model.md)
+- [Hodgkin-Huxley model](Example_00_HodgkinHuxleyModel.md)
+- [Decision-making model](Example_01_DecisionMakingModel.md)
 </div>

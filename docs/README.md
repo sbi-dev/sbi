@@ -15,12 +15,11 @@ locally, follow these steps:
     ```
 
 2. Convert the current version of the documentation notebooks to markdown and build the
-   website locally using `mike`:
+   website locally using `mkdocs`:
 
     ```bash
     jupyter nbconvert --to markdown ../tutorials/*.ipynb --output-dir docs/tutorials/
-    jupyter nbconvert --to markdown ../examples/*.ipynb --output-dir docs/examples/
-    mike serve
+    mkdocs serve
     ```
 
 ### Deployment
