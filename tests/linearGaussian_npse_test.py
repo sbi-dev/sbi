@@ -19,17 +19,15 @@ from .test_utils import check_c2st, get_dkl_gaussian_prior
 
 
 # We always test num_dim and sample_with with defaults and mark the rests as slow.
-@pytest.mark.parametrize("num_dim", [1, 3])
 @pytest.mark.parametrize(
-    "sde_type, prior_str, sample_with",
+    "sde_type, num_dim, prior_str, sample_with",
     [
-        pytest.param("vp", "uniform", ["sde", "ode"]),
-        pytest.param("vp", "gaussian", ["sde", "ode"], marks=pytest.mark.slow),
-        pytest.param("ve", "gaussian", ["sde", "ode"], marks=pytest.mark.slow),
-        pytest.param("ve", "uniform", ["sde", "ode"], marks=pytest.mark.slow),
-        pytest.param("subvp", "gaussian", ["sde", "ode"], marks=pytest.mark.slow),
-        pytest.param("subvp", "uniform", ["sde", "ode"], marks=pytest.mark.slow),
-    ],
+        ("vp", 1, "gaussian", ["sde", "ode"]),
+        ("vp", 3, "uniform", ["sde", "ode"]),
+        ("vp", 3, "gaussian", ["sde", "ode"]),
+        ("ve", 3, "uniform", ["sde", "ode"]),
+        ("subvp", 3, "uniform", ["sde", "ode"]),
+    ]
 )
 def test_c2st_npse_on_linearGaussian(
     sde_type, num_dim: int, prior_str: str, sample_with: List[str]
@@ -38,7 +36,7 @@ def test_c2st_npse_on_linearGaussian(
 
     x_o = zeros(1, num_dim)
     num_samples = 1000
-    num_simulations = 5000
+    num_simulations = 10_000
 
     # likelihood_mean will be likelihood_shift+theta
     likelihood_shift = -1.0 * ones(num_dim)

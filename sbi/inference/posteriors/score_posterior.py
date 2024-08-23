@@ -82,7 +82,9 @@ class ScorePosterior(NeuralPosterior):
         self.score_estimator = score_estimator
 
         self.sample_with = sample_with
-        assert self.sample_with in ["ode", "sde"], "sample_with must be 'ode' or 'sde'."
+        assert self.sample_with in ["ode", "sde"], (
+            f"sample_with must be 'ode' or 'sde', but is {self.sample_with}."
+        )
         self.max_sampling_batch_size = max_sampling_batch_size
 
         self._purpose = """It samples from the diffusion model given the \

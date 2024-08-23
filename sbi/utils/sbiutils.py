@@ -22,6 +22,7 @@ from torch.distributions import (
     biject_to,
     constraints,
 )
+from torch.optim.adam import Adam
 
 from sbi.sbi_types import TorchTransform
 from sbi.utils.torchutils import atleast_2d
@@ -866,6 +867,7 @@ def mog_log_prob(
 def gradient_ascent(
     potential_fn: Callable,
     inits: Tensor,
+    theta_transform: Optional[torch_tf.Transform] = None,
     num_iter: int = 1_000,
     num_to_optimize: int = 100,
     learning_rate: float = 0.01,
@@ -909,30 +911,34 @@ def gradient_ascent(
         The `argmax` and `max` of the `potential_fn`.
     """
 
-    # This if-case avoids initial computation of log-probs for score-based methods.
-    # (Because log-prob is slow for them).
-    if num_to_optimize > len(inits):
-        init_probs = potential_fn(inits).detach()
-
-        # Pick the `num_to_optimize` best init locations.
-        sort_indices = torch.argsort(init_probs, dim=0)
-        sorted_inits = inits[sort_indices]
-        optimize_inits = sorted_inits[-num_to_optimize:]
-
-        # The `_overall` variables store data accross the iterations, whereas the
-        # `_iter` variables contain data exclusively extracted from the current
-        # iteration.
-        best_log_prob_iter = torch.max(init_probs)
-        best_theta_iter = sorted_inits[-1]
-        best_theta_overall = best_theta_iter.detach().clone()
+    if theta_transform is None:
+        theta_transform = torch_tf.IndependentTransform(
+            torch_tf.identity_transform, reinterpreted_batch_ndims=1
+        )
     else:
-        optimize_inits = inits
-        best_log_prob_iter = torch.tensor(-(2**31))
-        best_theta_overall = None
+        theta_transform = theta_transform
 
+    init_probs = potential_fn(inits).detach()
+
+    # Pick the `num_to_optimize` best init locations.
+    sort_indices = torch.argsort(init_probs, dim=0)
+    sorted_inits = inits[sort_indices]
+    optimize_inits = sorted_inits[-num_to_optimize:]
+
+    # The `_overall` variables store data accross the iterations, whereas the
+    # `_iter` variables contain data exclusively extracted from the current
+    # iteration.
+    best_log_prob_iter = torch.max(init_probs)
+    best_theta_iter = sorted_inits[-1]
+    best_theta_overall = best_theta_iter.detach().clone()
     best_log_prob_overall = best_log_prob_iter.detach().clone()
+
     argmax_ = best_theta_overall
     max_val = best_log_prob_overall
+
+    optimize_inits = theta_transform(optimize_inits)
+    optimize_inits.requires_grad_(True)  # type: ignore
+    optimizer = Adam([optimize_inits], lr=learning_rate)  # type: ignore
 
     iter_ = 0
 
@@ -940,50 +946,39 @@ def gradient_ascent(
     # back on the last saved `.map_`. We want to avoid a long error-message here.
     try:
         while iter_ < num_iter:
-            # Gradient of the potential, either `gradient` function (e.g. for
-            # score-based estimators) or via autodiff (e.g. for flows).
-            try:
-                optimize_inits.requires_grad_(False)  # type: ignore
-                gradient = potential_fn.gradient(optimize_inits)
-            except (NotImplementedError, AttributeError):
-                optimize_inits.requires_grad_(True)  # type: ignore
-                probs = potential_fn(optimize_inits).squeeze()
-                loss = probs.sum()
-                loss.backward()
-                gradient = optimize_inits.grad
-                assert isinstance(gradient, Tensor), "Gradient must be a tensor."
-
-            # Update the parameters with gradient descent.
-            # See https://discuss.pytorch.org/t/updatation-of-parameters-without-using-optimizer-step/34244/2
-            with torch.no_grad():
-                new_value = optimize_inits + learning_rate * gradient
-                optimize_inits.copy_(new_value)
+            optimizer.zero_grad()
+            probs = potential_fn(theta_transform.inv(optimize_inits)).squeeze()
+            loss = -probs.sum()
+            loss.backward()
+            optimizer.step()
 
             with torch.no_grad():
-                if iter_ % save_best_every + 1 == 0 or iter_ == num_iter - 1:
+                if iter_ % save_best_every == 0 or iter_ == num_iter - 1:
                     # Evaluate the optimized locations and pick the best one.
-                    log_probs_of_optimized = (
-                        potential_fn(optimize_inits).detach().squeeze()
+                    log_probs_of_optimized = potential_fn(
+                        theta_transform.inv(optimize_inits)
                     )
                     best_theta_iter = optimize_inits[  # type: ignore
                         torch.argmax(log_probs_of_optimized)
                     ].view(1, -1)
-                    best_log_prob_iter = torch.max(log_probs_of_optimized)
+                    best_log_prob_iter = potential_fn(
+                        theta_transform.inv(best_theta_iter)
+                    )
                     if best_log_prob_iter > best_log_prob_overall:
                         best_theta_overall = best_theta_iter.detach().clone()
                         best_log_prob_overall = best_log_prob_iter.detach().clone()
 
-            if show_progress_bars:
-                print(
-                    "\r",
-                    f"Optimizing MAP estimate. Iterations: {iter_ + 1} / "
-                    f"{num_iter}. Performance in iteration "
-                    f"{divmod(iter_ + 1, save_best_every)[0] * save_best_every}: "
-                    f"{best_log_prob_iter.item():.2f} (= unnormalized log-prob)",
-                    end="",
-                )
-            argmax_ = best_theta_overall
-            max_val = best_log_prob_overall
+                if show_progress_bars:
+                    print(
+                        "\r",
+                        f"Optimizing MAP estimate. Iterations: {iter_ + 1} / "
+                        f"{num_iter}. Performance in iteration "
+                        f"{divmod(iter_ + 1, save_best_every)[0] * save_best_every}: "
+                        f"{best_log_prob_iter.item():.2f} (= unnormalized log-prob)",
+                        end="",
+                    )
+                argmax_ = theta_transform.inv(best_theta_overall)
+                max_val = best_log_prob_overall
 
             iter_ += 1
 
@@ -992,8 +987,7 @@ def gradient_ascent(
         print(interruption + interruption_note)
         return argmax_, max_val  # type: ignore
 
-    print("max_val", max_val)
-    return best_theta_overall, max_val  # type: ignore
+    return theta_transform.inv(best_theta_overall), max_val  # type: ignore
 
 
 def seed_all_backends(seed: Optional[Union[int, Tensor]] = None) -> None:

@@ -181,15 +181,49 @@ class NeuralPosterior:
         else:
             return self.default_x
 
-    def map(
+    def _calculate_map(
         self,
-        x: Optional[Tensor] = None,
-        num_iter: int = 1000,
+        num_iter: int = 1_000,
         num_to_optimize: int = 100,
         learning_rate: float = 0.01,
         init_method: Union[str, Tensor] = "posterior",
-        num_init_samples: int = 1000,
-        save_best_every: int = 1000,
+        num_init_samples: int = 1_000,
+        save_best_every: int = 10,
+        show_progress_bars: bool = False,
+    ) -> Tensor:
+        """Calculates the maximum-a-posteriori estimate (MAP).
+        See `map()` method of child classes for docstring.
+        """
+
+        if init_method == "posterior":
+            inits = self.sample((num_init_samples,))
+        elif init_method == "proposal":
+            inits = self.proposal.sample((num_init_samples,))  # type: ignore
+        elif isinstance(init_method, Tensor):
+            inits = init_method
+        else:
+            raise ValueError
+
+        return gradient_ascent(
+            potential_fn=self.potential_fn,
+            inits=inits,
+            theta_transform=self.theta_transform,
+            num_iter=num_iter,
+            num_to_optimize=num_to_optimize,
+            learning_rate=learning_rate,
+            save_best_every=save_best_every,
+            show_progress_bars=show_progress_bars,
+        )[0]
+
+    def map(
+        self,
+        x: Optional[Tensor] = None,
+        num_iter: int = 1_000,
+        num_to_optimize: int = 100,
+        learning_rate: float = 0.01,
+        init_method: Union[str, Tensor] = "posterior",
+        num_init_samples: int = 1_000,
+        save_best_every: int = 10,
         show_progress_bars: bool = False,
         force_update: bool = False,
     ) -> Tensor:
@@ -256,41 +290,34 @@ class NeuralPosterior:
             )
         return self._map
 
-    def _calculate_map(
-        self,
-        num_iter: int = 1_000,
-        num_to_optimize: int = 100,
-        learning_rate: float = 0.01,
-        init_method: Union[str, Tensor] = "posterior",
-        num_init_samples: int = 1_000,
-        save_best_every: int = 10,
-        show_progress_bars: bool = False,
-    ) -> Tensor:
-        """Calculates the maximum-a-posteriori estimate (MAP).
-
-        See `map()` method of child classes for docstring.
-        """
-        if init_method == "posterior":
-            inits = self.sample((num_init_samples,))
-        elif init_method == "proposal":
-            inits = self.proposal.sample((num_init_samples,))  # type: ignore
-        elif isinstance(init_method, Tensor):
-            inits = init_method
-        else:
-            raise ValueError
-
-        return gradient_ascent(
-            potential_fn=self.potential_fn,
-            inits=inits,
-            num_iter=num_iter,
-            num_to_optimize=num_to_optimize,
-            learning_rate=learning_rate,
-            save_best_every=save_best_every,
-            show_progress_bars=show_progress_bars,
-        )[0]
-
     def __repr__(self):
         desc = f"""{self.__class__.__name__} sampler for potential_fn=<{
             self.potential_fn.__class__.__name__
         }>"""
         return desc
+    
+    def __str__(self):
+        desc = (
+            f"Posterior p(θ|x) of type {self.__class__.__name__}. "
+            f"{self._purpose}"
+        )
+        return desc
+
+    def __getstate__(self) -> Dict:
+        """Returns the state of the object that is supposed to be pickled.
+
+        Returns:
+            Dictionary containing the state.
+        """
+        return self.__dict__
+
+    def __setstate__(self, state_dict: Dict):
+        """Sets the state when being loaded from pickle.
+
+        For developers: for any new attribute added to `NeuralPosterior`, we have to
+        add an entry here using `check_warn_and_setstate()`.
+
+        Args:
+            state_dict: State to be restored.
+        """
+        self.__dict__ = state_dict

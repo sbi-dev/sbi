@@ -132,21 +132,10 @@ class NPSE(NeuralInference):
         Returns:
             NeuralInference object (returned so that this function is chainable).
         """
-        if (
-            proposal is None
-            or proposal is self._prior
-            or (
-                isinstance(proposal, RestrictedPrior) and proposal._prior is self._prior
-            )
-        ):
-            # The `_data_round_index` will later be used to infer if one should train
-            # with MLE loss or with atomic loss (see, in `train()`:
-            # self._round = max(self._data_round_index))
-            current_round = 0
-        else:
-            raise NotImplementedError(
-                "Multi-round NPSE is not yet implemented. Please use single-round NPSE."
-            )
+        assert proposal is None, (
+            "Multi-round NPSE is not yet implemented. Please use single-round NPSE."
+        )
+        current_round = 0
 
         if exclude_invalid_x is None:
             exclude_invalid_x = current_round == 0
@@ -170,8 +159,6 @@ class NPSE(NeuralInference):
 
         npe_msg_on_invalid_x(num_nans, num_infs, exclude_invalid_x, "Single-round NPE")
 
-        self._check_proposal(proposal)
-
         self._data_round_index.append(current_round)
         prior_masks = mask_sims_from_prior(int(current_round > 0), theta.size(0))
 
@@ -182,16 +169,6 @@ class NPSE(NeuralInference):
         self._proposal_roundwise.append(proposal)
 
         if self._prior is None or isinstance(self._prior, ImproperEmpirical):
-            if proposal is not None:
-                raise ValueError(
-                    "You had not passed a prior at initialization, but now you "
-                    "passed a proposal. If you want to run multi-round SNPE, you have "
-                    "to specify a prior (set the `.prior` argument or re-initialize "
-                    "the object with a prior distribution). If the samples you passed "
-                    "to `append_simulations()` were sampled from the prior, you can "
-                    "run single-round inference with "
-                    "`append_simulations(..., proposal=None)`."
-                )
             theta_prior = self.get_simulations()[0].to(self._device)
             self._prior = ImproperEmpirical(
                 theta_prior, ones(theta_prior.shape[0], device=self._device)
@@ -442,34 +419,6 @@ class NPSE(NeuralInference):
 
         return deepcopy(self._neural_net)
 
-    def _converged(self, epoch: int, stop_after_epochs: int) -> bool:
-        """Check if training has converged.
-
-        Args:
-            epoch: Current epoch.
-            stop_after_epochs: Number of epochs to wait for improvement on the
-                validation set before terminating training.
-
-        Returns:
-            Whether training has converged.
-        """
-        converged = False
-
-        # No checkpointing, just check if the validation loss has improved.
-
-        # (Re)-start the epoch count with the first epoch or any improvement.
-        if epoch == 0 or self._val_loss < self._best_val_loss:
-            self._best_val_loss = self._val_loss
-            self._epochs_since_last_improvement = 0
-        else:
-            self._epochs_since_last_improvement += 1
-
-        # If no validation improvement over many epochs, stop training.
-        if self._epochs_since_last_improvement > stop_after_epochs - 1:
-            converged = True
-
-        return converged
-
     def build_posterior(
         self,
         score_estimator: Optional[ConditionalScoreEstimator] = None,
@@ -567,45 +516,3 @@ class NPSE(NeuralInference):
             )
 
         return calibration_kernel(x) * loss
-
-    def _check_proposal(self, proposal):
-        """
-        Check for validity of the provided proposal distribution.
-
-        If the proposal is a `NeuralPosterior`, we check if the default_x is set.
-        If the proposal is **not** a `NeuralPosterior`, we warn since it is likely that
-        the user simply passed the prior, but this would still trigger atomic loss.
-        """
-        if proposal is not None:
-            check_if_proposal_has_default_x(proposal)
-
-            if isinstance(proposal, RestrictedPrior):
-                if proposal._prior is not self._prior:
-                    warn(
-                        "The proposal you passed is a `RestrictedPrior`, but the "
-                        "proposal distribution it uses is not the prior (it can be "
-                        "accessed via `RestrictedPrior._prior`). We do not "
-                        "recommend to mix the `RestrictedPrior` with multi-round "
-                        "SNPE.",
-                        stacklevel=2,
-                    )
-            elif (
-                not isinstance(proposal, NeuralPosterior)
-                and proposal is not self._prior
-            ):
-                warn(
-                    "The proposal you passed is neither the prior nor a "
-                    "`NeuralPosterior` object. If you are an expert user and did so "
-                    "for research purposes, this is fine. If not, you might be doing "
-                    "something wrong: feel free to create an issue on Github.",
-                    stacklevel=2,
-                )
-        elif self._round > 0:
-            raise ValueError(
-                "A proposal was passed but no prior was passed at initialisation. When "
-                "running multi-round inference, a prior needs to be specified upon "
-                "initialisation. Potential fix: setting the `._prior` attribute or "
-                "re-initialisation. If the samples passed to `append_simulations()` "
-                "were sampled from the prior, single-round inference can be performed "
-                "with `append_simulations(..., proprosal=None)`."
-            )
