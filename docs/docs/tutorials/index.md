@@ -17,6 +17,7 @@ inference.
 <div class="grid cards" markdown>
 - [Getting started](00_getting_started_flexible.md)
 - [Amortized inference](01_gaussian_amortized.md)
+- [More flexibility for training and sampling](18_training_interface.md)
 - [Implemented algorithms](16_implemented_methods.md)
 </div>
 
