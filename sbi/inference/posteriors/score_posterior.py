@@ -1,5 +1,5 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from typing import Dict, Optional, Union
 
@@ -60,7 +60,8 @@ class ScorePosterior(NeuralPosterior):
             enable_transform: Whether to transform parameters to unconstrained space
                 during MAP optimization. When False, an identity transform will be
                 returned for `theta_transform`. True is not supported yet.
-            sample_with: The method with which to sample. Either of [`ode`, `sde`].
+            sample_with: Whether to sample from the posterior using the ODE-based
+                sampler or the SDE-based sampler.
         """
 
         check_prior(prior)
@@ -82,9 +83,10 @@ class ScorePosterior(NeuralPosterior):
         self.score_estimator = score_estimator
 
         self.sample_with = sample_with
-        assert self.sample_with in ["ode", "sde"], (
-            f"sample_with must be 'ode' or 'sde', but is {self.sample_with}."
-        )
+        assert self.sample_with in [
+            "ode",
+            "sde",
+        ], f"sample_with must be 'ode' or 'sde', but is {self.sample_with}."
         self.max_sampling_batch_size = max_sampling_batch_size
 
         self._purpose = """It samples from the diffusion model given the \
@@ -112,7 +114,7 @@ class ScorePosterior(NeuralPosterior):
             predictor: The predictor for the diffusion-based sampler. Can be a string or
                 a custom predictor following the API in `sbi.samplers.score.predictors`.
                 Currently, only `euler_maruyama` is implemented.
-            corrector: The corrector for the diffusion-based sampler. Either of 
+            corrector: The corrector for the diffusion-based sampler. Either of
                 [None].
             predictor_params: Additional parameters passed to predictor.
             corrector_params: Additional parameters passed to corrector.
@@ -173,7 +175,7 @@ class ScorePosterior(NeuralPosterior):
             predictor: The predictor for the diffusion-based sampler. Can be a string or
                 a custom predictor following the API in `sbi.samplers.score.predictors`.
                 Currently, only `euler_maruyama` is implemented.
-            corrector: The corrector for the diffusion-based sampler. Either of 
+            corrector: The corrector for the diffusion-based sampler. Either of
                 [None].
             steps: Number of steps to take for the Euler-Maruyama method.
             ts: Time points at which to evaluate the diffusion process. If None, a
@@ -231,7 +233,7 @@ class ScorePosterior(NeuralPosterior):
 
         This build the probability flow ODE and then samples from the corresponding
         flow. This is implemented via the zuko library.
-        
+
         Args:
             x: Condition.
             sample_shape: The shape of the samples to be returned.

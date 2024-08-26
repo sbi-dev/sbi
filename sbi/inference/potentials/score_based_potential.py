@@ -1,5 +1,5 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from typing import Optional, Tuple
 
@@ -215,7 +215,7 @@ def build_freeform_jacobian_transform(
     exact: bool = True,
 ) -> FreeFormJacobianTransform:
     """Builds the free-form Jacobian for the probability flow ODE, used for log-prob.
-    
+
     Args:
         score_estimator: The neural network estimating the score.
         x_o: Observation.
@@ -258,7 +258,7 @@ def _iid_bridge(
 ):
     r"""
     Returns the score-based potential for multiple IID observations.
-    
+
     This can require a special solver to obtain the correct tall posterior.
 
     Args:
@@ -284,10 +284,8 @@ def _iid_bridge(
     # xos is of shape (num_obs, *condition_shape).
     # theta is of shape (num_samples, *parameter_shape).
 
-    # we need to combine the batch shapes of num_obs and num_samples for both
+    # TODO: we need to combine the batch shapes of num_obs and num_samples for both
     # theta and xos.
-    # TODO: janfb adapted this to fix the iid setting shape problems, but iid inference
-    # is not working correctly.
     theta_per_xo = theta.repeat(num_obs, 1)
     xos_per_theta = xos.repeat_interleave(theta.shape[0], dim=0)
 

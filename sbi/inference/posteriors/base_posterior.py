@@ -244,6 +244,9 @@ class NeuralPosterior:
             x: Deprecated - use `.set_default_x()` prior to `.map()`.
             num_iter: Number of optimization steps that the algorithm takes
                 to find the MAP.
+            num_to_optimize: From the drawn `num_init_samples`, use the
+                `num_to_optimize` with highest log-probability as the initial points
+                for the optimization.
             learning_rate: Learning rate of the optimizer.
             init_method: How to select the starting parameters for the optimization. If
                 it is a string, it can be either [`posterior`, `prior`], which samples
@@ -251,9 +254,6 @@ class NeuralPosterior:
                 tensor, the tensor will be used as init locations.
             num_init_samples: Draw this number of samples from the posterior and
                 evaluate the log-probability of all of them.
-            num_to_optimize: From the drawn `num_init_samples`, use the
-                `num_to_optimize` with highest log-probability as the initial points
-                for the optimization.
             save_best_every: The best log-probability is computed, saved in the
                 `map`-attribute, and printed every `save_best_every`-th iteration.
                 Computing the best log-probability creates a significant overhead
@@ -295,11 +295,10 @@ class NeuralPosterior:
             self.potential_fn.__class__.__name__
         }>"""
         return desc
-    
+
     def __str__(self):
         desc = (
-            f"Posterior p(θ|x) of type {self.__class__.__name__}. "
-            f"{self._purpose}"
+            f"Posterior p(θ|x) of type {self.__class__.__name__}. " f"{self._purpose}"
         )
         return desc
 

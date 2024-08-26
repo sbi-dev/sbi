@@ -1,8 +1,6 @@
-import math
 from abc import ABC, abstractmethod
 from typing import Callable, Optional, Type
 
-import torch
 from torch import Tensor
 
 from sbi.samplers.score.predictors import Predictor

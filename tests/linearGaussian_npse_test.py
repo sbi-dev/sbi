@@ -27,7 +27,7 @@ from .test_utils import check_c2st, get_dkl_gaussian_prior
         ("vp", 3, "gaussian", ["sde", "ode"]),
         ("ve", 3, "uniform", ["sde", "ode"]),
         ("subvp", 3, "uniform", ["sde", "ode"]),
-    ]
+    ],
 )
 def test_c2st_npse_on_linearGaussian(
     sde_type, num_dim: int, prior_str: str, sample_with: List[str]

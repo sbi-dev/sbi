@@ -1,9 +1,8 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 import time
 from copy import deepcopy
 from typing import Any, Callable, Optional, Union
-from warnings import warn
 
 import torch
 from torch import Tensor, ones
@@ -21,7 +20,6 @@ from sbi.inference.posteriors.score_posterior import ScorePosterior
 from sbi.neural_nets.estimators.score_estimator import ConditionalScoreEstimator
 from sbi.neural_nets.factory import posterior_score_nn
 from sbi.utils import (
-    RestrictedPrior,
     check_estimator_arg,
     handle_invalid_x,
     npe_msg_on_invalid_x,
@@ -131,9 +129,9 @@ class NPSE(NeuralInference):
         Returns:
             NeuralInference object (returned so that this function is chainable).
         """
-        assert proposal is None, (
-            "Multi-round NPSE is not yet implemented. Please use single-round NPSE."
-        )
+        assert (
+            proposal is None
+        ), "Multi-round NPSE is not yet implemented. Please use single-round NPSE."
         current_round = 0
 
         if exclude_invalid_x is None:
@@ -233,7 +231,7 @@ class NPSE(NeuralInference):
         self._round = max(self._data_round_index)
 
         if self._round == 0 and self._neural_net is not None:
-            assert force_first_round_loss, (
+            assert force_first_round_loss or resume_training, (
                 "You have already trained this neural network. After you had trained "
                 "the network, you again appended simulations with `append_simulations"
                 "(theta, x)`, but you did not provide a proposal. If the new "
@@ -243,7 +241,7 @@ class NPSE(NeuralInference):
                 "proposal, i.e. `append_simulations(theta, x, proposal)`. If "
                 "your samples are not sampled from the prior and you do not pass a "
                 "proposal and you set `force_first_round_loss=True`, the result of "
-                "SNPE will not be the true posterior. Instead, it will be the proposal "
+                "NPSE will not be the true posterior. Instead, it will be the proposal "
                 "posterior, which (usually) is more narrow than the true posterior."
             )
 
@@ -274,8 +272,6 @@ class NPSE(NeuralInference):
         # First round or if retraining from scratch:
         # Call the `self._build_neural_net` with the rounds' thetas and xs as
         # arguments, which will build the neural network.
-        # This is passed into NeuralPosterior, to create a neural posterior which
-        # can `sample()` and `log_prob()`. The network is accessible via `.net`.
         if self._neural_net is None or retrain_from_scratch:
             # Get theta,x to initialize NN
             theta, x, _ = self.get_simulations(starting_round=start_idx)
@@ -423,7 +419,7 @@ class NPSE(NeuralInference):
         score_estimator: Optional[ConditionalScoreEstimator] = None,
         prior: Optional[Distribution] = None,
         sample_with: str = "sde",
-    ) -> Union[ScorePosterior, DirectPosterior]:
+    ) -> ScorePosterior:
         r"""Build posterior from the score estimator.
 
         For NPSE, the posterior distribution that is returned here implements the
@@ -436,8 +432,10 @@ class NPSE(NeuralInference):
             score_estimator: The score estimator that the posterior is based on.
                 If `None`, use the latest neural score estimator that was trained.
             prior: Prior distribution.
-            sample_with: Method to use for sampling from the posterior. Currently only
-                sampling via 'sde' is available.
+            sample_with: Method to use for sampling from the posterior. Can be one of
+                'sde' (default) or 'ode'. The 'sde' method uses the score to
+                do a Langevin diffusion step, while the 'ode' method uses the score to
+                define a probabilistic ODE and solves it with a numerical ODE solver.
 
         Returns:
             Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods.
@@ -456,11 +454,10 @@ class NPSE(NeuralInference):
             score_estimator = self._neural_net
             # If internal net is used device is defined.
             device = self._device
+        # Otherwise, infer it from the device of the net parameters.
         else:
             # TODO: Add protocol for checking if the score estimator has forward and
             # loss methods with the correct signature.
-            score_estimator = score_estimator
-            # Otherwise, infer it from the device of the net parameters.
             device = str(next(score_estimator.parameters()).device)
 
         posterior = ScorePosterior(
@@ -521,12 +518,16 @@ class NPSE(NeuralInference):
 
         Unlike the `._converged` method in base.py, this method does not reset to the
         best model. We noticed that this improves performance. Deleting this method
-        will make C2ST tests fail.
+        will make C2ST tests fail. This is because the loss is very stochastic, so
+        resetting might reset to an underfitted model. Ideally, we would write a
+        custom `._converged()` method which checks whether the loss is still going
+        down **for all t**.
 
         Args:
             epoch: Current epoch.
             stop_after_epochs: Number of epochs to wait for improvement on the
                 validation set before terminating training.
+
         Returns:
             Whether training has converged.
         """

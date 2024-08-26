@@ -7,9 +7,9 @@ from torch import Tensor
 from sbi.neural_nets.embedding_nets import GaussianFourierTimeEmbedding
 from sbi.neural_nets.estimators.score_estimator import (
     ConditionalScoreEstimator,
+    SubVPScoreEstimator,
     VEScoreEstimator,
     VPScoreEstimator,
-    SubVPScoreEstimator,
 )
 from sbi.utils.sbiutils import standardizing_net, z_score_parser, z_standardization
 from sbi.utils.user_input_checks import check_data_device
@@ -209,15 +209,27 @@ class MLP(nn.Module):
 
     def __init__(
         self,
-        input_dim,
-        output_dim,
-        input_handler,
-        hidden_dim=100,
-        num_layers=5,
-        activation=nn.GELU(),
-        layer_norm=True,
-        skip_connection=True,
+        input_dim: int,
+        output_dim: int,
+        input_handler: nn.Module,
+        hidden_dim: int = 100,
+        num_layers: int = 5,
+        activation: nn.Module = nn.GELU(),
+        layer_norm: bool = True,
+        skip_connection: bool = True,
     ):
+        """Initializes the MLP.
+
+        Args:
+            input_dim: The dimensionality of the input tensor.
+            output_dim: The dimensionality of the output tensor.
+            input_handler: The input handler module.
+            hidden_dim: The dimensionality of the hidden layers.
+            num_layers: The number of hidden layers.
+            activation: The activation function.
+            layer_norm: Whether to use layer normalization.
+            skip_connection: Whether to use skip connections.
+        """
         super().__init__()
 
         self.input_handler = input_handler
@@ -333,11 +345,11 @@ class AdaMLP(nn.Module):
 
     def __init__(
         self,
-        x_dim,
-        emb_dim,
-        input_handler,
-        hidden_dim=100,
-        num_layers=3,
+        x_dim: int,
+        emb_dim: int,
+        input_handler: nn.Module,
+        hidden_dim: int = 100,
+        num_layers: int = 3,
         **kwargs,
     ):
         super().__init__()

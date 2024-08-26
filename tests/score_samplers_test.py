@@ -16,20 +16,13 @@ from sbi.neural_nets.score_nets import build_score_estimator
 from sbi.samplers.score.score import Diffuser
 
 
-@pytest.mark.parametrize(
-    "sde_type",
-    [
-        "vp",
-        "ve",
-        "subvp",
-    ],
-)
+@pytest.mark.parametrize("sde_type", ["vp", "ve", "subvp"])
 @pytest.mark.parametrize("predictor", ("euler_maruyama",))
 @pytest.mark.parametrize("corrector", (None,))
 @pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
 @pytest.mark.parametrize("mu", (-1.0, 0.0, 1.0))
 @pytest.mark.parametrize("std", (1.0, 0.1))
-def test_score_estimator_forward_shapes(
+def test_gaussian_score_sampling(
     sde_type, predictor, corrector, input_event_shape, mu, std
 ):
     mean0 = mu * torch.ones(input_event_shape)
@@ -42,10 +35,10 @@ def test_score_estimator_forward_shapes(
     t_min = score_fn.score_estimator.t_min
     t_max = score_fn.score_estimator.t_max
     ts = torch.linspace(t_max, t_min, 500)
-    samples = sampler.run(10_000, ts)
+    samples = sampler.run(1_000, ts)
 
-    mean_est = samples[0].mean(0)
-    std_est = samples[0].std(0)
+    mean_est = samples.mean(0)
+    std_est = samples.std(0)
 
     assert torch.allclose(mean_est, mean0, atol=1e-1)
     assert torch.allclose(std_est, std0, atol=1e-1)
@@ -68,8 +61,13 @@ def _build_gaussian_score_estimator(
     # Note the precondition predicts a correct Gaussian score by default if the neural
     # net predicts 0!
     class DummyNet(torch.nn.Module):
-        def forward(self, x):
-            return torch.zeros((x.shape[0], *input_event_shape))
+
+        def __init__(self):
+            super().__init__()
+            self.dummy_param_for_device_detection = torch.nn.Linear(1, 1)
+
+        def forward(self, input, condition, time):
+            return torch.zeros_like(input)
 
     score_estimator = build_score_estimator(
         building_thetas,

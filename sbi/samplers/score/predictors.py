@@ -1,14 +1,14 @@
+# This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+
 from abc import ABC, abstractmethod
-from typing import Callable, Optional, Type
+from typing import Callable, Type
 
 import torch
 from torch import Tensor
 
 from sbi.inference.potentials.score_based_potential import (
     PosteriorScoreBasedPotential,
-)
-from sbi.neural_nets.estimators.score_estimator import (
-    VEScoreEstimator,
 )
 
 PREDICTORS = {}
@@ -48,18 +48,18 @@ def register_predictor(name: str) -> Callable:
 
 class Predictor(ABC):
     """Predictor base class.
-    
+
     See child classes for more detail.
     """
+
     def __init__(
         self,
         potential_fn: PosteriorScoreBasedPotential,
     ):
         """Initialize predictor.
-        
+
         Args:
-            potential_fn: The potential from which to sample. Must have 
-                `.gradient()` implemented.
+            potential_fn: potential with gradient from which to sample.
         """
         self.potential_fn = potential_fn
         self.device = potential_fn.device
@@ -70,7 +70,7 @@ class Predictor(ABC):
 
     def __call__(self, theta: Tensor, t1: Tensor, t0: Tensor) -> Tensor:
         """Run prediction.
-        
+
         Args:
             theta: Parameters.
             t1: Time.
@@ -81,7 +81,7 @@ class Predictor(ABC):
     @abstractmethod
     def predict(self, theta: Tensor, t1: Tensor, t0: Tensor) -> Tensor:
         """Run prediction.
-        
+
         Args:
             theta: Parameters.
             t1: Time.
@@ -101,8 +101,8 @@ class EulerMaruyama(Predictor):
         SDEs.
 
         Args:
-            potential_fn (ScoreBasedPotential): Score-based potential to predict.
-            eta (float, optional): Mediates how much noise is added during sampling i.e.
+            potential_fn: Score-based potential to predict.
+            eta: Mediates how much noise is added during sampling i.e.
                 for values approaching 0 this becomes the deterministic probabilifty
                 flow ODE. For large values it becomes a more stochastic reverse SDE.
                 Defaults to 1.0.
