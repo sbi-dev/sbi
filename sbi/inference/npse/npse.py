@@ -13,11 +13,10 @@ from torch.optim.adam import Adam
 from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi import utils as utils
-from sbi.inference import NeuralInference, check_if_proposal_has_default_x
+from sbi.inference import NeuralInference
 from sbi.inference.posteriors import (
     DirectPosterior,
 )
-from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.posteriors.score_posterior import ScorePosterior
 from sbi.neural_nets.estimators.score_estimator import ConditionalScoreEstimator
 from sbi.neural_nets.factory import posterior_score_nn
@@ -516,3 +515,34 @@ class NPSE(NeuralInference):
             )
 
         return calibration_kernel(x) * loss
+
+    def _converged(self, epoch: int, stop_after_epochs: int) -> bool:
+        """Check if training has converged.
+
+        Unlike the `._converged` method in base.py, this method does not reset to the
+        best model. We noticed that this improves performance. Deleting this method
+        will make C2ST tests fail.
+
+        Args:
+            epoch: Current epoch.
+            stop_after_epochs: Number of epochs to wait for improvement on the
+                validation set before terminating training.
+        Returns:
+            Whether training has converged.
+        """
+        converged = False
+
+        # No checkpointing, just check if the validation loss has improved.
+
+        # (Re)-start the epoch count with the first epoch or any improvement.
+        if epoch == 0 or self._val_loss < self._best_val_loss:
+            self._best_val_loss = self._val_loss
+            self._epochs_since_last_improvement = 0
+        else:
+            self._epochs_since_last_improvement += 1
+
+        # If no validation improvement over many epochs, stop training.
+        if self._epochs_since_last_improvement > stop_after_epochs - 1:
+            converged = True
+
+        return converged

@@ -112,8 +112,8 @@ class ScorePosterior(NeuralPosterior):
             predictor: The predictor for the diffusion-based sampler. Can be a string or
                 a custom predictor following the API in `sbi.samplers.score.predictors`.
                 Currently, only `euler_maruyama` is implemented.
-            corrector: The corrector for the diffusion-based sampler. No correctors
-                are implemented yet, therefore this has to be `None` at the moment.
+            corrector: The corrector for the diffusion-based sampler. Either of 
+                [None].
             predictor_params: Additional parameters passed to predictor.
             corrector_params: Additional parameters passed to corrector.
             steps: Number of steps to take for the Euler-Maruyama method.
@@ -173,8 +173,8 @@ class ScorePosterior(NeuralPosterior):
             predictor: The predictor for the diffusion-based sampler. Can be a string or
                 a custom predictor following the API in `sbi.samplers.score.predictors`.
                 Currently, only `euler_maruyama` is implemented.
-            corrector: The corrector for the diffusion-based sampler. No correctors
-                are implemented yet, therefore this has to be `None` at the moment.
+            corrector: The corrector for the diffusion-based sampler. Either of 
+                [None].
             steps: Number of steps to take for the Euler-Maruyama method.
             ts: Time points at which to evaluate the diffusion process. If None, a
                 linear grid between t_max and t_min is used.

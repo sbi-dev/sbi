@@ -157,7 +157,7 @@ def test_density_estimators_on_linearGaussian(density_estimator):
 
     x_o = zeros(1, x_dim)
     num_samples = 1000
-    num_simulations = 2000
+    num_simulations = 2500
 
     # likelihood_mean will be likelihood_shift+theta
     likelihood_shift = -1.0 * ones(x_dim)
