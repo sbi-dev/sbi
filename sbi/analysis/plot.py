@@ -179,10 +179,10 @@ def plt_kde_2d(
     ax.imshow(
         Z,
         extent=(
-            limits_col[0],
-            limits_col[1],
-            limits_row[0],
-            limits_row[1],
+            limits_col[0].item(),
+            limits_col[1].item(),
+            limits_row[0].item(),
+            limits_row[1].item(),
         ),
         **offdiag_kwargs["mpl_kwargs"],
     )
@@ -350,7 +350,7 @@ def get_offdiag_funcs(
 def _format_subplot(
     ax: Axes,
     current: str,
-    limits: Union[List, torch.Tensor],
+    limits: Union[List[List[float]], torch.Tensor],
     ticks: Optional[Union[List, torch.Tensor]],
     labels_dim: List[str],
     fig_kwargs: Dict,
@@ -384,6 +384,9 @@ def _format_subplot(
     ):
         ax.set_facecolor(fig_kwargs["fig_bg_colors"][current])
     # Limits
+    if isinstance(limits, Tensor):
+        assert limits.dim() == 2, "Limits should be a 2D tensor."
+        limits = limits.tolist()
     if current == "diag":
         eps = fig_kwargs["x_lim_add_eps"]
         ax.set_xlim((limits[col][0] - eps, limits[col][1] + eps))
