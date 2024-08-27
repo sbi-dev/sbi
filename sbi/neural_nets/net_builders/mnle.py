@@ -7,8 +7,10 @@ from typing import Optional
 import torch
 from torch import Tensor, nn
 
-from sbi.neural_nets.build_nets.categorial import build_categoricalmassestimator
-from sbi.neural_nets.build_nets.flow import (
+from sbi.neural_nets.estimators import MixedDensityEstimator
+from sbi.neural_nets.estimators.mixed_density_estimator import _separate_input
+from sbi.neural_nets.net_builders.categorial import build_categoricalmassestimator
+from sbi.neural_nets.net_builders.flow import (
     build_made,
     build_maf,
     build_maf_rqs,
@@ -23,9 +25,7 @@ from sbi.neural_nets.build_nets.flow import (
     build_zuko_sospf,
     build_zuko_unaf,
 )
-from sbi.neural_nets.build_nets.mdn import build_mdn
-from sbi.neural_nets.estimators import MixedDensityEstimator
-from sbi.neural_nets.estimators.mixed_density_estimator import _separate_input
+from sbi.neural_nets.net_builders.mdn import build_mdn
 from sbi.utils.sbiutils import (
     standardizing_net,
     z_score_parser,

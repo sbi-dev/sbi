@@ -8,8 +8,8 @@ import torch
 from torch import eye, zeros
 from torch.distributions import MultivariateNormal
 
-from sbi.neural_nets.build_nets import build_linear_classifier
 from sbi.neural_nets.embedding_nets import CNNEmbedding
+from sbi.neural_nets.net_builders import build_linear_classifier
 from sbi.neural_nets.ratio_estimators import RatioEstimator
 
 

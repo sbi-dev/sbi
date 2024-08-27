@@ -12,7 +12,7 @@ from torch import Tensor
 from sbi.inference.potentials.score_based_potential import (
     score_estimator_based_potential,
 )
-from sbi.neural_nets.build_nets import build_score_estimator
+from sbi.neural_nets.net_builders import build_score_estimator
 from sbi.samplers.score.score import Diffuser
 
 
