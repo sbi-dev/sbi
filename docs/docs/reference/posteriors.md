@@ -20,6 +20,11 @@
       filters: [ "!^_", "^__", "!^__class__" ]
       inherited_members: true
 
+::: sbi.inference.posteriors.score_posterior.ScorePosterior
+    selection:
+      filters: [ "!^_", "^__", "!^__class__" ]
+      inherited_members: true
+
 ::: sbi.inference.posteriors.vi_posterior.VIPosterior
     selection:
       filters: [ "!^_", "^__", "!^__class__" ]

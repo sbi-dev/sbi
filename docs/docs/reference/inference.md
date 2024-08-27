@@ -12,6 +12,16 @@
       filters: [ "!^_", "^__", "!^__class__" ]
       inherited_members: true
 
+::: sbi.inference.fmpe.fmpe_base.FMPE
+    selection:
+      filters: [ "!^_", "^__", "!^__class__" ]
+      inherited_members: true
+
+::: sbi.inference.npse.npse.NPSE
+    selection:
+      filters: [ "!^_", "^__", "!^__class__" ]
+      inherited_members: true
+
 ::: sbi.inference.snle.snle_a.SNLE_A
     selection:
       filters: [ "!^_", "^__", "!^__class__" ]

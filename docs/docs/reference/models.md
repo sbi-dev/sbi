@@ -6,4 +6,8 @@
 
 ::: sbi.neural_nets.factory.classifier_nn
 
-::: sbi.neural_nets.density_estimators.ConditionalDensityEstimator
+::: sbi.neural_nets.factory.flowmatching_nn
+
+::: sbi.neural_nets.factory.posterior_score_nn
+
+::: sbi.neural_nets.estimators.ConditionalDensityEstimator
