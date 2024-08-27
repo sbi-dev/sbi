@@ -538,7 +538,7 @@
 <p>Below, we will first describe how you can run <code>Neural Posterior Estimation (NPE)</code>. We will attach code snippets for <code>Neural Likelihood Estimation (NLE)</code> and <code>Neural Ratio Estimation (NRE)</code> at the end.</p>
 <h2 id="neural-posterior-estimation">Neural Posterior Estimation<a class="headerlink" href="#neural-posterior-estimation" title="Permanent link">&para;</a></h2>
 <p>First, we have to decide on what <code>DensityEstimator</code> to use. In this tutorial, we will use a <code>Neural Spline Flow</code> (NSF) taken from the <a href="https://github.com/bayesiains/nflows"><code>nflows</code></a> package.</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi.neural_nets.flow</span> <span class="kn">import</span> <span class="n">build_nsf</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi.neural_nets.build_nets</span> <span class="kn">import</span> <span class="n">build_nsf</span>
 
 <span class="n">density_estimator</span> <span class="o">=</span> <span class="n">build_nsf</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
 </code></pre></div>

@@ -528,7 +528,7 @@
 
 <span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">NPSE</span>
 <span class="kn">from</span> <span class="nn">sbi.utils</span> <span class="kn">import</span> <span class="n">BoxUniform</span>
-<span class="kn">from</span> <span class="nn">sbi</span> <span class="kn">import</span> <span class="n">analysis</span> <span class="k">as</span> <span class="n">analysis</span>
+<span class="kn">from</span> <span class="nn">sbi.analysis</span> <span class="kn">import</span> <span class="n">pairplot</span>
 </code></pre></div>
 <div class="codehilite"><pre><span></span><code>WARNING (pytensor.tensor.blas): Using NumPy C-API based implementation for BLAS functions.
 </code></pre></div>
@@ -538,8 +538,9 @@
 <span class="n">num_dims</span> <span class="o">=</span> <span class="mi">3</span>
 <span class="n">num_sims</span> <span class="o">=</span> <span class="mi">5000</span>
 <span class="n">prior</span> <span class="o">=</span> <span class="n">BoxUniform</span><span class="p">(</span><span class="n">low</span><span class="o">=-</span><span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">num_dims</span><span class="p">),</span> <span class="n">high</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">num_dims</span><span class="p">))</span>
+
 <span class="k">def</span> <span class="nf">simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">):</span>
-    <span class="c1"># linear gaussian</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Linear gaussian simulator.&quot;&quot;&quot;</span>
     <span class="k">return</span> <span class="n">theta</span> <span class="o">+</span> <span class="mf">1.0</span> <span class="o">+</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn_like</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span> <span class="o">*</span> <span class="mf">0.1</span>
 
 <span class="c1"># Produce simulations</span>
@@ -593,14 +594,13 @@ pass for normalizing flows). </p>
 <div class="codehilite"><pre><span></span><code> Neural network successfully converged after 61 epochs.
 </code></pre></div>
 
-<div class="highlight"><pre><span></span><code><span class="c1"># the custom way</span>
-
-<span class="c1"># set up a custom vector field neural network</span>
-<span class="n">net_builder</span> <span class="o">=</span> <span class="n">flowmatching_nn</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">&quot;resnet&quot;</span><span class="p">,</span>
-                              <span class="n">num_blocks</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>
-                              <span class="n">hidden_features</span><span class="o">=</span><span class="mi">24</span><span class="p">,</span>
-                            <span class="c1">#   embedding_net = CNNEmbedding  # e.g., for image data.</span>
-                              <span class="p">)</span>
+<div class="highlight"><pre><span></span><code><span class="c1"># Set up a custom vector field neural network</span>
+<span class="n">net_builder</span> <span class="o">=</span> <span class="n">flowmatching_nn</span><span class="p">(</span>
+    <span class="n">model</span><span class="o">=</span><span class="s2">&quot;resnet&quot;</span><span class="p">,</span>
+    <span class="n">num_blocks</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>
+    <span class="n">hidden_features</span><span class="o">=</span><span class="mi">24</span><span class="p">,</span>
+    <span class="c1"># embedding_net=CNNEmbedding  # e.g., for image data.</span>
+<span class="p">)</span>
 <span class="n">trainer</span> <span class="o">=</span> <span class="n">FMPE</span><span class="p">(</span><span class="n">prior</span><span class="p">,</span> <span class="n">density_estimator</span><span class="o">=</span><span class="n">net_builder</span><span class="p">)</span>
 <span class="n">trainer</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">(</span><span class="n">training_batch_size</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">learning_rate</span><span class="o">=</span><span class="mf">5e-4</span><span class="p">)</span>
 <span class="n">posterior</span> <span class="o">=</span> <span class="n">trainer</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">()</span>
@@ -613,7 +613,7 @@ Drawing 10000 posterior samples:   0%|          | 0/10000 [00:00&lt;?, ?it/s]
 </code></pre></div>
 
 <div class="highlight"><pre><span></span><code><span class="c1"># plot posterior samples</span>
-<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">analysis</span><span class="o">.</span><span class="n">pairplot</span><span class="p">(</span>
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">pairplot</span><span class="p">(</span>
     <span class="n">posterior_samples</span><span class="p">,</span> <span class="n">limits</span><span class="o">=</span><span class="p">[[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">]],</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mi">5</span><span class="p">),</span>
     <span class="n">labels</span><span class="o">=</span><span class="p">[</span><span class="sa">r</span><span class="s2">&quot;$\theta_1$&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;$\theta_2$&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;$\theta_3$&quot;</span><span class="p">],</span>
     <span class="n">points</span><span class="o">=</span><span class="n">theta_o</span> <span class="c1"># add ground truth thetas</span>
@@ -631,7 +631,7 @@ Drawing 10000 posterior samples:   0%|          | 0/10000 [00:00&lt;?, ?it/s]
 <p>For more details on score-based generative models, see <a href="https://arxiv.org/abs/2011.13456">Song et al., 2020</a> (in particular, Figure 1 and 2).</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># Instantiate NPSE and append simulations</span>
 <span class="n">inference</span> <span class="o">=</span> <span class="n">NPSE</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span> <span class="n">sde_type</span><span class="o">=</span><span class="s2">&quot;ve&quot;</span><span class="p">)</span>
-<span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">);</span>
+<span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
 </code></pre></div>
 <p>Note the argument <code>sde_type</code>, which defines whether the forward diffusion process has a noising schedule that is Variance Exploding (<code>ve</code>, i.e., <a href="https://proceedings.neurips.cc/paper/2019/hash/3001ef257407d5a371a96dcd947c7d93-Abstract.html?ref=https://githubhelp.com">SMLD</a>), Variance Preserving (<code>vp</code>, i.e., <a href="https://proceedings.neurips.cc/paper/2020/hash/4c5bcfec8584af0d967f1ab10179ca4b-Abstract.html">DDPM</a>), or sub-Variance Preserving (<code>subvp</code>) in the limit.</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># Train the score estimator</span>
@@ -648,7 +648,7 @@ Drawing 10000 posterior samples:   0%|          | 0/10000 [00:00&lt;?, ?it/s]
 </code></pre></div>
 
 <div class="highlight"><pre><span></span><code><span class="c1"># plot posterior samples</span>
-<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">analysis</span><span class="o">.</span><span class="n">pairplot</span><span class="p">(</span>
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">pairplot</span><span class="p">(</span>
     <span class="n">posterior_samples</span><span class="p">,</span> <span class="n">limits</span><span class="o">=</span><span class="p">[[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">]],</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mi">5</span><span class="p">),</span>
     <span class="n">labels</span><span class="o">=</span><span class="p">[</span><span class="sa">r</span><span class="s2">&quot;$\theta_1$&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;$\theta_2$&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;$\theta_3$&quot;</span><span class="p">],</span>
     <span class="n">points</span><span class="o">=</span><span class="n">theta_o</span> <span class="c1"># add ground truth thetas</span>

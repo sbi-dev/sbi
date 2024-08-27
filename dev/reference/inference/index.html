@@ -4955,8 +4955,7 @@ simulation-based inference.</p>
 
               <details class="quote">
                 <summary>Source code in <code>sbi/inference/fmpe/fmpe_base.py</code></summary>
-                <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 30</span>
-<span class="normal"> 31</span>
+                <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 31</span>
 <span class="normal"> 32</span>
 <span class="normal"> 33</span>
 <span class="normal"> 34</span>
@@ -5264,7 +5263,8 @@ simulation-based inference.</p>
 <span class="normal">336</span>
 <span class="normal">337</span>
 <span class="normal">338</span>
-<span class="normal">339</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span> <span class="nc">FMPE</span><span class="p">(</span><span class="n">NeuralInference</span><span class="p">):</span>
+<span class="normal">339</span>
+<span class="normal">340</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span> <span class="nc">FMPE</span><span class="p">(</span><span class="n">NeuralInference</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Implements the Flow Matching Posterior Estimator (FMPE) for</span>
 <span class="sd">    simulation-based inference.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -5705,8 +5705,7 @@ field for flow matching. Can be a string, e.g., &lsquo;mlp&rsquo; or &lsquo;resn
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/fmpe/fmpe_base.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">35</span>
-<span class="normal">36</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">36</span>
 <span class="normal">37</span>
 <span class="normal">38</span>
 <span class="normal">39</span>
@@ -5738,7 +5737,8 @@ field for flow matching. Can be a string, e.g., &lsquo;mlp&rsquo; or &lsquo;resn
 <span class="normal">65</span>
 <span class="normal">66</span>
 <span class="normal">67</span>
-<span class="normal">68</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">68</span>
+<span class="normal">69</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">],</span>
     <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;mlp&quot;</span><span class="p">,</span>
@@ -5806,7 +5806,7 @@ field for flow matching. Can be a string, e.g., &lsquo;mlp&rsquo; or &lsquo;resn
           <tr class="doc-section-item">
             <td><code>density_estimator</code></td>
             <td>
-                  <code><span title="typing.Optional">Optional</span>[<a class="autorefs autorefs-internal" title="sbi.neural_nets.ConditionalDensityEstimator" href="../models/#sbi.neural_nets.estimators.ConditionalDensityEstimator">ConditionalDensityEstimator</a>]</code>
+                  <code><span title="typing.Optional">Optional</span>[<a class="autorefs autorefs-internal" title="sbi.neural_nets.estimators.ConditionalDensityEstimator" href="../models/#sbi.neural_nets.estimators.ConditionalDensityEstimator">ConditionalDensityEstimator</a>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -5887,8 +5887,7 @@ field for flow matching. Can be a string, e.g., &lsquo;mlp&rsquo; or &lsquo;resn
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/fmpe/fmpe_base.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">289</span>
-<span class="normal">290</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">290</span>
 <span class="normal">291</span>
 <span class="normal">292</span>
 <span class="normal">293</span>
@@ -5937,7 +5936,8 @@ field for flow matching. Can be a string, e.g., &lsquo;mlp&rsquo; or &lsquo;resn
 <span class="normal">336</span>
 <span class="normal">337</span>
 <span class="normal">338</span>
-<span class="normal">339</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">build_posterior</span><span class="p">(</span>
+<span class="normal">339</span>
+<span class="normal">340</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">build_posterior</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">ConditionalDensityEstimator</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -6180,7 +6180,7 @@ results.</p>
       <tbody>
           <tr class="doc-section-item">
 <td><code>DensityEstimator</code></td>            <td>
-                  <code><a class="autorefs autorefs-internal" title="sbi.neural_nets.ConditionalDensityEstimator" href="../models/#sbi.neural_nets.estimators.ConditionalDensityEstimator">ConditionalDensityEstimator</a></code>
+                  <code><a class="autorefs autorefs-internal" title="sbi.neural_nets.estimators.ConditionalDensityEstimator" href="../models/#sbi.neural_nets.estimators.ConditionalDensityEstimator">ConditionalDensityEstimator</a></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -6193,8 +6193,7 @@ results.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/fmpe/fmpe_base.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">127</span>
-<span class="normal">128</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">128</span>
 <span class="normal">129</span>
 <span class="normal">130</span>
 <span class="normal">131</span>
@@ -6353,7 +6352,8 @@ results.</p>
 <span class="normal">284</span>
 <span class="normal">285</span>
 <span class="normal">286</span>
-<span class="normal">287</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">train</span><span class="p">(</span>
+<span class="normal">287</span>
+<span class="normal">288</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">train</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">training_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">200</span><span class="p">,</span>
     <span class="n">learning_rate</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">5e-4</span><span class="p">,</span>
