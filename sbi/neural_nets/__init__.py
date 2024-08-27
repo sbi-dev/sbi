@@ -7,34 +7,21 @@ from sbi.neural_nets.factory import (
 )
 
 
-class CNNEmbedding:
-    """Exists only to raise an explicit error for imports of embedding networks."""
-
-    def __init__(self, *args, **kwargs):
-        raise ValueError(
+def __getattr__(name):
+    if name in ["CNNEmbedding", "FCEmbedding", "PermutationInvariantEmbedding"]:
+        raise ImportError(
             "As of sbi v0.23.0, you have to import embedding networks from "
             "`sbi.neural_nets.embedding_nets`. For example, use: "
-            "`from sbi.neural_nets.embedding_nets import CNNEmbedding`"
+            f"`from sbi.neural_nets.embedding_nets import {name}`"
         )
-
-
-class FCEmbedding:
-    """Exists only to raise an explicit error for imports of embedding networks."""
-
-    def __init__(self, *args, **kwargs):
-        raise ValueError(
-            "As of sbi v0.23.0, you have to import embedding networks from "
-            "`sbi.neural_nets.embedding_nets`. For example, use: "
-            "`from sbi.neural_nets.embedding_nets import FCEmbedding`"
-        )
-
-
-class PermutationInvariantEmbedding:
-    """Exists only to raise an explicit error for imports of embedding networks."""
-
-    def __init__(self, *args, **kwargs):
-        raise ValueError(
-            "As of sbi v0.23.0, you have to import embedding networks from "
-            "`sbi.neural_nets.embedding_nets`. For example, use: "
-            "`from sbi.neural_nets.embedding_nets import PermutationInvariantEmbedding`"
-        )
+    elif name == "classifier_nn":
+        return classifier_nn
+    elif name == "flowmatching_nn":
+        return flowmatching_nn
+    elif name == "likelihood_nn":
+        return likelihood_nn
+    elif name == "posterior_nn":
+        return posterior_nn
+    elif name == "posterior_score_nn":
+        return posterior_score_nn
+    raise AttributeError(f"Module '{__name__}' has no attribute '{name}'")
