@@ -8,8 +8,8 @@ from torch import Tensor
 from torch.distributions import Distribution
 
 from sbi.inference.potentials.base_potential import BasePotential
-from sbi.neural_nets.density_estimators import ConditionalDensityEstimator
-from sbi.neural_nets.density_estimators.shape_handling import (
+from sbi.neural_nets.estimators import ConditionalDensityEstimator
+from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
     reshape_to_sample_batch_event,
 )

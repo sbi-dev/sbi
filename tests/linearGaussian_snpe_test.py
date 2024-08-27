@@ -30,6 +30,7 @@ from sbi.simulators.linear_gaussian import (
     true_posterior_linear_gaussian_mvn_prior,
 )
 from sbi.utils import RestrictedPrior, get_density_thresholder
+from sbi.utils.user_input_checks import process_prior, process_simulator
 
 from .sbiutils_test import conditional_of_mvn
 from .test_utils import (
@@ -156,7 +157,7 @@ def test_density_estimators_on_linearGaussian(density_estimator):
 
     x_o = zeros(1, x_dim)
     num_samples = 1000
-    num_simulations = 2000
+    num_simulations = 2500
 
     # likelihood_mean will be likelihood_shift+theta
     likelihood_shift = -1.0 * ones(x_dim)
@@ -477,6 +478,8 @@ def test_api_force_first_round_loss(
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     inference = SNPE_C(prior, show_progress_bars=False)
+    prior, _, prior_returns_numpy = process_prior(prior)
+    simulator = process_simulator(simulator, prior, prior_returns_numpy)
 
     proposal = prior
     for _ in range(2):

@@ -2,7 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import inspect
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from typing import Any, Callable, Dict, Optional, Union
 from warnings import warn
 
@@ -20,7 +20,7 @@ from sbi.utils.torchutils import ensure_theta_batched, process_device
 from sbi.utils.user_input_checks import process_x
 
 
-class NeuralPosterior(ABC):
+class NeuralPosterior:
     r"""Posterior $p(\theta|x)$ with `log_prob()` and `sample()` methods.<br/><br/>
     All inference methods in sbi train a neural network which is then used to obtain
     the posterior distribution. The `NeuralPosterior` class wraps the trained network
@@ -52,6 +52,7 @@ class NeuralPosterior(ABC):
                 stacklevel=2,
             )
 
+        # Wrap as `CallablePotentialWrapper` if `potential_fn` is a Callable.
         if not isinstance(potential_fn, BasePotential):
             kwargs_of_callable = list(inspect.signature(potential_fn).parameters.keys())
             for key in ["theta", "x_o"]:
@@ -191,7 +192,6 @@ class NeuralPosterior(ABC):
         show_progress_bars: bool = False,
     ) -> Tensor:
         """Calculates the maximum-a-posteriori estimate (MAP).
-
         See `map()` method of child classes for docstring.
         """
 
@@ -215,7 +215,6 @@ class NeuralPosterior(ABC):
             show_progress_bars=show_progress_bars,
         )[0]
 
-    @abstractmethod
     def map(
         self,
         x: Optional[Tensor] = None,
@@ -228,11 +227,44 @@ class NeuralPosterior(ABC):
         show_progress_bars: bool = False,
         force_update: bool = False,
     ) -> Tensor:
-        """Returns stored maximum-a-posterior estimate (MAP), otherwise calculates it.
+        r"""Returns the maximum-a-posteriori estimate (MAP).
 
-        See child classes for docstring.
+        The MAP is obtained by running gradient
+        ascent from a given number of starting positions (samples from the posterior
+        with the highest log-probability). After the optimization is done, we select the
+        parameter set that has the highest log-probability after the optimization.
+
+        Warning: The default values used by this function are not well-tested. They
+        might require hand-tuning for the problem at hand.
+
+        For developers: if the prior is a `BoxUniform`, we carry out the optimization
+        in unbounded space and transform the result back into bounded space.
+
+        Args:
+            x: Deprecated - use `.set_default_x()` prior to `.map()`.
+            num_iter: Number of optimization steps that the algorithm takes
+                to find the MAP.
+            num_to_optimize: From the drawn `num_init_samples`, use the
+                `num_to_optimize` with highest log-probability as the initial points
+                for the optimization.
+            learning_rate: Learning rate of the optimizer.
+            init_method: How to select the starting parameters for the optimization. If
+                it is a string, it can be either [`posterior`, `prior`], which samples
+                the respective distribution `num_init_samples` times. If it is a
+                tensor, the tensor will be used as init locations.
+            num_init_samples: Draw this number of samples from the posterior and
+                evaluate the log-probability of all of them.
+            save_best_every: The best log-probability is computed, saved in the
+                `map`-attribute, and printed every `save_best_every`-th iteration.
+                Computing the best log-probability creates a significant overhead
+                for score-based estimators (thus, the default is `1000`.)
+            show_progress_bars: Whether to show a progressbar during sampling from
+                the posterior.
+            force_update: Whether to re-calculate the MAP when x is unchanged and
+                have a cached value.
+        Returns:
+            The MAP estimate.
         """
-
         if x is not None:
             raise ValueError(
                 "Passing `x` directly to `.map()` has been deprecated."
@@ -266,10 +298,8 @@ class NeuralPosterior(ABC):
 
     def __str__(self):
         desc = (
-            f"Posterior conditional density p(θ|x) of type {self.__class__.__name__}. "
-            f"{self._purpose}"
+            f"Posterior p(θ|x) of type {self.__class__.__name__}. " f"{self._purpose}"
         )
-
         return desc
 
     def __getstate__(self) -> Dict:

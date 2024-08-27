@@ -8,8 +8,8 @@ import torch
 from torch import Tensor, nn
 
 from sbi.neural_nets.categorial import build_categoricalmassestimator
-from sbi.neural_nets.density_estimators import MixedDensityEstimator
-from sbi.neural_nets.density_estimators.mixed_density_estimator import _separate_input
+from sbi.neural_nets.estimators import MixedDensityEstimator
+from sbi.neural_nets.estimators.mixed_density_estimator import _separate_input
 from sbi.neural_nets.flow import (
     build_made,
     build_maf,

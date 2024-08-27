@@ -21,7 +21,7 @@ from tqdm.auto import tqdm
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials.base_potential import BasePotential
-from sbi.neural_nets.density_estimators.shape_handling import reshape_to_batch_event
+from sbi.neural_nets.estimators.shape_handling import reshape_to_batch_event
 from sbi.samplers.mcmc import (
     IterateParameters,
     PyMCSampler,

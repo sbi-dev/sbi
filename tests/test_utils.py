@@ -146,7 +146,6 @@ def check_c2st(x: Tensor, y: Tensor, alg: str, tol: float = 0.1) -> None:
     chance."""
 
     score = c2st(x, y).item()
-
     print(f"c2st for {alg} is {score:.2f}.")
 
     assert (

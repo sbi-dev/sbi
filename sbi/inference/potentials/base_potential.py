@@ -35,6 +35,11 @@ class BasePotential(metaclass=ABCMeta):
     def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
         raise NotImplementedError
 
+    def gradient(
+        self, theta: Tensor, time: Optional[Tensor] = None, track_gradients: bool = True
+    ) -> Tensor:
+        raise NotImplementedError
+
     @property
     def x_is_iid(self) -> bool:
         """If x has batch dimension greater than 1, whether to intepret the batch as iid

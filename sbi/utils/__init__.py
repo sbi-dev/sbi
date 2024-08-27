@@ -69,3 +69,4 @@ from sbi.utils.user_input_checks import (
     validate_theta_and_x,
 )
 from sbi.utils.user_input_checks_utils import MultipleIndependent
+from sbi.utils.get_nn_models import posterior_nn, likelihood_nn, classifier_nn

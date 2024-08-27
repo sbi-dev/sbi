@@ -197,7 +197,7 @@ def test_lc2st_true_positiv_rate(method):
 
     # good estimator: big training and num_epochs = accept
     # (convergence of the estimator)
-    num_train = 10_000
+    num_train = 5_000
     num_epochs = 200
 
     num_cal = 1_000

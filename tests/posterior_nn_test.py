@@ -32,7 +32,13 @@ from tests.test_utils import check_c2st
     (
         0,
         1,
-        pytest.param(2, marks=pytest.mark.xfail(raises=AssertionError)),
+        pytest.param(
+            2,
+            marks=pytest.mark.xfail(
+                raises=AssertionError,
+                reason=".log_prob() supports only batch size 1 for x_o.",
+            ),
+        ),
     ),
 )
 def test_log_prob_with_different_x(snpe_method: type, x_o_batch_dim: bool):

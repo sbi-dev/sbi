@@ -241,8 +241,7 @@ class FMPE(NeuralInference):
             self.epoch += 1
 
             train_loss_average = train_loss_sum / len(train_loader)  # type: ignore
-            # TODO: rename to loss once renaming is done in base class.
-            self._summary["training_log_probs"].append(-train_loss_average)
+            self._summary["training_loss"].append(train_loss_average)
 
             # Calculate validation performance.
             self._neural_net.eval()
@@ -262,11 +261,8 @@ class FMPE(NeuralInference):
             self._val_loss = val_loss_sum / (
                 len(val_loader) * val_loader.batch_size  # type: ignore
             )
-            # TODO: remove this once renaming to loss in base class is done.
-            self._val_log_prob = -self._val_loss
-            # Log validation log prob for every epoch.
-            # TODO: rename to loss and fix sign once renaming in base is done.
-            self._summary["validation_log_probs"].append(-self._val_loss)
+            # Log validation loss for every epoch.
+            self._summary["validation_loss"].append(self._val_loss)
             self._summary["epoch_durations_sec"].append(time.time() - epoch_start_time)
 
             self._maybe_show_progress(self._show_progress_bars, self.epoch)
@@ -275,8 +271,7 @@ class FMPE(NeuralInference):
 
         # Update summary.
         self._summary["epochs_trained"].append(self.epoch)
-        # TODO: rename to loss once renaming is done in base class.
-        self._summary["best_validation_log_prob"].append(self._best_val_log_prob)
+        self._summary["best_validation_loss"].append(self._best_val_loss)
 
         # Update tensorboard and summary dict.
         self._summarize(round_=self._round)

@@ -1,3 +1,6 @@
+# This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+
 from typing import Optional
 
 import torch
@@ -5,7 +8,7 @@ from torch import Tensor, nn
 from torch.distributions import Categorical
 from torch.nn import Sigmoid, Softmax
 
-from sbi.neural_nets.density_estimators.base import ConditionalDensityEstimator
+from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
 
 
 class CategoricalNet(nn.Module):
