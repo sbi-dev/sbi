@@ -121,12 +121,3 @@ class EulerMaruyama(Predictor):
         g_backward = self.eta * g
         return theta - f_backward * dt + g_backward * torch.randn_like(theta) * dt_sqrt
 
-
-def vp_default_bridge(alpha, alpha_new, std, std_new, t1, t0):
-    # Default bridge function for the DDIM predictor https://arxiv.org/pdf/2010.02502
-    return std_new / std * torch.sqrt((1 - alpha / alpha_new))
-
-
-def ve_default_bridge(alpha, alpha_new, std, std_new, t1, t0):
-    # Something else
-    return std_new / 10
