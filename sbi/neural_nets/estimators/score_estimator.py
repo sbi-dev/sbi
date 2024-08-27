@@ -2,6 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import math
+from math import pi
 from typing import Callable, Optional, Union
 
 import torch
@@ -652,3 +653,20 @@ class VEScoreEstimator(ConditionalScoreEstimator):
             g = g.unsqueeze(-1)
 
         return g
+
+
+class GaussianFourierTimeEmbedding(nn.Module):
+    """Gaussian random features for encoding time steps.
+
+    This is to be used as a utility for score-matching."""
+
+    def __init__(self, embed_dim=256, scale=30.0):
+        super().__init__()
+        # Randomly sample weights during initialization. These weights are fixed
+        # during optimization and are not trainable.
+        self.W = nn.Parameter(torch.randn(embed_dim // 2) * scale, requires_grad=False)
+
+    def forward(self, times: Tensor):
+        times_proj = times[:, None] * self.W[None, :] * 2 * pi
+        embedding = torch.cat([torch.sin(times_proj), torch.cos(times_proj)], dim=-1)
+        return torch.squeeze(embedding, dim=1)
