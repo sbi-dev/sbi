@@ -7,12 +7,12 @@ import torch
 from torch import Tensor, nn, ones
 from torch.distributions import Distribution
 
-from sbi.inference.snre.snre_a import SNRE_A
+from sbi.inference.trainers.nre.nre_a import NRE_A
 from sbi.sbi_types import TensorboardSummaryWriter
 from sbi.utils.sbiutils import del_entries
 
 
-class BNRE(SNRE_A):
+class BNRE(NRE_A):
     def __init__(
         self,
         prior: Optional[Distribution] = None,

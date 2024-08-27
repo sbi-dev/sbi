@@ -1,1 +1,1 @@
-from sbi.inference.npse.npse import NPSE
+from sbi.inference.trainers.npse.npse import NPSE

@@ -13,7 +13,7 @@ from torch.optim.adam import Adam
 from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi import utils as utils
-from sbi.inference.base import NeuralInference
+from sbi.inference.trainers.base import NeuralInference
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.neural_nets import flowmatching_nn
 from sbi.neural_nets.estimators import ConditionalDensityEstimator

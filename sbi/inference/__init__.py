@@ -15,13 +15,15 @@ SNL = SNLE = SNLE_A = NLE = NLE_A
 _nle_family = ["NLE"]
 
 
+SNPE_A = NPE_A
+SNPE_B = NPE_B
 SNPE = APT = SNPE_C = NPE = NPE_C
 _npe_family = ["NPE_A", "NPE_C"]
 
 
-SRE = SNRE_B = NRE_B
+SRE = SNRE = SNRE_B = NRE = NRE_B
 AALR = SNRE_A = NRE_A
-CNRE = NRE_C
+CNRE = SNRE_C = NRE_C
 _nre_family = ["NRE_A", "NRE_B", "NRE_C", "BNRE"]
 
 ABC = MCABC

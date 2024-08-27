@@ -10,7 +10,7 @@ from torch import Tensor, eye, nn, ones
 from torch.distributions import Distribution, MultivariateNormal, Uniform
 
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
-from sbi.inference.snpe.snpe_base import PosteriorEstimator
+from sbi.inference.trainers.npe.npe_base import PosteriorEstimator
 from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
     reshape_to_sample_batch_event,

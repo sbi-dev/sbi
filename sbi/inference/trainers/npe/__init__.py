@@ -1,4 +1,4 @@
-from sbi.inference.snpe.snpe_a import SNPE_A  # noqa: F401
-from sbi.inference.snpe.snpe_b import SNPE_B  # noqa: F401
-from sbi.inference.snpe.snpe_base import PosteriorEstimator  # noqa: F401
-from sbi.inference.snpe.snpe_c import SNPE_C  # noqa: F401
+from sbi.inference.trainers.npe.npe_a import NPE_A  # noqa: F401
+from sbi.inference.trainers.npe.npe_b import NPE_B  # noqa: F401
+from sbi.inference.trainers.npe.npe_base import PosteriorEstimator  # noqa: F401
+from sbi.inference.trainers.npe.npe_c import NPE_C  # noqa: F401

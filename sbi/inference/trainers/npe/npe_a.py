@@ -13,7 +13,7 @@ from torch import Tensor
 from torch.distributions import Distribution, MultivariateNormal
 
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
-from sbi.inference.snpe.snpe_base import PosteriorEstimator
+from sbi.inference.trainers.npe.npe_base import PosteriorEstimator
 from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
 from sbi.sbi_types import TensorboardSummaryWriter, TorchModule
 from sbi.utils import torchutils
