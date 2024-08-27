@@ -24,7 +24,8 @@ from sbi.inference.posteriors import (
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.posteriors.importance_posterior import ImportanceSamplingPosterior
 from sbi.inference.potentials import posterior_estimator_based_potential
-from sbi.neural_nets import ConditionalDensityEstimator, posterior_nn
+from sbi.neural_nets import posterior_nn
+from sbi.neural_nets.estimators import ConditionalDensityEstimator
 from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
     reshape_to_sample_batch_event,

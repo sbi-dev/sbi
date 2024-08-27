@@ -15,7 +15,8 @@ from torch.utils.tensorboard.writer import SummaryWriter
 from sbi import utils as utils
 from sbi.inference.base import NeuralInference
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
-from sbi.neural_nets import ConditionalDensityEstimator, flowmatching_nn
+from sbi.neural_nets import flowmatching_nn
+from sbi.neural_nets.estimators import ConditionalDensityEstimator
 from sbi.utils import (
     RestrictedPrior,
     handle_invalid_x,

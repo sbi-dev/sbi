@@ -16,7 +16,8 @@ from sbi.inference.base import NeuralInference
 from sbi.inference.posteriors import MCMCPosterior, RejectionPosterior, VIPosterior
 from sbi.inference.posteriors.importance_posterior import ImportanceSamplingPosterior
 from sbi.inference.potentials import likelihood_estimator_based_potential
-from sbi.neural_nets import ConditionalDensityEstimator, likelihood_nn
+from sbi.neural_nets import likelihood_nn
+from sbi.neural_nets.estimators import ConditionalDensityEstimator
 from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
 )

@@ -10,13 +10,11 @@ import torch
 from torch import eye, zeros
 from torch.distributions import MultivariateNormal
 
-from sbi.neural_nets import build_mnle
-from sbi.neural_nets.categorial import build_categoricalmassestimator
 from sbi.neural_nets.embedding_nets import CNNEmbedding
 from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_sample_batch_event,
 )
-from sbi.neural_nets.flow import (
+from sbi.neural_nets.build_nets import (
     build_maf,
     build_maf_rqs,
     build_nsf,
@@ -29,12 +27,11 @@ from sbi.neural_nets.flow import (
     build_zuko_nsf,
     build_zuko_sospf,
     build_zuko_unaf,
-)
-from sbi.neural_nets.flow_matcher import (
+    build_mnle, build_categoricalmassestimator,
     build_mlp_flowmatcher,
     build_resnet_flowmatcher,
+    build_mdn,
 )
-from sbi.neural_nets.mdn import build_mdn
 
 # List of all density estimator builders for testing.
 model_builders = [
