@@ -335,6 +335,8 @@ class AdaMLP(nn.Module):
     MLP denoising network using adaptive layer normalization for conditioning.
     Relevant literature: https://arxiv.org/abs/2212.09748
 
+    See "Scalable Diffusion Models with Transformers", by William Peebles, Saining Xie.
+
     Arguments:
         x_dim: The dimensionality of the input tensor.
         emb_dim: The number of embedding features.
