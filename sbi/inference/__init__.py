@@ -1,15 +1,15 @@
 from sbi.inference.abc import MCABC, SMCABC
-from sbi.inference.base import (
+from sbi.inference.trainers.base import (
     NeuralInference,  # noqa: F401
     check_if_proposal_has_default_x,
     infer,
     simulate_for_sbi,
 )
-from sbi.inference.fmpe import FMPE
-from sbi.inference.npse.npse import NPSE
-from sbi.inference.snle import MNLE, SNLE_A
-from sbi.inference.snpe import SNPE_A, SNPE_B, SNPE_C  # noqa: F401
-from sbi.inference.snre import BNRE, SNRE, SNRE_A, SNRE_B, SNRE_C  # noqa: F401
+from sbi.inference.trainers.fmpe import FMPE
+from sbi.inference.trainers.npse.npse import NPSE
+from sbi.inference.trainers.snle import MNLE, SNLE_A
+from sbi.inference.trainers.snpe import SNPE_A, SNPE_B, SNPE_C  # noqa: F401
+from sbi.inference.trainers.snre import BNRE, SNRE, SNRE_A, SNRE_B, SNRE_C  # noqa: F401
 
 SNL = SNLE = SNLE_A
 _snle_family = ["SNL"]
