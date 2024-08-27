@@ -6,12 +6,12 @@ from typing import Any, Callable, Optional, Union
 
 from torch import nn
 
-from sbi.neural_nets.classifier import (
+from sbi.neural_nets.build_functions.classifier import (
     build_linear_classifier,
     build_mlp_classifier,
     build_resnet_classifier,
 )
-from sbi.neural_nets.flow import (
+from sbi.neural_nets.build_functions.flow import (
     build_made,
     build_maf,
     build_maf_rqs,
@@ -26,13 +26,13 @@ from sbi.neural_nets.flow import (
     build_zuko_sospf,
     build_zuko_unaf,
 )
-from sbi.neural_nets.flow_matcher import (
+from sbi.neural_nets.build_functions.flow_matcher import (
     build_mlp_flowmatcher,
     build_resnet_flowmatcher,
 )
-from sbi.neural_nets.mdn import build_mdn
-from sbi.neural_nets.mnle import build_mnle
-from sbi.neural_nets.score_nets import build_score_estimator
+from sbi.neural_nets.build_functions.mdn import build_mdn
+from sbi.neural_nets.build_functions.mnle import build_mnle
+from sbi.neural_nets.build_functions.score_nets import build_score_estimator
 from sbi.utils.nn_utils import check_net_device
 
 model_builders = {
