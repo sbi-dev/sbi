@@ -40,8 +40,13 @@ def my_simulator(parameters):
 
 You can also write your own code to parallelize simulations with whatever
 multiprocessing framework you prefer. You can then simulate your data outside of
-`sbi` and pass the simulated data as shown in the [flexible
-interface](https://sbi-dev.github.io/sbi/tutorial/02_flexible_interface/):
+`sbi` and pass the simulated data using `.append_simulations`:
+
+```python
+# Given pre-simulated theta and x
+trainer = SNPE(prior)
+trainer.append_simulations(theta, x).train()
+```
 
 ## Some more background
 

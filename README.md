@@ -7,7 +7,7 @@
 
 ## `sbi`: Simulation-Based Inference
 
-[Getting Started](https://sbi-dev.github.io/sbi/latest/tutorial/00_getting_started/) |
+[Getting Started](https://sbi-dev.github.io/sbi/latest/tutorials/00_getting_started/) |
 [Documentation](https://sbi-dev.github.io/sbi/)
 
 `sbi` is a Python package for simulation-based inference, designed to meet the needs of
@@ -26,7 +26,7 @@ and revealing potential interactions between parameters.
 
 - **Low-Level Interfaces**: For those who require maximum control over the inference
   process, `sbi` provides low-level interfaces that allow you to fine-tune many aspects
-  of your work.
+  of your workflow.
 - **High-Level Interfaces**: If you prefer simplicity and efficiency, `sbi` also offers
   high-level interfaces that enable quick and easy implementation of complex inference
   tasks.
@@ -89,18 +89,18 @@ print(posterior)
 ## Tutorials
 
 If you're new to `sbi`, we recommend starting with our [Getting
-Started](https://sbi-dev.github.io/sbi/latest/tutorial/00_getting_started/) tutorial.
+Started](https://sbi-dev.github.io/sbi/latest/tutorials/00_getting_started/) tutorial.
 
 You can also access and run these tutorials directly in your browser by opening
 [Codespace](https://docs.github.com/en/codespaces/overview). To do so, click the green
 “Code” button on the GitHub repository and select “Open with Codespaces.” This provides
-a fully functional environment where you can explore sbi through Jupyter notebooks.
+a fully functional environment where you can explore `sbi` through Jupyter notebooks.
 
 ## Inference Algorithms
 
 The following inference algorithms are currently available. You can find instructions on
 how to run each of these methods
-[here](https://sbi-dev.github.io/sbi/latest/tutorial/16_implemented_methods/).
+[here](https://sbi-dev.github.io/sbi/latest/tutorials/16_implemented_methods/).
 
 ### Neural Posterior Estimation: amortized (NPE) and sequential (SNPE)
 
@@ -126,9 +126,8 @@ how to run each of these methods
   (NeurIPS 2023).
 
 * [`NPSE`](https://sbi-dev.github.io/sbi/reference/#sbi.inference.npse.npse.NPSE) from
-  Sharrock, L., Simons, J., Liu, S., & Beaumont, M. [_Sequential neural score
-  estimation: Likelihood-free inference with conditional score based diffusion
-  models._](https://arxiv.org/abs/2210.04872v3). (ICML 2024)
+  Geffner, T., Papamakarios, G., & Mnih, A. [_Compositional score modeling
+  for simulation-based inference_]. (ICML 2023)
 
 ### Neural Likelihood Estimation: amortized (NLE) and sequential (SNLE)
 

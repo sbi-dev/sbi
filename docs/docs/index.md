@@ -45,7 +45,7 @@ Then, check out our material:
 -  :rocket: [__Tutorials and Examples__](tutorials/index.md)
    <br/><br/>
    *Various examples illustrating how to<br/> [get
-   started](tutorials/00_getting_started_flexible.md) or use the `sbi` package.*
+   started](tutorials/00_getting_started.md) or use the `sbi` package.*
 
 -  :building_construction: [__Reference API__](reference/index.md)
    <br/><br/>

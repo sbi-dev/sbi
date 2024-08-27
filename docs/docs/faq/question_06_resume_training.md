@@ -2,10 +2,7 @@
 # Can I stop neural network training and resume it later?
 
 Many clusters have a time limit, and `sbi` might exceed this limit. You can
-circumvent this problem by using the [flexible
-interface](https://sbi-dev.github.io/sbi/tutorial/02_flexible_interface/). After
-simulations are finished, `sbi` trains a neural network. If this process takes
-too long, you can stop training and resume it later. The syntax is:
+circumvent this problem by stopping and resuming training:
 
 ```python
 inference = SNPE(prior=prior)
