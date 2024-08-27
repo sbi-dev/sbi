@@ -190,33 +190,22 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         # Compute MSE loss between network output and true score.
         loss = torch.sum((score_pred - score_target) ** 2.0, dim=-1)
 
-        # For times -> 0 this loss has high variance, hece it can help a lot to add
-        # a control variate i.e. a term that has zero expectation but is strongly
-        # correlated with our objective. Todo so notice that the if we perform a
-        # 0 th order taylor expansion of the score network around the mean i.e.
-        # s(input_noised) = s(mean) + O(std), we get
-        #   E_eps[||-eps/std - s(mean)||^2]
-        # = E_eps[||eps||^2/std^2 + 2<s(mean),eps/std> + ||s(mean)||^2]
-        # = E_eps[||eps||^]/std^2 + 2<s(mean), E_eps[eps]/std> + C
-        # Notice that we can calculate this expectation analytically which will evaluate
-        # to D/std^2.
-        # This allows us to add a control variate to the loss that is zero on
-        # expectation i.e. (eps**2/std**2 - 2s(mean)eps**T + s(mean)**2 - D/std**2).
-        # For small std the Taylor expansion will be good and the control variate will
-        # strongly correlate with the objective, hence reducing the variance of the
-        # estimator.
-        # For large std the Taylor expansion will be bad and the control variate will
-        # only loosely correlate with the objective, hence could potentially increase
-        # the variance of the estimator.
-        # Proposed in https://arxiv.org/pdf/2101.03288  (works very well for small std)
+        # For times -> 0 this loss has high variance a standard method to reduce the
+        # variance is to use a control variate i.e. a term that has zero expectation but
+        # is strongly correlated with our objective.
+        # Such a term can be derived by performing a 0 th order taylor expansion score
+        # network around the mean (https://arxiv.org/pdf/2101.03288 for details).
+        # NOTE: As it is a taylor expansion it will only work well for small std.
 
         if control_variate:
             D = input.shape[-1]
             score_mean_pred = self.forward(mean, condition, times)
             s = torch.squeeze(std, -1)
 
+            # Loss terms that depend on eps
             term1 = 2 / s * torch.sum(eps * score_mean_pred, dim=-1)
             term2 = torch.sum(eps**2, dim=-1) / s**2
+            # This term is the analytical expectation of the above term
             term3 = D / s**2
 
             control_variate = term3 - term1 - term2

@@ -36,8 +36,10 @@ class Diffuser:
             score_based_potential_gradient: A time-dependent score-based potential.
             predictor: A predictor to propagate samples forward in time.
             corrector (Ooptional): A corrector to refine the samples. Defaults to None.
-            predictor_params (optional): _description_. Defaults to None.
-            corrector_params (optional): _description_. Defaults to None.
+            predictor_params (optional): Parameters passed to the predictor, if given as
+                string. Defaults to None.
+            corrector_params (optional): Parameters passed to the corrector, if given as
+                string. Defaults to None.
         """
         # Set predictor and corrector
         self.set_predictor(predictor, score_based_potential, **(predictor_params or {}))

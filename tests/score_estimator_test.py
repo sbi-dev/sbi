@@ -17,12 +17,14 @@ from sbi.neural_nets.score_nets import build_score_estimator
 @pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
 @pytest.mark.parametrize("condition_event_shape", ((1,), (7,)))
 @pytest.mark.parametrize("batch_dim", (1, 10))
+@pytest.mark.parametrize("score_net", ["mlp", "ada_mlp"])
 def test_score_estimator_loss_shapes(
     sde_type,
     input_sample_dim,
     input_event_shape,
     condition_event_shape,
     batch_dim,
+    score_net,
 ):
     """Test whether `loss` of DensityEstimators follow the shape convention."""
     score_estimator, inputs, conditions = _build_score_estimator_and_tensors(
@@ -31,6 +33,7 @@ def test_score_estimator_loss_shapes(
         condition_event_shape,
         batch_dim,
         input_sample_dim,
+        score_net=score_net,
     )
 
     losses = score_estimator.loss(inputs[0], condition=conditions)
@@ -65,8 +68,14 @@ def test_score_estimator_on_device(sde_type, device):
 @pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
 @pytest.mark.parametrize("condition_event_shape", ((1,), (7,)))
 @pytest.mark.parametrize("batch_dim", (1, 10))
+@pytest.mark.parametrize("score_net", ["mlp", "ada_mlp"])
 def test_score_estimator_forward_shapes(
-    sde_type, input_sample_dim, input_event_shape, condition_event_shape, batch_dim
+    sde_type,
+    input_sample_dim,
+    input_event_shape,
+    condition_event_shape,
+    batch_dim,
+    score_net,
 ):
     """Test whether `forward` of DensityEstimators follow the shape convention."""
     score_estimator, inputs, conditions = _build_score_estimator_and_tensors(
@@ -75,6 +84,7 @@ def test_score_estimator_forward_shapes(
         condition_event_shape,
         batch_dim,
         input_sample_dim,
+        score_net=score_net,
     )
     # Batched times
     times = torch.rand((batch_dim,))
@@ -119,6 +129,7 @@ def _build_score_estimator_and_tensors(
         sde_type=sde_type,
         embedding_net_x=embedding_net_x,
         embedding_net_y=embedding_net_y,
+        **kwargs,
     )
 
     inputs = building_thetas[:batch_dim]
