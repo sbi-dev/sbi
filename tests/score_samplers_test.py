@@ -61,7 +61,6 @@ def _build_gaussian_score_estimator(
     # Note the precondition predicts a correct Gaussian score by default if the neural
     # net predicts 0!
     class DummyNet(torch.nn.Module):
-
         def __init__(self):
             super().__init__()
             self.dummy_param_for_device_detection = torch.nn.Linear(1, 1)

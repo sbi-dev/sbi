@@ -56,7 +56,8 @@ class NPSE(NeuralInference):
         Args:
             prior: Prior distribution.
             score_estimator: Neural network architecture for the score estimator. Can be
-                a string (e.g. 'mlp') or a callable that returns a neural network.
+                a string (e.g. 'mlp' or 'ada_mlp') or a callable that returns a neural
+                network.
             sde_type: Type of SDE to use. Must be one of ['vp', 've', 'subvp'].
             device: Device to run the training on.
             logging_level: Logging level for the training. Can be an integer or a

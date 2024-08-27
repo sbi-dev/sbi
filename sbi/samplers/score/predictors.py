@@ -120,4 +120,3 @@ class EulerMaruyama(Predictor):
         f_backward = f - (1 + self.eta**2) / 2 * g**2 * score
         g_backward = self.eta * g
         return theta - f_backward * dt + g_backward * torch.randn_like(theta) * dt_sqrt
-

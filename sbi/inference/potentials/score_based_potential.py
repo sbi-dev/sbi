@@ -162,7 +162,7 @@ class PosteriorScoreBasedPotential(BasePotential):
                 raise NotImplementedError(
                     "Score accumulation for IID data is not yet implemented."
                 )
-               
+
         return score
 
     def get_continuous_normalizing_flow(
@@ -229,4 +229,3 @@ def build_freeform_jacobian_transform(
         exact=exact,
     )
     return transform
-
