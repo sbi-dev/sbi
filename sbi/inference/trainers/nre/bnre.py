@@ -7,12 +7,12 @@ import torch
 from torch import Tensor, nn, ones
 from torch.distributions import Distribution
 
-from sbi.inference.snre.snre_a import SNRE_A
+from sbi.inference.trainers.nre.nre_a import NRE_A
 from sbi.sbi_types import TensorboardSummaryWriter
 from sbi.utils.sbiutils import del_entries
 
 
-class BNRE(SNRE_A):
+class BNRE(NRE_A):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
@@ -22,8 +22,10 @@ class BNRE(SNRE_A):
         summary_writer: Optional[TensorboardSummaryWriter] = None,
         show_progress_bars: bool = True,
     ):
-        r"""Balanced neural ratio estimation (BNRE)[1]. BNRE is a variation of NRE
-        aiming to produce more conservative posterior approximations
+        r"""Balanced neural ratio estimation (BNRE)[1].
+
+        BNRE is a variation of NRE aiming to produce more conservative posterior
+        approximations.
 
         [1] Delaunoy, A., Hermans, J., Rozet, F., Wehenkel, A., & Louppe, G..
         Towards Reliable Simulation-Based Inference with Balanced Neural Ratio

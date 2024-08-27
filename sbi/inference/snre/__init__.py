@@ -1,9 +1,7 @@
-from sbi.inference.snre.bnre import BNRE
-from sbi.inference.snre.snre_a import SNRE_A
-from sbi.inference.snre.snre_b import SNRE_B
-from sbi.inference.snre.snre_c import SNRE_C
-
-# Aliases
-AALR = SNRE_A
-SRE = SNRE = SNRE_B
-CNRE = NREC = SNRE_C
+raise ImportError(
+    "You imported a file from `sbi.inference.snre`. However, as of sbi v0.23.0, this "
+    "import is no longer supported. Instead, you have to import methods from "
+    "`sbi.inference.trainers.nre` (notice the renaming from snre to nre). For example: "
+    "`from sbi.inference.trainers.nre import SNRE_B` "
+    "Please create an issue if you experience unexpected behavior."
+)

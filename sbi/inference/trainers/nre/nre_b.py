@@ -7,12 +7,12 @@ import torch
 from torch import Tensor, nn
 from torch.distributions import Distribution
 
-from sbi.inference.snre.snre_base import RatioEstimator
+from sbi.inference.trainers.nre.nre_base import RatioEstimator
 from sbi.sbi_types import TensorboardSummaryWriter
 from sbi.utils.sbiutils import del_entries
 
 
-class SNRE_B(RatioEstimator):
+class NRE_B(RatioEstimator):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
@@ -22,7 +22,7 @@ class SNRE_B(RatioEstimator):
         summary_writer: Optional[TensorboardSummaryWriter] = None,
         show_progress_bars: bool = True,
     ):
-        r"""SRE[1], here known as SNRE_B.
+        r"""SRE[1], here known as NRE_B.
 
         [1] _On Contrastive Learning for Likelihood-free Inference_, Durkan et al.,
             ICML 2020, https://arxiv.org/pdf/2002.03712

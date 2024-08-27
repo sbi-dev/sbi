@@ -1,2 +1,7 @@
-from sbi.inference.snle.mnle import MNLE  # noqa: F401
-from sbi.inference.snle.snle_a import SNLE_A  # noqa: F401
+raise ImportError(
+    "You imported a file from `sbi.inference.snle`. However, as of sbi v0.23.0, this "
+    "import is no longer supported. Instead, you have to import methods from "
+    "`sbi.inference.trainers.nle` (notice the renaming from snle to nle). For example: "
+    "`from sbi.inference.trainers.nle import SNLE_A` "
+    "Please create an issue if you experience unexpected behavior."
+)

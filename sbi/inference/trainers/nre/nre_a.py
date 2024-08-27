@@ -7,12 +7,12 @@ import torch
 from torch import Tensor, nn, ones
 from torch.distributions import Distribution
 
-from sbi.inference.snre.snre_base import RatioEstimator
+from sbi.inference.trainers.nre.nre_base import RatioEstimator
 from sbi.sbi_types import TensorboardSummaryWriter
 from sbi.utils.sbiutils import del_entries
 
 
-class SNRE_A(RatioEstimator):
+class NRE_A(RatioEstimator):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
@@ -22,7 +22,7 @@ class SNRE_A(RatioEstimator):
         summary_writer: Optional[TensorboardSummaryWriter] = None,
         show_progress_bars: bool = True,
     ):
-        r"""AALR[1], here known as SNRE_A.
+        r"""AALR[1], here known as NRE_A.
 
         [1] _Likelihood-free MCMC with Amortized Approximate Likelihood Ratios_, Hermans
             et al., ICML 2020, https://arxiv.org/abs/1903.04057

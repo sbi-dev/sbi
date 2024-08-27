@@ -20,7 +20,7 @@ from sbi.inference import (
     VIPosterior,
     ratio_estimator_based_potential,
 )
-from sbi.inference.snre.snre_base import RatioEstimator
+from sbi.inference.trainers.nre.nre_base import RatioEstimator
 from sbi.simulators.linear_gaussian import (
     diagonal_linear_gaussian,
     linear_gaussian,

@@ -17,7 +17,7 @@ from sbi.analysis import (
     sensitivity_analysis,
 )
 from sbi.inference import SNPE, SNPE_A
-from sbi.inference.snpe.snpe_a import SNPE_A_MDN
+from sbi.inference.trainers.npe.npe_a import SNPE_A_MDN
 from sbi.neural_nets import classifier_nn, likelihood_nn, posterior_nn
 from sbi.utils import BoxUniform, get_kde
 
