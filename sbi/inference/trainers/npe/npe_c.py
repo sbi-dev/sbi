@@ -45,8 +45,7 @@ class NPE_C(PosteriorEstimator):
 
         Like all NPE methods, this method trains a deep neural density estimator to
         directly approximate the posterior. Also like all other NPE methods, in the
-        first round, this density estimator is trained with a maximum-likelihood loss
-        in the first round.
+        first round, this density estimator is trained with a maximum-likelihood loss.
 
         For the sequential mode in which the density estimator is trained across rounds,
         this class implements two loss variants of NPE-C: the non-atomic and the atomic

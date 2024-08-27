@@ -45,8 +45,7 @@ class NPE_A(PosteriorEstimator):
 
         Like all NPE methods, this method trains a deep neural density estimator to
         directly approximate the posterior. Also like all other NPE methods, in the
-        first round, this density estimator is trained with a maximum-likelihood loss
-        in the first round.
+        first round, this density estimator is trained with a maximum-likelihood loss.
 
         This class implements NPE-A. NPE-A trains across multiple rounds with a
         maximum-likelihood-loss. This will make training converge to the proposal
