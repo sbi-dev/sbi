@@ -162,24 +162,7 @@ class PosteriorScoreBasedPotential(BasePotential):
                 raise NotImplementedError(
                     "Score accumulation for IID data is not yet implemented."
                 )
-                if self.prior is None:
-                    raise ValueError(
-                        "Prior must be provided when interpreting the data as IID."
-                    )
-
-                if self.iid_method == "iid_bridge":
-                    score = _iid_bridge(
-                        theta=theta,
-                        xos=self.x_o,
-                        time=time,
-                        score_estimator=self.score_estimator,
-                        prior=self.prior,
-                    )
-                else:
-                    raise NotImplementedError(
-                        f"Method {self.iid_method} not implemented."
-                    )
-
+               
         return score
 
     def get_continuous_normalizing_flow(
