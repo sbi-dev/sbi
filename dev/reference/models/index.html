@@ -486,7 +486,25 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#sbi.neural_nets.density_estimators.ConditionalDensityEstimator" class="md-nav__link">
+  <a href="#sbi.neural_nets.factory.flowmatching_nn" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;flowmatching_nn
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.neural_nets.factory.posterior_score_nn" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;posterior_score_nn
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.neural_nets.estimators.ConditionalDensityEstimator" class="md-nav__link">
     <span class="md-ellipsis">
       <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;ConditionalDensityEstimator
     </span>
@@ -496,7 +514,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#sbi.neural_nets.density_estimators.ConditionalDensityEstimator.embedding_net" class="md-nav__link">
+  <a href="#sbi.neural_nets.estimators.ConditionalDensityEstimator.embedding_net" class="md-nav__link">
     <span class="md-ellipsis">
       <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;embedding_net
     </span>
@@ -505,7 +523,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#sbi.neural_nets.density_estimators.ConditionalDensityEstimator.__init__" class="md-nav__link">
+  <a href="#sbi.neural_nets.estimators.ConditionalDensityEstimator.__init__" class="md-nav__link">
     <span class="md-ellipsis">
       <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;__init__
     </span>
@@ -514,7 +532,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#sbi.neural_nets.density_estimators.ConditionalDensityEstimator.log_prob" class="md-nav__link">
+  <a href="#sbi.neural_nets.estimators.ConditionalDensityEstimator.log_prob" class="md-nav__link">
     <span class="md-ellipsis">
       <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;log_prob
     </span>
@@ -523,7 +541,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#sbi.neural_nets.density_estimators.ConditionalDensityEstimator.loss" class="md-nav__link">
+  <a href="#sbi.neural_nets.estimators.ConditionalDensityEstimator.loss" class="md-nav__link">
     <span class="md-ellipsis">
       <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;loss
     </span>
@@ -532,7 +550,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#sbi.neural_nets.density_estimators.ConditionalDensityEstimator.sample" class="md-nav__link">
+  <a href="#sbi.neural_nets.estimators.ConditionalDensityEstimator.sample" class="md-nav__link">
     <span class="md-ellipsis">
       <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;sample
     </span>
@@ -541,7 +559,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#sbi.neural_nets.density_estimators.ConditionalDensityEstimator.sample_and_log_prob" class="md-nav__link">
+  <a href="#sbi.neural_nets.estimators.ConditionalDensityEstimator.sample_and_log_prob" class="md-nav__link">
     <span class="md-ellipsis">
       <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;sample_and_log_prob
     </span>
@@ -1124,8 +1142,7 @@ Ignored if density estimator is not an mdn.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/neural_nets/factory.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">135</span>
-<span class="normal">136</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">136</span>
 <span class="normal">137</span>
 <span class="normal">138</span>
 <span class="normal">139</span>
@@ -1195,7 +1212,8 @@ Ignored if density estimator is not an mdn.</p>
 <span class="normal">203</span>
 <span class="normal">204</span>
 <span class="normal">205</span>
-<span class="normal">206</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">likelihood_nn</span><span class="p">(</span>
+<span class="normal">206</span>
+<span class="normal">207</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">likelihood_nn</span><span class="p">(</span>
     <span class="n">model</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">z_score_theta</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;independent&quot;</span><span class="p">,</span>
     <span class="n">z_score_x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;independent&quot;</span><span class="p">,</span>
@@ -1414,8 +1432,7 @@ simulation outputs.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/neural_nets/factory.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 61</span>
-<span class="normal"> 62</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 62</span>
 <span class="normal"> 63</span>
 <span class="normal"> 64</span>
 <span class="normal"> 65</span>
@@ -1485,7 +1502,8 @@ simulation outputs.</p>
 <span class="normal">129</span>
 <span class="normal">130</span>
 <span class="normal">131</span>
-<span class="normal">132</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">classifier_nn</span><span class="p">(</span>
+<span class="normal">132</span>
+<span class="normal">133</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">classifier_nn</span><span class="p">(</span>
     <span class="n">model</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">z_score_theta</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;independent&quot;</span><span class="p">,</span>
     <span class="n">z_score_x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;independent&quot;</span><span class="p">,</span>
@@ -1563,20 +1581,645 @@ simulation outputs.</p>
 
 </div>
 
+<div class="doc doc-object doc-function">
+
+
+<h2 id="sbi.neural_nets.factory.flowmatching_nn" class="doc doc-heading">
+            <code class=" language-python"><span class="n">flowmatching_nn</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">z_score_theta</span><span class="o">=</span><span class="s1">&#39;independent&#39;</span><span class="p">,</span> <span class="n">z_score_x</span><span class="o">=</span><span class="s1">&#39;independent&#39;</span><span class="p">,</span> <span class="n">hidden_features</span><span class="o">=</span><span class="mi">64</span><span class="p">,</span> <span class="n">num_layers</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">num_blocks</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">num_frequencies</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">embedding_net</span><span class="o">=</span><span class="n">nn</span><span class="o">.</span><span class="n">Identity</span><span class="p">(),</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
+
+<a href="#sbi.neural_nets.factory.flowmatching_nn" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents first">
+
+      <p>Returns a function that builds a neural net that can act as
+a vector field estimator for Flow Matching. This function will usually
+be used for Flow Matching. The returned function is to be passed to the</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code>model</code></td>
+            <td>
+                  <code>str</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>the type of regression network to learn the vector field. One of [&lsquo;mlp&rsquo;,
+&lsquo;resnet&rsquo;].</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code>z_score_theta</code></td>
+            <td>
+                  <code><span title="typing.Optional">Optional</span>[str]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Whether to z-score parameters <span class="arithmatex">\(\theta\)</span> before passing them into
+the network, can take one of the following:
+- <code>none</code>, or None: do not z-score.
+- <code>independent</code>: z-score each dimension independently.
+- <code>structured</code>: treat dimensions as related, therefore compute mean and std
+over the entire batch, instead of per-dimension. Should be used when each
+sample is, for example, a time series or an image.</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#39;independent&#39;</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code>z_score_x</code></td>
+            <td>
+                  <code><span title="typing.Optional">Optional</span>[str]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Whether to z-score simulation outputs <span class="arithmatex">\(x\)</span> before passing them into
+the network, same options as z_score_theta.</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#39;independent&#39;</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code>hidden_features</code></td>
+            <td>
+                  <code>int</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of hidden features.</p>
+              </div>
+            </td>
+            <td>
+                  <code>64</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code>num_layers</code></td>
+            <td>
+                  <code>int</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of transforms when a flow is used. Only relevant if
+density estimator is a normalizing flow (i.e. currently either a <code>maf</code> or a
+<code>nsf</code>). Ignored if density estimator is a <code>mdn</code> or <code>made</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>5</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code>num_blocks</code></td>
+            <td>
+                  <code>int</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of blocks if a ResNet is used.</p>
+              </div>
+            </td>
+            <td>
+                  <code>5</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code>num_frequencies</code></td>
+            <td>
+                  <code>int</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of frequencies for the time embedding.</p>
+              </div>
+            </td>
+            <td>
+                  <code>3</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code>embedding_net</code></td>
+            <td>
+                  <code><span title="torch.nn.Module">Module</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Optional embedding network for the condition.</p>
+              </div>
+            </td>
+            <td>
+                  <code><span title="torch.nn.Identity">Identity</span>()</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code>kwargs</code></td>
+            <td>
+                  <code><span title="typing.Any">Any</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>additional custom arguments passed to downstream build functions.</p>
+              </div>
+            </td>
+            <td>
+                  <code>{}</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+            <details class="quote">
+              <summary>Source code in <code>sbi/neural_nets/factory.py</code></summary>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">210</span>
+<span class="normal">211</span>
+<span class="normal">212</span>
+<span class="normal">213</span>
+<span class="normal">214</span>
+<span class="normal">215</span>
+<span class="normal">216</span>
+<span class="normal">217</span>
+<span class="normal">218</span>
+<span class="normal">219</span>
+<span class="normal">220</span>
+<span class="normal">221</span>
+<span class="normal">222</span>
+<span class="normal">223</span>
+<span class="normal">224</span>
+<span class="normal">225</span>
+<span class="normal">226</span>
+<span class="normal">227</span>
+<span class="normal">228</span>
+<span class="normal">229</span>
+<span class="normal">230</span>
+<span class="normal">231</span>
+<span class="normal">232</span>
+<span class="normal">233</span>
+<span class="normal">234</span>
+<span class="normal">235</span>
+<span class="normal">236</span>
+<span class="normal">237</span>
+<span class="normal">238</span>
+<span class="normal">239</span>
+<span class="normal">240</span>
+<span class="normal">241</span>
+<span class="normal">242</span>
+<span class="normal">243</span>
+<span class="normal">244</span>
+<span class="normal">245</span>
+<span class="normal">246</span>
+<span class="normal">247</span>
+<span class="normal">248</span>
+<span class="normal">249</span>
+<span class="normal">250</span>
+<span class="normal">251</span>
+<span class="normal">252</span>
+<span class="normal">253</span>
+<span class="normal">254</span>
+<span class="normal">255</span>
+<span class="normal">256</span>
+<span class="normal">257</span>
+<span class="normal">258</span>
+<span class="normal">259</span>
+<span class="normal">260</span>
+<span class="normal">261</span>
+<span class="normal">262</span>
+<span class="normal">263</span>
+<span class="normal">264</span>
+<span class="normal">265</span>
+<span class="normal">266</span>
+<span class="normal">267</span>
+<span class="normal">268</span>
+<span class="normal">269</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">flowmatching_nn</span><span class="p">(</span>
+    <span class="n">model</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">z_score_theta</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;independent&quot;</span><span class="p">,</span>
+    <span class="n">z_score_x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;independent&quot;</span><span class="p">,</span>
+    <span class="n">hidden_features</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">64</span><span class="p">,</span>
+    <span class="n">num_layers</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">5</span><span class="p">,</span>
+    <span class="n">num_blocks</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">5</span><span class="p">,</span>
+    <span class="n">num_frequencies</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">3</span><span class="p">,</span>
+    <span class="n">embedding_net</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Identity</span><span class="p">(),</span>
+    <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Callable</span><span class="p">:</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Returns a function that builds a neural net that can act as</span>
+<span class="sd">    a vector field estimator for Flow Matching. This function will usually</span>
+<span class="sd">    be used for Flow Matching. The returned function is to be passed to the</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        model: the type of regression network to learn the vector field. One of [&#39;mlp&#39;,</span>
+<span class="sd">            &#39;resnet&#39;].</span>
+<span class="sd">        z_score_theta: Whether to z-score parameters $\theta$ before passing them into</span>
+<span class="sd">            the network, can take one of the following:</span>
+<span class="sd">            - `none`, or None: do not z-score.</span>
+<span class="sd">            - `independent`: z-score each dimension independently.</span>
+<span class="sd">            - `structured`: treat dimensions as related, therefore compute mean and std</span>
+<span class="sd">            over the entire batch, instead of per-dimension. Should be used when each</span>
+<span class="sd">            sample is, for example, a time series or an image.</span>
+<span class="sd">        z_score_x: Whether to z-score simulation outputs $x$ before passing them into</span>
+<span class="sd">            the network, same options as z_score_theta.</span>
+<span class="sd">        hidden_features: Number of hidden features.</span>
+<span class="sd">        num_layers: Number of transforms when a flow is used. Only relevant if</span>
+<span class="sd">            density estimator is a normalizing flow (i.e. currently either a `maf` or a</span>
+<span class="sd">            `nsf`). Ignored if density estimator is a `mdn` or `made`.</span>
+<span class="sd">        num_blocks: Number of blocks if a ResNet is used.</span>
+<span class="sd">        num_frequencies: Number of frequencies for the time embedding.</span>
+<span class="sd">        embedding_net: Optional embedding network for the condition.</span>
+<span class="sd">        kwargs: additional custom arguments passed to downstream build functions.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">implemented_models</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;mlp&quot;</span><span class="p">,</span> <span class="s2">&quot;resnet&quot;</span><span class="p">]</span>
+
+    <span class="k">if</span> <span class="n">model</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">implemented_models</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Model </span><span class="si">{</span><span class="n">model</span><span class="si">}</span><span class="s2"> in not implemented for FMPE&quot;</span><span class="p">)</span>
+
+    <span class="n">model_str</span> <span class="o">=</span> <span class="n">model</span> <span class="o">+</span> <span class="s2">&quot;_flowmatcher&quot;</span>
+
+    <span class="k">def</span> <span class="nf">build_fn</span><span class="p">(</span><span class="n">batch_theta</span><span class="p">,</span> <span class="n">batch_x</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">model_builders</span><span class="p">[</span><span class="n">model_str</span><span class="p">](</span>
+            <span class="n">batch_x</span><span class="o">=</span><span class="n">batch_theta</span><span class="p">,</span>
+            <span class="n">batch_y</span><span class="o">=</span><span class="n">batch_x</span><span class="p">,</span>
+            <span class="n">z_score_x</span><span class="o">=</span><span class="n">z_score_theta</span><span class="p">,</span>
+            <span class="n">z_score_y</span><span class="o">=</span><span class="n">z_score_x</span><span class="p">,</span>
+            <span class="n">hidden_features</span><span class="o">=</span><span class="n">hidden_features</span><span class="p">,</span>
+            <span class="n">num_layers</span><span class="o">=</span><span class="n">num_layers</span><span class="p">,</span>
+            <span class="n">num_blocks</span><span class="o">=</span><span class="n">num_blocks</span><span class="p">,</span>
+            <span class="n">num_freqs</span><span class="o">=</span><span class="n">num_frequencies</span><span class="p">,</span>
+            <span class="n">embedding_net</span><span class="o">=</span><span class="n">check_net_device</span><span class="p">(</span>
+                <span class="n">embedding_net</span><span class="p">,</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span> <span class="n">embedding_net_warn_msg</span>
+            <span class="p">),</span>
+            <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">build_fn</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="sbi.neural_nets.factory.posterior_score_nn" class="doc doc-heading">
+            <code class=" language-python"><span class="n">posterior_score_nn</span><span class="p">(</span><span class="n">sde_type</span><span class="p">,</span> <span class="n">score_net_type</span><span class="o">=</span><span class="s1">&#39;mlp&#39;</span><span class="p">,</span> <span class="n">z_score_theta</span><span class="o">=</span><span class="s1">&#39;independent&#39;</span><span class="p">,</span> <span class="n">z_score_x</span><span class="o">=</span><span class="s1">&#39;independent&#39;</span><span class="p">,</span> <span class="n">t_embedding_dim</span><span class="o">=</span><span class="mi">16</span><span class="p">,</span> <span class="n">hidden_features</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">embedding_net</span><span class="o">=</span><span class="n">nn</span><span class="o">.</span><span class="n">Identity</span><span class="p">(),</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
+
+<a href="#sbi.neural_nets.factory.posterior_score_nn" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents first">
+
+      <p>Build util function that builds a ScoreEstimator object for score-based
+posteriors.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code>sde_type</code></td>
+            <td>
+                  <code>str</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>SDE type used, which defines the mean and std functions. One of:
+- &lsquo;vp&rsquo;: Variance preserving.
+- &lsquo;subvp&rsquo;: Sub-variance preserving.
+- &lsquo;ve&rsquo;: Variance exploding.
+Defaults to &lsquo;vp&rsquo;.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code>score_net</code></td>
+            <td>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Type of regression network. One of:
+- &lsquo;mlp&rsquo;: Fully connected feed-forward network.
+- &lsquo;resnet&rsquo;: Residual network (NOT IMPLEMENTED).
+-  nn.Module: Custom network
+Defaults to &lsquo;mlp&rsquo;.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code>z_score_theta</code></td>
+            <td>
+                  <code><span title="typing.Optional">Optional</span>[str]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Whether to z-score thetas passing into the network, can be one
+of:
+- <code>none</code>, or None: do not z-score.
+- <code>independent</code>: z-score each dimension independently.
+- <code>structured</code>: treat dimensions as related, therefore compute mean and std
+over the entire batch, instead of per-dimension. Should be used when each
+sample is, for example, a time series or an image.</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#39;independent&#39;</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code>z_score_x</code></td>
+            <td>
+                  <code><span title="typing.Optional">Optional</span>[str]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Whether to z-score xs passing into the network, same options as
+z_score_theta.</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#39;independent&#39;</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code>t_embedding_dim</code></td>
+            <td>
+                  <code>int</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Embedding dimension of diffusion time. Defaults to 16.</p>
+              </div>
+            </td>
+            <td>
+                  <code>16</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code>hidden_features</code></td>
+            <td>
+                  <code>int</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of hidden units per layer. Defaults to 50.</p>
+              </div>
+            </td>
+            <td>
+                  <code>50</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code>embedding_net</code></td>
+            <td>
+                  <code><span title="torch.nn.Module">Module</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Embedding network for x (conditioning variable). Defaults to
+nn.Identity().</p>
+              </div>
+            </td>
+            <td>
+                  <code><span title="torch.nn.Identity">Identity</span>()</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="typing.Callable">Callable</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Constructor function for NPSE.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+            <details class="quote">
+              <summary>Source code in <code>sbi/neural_nets/factory.py</code></summary>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">375</span>
+<span class="normal">376</span>
+<span class="normal">377</span>
+<span class="normal">378</span>
+<span class="normal">379</span>
+<span class="normal">380</span>
+<span class="normal">381</span>
+<span class="normal">382</span>
+<span class="normal">383</span>
+<span class="normal">384</span>
+<span class="normal">385</span>
+<span class="normal">386</span>
+<span class="normal">387</span>
+<span class="normal">388</span>
+<span class="normal">389</span>
+<span class="normal">390</span>
+<span class="normal">391</span>
+<span class="normal">392</span>
+<span class="normal">393</span>
+<span class="normal">394</span>
+<span class="normal">395</span>
+<span class="normal">396</span>
+<span class="normal">397</span>
+<span class="normal">398</span>
+<span class="normal">399</span>
+<span class="normal">400</span>
+<span class="normal">401</span>
+<span class="normal">402</span>
+<span class="normal">403</span>
+<span class="normal">404</span>
+<span class="normal">405</span>
+<span class="normal">406</span>
+<span class="normal">407</span>
+<span class="normal">408</span>
+<span class="normal">409</span>
+<span class="normal">410</span>
+<span class="normal">411</span>
+<span class="normal">412</span>
+<span class="normal">413</span>
+<span class="normal">414</span>
+<span class="normal">415</span>
+<span class="normal">416</span>
+<span class="normal">417</span>
+<span class="normal">418</span>
+<span class="normal">419</span>
+<span class="normal">420</span>
+<span class="normal">421</span>
+<span class="normal">422</span>
+<span class="normal">423</span>
+<span class="normal">424</span>
+<span class="normal">425</span>
+<span class="normal">426</span>
+<span class="normal">427</span>
+<span class="normal">428</span>
+<span class="normal">429</span>
+<span class="normal">430</span>
+<span class="normal">431</span>
+<span class="normal">432</span>
+<span class="normal">433</span>
+<span class="normal">434</span>
+<span class="normal">435</span>
+<span class="normal">436</span>
+<span class="normal">437</span>
+<span class="normal">438</span>
+<span class="normal">439</span>
+<span class="normal">440</span>
+<span class="normal">441</span>
+<span class="normal">442</span>
+<span class="normal">443</span>
+<span class="normal">444</span>
+<span class="normal">445</span>
+<span class="normal">446</span>
+<span class="normal">447</span>
+<span class="normal">448</span>
+<span class="normal">449</span>
+<span class="normal">450</span>
+<span class="normal">451</span>
+<span class="normal">452</span>
+<span class="normal">453</span>
+<span class="normal">454</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">posterior_score_nn</span><span class="p">(</span>
+    <span class="n">sde_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">score_net_type</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;mlp&quot;</span><span class="p">,</span>
+    <span class="n">z_score_theta</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;independent&quot;</span><span class="p">,</span>
+    <span class="n">z_score_x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;independent&quot;</span><span class="p">,</span>
+    <span class="n">t_embedding_dim</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">16</span><span class="p">,</span>
+    <span class="n">hidden_features</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">50</span><span class="p">,</span>
+    <span class="n">embedding_net</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Identity</span><span class="p">(),</span>
+    <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Callable</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Build util function that builds a ScoreEstimator object for score-based</span>
+<span class="sd">    posteriors.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        sde_type: SDE type used, which defines the mean and std functions. One of:</span>
+<span class="sd">            - &#39;vp&#39;: Variance preserving.</span>
+<span class="sd">            - &#39;subvp&#39;: Sub-variance preserving.</span>
+<span class="sd">            - &#39;ve&#39;: Variance exploding.</span>
+<span class="sd">            Defaults to &#39;vp&#39;.</span>
+<span class="sd">        score_net: Type of regression network. One of:</span>
+<span class="sd">            - &#39;mlp&#39;: Fully connected feed-forward network.</span>
+<span class="sd">            - &#39;resnet&#39;: Residual network (NOT IMPLEMENTED).</span>
+<span class="sd">            -  nn.Module: Custom network</span>
+<span class="sd">            Defaults to &#39;mlp&#39;.</span>
+<span class="sd">        z_score_theta: Whether to z-score thetas passing into the network, can be one</span>
+<span class="sd">            of:</span>
+<span class="sd">            - `none`, or None: do not z-score.</span>
+<span class="sd">            - `independent`: z-score each dimension independently.</span>
+<span class="sd">            - `structured`: treat dimensions as related, therefore compute mean and std</span>
+<span class="sd">            over the entire batch, instead of per-dimension. Should be used when each</span>
+<span class="sd">            sample is, for example, a time series or an image.</span>
+<span class="sd">        z_score_x: Whether to z-score xs passing into the network, same options as</span>
+<span class="sd">            z_score_theta.</span>
+<span class="sd">        t_embedding_dim: Embedding dimension of diffusion time. Defaults to 16.</span>
+<span class="sd">        hidden_features: Number of hidden units per layer. Defaults to 50.</span>
+<span class="sd">        embedding_net: Embedding network for x (conditioning variable). Defaults to</span>
+<span class="sd">            nn.Identity().</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Constructor function for NPSE.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">kwargs</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
+        <span class="nb">zip</span><span class="p">(</span>
+            <span class="p">(</span>
+                <span class="s2">&quot;z_score_x&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;z_score_y&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;sde_type&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;score_net&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;t_embedding_dim&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;hidden_features&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;embedding_net_y&quot;</span><span class="p">,</span>
+            <span class="p">),</span>
+            <span class="p">(</span>
+                <span class="n">z_score_theta</span><span class="p">,</span>
+                <span class="n">z_score_x</span><span class="p">,</span>
+                <span class="n">sde_type</span><span class="p">,</span>
+                <span class="n">score_net_type</span><span class="p">,</span>
+                <span class="n">t_embedding_dim</span><span class="p">,</span>
+                <span class="n">hidden_features</span><span class="p">,</span>
+                <span class="n">embedding_net</span><span class="p">,</span>
+            <span class="p">),</span>
+        <span class="p">),</span>
+        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">build_fn</span><span class="p">(</span><span class="n">batch_theta</span><span class="p">,</span> <span class="n">batch_x</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Build function wrapper for the build_score_estimator function that</span>
+<span class="sd">        is required for the score posterior class.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            batch_theta: a batch of theta.</span>
+<span class="sd">            batch_x: a batch of x.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Callable: a ScoreEstimator object.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">build_score_estimator</span><span class="p">(</span><span class="n">batch_x</span><span class="o">=</span><span class="n">batch_theta</span><span class="p">,</span> <span class="n">batch_y</span><span class="o">=</span><span class="n">batch_x</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">build_fn</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
 <div class="doc doc-object doc-class">
 
 
 
-<h2 id="sbi.neural_nets.density_estimators.ConditionalDensityEstimator" class="doc doc-heading">
+<h2 id="sbi.neural_nets.estimators.ConditionalDensityEstimator" class="doc doc-heading">
             <code>ConditionalDensityEstimator</code>
 
 
-<a href="#sbi.neural_nets.density_estimators.ConditionalDensityEstimator" class="headerlink" title="Permanent link">&para;</a></h2>
+<a href="#sbi.neural_nets.estimators.ConditionalDensityEstimator" class="headerlink" title="Permanent link">&para;</a></h2>
 
 
     <div class="doc doc-contents first">
             <p class="doc doc-class-bases">
-              Bases: <code><span title="sbi.neural_nets.density_estimators.base.ConditionalEstimator">ConditionalEstimator</span></code></p>
+              Bases: <code><span title="sbi.neural_nets.estimators.base.ConditionalEstimator">ConditionalEstimator</span></code></p>
 
 
       <p>Base class for density estimators.</p>
@@ -1593,7 +2236,7 @@ The condition is a tensor of shape (batch_size, *condition_shape), where
 condition_shape is the shape of the condition tensor.</p>
 </details>
               <details class="quote">
-                <summary>Source code in <code>sbi/neural_nets/density_estimators/base.py</code></summary>
+                <summary>Source code in <code>sbi/neural_nets/estimators/base.py</code></summary>
                 <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">119</span>
 <span class="normal">120</span>
 <span class="normal">121</span>
@@ -1820,14 +2463,14 @@ condition_shape is the shape of the condition tensor.</p>
 
 
 
-<h3 id="sbi.neural_nets.density_estimators.ConditionalDensityEstimator.embedding_net" class="doc doc-heading">
+<h3 id="sbi.neural_nets.estimators.ConditionalDensityEstimator.embedding_net" class="doc doc-heading">
             <code class=" language-python"><span class="n">embedding_net</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">]</span></code>
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-property"><code>property</code></small>
   </span>
 
-<a href="#sbi.neural_nets.density_estimators.ConditionalDensityEstimator.embedding_net" class="headerlink" title="Permanent link">&para;</a></h3>
+<a href="#sbi.neural_nets.estimators.ConditionalDensityEstimator.embedding_net" class="headerlink" title="Permanent link">&para;</a></h3>
 
 
     <div class="doc doc-contents ">
@@ -1842,10 +2485,10 @@ condition_shape is the shape of the condition tensor.</p>
 <div class="doc doc-object doc-function">
 
 
-<h3 id="sbi.neural_nets.density_estimators.ConditionalDensityEstimator.__init__" class="doc doc-heading">
+<h3 id="sbi.neural_nets.estimators.ConditionalDensityEstimator.__init__" class="doc doc-heading">
             <code class=" language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">net</span><span class="p">,</span> <span class="n">input_shape</span><span class="p">,</span> <span class="n">condition_shape</span><span class="p">)</span></code>
 
-<a href="#sbi.neural_nets.density_estimators.ConditionalDensityEstimator.__init__" class="headerlink" title="Permanent link">&para;</a></h3>
+<a href="#sbi.neural_nets.estimators.ConditionalDensityEstimator.__init__" class="headerlink" title="Permanent link">&para;</a></h3>
 
 
     <div class="doc doc-contents ">
@@ -1912,7 +2555,7 @@ evaluated (and which is also the event_shape of samples).</p>
     </table>
 
             <details class="quote">
-              <summary>Source code in <code>sbi/neural_nets/density_estimators/base.py</code></summary>
+              <summary>Source code in <code>sbi/neural_nets/estimators/base.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">134</span>
 <span class="normal">135</span>
 <span class="normal">136</span>
@@ -1949,14 +2592,14 @@ evaluated (and which is also the event_shape of samples).</p>
 <div class="doc doc-object doc-function">
 
 
-<h3 id="sbi.neural_nets.density_estimators.ConditionalDensityEstimator.log_prob" class="doc doc-heading">
+<h3 id="sbi.neural_nets.estimators.ConditionalDensityEstimator.log_prob" class="doc doc-heading">
             <code class=" language-python"><span class="n">log_prob</span><span class="p">(</span><span class="nb">input</span><span class="p">,</span> <span class="n">condition</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-abstractmethod"><code>abstractmethod</code></small>
   </span>
 
-<a href="#sbi.neural_nets.density_estimators.ConditionalDensityEstimator.log_prob" class="headerlink" title="Permanent link">&para;</a></h3>
+<a href="#sbi.neural_nets.estimators.ConditionalDensityEstimator.log_prob" class="headerlink" title="Permanent link">&para;</a></h3>
 
 
     <div class="doc doc-contents ">
@@ -2056,7 +2699,7 @@ i.e. batched conditions.</p>
     </table>
 
             <details class="quote">
-              <summary>Source code in <code>sbi/neural_nets/density_estimators/base.py</code></summary>
+              <summary>Source code in <code>sbi/neural_nets/estimators/base.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">154</span>
 <span class="normal">155</span>
 <span class="normal">156</span>
@@ -2103,14 +2746,14 @@ i.e. batched conditions.</p>
 <div class="doc doc-object doc-function">
 
 
-<h3 id="sbi.neural_nets.density_estimators.ConditionalDensityEstimator.loss" class="doc doc-heading">
+<h3 id="sbi.neural_nets.estimators.ConditionalDensityEstimator.loss" class="doc doc-heading">
             <code class=" language-python"><span class="n">loss</span><span class="p">(</span><span class="nb">input</span><span class="p">,</span> <span class="n">condition</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-abstractmethod"><code>abstractmethod</code></small>
   </span>
 
-<a href="#sbi.neural_nets.density_estimators.ConditionalDensityEstimator.loss" class="headerlink" title="Permanent link">&para;</a></h3>
+<a href="#sbi.neural_nets.estimators.ConditionalDensityEstimator.loss" class="headerlink" title="Permanent link">&para;</a></h3>
 
 
     <div class="doc doc-contents ">
@@ -2185,7 +2828,7 @@ i.e. batched conditions.</p>
     </table>
 
             <details class="quote">
-              <summary>Source code in <code>sbi/neural_nets/density_estimators/base.py</code></summary>
+              <summary>Source code in <code>sbi/neural_nets/estimators/base.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">174</span>
 <span class="normal">175</span>
 <span class="normal">176</span>
@@ -2222,14 +2865,14 @@ i.e. batched conditions.</p>
 <div class="doc doc-object doc-function">
 
 
-<h3 id="sbi.neural_nets.density_estimators.ConditionalDensityEstimator.sample" class="doc doc-heading">
+<h3 id="sbi.neural_nets.estimators.ConditionalDensityEstimator.sample" class="doc doc-heading">
             <code class=" language-python"><span class="n">sample</span><span class="p">(</span><span class="n">sample_shape</span><span class="p">,</span> <span class="n">condition</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-abstractmethod"><code>abstractmethod</code></small>
   </span>
 
-<a href="#sbi.neural_nets.density_estimators.ConditionalDensityEstimator.sample" class="headerlink" title="Permanent link">&para;</a></h3>
+<a href="#sbi.neural_nets.estimators.ConditionalDensityEstimator.sample" class="headerlink" title="Permanent link">&para;</a></h3>
 
 
     <div class="doc doc-contents ">
@@ -2303,7 +2946,7 @@ i.e. batched conditions.</p>
     </table>
 
             <details class="quote">
-              <summary>Source code in <code>sbi/neural_nets/density_estimators/base.py</code></summary>
+              <summary>Source code in <code>sbi/neural_nets/estimators/base.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">189</span>
 <span class="normal">190</span>
 <span class="normal">191</span>
@@ -2338,10 +2981,10 @@ i.e. batched conditions.</p>
 <div class="doc doc-object doc-function">
 
 
-<h3 id="sbi.neural_nets.density_estimators.ConditionalDensityEstimator.sample_and_log_prob" class="doc doc-heading">
+<h3 id="sbi.neural_nets.estimators.ConditionalDensityEstimator.sample_and_log_prob" class="doc doc-heading">
             <code class=" language-python"><span class="n">sample_and_log_prob</span><span class="p">(</span><span class="n">sample_shape</span><span class="p">,</span> <span class="n">condition</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
 
-<a href="#sbi.neural_nets.density_estimators.ConditionalDensityEstimator.sample_and_log_prob" class="headerlink" title="Permanent link">&para;</a></h3>
+<a href="#sbi.neural_nets.estimators.ConditionalDensityEstimator.sample_and_log_prob" class="headerlink" title="Permanent link">&para;</a></h3>
 
 
     <div class="doc doc-contents ">
@@ -2422,7 +3065,7 @@ more efficient than computing them separately. This method should
 then be overwritten to provide a more efficient implementation.</p>
 </details>
             <details class="quote">
-              <summary>Source code in <code>sbi/neural_nets/density_estimators/base.py</code></summary>
+              <summary>Source code in <code>sbi/neural_nets/estimators/base.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">203</span>
 <span class="normal">204</span>
 <span class="normal">205</span>

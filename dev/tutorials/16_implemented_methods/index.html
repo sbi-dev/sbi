@@ -486,15 +486,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#flow-matching-posterior-estimation" class="md-nav__link">
-    <span class="md-ellipsis">
-      Flow Matching Posterior Estimation
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#diagnostics-and-utilities" class="md-nav__link">
     <span class="md-ellipsis">
       Diagnostics and utilities
@@ -566,13 +557,13 @@
 <div class="codehilite"><pre><span></span><code>WARNING (pytensor.tensor.blas): Using NumPy C-API based implementation for BLAS functions.
 
 
- Neural network successfully converged after 60 epochs.
+ Neural network successfully converged after 83 epochs.
 
 
 Drawing 1000 posterior samples:   0%|          | 0/1000 [00:00&lt;?, ?it/s]
 
 
- Neural network successfully converged after 85 epochs.
+ Neural network successfully converged after 27 epochs.
 </code></pre></div>
 
 <p><strong>Automatic posterior transformation for likelihood-free inference</strong><br>by Greenberg, Nonnenmacher &amp; Macke (ICML 2019) <br><a href="http://proceedings.mlr.press/v97/greenberg19a/greenberg19a.pdf">[PDF]</a></p>
@@ -587,14 +578,14 @@ Drawing 1000 posterior samples:   0%|          | 0/1000 [00:00&lt;?, ?it/s]
     <span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">()</span><span class="o">.</span><span class="n">set_default_x</span><span class="p">(</span><span class="n">x_o</span><span class="p">)</span>
     <span class="n">proposal</span> <span class="o">=</span> <span class="n">posterior</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 116 epochs.
+<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 304 epochs.
 
 
 Drawing 1000 posterior samples:   0%|          | 0/1000 [00:00&lt;?, ?it/s]
 
 
 Using SNPE-C with atomic loss
- Neural network successfully converged after 56 epochs.
+ Neural network successfully converged after 40 epochs.
 </code></pre></div>
 
 <p><strong>BayesFlow: Learning complex stochastic models with invertible neural
@@ -615,7 +606,7 @@ implemented in <code>sbi</code> as well, under <code>sbi.neural_nets.embedding_n
 <span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">()</span>
 <span class="n">samples</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">1000</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_o</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 142 epochs.
+<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 129 epochs.
 
 
 Drawing 1000 posterior samples:   0%|          | 0/1000 [00:00&lt;?, ?it/s]
@@ -636,19 +627,50 @@ Drawing 1000 posterior samples:   0%|          | 0/1000 [00:00&lt;?, ?it/s]
     <span class="n">accept_reject_fn</span> <span class="o">=</span> <span class="n">get_density_thresholder</span><span class="p">(</span><span class="n">posterior</span><span class="p">,</span> <span class="n">quantile</span><span class="o">=</span><span class="mf">1e-4</span><span class="p">)</span>
     <span class="n">proposal</span> <span class="o">=</span> <span class="n">RestrictedPrior</span><span class="p">(</span><span class="n">prior</span><span class="p">,</span> <span class="n">accept_reject_fn</span><span class="p">,</span> <span class="n">sample_with</span><span class="o">=</span><span class="s2">&quot;rejection&quot;</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 258 epochs.
+<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 180 epochs.
 
 
 Drawing 1000000 posterior samples:   0%|          | 0/1000000 [00:00&lt;?, ?it/s]
 
 
-The `RestrictedPrior` rejected 40.8%
+The `RestrictedPrior` rejected 44.8%
                 of prior samples. You will get a speed-up of
-                69.0%.
- Neural network successfully converged after 43 epochs.
+                81.2%.
+ Neural network successfully converged after 34 epochs.
 
 
 Drawing 1000000 posterior samples:   0%|          | 0/1000000 [00:00&lt;?, ?it/s]
+</code></pre></div>
+
+<p><strong>Flow Matching for Scalable Simulation-Based Inference</strong> <br> by Dax, Wildberger, Buchholz, Green, Macke,
+Schölkopf (NeurIPS 2023) <br> <a href="https://arxiv.org/abs/2305.17161">[Paper]</a></p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">FMPE</span>
+
+<span class="n">inference</span> <span class="o">=</span> <span class="n">FMPE</span><span class="p">(</span><span class="n">prior</span><span class="p">)</span>
+<span class="c1"># FMPE does support multiple rounds of inference</span>
+<span class="n">theta</span> <span class="o">=</span> <span class="n">prior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_sims</span><span class="p">,))</span>
+<span class="n">x</span> <span class="o">=</span> <span class="n">simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
+<span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
+<span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">()</span><span class="o">.</span><span class="n">set_default_x</span><span class="p">(</span><span class="n">x_o</span><span class="p">)</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 93 epochs.
+</code></pre></div>
+
+<p><strong>Neural posterior score estimation</strong><br>
+based on:
+- Geffner, T., Papamakarios, G., &amp; Mnih, A. Compositional score modeling for simulation-based inference. ICML 2023.
+- Sharrock, L., Simons, J., Liu, S., &amp; Beaumont, M.. Sequential neural score estimation: Likelihood-free inference with conditional score based diffusion models. arXiv preprint arXiv:2210.04872. ICML 2024.</p>
+<p>Note that currently only the single-round variant is implemented.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">NPSE</span>
+
+<span class="n">theta</span> <span class="o">=</span> <span class="n">prior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_sims</span><span class="p">,))</span>
+<span class="n">x</span> <span class="o">=</span> <span class="n">simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
+
+<span class="n">inference</span> <span class="o">=</span> <span class="n">NPSE</span><span class="p">(</span><span class="n">prior</span><span class="p">,</span> <span class="n">sde_type</span><span class="o">=</span><span class="s2">&quot;ve&quot;</span><span class="p">)</span>
+<span class="n">_</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
+<span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">()</span><span class="o">.</span><span class="n">set_default_x</span><span class="p">(</span><span class="n">x_o</span><span class="p">)</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 659 epochs.
 </code></pre></div>
 
 <h2 id="likelihood-estimation-snle">Likelihood estimation (SNLE)<a class="headerlink" href="#likelihood-estimation-snle" title="Permanent link">&para;</a></h2>
@@ -666,13 +688,13 @@ Drawing 1000000 posterior samples:   0%|          | 0/1000000 [00:00&lt;?, ?it/s
                                                            <span class="s2">&quot;thin&quot;</span><span class="p">:</span> <span class="mi">5</span><span class="p">})</span>
     <span class="n">proposal</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">set_default_x</span><span class="p">(</span><span class="n">x_o</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 146 epochs.
+<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 68 epochs.
 
 
 Running vectorized MCMC with 20 chains:   0%|          | 0/26000 [00:00&lt;?, ?it/s]
 
 
- Neural network successfully converged after 55 epochs.
+ Neural network successfully converged after 24 epochs.
 </code></pre></div>
 
 <p><strong>Variational methods for simulation-based inference</strong> <br> by Glöckler, Deistler, Macke (ICLR 2022) <br><a href="https://arxiv.org/abs/2203.04176">[Paper]</a></p>
@@ -688,24 +710,24 @@ Running vectorized MCMC with 20 chains:   0%|          | 0/26000 [00:00&lt;?, ?i
                                           <span class="n">vi_method</span><span class="o">=</span><span class="s2">&quot;fKL&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">set_default_x</span><span class="p">(</span><span class="n">x_o</span><span class="p">)</span>
     <span class="n">proposal</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>  <span class="c1"># Train VI posterior on given x_o.</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 55 epochs.
+<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 167 epochs.
 
 
   0%|          | 0/2000 [00:00&lt;?, ?it/s]
 
 
 
-Converged with loss: 0.04
-Quality Score: 0.192     Good: Smaller than 0.5  Bad: Larger than 1.0            NOTE: Less sensitive to mode collapse.
- Neural network successfully converged after 86 epochs.
+Converged with loss: 0.03
+Quality Score: 0.108     Good: Smaller than 0.5  Bad: Larger than 1.0            NOTE: Less sensitive to mode collapse.
+ Neural network successfully converged after 25 epochs.
 
 
   0%|          | 0/2000 [00:00&lt;?, ?it/s]
 
 
 
-Converged with loss: 0.0
-Quality Score: -0.034    Good: Smaller than 0.5  Bad: Larger than 1.0            NOTE: Less sensitive to mode collapse.
+Converged with loss: 0.01
+Quality Score: 0.077     Good: Smaller than 0.5  Bad: Larger than 1.0            NOTE: Less sensitive to mode collapse.
 </code></pre></div>
 
 <p><strong>Flexible and efficient simulation-based inference for models of decision-making</strong> <br> by Boelts, Lueckmann, Gao, Macke (Elife 2022) <br><a href="https://elifesciences.org/articles/77220">[Paper]</a></p>
@@ -727,7 +749,7 @@ Quality Score: -0.034    Good: Smaller than 0.5  Bad: Larger than 1.0           
 <span class="n">_</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
 <span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">()</span><span class="o">.</span><span class="n">set_default_x</span><span class="p">(</span><span class="n">x_o</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 52 epochs.
+<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 76 epochs.
 </code></pre></div>
 
 <p><strong>On Contrastive Learning for Likelihood-free Inference</strong><br>Durkan, Murray &amp; Papamakarios (ICML 2020) <br><a href="http://proceedings.mlr.press/v119/durkan20a/durkan20a.pdf">[PDF]</a>.</p>
@@ -744,13 +766,13 @@ Quality Score: -0.034    Good: Smaller than 0.5  Bad: Larger than 1.0           
                                                            <span class="s2">&quot;thin&quot;</span><span class="p">:</span> <span class="mi">5</span><span class="p">})</span>
     <span class="n">proposal</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">set_default_x</span><span class="p">(</span><span class="n">x_o</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 70 epochs.
+<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 68 epochs.
 
 
 Running vectorized MCMC with 20 chains:   0%|          | 0/26000 [00:00&lt;?, ?it/s]
 
 
- Neural network successfully converged after 39 epochs.
+ Neural network successfully converged after 46 epochs.
 </code></pre></div>
 
 <p><strong>Towards Reliable Simulation-Based Inference with Balanced Neural Ratio Estimation</strong><br>by Delaunoy, Hermans, Rozet, Wehenkel &amp; Louppe (NeurIPS 2022) <br><a href="https://arxiv.org/pdf/2208.13624.pdf">[PDF]</a></p>
@@ -762,7 +784,7 @@ Running vectorized MCMC with 20 chains:   0%|          | 0/26000 [00:00&lt;?, ?i
 <span class="n">_</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">(</span><span class="n">regularization_strength</span><span class="o">=</span><span class="mf">100.</span><span class="p">)</span>
 <span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">()</span><span class="o">.</span><span class="n">set_default_x</span><span class="p">(</span><span class="n">x_o</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 181 epochs.
+<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 228 epochs.
 </code></pre></div>
 
 <p><strong>Contrastive Neural Ratio Estimation</strong><br>Benjamin Kurt Miller, Christoph Weniger, Patrick Forré (NeurIPS 2022) <br><a href="https://arxiv.org/pdf/2210.06170.pdf">[PDF]</a></p>
@@ -781,12 +803,9 @@ Running vectorized MCMC with 20 chains:   0%|          | 0/26000 [00:00&lt;?, ?i
 <span class="p">)</span>
 <span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">()</span><span class="o">.</span><span class="n">set_default_x</span><span class="p">(</span><span class="n">x_o</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 92 epochs.
+<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 83 epochs.
 </code></pre></div>
 
-<h2 id="flow-matching-posterior-estimation">Flow Matching Posterior Estimation<a class="headerlink" href="#flow-matching-posterior-estimation" title="Permanent link">&para;</a></h2>
-<p><strong>Flow Matching for Scalable Simulation-Based Inference</strong> <br> by Dax, Wildberger, Buchholz, Green, Macke,
-Schölkopf (NeurIPS 2023) <br> <a href="https://arxiv.org/abs/2305.17161">[Paper]</a></p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">FMPE</span>
 
 <span class="n">inference</span> <span class="o">=</span> <span class="n">FMPE</span><span class="p">(</span><span class="n">prior</span><span class="p">)</span>
@@ -796,7 +815,7 @@ Schölkopf (NeurIPS 2023) <br> <a href="https://arxiv.org/abs/2305.17161">[Paper
 <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
 <span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">()</span><span class="o">.</span><span class="n">set_default_x</span><span class="p">(</span><span class="n">x_o</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 66 epochs.
+<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 38 epochs.
 </code></pre></div>
 
 <h2 id="diagnostics-and-utilities">Diagnostics and utilities<a class="headerlink" href="#diagnostics-and-utilities" title="Permanent link">&para;</a></h2>
@@ -825,7 +844,7 @@ Schölkopf (NeurIPS 2023) <br> <a href="https://arxiv.org/abs/2305.17161">[Paper
     <span class="n">num_bins</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span>
 <span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 164 epochs.
+<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 148 epochs.
 
 
 Drawing 1000 posterior samples:   0%|          | 0/1000 [00:00&lt;?, ?it/s]
@@ -835,7 +854,7 @@ Drawing 1000 posterior samples:   0%|          | 0/1000 [00:00&lt;?, ?it/s]
 Calculating ranks for 1000 sbc samples.:   0%|          | 0/1000 [00:00&lt;?, ?it/s]
 </code></pre></div>
 
-<p><img alt="png" src="../16_implemented_methods_files/16_implemented_methods_31_3.png" /></p>
+<p><img alt="png" src="../16_implemented_methods_files/16_implemented_methods_34_3.png" /></p>
 <p><strong>Expected coverage (sample-based)</strong><br>as computed in Deistler, Goncalves, Macke (Neurips 2022) <a href="https://arxiv.org/abs/2210.04815">[Paper]</a> and in Rozet, Louppe (2021) <a href="https://matheo.uliege.be/handle/2268.2/12993">[Paper]</a></p>
 <div class="highlight"><pre><span></span><code><span class="n">thetas</span> <span class="o">=</span> <span class="n">prior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">100</span><span class="p">,))</span>
 <span class="n">xs</span> <span class="o">=</span> <span class="n">simulator</span><span class="p">(</span><span class="n">thetas</span><span class="p">)</span>
@@ -864,7 +883,7 @@ Calculating ranks for 1000 sbc samples.:   0%|          | 0/1000 [00:00&lt;?, ?i
 Calculating ranks for 100 sbc samples.:   0%|          | 0/100 [00:00&lt;?, ?it/s]
 </code></pre></div>
 
-<p><img alt="png" src="../16_implemented_methods_files/16_implemented_methods_33_2.png" /></p>
+<p><img alt="png" src="../16_implemented_methods_files/16_implemented_methods_36_2.png" /></p>
 <p><strong>TARP: Sampling-Based Accuracy Testing of Posterior Estimators for General Inference</strong></p>
 <p>Lemos, Coogan, Hezaveh &amp; Perreault-Levasseur (ICML 2023)<br><a href="https://arxiv.org/abs/2302.03026">[Paper]</a></p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi.diagnostics.tarp</span> <span class="kn">import</span> <span class="n">run_tarp</span>
@@ -886,7 +905,7 @@ Calculating ranks for 100 sbc samples.:   0%|          | 0/100 [00:00&lt;?, ?it/
 <div class="codehilite"><pre><span></span><code>Drawing 1000 posterior samples:   0%|          | 0/1000 [00:00&lt;?, ?it/s]
 </code></pre></div>
 
-<p><img alt="png" src="../16_implemented_methods_files/16_implemented_methods_35_1.png" /></p>
+<p><img alt="png" src="../16_implemented_methods_files/16_implemented_methods_38_1.png" /></p>
 <p><strong>Restriction estimator</strong><br>by Deistler, Macke &amp; Goncalves (PNAS 2022) <br><a href="https://www.pnas.org/doi/10.1073/pnas.2207632119">[Paper]</a></p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">SNPE</span>
 <span class="kn">from</span> <span class="nn">sbi.utils</span> <span class="kn">import</span> <span class="n">RestrictionEstimator</span>
@@ -907,10 +926,10 @@ Calculating ranks for 100 sbc samples.:   0%|          | 0/100 [00:00&lt;?, ?it/
 <span class="n">density_estimator</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">all_theta</span><span class="p">,</span> <span class="n">all_x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
 <span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">()</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>The `RestrictedPrior` rejected 1.4%ined:  1204
+<div class="codehilite"><pre><span></span><code>The `RestrictedPrior` rejected 3.7%ined:  996
                 of prior samples. You will get a speed-up of
-                1.4%.
- Neural network successfully converged after 125 epochs.
+                3.9%.
+ Neural network successfully converged after 190 epochs.
 </code></pre></div>
 
 

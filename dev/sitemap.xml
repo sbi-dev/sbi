@@ -201,6 +201,11 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
+         <loc>https://sbi-dev.github.io/sbi/dev/tutorials/19_flowmatching_and_scorematching/</loc>
+         <lastmod>2024-08-27</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
          <loc>https://sbi-dev.github.io/sbi/dev/tutorials/Example_00_HodgkinHuxleyModel/</loc>
          <lastmod>2024-08-27</lastmod>
          <changefreq>daily</changefreq>
