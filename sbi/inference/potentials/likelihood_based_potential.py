@@ -13,7 +13,7 @@ from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
     reshape_to_sample_batch_event,
 )
-from sbi.neural_nets.mnle import MixedDensityEstimator
+from sbi.neural_nets.estimators import MixedDensityEstimator
 from sbi.sbi_types import TorchTransform
 from sbi.utils.sbiutils import mcmc_transform
 

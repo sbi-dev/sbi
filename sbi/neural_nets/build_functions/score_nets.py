@@ -4,9 +4,9 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 
-from sbi.neural_nets.embedding_nets import GaussianFourierTimeEmbedding
 from sbi.neural_nets.estimators.score_estimator import (
     ConditionalScoreEstimator,
+    GaussianFourierTimeEmbedding,
     SubVPScoreEstimator,
     VEScoreEstimator,
     VPScoreEstimator,
