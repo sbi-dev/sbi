@@ -20,8 +20,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.8']
-        torch-version: ['1.11', '2.2']
+        python-version: ['3.9', '3.12']
 
     steps:
     - name: Checkout
@@ -40,7 +39,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ matrix.torch-version }}$
+        key: ${{ runner.os }}-pip-${{ matrix.python-version }}
         restore-keys: |
           ${{ runner.os }}-pip-${{ matrix.python-version }}-
           ${{ runner.os }}-pip-
@@ -48,7 +47,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install torch==${{ matrix.torch-version }} --extra-index-url https://download.pytorch.org/whl/cpu
+        pip install torch --extra-index-url https://download.pytorch.org/whl/cpu
         pip install -e .[dev]
 
     - name: Run the fast CPU tests with coverage

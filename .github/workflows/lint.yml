@@ -22,7 +22,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.8'
+          python-version: '3.9'
       - uses: pre-commit/action@v3.0.1
         with:
           extra_args: --all-files --show-diff-on-failure
@@ -40,14 +40,14 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.8'
+          python-version: '3.9'
 
       - name: Cache dependency
         id: cache-dependencies
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ubuntu-latest-pip-3.8
+          key: ubuntu-latest-pip-3.9
           restore-keys: |
             ubuntu-latest-pip-
 

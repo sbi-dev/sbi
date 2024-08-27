@@ -109,7 +109,7 @@ def test_consistent_sbc_results(density_estimator, cov_method):
     def simulator(theta):
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    num_simulations = 2000
+    num_simulations = 4000
     num_posterior_samples = 1000
     num_sbc_runs = 100
 
