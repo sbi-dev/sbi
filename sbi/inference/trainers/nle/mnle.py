@@ -28,7 +28,7 @@ class MNLE(LikelihoodEstimator):
         r"""Mixed Neural Likelihood Estimation (MNLE) [1].
 
         Like NLE, but designed to be applied to data with mixed types, e.g., continuous
-        data and discrete data like they occur in decision-making experiments 
+        data and discrete data like they occur in decision-making experiments
         (reation times and choices).
 
         [1] Flexible and efficient simulation-based inference for models of

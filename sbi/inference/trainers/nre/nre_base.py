@@ -12,10 +12,10 @@ from torch.nn.utils.clip_grad import clip_grad_norm_
 from torch.optim.adam import Adam
 from torch.utils.tensorboard.writer import SummaryWriter
 
-from sbi.inference.trainers.base import NeuralInference
 from sbi.inference.posteriors import MCMCPosterior, RejectionPosterior, VIPosterior
 from sbi.inference.posteriors.importance_posterior import ImportanceSamplingPosterior
 from sbi.inference.potentials import ratio_estimator_based_potential
+from sbi.inference.trainers.base import NeuralInference
 from sbi.neural_nets import classifier_nn
 from sbi.utils import (
     check_estimator_arg,
