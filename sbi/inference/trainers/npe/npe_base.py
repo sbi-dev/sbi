@@ -14,7 +14,7 @@ from torch.nn.utils.clip_grad import clip_grad_norm_
 from torch.optim.adam import Adam
 from torch.utils.tensorboard.writer import SummaryWriter
 
-from sbi.inference.base import NeuralInference, check_if_proposal_has_default_x
+from sbi.inference.trainers.base import NeuralInference, check_if_proposal_has_default_x
 from sbi.inference.posteriors import (
     DirectPosterior,
     MCMCPosterior,
@@ -55,6 +55,10 @@ class PosteriorEstimator(NeuralInference, ABC):
         show_progress_bars: bool = True,
     ):
         """Base class for Sequential Neural Posterior Estimation methods.
+
+        We note that the different subclasses (NPE_A, NPE_B, NPE_C) have the same
+        loss function in the first round and only differ when they are being run in
+        a sequential scheme.
 
         Args:
             density_estimator: If it is a string, use a pre-configured network of the

@@ -1,18 +1,18 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Callable, Dict, Optional, Union
+from typing import Any, Callable, Dict, Optional, Union
 
 import torch
 from torch import Tensor, nn, ones
 from torch.distributions import Distribution
 
-from sbi.inference.snre.snre_a import SNRE_A
+from sbi.inference.trainers.nre.nre_base import RatioEstimator
 from sbi.sbi_types import TensorboardSummaryWriter
 from sbi.utils.sbiutils import del_entries
 
 
-class BNRE(SNRE_A):
+class NRE_A(RatioEstimator):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
@@ -22,13 +22,10 @@ class BNRE(SNRE_A):
         summary_writer: Optional[TensorboardSummaryWriter] = None,
         show_progress_bars: bool = True,
     ):
-        r"""Balanced neural ratio estimation (BNRE)[1]. BNRE is a variation of NRE
-        aiming to produce more conservative posterior approximations
+        r"""AALR[1], here known as NRE_A.
 
-        [1] Delaunoy, A., Hermans, J., Rozet, F., Wehenkel, A., & Louppe, G..
-        Towards Reliable Simulation-Based Inference with Balanced Neural Ratio
-        Estimation.
-        NeurIPS 2022. https://arxiv.org/abs/2208.13624
+        [1] _Likelihood-free MCMC with Amortized Approximate Likelihood Ratios_, Hermans
+            et al., ICML 2020, https://arxiv.org/abs/1903.04057
 
         Args:
             prior: A probability distribution that expresses prior knowledge about the
@@ -38,9 +35,9 @@ class BNRE(SNRE_A):
                 a string, use a pre-configured network of the provided type (one of
                 linear, mlp, resnet). Alternatively, a function that builds a custom
                 neural network can be provided. The function will be called with the
-                first batch of simulations $(\theta, x)$, which can thus be used for
-                shape inference and potentially for z-scoring. It needs to return a
-                PyTorch `nn.Module` implementing the classifier.
+                first batch of simulations (theta, x), which can thus be used for shape
+                inference and potentially for z-scoring. It needs to return a PyTorch
+                `nn.Module` implementing the classifier.
             device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.
@@ -55,7 +52,6 @@ class BNRE(SNRE_A):
 
     def train(
         self,
-        regularization_strength: float = 100.0,
         training_batch_size: int = 200,
         learning_rate: float = 5e-4,
         validation_fraction: float = 0.1,
@@ -67,12 +63,11 @@ class BNRE(SNRE_A):
         retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[Dict] = None,
+        loss_kwargs: Optional[Dict[str, Any]] = None,
     ) -> nn.Module:
         r"""Return classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
-        Args:
 
-            regularization_strength: The multiplicative coefficient applied to the
-                balancing regularizer ($\lambda$).
+        Args:
             training_batch_size: Training batch size.
             learning_rate: Learning rate for Adam optimizer.
             validation_fraction: The fraction of data to use for validation.
@@ -83,8 +78,6 @@ class BNRE(SNRE_A):
                 we train until validation loss increases (see also `stop_after_epochs`).
             clip_max_norm: Value at which to clip the total gradient norm in order to
                 prevent exploding gradients. Use None for no clipping.
-            exclude_invalid_x: Whether to exclude simulation outputs `x=NaN` or `x=±∞`
-                during training. Expect errors, silent or explicit, when `False`.
             resume_training: Can be used in case training time is limited, e.g. on a
                 cluster. If `True`, the split between train and validation set, the
                 optimizer, the number of epochs, and the best validation log-prob will
@@ -98,18 +91,18 @@ class BNRE(SNRE_A):
                 loss and leakage after the training.
             dataloader_kwargs: Additional or updated kwargs to be passed to the training
                 and validation dataloaders (like, e.g., a collate_fn)
+            loss_kwargs: Additional or updated kwargs to be passed to the self._loss fn.
+
         Returns:
             Classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
         """
-        kwargs = del_entries(locals(), entries=("self", "__class__"))
-        kwargs["loss_kwargs"] = {
-            "regularization_strength": kwargs.pop("regularization_strength")
-        }
-        return super().train(**kwargs)
 
-    def _loss(
-        self, theta: Tensor, x: Tensor, num_atoms: int, regularization_strength: float
-    ) -> Tensor:
+        # AALR is defined for `num_atoms=2`.
+        # Proxy to `super().__call__` to ensure right parameter.
+        kwargs = del_entries(locals(), entries=("self", "__class__"))
+        return super().train(**kwargs, num_atoms=2)
+
+    def _loss(self, theta: Tensor, x: Tensor, num_atoms: int) -> Tensor:
         """Returns the binary cross-entropy loss for the trained classifier.
 
         The classifier takes as input a $(\theta,x)$ pair. It is trained to predict 1
@@ -131,13 +124,4 @@ class BNRE(SNRE_A):
         labels[1::2] = 0.0
 
         # Binary cross entropy to learn the likelihood (AALR-specific)
-        bce = nn.BCELoss()(likelihood, labels)
-
-        # Balancing regularizer
-        regularizer = (
-            (torch.sigmoid(logits[0::2]) + torch.sigmoid(logits[1::2]) - 1)
-            .mean()
-            .square()
-        )
-
-        return bce + regularization_strength * regularizer
+        return nn.BCELoss()(likelihood, labels)

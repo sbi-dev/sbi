@@ -28,7 +28,7 @@ from sbi.utils.sbiutils import mog_log_prob
 from sbi.utils.torchutils import BoxUniform, assert_all_finite
 
 
-class SNPE_C(PosteriorEstimator):
+class NPE_C(PosteriorEstimator):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
@@ -38,13 +38,19 @@ class SNPE_C(PosteriorEstimator):
         summary_writer: Optional[TensorboardSummaryWriter] = None,
         show_progress_bars: bool = True,
     ):
-        r"""SNPE-C / APT [1].
+        r"""NPE-C / APT [1].
 
         [1] _Automatic Posterior Transformation for Likelihood-free Inference_,
             Greenberg et al., ICML 2019, https://arxiv.org/abs/1905.07488.
 
-        This class implements two loss variants of SNPE-C: the non-atomic and the atomic
-        version. The atomic loss of SNPE-C can be used for any density estimator,
+        Like all NPE methods, this method trains a deep neural density estimator to
+        directly approximate the posterior. Also like all other NPE methods, in the
+        first round, this density estimator is trained with a maximum-likelihood loss
+        in the first round.
+
+        For the sequential mode in which the density estimator is trained across rounds,
+        this class implements two loss variants of NPE-C: the non-atomic and the atomic
+        version. The atomic loss of NPE-C can be used for any density estimator,
         i.e. also for normalizing flows. However, it suffers from leakage issues. On
         the other hand, the non-atomic loss can only be used only if the proposal
         distribution is a mixture of Gaussians, the density estimator is a mixture of

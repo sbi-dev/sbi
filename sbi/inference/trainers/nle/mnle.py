@@ -8,7 +8,7 @@ from torch.distributions import Distribution
 
 from sbi.inference.posteriors import MCMCPosterior, RejectionPosterior, VIPosterior
 from sbi.inference.potentials import mixed_likelihood_estimator_based_potential
-from sbi.inference.snle.snle_base import LikelihoodEstimator
+from sbi.inference.trainers.nle.nle_base import LikelihoodEstimator
 from sbi.neural_nets.estimators import MixedDensityEstimator
 from sbi.sbi_types import TensorboardSummaryWriter, TorchModule
 from sbi.utils.sbiutils import del_entries
@@ -27,9 +27,9 @@ class MNLE(LikelihoodEstimator):
     ):
         r"""Mixed Neural Likelihood Estimation (MNLE) [1].
 
-        Like SNLE, but not sequential and designed to be applied to data with mixed
-        types, e.g., continuous data and discrete data like they occur in
-        decision-making experiments (reation times and choices).
+        Like NLE, but designed to be applied to data with mixed types, e.g., continuous
+        data and discrete data like they occur in decision-making experiments 
+        (reation times and choices).
 
         [1] Flexible and efficient simulation-based inference for models of
         decision-making, Boelts et al. 2021,

@@ -5,12 +5,12 @@ from typing import Callable, Optional, Union
 
 from torch.distributions import Distribution
 
-from sbi.inference.snle.snle_base import LikelihoodEstimator
+from sbi.inference.trainers.nle.nle_base import LikelihoodEstimator
 from sbi.sbi_types import TensorboardSummaryWriter
 from sbi.utils.sbiutils import del_entries
 
 
-class SNLE_A(LikelihoodEstimator):
+class NLE_A(LikelihoodEstimator):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
@@ -20,7 +20,7 @@ class SNLE_A(LikelihoodEstimator):
         summary_writer: Optional[TensorboardSummaryWriter] = None,
         show_progress_bars: bool = True,
     ):
-        r"""Sequential Neural Likelihood [1].
+        r"""Neural Likelihood Estimation [1].
 
         [1] Sequential Neural Likelihood: Fast Likelihood-free Inference with
         Autoregressive Flows_, Papamakarios et al., AISTATS 2019,

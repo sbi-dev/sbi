@@ -13,7 +13,7 @@ from sbi.sbi_types import TensorboardSummaryWriter
 from sbi.utils.sbiutils import del_entries
 
 
-class SNPE_B(PosteriorEstimator):
+class NPE_B(PosteriorEstimator):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
@@ -23,7 +23,7 @@ class SNPE_B(PosteriorEstimator):
         summary_writer: Optional[TensorboardSummaryWriter] = None,
         show_progress_bars: bool = True,
     ):
-        r"""SNPE-B [1]. CURRENTLY NOT IMPLEMENTED.
+        r"""NPE-B [1]. CURRENTLY NOT IMPLEMENTED.
 
         [1] _Flexible statistical inference for mechanistic models of neural dynamics_,
             Lueckmann, Gonçalves et al., NeurIPS 2017, https://arxiv.org/abs/1711.01861.

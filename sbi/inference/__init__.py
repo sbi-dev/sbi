@@ -7,29 +7,29 @@ from sbi.inference.trainers.base import (
 )
 from sbi.inference.trainers.fmpe import FMPE
 from sbi.inference.trainers.npse.npse import NPSE
-from sbi.inference.trainers.snle import MNLE, SNLE_A
-from sbi.inference.trainers.snpe import SNPE_A, SNPE_B, SNPE_C  # noqa: F401
-from sbi.inference.trainers.snre import BNRE, SNRE, SNRE_A, SNRE_B, SNRE_C  # noqa: F401
+from sbi.inference.trainers.nle import MNLE, NLE_A
+from sbi.inference.trainers.npe import NPE_A, NPE_B, NPE_C  # noqa: F401
+from sbi.inference.trainers.nre import BNRE, NRE, NRE_A, NRE_B, NRE_C  # noqa: F401
 
-SNL = SNLE = SNLE_A
-_snle_family = ["SNL"]
-
-
-SNPE = APT = SNPE_C
-_snpe_family = ["SNPE_A", "SNPE_C", "SNPE", "APT"]
+SNL = SNLE = SNLE_A = NLE = NLE_A
+_nle_family = ["NLE"]
 
 
-SRE = SNRE_B
-AALR = SNRE_A
-CNRE = NREC = SNRE_C
-_snre_family = ["SNRE_A", "AALR", "SNRE_B", "SNRE", "SRE", "SNRE_C", "CNRE", "NREC"]
+SNPE = APT = SNPE_C = NPE = NPE_C
+_npe_family = ["NPE_A", "NPE_C"]
+
+
+SRE = SNRE_B = NRE_B
+AALR = SNRE_A = NRE_A
+CNRE = NRE_C
+_nre_family = ["NRE_A", "NRE_B", "NRE_C", "BNRE"]
 
 ABC = MCABC
 SMC = SMCABC
 _abc_family = ["ABC", "MCABC", "SMC", "SMCABC"]
 
 
-__all__ = _snpe_family + _snre_family + _snle_family + _abc_family
+__all__ = _npe_family + _nre_family + _nle_family + _abc_family
 
 from sbi.inference.posteriors import (
     DirectPosterior,
