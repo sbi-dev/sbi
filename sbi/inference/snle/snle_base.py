@@ -238,7 +238,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
             self._val_loss = val_loss_sum / (
                 len(val_loader) * val_loader.batch_size  # type: ignore
             )
-            # Log validation log prob for every epoch.
+            # Log validation loss for every epoch.
             self._summary["validation_loss"].append(self._val_loss)
 
             self._maybe_show_progress(self._show_progress_bars, self.epoch)

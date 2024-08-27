@@ -477,7 +477,7 @@ class NeuralInference(ABC):
             - validation_loss:
                 validation loss for every epoch (for each round).
             - training_loss
-                training log probs for every epoch (for each round).
+                training loss for every epoch (for each round).
             - epoch_durations_sec
                 epoch duration for every epoch (for each round)
 
