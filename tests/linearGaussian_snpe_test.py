@@ -271,7 +271,7 @@ def test_c2st_npe_on_linearGaussian_different_dims(density_estimator="maf"):
         "tsnpe_sir",
     ),
 )
-def test_c2st_multi_round_npe_on_linearGaussian(method_str: str):
+def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str):
     """Test whether NPE B/C infer well a simple example with available ground truth.
     .
     """
@@ -293,14 +293,14 @@ def test_c2st_multi_round_npe_on_linearGaussian(method_str: str):
     )
     target_samples = gt_posterior.sample((num_samples,))
 
-    if method_str == "npe_c_non_atomic":
+    if method_str == "snpe_c_non_atomic":
         # Test whether NPE works properly with structured z-scoring.
         density_estimator = posterior_nn(
             "mdn", z_score_x="structured", num_components=5
         )
         method_str = "snpe_c"
     elif method_str == "snpe_a":
-        density_estimator = "mdn_npe_a"
+        density_estimator = "mdn_snpe_a"
     else:
         density_estimator = "maf"
 
