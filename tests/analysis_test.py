@@ -5,7 +5,7 @@ import pytest
 import torch
 
 from sbi.analysis import ActiveSubspace, conditional_corrcoeff, conditional_pairplot
-from sbi.inference import SNPE
+from sbi.inference import NPE
 from sbi.utils import BoxUniform, get_1d_marginal_peaks_from_kde
 from sbi.utils.torchutils import process_device
 
@@ -34,7 +34,7 @@ def test_analysis_modules(device: str) -> None:
     theta = prior.sample((300,)).to(device)
     x = simulator(theta)
 
-    inf = SNPE(prior=prior, device=device)
+    inf = NPE(prior=prior, device=device)
     _ = inf.append_simulations(theta, x).train(max_num_epochs=10)
 
     observation = torch.zeros(num_dim)

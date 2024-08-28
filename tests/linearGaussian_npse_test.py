@@ -102,7 +102,7 @@ def test_c2st_npse_on_linearGaussian(
 
 
 def test_c2st_npse_on_linearGaussian_different_dims():
-    """Test SNPE on linear Gaussian with different theta and x dimensionality."""
+    """Test NPE on linear Gaussian with different theta and x dimensionality."""
 
     theta_dim = 3
     x_dim = 2

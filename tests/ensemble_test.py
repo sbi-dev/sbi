@@ -7,7 +7,7 @@ import pytest
 from torch import eye, ones, zeros
 from torch.distributions import MultivariateNormal
 
-from sbi.inference import SNLE_A, SNPE_C, SNRE_A
+from sbi.inference import NLE_A, NPE_C, NRE_A
 from sbi.inference.posteriors import EnsemblePosterior
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
@@ -34,7 +34,7 @@ def test_import_before_deprecation():
 
         theta = prior.sample((num_simulations,))
         x = simulator(theta)
-        inferer = SNPE_C(prior)
+        inferer = NPE_C(prior)
         inferer.append_simulations(theta, x).train(max_num_epochs=1)
         posterior = inferer.build_posterior()
 
@@ -46,12 +46,12 @@ def test_import_before_deprecation():
 @pytest.mark.parametrize(
     "inference_method, num_trials",
     (
-        (SNPE_C, 1),
-        pytest.param(SNPE_C, 5, marks=pytest.mark.xfail),
-        pytest.param(SNLE_A, 1, marks=pytest.mark.mcmc),
-        pytest.param(SNLE_A, 5, marks=pytest.mark.mcmc),
-        pytest.param(SNRE_A, 1, marks=pytest.mark.mcmc),
-        pytest.param(SNRE_A, 5, marks=pytest.mark.mcmc),
+        (NPE_C, 1),
+        pytest.param(NPE_C, 5, marks=pytest.mark.xfail),
+        pytest.param(NLE_A, 1, marks=pytest.mark.mcmc),
+        pytest.param(NLE_A, 5, marks=pytest.mark.mcmc),
+        pytest.param(NRE_A, 1, marks=pytest.mark.mcmc),
+        pytest.param(NRE_A, 5, marks=pytest.mark.mcmc),
     ),
 )
 def test_c2st_posterior_ensemble_on_linearGaussian(
@@ -90,7 +90,7 @@ def test_c2st_posterior_ensemble_on_linearGaussian(
         inferer = inference_method(prior)
         inferer.append_simulations(theta, x).train(
             training_batch_size=100,
-            max_num_epochs=1 if inference_method == "SNPE" and num_trials > 1 else 100,
+            max_num_epochs=1 if inference_method == "NPE" and num_trials > 1 else 100,
         )
         posteriors.append(inferer.build_posterior())
 
@@ -99,7 +99,7 @@ def test_c2st_posterior_ensemble_on_linearGaussian(
     posterior.set_default_x(x_o)
 
     # test sampling and evaluation.
-    if isinstance(inferer, (SNLE_A, SNRE_A)):
+    if isinstance(inferer, (NLE_A, NRE_A)):
         samples = posterior.sample(
             (num_samples,),
             method="slice_np_vectorized",
@@ -122,7 +122,7 @@ def test_c2st_posterior_ensemble_on_linearGaussian(
     # Checks for log_prob()
     # For the Gaussian prior, we compute the KLd between ground truth and posterior.
     # This step is skipped for NLE since the probabilities are not normalised.
-    if isinstance(inferer, (SNPE_C, SNRE_A)):
+    if isinstance(inferer, (NPE_C, NRE_A)):
         dkl = get_dkl_gaussian_prior(
             posterior,
             x_o[0],
@@ -142,7 +142,7 @@ def test_c2st_posterior_ensemble_on_linearGaussian(
 
     # Test sample_batched
     x_o_batch_dim = 2
-    if isinstance(inferer, (SNLE_A, SNRE_A)):
+    if isinstance(inferer, (NLE_A, NRE_A)):
         # TODO: Implement batched sampling for MCMC methods
         return
     else:

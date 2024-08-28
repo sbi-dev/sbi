@@ -11,9 +11,9 @@ from sbi import utils
 from sbi.inference import (
     AALR,
     BNRE,
-    SNRE_A,
-    SNRE_B,
-    SNRE_C,
+    NRE_A,
+    NRE_B,
+    NRE_C,
     ImportanceSamplingPosterior,
     MCMCPosterior,
     RejectionPosterior,
@@ -37,7 +37,7 @@ from tests.test_utils import (
 
 @pytest.mark.mcmc
 @pytest.mark.parametrize("num_dim", (1,))  # dim 3 is tested below.
-@pytest.mark.parametrize("snre_method", (SNRE_B, SNRE_C))
+@pytest.mark.parametrize("snre_method", (NRE_B, NRE_C))
 def test_api_snre_multiple_trials_and_rounds_map(
     num_dim: int,
     snre_method: RatioEstimator,
@@ -46,7 +46,7 @@ def test_api_snre_multiple_trials_and_rounds_map(
     num_samples: int = 12,
     num_simulations: int = 100,
 ):
-    """Test SNRE API with 2 rounds, different priors num trials and MAP."""
+    """Test NRE API with 2 rounds, different priors num trials and MAP."""
     prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
 
     simulator = diagonal_linear_gaussian
@@ -71,7 +71,7 @@ def test_api_snre_multiple_trials_and_rounds_map(
 
 
 @pytest.mark.mcmc
-@pytest.mark.parametrize("snre_method", (SNRE_B, SNRE_C))
+@pytest.mark.parametrize("snre_method", (NRE_B, NRE_C))
 def test_c2st_sre_on_linearGaussian(
     snre_method: RatioEstimator, mcmc_params_accurate: dict
 ):
@@ -136,7 +136,7 @@ def test_c2st_sre_on_linearGaussian(
 
 @pytest.mark.mcmc
 @pytest.mark.slow
-@pytest.mark.parametrize("snre_method", (SNRE_A, SNRE_B, SNRE_C, BNRE))
+@pytest.mark.parametrize("snre_method", (NRE_A, NRE_B, NRE_C, BNRE))
 @pytest.mark.parametrize("prior_str", ("gaussian", "uniform"))
 @pytest.mark.parametrize("num_trials", (3,))  # num_trials=1 is tested above.
 def test_c2st_snre_variants_on_linearGaussian_with_multiple_trials(
@@ -145,7 +145,7 @@ def test_c2st_snre_variants_on_linearGaussian_with_multiple_trials(
     num_trials: int,
     mcmc_params_accurate: dict,
 ):
-    """Test C2ST and MAP accuracy of SNRE variants on linear gaussian.
+    """Test C2ST and MAP accuracy of NRE variants on linear gaussian.
 
     Args:
         num_dim: parameter dimension of the gaussian model
@@ -250,11 +250,11 @@ def test_c2st_snre_variants_on_linearGaussian_with_multiple_trials(
 
 @pytest.mark.slow
 @pytest.mark.parametrize("num_trials", (1, 3))
-@pytest.mark.parametrize("snre_method", (SNRE_B, SNRE_C))
+@pytest.mark.parametrize("snre_method", (NRE_B, NRE_C))
 def test_c2st_multi_round_snr_on_linearGaussian_vi(
     num_trials: int, snre_method: RatioEstimator
 ):
-    """Test C2ST accuracy of 2-round-SNRE with variational inference sampling."""
+    """Test C2ST accuracy of 2-round-NRE with variational inference sampling."""
 
     num_dim = 2
     x_o = zeros((num_trials, num_dim))
@@ -371,7 +371,7 @@ def test_api_sre_sampling_methods(
 
     simulator = diagonal_linear_gaussian
 
-    inference = SNRE_B(classifier="resnet", show_progress_bars=False)
+    inference = NRE_B(classifier="resnet", show_progress_bars=False)
 
     theta = prior.sample((num_simulations,))
     x = simulator(theta)

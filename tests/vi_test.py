@@ -13,7 +13,7 @@ import torch.distributions.transforms as torch_tf
 from torch import eye, ones, zeros
 from torch.distributions import Beta, Binomial, Gamma, MultivariateNormal
 
-from sbi.inference import SNLE, likelihood_estimator_based_potential
+from sbi.inference import NLE, likelihood_estimator_based_potential
 from sbi.inference.posteriors import VIPosterior
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.samplers.vi.vi_pyro_flows import get_default_flows, get_flow_builder
@@ -369,7 +369,7 @@ def test_vi_with_multiple_independent_prior():
     theta = prior.sample((num_simulations,))
     x = simulator(theta)
 
-    trainer = SNLE(prior)
+    trainer = NLE(prior)
     nle = trainer.append_simulations(theta, x).train()
     potential, transform = likelihood_estimator_based_potential(nle, prior, x[0])
     posterior = VIPosterior(

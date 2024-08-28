@@ -9,8 +9,8 @@ from torch import Tensor, eye, ones, zeros
 from torch.distributions import MultivariateNormal, Uniform
 
 from sbi.inference import (
-    SNLE,
-    SNPE,
+    NLE,
+    NPE,
     DirectPosterior,
     MCMCPosterior,
     likelihood_estimator_based_potential,
@@ -23,7 +23,7 @@ from tests.test_utils import check_c2st
 
 
 @pytest.mark.parametrize(
-    "method", (SNPE, pytest.param(SNLE, marks=[pytest.mark.slow, pytest.mark.mcmc]))
+    "method", (NPE, pytest.param(NLE, marks=[pytest.mark.slow, pytest.mark.mcmc]))
 )
 def test_mdn_inference_with_different_methods(method, mcmc_params_accurate: dict):
     num_dim = 2
@@ -52,7 +52,7 @@ def test_mdn_inference_with_different_methods(method, mcmc_params_accurate: dict
     x = simulator(theta)
 
     estimator = inference.append_simulations(theta, x).train()
-    if method == SNPE:
+    if method == NPE:
         posterior = DirectPosterior(posterior_estimator=estimator, prior=prior)
     else:
         potential_fn, theta_transform = likelihood_estimator_based_potential(
@@ -94,7 +94,7 @@ def test_mdn_with_1D_uniform_prior():
     def simulator(theta: Tensor) -> Tensor:
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    inference = SNPE(density_estimator="mdn")
+    inference = NPE(density_estimator="mdn")
 
     theta = prior.sample((num_simulations,))
     x = simulator(theta)

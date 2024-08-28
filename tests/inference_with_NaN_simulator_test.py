@@ -8,9 +8,9 @@ from torch.distributions import MultivariateNormal
 
 from sbi import utils as utils
 from sbi.inference import (
+    NPE_A,
+    NPE_C,
     SNL,
-    SNPE_A,
-    SNPE_C,
     SRE,
     DirectPosterior,
     simulate_for_sbi,
@@ -48,7 +48,7 @@ def test_handle_invalid_x(x_shape):
     assert torch.isfinite(x[x_is_valid]).all()
 
 
-@pytest.mark.parametrize("snpe_method", [SNPE_A, SNPE_C])
+@pytest.mark.parametrize("snpe_method", [NPE_A, NPE_C])
 def test_z_scoring_warning(snpe_method: type):
     # Create data with large variance.
     num_dim = 2
@@ -68,7 +68,7 @@ def test_z_scoring_warning(snpe_method: type):
 @pytest.mark.parametrize(
     ("method", "percent_nans"),
     (
-        (SNPE_C, 0.05),
+        (NPE_C, 0.05),
         pytest.param(SNL, 0.05, marks=pytest.mark.xfail),
         pytest.param(SRE, 0.05, marks=pytest.mark.xfail),
     ),
@@ -158,7 +158,7 @@ def test_inference_with_restriction_estimator():
     all_theta, all_x, _ = restriction_estimator.get_simulations()
 
     # Any method can be used in combination with the `RejectionEstimator`.
-    inference = SNPE_C(prior=prior)
+    inference = NPE_C(prior=prior)
     posterior_estimator = inference.append_simulations(all_theta, all_x).train()
 
     # Build posterior.
@@ -169,7 +169,7 @@ def test_inference_with_restriction_estimator():
     samples = posterior.sample((num_samples,))
 
     # Compute the c2st and assert it is near chance level of 0.5.
-    check_c2st(samples, target_samples, alg=f"{SNPE_C}")
+    check_c2st(samples, target_samples, alg=f"{NPE_C}")
 
 
 @pytest.mark.parametrize("prior", ("uniform", "gaussian"))

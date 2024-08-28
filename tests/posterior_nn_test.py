@@ -9,12 +9,12 @@ from torch import eye, ones, zeros
 from torch.distributions import MultivariateNormal
 
 from sbi.inference import (
-    SNLE_A,
-    SNPE_A,
-    SNPE_C,
-    SNRE_A,
-    SNRE_B,
-    SNRE_C,
+    NLE_A,
+    NPE_A,
+    NPE_C,
+    NRE_A,
+    NRE_B,
+    NRE_C,
     DirectPosterior,
 )
 from sbi.simulators.linear_gaussian import (
@@ -26,7 +26,7 @@ from sbi.utils.diagnostics_utils import get_posterior_samples_on_batch
 from tests.test_utils import check_c2st
 
 
-@pytest.mark.parametrize("snpe_method", [SNPE_A, SNPE_C])
+@pytest.mark.parametrize("snpe_method", [NPE_A, NPE_C])
 @pytest.mark.parametrize(
     "x_o_batch_dim",
     (
@@ -69,9 +69,7 @@ def test_log_prob_with_different_x(snpe_method: type, x_o_batch_dim: bool):
     _ = posterior.log_prob(samples)
 
 
-@pytest.mark.parametrize(
-    "snplre_method", [SNPE_A, SNPE_C, SNLE_A, SNRE_A, SNRE_B, SNRE_C]
-)
+@pytest.mark.parametrize("snplre_method", [NPE_A, NPE_C, NLE_A, NRE_A, NRE_B, NRE_C])
 def test_importance_posterior_sample_log_prob(snplre_method: type):
     num_dim = 2
     num_simulations = 1000
@@ -98,7 +96,7 @@ def test_importance_posterior_sample_log_prob(snplre_method: type):
     assert log_prob.shape == (10,), "logprob shape wrong"
 
 
-@pytest.mark.parametrize("snpe_method", [SNPE_A, SNPE_C])
+@pytest.mark.parametrize("snpe_method", [NPE_A, NPE_C])
 @pytest.mark.parametrize("x_o_batch_dim", (0, 1, 2))
 def test_batched_sample_log_prob_with_different_x(
     snpe_method: type, x_o_batch_dim: bool
@@ -130,7 +128,7 @@ def test_batched_sample_log_prob_with_different_x(
 
 
 @pytest.mark.mcmc
-@pytest.mark.parametrize("snlre_method", [SNLE_A, SNRE_A, SNRE_B, SNRE_C, SNPE_C])
+@pytest.mark.parametrize("snlre_method", [NLE_A, NRE_A, NRE_B, NRE_C, NPE_C])
 @pytest.mark.parametrize("x_o_batch_dim", (0, 1, 2))
 @pytest.mark.parametrize("init_strategy", ["proposal", "resample"])
 @pytest.mark.parametrize(
@@ -239,7 +237,7 @@ def test_batched_sampling_and_logprob_accuracy(density_estimator: str):
     def simulator(theta):
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    inference = SNPE_C(
+    inference = NPE_C(
         prior=prior, show_progress_bars=False, density_estimator=density_estimator
     )
     theta = prior.sample((num_simulations,))

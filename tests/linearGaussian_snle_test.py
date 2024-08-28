@@ -9,7 +9,7 @@ from torch import eye, ones, zeros
 from torch.distributions import HalfNormal, MultivariateNormal
 
 from sbi.inference import (
-    SNLE,
+    NLE,
     ImportanceSamplingPosterior,
     MCMCPosterior,
     RejectionPosterior,
@@ -35,7 +35,7 @@ from .test_utils import check_c2st, get_prob_outside_uniform_prior
 def test_api_snle_multiple_trials_and_rounds_map(
     num_dim: int, prior_str: str, mcmc_params_fast: dict
 ):
-    """Test SNLE API with 2 rounds, different priors num trials and MAP."""
+    """Test NLE API with 2 rounds, different priors num trials and MAP."""
     num_rounds = 2
     num_samples = 1
     num_simulations_per_round = 100
@@ -48,7 +48,7 @@ def test_api_snle_multiple_trials_and_rounds_map(
         prior = BoxUniform(-2.0 * ones(num_dim), 2.0 * ones(num_dim))
 
     simulator = diagonal_linear_gaussian
-    inference = SNLE(prior=prior, density_estimator="mdn", show_progress_bars=False)
+    inference = NLE(prior=prior, density_estimator="mdn", show_progress_bars=False)
 
     proposals = [prior]
     for _ in range(num_rounds):
@@ -71,7 +71,7 @@ def test_api_snle_multiple_trials_and_rounds_map(
 def test_c2st_snl_on_linear_gaussian_different_dims(
     mcmc_params_accurate: dict, model_str="maf"
 ):
-    """Test SNLE on linear Gaussian task with different theta and x dims."""
+    """Test NLE on linear Gaussian task with different theta and x dims."""
 
     theta_dim = 3
     x_dim = 2
@@ -107,7 +107,7 @@ def test_c2st_snl_on_linear_gaussian_different_dims(
         )
 
     density_estimator = likelihood_nn(model=model_str, num_transforms=3)
-    inference = SNLE(density_estimator=density_estimator, show_progress_bars=False)
+    inference = NLE(density_estimator=density_estimator, show_progress_bars=False)
 
     theta = prior.sample((num_simulations,))
     x = simulator(theta)
@@ -163,7 +163,7 @@ def test_c2st_and_map_snl_on_linearGaussian_different(
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     density_estimator = likelihood_nn(model_str, num_transforms=3)
-    inference = SNLE(density_estimator=density_estimator, show_progress_bars=False)
+    inference = NLE(density_estimator=density_estimator, show_progress_bars=False)
 
     theta = prior.sample((num_simulations,))
     x = simulator(theta)
@@ -245,7 +245,7 @@ def test_map_with_multiple_independent_prior(use_transform):
     x = simulator(theta)
     x_o = zeros((1, dim))
 
-    trainer = SNLE(prior).append_simulations(theta, x)
+    trainer = NLE(prior).append_simulations(theta, x)
     likelihood_estimator = trainer.train(max_num_epochs=5)
 
     potential_fn, parameter_transform = likelihood_estimator_based_potential(
@@ -289,7 +289,7 @@ def test_c2st_multi_round_snl_on_linearGaussian(
     def simulator(theta):
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    inference = SNLE(show_progress_bars=False)
+    inference = NLE(show_progress_bars=False)
 
     theta = prior.sample((num_simulations_per_round,))
     x = simulator(theta)
@@ -352,7 +352,7 @@ def test_c2st_multi_round_snl_on_linearGaussian_vi(num_trials: int):
     def simulator(theta):
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    inference = SNLE(show_progress_bars=False)
+    inference = NLE(show_progress_bars=False)
 
     theta = prior.sample((num_simulations_per_round,))
     x = simulator(theta)
@@ -447,7 +447,7 @@ def test_api_snl_sampling_methods(
 
     simulator = diagonal_linear_gaussian
 
-    inference = SNLE(show_progress_bars=False)
+    inference = NLE(show_progress_bars=False)
 
     theta = prior.sample((num_simulations,))
     x = simulator(theta)

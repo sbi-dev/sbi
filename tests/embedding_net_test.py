@@ -9,7 +9,7 @@ from torch import eye, ones, zeros
 from torch.distributions import MultivariateNormal
 
 from sbi import utils
-from sbi.inference import FMPE, SNLE, SNPE, SNRE
+from sbi.inference import FMPE, NLE, NPE, NRE
 from sbi.neural_nets import classifier_nn, flowmatching_nn, likelihood_nn, posterior_nn
 from sbi.neural_nets.embedding_nets import (
     CNNEmbedding,
@@ -25,7 +25,7 @@ from .test_utils import check_c2st
 
 
 @pytest.mark.mcmc
-@pytest.mark.parametrize("method", ["SNPE", "SNLE", "SNRE", "FMPE"])
+@pytest.mark.parametrize("method", ["NPE", "NLE", "NRE", "FMPE"])
 @pytest.mark.parametrize("num_dim", [1, 2])
 @pytest.mark.parametrize("embedding_net", ["mlp"])
 def test_embedding_net_api(
@@ -49,19 +49,19 @@ def test_embedding_net_api(
     else:
         raise NameError(f"{embedding_net} not supported.")
 
-    if method == "SNPE":
+    if method == "NPE":
         density_estimator = posterior_nn("maf", embedding_net=embedding)
-        inference = SNPE(
+        inference = NPE(
             prior, density_estimator=density_estimator, show_progress_bars=False
         )
-    elif method == "SNLE":
+    elif method == "NLE":
         density_estimator = likelihood_nn("maf", embedding_net=embedding)
-        inference = SNLE(
+        inference = NLE(
             prior, density_estimator=density_estimator, show_progress_bars=False
         )
-    elif method == "SNRE":
+    elif method == "NRE":
         classifier = classifier_nn("resnet", embedding_net_x=embedding)
-        inference = SNRE(prior, classifier=classifier, show_progress_bars=False)
+        inference = NRE(prior, classifier=classifier, show_progress_bars=False)
     elif method == "FMPE":
         vectorfield_net = flowmatching_nn(model="mlp", embedding_net=embedding)
         inference = FMPE(
@@ -106,7 +106,7 @@ def test_embedding_api_with_multiple_trials(
     )
 
     density_estimator = posterior_nn("maf", embedding_net=embedding_net)
-    inference = SNPE(prior, density_estimator=density_estimator)
+    inference = NPE(prior, density_estimator=density_estimator)
 
     _ = inference.append_simulations(theta, x).train(max_num_epochs=5)
 
@@ -165,7 +165,7 @@ def test_1d_and_2d_cnn_embedding_net(input_shape, num_channels):
             1, num_channels, *[1 for _ in range(len(input_shape))]
         )
 
-    trainer = SNPE(prior=prior, density_estimator=estimator_provider)
+    trainer = NPE(prior=prior, density_estimator=estimator_provider)
     trainer.append_simulations(theta, x).train(max_num_epochs=2)
     posterior = trainer.build_posterior().set_default_x(xo)
 
@@ -217,7 +217,7 @@ def test_npe_with_with_iid_embedding_varying_num_trials(trial_factor=50):
         z_score_x="none",  # turn off z-scoring because of NaN encodings.
         z_score_theta="independent",
     )
-    inference = SNPE(prior, density_estimator=density_estimator)
+    inference = NPE(prior, density_estimator=density_estimator)
 
     # do not exclude invalid x, as we padded with nans.
     _ = inference.append_simulations(theta, x, exclude_invalid_x=False).train(

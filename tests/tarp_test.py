@@ -6,7 +6,7 @@ from torch.nn import L1Loss
 
 from sbi.analysis.plot import plot_tarp
 from sbi.diagnostics.tarp import _run_tarp, check_tarp, get_tarp_references, run_tarp
-from sbi.inference import SNPE
+from sbi.inference import NPE
 from sbi.simulators import linear_gaussian
 from sbi.utils import BoxUniform
 from sbi.utils.metrics import l1, l2
@@ -249,7 +249,7 @@ def test_check_tarp_detect_bias(biased_samples):
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize("method", [SNPE])
+@pytest.mark.parametrize("method", [NPE])
 def test_consistent_run_tarp_results_with_posterior(method):
     """Tests running inference and checking samples with tarp."""
 

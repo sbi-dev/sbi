@@ -13,12 +13,12 @@ from torch.distributions import MultivariateNormal
 
 from sbi import utils as utils
 from sbi.inference import (
-    SNLE,
-    SNPE_A,
-    SNPE_C,
-    SNRE_A,
-    SNRE_B,
-    SNRE_C,
+    NLE,
+    NPE_A,
+    NPE_C,
+    NRE_A,
+    NRE_B,
+    NRE_C,
     VIPosterior,
     likelihood_estimator_based_potential,
     ratio_estimator_based_potential,
@@ -49,22 +49,22 @@ pytestmark = pytest.mark.skipif(
 @pytest.mark.parametrize(
     "method, model, sampling_method",
     [
-        (SNPE_C, "maf", "direct"),
-        (SNPE_C, "mdn", "rejection"),
-        pytest.param(SNPE_C, "maf", "slice_np_vectorized", marks=pytest.mark.mcmc),
-        pytest.param(SNPE_C, "mdn", "slice_np", marks=pytest.mark.mcmc),
-        pytest.param(SNLE, "nsf", "slice_np_vectorized", marks=pytest.mark.mcmc),
-        pytest.param(SNLE, "mdn", "slice_np", marks=pytest.mark.mcmc),
-        (SNLE, "nsf", "rejection"),
-        (SNLE, "maf", "importance"),
-        pytest.param(SNRE_A, "mlp", "slice_np_vectorized", marks=pytest.mark.mcmc),
-        pytest.param(SNRE_A, "mlp", "slice_np", marks=pytest.mark.mcmc),
-        (SNRE_B, "resnet", "rejection"),
-        (SNRE_B, "resnet", "importance"),
-        pytest.param(SNRE_B, "resnet", "slice_np", marks=pytest.mark.mcmc),
-        (SNRE_C, "resnet", "rejection"),
-        (SNRE_C, "resnet", "importance"),
-        pytest.param(SNRE_C, "resnet", "nuts_pymc", marks=pytest.mark.mcmc),
+        (NPE_C, "maf", "direct"),
+        (NPE_C, "mdn", "rejection"),
+        pytest.param(NPE_C, "maf", "slice_np_vectorized", marks=pytest.mark.mcmc),
+        pytest.param(NPE_C, "mdn", "slice_np", marks=pytest.mark.mcmc),
+        pytest.param(NLE, "nsf", "slice_np_vectorized", marks=pytest.mark.mcmc),
+        pytest.param(NLE, "mdn", "slice_np", marks=pytest.mark.mcmc),
+        (NLE, "nsf", "rejection"),
+        (NLE, "maf", "importance"),
+        pytest.param(NRE_A, "mlp", "slice_np_vectorized", marks=pytest.mark.mcmc),
+        pytest.param(NRE_A, "mlp", "slice_np", marks=pytest.mark.mcmc),
+        (NRE_B, "resnet", "rejection"),
+        (NRE_B, "resnet", "importance"),
+        pytest.param(NRE_B, "resnet", "slice_np", marks=pytest.mark.mcmc),
+        (NRE_C, "resnet", "rejection"),
+        (NRE_C, "resnet", "importance"),
+        pytest.param(NRE_C, "resnet", "nuts_pymc", marks=pytest.mark.mcmc),
     ],
 )
 @pytest.mark.parametrize(
@@ -121,21 +121,21 @@ def test_training_and_mcmc_on_device(
     def simulator(theta):
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    if method in [SNPE_A, SNPE_C]:
+    if method in [NPE_A, NPE_C]:
         kwargs = dict(
             density_estimator=posterior_nn(
                 model=model, num_transforms=2, dtype=torch.float32
             )
         )
         train_kwargs = dict(force_first_round_loss=True)
-    elif method == SNLE:
+    elif method == NLE:
         kwargs = dict(
             density_estimator=likelihood_nn(
                 model=model, num_transforms=2, dtype=torch.float32
             )
         )
         train_kwargs = dict()
-    elif method in (SNRE_A, SNRE_B, SNRE_C):
+    elif method in (NRE_A, NRE_B, NRE_C):
         kwargs = dict(classifier=classifier_nn(model=model))
         train_kwargs = dict()
     else:
@@ -169,17 +169,17 @@ def test_training_and_mcmc_on_device(
                 sample_with=sampling_method,
                 rejection_sampling_parameters=(
                     {"proposal": prior}
-                    if sampling_method == "rejection" and method == SNPE_C
+                    if sampling_method == "rejection" and method == NPE_C
                     else {}
                 ),
             )
         else:
-            # build potential for SNLE or SNRE and construct ImportanceSamplingPosterior
-            if method == SNLE:
+            # build potential for NLE or NRE and construct ImportanceSamplingPosterior
+            if method == NLE:
                 potential_fn, theta_transform = likelihood_estimator_based_potential(
                     estimator, prior, x_o
                 )
-            elif method in [SNRE_A, SNRE_B, SNRE_C]:
+            elif method in [NRE_A, NRE_B, NRE_C]:
                 potential_fn, theta_transform = ratio_estimator_based_potential(
                     estimator, prior, x_o
                 )
@@ -250,9 +250,7 @@ def test_validate_theta_and_x_device(training_device: str, data_device: str) -> 
 
 
 @pytest.mark.gpu
-@pytest.mark.parametrize(
-    "inference_method", [SNPE_A, SNPE_C, SNRE_A, SNRE_B, SNRE_C, SNLE]
-)
+@pytest.mark.parametrize("inference_method", [NPE_A, NPE_C, NRE_A, NRE_B, NRE_C, NLE])
 @pytest.mark.parametrize("data_device", ("cpu", "gpu"))
 @pytest.mark.parametrize("training_device", ("cpu", "gpu"))
 @pytest.mark.parametrize("embedding_device", ("cpu", "gpu"))
@@ -275,13 +273,13 @@ def test_train_with_different_data_and_training_device(
         embedding_device
     )
 
-    if inference_method in [SNRE_A, SNRE_B, SNRE_C]:
+    if inference_method in [NRE_A, NRE_B, NRE_C]:
         net_builder_fun = classifier_nn
         kwargs = dict(model="mlp", embedding_net_x=embedding_net)
-    elif inference_method == SNLE:
+    elif inference_method == NLE:
         net_builder_fun = likelihood_nn
         kwargs = dict(model="mdn", embedding_net=embedding_net)
-    elif inference_method == SNPE_A:
+    elif inference_method == NPE_A:
         net_builder_fun = posterior_nn
         kwargs = dict(model="mdn_snpe_a", embedding_net=embedding_net)
     else:
@@ -322,9 +320,7 @@ def test_train_with_different_data_and_training_device(
     ), "inferred posterior device not correct."
 
 
-@pytest.mark.parametrize(
-    "inference_method", [SNPE_A, SNPE_C, SNRE_A, SNRE_B, SNRE_C, SNLE]
-)
+@pytest.mark.parametrize("inference_method", [NPE_A, NPE_C, NRE_A, NRE_B, NRE_C, NLE])
 def test_nograd_after_inference_train(inference_method) -> None:
     """Test that no gradients are present after training."""
     num_dim = 2
@@ -335,11 +331,9 @@ def test_nograd_after_inference_train(inference_method) -> None:
         prior,
         **(
             dict(classifier="resnet")
-            if inference_method in [SNRE_A, SNRE_B, SNRE_C]
+            if inference_method in [NRE_A, NRE_B, NRE_C]
             else dict(
-                density_estimator=(
-                    "mdn_snpe_a" if inference_method == SNPE_A else "maf"
-                )
+                density_estimator=("mdn_snpe_a" if inference_method == NPE_A else "maf")
             )
         ),
         show_progress_bars=False,
@@ -441,4 +435,4 @@ def test_boxuniform_device_handling(arg_device, device):
     prior = BoxUniform(
         low=zeros(1).to(arg_device), high=ones(1).to(arg_device), device=device
     )
-    SNPE_C(prior=prior, device=arg_device)
+    NPE_C(prior=prior, device=arg_device)

@@ -12,7 +12,7 @@ from torch.distributions import MultivariateNormal, Uniform
 
 from sbi.analysis import sbc_rank_plot
 from sbi.diagnostics import check_sbc, get_nltp, run_sbc
-from sbi.inference import NPSE, SNLE, SNPE
+from sbi.inference import NLE, NPE, NPSE
 from sbi.simulators.linear_gaussian import linear_gaussian
 from sbi.utils import BoxUniform, MultipleIndependent
 from tests.test_utils import PosteriorPotential, TractablePosterior
@@ -23,9 +23,9 @@ from tests.test_utils import PosteriorPotential, TractablePosterior
 @pytest.mark.parametrize(
     "method, sampler",
     (
-        (SNPE, None),
-        pytest.param(SNLE, "mcmc", marks=pytest.mark.mcmc),
-        pytest.param(SNLE, "vi", marks=pytest.mark.mcmc),
+        (NPE, None),
+        pytest.param(NLE, "mcmc", marks=pytest.mark.mcmc),
+        pytest.param(NLE, "vi", marks=pytest.mark.mcmc),
         (NPSE, None),
     ),
 )
@@ -55,7 +55,7 @@ def test_running_sbc(method, prior, reduce_fn_str, sampler, mcmc_params_accurate
     inferer = method(prior, show_progress_bars=False)
 
     inferer.append_simulations(theta, x).train(max_num_epochs=max_num_epochs)
-    if method == SNLE:
+    if method == NLE:
         posterior_kwargs = {
             "sample_with": "mcmc" if sampler == "mcmc" else "vi",
             "mcmc_method": "slice_np_vectorized",
@@ -104,7 +104,7 @@ def test_consistent_sbc_results(density_estimator, cov_method):
     num_sbc_runs = 100
 
     # Create inference object. Here, NPE is used.
-    inference = SNPE(prior=prior, density_estimator=density_estimator)
+    inference = NPE(prior=prior, density_estimator=density_estimator)
 
     # generate simulations and pass to the inference object
     theta = prior.sample((num_simulations,))
