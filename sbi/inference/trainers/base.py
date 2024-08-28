@@ -57,7 +57,7 @@ def infer(
     The scope of this function is limited to the most essential features of sbi. For
     more flexibility (e.g. multi-round inference, different density estimators) please
     use the flexible interface described here:
-    https://sbi-dev.github.io/sbi/tutorial/02_flexible_interface/
+    https://sbi-dev.github.io/sbi/latest/tutorials/02_multiround_inference/
 
     Args:
         simulator: A function that takes parameters $\theta$ and maps them to
@@ -98,7 +98,7 @@ def infer(
         warn(
             "We discourage the use the simple interface in more complicated settings. "
             "Have a look into the flexible interface, e.g. in our tutorial "
-            "(https://sbi-dev.github.io/sbi/tutorial/02_flexible_interface/).",
+            "(https://sbi-dev.github.io/sbi/latest/tutorials/00_getting_started).",
             stacklevel=2,
         )
     # Set variables to empty dicts to be able to pass them
