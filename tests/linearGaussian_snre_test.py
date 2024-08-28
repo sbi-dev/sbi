@@ -37,10 +37,10 @@ from tests.test_utils import (
 
 @pytest.mark.mcmc
 @pytest.mark.parametrize("num_dim", (1,))  # dim 3 is tested below.
-@pytest.mark.parametrize("snre_method", (NRE_B, NRE_C))
-def test_api_snre_multiple_trials_and_rounds_map(
+@pytest.mark.parametrize("nre_method", (NRE_B, NRE_C))
+def test_api_nre_multiple_trials_and_rounds_map(
     num_dim: int,
-    snre_method: RatioEstimator,
+    nre_method: RatioEstimator,
     mcmc_params_fast: dict,
     num_rounds: int = 2,
     num_samples: int = 12,
@@ -50,7 +50,7 @@ def test_api_snre_multiple_trials_and_rounds_map(
     prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
 
     simulator = diagonal_linear_gaussian
-    inference = snre_method(prior=prior, classifier="mlp", show_progress_bars=False)
+    inference = nre_method(prior=prior, classifier="mlp", show_progress_bars=False)
 
     proposals = [prior]
     for _ in range(num_rounds):
@@ -71,9 +71,9 @@ def test_api_snre_multiple_trials_and_rounds_map(
 
 
 @pytest.mark.mcmc
-@pytest.mark.parametrize("snre_method", (NRE_B, NRE_C))
+@pytest.mark.parametrize("nre_method", (NRE_B, NRE_C))
 def test_c2st_sre_on_linearGaussian(
-    snre_method: RatioEstimator, mcmc_params_accurate: dict
+    nre_method: RatioEstimator, mcmc_params_accurate: dict
 ):
     """Test whether SRE infers well a simple example with available ground truth.
 
@@ -102,7 +102,7 @@ def test_c2st_sre_on_linearGaussian(
             theta, likelihood_shift, likelihood_cov, num_discarded_dims=discard_dims
         )
 
-    inference = snre_method(classifier="resnet", show_progress_bars=False)
+    inference = nre_method(classifier="resnet", show_progress_bars=False)
 
     theta = prior.sample((num_simulations,))
     x = simulator(theta)
@@ -131,16 +131,16 @@ def test_c2st_sre_on_linearGaussian(
     samples = posterior.sample((num_samples,))
 
     # Compute the c2st and assert it is near chance level of 0.5.
-    check_c2st(samples, target_samples, alg=f"{snre_method.__name__}")
+    check_c2st(samples, target_samples, alg=f"{nre_method.__name__}")
 
 
 @pytest.mark.mcmc
 @pytest.mark.slow
-@pytest.mark.parametrize("snre_method", (NRE_A, NRE_B, NRE_C, BNRE))
+@pytest.mark.parametrize("nre_method", (NRE_A, NRE_B, NRE_C, BNRE))
 @pytest.mark.parametrize("prior_str", ("gaussian", "uniform"))
 @pytest.mark.parametrize("num_trials", (3,))  # num_trials=1 is tested above.
-def test_c2st_snre_variants_on_linearGaussian_with_multiple_trials(
-    snre_method: RatioEstimator,
+def test_c2st_nre_variants_on_linearGaussian_with_multiple_trials(
+    nre_method: RatioEstimator,
     prior_str: str,
     num_trials: int,
     mcmc_params_accurate: dict,
@@ -159,7 +159,7 @@ def test_c2st_snre_variants_on_linearGaussian_with_multiple_trials(
     x_o = zeros(num_trials, num_dim)
 
     train_kwargs = {"training_batch_size": 100}
-    if snre_method == BNRE:
+    if nre_method == BNRE:
         train_kwargs["regularization_strength"] = 20
 
     # `likelihood_mean` will be `likelihood_shift + theta`.
@@ -181,7 +181,7 @@ def test_c2st_snre_variants_on_linearGaussian_with_multiple_trials(
         show_progress_bars=False,
     )
 
-    inference = snre_method(**kwargs)
+    inference = nre_method(**kwargs)
 
     # Should use default `num_atoms=10` for SRE; `num_atoms=2` for AALR
     theta = prior.sample((num_simulations,))
@@ -214,13 +214,13 @@ def test_c2st_snre_variants_on_linearGaussian_with_multiple_trials(
     check_c2st(
         samples,
         target_samples,
-        alg=f"snre-{prior_str}-{snre_method.__name__}-{num_trials}trials",
+        alg=f"nre-{prior_str}-{nre_method.__name__}-{num_trials}trials",
     )
 
     map_ = posterior.map(num_init_samples=1_000, init_method="proposal")
 
     # Checks for log_prob()
-    if prior_str == "gaussian" and isinstance(snre_method, (AALR, BNRE)):
+    if prior_str == "gaussian" and isinstance(nre_method, (AALR, BNRE)):
         # For the Gaussian prior, we compute the KLd between ground truth and
         # posterior. We can do this only if the classifier_loss was as described in
         # Hermans et al. 2020 ('aalr') since Durkan et al. 2020 version only allows

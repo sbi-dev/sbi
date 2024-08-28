@@ -41,12 +41,12 @@ from .test_utils import (
 )
 
 
-@pytest.mark.parametrize("snpe_method", [NPE_A, NPE_C])
+@pytest.mark.parametrize("npe_method", [NPE_A, NPE_C])
 @pytest.mark.parametrize(
     "num_dim, prior_str",
     ((2, "gaussian"), (2, "uniform"), (1, "gaussian")),
 )
-def test_c2st_snpe_on_linearGaussian(snpe_method, num_dim: int, prior_str: str):
+def test_c2st_npe_on_linearGaussian(npe_method, num_dim: int, prior_str: str):
     """Test whether NPE infers well a simple example with available ground truth."""
 
     x_o = zeros(1, num_dim)
@@ -78,7 +78,7 @@ def test_c2st_snpe_on_linearGaussian(snpe_method, num_dim: int, prior_str: str):
     def simulator(theta):
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    inference = snpe_method(prior, show_progress_bars=False)
+    inference = npe_method(prior, show_progress_bars=False)
 
     theta = prior.sample((num_simulations,))
     x = simulator(theta)
@@ -92,7 +92,7 @@ def test_c2st_snpe_on_linearGaussian(snpe_method, num_dim: int, prior_str: str):
     samples = posterior.sample((num_samples,))
 
     # Compute the c2st and assert it is near chance level of 0.5.
-    check_c2st(samples, target_samples, alg="snpe_c")
+    check_c2st(samples, target_samples, alg="npe_c")
 
     map_ = posterior.map(num_init_samples=1_000, show_progress_bars=False)
 
@@ -188,10 +188,10 @@ def test_density_estimators_on_linearGaussian(density_estimator):
     samples = posterior.sample((num_samples,))
 
     # Compute the c2st and assert it is near chance level of 0.5.
-    check_c2st(samples, target_samples, alg=f"snpe_{density_estimator}")
+    check_c2st(samples, target_samples, alg=f"npe_{density_estimator}")
 
 
-def test_c2st_snpe_on_linearGaussian_different_dims(density_estimator="maf"):
+def test_c2st_npe_on_linearGaussian_different_dims(density_estimator="maf"):
     """Test NPE on linear Gaussian with different theta and x dimensionality."""
 
     theta_dim = 3
@@ -271,7 +271,7 @@ def test_c2st_snpe_on_linearGaussian_different_dims(density_estimator="maf"):
         "tsnpe_sir",
     ),
 )
-def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str):
+def test_c2st_multi_round_npe_on_linearGaussian(method_str: str):
     """Test whether NPE B/C infer well a simple example with available ground truth.
     .
     """
@@ -293,14 +293,14 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str):
     )
     target_samples = gt_posterior.sample((num_samples,))
 
-    if method_str == "snpe_c_non_atomic":
+    if method_str == "npe_c_non_atomic":
         # Test whether NPE works properly with structured z-scoring.
         density_estimator = posterior_nn(
             "mdn", z_score_x="structured", num_components=5
         )
         method_str = "snpe_c"
     elif method_str == "snpe_a":
-        density_estimator = "mdn_snpe_a"
+        density_estimator = "mdn_npe_a"
     else:
         density_estimator = "maf"
 
@@ -679,8 +679,8 @@ def test_mdn_conditional_density(num_dim: int = 3, cond_dim: int = 1):
     )
 
 
-@pytest.mark.parametrize("snpe_method", [NPE_A, NPE_C])
-def test_example_posterior(snpe_method: type):
+@pytest.mark.parametrize("npe_method", [NPE_A, NPE_C])
+def test_example_posterior(npe_method: type):
     """Return an inferred `NeuralPosterior` for interactive examination."""
     num_dim = 2
     x_o = zeros(1, num_dim)
@@ -694,18 +694,18 @@ def test_example_posterior(snpe_method: type):
     prior_cov = eye(num_dim)
     prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
 
-    extra_kwargs = dict(final_round=True) if snpe_method == NPE_A else dict()
+    extra_kwargs = dict(final_round=True) if npe_method == NPE_A else dict()
 
     def simulator(theta):
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    inference = snpe_method(prior, show_progress_bars=False)
+    inference = npe_method(prior, show_progress_bars=False)
     theta = prior.sample((num_simulations,))
     x = simulator(theta)
     posterior_estimator = inference.append_simulations(theta, x).train(
         max_num_epochs=2, **extra_kwargs
     )
-    if snpe_method == NPE_A:
+    if npe_method == NPE_A:
         posterior_estimator = inference.correct_for_proposal()
     posterior = DirectPosterior(
         prior=prior, posterior_estimator=posterior_estimator
