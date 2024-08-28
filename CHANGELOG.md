@@ -13,21 +13,25 @@
 
 ## Major Changes
 
-- change `sbi` default parameters: `training_batch_size=200`, `num_chains=20` (#1221,
-  @janfb)
+- internal renaming of all inference classes from, e.g., `SNPE` to `NPE` (i.e., we 
+  removed the `S` prefix). The functionality of the classes remains the same. The NPE 
+  class handles both the amortized and sequential versions of neural posterior 
+  estimation. An alias for SNPE still exists for backwards compatibility (#1238) 
+  (@michaeldeistler).
+- change `sbi` default parameters: `training_batch_size=200`, `num_chains=20` (#1221)
+  (@janfb)
 - change imports of `posterior_nn`, `likelihood_nn`, and `classifier_nn`. They should
-  now be imported from `sbi.neural_nets`, not from `sbi.utils` (#994, @famura)
+  now be imported from `sbi.neural_nets`, not from `sbi.utils` (#994) (@famura)
 - big refactoring of plotting utilities, new tutorial (#1084) (@Matthijspals)
 - improved tutorials and website documentation (#1012, #1051, #1073) (@augustes,
   @zinaStef, @lisahaxel, @psteinb)
 - improved website structure and contribution guides (#1019) (@tomMoral, @janfb)
 - drop support for python3.8 and torch1.12 (#1233)
-- refactor folder structure and naming of `neural_nets`, and all inferences classes
-  (#1237, #1238)
+- refactor folder structure and naming of `neural_nets` (#1237) (@michaeldeistler)
 
 ## New Features
 
-- full flexibility over the training loop (#983, @michaeldeistler)
+- full flexibility over the training loop (#983) (@michaeldeistler)
 - unified density estimator classes (#952, #965, #979, #1151) (@michaeldeistler, 
   @gmoss13, @tomMoral, @manualgloeckler)
 - vectorized sampling and log_prob for `(S)NPE` given batches of x (#1153)
@@ -51,6 +55,7 @@
 - batched sampling and embedding net support for `MNLE` (#1203) (@janfb)
 - adapt `MNLE` to new densitye stimator abstraction (#1089) (@coschroeder)
 - better plotting options for coverage plots (#1039, #1212) (@janfb)
+- allow for potential_fn to be a Callable (#943) (@michaeldeistler)
 
 ## Bug Fixes
 
@@ -59,14 +64,12 @@
 - fixed notebook by changing MCMC parameters (#1058) (@zinaStef)
 - fix: add NeuralPosteriorEnsemble to utils.__init__ (#1002) (@jnsbck)
 - fix: print_false_positive_rate (#976) (@danielmk)
-- fix: require potential_fn as Callable to make posteriors pickable (#943)
-  (@deismic)
 - fix: make VIPosterior pickable (#951) (@manuelgloeckler)
 - fix: bug in importance sampled posterior (#1081) (@max-dax)
 - fix: embedding device and warning handling (#1186) (@janfb)
 - fix: c2st with constant features (#1204) (@janfb)
-- Fix erroneous warnings about different devices (#1225, @ThomasGesseyJonesPX)
-- Fix type annotation in class 'ConditionedPotential` (#1222, @schroedk)
+- fix: erroneous warnings about different devices (#1225, @ThomasGesseyJonesPX)
+- fix: type annotation in class `ConditionedPotential` (#1222) (@schroedk)
 
 ## Maintenance and other changes
 
