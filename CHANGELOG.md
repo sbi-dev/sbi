@@ -16,8 +16,8 @@
 - internal renaming of all inference classes from, e.g., `SNPE` to `NPE` (i.e., we
   removed the `S` prefix). The functionality of the classes remains the same. The NPE
   class handles both the amortized and sequential versions of neural posterior
-  estimation. An alias for SNPE still exists for backwards compatibility (#1238)
-  (@michaeldeistler).
+  estimation. An alias for SNPE (and other sequential methods) still exists for
+  backwards compatibility (#1238) (@michaeldeistler).
 - change `sbi` default parameters: `training_batch_size=200`, `num_chains=20` (#1221)
   (@janfb)
 - change imports of `posterior_nn`, `likelihood_nn`, and `classifier_nn`. They should
