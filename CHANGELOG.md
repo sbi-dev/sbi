@@ -11,39 +11,46 @@
   @jsvetter, @pfuhr, @turnmanh, @fariedabuzaid, @augustes, @zinastef, @Baschdl,
   @danielmk, @lisahaxel, @janko-petkovic, @samadpls, @ThomasGesseyJonesPX, @schroedk
 
-## Major Changes and New Features
+## Major Changes
 
 - change `sbi` default parameters: `training_batch_size=200`, `num_chains=20` (#1221,
   @janfb)
-- more flexible API and shape handling for density estimator classes (#952, #965, #979,
-  #1151) (@gmoss13, @tomMoral, @manualgloeckler)
+- change imports of `posterior_nn`, `likelihood_nn`, and `classifier_nn`. They should
+  now be imported from `sbi.neural_nets`, not from `sbi.utils` (#994, @famura)
+- big refactoring of plotting utilities, new tutorial (#1084) (@Matthijspals)
+- improved tutorials and website documentation (#1012, #1051, #1073) (@augustes,
+  @zinaStef, @lisahaxel, @psteinb)
+- improved website structure and contribution guides (#1019) (@tomMoral, @janfb)
+- drop support for python3.8 and torch1.12 (#1233)
+- refactor folder structure and naming of `neural_nets`, and all inferences classes
+  (#1237, #1238)
+
+## New Features
+
+- full flexibility over the training loop (#983, @michaeldeistler)
+- unified density estimator classes (#952, #965, #979, #1151) (@michaeldeistler, 
+  @gmoss13, @tomMoral, @manualgloeckler)
 - vectorized sampling and log_prob for `(S)NPE` given batches of x (#1153)
-  (@manuelgloeckler, @deismic)
+  (@manuelgloeckler, @michaeldeistler)
 - batched sampling for vectorized MCMC samplers (#1176, #1210) (@gmoss13, @janfb)
 - support @zuko as a backend for normalizing flows (#1088, #1116)
   (@anastasiakrouglova)
 - local c2st metric (#1109) (@JuliaLinhart)
 - tarp coverage metric (#1106) (@psteinb)
 - add interface for @PyMC samplers (#1053) (@famura, @felixp8)
-- big refactoring of plotting utilities, new tutorial (#1084) (@Matthijspals)
 - flow matching density estimators (#1049) (@turnmanh, @fariedabuzaid, @janfb)
 - score matching density estimators (#1015) (@rdgao, @jsvetter, @pfuhr,
-  @manuelgloeckler, @deismic, @janfb)
+  @manuelgloeckler, @michaeldeistler, @janfb)
 - ABC methods for trial-based data using statistical distances (#1104)
   (@theogruner)
-- improved tutorials and website documentation (#1012, #1051, #1073) (@augustes,
-  @zinaStef, @lisahaxel, @psteinb)
-- improved website structure and contribution guides (#1019) (@tomMoral, @janfb)
 - support Apple MPS as gpu device (#912) (@janfb)
 - dev container for using `sbi` in codespaces on GitHub (#1070) (@turnmanh)
 - enable importance sampling for likelihood-based estimators (#1183) (@manuelgloeckler)
 - refactoring and unified shape handling for `RatioEstimator` (#1097) (@bkmi)
 - faster sbc and tarp calibration checks via batched sampling (#1196) (@janfb)
 - batched sampling and embedding net support for `MNLE` (#1203) (@janfb)
+- adapt `MNLE` to new densitye stimator abstraction (#1089) (@coschroeder)
 - better plotting options for coverage plots (#1039, #1212) (@janfb)
-- drop support for python3.8 and torch1.12 (#1233)
-- refactor folder structure and naming of `neural_nets`, and all inferences classes
-  (#1237, #1238)
 
 ## Bug Fixes
 
@@ -68,7 +75,6 @@
 - switch to `pyproject.toml` for package specification (#941) (@janfb)
 - Split the GitHub workflow in CI and CD (#1063) (@famura)
 - split linting process from the CI/CD workflow (#1164) (@tomMoral)
-- adapt `MNLE` to new densitye stimator abstraction (#1089) (@coschroeder)
 - Switch to the newest `pyright` and fix all typing errors (#1045, #1108) (@Baschdl)
 - introduce two docs versions: `latest` pointing to latest release at
   https://sbi-dev.github.io/sbi/latest/ and `dev` pointing to the latest version on
