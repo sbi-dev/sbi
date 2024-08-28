@@ -59,8 +59,6 @@
 
 ## Helpers
 
-::: sbi.inference.trainers.base.infer
-
 ::: sbi.inference.trainers.base.simulate_for_sbi
 
 ::: sbi.utils.user_input_checks.process_prior
