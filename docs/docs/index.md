@@ -154,8 +154,7 @@ methods](tutorials/16_implemented_methods.md).
   [[Paper]](https://arxiv.org/abs/2305.17161)
 
 - **Compositional Score Modeling for Simulation-Based Inference**<br> by Geffner, T.,
-  Papamakarios, G., & Mnih, A. (2023, July). Compositional score modeling for
-  simulation-based inference. (ICML 2023)<br>
+  Papamakarios, G., & Mnih, A. (ICML 2023)<br>
   [[Paper]](https://proceedings.mlr.press/v202/geffner23a.html)
 
 ### Likelihood-estimation (`(S)NLE`)
@@ -171,7 +170,6 @@ methods](tutorials/16_implemented_methods.md).
 - **Flexible and efficient simulation-based inference for models of
   decision-making** <br> by Boelts, Lueckmann, Gao, Macke (Elife 2022)
   <br>[[Paper]](https://elifesciences.org/articles/77220)
-
 
 ### Likelihood-ratio-estimation (`(S)NRE`)
 
