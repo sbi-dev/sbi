@@ -5,7 +5,7 @@ import pytest
 import torch
 
 from sbi import utils
-from sbi.inference import SNPE, infer
+from sbi.inference import NPE, infer
 
 
 def test_infer():
@@ -16,12 +16,12 @@ def test_infer():
     def simulator(parameter_set):
         return 1.0 + parameter_set + torch.randn(parameter_set.shape) * 0.1
 
-    posterior = infer(simulator, prior, method="SNPE_A", num_simulations=10)
+    posterior = infer(simulator, prior, method="NPE_A", num_simulations=10)
     assert posterior is not None, "Most basic use of 'infer' failed"
     posterior = infer(
         simulator,
         prior,
-        method="SNPE_A",
+        method="NPE_A",
         num_simulations=10,
         init_kwargs={"num_components": 5},
         train_kwargs={"max_num_epochs": 2},
@@ -35,7 +35,7 @@ def test_get_dataloaders(training_batch_size):
     N = 1000
     validation_fraction = 0.1
 
-    inferer = SNPE()
+    inferer = NPE()
     inferer.append_simulations(torch.ones(N), torch.zeros(N))
     _, val_loader = inferer.get_dataloaders(
         0,

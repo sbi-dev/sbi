@@ -10,7 +10,7 @@ from matplotlib.pyplot import close, subplots
 from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi.analysis import pairplot, plot_summary, sbc_rank_plot
-from sbi.inference import SNLE, SNPE, SNRE
+from sbi.inference import NLE, NPE, NRE
 from sbi.utils import BoxUniform
 
 
@@ -94,7 +94,7 @@ def test_pairplot_dep(
     close()
 
 
-@pytest.mark.parametrize("method", (SNPE, SNLE, SNRE))
+@pytest.mark.parametrize("method", (NPE, NLE, NRE))
 def test_plot_summary(method, tmp_path):
     num_dim = 1
     prior = BoxUniform(low=-2 * torch.ones(num_dim), high=2 * torch.ones(num_dim))
@@ -112,7 +112,7 @@ def test_plot_summary(method, tmp_path):
 
     train_kwargs = (
         dict(max_num_epochs=5, validation_fraction=0.5, num_atoms=2)
-        if method == SNRE
+        if method == NRE
         else dict(max_num_epochs=1)
     )
     _ = inference.append_simulations(theta, x).train(**train_kwargs)

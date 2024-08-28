@@ -5,7 +5,7 @@ Many clusters have a time limit, and `sbi` might exceed this limit. You can
 circumvent this problem by stopping and resuming training:
 
 ```python
-inference = SNPE(prior=prior)
+inference = NPE(prior=prior)
 inference = inference.append_simulations(theta, x)
 inference.train(max_num_epochs=300)  # Pick `max_num_epochs` such that it does not exceed the runtime.
 

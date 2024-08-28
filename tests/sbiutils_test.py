@@ -16,8 +16,8 @@ from sbi.analysis import (
     eval_conditional_density,
     sensitivity_analysis,
 )
-from sbi.inference import SNPE, SNPE_A
-from sbi.inference.trainers.npe.npe_a import SNPE_A_MDN
+from sbi.inference import NPE, NPE_A
+from sbi.inference.trainers.npe.npe_a import NPE_A_MDN
 from sbi.neural_nets import classifier_nn, likelihood_nn, posterior_nn
 from sbi.utils import BoxUniform, get_kde
 
@@ -210,13 +210,13 @@ def test_gaussian_transforms(snpe_method: str, plot_results: bool = False):
     """
     Tests whether the the product between proposal and posterior is computed correctly.
 
-    For SNPE-C, this initializes two MoGs with two components each. It then evaluates
+    For NPE-C, this initializes two MoGs with two components each. It then evaluates
     their product by simply multiplying the probabilities of the two. The result is
     compared to the product of two MoGs as implemented in APT.
 
-    For SNPE-A, it initializes a MoG with two compontents and one Gaussian (with one
+    For NPE-A, it initializes a MoG with two compontents and one Gaussian (with one
     component). It then devices the MoG by the Gaussian and compares it to the
-    transformation in SNPE-A.
+    transformation in NPE-A.
 
     Args:
         snpe_method: String indicating whether to test snpe-a or snpe-c.
@@ -271,12 +271,12 @@ def test_gaussian_transforms(snpe_method: str, plot_results: bool = False):
     if snpe_method == "snpe_c":
         probs_mult = probs1 * probs2
 
-        # Set up a SNPE object in order to use the
+        # Set up a NPE object in order to use the
         # `_automatic_posterior_transformation()`.
         prior = BoxUniform(-5 * ones(2), 5 * ones(2))
         # Testing new z-score arg options.
         density_estimator = posterior_nn("mdn", z_score_theta=None, z_score_x=None)
-        inference = SNPE(prior=prior, density_estimator=density_estimator)
+        inference = NPE(prior=prior, density_estimator=density_estimator)
         theta_ = torch.rand(100, 2)
         x_ = torch.rand(100, 2)
         _ = inference.append_simulations(theta_, x_).train(max_num_epochs=1)
@@ -300,13 +300,13 @@ def test_gaussian_transforms(snpe_method: str, plot_results: bool = False):
 
         prior = BoxUniform(-5 * ones(2), 5 * ones(2))
 
-        inference = SNPE_A(prior=prior)
+        inference = NPE_A(prior=prior)
         theta_ = torch.rand(100, 2)
         x_ = torch.rand(100, 2)
         density_estimator = inference.append_simulations(theta_, x_).train(
             max_num_epochs=1
         )
-        wrapped_density_estimator = SNPE_A_MDN(
+        wrapped_density_estimator = NPE_A_MDN(
             flow=density_estimator, proposal=prior, prior=prior, device="cpu"
         )
 
@@ -359,7 +359,7 @@ def test_gaussian_transforms(snpe_method: str, plot_results: bool = False):
             ax[3].set_title("APT")
         elif snpe_method == "snpe_a":
             ax[2].set_title("p_1 / p_2")
-            ax[3].set_title("SNPE-A")
+            ax[3].set_title("NPE-A")
 
         plt.show()
 

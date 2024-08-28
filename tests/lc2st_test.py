@@ -8,7 +8,7 @@ import torch
 from sklearn.neural_network import MLPClassifier
 
 from sbi.diagnostics.lc2st import LC2ST, LC2ST_NF
-from sbi.inference import SNPE
+from sbi.inference import NPE
 from sbi.simulators.gaussian_mixture import (
     gaussian_mixture,
     uniform_prior_gaussian_mixture,
@@ -38,7 +38,7 @@ def test_running_lc2st(method, classifier, cv_folds, num_ensemble, z_score):
     x_train = simulator(theta_train)
 
     # Train the neural posterior estimators
-    inference = SNPE(prior, density_estimator='maf')
+    inference = NPE(prior, density_estimator='maf')
     inference = inference.append_simulations(theta=theta_train, x=x_train)
     npe = inference.train(training_batch_size=100, max_num_epochs=1)
 
@@ -134,7 +134,7 @@ def test_lc2st_true_negativ_rate(method):
     x_train = simulator(theta_train)
 
     # Train the neural posterior estimators
-    inference = SNPE(prior, density_estimator='maf')
+    inference = NPE(prior, density_estimator='maf')
     inference = inference.append_simulations(theta=theta_train, x=x_train)
     npe = inference.train(training_batch_size=100, max_num_epochs=num_epochs)
 
@@ -213,7 +213,7 @@ def test_lc2st_true_positiv_rate(method):
     x_train = simulator(theta_train)
 
     # Train the neural posterior estimators
-    inference = SNPE(prior, density_estimator='maf')
+    inference = NPE(prior, density_estimator='maf')
     inference = inference.append_simulations(theta=theta_train, x=x_train)
     npe = inference.train(training_batch_size=100, max_num_epochs=num_epochs)
 

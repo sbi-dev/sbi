@@ -230,10 +230,10 @@ class NPE_A(PosteriorEstimator):
     def correct_for_proposal(
         self,
         density_estimator: Optional[TorchModule] = None,
-    ) -> "SNPE_A_MDN":
+    ) -> "NPE_A_MDN":
         r"""Build mixture of Gaussians that approximates the posterior.
 
-        Returns a `SNPE_A_MDN` object, which applies the posthoc-correction required in
+        Returns a `NPE_A_MDN` object, which applies the posthoc-correction required in
         SNPE-A.
 
         Args:
@@ -272,8 +272,8 @@ class NPE_A(PosteriorEstimator):
                 """
             proposal = self._proposal_roundwise[-1]
 
-        # Create the SNPE_A_MDN
-        wrapped_density_estimator = SNPE_A_MDN(
+        # Create the NPE_A_MDN
+        wrapped_density_estimator = NPE_A_MDN(
             flow=density_estimator,  # type: ignore
             proposal=proposal,
             prior=self._prior,
@@ -372,7 +372,7 @@ class NPE_A(PosteriorEstimator):
                     param.grad = None  # let autograd construct a new gradient
 
 
-class SNPE_A_MDN(ConditionalDensityEstimator):
+class NPE_A_MDN(ConditionalDensityEstimator):
     """Generates a posthoc-corrected MDN which approximates the posterior.
 
     TODO: Adapt this class to the new `DensityEstimator` interface. Maybe even to a
@@ -639,7 +639,7 @@ class SNPE_A_MDN(ConditionalDensityEstimator):
             covariances_post, means_pp, precisions_pp, means_d, precisions_d
         )
 
-        logits_post = SNPE_A_MDN._logits_posterior(
+        logits_post = NPE_A_MDN._logits_posterior(
             means_post,
             precisions_post,
             covariances_post,
@@ -655,7 +655,7 @@ class SNPE_A_MDN(ConditionalDensityEstimator):
 
     def _set_state_for_mog_proposal(self) -> None:
         """
-        Set state variables of the SNPE_A_MDN instance every time `set_proposal()`
+        Set state variables of the NPE_A_MDN instance every time `set_proposal()`
         is called, i.e. every time a posterior is build using
         `SNPE_A.build_posterior()`.
 

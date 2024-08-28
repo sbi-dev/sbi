@@ -10,7 +10,7 @@ from torch import eye, ones, zeros
 from torch.distributions import Uniform
 
 from sbi.inference import (
-    SNLE,
+    NLE,
     MCMCPosterior,
     likelihood_estimator_based_potential,
 )
@@ -203,7 +203,7 @@ def test_getting_inference_diagnostics(method, mcmc_params_fast: dict):
 
     simulator = diagonal_linear_gaussian
     density_estimator = likelihood_nn("maf", num_transforms=3)
-    inference = SNLE(density_estimator=density_estimator, show_progress_bars=False)
+    inference = NLE(density_estimator=density_estimator, show_progress_bars=False)
     prior, *_ = process_prior(prior)
     theta = prior.sample((num_simulations,))
     x = simulator(theta)

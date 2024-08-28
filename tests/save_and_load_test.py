@@ -7,17 +7,17 @@ import pytest
 import torch
 
 from sbi import utils as utils
-from sbi.inference import SNLE, SNPE, SNRE
+from sbi.inference import NLE, NPE, NRE
 
 
 @pytest.mark.parametrize(
     "inference_method, sampling_method",
     (
-        (SNPE, "direct"),
-        pytest.param(SNLE, "mcmc", marks=pytest.mark.mcmc),
-        pytest.param(SNRE, "mcmc", marks=pytest.mark.mcmc),
-        pytest.param(SNRE, "vi", marks=pytest.mark.mcmc),
-        (SNRE, "rejection"),
+        (NPE, "direct"),
+        pytest.param(NLE, "mcmc", marks=pytest.mark.mcmc),
+        pytest.param(NRE, "mcmc", marks=pytest.mark.mcmc),
+        pytest.param(NRE, "vi", marks=pytest.mark.mcmc),
+        (NRE, "rejection"),
     ),
 )
 def test_picklability(inference_method, sampling_method: str, tmp_path):

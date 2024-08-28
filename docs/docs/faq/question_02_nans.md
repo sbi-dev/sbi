@@ -16,7 +16,7 @@ Importantly, in order for neural network training work well, the floating point
 number should still be in a reasonable range, i.e., maybe a few standard
 deviations outside of 'good' values.
 
-If you are running **multi-round** SNPE, however, things can go fully wrong if
+If you are running **multi-round** NPE (SNPE), however, things can go fully wrong if
 invalid data are encountered. In that case, you will get the following warning
 
 ```python
@@ -24,7 +24,7 @@ When invalid simulations are excluded, multi-round SNPE-C can leak into the regi
 where parameters led to invalid simulations. This can lead to poor results.
 ```
 
-Hence, if you are running multi-round SNPE and a significant fraction of
+Hence, if you are running multi-round NPE and a significant fraction of
 simulations returns at least one invalid number, we strongly recommend manually
 replacing the value in your simulation code as described above (or resorting to
-single-round SNPE, or using a different `sbi` method entirely).
+single-round NPE, or using a different `sbi` method entirely).

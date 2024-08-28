@@ -81,7 +81,7 @@ Note that in `custom_prior_wrapper_kwargs` you can pass additinal arguments for
 the wrapper, e.g., `validate_args` or `arg_constraints` see the `Distribution`
 documentation for more details.
 
-If you are using `sbi` < 0.17.2 and use `SNLE` the code above will produce a
+If you are using `sbi` < 0.17.2 and use `NLE` the code above will produce a
 `NotImplementedError` (see [#581](https://github.com/mackelab/sbi/issues/581)).
-In this case, you need to update to a newer version of `sbi` or use `SNPE`
+In this case, you need to update to a newer version of `sbi` or use `NPE`
 instead.

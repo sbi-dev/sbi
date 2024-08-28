@@ -10,7 +10,7 @@ Yes, we support GPU training. When creating the inference object in the flexible
 interface, you can pass the `device` as an argument, e.g.,
 
 ```python
-inference = SNPE(prior, device="cuda", density_estimator="maf")
+inference = NPE(prior, device="cuda", density_estimator="maf")
 ```
 
 The device is set to `"cpu"` by default. But it can be set to anything, as long
@@ -33,7 +33,7 @@ device="cuda:0"), covariance_matrix=torch.eye(2, device="cuda:0"))
 
 Whether or not you reduce your training time when training on a GPU depends on
 the problem at hand. We provide a couple of default density estimators for
-`SNPE`, `SNLE` and `SNRE`, e.g., a mixture density network
+`NPE`, `NLE` and `NRE`, e.g., a mixture density network
 (`density_estimator="mdn"`) or a Masked Autoregressive Flow
 (`density_estimator="maf"`). For these default density estimators, we do **not**
 expect a speed-up. This is because the underlying neural networks are relatively

@@ -5,7 +5,7 @@ interface:
 
 ```python
 import torch
-from sbi.inference import SNPE
+from sbi.inference import NPE
 
 # define shifted Gaussian simulator.
 def simulator(θ): return θ + torch.randn_like(θ)
@@ -15,7 +15,7 @@ def simulator(θ): return θ + torch.randn_like(θ)
 x = simulator(θ)
 
 # choose sbi method and train
-inference = SNPE()
+inference = NPE()
 inference.append_simulations(θ, x).train()
 
 # do inference given observed data
@@ -103,8 +103,8 @@ The methods then proceed by
    full space of parameters consistent with the data and the prior, i.e. the
    posterior distribution. The posterior assigns high probability to parameters
    that are consistent with both the data and the prior, and low probability to
-   inconsistent parameters. While SNPE directly learns the posterior
-   distribution, SNLE and SNRE need an extra MCMC sampling step to construct a
+   inconsistent parameters. While NPE directly learns the posterior
+   distribution, NLE and NRE need an extra MCMC sampling step to construct a
    posterior.
 4. If needed, an initial estimate of the posterior can be used to adaptively
    generate additional informative simulations.
