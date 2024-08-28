@@ -1,48 +1,48 @@
 # Inference
 
-## Algorithms
+## Training algorithms
 
-::: sbi.inference.snpe.snpe_a.SNPE_A
+::: sbi.inference.trainers.npe.npe_a.NPE_A
     selection:
       filters: [ "!^_", "^__", "!^__class__" ]
       inherited_members: true
 
-::: sbi.inference.snpe.snpe_c.SNPE_C
+::: sbi.inference.trainers.npe.npe_c.NPE_C
     selection:
       filters: [ "!^_", "^__", "!^__class__" ]
       inherited_members: true
 
-::: sbi.inference.fmpe.fmpe_base.FMPE
+::: sbi.inference.trainers.fmpe.fmpe.FMPE
     selection:
       filters: [ "!^_", "^__", "!^__class__" ]
       inherited_members: true
 
-::: sbi.inference.npse.npse.NPSE
+::: sbi.inference.trainers.npse.npse.NPSE
     selection:
       filters: [ "!^_", "^__", "!^__class__" ]
       inherited_members: true
 
-::: sbi.inference.snle.snle_a.SNLE_A
+::: sbi.inference.trainers.nle.nle_a.NLE_A
     selection:
       filters: [ "!^_", "^__", "!^__class__" ]
       inherited_members: true
 
-::: sbi.inference.snre.snre_a.SNRE_A
+::: sbi.inference.trainers.nre.nre_a.NRE_A
     selection:
       filters: [ "!^_", "^__", "!^__class__" ]
       inherited_members: true
 
-::: sbi.inference.snre.snre_b.SNRE_B
+::: sbi.inference.trainers.nre.nre_b.NRE_B
     selection:
       filters: [ "!^_", "^__", "!^__class__" ]
       inherited_members: true
 
-::: sbi.inference.snre.snre_c.SNRE_C
+::: sbi.inference.trainers.nre.nre_c.NRE_C
     selection:
       filters: [ "!^_", "^__", "!^__class__" ]
       inherited_members: true
 
-::: sbi.inference.snre.bnre.BNRE
+::: sbi.inference.trainers.nre.bnre.BNRE
     selection:
       filters: [ "!^_", "^__", "!^__class__" ]
       inherited_members: true
@@ -59,9 +59,9 @@
 
 ## Helpers
 
-::: sbi.inference.base.infer
+::: sbi.inference.trainers.base.infer
 
-::: sbi.inference.base.simulate_for_sbi
+::: sbi.inference.trainers.base.simulate_for_sbi
 
 ::: sbi.utils.user_input_checks.process_prior
 
