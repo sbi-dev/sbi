@@ -1,3 +1,88 @@
+# v0.23.0
+
+## Announcements
+
+- Re-licensing: license change from
+  [AGPLv3](https://www.gnu.org/licenses/agpl-3.0.en.html) to
+  [Apache-2.0](https://www.apache.org/licenses/LICENSE-2.0) (see #997 for
+  details)
+- `sbi` is now affiliated with [`NumFOCUS`](https://numfocus.org) 🎉
+- New contributors 🎉: @anastasiakrouglova, @theogruner, @felixp8, @Matthijspals,
+  @jsvetter, @pfuhr, @turnmanh, @fariedabuzaid, @augustes, @zinastef, @Baschdl,
+  @danielmk, @lisahaxel, @janko-petkovic, @samadpls, @ThomasGesseyJonesPX, @schroedk
+
+## Major Changes
+
+- internal renaming of all inference classes from, e.g., `SNPE` to `NPE` (i.e., we
+  removed the `S` prefix). The functionality of the classes remains the same. The NPE
+  class handles both the amortized and sequential versions of neural posterior
+  estimation. An alias for SNPE (and other sequential methods) still exists for
+  backwards compatibility (#1238) (@michaeldeistler).
+- change `sbi` default parameters: `training_batch_size=200`, `num_chains=20` (#1221)
+  (@janfb)
+- change imports of `posterior_nn`, `likelihood_nn`, and `classifier_nn`. They should
+  now be imported from `sbi.neural_nets`, not from `sbi.utils` (#994) (@famura)
+- big refactoring of plotting utilities, new tutorial (#1084) (@Matthijspals)
+- improved tutorials and website documentation (#1012, #1051, #1073) (@augustes,
+  @zinaStef, @lisahaxel, @psteinb)
+- improved website structure and contribution guides (#1019) (@tomMoral, @janfb)
+- drop support for python3.8 and torch1.12 (#1233)
+- refactor folder structure and naming of `neural_nets` (#1237) (@michaeldeistler)
+
+## New Features
+
+- full flexibility over the training loop (#983) (@michaeldeistler)
+- unified density estimator classes (#952, #965, #979, #1151) (@michaeldeistler,
+  @gmoss13, @tomMoral, @manualgloeckler)
+- vectorized sampling and log_prob for `(S)NPE` given batches of x (#1153)
+  (@manuelgloeckler, @michaeldeistler)
+- batched sampling for vectorized MCMC samplers (#1176, #1210) (@gmoss13, @janfb)
+- support @zuko as a backend for normalizing flows (#1088, #1116)
+  (@anastasiakrouglova)
+- local c2st metric (#1109) (@JuliaLinhart)
+- tarp coverage metric (#1106) (@psteinb)
+- add interface for @PyMC samplers (#1053) (@famura, @felixp8)
+- flow matching density estimators (#1049) (@turnmanh, @fariedabuzaid, @janfb)
+- score matching density estimators (#1015) (@rdgao, @jsvetter, @pfuhr,
+  @manuelgloeckler, @michaeldeistler, @janfb)
+- ABC methods for trial-based data using statistical distances (#1104)
+  (@theogruner)
+- support Apple MPS as gpu device (#912) (@janfb)
+- dev container for using `sbi` in codespaces on GitHub (#1070) (@turnmanh)
+- enable importance sampling for likelihood-based estimators (#1183) (@manuelgloeckler)
+- refactoring and unified shape handling for `RatioEstimator` (#1097) (@bkmi)
+- faster sbc and tarp calibration checks via batched sampling (#1196) (@janfb)
+- batched sampling and embedding net support for `MNLE` (#1203) (@janfb)
+- adapt `MNLE` to new densitye stimator abstraction (#1089) (@coschroeder)
+- better plotting options for coverage plots (#1039, #1212) (@janfb)
+- allow for potential_fn to be a Callable (#943) (@michaeldeistler)
+
+## Bug Fixes
+
+- bugfix for embedding net tutorial (#1159) (@deismic)
+- Fixup for process_x in EnsemblePosterior (#1148) (@deismic)
+- fixed notebook by changing MCMC parameters (#1058) (@zinaStef)
+- fix: add NeuralPosteriorEnsemble to utils.__init__ (#1002) (@jnsbck)
+- fix: print_false_positive_rate (#976) (@danielmk)
+- fix: make VIPosterior pickable (#951) (@manuelgloeckler)
+- fix: bug in importance sampled posterior (#1081) (@max-dax)
+- fix: embedding device and warning handling (#1186) (@janfb)
+- fix: c2st with constant features (#1204) (@janfb)
+- fix: erroneous warnings about different devices (#1225, @ThomasGesseyJonesPX)
+- fix: type annotation in class `ConditionedPotential` (#1222) (@schroedk)
+
+## Maintenance and other changes
+
+- add pre-commit hooks (#955) (@janfb)
+- add ruff to replace `isort`, `black`, `flake` (#960, #978, #1113) (@janfb)
+- switch to `pyproject.toml` for package specification (#941) (@janfb)
+- Split the GitHub workflow in CI and CD (#1063) (@famura)
+- split linting process from the CI/CD workflow (#1164) (@tomMoral)
+- Switch to the newest `pyright` and fix all typing errors (#1045, #1108) (@Baschdl)
+- introduce two docs versions: `latest` pointing to latest release at
+  https://sbi-dev.github.io/sbi/latest/ and `dev` pointing to the latest version on
+  `main` https://sbi-dev.github.io/sbi/dev/
+
 # v0.22.0
 
 ## API change
@@ -7,6 +92,7 @@
 - `sbi.analysis.pairplot`: `upper` was replaced by `offdiag` and will be deprecated in a future release.
 
 ## Features and enhancements
+
 - size-invariant embedding nets for amortized inference with iid-data (@janfb, #808)
 - option for new using MAF with rational quadratic splines (thanks to @ImahnShekhzadeh, #819)
 - improved docstring for `process_prior` (thanks to @musoke, #813)
