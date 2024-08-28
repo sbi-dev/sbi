@@ -469,7 +469,7 @@
 
 
 <h1 id="sampling-algorithms-in-sbi">Sampling algorithms in <code>sbi</code><a class="headerlink" href="#sampling-algorithms-in-sbi" title="Permanent link">&para;</a></h1>
-<p><code>sbi</code> implements three methods: SNPE, SNLE, and SNRE. When using SNPE, the trained neural network directly approximates the posterior. Thus, sampling from the posterior can be done by sampling from the trained neural network. The neural networks trained in SNLE and SNRE approximate the likelihood(-ratio). Thus, in order to draw samples from the posterior, one has to perform additional sampling steps, e.g. Markov-chain Monte-Carlo (MCMC). In <code>sbi</code>, the implemented samplers are:</p>
+<p><code>sbi</code> implements three methods: NPE, NLE, and NRE. When using NPE, the trained neural network directly approximates the posterior. Thus, sampling from the posterior can be done by sampling from the trained neural network. The neural networks trained in NLE and NRE approximate the likelihood(-ratio). Thus, in order to draw samples from the posterior, one has to perform additional sampling steps, e.g. Markov-chain Monte-Carlo (MCMC). In <code>sbi</code>, the implemented samplers are:</p>
 <ul>
 <li>
 <p>Markov-chain Monte-Carlo (MCMC)</p>
@@ -480,11 +480,14 @@
 <li>
 <p>Variational inference (VI)</p>
 </li>
+<li>
+<p>Importance sampling (IS)</p>
+</li>
 </ul>
 <p>Below, we will demonstrate how these samplers can be used in <code>sbi</code>. First, we train the neural network as always:</p>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">torch</span>
 
-<span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">SNLE</span>
+<span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">NLE</span>
 
 <span class="c1"># dummy Gaussian simulator for demonstration</span>
 <span class="n">num_dim</span> <span class="o">=</span> <span class="mi">2</span>
@@ -493,7 +496,7 @@
 <span class="n">x</span> <span class="o">=</span> <span class="n">theta</span> <span class="o">+</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">1000</span><span class="p">,</span> <span class="n">num_dim</span><span class="p">))</span>
 <span class="n">x_o</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="n">num_dim</span><span class="p">))</span>
 
-<span class="n">inference</span> <span class="o">=</span> <span class="n">SNLE</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="n">inference</span> <span class="o">=</span> <span class="n">NLE</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
 <span class="n">likelihood_estimator</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
 </code></pre></div>
 <div class="codehilite"><pre><span></span><code>WARNING (pytensor.tensor.blas): Using NumPy C-API based implementation for BLAS functions.
@@ -521,7 +524,7 @@
 </code></pre></div>
 <h1 id="more-flexibility-in-adjusting-the-sampler">More flexibility in adjusting the sampler<a class="headerlink" href="#more-flexibility-in-adjusting-the-sampler" title="Permanent link">&para;</a></h1>
 <p>With the above syntax, you can easily try out different sampling algorithms. However, in many cases, you might want to customize your sampler. Below, we demonstrate how you can change hyperparameters of the samplers (e.g. number of warm-up steps of MCMC) or how you can write your own sampler from scratch.</p>
-<h2 id="main-syntax-for-snle-and-snre">Main syntax (for SNLE and SNRE)<a class="headerlink" href="#main-syntax-for-snle-and-snre" title="Permanent link">&para;</a></h2>
+<h2 id="main-syntax-for-nle-and-nre">Main syntax (for NLE and NRE)<a class="headerlink" href="#main-syntax-for-nle-and-nre" title="Permanent link">&para;</a></h2>
 <p>As above, we begin by training the neural network as always:</p>
 <p>Then, for full flexibility on using the sampler, we do not use the <code>.build_posterior()</code> method, but instead we explicitly define the potential function and the sampling algorithm (see below for explanation):</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">MCMCPosterior</span><span class="p">,</span> <span class="n">likelihood_estimator_based_potential</span>
@@ -556,7 +559,7 @@ Quality Score: -0.029    Good: Smaller than 0.5  Bad: Larger than 1.0           
 <p>At this point, you could also plug the <code>potential_fn</code> into any sampler of your choice and not rely on any of the in-built <code>sbi</code>-samplers.</p>
 <h2 id="further-explanation">Further explanation<a class="headerlink" href="#further-explanation" title="Permanent link">&para;</a></h2>
 <p>The first lines are the same as for the flexible interface:</p>
-<div class="highlight"><pre><span></span><code><span class="n">inference</span> <span class="o">=</span> <span class="n">SNLE</span><span class="p">()</span>
+<div class="highlight"><pre><span></span><code><span class="n">inference</span> <span class="o">=</span> <span class="n">NLE</span><span class="p">()</span>
 <span class="n">likelihood_estimator</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
 </code></pre></div>
 <div class="codehilite"><pre><span></span><code> Neural network successfully converged after 72 epochs.
@@ -587,11 +590,11 @@ Quality Score: -0.029    Good: Smaller than 0.5  Bad: Larger than 1.0           
 <span class="p">)</span>
 <span class="n">posterior</span> <span class="o">=</span> <span class="n">RejectionPosterior</span><span class="p">(</span><span class="n">potential_fn</span><span class="p">,</span> <span class="n">proposal</span><span class="o">=</span><span class="n">prior</span><span class="p">)</span>
 </code></pre></div>
-<h2 id="main-syntax-for-snpe">Main syntax for SNPE<a class="headerlink" href="#main-syntax-for-snpe" title="Permanent link">&para;</a></h2>
-<p>SNPE usually does not require MCMC or rejection sampling (if you still need it, you can use the same syntax as above with the <code>posterior_estimator_based_potential</code> function). Instead, SNPE samples from the neural network. If the support of the prior is bounded, some samples can lie outside of the support of the prior. The <code>DirectPosterior</code> class automatically rejects these samples:</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">SNPE</span><span class="p">,</span> <span class="n">DirectPosterior</span>
+<h2 id="main-syntax-for-npe">Main syntax for NPE<a class="headerlink" href="#main-syntax-for-npe" title="Permanent link">&para;</a></h2>
+<p>NPE usually does not require MCMC or rejection sampling (if you still need it, you can use the same syntax as above with the <code>posterior_estimator_based_potential</code> function). Instead, NPE samples from the neural network. If the support of the prior is bounded, some samples can lie outside of the support of the prior. The <code>DirectPosterior</code> class automatically rejects these samples:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">NPE</span><span class="p">,</span> <span class="n">DirectPosterior</span>
 
-<span class="n">inference</span> <span class="o">=</span> <span class="n">SNPE</span><span class="p">()</span>
+<span class="n">inference</span> <span class="o">=</span> <span class="n">NPE</span><span class="p">()</span>
 <span class="n">posterior_estimator</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
 
 <span class="n">posterior</span> <span class="o">=</span> <span class="n">DirectPosterior</span><span class="p">(</span><span class="n">posterior_estimator</span><span class="p">,</span> <span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">)</span>

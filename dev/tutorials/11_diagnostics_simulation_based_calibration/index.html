@@ -626,7 +626,7 @@ this technique with sbi.</p>
 
 <span class="kn">from</span> <span class="nn">sbi.analysis.plot</span> <span class="kn">import</span> <span class="n">sbc_rank_plot</span>
 <span class="kn">from</span> <span class="nn">sbi.diagnostics</span> <span class="kn">import</span> <span class="n">check_sbc</span><span class="p">,</span> <span class="n">check_tarp</span><span class="p">,</span> <span class="n">run_sbc</span><span class="p">,</span> <span class="n">run_tarp</span>
-<span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">SNPE</span><span class="p">,</span> <span class="n">simulate_for_sbi</span>
+<span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">NPE</span><span class="p">,</span> <span class="n">simulate_for_sbi</span>
 </code></pre></div>
 <div class="codehilite"><pre><span></span><code>WARNING (pytensor.tensor.blas): Using NumPy C-API based implementation for BLAS functions.
 </code></pre></div>
@@ -681,7 +681,7 @@ x    : [[1.941461  1.4396194]]
 <div class="highlight"><pre><span></span><code><span class="n">_</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
 
 <span class="c1"># we use a mdn model to have a fast turnaround with training the NPE</span>
-<span class="n">inferer</span> <span class="o">=</span> <span class="n">SNPE</span><span class="p">(</span><span class="n">prior</span><span class="p">,</span> <span class="n">density_estimator</span><span class="o">=</span><span class="s2">&quot;nsf&quot;</span><span class="p">)</span>
+<span class="n">inferer</span> <span class="o">=</span> <span class="n">NPE</span><span class="p">(</span><span class="n">prior</span><span class="p">,</span> <span class="n">density_estimator</span><span class="o">=</span><span class="s2">&quot;nsf&quot;</span><span class="p">)</span>
 <span class="c1"># append simulations and run training.</span>
 <span class="n">inferer</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">(</span><span class="n">training_batch_size</span><span class="o">=</span><span class="mi">200</span><span class="p">);</span>
 </code></pre></div>

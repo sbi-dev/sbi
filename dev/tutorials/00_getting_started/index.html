@@ -8,7 +8,7 @@
       
       
       
-        <link rel="canonical" href="https://sbi-dev.github.io/sbi/dev/tutorials/00_getting_started_flexible/">
+        <link rel="canonical" href="https://sbi-dev.github.io/sbi/dev/tutorials/00_getting_started/">
       
       
       
@@ -513,14 +513,14 @@
 
 
 <h1 id="getting-started-with-sbi">Getting started with <code>sbi</code><a class="headerlink" href="#getting-started-with-sbi" title="Permanent link">&para;</a></h1>
-<p>Note, you can find the original version of this notebook at <a href="https://github.com/sbi-dev/sbi/blob/main/tutorials/00_getting_started_flexible.ipynb">/tutorials/00_getting_started_flexible.ipynb</a> in the <code>sbi</code> repository.</p>
+<p>Note, you can find the original version of this notebook at <a href="https://github.com/sbi-dev/sbi/blob/main/tutorials/00_getting_started.ipynb">/tutorials/00_getting_started.ipynb</a> in the <code>sbi</code> repository.</p>
 <p><code>sbi</code> provides a simple interface to run state-of-the-art algorithms for simulation-based inference.</p>
 <p><strong>The overall goal of simulation-based inference is to algorithmically identify model parameters which are consistent with data.</strong></p>
 <p>In this tutorial we demonstrate how to get started with the <code>sbi</code> toolbox and how to perform parameter inference on a simple model.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">torch</span>
 
 <span class="kn">from</span> <span class="nn">sbi.analysis</span> <span class="kn">import</span> <span class="n">pairplot</span>
-<span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">SNPE</span><span class="p">,</span> <span class="n">simulate_for_sbi</span>
+<span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">NPE</span><span class="p">,</span> <span class="n">simulate_for_sbi</span>
 <span class="kn">from</span> <span class="nn">sbi.utils</span> <span class="kn">import</span> <span class="n">BoxUniform</span>
 <span class="kn">from</span> <span class="nn">sbi.utils.user_input_checks</span> <span class="kn">import</span> <span class="p">(</span>
     <span class="n">check_sbi_inputs</span><span class="p">,</span>
@@ -566,10 +566,10 @@
 </code></pre></div>
 <p>Next, we instantiate the inference object. In this example, we will use neural perform posterior estimation (NPE):</p>
 <blockquote>
-<p>Note: In the <code>sbi</code> toolbox, NPE is run by using the <code>SNPE</code> (Sequential NPE) class for only one iteration of simulation and training. </p>
-<p>Note: This is where you could specify an alternative inference object such as (S)NRE for ratio estimation or (S)NLE for likelihood estimation. Here, you can see <a href="https://sbi-dev.github.io/sbi/tutorial/16_implemented_methods/">all implemented methods</a>.</p>
+<p>Note: In <code>sbi</code> version 0.23.0, we renamed all inference classes from, e.g., <code>SNPE</code>, to <code>NPE</code> (i.e., we removed the <code>S</code> prefix). The functionality of the classes remains the same. The <code>NPE</code> class handles both the amortized (as shown in this tutorial) and sequential (as shown <a href="https://sbi-dev.github.io/sbi/tutorial/02_multiround_inference/">here</a>) versions of neural posterior estimation. An alias for <code>SNPE</code> still exists for backwards compatibility.</p>
+<p>Note: This is where you could specify an alternative inference object such as NRE for ratio estimation or NLE for likelihood estimation. Here, you can see <a href="https://sbi-dev.github.io/sbi/latest/tutorials/16_implemented_methods/">all implemented methods</a>.</p>
 </blockquote>
-<div class="highlight"><pre><span></span><code><span class="n">inference</span> <span class="o">=</span> <span class="n">SNPE</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><span class="n">inference</span> <span class="o">=</span> <span class="n">NPE</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">)</span>
 </code></pre></div>
 <p>Next, we need simulations, or more specifically, pairs of parameters <span class="arithmatex">\(\theta\)</span> which we sample from the <em>prior</em> and corresponding simulations <span class="arithmatex">\(x = \mathrm{simulator} (\theta)\)</span>. The <code>sbi</code> helper function called <code>simulate_for_sbi</code> allows to parallelize your code with <code>joblib</code>.</p>
 <blockquote>
@@ -622,7 +622,7 @@ x.shape torch.Size([2000, 3])
 <div class="codehilite"><pre><span></span><code>Drawing 10000 posterior samples:   0%|          | 0/10000 [00:00&lt;?, ?it/s]
 </code></pre></div>
 
-<p><img alt="png" src="../00_getting_started_flexible_files/00_getting_started_flexible_25_1.png" /></p>
+<p><img alt="png" src="../00_getting_started_files/00_getting_started_25_1.png" /></p>
 <h2 id="assessing-the-posterior-for-the-known-theta-x-pair">Assessing the posterior for the known <span class="arithmatex">\(\theta, x\)</span> - pair<a class="headerlink" href="#assessing-the-posterior-for-the-known-theta-x-pair" title="Permanent link">&para;</a></h2>
 <p>For this special case, we have access to the ground-truth parameters that generated the observation. We can thus assess if the inferred distributions over the parameters match the parameters <span class="arithmatex">\(\theta_{true}\)</span> we used to generate our test observation <span class="arithmatex">\(x_{obs}\)</span>.</p>
 <div class="highlight"><pre><span></span><code><span class="n">samples</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">10000</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_obs</span><span class="p">)</span>
@@ -631,7 +631,7 @@ x.shape torch.Size([2000, 3])
 <div class="codehilite"><pre><span></span><code>Drawing 10000 posterior samples:   0%|          | 0/10000 [00:00&lt;?, ?it/s]
 </code></pre></div>
 
-<p><img alt="png" src="../00_getting_started_flexible_files/00_getting_started_flexible_28_1.png" /></p>
+<p><img alt="png" src="../00_getting_started_files/00_getting_started_28_1.png" /></p>
 <p>The log-probability should ideally indicate that the true parameters, given the corresponding observation, are more likely than a different set of randomly chosen parameters from the prior distribution. </p>
 <p>Relative to the obtained log-probabilities, we can investigate the range of log-probabilities of the parameters sampled from the posterior.</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># first sample an alternative parameter set from the prior</span>

@@ -470,11 +470,8 @@
 
 <h1 id="can-i-stop-neural-network-training-and-resume-it-later">Can I stop neural network training and resume it later?<a class="headerlink" href="#can-i-stop-neural-network-training-and-resume-it-later" title="Permanent link">&para;</a></h1>
 <p>Many clusters have a time limit, and <code>sbi</code> might exceed this limit. You can
-circumvent this problem by using the <a href="https://sbi-dev.github.io/sbi/tutorial/02_flexible_interface/">flexible
-interface</a>. After
-simulations are finished, <code>sbi</code> trains a neural network. If this process takes
-too long, you can stop training and resume it later. The syntax is:</p>
-<div class="highlight"><pre><span></span><code><span class="n">inference</span> <span class="o">=</span> <span class="n">SNPE</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">)</span>
+circumvent this problem by stopping and resuming training:</p>
+<div class="highlight"><pre><span></span><code><span class="n">inference</span> <span class="o">=</span> <span class="n">NPE</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">)</span>
 <span class="n">inference</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
 <span class="n">inference</span><span class="o">.</span><span class="n">train</span><span class="p">(</span><span class="n">max_num_epochs</span><span class="o">=</span><span class="mi">300</span><span class="p">)</span>  <span class="c1"># Pick `max_num_epochs` such that it does not exceed the runtime.</span>
 

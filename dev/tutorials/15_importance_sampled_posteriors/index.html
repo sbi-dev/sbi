@@ -493,7 +493,7 @@
 <span class="kn">from</span> <span class="nn">torch.distributions</span> <span class="kn">import</span> <span class="n">MultivariateNormal</span>
 <span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
 
-<span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">SNPE</span><span class="p">,</span> <span class="n">ImportanceSamplingPosterior</span>
+<span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">NPE</span><span class="p">,</span> <span class="n">ImportanceSamplingPosterior</span>
 <span class="kn">from</span> <span class="nn">sbi.utils</span> <span class="kn">import</span> <span class="n">BoxUniform</span>
 <span class="kn">from</span> <span class="nn">sbi.inference.potentials.base_potential</span> <span class="kn">import</span> <span class="n">BasePotential</span>
 <span class="kn">from</span> <span class="nn">sbi.analysis</span> <span class="kn">import</span> <span class="n">marginal_plot</span>
@@ -526,7 +526,7 @@
 
 <span class="c1"># train NPE model</span>
 <span class="n">_</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span>
-<span class="n">inference</span> <span class="o">=</span> <span class="n">SNPE</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">)</span>
+<span class="n">inference</span> <span class="o">=</span> <span class="n">NPE</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">)</span>
 <span class="n">_</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
 <span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">()</span>
 
@@ -547,7 +547,7 @@
 Drawing 10000 posterior samples:   0%|          | 0/10000 [00:00&lt;?, ?it/s]
 </code></pre></div>
 
-<p>In this case, we know the ground truth posterior, so we can compare SNPE to it:</p>
+<p>In this case, we know the ground truth posterior, so we can compare NPE to it:</p>
 <div class="highlight"><pre><span></span><code><span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">marginal_plot</span><span class="p">(</span>
     <span class="p">[</span><span class="n">theta_inferred</span><span class="p">,</span> <span class="n">gt_samples</span><span class="p">],</span>
     <span class="n">limits</span><span class="o">=</span><span class="p">[[</span><span class="o">-</span><span class="mi">5</span><span class="p">,</span> <span class="mi">5</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">5</span><span class="p">,</span> <span class="mi">5</span><span class="p">]],</span>
@@ -557,7 +557,7 @@ Drawing 10000 posterior samples:   0%|          | 0/10000 [00:00&lt;?, ?it/s]
 <span class="n">ax</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">legend</span><span class="p">([</span><span class="s2">&quot;NPE&quot;</span><span class="p">,</span> <span class="s2">&quot;Groud Truth&quot;</span><span class="p">],</span> <span class="n">loc</span><span class="o">=</span><span class="s2">&quot;upper right&quot;</span><span class="p">,</span> <span class="n">bbox_to_anchor</span><span class="o">=</span><span class="p">[</span><span class="mf">2.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">]);</span>
 </code></pre></div>
 <p><img alt="png" src="../15_importance_sampled_posteriors_files/15_importance_sampled_posteriors_9_0.png" /></p>
-<p>While SNPE is not completely off, it does not provide a perfect fit to the posterior. In cases where the likelihood is tractable, we can fix this with importance sampling.</p>
+<p>While NPE is not completely off, it does not provide a perfect fit to the posterior. In cases where the likelihood is tractable, we can fix this with importance sampling.</p>
 <h3 id="importance-sampling-with-the-sbi-toolbox">Importance sampling with the SBI toolbox<a class="headerlink" href="#importance-sampling-with-the-sbi-toolbox" title="Permanent link">&para;</a></h3>
 <p>With the SBI toolbox, importance sampling is a one-liner. SBI supports two methods for importance sampling:
 - <code>"importance"</code>: returns <code>n_samples</code> weighted samples (as above) corresponding to <code>n_samples * sample_efficiency</code> samples from the posterior. This results in unbiased samples, but the number of effective samples may be small when the SBI estimate is inaccurate.

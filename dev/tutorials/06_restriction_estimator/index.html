@@ -505,9 +505,9 @@
 
 <h1 id="efficient-handling-of-invalid-simulation-outputs">Efficient handling of invalid simulation outputs<a class="headerlink" href="#efficient-handling-of-invalid-simulation-outputs" title="Permanent link">&para;</a></h1>
 <p>For many simulators, the output of the simulator can be ill-defined or it can have non-sensical values. For example, in neuroscience models, if a specific parameter set does not produce a spike, features such as the spike shape can not be computed. When using <code>sbi</code>, such simulations that have <code>NaN</code> or <code>inf</code> in their output are discarded during neural network training. This can lead to inefficetive use of simulation budget: we carry out many simulations, but a potentially large fraction of them is discarded.</p>
-<p>In this tutorial, we show how we can use <code>sbi</code> to learn regions in parameter space that produce <code>valid</code> simulation outputs, and thereby improve the sampling efficiency. The key idea of the method is to use a classifier to distinguish parameters that lead to <code>valid</code> simulations from regions that lead to <code>invalid</code> simulations. After we have obtained the region in parameter space that produes <code>valid</code> simulation outputs, we train the deep neural density estimator used in <code>SNPE</code>. The method was originally proposed in <a href="https://arxiv.org/abs/1711.01861">Lueckmann, Goncalves et al. 2017</a> and later used in <a href="https://www.biorxiv.org/content/10.1101/2021.07.30.454484v3.abstract">Deistler et al. 2021</a>.</p>
+<p>In this tutorial, we show how we can use <code>sbi</code> to learn regions in parameter space that produce <code>valid</code> simulation outputs, and thereby improve the sampling efficiency. The key idea of the method is to use a classifier to distinguish parameters that lead to <code>valid</code> simulations from regions that lead to <code>invalid</code> simulations. After we have obtained the region in parameter space that produes <code>valid</code> simulation outputs, we train the deep neural density estimator used in <code>NPE</code>. The method was originally proposed in <a href="https://arxiv.org/abs/1711.01861">Lueckmann, Goncalves et al. 2017</a> and later used in <a href="https://www.biorxiv.org/content/10.1101/2021.07.30.454484v3.abstract">Deistler et al. 2021</a>.</p>
 <h2 id="main-syntax">Main syntax<a class="headerlink" href="#main-syntax" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">SNPE</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">NPE</span>
 <span class="kn">from</span> <span class="nn">sbi.utils</span> <span class="kn">import</span> <span class="n">RestrictionEstimator</span>
 
 <span class="n">restriction_estimator</span> <span class="o">=</span> <span class="n">RestrictionEstimator</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">)</span>
@@ -524,7 +524,7 @@
 
 <span class="n">all_theta</span><span class="p">,</span> <span class="n">all_x</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">restriction_estimator</span><span class="o">.</span><span class="n">get_simulations</span><span class="p">()</span>
 
-<span class="n">inference</span> <span class="o">=</span> <span class="n">SNPE</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">)</span>
+<span class="n">inference</span> <span class="o">=</span> <span class="n">NPE</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">)</span>
 <span class="n">density_estimator</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">all_theta</span><span class="p">,</span> <span class="n">all_x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
 <span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">()</span>
 </code></pre></div>
@@ -532,7 +532,7 @@
 <div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">torch</span>
 
 <span class="kn">from</span> <span class="nn">sbi.analysis</span> <span class="kn">import</span> <span class="n">pairplot</span>
-<span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">SNPE</span><span class="p">,</span> <span class="n">simulate_for_sbi</span>
+<span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">NPE</span><span class="p">,</span> <span class="n">simulate_for_sbi</span>
 <span class="kn">from</span> <span class="nn">sbi.utils</span> <span class="kn">import</span> <span class="n">BoxUniform</span><span class="p">,</span> <span class="n">RestrictionEstimator</span>
 
 <span class="n">_</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
@@ -608,7 +608,7 @@ Simulation outputs:  tensor([[ 1.7930,  1.5322],
         [ 0.3905, -0.3836]])
 </code></pre></div>
 
-<p>We can now use <strong>all</strong> simulations and run <code>SNPE</code> as always:</p>
+<p>We can now use <strong>all</strong> simulations and run <code>NPE</code> as always:</p>
 <div class="highlight"><pre><span></span><code><span class="n">restriction_estimator</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span>
     <span class="n">new_theta</span><span class="p">,</span> <span class="n">new_x</span>
 <span class="p">)</span>  <span class="c1"># Gather the new simulations in the `restriction_estimator`.</span>
@@ -618,7 +618,7 @@ Simulation outputs:  tensor([[ 1.7930,  1.5322],
     <span class="n">_</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">=</span> <span class="n">restriction_estimator</span><span class="o">.</span><span class="n">get_simulations</span><span class="p">()</span>  <span class="c1"># Get all simulations run so far.</span>
 
-<span class="n">inference</span> <span class="o">=</span> <span class="n">SNPE</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">)</span>
+<span class="n">inference</span> <span class="o">=</span> <span class="n">NPE</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">)</span>
 <span class="n">density_estimator</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">all_theta</span><span class="p">,</span> <span class="n">all_x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
 <span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">()</span>
 

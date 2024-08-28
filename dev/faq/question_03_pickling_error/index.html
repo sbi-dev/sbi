@@ -528,8 +528,11 @@ be found <a href="https://github.com/mackelab/sbi/issues/317">here</a>).</p>
 <h2 id="alternative-parallelize-yourself">Alternative: parallelize yourself<a class="headerlink" href="#alternative-parallelize-yourself" title="Permanent link">&para;</a></h2>
 <p>You can also write your own code to parallelize simulations with whatever
 multiprocessing framework you prefer. You can then simulate your data outside of
-<code>sbi</code> and pass the simulated data as shown in the <a href="https://sbi-dev.github.io/sbi/tutorial/02_flexible_interface/">flexible
-interface</a>:</p>
+<code>sbi</code> and pass the simulated data using <code>.append_simulations</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Given pre-simulated theta and x</span>
+<span class="n">trainer</span> <span class="o">=</span> <span class="n">SNPE</span><span class="p">(</span><span class="n">prior</span><span class="p">)</span>
+<span class="n">trainer</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
+</code></pre></div>
 <h2 id="some-more-background">Some more background<a class="headerlink" href="#some-more-background" title="Permanent link">&para;</a></h2>
 <p><code>sbi</code> uses <code>joblib</code> to parallelize simulations, which in turn uses <code>pickle</code> or
 <code>cloudpickle</code> to serialize the simulator. Almost all simulators will be

@@ -500,7 +500,7 @@ device name you passed. But we expect no speed-ups for default density estimator
 <h2 id="setup">Setup<a class="headerlink" href="#setup" title="Permanent link">&para;</a></h2>
 <p>Yes, we support GPU training. When creating the inference object in the flexible
 interface, you can pass the <code>device</code> as an argument, e.g.,</p>
-<div class="highlight"><pre><span></span><code><span class="n">inference</span> <span class="o">=</span> <span class="n">SNPE</span><span class="p">(</span><span class="n">prior</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="s2">&quot;cuda&quot;</span><span class="p">,</span> <span class="n">density_estimator</span><span class="o">=</span><span class="s2">&quot;maf&quot;</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><span class="n">inference</span> <span class="o">=</span> <span class="n">NPE</span><span class="p">(</span><span class="n">prior</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="s2">&quot;cuda&quot;</span><span class="p">,</span> <span class="n">density_estimator</span><span class="o">=</span><span class="s2">&quot;maf&quot;</span><span class="p">)</span>
 </code></pre></div>
 <p>The device is set to <code>"cpu"</code> by default. But it can be set to anything, as long
 as it maps to an existing PyTorch GPU device, e.g., <code>device="cuda"</code> or
@@ -517,7 +517,7 @@ device, e.g.,</p>
 <h2 id="performance">Performance<a class="headerlink" href="#performance" title="Permanent link">&para;</a></h2>
 <p>Whether or not you reduce your training time when training on a GPU depends on
 the problem at hand. We provide a couple of default density estimators for
-<code>SNPE</code>, <code>SNLE</code> and <code>SNRE</code>, e.g., a mixture density network
+<code>NPE</code>, <code>NLE</code> and <code>NRE</code>, e.g., a mixture density network
 (<code>density_estimator="mdn"</code>) or a Masked Autoregressive Flow
 (<code>density_estimator="maf"</code>). For these default density estimators, we do <strong>not</strong>
 expect a speed-up. This is because the underlying neural networks are relatively

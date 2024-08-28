@@ -469,34 +469,51 @@
 
 
 <h1 id="what-should-i-do-when-my-posterior-samples-are-outside-the-prior-support-in-snpe">What should I do when my &lsquo;posterior samples are outside the prior support&rsquo; in SNPE?<a class="headerlink" href="#what-should-i-do-when-my-posterior-samples-are-outside-the-prior-support-in-snpe" title="Permanent link">&para;</a></h1>
-<p>When working with <strong>multi-round</strong> SNPE, you might have experienced the following
-warning:</p>
+<p>When working with <strong>multi-round</strong> NPE (i.e., SNPE), you might have experienced the
+following warning:</p>
 <div class="highlight"><pre><span></span><code><span class="n">Only</span> <span class="n">x</span><span class="o">%</span> <span class="n">posterior</span> <span class="n">samples</span> <span class="n">are</span> <span class="n">within</span> <span class="n">the</span> <span class="n">prior</span> <span class="n">support</span><span class="o">.</span> <span class="n">It</span> <span class="n">may</span> <span class="n">take</span> <span class="n">a</span> <span class="n">long</span> <span class="n">time</span> <span class="n">to</span>
 <span class="n">collect</span> <span class="n">the</span> <span class="n">remaining</span> <span class="mi">10000</span> <span class="n">samples</span><span class="o">.</span> <span class="n">Consider</span> <span class="n">interrupting</span> <span class="p">(</span><span class="n">Ctrl</span><span class="o">-</span><span class="n">C</span><span class="p">)</span> <span class="ow">and</span> <span class="n">switching</span> <span class="n">to</span>
 <span class="s1">&#39;sample_with_mcmc=True&#39;</span><span class="o">.</span>
 </code></pre></div>
 <p>The reason for this issue is described in more detail
-<a href="https://arxiv.org/abs/2002.03712">here</a> and
+<a href="https://arxiv.org/abs/2210.04815">here</a>,
+<a href="https://arxiv.org/abs/2002.03712">here</a>, and
 <a href="https://arxiv.org/abs/1905.07488">here</a>. The following fixes are possible:</p>
 <ul>
+<li>
+<p>use truncated proposals for SNPE (TSNPE)
+<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">NPE</span>
+<span class="kn">from</span> <span class="nn">sbi.utils</span> <span class="kn">import</span> <span class="n">RestrictedPrior</span><span class="p">,</span> <span class="n">get_density_thresholder</span>
+
+<span class="n">inference</span> <span class="o">=</span> <span class="n">NPE</span><span class="p">(</span><span class="n">prior</span><span class="p">)</span>
+<span class="n">proposal</span> <span class="o">=</span> <span class="n">prior</span>
+<span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_rounds</span><span class="p">):</span>
+    <span class="n">theta</span> <span class="o">=</span> <span class="n">proposal</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_sims</span><span class="p">,))</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="n">simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
+    <span class="n">_</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">(</span><span class="n">force_first_round_loss</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">()</span><span class="o">.</span><span class="n">set_default_x</span><span class="p">(</span><span class="n">x_o</span><span class="p">)</span>
+
+    <span class="n">accept_reject_fn</span> <span class="o">=</span> <span class="n">get_density_thresholder</span><span class="p">(</span><span class="n">posterior</span><span class="p">,</span> <span class="n">quantile</span><span class="o">=</span><span class="mf">1e-4</span><span class="p">)</span>
+    <span class="n">proposal</span> <span class="o">=</span> <span class="n">RestrictedPrior</span><span class="p">(</span><span class="n">prior</span><span class="p">,</span> <span class="n">accept_reject_fn</span><span class="p">,</span> <span class="n">sample_with</span><span class="o">=</span><span class="s2">&quot;rejection&quot;</span><span class="p">)</span>
+</code></pre></div></p>
+</li>
 <li>
 <p>sample with MCMC: <code>samples = posterior((num_samples,), x=x_o, sample_with_mcmc=True)</code>.
 This approach will make sampling slower, but samples will not &ldquo;leak&rdquo;.</p>
 </li>
 <li>
-<p>resort to single-round SNPE and (if necessary) increase your simulation budget.</p>
+<p>resort to single-round NPE and (if necessary) increase your simulation budget.</p>
 </li>
 <li>
-<p>if your prior is either Gaussian (torch.distributions.MultivariateNormal) or
-Uniform (sbi.utils.BoxUniform), you can avoid leakage by using a mixture density
-network as density estimator. I.e., using the <a href="https://sbi-dev.github.io/sbi/tutorial/03_flexible_interface/">flexible
-interface</a>, set
-<code>density_estimator='mdn'</code>. When running inference, there should be a print
-statement &ldquo;Using SNPE-C with non-atomic loss&rdquo;.</p>
+<p>if your prior is either Gaussian (torch.distributions.MultivariateNormal) or Uniform
+(sbi.utils.BoxUniform), you can avoid leakage by using a mixture density network as
+density estimator. I.e., set <code>density_estimator='mdn'</code> when creating the <code>SNPE</code>
+inference object. When running inference, there should be a print statement &ldquo;Using
+SNPE-C with non-atomic loss&rdquo;.</p>
 </li>
 <li>
-<p>use a different algorithm, e.g., SNRE and SNLE. Note, however, that these algorithms
-can have different issues and potential pitfalls.</p>
+<p>use a different algorithm, e.g., Sequential NRE and Sequential NLE. Note, however,
+that these algorithms can have different issues and potential pitfalls.</p>
 </li>
 </ul>
 

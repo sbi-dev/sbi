@@ -574,7 +574,7 @@ synthetically (in practice, this would be an experimental observation).</p>
 
 <span class="c1"># sbi</span>
 <span class="kn">from</span> <span class="nn">sbi</span> <span class="kn">import</span> <span class="n">utils</span> <span class="k">as</span> <span class="n">utils</span>
-<span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">SNPE</span><span class="p">,</span> <span class="n">simulate_for_sbi</span>
+<span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">NPE</span><span class="p">,</span> <span class="n">simulate_for_sbi</span>
 <span class="kn">from</span> <span class="nn">sbi.utils.user_input_checks</span> <span class="kn">import</span> <span class="p">(</span>
     <span class="n">check_sbi_inputs</span><span class="p">,</span>
     <span class="n">process_prior</span><span class="p">,</span>
@@ -713,13 +713,12 @@ g_{Na}\)</span>,<span class="arithmatex">\(\bar g_K\)</span>)</p>
 <span class="n">check_sbi_inputs</span><span class="p">(</span><span class="n">simulation_wrapper</span><span class="p">,</span> <span class="n">prior</span><span class="p">)</span>
 </code></pre></div>
 <h2 id="running-inference">Running inference<a class="headerlink" href="#running-inference" title="Permanent link">&para;</a></h2>
-<p>Now that we have all the required components, we can run inference with <code>SNPE</code> to identify parameters whose activity matches this trace.</p>
+<p>Now that we have all the required components, we can run inference with <code>NPE</code> to identify parameters whose activity matches this trace.</p>
 <blockquote>
-<p>Note, that here we perform Neural Posterior Estimation (NPE). Single round sequential NPE which we call via SNPE corresponds to NPE. </p>
 <p>Note that this might take a few minutes.</p>
 </blockquote>
 <div class="highlight"><pre><span></span><code><span class="c1"># Create inference object. Here, NPE is used.</span>
-<span class="n">inference</span> <span class="o">=</span> <span class="n">SNPE</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">)</span>
+<span class="n">inference</span> <span class="o">=</span> <span class="n">NPE</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">)</span>
 
 <span class="c1"># generate simulations and pass to the inference object</span>
 <span class="n">theta</span><span class="p">,</span> <span class="n">x</span> <span class="o">=</span> <span class="n">simulate_for_sbi</span><span class="p">(</span><span class="n">simulation_wrapper</span><span class="p">,</span> <span class="n">proposal</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span>
@@ -815,7 +814,7 @@ g_{Na}\)</span>,<span class="arithmatex">\(\bar g_K\)</span>)</p>
 <span class="n">ax</span><span class="o">.</span><span class="n">set_yticks</span><span class="p">([</span><span class="o">-</span><span class="mi">80</span><span class="p">,</span> <span class="o">-</span><span class="mi">20</span><span class="p">,</span> <span class="mi">40</span><span class="p">]);</span>
 </code></pre></div>
 <p><img alt="png" src="../Example_00_HodgkinHuxleyModel_files/Example_00_HodgkinHuxleyModel_44_0.png" /></p>
-<p>As can be seen, the sample from the inferred posterior leads to simulations that closely resemble the observed data, confirming that <code>SNPE</code> did a good job at capturing the observed data in this simple case.</p>
+<p>As can be seen, the sample from the inferred posterior leads to simulations that closely resemble the observed data, confirming that <code>NPE</code> did a good job at capturing the observed data in this simple case.</p>
 <h2 id="references">References<a class="headerlink" href="#references" title="Permanent link">&para;</a></h2>
 <p>A. L. Hodgkin and A. F. Huxley. A quantitative description of membrane current and its application to conduction and excitation in nerve. The Journal of Physiology, 117(4):500–544, 1952.</p>
 <p>M. Pospischil, M. Toledo-Rodriguez, C. Monier, Z. Piwkowska, T. Bal, Y. Frégnac, H. Markram, and A. Destexhe. Minimal Hodgkin-Huxley type models for different classes of cortical and thalamic neurons. Biological Cybernetics, 99(4-5), 2008.</p>

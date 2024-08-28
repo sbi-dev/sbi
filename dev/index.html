@@ -660,7 +660,7 @@
 <p><code>sbi</code> provides access to simulation-based inference methods via a user-friendly
 interface:</p>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">SNPE</span>
+<span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">NPE</span>
 
 <span class="c1"># define shifted Gaussian simulator.</span>
 <span class="k">def</span> <span class="nf">simulator</span><span class="p">(</span><span class="n">θ</span><span class="p">):</span> <span class="k">return</span> <span class="n">θ</span> <span class="o">+</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn_like</span><span class="p">(</span><span class="n">θ</span><span class="p">)</span>
@@ -670,7 +670,7 @@ interface:</p>
 <span class="n">x</span> <span class="o">=</span> <span class="n">simulator</span><span class="p">(</span><span class="n">θ</span><span class="p">)</span>
 
 <span class="c1"># choose sbi method and train</span>
-<span class="n">inference</span> <span class="o">=</span> <span class="n">SNPE</span><span class="p">()</span>
+<span class="n">inference</span> <span class="o">=</span> <span class="n">NPE</span><span class="p">()</span>
 <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">θ</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
 
 <span class="c1"># do inference given observed data</span>
@@ -694,7 +694,7 @@ interface:</p>
 <li>
 <p><img alt="🚀" class="emojione" src="https://cdnjs.cloudflare.com/ajax/libs/emojione/2.2.7/assets/png/1f680.png" title=":rocket:" /> <a href="tutorials/"><strong>Tutorials and Examples</strong></a>
    <br/><br/>
-   <em>Various examples illustrating how to<br/> <a href="tutorials/00_getting_started_flexible/">get
+   <em>Various examples illustrating how to<br/> <a href="tutorials/00_getting_started/">get
    started</a> or use the <code>sbi</code> package.</em></p>
 </li>
 <li>
@@ -747,8 +747,8 @@ summary statistics thereof).</p>
    full space of parameters consistent with the data and the prior, i.e. the
    posterior distribution. The posterior assigns high probability to parameters
    that are consistent with both the data and the prior, and low probability to
-   inconsistent parameters. While SNPE directly learns the posterior
-   distribution, SNLE and SNRE need an extra MCMC sampling step to construct a
+   inconsistent parameters. While NPE directly learns the posterior
+   distribution, NLE and NRE need an extra MCMC sampling step to construct a
    posterior.</li>
 <li>If needed, an initial estimate of the posterior can be used to adaptively
    generate additional informative simulations.</li>

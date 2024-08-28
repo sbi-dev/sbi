@@ -497,12 +497,12 @@
 <h1 id="amortized-posterior-inference-on-gaussian-example">Amortized posterior inference on Gaussian example<a class="headerlink" href="#amortized-posterior-inference-on-gaussian-example" title="Permanent link">&para;</a></h1>
 <p>Note, you can find the original version of this notebook at <a href="https://github.com/sbi-dev/sbi/blob/main/tutorials/01_gaussian_amortized.ipynb">tutorials/01_gaussian_amortized.ipynb</a> in the <code>sbi</code> repository.</p>
 <p>In this tutorial, we introduce <strong>amortization</strong> that is the capability to evaluate the posterior for different observations without having to re-run inference.</p>
-<p>We will demonstrate how <code>sbi</code> can infer an amortized posterior for the illustrative linear Gaussian example introduced in <a href="https://sbi-dev.github.io/sbi/tutorial/00_getting_started_flexible/">Getting Started</a>, that takes in 3 parameters (<span class="arithmatex">\(\theta\)</span>). </p>
+<p>We will demonstrate how <code>sbi</code> can infer an amortized posterior for the illustrative linear Gaussian example introduced in <a href="https://sbi-dev.github.io/sbi/latest/tutorials/00_getting_started/">Getting Started</a>, that takes in 3 parameters (<span class="arithmatex">\(\theta\)</span>). </p>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">torch</span>
 
 <span class="kn">from</span> <span class="nn">sbi</span> <span class="kn">import</span> <span class="n">analysis</span> <span class="k">as</span> <span class="n">analysis</span>
 <span class="kn">from</span> <span class="nn">sbi</span> <span class="kn">import</span> <span class="n">utils</span> <span class="k">as</span> <span class="n">utils</span>
-<span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">SNPE</span><span class="p">,</span> <span class="n">simulate_for_sbi</span>
+<span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">NPE</span><span class="p">,</span> <span class="n">simulate_for_sbi</span>
 <span class="kn">from</span> <span class="nn">sbi.utils.user_input_checks</span> <span class="kn">import</span> <span class="p">(</span>
     <span class="n">check_sbi_inputs</span><span class="p">,</span>
     <span class="n">process_prior</span><span class="p">,</span>
@@ -527,7 +527,7 @@
 <span class="n">check_sbi_inputs</span><span class="p">(</span><span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">)</span>
 </code></pre></div>
 <div class="highlight"><pre><span></span><code><span class="c1"># Create inference object. Here, NPE is used.</span>
-<span class="n">inference</span> <span class="o">=</span> <span class="n">SNPE</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">)</span>
+<span class="n">inference</span> <span class="o">=</span> <span class="n">NPE</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">)</span>
 
 <span class="c1"># generate simulations and pass to the inference object</span>
 <span class="n">theta</span><span class="p">,</span> <span class="n">x</span> <span class="o">=</span> <span class="n">simulate_for_sbi</span><span class="p">(</span><span class="n">simulator</span><span class="p">,</span> <span class="n">proposal</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span> <span class="n">num_simulations</span><span class="o">=</span><span class="mi">2000</span><span class="p">)</span>
