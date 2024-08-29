@@ -110,7 +110,7 @@ ignore = [
 case-sensitive = true
 lines-between-types = 0  # like isort default.
 relative-imports-order = "furthest-to-closest"  # like isort default.
-known-first-party = ["sbi", "tests", "examples", "tutorials"]
+known-first-party = ["sbi", "tests", "tutorials"]
 
 [tool.ruff.format]
 exclude = ["*.ipynb"]
