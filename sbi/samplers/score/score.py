@@ -10,8 +10,7 @@ from tqdm.auto import tqdm
 from sbi.inference.potentials.score_based_potential import (
     PosteriorScoreBasedPotential,
 )
-from sbi.samplers.score.correctors import Corrector, get_corrector
-from sbi.samplers.score.predictors import Predictor, get_predictor
+from sbi.samplers.score import Corrector, Predictor, get_corrector, get_predictor
 
 
 class Diffuser:
