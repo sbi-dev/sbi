@@ -13,7 +13,7 @@ from sbi.inference.potentials.score_based_potential import (
     score_estimator_based_potential,
 )
 from sbi.neural_nets.net_builders import build_score_estimator
-from sbi.samplers.score.score import Diffuser
+from sbi.samplers.score import Diffuser
 
 
 @pytest.mark.parametrize("sde_type", ["vp", "ve", "subvp"])
