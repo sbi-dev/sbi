@@ -49,9 +49,9 @@ Beyond inference, `sbi` also provides:
 Getting started with `sbi` is straightforward, requiring only a few lines of code:
 
 ```python
-from sbi.inference import SNPE
+from sbi.inference import NPE
 # Given: parameters theta and corresponding simulations x
-inference = SNPE(prior=prior)
+inference = NPE(prior=prior)
 inference.append_simulations(theta, x).train()
 posterior = inference.build_posterior()
 ```
