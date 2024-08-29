@@ -137,7 +137,7 @@ def test_c2st_pymc_sampler_on_Gaussian(
     step: str,
     num_chains: int,
     num_dim: int = 2,
-    num_samples: int = 1000,
+    num_samples: int = 1100,  # Had to change from 1000 to 1100 in #1247.
     warmup: int = 100,
 ):
     """Test PyMC on Gaussian, comparing to ground truth target via c2st."""
