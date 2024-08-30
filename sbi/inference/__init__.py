@@ -3,7 +3,6 @@ from sbi.inference.trainers.base import (
     NeuralInference,  # noqa: F401
     check_if_proposal_has_default_x,
     infer,
-    simulate_for_sbi,
 )
 from sbi.inference.trainers.fmpe import FMPE
 from sbi.inference.trainers.nle import MNLE, NLE_A
@@ -48,3 +47,4 @@ from sbi.inference.potentials import (
     posterior_estimator_based_potential,
     ratio_estimator_based_potential,
 )
+from sbi.utils.simulation_utils import simulate_for_sbi
