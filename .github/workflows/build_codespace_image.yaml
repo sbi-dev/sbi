@@ -2,7 +2,8 @@ name: Docker Image for sbi toolkit
 
 on:
   release:
-    types: [published]
+    types: [ published ]
+  workflow_dispatch:
 
 jobs:
   build_devcontainer_base:
