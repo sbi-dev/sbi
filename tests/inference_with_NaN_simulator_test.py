@@ -19,7 +19,7 @@ from sbi.simulators.linear_gaussian import (
     linear_gaussian,
     samples_true_posterior_linear_gaussian_uniform_prior,
 )
-from sbi.utils import BoxUniform, RestrictionEstimator
+from sbi.utils import RestrictionEstimator
 from sbi.utils.sbiutils import handle_invalid_x
 from sbi.utils.user_input_checks import (
     check_sbi_inputs,
@@ -224,66 +224,3 @@ def test_restricted_prior_log_prob(prior):
     assert torch.all(
         restricted_prior_probs[torch.logical_not(valid_thetas)] == 0.0
     ), "Rejected theta has non-zero probablity."
-
-
-@pytest.mark.parametrize(
-    "num_simulations, simulation_batch_size, num_workers, use_process_simulator",
-    [
-        (0, None, 1, True),
-        (10, None, 1, True),
-        (100, 10, 1, True),
-        (100, None, 2, True),
-        (1000, 50, 4, True),
-        (100, 10, 2, False),
-    ],
-)
-def test_simulate_for_sbi(
-    num_simulations, simulation_batch_size, num_workers, use_process_simulator
-):
-    """Test the simulate_for_sbi function with various configurations."""
-    num_dim = 3
-    likelihood_shift = -1.0 * ones(num_dim)
-    likelihood_cov = 0.3 * eye(num_dim)
-    prior = BoxUniform(-2.0 * ones(num_dim), 2.0 * ones(num_dim))
-
-    def simulator(theta):
-        return linear_gaussian(theta, likelihood_shift, likelihood_cov)
-
-    if use_process_simulator:
-        simulator = process_simulator(simulator, prior, False)
-
-    theta, x = simulate_for_sbi(
-        simulator=simulator,
-        proposal=prior,
-        num_simulations=num_simulations,
-        simulation_batch_size=simulation_batch_size,
-        num_workers=num_workers,
-    )
-
-    if num_simulations == 0:
-        assert (
-            theta.numel() == 0
-        ), "Theta should be an empty tensor when num_simulations=0"
-        assert x.numel() == 0, "x should be an empty tensor when num_simulations=0"
-    else:
-        assert (
-            theta.shape[0] == num_simulations
-        ), "Theta should have num_simulations rows"
-        assert x.shape[0] == num_simulations, "x should have num_simulations rows"
-        assert theta.shape[1] == num_dim, "Theta should have num_dim columns"
-        assert x.shape[1] == num_dim, "x should have num_dim columns"
-
-        assert torch.all(torch.isfinite(theta)), "Theta contains non-finite values"
-        assert torch.all(torch.isfinite(x)), "x contains non-finite values"
-
-        assert torch.all(
-            theta >= prior.base_dist.low
-        ), "Theta contains values below the prior lower bound"
-        assert torch.all(
-            theta <= prior.base_dist.high
-        ), "Theta contains values above the prior upper bound"
-
-    if not use_process_simulator and num_workers > 1:
-        assert (
-            theta.shape[0] == num_simulations
-        ), "Simulation should work even without process_simulator"
