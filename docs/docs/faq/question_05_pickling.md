@@ -13,7 +13,10 @@ with open("/path/to/my_posterior.pkl", "wb") as handle:
     pickle.dump(posterior, handle)
 ```
 
-Note: posterior objects that were saved under `sbi v0.17.2` or older can not be
+Note: posterior objects that were saved under `sbi v0.22.0` or older cannot be
+loaded under `sbi v0.23.0` or newer.
+
+Note: posterior objects that were saved under `sbi v0.17.2` or older cannot be
 loaded under `sbi v0.18.0` or newer.
 
 Note: if you try to load a posterior that was saved under `sbi v0.14.x` or
