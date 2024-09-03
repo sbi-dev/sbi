@@ -604,7 +604,7 @@
 
     <div class="doc doc-contents first">
 
-      <p>Returns a function that builds a density estimator for learning the posterior.</p>
+        <p>Returns a function that builds a density estimator for learning the posterior.</p>
 <p>This function will usually be used for SNPE. The returned function is to be passed
 to the inference class when using the flexible interface.</p>
 
@@ -983,7 +983,7 @@ Ignored if density estimator is not an mdn.</p>
 
     <div class="doc doc-contents first">
 
-      <p>Returns a function that builds a density estimator for learning the likelihood.</p>
+        <p>Returns a function that builds a density estimator for learning the likelihood.</p>
 <p>This function will usually be used for SNLE. The returned function is to be passed
 to the inference class when using the flexible interface.</p>
 
@@ -1302,7 +1302,7 @@ Ignored if density estimator is not an mdn.</p>
 
     <div class="doc doc-contents first">
 
-      <p>Returns a function that builds a classifier for learning density ratios.</p>
+        <p>Returns a function that builds a classifier for learning density ratios.</p>
 <p>This function will usually be used for SNRE. The returned function is to be passed
 to the inference class when using the flexible interface.</p>
 <p>Note that in the view of the SNRE classifier we build below, x=theta and y=x.</p>
@@ -1592,7 +1592,7 @@ simulation outputs.</p>
 
     <div class="doc doc-contents first">
 
-      <p>Returns a function that builds a neural net that can act as
+        <p>Returns a function that builds a neural net that can act as
 a vector field estimator for Flow Matching. This function will usually
 be used for Flow Matching. The returned function is to be passed to the</p>
 
@@ -1885,7 +1885,7 @@ density estimator is a normalizing flow (i.e. currently either a <code>maf</code
 
     <div class="doc doc-contents first">
 
-      <p>Build util function that builds a ScoreEstimator object for score-based
+        <p>Build util function that builds a ScoreEstimator object for score-based
 posteriors.</p>
 
 
@@ -2222,7 +2222,7 @@ nn.Identity().</p>
               Bases: <code><span title="sbi.neural_nets.estimators.base.ConditionalEstimator">ConditionalEstimator</span></code></p>
 
 
-      <p>Base class for density estimators.</p>
+        <p>Base class for density estimators.</p>
 <p>The density estimator class is a wrapper around neural networks that
 allows to evaluate the <code>log_prob</code>, <code>sample</code>, and provide the <code>loss</code> of <span class="arithmatex">\(\theta,x\)</span>
 pairs. Here <span class="arithmatex">\(\theta\)</span> would be the <code>input</code> and <span class="arithmatex">\(x\)</span> would be the <code>condition</code>.</p>
@@ -2475,7 +2475,7 @@ condition_shape is the shape of the condition tensor.</p>
 
     <div class="doc doc-contents ">
 
-      <p>Return the embedding network if it exists.</p>
+        <p>Return the embedding network if it exists.</p>
     </div>
 
 </div>
@@ -2493,7 +2493,7 @@ condition_shape is the shape of the condition tensor.</p>
 
     <div class="doc doc-contents ">
 
-      <p>Base class for density estimators.</p>
+        <p>Base class for density estimators.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -2604,7 +2604,7 @@ evaluated (and which is also the event_shape of samples).</p>
 
     <div class="doc doc-contents ">
 
-      <p>Return the log probabilities of the inputs given a condition or multiple
+        <p>Return the log probabilities of the inputs given a condition or multiple
 i.e. batched conditions.</p>
 
 
@@ -2758,7 +2758,7 @@ i.e. batched conditions.</p>
 
     <div class="doc doc-contents ">
 
-      <p>Return the loss for training the density estimator.</p>
+        <p>Return the loss for training the density estimator.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -2877,7 +2877,7 @@ i.e. batched conditions.</p>
 
     <div class="doc doc-contents ">
 
-      <p>Return samples from the density estimator.</p>
+        <p>Return samples from the density estimator.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -2989,7 +2989,7 @@ i.e. batched conditions.</p>
 
     <div class="doc doc-contents ">
 
-      <p>Return samples and their density from the density estimator.</p>
+        <p>Return samples and their density from the density estimator.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>

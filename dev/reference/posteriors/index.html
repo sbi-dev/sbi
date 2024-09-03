@@ -972,7 +972,7 @@
               Bases: <code><span title="sbi.inference.posteriors.base_posterior.NeuralPosterior">NeuralPosterior</span></code></p>
 
 
-      <p>Posterior <span class="arithmatex">\(p(\theta|x_o)\)</span> with <code>log_prob()</code> and <code>sample()</code> methods, only
+        <p>Posterior <span class="arithmatex">\(p(\theta|x_o)\)</span> with <code>log_prob()</code> and <code>sample()</code> methods, only
 applicable to SNPE.<br/><br/>
 SNPE trains a neural network to directly approximate the posterior distribution.
 However, for bounded priors, the neural network can have leakage: it puts non-zero
@@ -2093,7 +2093,7 @@ returned for <code>theta_transform</code>.</p>
 
     <div class="doc doc-contents ">
 
-      <p>Return leakage correction factor for a leaky posterior density estimate.</p>
+        <p>Return leakage correction factor for a leaky posterior density estimate.</p>
 <p>The factor is estimated from the acceptance probability during rejection
 sampling from the posterior.</p>
 <p>This is to avoid re-estimating the acceptance probability from scratch
@@ -2315,7 +2315,7 @@ re-evaluate only whenever a new <code>x</code> is passed.</p>
 
     <div class="doc doc-contents ">
 
-      <p>Returns the log-probability of the posterior <span class="arithmatex">\(p(\theta|x)\)</span>.</p>
+        <p>Returns the log-probability of the posterior <span class="arithmatex">\(p(\theta|x)\)</span>.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -2599,7 +2599,7 @@ These parameters only have an effect if <code>norm_posterior=True</code>.</p>
 
     <div class="doc doc-contents ">
 
-      <p>Given a batch of observations [x_1, &hellip;, x_B] and a batch of parameters             [$  heta_1$,&hellip;, $  heta_B$] this function evalautes the log-probabilities             of the posteriors <span class="arithmatex">\(p(        heta_1|x_1)\)</span>, &hellip;, <span class="arithmatex">\(p(  heta_B|x_B)\)</span> in a batched             (i.e. vectorized) manner.</p>
+        <p>Given a batch of observations [x_1, &hellip;, x_B] and a batch of parameters             [$  heta_1$,&hellip;, $  heta_B$] this function evalautes the log-probabilities             of the posteriors <span class="arithmatex">\(p(        heta_1|x_1)\)</span>, &hellip;, <span class="arithmatex">\(p(  heta_B|x_B)\)</span> in a batched             (i.e. vectorized) manner.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -2887,7 +2887,7 @@ These parameters only have an effect if <code>norm_posterior=True</code>.</p>
 
     <div class="doc doc-contents ">
 
-      <p>Returns the maximum-a-posteriori estimate (MAP).</p>
+        <p>Returns the maximum-a-posteriori estimate (MAP).</p>
 <p>The method can be interrupted (Ctrl-C) when the user sees that the
 log-probability converges. The best estimate will be saved in <code>self._map</code> and
 can be accessed with <code>self.map()</code>. The MAP is obtained by running gradient
@@ -3239,7 +3239,7 @@ have a cached value.</p>
 
     <div class="doc doc-contents ">
 
-      <p>Return samples from posterior distribution <span class="arithmatex">\(p(\theta|x)\)</span>.</p>
+        <p>Return samples from posterior distribution <span class="arithmatex">\(p(\theta|x)\)</span>.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -3417,7 +3417,7 @@ samples and then reshape into the desired shape.</p>
 
     <div class="doc doc-contents ">
 
-      <p>Given a batch of observations [x_1, &hellip;, x_B] this function samples from
+        <p>Given a batch of observations [x_1, &hellip;, x_B] this function samples from
 posteriors <span class="arithmatex">\(p(\theta|x_1)\)</span>, &hellip; ,<span class="arithmatex">\(p(\theta|x_B)\)</span>, in a batched (i.e. vectorized)
 manner.</p>
 
@@ -3634,7 +3634,7 @@ given every observation.</p>
               Bases: <code><span title="sbi.inference.posteriors.base_posterior.NeuralPosterior">NeuralPosterior</span></code></p>
 
 
-      <p>Provides importance sampling to sample from the posterior.<br/><br/>
+        <p>Provides importance sampling to sample from the posterior.<br/><br/>
 SNLE or SNRE train neural networks to approximate the likelihood(-ratios).
 <code>ImportanceSamplingPosterior</code> allows to estimate the posterior log-probability by
 estimating the normlalization constant with importance sampling. It also allows to
@@ -4611,7 +4611,7 @@ None, <code>potential_fn.device</code> is used.</p>
 
     <div class="doc doc-contents ">
 
-      <p>Returns the normalization constant via importance sampling.</p>
+        <p>Returns the normalization constant via importance sampling.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -4745,7 +4745,7 @@ unchanged and have a cached value.</p>
 
     <div class="doc doc-contents ">
 
-      <p>Returns the log-probability of theta under the posterior.</p>
+        <p>Returns the log-probability of theta under the posterior.</p>
 <p>The normalization constant is estimated with importance sampling.</p>
 
 
@@ -4931,7 +4931,7 @@ consumption.</p>
 
     <div class="doc doc-contents ">
 
-      <p>Returns the maximum-a-posteriori estimate (MAP).</p>
+        <p>Returns the maximum-a-posteriori estimate (MAP).</p>
 <p>The method can be interrupted (Ctrl-C) when the user sees that the
 log-probability converges. The best estimate will be saved in <code>self._map</code> and
 can be accessed with <code>self.map()</code>. The MAP is obtained by running gradient
@@ -5283,7 +5283,7 @@ have a cached value.</p>
 
     <div class="doc doc-contents ">
 
-      <p>Return samples from the approximate posterior distribution.</p>
+        <p>Return samples from the approximate posterior distribution.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -5519,7 +5519,7 @@ proposal at every iteration.</p>
               Bases: <code><span title="sbi.inference.posteriors.base_posterior.NeuralPosterior">NeuralPosterior</span></code></p>
 
 
-      <p>Provides MCMC to sample from the posterior.<br/><br/>
+        <p>Provides MCMC to sample from the posterior.<br/><br/>
 SNLE or SNRE train neural networks to approximate the likelihood(-ratios).
 <code>MCMCPosterior</code> allows to sample from the posterior with MCMC.</p>
 
@@ -7578,7 +7578,7 @@ SNLE or SNRE train neural networks to approximate the likelihood(-ratios).
 
     <div class="doc doc-contents ">
 
-      <p>Returns MCMC method.</p>
+        <p>Returns MCMC method.</p>
     </div>
 
 </div>
@@ -7599,7 +7599,7 @@ SNLE or SNRE train neural networks to approximate the likelihood(-ratios).
 
     <div class="doc doc-contents ">
 
-      <p>Returns sampler created by <code>sample</code>.</p>
+        <p>Returns sampler created by <code>sample</code>.</p>
     </div>
 
 </div>
@@ -8091,7 +8091,7 @@ faster than <code>"spawn"</code> but is only supported on POSIX-based systems
 
     <div class="doc doc-contents ">
 
-      <p>Returns arviz InferenceData object constructed most recent samples.</p>
+        <p>Returns arviz InferenceData object constructed most recent samples.</p>
 <p>Note: the InferenceData is constructed using the posterior samples generated in
 most recent call to <code>.sample(...)</code>.</p>
 <p>For Pyro and PyMC samplers, InferenceData will contain diagnostics, but for
@@ -8252,7 +8252,7 @@ sbi slice samplers, only the samples are added.</p>
 
     <div class="doc doc-contents ">
 
-      <p>Returns the log-probability of theta under the posterior.</p>
+        <p>Returns the log-probability of theta under the posterior.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -8394,7 +8394,7 @@ consumption.</p>
 
     <div class="doc doc-contents ">
 
-      <p>Returns the maximum-a-posteriori estimate (MAP).</p>
+        <p>Returns the maximum-a-posteriori estimate (MAP).</p>
 <p>The method can be interrupted (Ctrl-C) when the user sees that the
 log-probability converges. The best estimate will be saved in <code>self._map</code> and
 can be accessed with <code>self.map()</code>. The MAP is obtained by running gradient
@@ -8746,7 +8746,7 @@ have a cached value.</p>
 
     <div class="doc doc-contents ">
 
-      <p>Return samples from posterior distribution <span class="arithmatex">\(p(\theta|x)\)</span> with MCMC.</p>
+        <p>Return samples from posterior distribution <span class="arithmatex">\(p(\theta|x)\)</span> with MCMC.</p>
 <p>Check the <code>__init__()</code> method for a description of all arguments as well as
 their default values.</p>
 
@@ -9187,7 +9187,7 @@ samples and then reshape into the desired shape.</p>
 
     <div class="doc doc-contents ">
 
-      <p>Given a batch of observations [x_1, &hellip;, x_B] this function samples from
+        <p>Given a batch of observations [x_1, &hellip;, x_B] this function samples from
 posteriors <span class="arithmatex">\(p(\theta|x_1)\)</span>, &hellip; ,<span class="arithmatex">\(p(\theta|x_B)\)</span>, in a batched (i.e. vectorized)
 manner.</p>
 <p>Check the <code>__init__()</code> method for a description of all arguments as well as
@@ -9700,7 +9700,7 @@ parameter generation and mcmc sampling.</p>
 
     <div class="doc doc-contents ">
 
-      <p>Sets sampling method to for MCMC and returns <code>NeuralPosterior</code>.</p>
+        <p>Sets sampling method to for MCMC and returns <code>NeuralPosterior</code>.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -9807,7 +9807,7 @@ parameter generation and mcmc sampling.</p>
               Bases: <code><span title="sbi.inference.posteriors.base_posterior.NeuralPosterior">NeuralPosterior</span></code></p>
 
 
-      <p>Provides rejection sampling to sample from the posterior.<br/><br/>
+        <p>Provides rejection sampling to sample from the posterior.<br/><br/>
 SNLE or SNRE train neural networks to approximate the likelihood(-ratios).
 <code>RejectionPosterior</code> allows to sample from the posterior with rejection sampling.</p>
 
@@ -10556,7 +10556,7 @@ maximum of the <code>potential_fn / proposal</code> ratio.</p>
 
     <div class="doc doc-contents ">
 
-      <p>Returns the log-probability of theta under the posterior.</p>
+        <p>Returns the log-probability of theta under the posterior.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -10698,7 +10698,7 @@ consumption.</p>
 
     <div class="doc doc-contents ">
 
-      <p>Returns the maximum-a-posteriori estimate (MAP).</p>
+        <p>Returns the maximum-a-posteriori estimate (MAP).</p>
 <p>The method can be interrupted (Ctrl-C) when the user sees that the
 log-probability converges. The best estimate will be saved in <code>self._map</code> and
 can be accessed with <code>self.map()</code>. The MAP is obtained by running gradient
@@ -11050,7 +11050,7 @@ have a cached value.</p>
 
     <div class="doc doc-contents ">
 
-      <p>Return samples from posterior <span class="arithmatex">\(p(\theta|x)\)</span> via rejection sampling.</p>
+        <p>Return samples from posterior <span class="arithmatex">\(p(\theta|x)\)</span> via rejection sampling.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -11299,7 +11299,7 @@ samples and then reshape into the desired shape.</p>
               Bases: <code><span title="sbi.inference.posteriors.base_posterior.NeuralPosterior">NeuralPosterior</span></code></p>
 
 
-      <p>Posterior <span class="arithmatex">\(p(\theta|x_o)\)</span> with <code>log_prob()</code> and <code>sample()</code> methods. It samples
+        <p>Posterior <span class="arithmatex">\(p(\theta|x_o)\)</span> with <code>log_prob()</code> and <code>sample()</code> methods. It samples
 from the diffusion model given the score_estimator and rejects samples that lie
 outside of the prior bounds.</p>
 <p>The posterior is defined by a score estimator and a prior. The score estimator
@@ -12244,7 +12244,7 @@ sampler or the SDE-based sampler.</p>
 
     <div class="doc doc-contents ">
 
-      <p>Returns the log-probability of the posterior <span class="arithmatex">\(p(\theta|x)\)</span>.</p>
+        <p>Returns the log-probability of the posterior <span class="arithmatex">\(p(\theta|x)\)</span>.</p>
 <p>This requires building and evaluating the probability flow ODE.</p>
 
 
@@ -12476,7 +12476,7 @@ stochastic approximation, which is faster but less accurate.</p>
 
     <div class="doc doc-contents ">
 
-      <p>Returns the maximum-a-posteriori estimate (MAP).</p>
+        <p>Returns the maximum-a-posteriori estimate (MAP).</p>
 <p>The method can be interrupted (Ctrl-C) when the user sees that the
 log-probability converges. The best estimate will be saved in <code>self._map</code> and
 can be accessed with <code>self.map()</code>. The MAP is obtained by running gradient
@@ -12816,7 +12816,7 @@ have a cached value.</p>
 
     <div class="doc doc-contents ">
 
-      <p>Return samples from posterior distribution <span class="arithmatex">\(p(\theta|x)\)</span>.</p>
+        <p>Return samples from posterior distribution <span class="arithmatex">\(p(\theta|x)\)</span>.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -13134,7 +13134,7 @@ linear grid between t_max and t_min is used.</p>
 
     <div class="doc doc-contents ">
 
-      <p>Return samples from posterior distribution with probability flow ODE.</p>
+        <p>Return samples from posterior distribution with probability flow ODE.</p>
 <p>This build the probability flow ODE and then samples from the corresponding
 flow. This is implemented via the zuko library.</p>
 
@@ -13281,7 +13281,7 @@ flow. This is implemented via the zuko library.</p>
               Bases: <code><span title="sbi.inference.posteriors.base_posterior.NeuralPosterior">NeuralPosterior</span></code></p>
 
 
-      <p>Provides VI (Variational Inference) to sample from the posterior.<br/><br/>
+        <p>Provides VI (Variational Inference) to sample from the posterior.<br/><br/>
 SNLE or SNRE train neural networks to approximate the likelihood(-ratios).
 <code>VIPosterior</code> allows to learn a tractable variational posterior <span class="arithmatex">\(q(\theta)\)</span> which
 approximates the true posterior <span class="arithmatex">\(p(\theta|x_o)\)</span>. After this second training stage,
@@ -14530,7 +14530,7 @@ Frellsen, Umberto Picchini, 2021, <a href="https://arxiv.org/abs/2102.06522">htt
 
     <div class="doc doc-contents ">
 
-      <p>Returns the variational posterior.</p>
+        <p>Returns the variational posterior.</p>
     </div>
 
 </div>
@@ -14552,7 +14552,7 @@ Frellsen, Umberto Picchini, 2021, <a href="https://arxiv.org/abs/2102.06522">htt
 
     <div class="doc doc-contents ">
 
-      <p>Variational inference method e.g. one of [rKL, fKL, IW, alpha].</p>
+        <p>Variational inference method e.g. one of [rKL, fKL, IW, alpha].</p>
     </div>
 
 </div>
@@ -14570,7 +14570,7 @@ Frellsen, Umberto Picchini, 2021, <a href="https://arxiv.org/abs/2102.06522">htt
 
     <div class="doc doc-contents ">
 
-      <p>This method is called when using <code>copy.deepcopy</code> on the object.</p>
+        <p>This method is called when using <code>copy.deepcopy</code> on the object.</p>
 <p>It defines how the object is copied. We need to overwrite this method, since the
 default implementation does use <strong>getstate</strong> and <strong>setstate</strong> which we overwrite
 to enable pickling (and in particular the necessary modifications are
@@ -14696,7 +14696,7 @@ incompatible deep copying).</p>
 
     <div class="doc doc-contents ">
 
-      <p>This method is called when pickling the object.</p>
+        <p>This method is called when pickling the object.</p>
 <p>It defines what is pickled. We need to overwrite this method, since some parts
 due not support pickle protocols (e.g. due to local functions, etc.).</p>
 
@@ -15137,7 +15137,7 @@ attribute.</p>
 
     <div class="doc doc-contents ">
 
-      <p>This method is called when unpickling the object.</p>
+        <p>This method is called when unpickling the object.</p>
 <p>Especially, we need to restore the removed attributes and ensure that the object
 e.g. remains deep copy compatible.</p>
 
@@ -15220,7 +15220,7 @@ e.g. remains deep copy compatible.</p>
 
     <div class="doc doc-contents ">
 
-      <p>This function will evaluate the quality of the variational posterior
+        <p>This function will evaluate the quality of the variational posterior
 distribution. We currently support two different metrics of type <code>psis</code>, which
 checks the quality based on the tails of importance weights (there should not be
 much with a large one), or <code>prop</code> which checks the proportionality between q
@@ -15330,7 +15330,7 @@ prop, prop_prior].</p>
 
     <div class="doc doc-contents ">
 
-      <p>Returns the log-probability of theta under the variational posterior.</p>
+        <p>Returns the log-probability of theta under the variational posterior.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -15470,7 +15470,7 @@ consumption.</p>
 
     <div class="doc doc-contents ">
 
-      <p>Returns the maximum-a-posteriori estimate (MAP).</p>
+        <p>Returns the maximum-a-posteriori estimate (MAP).</p>
 <p>The method can be interrupted (Ctrl-C) when the user sees that the
 log-probability converges. The best estimate will be saved in <code>self._map</code> and
 can be accessed with <code>self.map()</code>. The MAP is obtained by running gradient
@@ -15824,7 +15824,7 @@ have a cached value.</p>
 
     <div class="doc doc-contents ">
 
-      <p>Samples from the variational posterior distribution.</p>
+        <p>Samples from the variational posterior distribution.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -15940,7 +15940,7 @@ have a cached value.</p>
 
     <div class="doc doc-contents ">
 
-      <p>Defines the variational family.</p>
+        <p>Defines the variational family.</p>
 <p>You can specify over which parameters/modules we optimize. This is required for
 custom distributions which e.g. do not inherit nn.Modules or has the function
 <code>parameters</code> or <code>modules</code> to give direct access to trainable parameters.
@@ -16187,7 +16187,7 @@ is already a <code>VIPosterior</code>, then the arguments will be copied from it
 
     <div class="doc doc-contents ">
 
-      <p>Sets variational inference method.</p>
+        <p>Sets variational inference method.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -16283,7 +16283,7 @@ is already a <code>VIPosterior</code>, then the arguments will be copied from it
 
     <div class="doc doc-contents ">
 
-      <p>This method trains the variational posterior.</p>
+        <p>This method trains the variational posterior.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -16512,7 +16512,7 @@ weight_transform: Callable applied to importance weights (only for fKL)</p>
           </tr>
       </tbody>
     </table>
-      <p>Returns:
+        <p>Returns:
     VIPosterior: <code>VIPosterior</code> (can be used to chain calls).</p>
 
             <details class="quote">

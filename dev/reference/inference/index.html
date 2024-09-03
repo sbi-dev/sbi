@@ -1718,7 +1718,7 @@
 
     <div class="doc doc-contents ">
 
-      <p>NPE-A [1].</p>
+        <p>NPE-A [1].</p>
 <p>[1] <em>Fast epsilon-free Inference of Simulation Models with Bayesian Conditional
     Density Estimation</em>, Papamakarios et al., NeurIPS 2016,
     <a href="https://arxiv.org/abs/1605.06376">https://arxiv.org/abs/1605.06376</a>.</p>
@@ -2034,7 +2034,7 @@ file location (default is <code>&lt;current working directory&gt;/logs</code>.)<
 
     <div class="doc doc-contents ">
 
-      <p>Build posterior from the neural density estimator.</p>
+        <p>Build posterior from the neural density estimator.</p>
 <p>This method first corrects the estimated density with <code>correct_for_proposal</code>
 and then returns a <code>DirectPosterior</code>.</p>
 
@@ -2195,7 +2195,7 @@ If <code>None</code>, use the latest neural density estimator that was trained.<
 
     <div class="doc doc-contents ">
 
-      <p>Build mixture of Gaussians that approximates the posterior.</p>
+        <p>Build mixture of Gaussians that approximates the posterior.</p>
 <p>Returns a <code>NPE_A_MDN</code> object, which applies the posthoc-correction required in
 SNPE-A.</p>
 
@@ -2376,7 +2376,7 @@ If <code>None</code>, use the latest neural density estimator that was trained.<
 
     <div class="doc doc-contents ">
 
-      <p>Return density estimator that approximates the proposal posterior.</p>
+        <p>Return density estimator that approximates the proposal posterior.</p>
 <p>[1] <em>Fast epsilon-free Inference of Simulation Models with Bayesian Conditional
     Density Estimation</em>, Papamakarios et al., NeurIPS 2016,
     <a href="https://arxiv.org/abs/1605.06376">https://arxiv.org/abs/1605.06376</a>.</p>
@@ -4217,7 +4217,7 @@ on the number of mixture components.</p>
 
     <div class="doc doc-contents ">
 
-      <p>NPE-C / APT [1].</p>
+        <p>NPE-C / APT [1].</p>
 <p>[1] <em>Automatic Posterior Transformation for Likelihood-free Inference</em>,
     Greenberg et al., ICML 2019, <a href="https://arxiv.org/abs/1905.07488">https://arxiv.org/abs/1905.07488</a>.</p>
 <p>Like all NPE methods, this method trains a deep neural density estimator to
@@ -4495,7 +4495,7 @@ file location (default is <code>&lt;current working directory&gt;/logs</code>.)<
 
     <div class="doc doc-contents ">
 
-      <p>Return density estimator that approximates the distribution <span class="arithmatex">\(p(\theta|x)\)</span>.</p>
+        <p>Return density estimator that approximates the distribution <span class="arithmatex">\(p(\theta|x)\)</span>.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -4984,7 +4984,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
               Bases: <code><span title="sbi.inference.trainers.base.NeuralInference">NeuralInference</span></code></p>
 
 
-      <p>Implements the Flow Matching Posterior Estimator (FMPE) for
+        <p>Implements the Flow Matching Posterior Estimator (FMPE) for
 simulation-based inference.</p>
 
               <details class="quote">
@@ -5634,7 +5634,7 @@ simulation-based inference.</p>
 
     <div class="doc doc-contents ">
 
-      <p>Initialization method for the FMPE class.</p>
+        <p>Initialization method for the FMPE class.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -5823,7 +5823,7 @@ field for flow matching. Can be a string, e.g., &lsquo;mlp&rsquo; or &lsquo;resn
 
     <div class="doc doc-contents ">
 
-      <p>Build the posterior distribution.</p>
+        <p>Build the posterior distribution.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -6039,7 +6039,7 @@ field for flow matching. Can be a string, e.g., &lsquo;mlp&rsquo; or &lsquo;resn
 
     <div class="doc doc-contents ">
 
-      <p>Train the flow matching estimator.</p>
+        <p>Train the flow matching estimator.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -7639,7 +7639,7 @@ results.</p>
 
     <div class="doc doc-contents ">
 
-      <p>Base class for Neural Posterior Score Estimation methods.</p>
+        <p>Base class for Neural Posterior Score Estimation methods.</p>
 <p>Instead of performing conditonal <em>density</em> estimation, NPSE methods perform
 conditional <em>score</em> estimation i.e. they estimate the gradient of the log
 density using denoising score matching loss.</p>
@@ -7930,7 +7930,7 @@ string.</p>
 
     <div class="doc doc-contents ">
 
-      <p>Store parameters and simulation outputs to use them for later training.</p>
+        <p>Store parameters and simulation outputs to use them for later training.</p>
 <p>Data are stored as entries in lists for each type of variable (parameter/data).</p>
 <p>Stores <span class="arithmatex">\(\theta\)</span>, <span class="arithmatex">\(x\)</span>, prior_masks (indicating if simulations are coming from the
 prior or not) and an index indicating which round the batch of simulations came
@@ -8224,7 +8224,7 @@ much VRAM can set to &lsquo;cpu&rsquo; to store data on system memory instead.</
 
     <div class="doc doc-contents ">
 
-      <p>Build posterior from the score estimator.</p>
+        <p>Build posterior from the score estimator.</p>
 <p>For NPSE, the posterior distribution that is returned here implements the
 following functionality over the raw neural density estimator:
 - correct the calculation of the log probability such that it compensates for
@@ -8449,7 +8449,7 @@ define a probabilistic ODE and solves it with a numerical ODE solver.</p>
 
     <div class="doc doc-contents ">
 
-      <p>Returns a score estimator that approximates the score
+        <p>Returns a score estimator that approximates the score
 <span class="arithmatex">\(\nabla_\theta \log p(\theta|x)\)</span>.</p>
 
 
@@ -9304,7 +9304,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 
     <div class="doc doc-contents ">
 
-      <p>Neural Likelihood Estimation [1].</p>
+        <p>Neural Likelihood Estimation [1].</p>
 <p>[1] Sequential Neural Likelihood: Fast Likelihood-free Inference with
 Autoregressive Flows_, Papamakarios et al., AISTATS 2019,
 <a href="https://arxiv.org/abs/1805.07226">https://arxiv.org/abs/1805.07226</a></p>
@@ -9780,7 +9780,7 @@ sampling.</p>
 
     <div class="doc doc-contents ">
 
-      <p>AALR[1], here known as NRE_A.</p>
+        <p>AALR[1], here known as NRE_A.</p>
 <p>[1] <em>Likelihood-free MCMC with Amortized Approximate Likelihood Ratios</em>, Hermans
     et al., ICML 2020, <a href="https://arxiv.org/abs/1903.04057">https://arxiv.org/abs/1903.04057</a></p>
 
@@ -9984,7 +9984,7 @@ sampling.</p>
 
     <div class="doc doc-contents ">
 
-      <p>Return classifier that approximates the ratio <span class="arithmatex">\(p(\theta,x)/p(\theta)p(x)\)</span>.</p>
+        <p>Return classifier that approximates the ratio <span class="arithmatex">\(p(\theta,x)/p(\theta)p(x)\)</span>.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -10586,7 +10586,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 
     <div class="doc doc-contents ">
 
-      <p>SRE[1], here known as NRE_B.</p>
+        <p>SRE[1], here known as NRE_B.</p>
 <p>[1] <em>On Contrastive Learning for Likelihood-free Inference</em>, Durkan et al.,
     ICML 2020, <a href="https://arxiv.org/pdf/2002.03712">https://arxiv.org/pdf/2002.03712</a></p>
 
@@ -10790,7 +10790,7 @@ sampling.</p>
 
     <div class="doc doc-contents ">
 
-      <p>Return classifier that approximates the ratio <span class="arithmatex">\(p(\theta,x)/p(\theta)p(x)\)</span>.</p>
+        <p>Return classifier that approximates the ratio <span class="arithmatex">\(p(\theta,x)/p(\theta)p(x)\)</span>.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -11548,7 +11548,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 
     <div class="doc doc-contents ">
 
-      <p>NRE-C[1] is a generalization of the non-sequential (amortized) versions of
+        <p>NRE-C[1] is a generalization of the non-sequential (amortized) versions of
 NRE_A and NRE_B. We call the algorithm NRE_C within <code>sbi</code>.</p>
 <p>NRE-C:
 (1) like NRE_B, features a &ldquo;multiclass&rdquo; loss function where several marginally
@@ -11792,7 +11792,7 @@ sampling.</p>
 
     <div class="doc doc-contents ">
 
-      <p>Return classifier that approximates the ratio <span class="arithmatex">\(p(\theta,x)/p(\theta)p(x)\)</span>.</p>
+        <p>Return classifier that approximates the ratio <span class="arithmatex">\(p(\theta,x)/p(\theta)p(x)\)</span>.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -12489,7 +12489,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 
     <div class="doc doc-contents ">
 
-      <p>Balanced neural ratio estimation (BNRE)[1].</p>
+        <p>Balanced neural ratio estimation (BNRE)[1].</p>
 <p>BNRE is a variation of NRE aiming to produce more conservative posterior
 approximations.</p>
 <p>[1] Delaunoy, A., Hermans, J., Rozet, F., Wehenkel, A., &amp; Louppe, G..
@@ -12707,7 +12707,7 @@ sampling.</p>
 
     <div class="doc doc-contents ">
 
-      <p>Return classifier that approximates the ratio <span class="arithmatex">\(p(\theta,x)/p(\theta)p(x)\)</span>.
+        <p>Return classifier that approximates the ratio <span class="arithmatex">\(p(\theta,x)/p(\theta)p(x)\)</span>.
 Args:</p>
 <div class="codehilite"><pre><span></span><code>regularization_strength: The multiplicative coefficient applied to the
     balancing regularizer ($\lambda$).
@@ -12878,7 +12878,7 @@ dataloader_kwargs: Additional or updated kwargs to be passed to the training
               Bases: <code><span title="sbi.inference.abc.abc_base.ABCBASE">ABCBASE</span></code></p>
 
 
-      <p>Monte-Carlo Approximate Bayesian Computation (Rejection ABC).</p>
+        <p>Monte-Carlo Approximate Bayesian Computation (Rejection ABC).</p>
 
               <details class="quote">
                 <summary>Source code in <code>sbi/inference/abc/mcabc.py</code></summary>
@@ -13339,7 +13339,7 @@ dataloader_kwargs: Additional or updated kwargs to be passed to the training
 
     <div class="doc doc-contents ">
 
-      <p>Run MCABC and return accepted parameters or KDE object fitted on them.</p>
+        <p>Run MCABC and return accepted parameters or KDE object fitted on them.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -13915,7 +13915,7 @@ kde True), distances and simulated data x.</p>
 
     <div class="doc doc-contents ">
 
-      <p>Monte-Carlo Approximate Bayesian Computation (Rejection ABC) [1].</p>
+        <p>Monte-Carlo Approximate Bayesian Computation (Rejection ABC) [1].</p>
 <p>[1] Pritchard, J. K., Seielstad, M. T., Perez-Lezaun, A., &amp; Feldman, M. W.
 (1999). Population growth of human Y chromosomes: a study of Y chromosome
 microsatellites. Molecular biology and evolution, 16(12), 1791-1798.</p>
@@ -14205,7 +14205,7 @@ all simulations at the same time.</p>
               Bases: <code><span title="sbi.inference.abc.abc_base.ABCBASE">ABCBASE</span></code></p>
 
 
-      <p>Sequential Monte Carlo Approximate Bayesian Computation.</p>
+        <p>Sequential Monte Carlo Approximate Bayesian Computation.</p>
 
               <details class="quote">
                 <summary>Source code in <code>sbi/inference/abc/smcabc.py</code></summary>
@@ -15786,7 +15786,7 @@ all simulations at the same time.</p>
 
     <div class="doc doc-contents ">
 
-      <p>Run SMCABC and return accepted parameters or KDE object fitted on them.</p>
+        <p>Run SMCABC and return accepted parameters or KDE object fitted on them.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -16624,7 +16624,7 @@ populations.</p>
 
     <div class="doc doc-contents ">
 
-      <p>Sequential Monte Carlo Approximate Bayesian Computation.</p>
+        <p>Sequential Monte Carlo Approximate Bayesian Computation.</p>
 
 
 <details class="we-distinguish-between-three-different-smc-methods-here" open>
@@ -16634,7 +16634,7 @@ populations.</p>
 <li>B: Sisson et al. 2007 (with correction from 2009)</li>
 <li>C: Beaumont et al. 2009</li>
 </ul>
-</details>      <p>In Toni et al. 2010 we find an overview of the differences on page 34:
+</details>        <p>In Toni et al. 2010 we find an overview of the differences on page 34:
     - B: same as A except for resampling of weights if the effective sampling
         size is too small.
     - C: same as A except for calculation of the covariance of the perturbation
@@ -17033,7 +17033,7 @@ sampling.</p>
 
     <div class="doc doc-contents ">
 
-      <p>Return kernel variance for a given population of particles and weights.</p>
+        <p>Return kernel variance for a given population of particles and weights.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/abc/smcabc.py</code></summary>
@@ -17137,7 +17137,7 @@ sampling.</p>
 
     <div class="doc doc-contents ">
 
-      <p>Return new kernel distribution for a given set of paramters.</p>
+        <p>Return new kernel distribution for a given set of paramters.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/abc/smcabc.py</code></summary>
@@ -17193,7 +17193,7 @@ sampling.</p>
 
     <div class="doc doc-contents ">
 
-      <p>Return range of particles in each parameter dimension.</p>
+        <p>Return range of particles in each parameter dimension.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/abc/smcabc.py</code></summary>
@@ -17245,7 +17245,7 @@ sampling.</p>
 
     <div class="doc doc-contents ">
 
-      <p>Return resampled particles and uniform weights if effectice sampling size is
+        <p>Return resampled particles and uniform weights if effectice sampling size is
 too small.</p>
 
             <details class="quote">
@@ -17312,7 +17312,7 @@ too small.</p>
 
     <div class="doc doc-contents ">
 
-      <p>Return particles and weights adjusted with LRA.</p>
+        <p>Return particles and weights adjusted with LRA.</p>
 <p>Runs (weighted) linear regression from xs onto particles to adjust the
 particles.</p>
 <p>Updates the SMC weights according to the new particles.</p>
@@ -17397,7 +17397,7 @@ particles.</p>
 
     <div class="doc doc-contents ">
 
-      <p>Return transform for semi-automatic summary statistics.</p>
+        <p>Return transform for semi-automatic summary statistics.</p>
 <p>Runs an single round of rejection abc with fixed budget and accepts
 num_particles simulations to run the regression for sass.</p>
 <p>Sets self.x_o once the x_shape can be derived from simulations.</p>
@@ -17496,7 +17496,7 @@ num_particles simulations to run the regression for sass.</p>
 
     <div class="doc doc-contents ">
 
-      <p>Return samples from particles sampled with weights.</p>
+        <p>Return samples from particles sampled with weights.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/abc/smcabc.py</code></summary>
@@ -17553,7 +17553,7 @@ num_particles simulations to run the regression for sass.</p>
 
     <div class="doc doc-contents first">
 
-      <p>Returns (<span class="arithmatex">\(\theta, x\)</span>) pairs obtained from sampling the proposal and simulating.</p>
+        <p>Returns (<span class="arithmatex">\(\theta, x\)</span>) pairs obtained from sampling the proposal and simulating.</p>
 <p>This function performs two steps:</p>
 <ul>
 <li>Sample parameters <span class="arithmatex">\(\theta\)</span> from the <code>proposal</code>.</li>
@@ -17685,7 +17685,7 @@ proposal.</p>
           </tr>
       </tbody>
     </table>
-      <p>Returns: Sampled parameters <span class="arithmatex">\(\theta\)</span> and simulation-outputs <span class="arithmatex">\(x\)</span>.</p>
+        <p>Returns: Sampled parameters <span class="arithmatex">\(\theta\)</span> and simulation-outputs <span class="arithmatex">\(x\)</span>.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/utils/simulation_utils.py</code></summary>
@@ -17903,7 +17903,7 @@ proposal.</p>
 
     <div class="doc doc-contents first">
 
-      <p>Return PyTorch distribution-like prior from user-provided prior.</p>
+        <p>Return PyTorch distribution-like prior from user-provided prior.</p>
 <p>NOTE: If the prior argument is a sequence of PyTorch distributions, they will be
 interpreted as independent prior dimensions wrapped in a <code>MultipleIndependent</code>
 pytorch Distribution. In case the elements are not PyTorch distributions, make sure
@@ -18163,7 +18163,7 @@ constraints.
 
     <div class="doc doc-contents first">
 
-      <p>Returns a simulator that meets the requirements for usage in sbi.</p>
+        <p>Returns a simulator that meets the requirements for usage in sbi.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
