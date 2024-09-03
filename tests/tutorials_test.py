@@ -11,7 +11,7 @@ def list_notebooks(directory: str) -> list:
     notebooks = [
         os.path.join(directory, f)
         for f in os.listdir(directory)
-        if f.endswith("distributions.ipynb")
+        if f.endswith(".ipynb")
     ]
     return sorted(notebooks)
 
