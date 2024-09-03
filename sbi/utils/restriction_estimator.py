@@ -606,7 +606,7 @@ class AcceptRejectFunction:
         return fraction_false_positives
 
 
-class RestrictedPrior:
+class RestrictedPrior(Distribution):
     def __init__(
         self,
         prior: Distribution,
@@ -620,9 +620,9 @@ class RestrictedPrior:
 
         References:
         - Deistler et al. (2022): "Energy-efficient network activity from disparate
-        circuit parameters"
+          circuit parameters"
         - Deistler et al. (2022): "Truncated proposals for scalable and hassle-free
-        simulation-based inference"
+          simulation-based inference"
 
         Args:
             prior: Prior distribution, will be used as proposal distribution whose
@@ -635,13 +635,13 @@ class RestrictedPrior:
                 a `posterior` at initialization.
             device: Device used for sampling and evaluating.
         """
-
+        super().__init__(validate_args=False)
         self._prior = prior
         self._accept_reject_fn = accept_reject_fn
-        self._posterior = posterior
-        self.acceptance_rate = None
-        self._device = device
+        self._posterior = posterior  # Only used for SIR.
         self._sample_with = sample_with
+        self._device = device
+        self.acceptance_rate = None  # Only defined for rejection sampling.
 
     def sample(
         self,
@@ -694,23 +694,20 @@ class RestrictedPrior:
             )
             if save_acceptance_rate:
                 self.acceptance_rate = torch.as_tensor(acceptance_rate)
-            print(
-                f"""The `RestrictedPrior` rejected {(1.0 - acceptance_rate) * 100:.1f}%
-                of prior samples. You will get a speed-up of
-                {(1.0 / acceptance_rate - 1.0) * 100:.1f}%."""
-            )
+            if print_rejected_frac:
+                print(
+                    f"The `RestrictedPrior` rejected "
+                    f"{(1.0 - acceptance_rate) * 100:.1f}% of prior samples. You will "
+                    f"get a speed-up of {(1.0 / acceptance_rate - 1.0) * 100:.1f}%."
+                )
         elif sample_with == "sir":
             assert self._posterior is not None, (
                 "In order to use SIR sampling, you must provide a `posterior`: "
                 "`RestrictionEstimator(..., posterior=posterior)`."
             )
-            num_samples = torch.Size(sample_shape).numel()
 
-            accept_reject_fn = lambda theta: self._accept_reject_fn(theta).type(
-                torch.float32
-            )
             samples = sampling_importance_resampling(
-                accept_reject_fn,
+                self._accept_reject_fn,
                 proposal=self._posterior,
                 num_samples=num_samples,
                 oversampling_factor=oversampling_factor,
@@ -758,10 +755,10 @@ class RestrictedPrior:
         with torch.set_grad_enabled(track_gradients):
             # Evaluate on device, move back to cpu for comparison with prior.
             prior_log_prob = self._prior.log_prob(theta)
-            accepted_by_classifer = self._accept_reject_fn(theta)
+            accepted = self._accept_reject_fn(theta).bool()
 
             masked_log_prob = torch.where(
-                accepted_by_classifer.bool(),
+                accepted,
                 prior_log_prob,
                 torch.tensor(float("-inf"), dtype=torch.float32),
             )
@@ -784,24 +781,48 @@ class RestrictedPrior:
         show_progress_bars: bool = False,
         rejection_sampling_batch_size: int = 10_000,
     ) -> Tensor:
-        r"""Return the fraction of prior samples accepted by the classifier.
+        """
+        Return the fraction of prior samples accepted by the classifier.
 
         The factor is estimated from the acceptance probability during rejection
         sampling from the prior.
 
-        Arguments:
-            num_rejection_samples: Number of samples used to estimate correction factor.
-            show_progress_bars: Whether to show a progress bar during sampling.
+        Args:
+            num_rejection_samples: Number of samples to estimate the acceptance rate.
+            force_update: Whether to force update the acceptance rate.
+            show_progress_bars: Whether to show progress bars during sampling.
             rejection_sampling_batch_size: Batch size for rejection sampling.
 
         Returns:
-            Estimated acceptance rate.
+            Tensor of the estimated acceptance rate.
         """
         if self.acceptance_rate is None or force_update:
-            _ = self.sample(
-                (num_rejection_samples,),
+            self.sample(
+                sample_shape=torch.Size((num_rejection_samples,)),
+                sample_with="rejection",
                 show_progress_bars=show_progress_bars,
                 max_sampling_batch_size=rejection_sampling_batch_size,
                 save_acceptance_rate=True,
             )
-        return self.acceptance_rate  # type:ignore
+        # after calling sample, self.acceptance_rate will be a Tensor.
+        return self.acceptance_rate  # type: ignore
+
+    @property
+    def mean(self) -> Tensor:
+        """Mean of the restricted prior (not implemented)."""
+        raise NotImplementedError("Mean is not implemented for RestrictedPrior.")
+
+    @property
+    def variance(self) -> Tensor:
+        """Variance of the restricted prior (not implemented)."""
+        raise NotImplementedError("Variance is not implemented for RestrictedPrior.")
+
+    @property
+    def support(self):
+        # Return base prior's support or raise an error
+        try:
+            return self._prior.support
+        except AttributeError as e:
+            raise NotImplementedError(
+                "Support is not implemented for this RestrictedPrior."
+            ) from e

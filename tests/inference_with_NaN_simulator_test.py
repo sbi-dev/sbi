@@ -157,13 +157,18 @@ def test_inference_with_restriction_estimator():
 
     all_theta, all_x, _ = restriction_estimator.get_simulations()
 
+    # test passing restricted prior to inference and using process_prior, see #790.
+    restricted_prior = restriction_estimator.restrict_prior()
+    prior = process_prior(restricted_prior)[0]
+
     # Any method can be used in combination with the `RejectionEstimator`.
     inference = NPE_C(prior=prior)
     posterior_estimator = inference.append_simulations(all_theta, all_x).train()
 
     # Build posterior.
     posterior = DirectPosterior(
-        prior=prior, posterior_estimator=posterior_estimator
+        prior=prior,
+        posterior_estimator=posterior_estimator,
     ).set_default_x(x_o)
 
     samples = posterior.sample((num_samples,))
@@ -198,12 +203,15 @@ def test_restricted_prior_log_prob(prior):
     _ = restriction_estimator.train(max_num_epochs=40)
     restricted_prior = restriction_estimator.restrict_prior()
 
+    # test restricted prior log_prob
+    restricted_prior, _, _ = process_prior(restricted_prior)
+
     def integrate_grid(distribution):
         resolution = 500
         range_ = 4
         x = torch.linspace(-range_, range_, resolution)
         y = torch.linspace(-range_, range_, resolution)
-        X, Y = torch.meshgrid(x, y)
+        X, Y = torch.meshgrid(x, y, indexing="ij")
         xy = torch.stack([X, Y])
         xy = torch.reshape(xy, (2, resolution**2)).T
         dist_on_grid = torch.exp(distribution.log_prob(xy))
