@@ -35,7 +35,7 @@ from tests.test_utils import check_c2st
         pytest.param(
             2,
             marks=pytest.mark.xfail(
-                raises=AssertionError,
+                raises=ValueError,
                 reason=".log_prob() supports only batch size 1 for x_o.",
             ),
         ),
