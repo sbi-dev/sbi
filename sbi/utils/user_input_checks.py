@@ -12,7 +12,7 @@ from torch import Tensor, float32, nn
 from torch.distributions import Distribution, Uniform
 
 from sbi.sbi_types import Array
-from sbi.utils.sbiutils import warn_on_batched_x, within_support
+from sbi.utils.sbiutils import within_support
 from sbi.utils.torchutils import BoxUniform, atleast_2d
 from sbi.utils.user_input_checks_utils import (
     CustomPriorWrapper,
@@ -582,7 +582,6 @@ def process_x(x: Array, x_event_shape: Optional[torch.Size] = None) -> Tensor:
         x = x.unsqueeze(0)
 
     input_x_shape = x.shape
-    warn_on_batched_x(batch_size=input_x_shape[0])
 
     if x_event_shape is not None:
         # Number of trials can change for every new x, but single trial x shape must
