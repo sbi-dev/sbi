@@ -49,18 +49,18 @@ dependencies = [
 [project.optional-dependencies]
 doc = [
     # Documentation
-    "jupyter_contrib_nbextensions",
-    "notebook <= 6.4.12",
-    "nbconvert",
-    "nbformat",
-    "traitlets <= 5.9.0",
     "ipython <= 8.9.0",
+    "jupyter_contrib_nbextensions",
+    "mike",
     "mkdocs",
-    "mkdocs-material",
     "markdown-include",
+    "mkdocs-material",
     "mkdocs-redirects",
     "mkdocstrings[python] >= 0.18",
-    "mike"
+    "nbconvert",
+    "nbformat",
+    "notebook <= 6.4.12",
+    "traitlets <= 5.9.0",
 ]
 dev = [
     "ffmpeg",
