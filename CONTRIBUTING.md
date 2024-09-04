@@ -2,4 +2,4 @@
 
 The latest contributing guide is available in the repository at `docs/contribute.md`, or online at:
 
-[https://sbi-dev.github.io/sbi/contribute/](https://sbi-dev.github.io/sbi/contribute/)
+[sbi-dev.github.io/sbi/latest/contribute/](https://sbi-dev.github.io/sbi/latest/contribute/)
