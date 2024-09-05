@@ -706,8 +706,14 @@ class RestrictedPrior(Distribution):
                 "`RestrictionEstimator(..., posterior=posterior)`."
             )
 
+            num_samples = torch.Size(sample_shape).numel()
+
+            accept_reject_fn = lambda theta: self._accept_reject_fn(theta).type(
+                torch.float32
+            )
+
             samples = sampling_importance_resampling(
-                self._accept_reject_fn,
+                accept_reject_fn,
                 proposal=self._posterior,
                 num_samples=num_samples,
                 oversampling_factor=oversampling_factor,
