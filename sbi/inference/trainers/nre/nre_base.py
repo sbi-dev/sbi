@@ -21,7 +21,6 @@ from sbi.utils import (
     check_estimator_arg,
     check_prior,
     clamp_and_warn,
-    x_shape_from_simulation,
 )
 from sbi.utils.torchutils import repeat_rows
 
@@ -203,7 +202,6 @@ class RatioEstimator(NeuralInference, ABC):
                 theta[self.train_indices].to("cpu"),
                 x[self.train_indices].to("cpu"),
             )
-            self._x_shape = x_shape_from_simulation(x.to("cpu"))
             del x, theta
         self._neural_net.to(self._device)
 

@@ -96,7 +96,6 @@ class EnsemblePosterior(NeuralPosterior):
             potential_fn=potential_fn,
             theta_transform=theta_transform,
             device=device,
-            x_shape=None,
         )
 
     def ensure_same_device(self, posteriors: List) -> str:

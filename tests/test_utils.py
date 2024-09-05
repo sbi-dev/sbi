@@ -219,7 +219,6 @@ class TractablePosterior(NeuralPosterior):
         potential_fn: Callable,
         theta_transform: Optional[TorchTransform] = None,
         device: Optional[str] = "cpu",
-        x_shape: Optional[torch.Size] = None,
     ):
         """
         Args:
@@ -228,10 +227,9 @@ class TractablePosterior(NeuralPosterior):
                 Allows to perform, e.g. MCMC in unconstrained space.
             device: Training device, e.g., "cpu", "cuda" or "cuda:0". If None,
                 `potential_fn.device` is used.
-            x_shape: Shape of the observed data.
         """
         assert isinstance(potential_fn, PosteriorPotential)
-        super().__init__(potential_fn, theta_transform, device, x_shape)
+        super().__init__(potential_fn, theta_transform, device)
 
     def sample(
         self,
