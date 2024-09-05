@@ -29,15 +29,16 @@ class CategoricalMADE(MADE):
         use_batch_norm=False,
         epsilon=1e-2,
         custom_initialization=True,
+        #TODO: embedding_net: Optional[nn.Module] = None,
     ):
 
         if use_residual_blocks and random_mask:
             raise ValueError("Residual blocks can't be used with random masks.")
 
         self.num_variables = len(categories)
-        self.max_categories = max(categories)
+        self.num_categories = int(max(categories))
         self.categories = categories
-        self.mask = torch.zeros(self.num_variables, self.max_categories)
+        self.mask = torch.zeros(self.num_variables, self.num_categories)
         for i, c in enumerate(categories):
             self.mask[i, :c] = 1
 
@@ -46,7 +47,7 @@ class CategoricalMADE(MADE):
             hidden_features,
             context_features=context_features,
             num_blocks=num_blocks,
-            output_multiplier=self.max_categories,
+            output_multiplier=self.num_categories,
             use_residual_blocks=use_residual_blocks,
             random_mask=random_mask,
             activation=activation,
@@ -68,10 +69,10 @@ class CategoricalMADE(MADE):
         ps = ps / ps.sum(dim=-1, keepdim=True)
         return ps
         
-    # outputs (batch_size, num_variables, max_categories)
+    # outputs (batch_size, num_variables, num_categories)
     def log_prob(self, inputs, context=None):
         outputs = self.forward(inputs, context=context)
-        outputs = outputs.reshape(*inputs.shape, self.max_categories)
+        outputs = outputs.reshape(*inputs.shape, self.num_categories)
         ps = self.compute_probs(outputs)
         
         # categorical log prob
@@ -91,7 +92,7 @@ class CategoricalMADE(MADE):
 
             for variable in range(self.num_variables):
                 outputs = self.forward(samples, context)
-                outputs = outputs.reshape(*samples.shape, self.max_categories)
+                outputs = outputs.reshape(*samples.shape, self.num_categories)
                 ps = self.compute_probs(outputs)
                 samples[:, variable] = Categorical(probs=ps[:,variable]).sample()
 
