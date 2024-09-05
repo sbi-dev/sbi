@@ -539,6 +539,10 @@
 
 <span class="c1"># sample from posterior</span>
 <span class="n">theta_inferred</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">10_000</span><span class="p">,))</span>
+
+<span class="c1"># get samples from ground-truth posterior</span>
+<span class="n">gt_samples</span> <span class="o">=</span> <span class="n">MultivariateNormal</span><span class="p">(</span><span class="n">observation</span><span class="p">,</span> <span class="n">eye</span><span class="p">(</span><span class="mi">2</span><span class="p">))</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">theta_inferred</span><span class="p">)</span> <span class="o">*</span> <span class="mi">5</span><span class="p">,))</span>
+<span class="n">gt_samples</span> <span class="o">=</span> <span class="n">gt_samples</span><span class="p">[</span><span class="n">prior</span><span class="o">.</span><span class="n">support</span><span class="o">.</span><span class="n">check</span><span class="p">(</span><span class="n">gt_samples</span><span class="p">)][:</span><span class="nb">len</span><span class="p">(</span><span class="n">theta_inferred</span><span class="p">)]</span>
 </code></pre></div>
 <div class="codehilite"><pre><span></span><code> Neural network successfully converged after 70 epochs.observations.shape torch.Size([2])
 

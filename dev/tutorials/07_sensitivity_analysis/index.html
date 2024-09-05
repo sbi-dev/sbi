@@ -531,9 +531,6 @@
 
 <span class="n">_</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>WARNING (pytensor.tensor.blas): Using NumPy C-API based implementation for BLAS functions.
-</code></pre></div>
-
 <p>Let&rsquo;s define a simple Gaussian toy example:</p>
 <div class="highlight"><pre><span></span><code><span class="n">prior</span> <span class="o">=</span> <span class="n">MultivariateNormal</span><span class="p">(</span><span class="mf">0.0</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">2</span><span class="p">),</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="mi">2</span><span class="p">))</span>
 
@@ -543,24 +540,18 @@
         <span class="n">theta</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.8</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">2</span><span class="p">),</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([[</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">0.98</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.98</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">]])</span>
     <span class="p">)</span>
 
-
-<span class="n">theta</span> <span class="o">=</span> <span class="n">prior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">2000</span><span class="p">,))</span>
-<span class="n">x</span> <span class="o">=</span> <span class="n">simulator</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+<span class="n">num_simulations</span> <span class="o">=</span> <span class="mi">2000</span>
+<span class="n">theta</span> <span class="o">=</span> <span class="n">prior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_simulations</span><span class="p">,))</span>
+<span class="n">x</span> <span class="o">=</span> <span class="n">simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
 <span class="n">inference</span> <span class="o">=</span> <span class="n">NPE</span><span class="p">(</span><span class="n">prior</span><span class="p">)</span>
 <span class="n">_</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
 <span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">()</span><span class="o">.</span><span class="n">set_default_x</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">2</span><span class="p">))</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>  0%|          | 0/2000 [00:00&lt;?, ?it/s]
-
-
- Neural network successfully converged after 89 epochs.
+<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 185 epochs.
 </code></pre></div>
 
 <div class="highlight"><pre><span></span><code><span class="n">posterior_samples</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">2000</span><span class="p">,))</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>Drawing 2000 posterior samples:   0%|          | 0/2000 [00:00&lt;?, ?it/s]
-</code></pre></div>
-
 <div class="highlight"><pre><span></span><code><span class="n">_</span> <span class="o">=</span> <span class="n">pairplot</span><span class="p">(</span><span class="n">posterior_samples</span><span class="p">,</span> <span class="n">limits</span><span class="o">=</span><span class="p">[[</span><span class="o">-</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">]],</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">4</span><span class="p">))</span>
 </code></pre></div>
 <p><img alt="png" src="../07_sensitivity_analysis_files/07_sensitivity_analysis_8_0.png" /></p>
@@ -568,9 +559,6 @@
 <div class="highlight"><pre><span></span><code><span class="n">sensitivity</span> <span class="o">=</span> <span class="n">ActiveSubspace</span><span class="p">(</span><span class="n">posterior</span><span class="p">)</span>
 <span class="n">e_vals</span><span class="p">,</span> <span class="n">e_vecs</span> <span class="o">=</span> <span class="n">sensitivity</span><span class="o">.</span><span class="n">find_directions</span><span class="p">(</span><span class="n">posterior_log_prob_as_property</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>Drawing 1000 posterior samples:   0%|          | 0/1000 [00:00&lt;?, ?it/s]
-</code></pre></div>
-
 <p>The method <code>.find_active()</code> returns eigenvalues and the corresponding eigenvectors. It does so by computing the matrix:</p>
 <p><span class="arithmatex">\(M = \mathbb{E}_{p(\theta|x_o)}[\nabla_{\theta}p(\theta|x_o)^T \nabla_{\theta}p(\theta|x_o)\)</span>]</p>
 <p>It then does an eigendecomposition:
@@ -580,11 +568,11 @@
 <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Eigenvectors: </span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">e_vecs</span><span class="p">)</span>
 </code></pre></div>
 <div class="codehilite"><pre><span></span><code>Eigenvalues: 
- tensor([2.6168e-06, 1.3167e-04])
+ tensor([5.2963e-07, 8.0295e-05])
 
 Eigenvectors: 
- tensor([[ 0.7017,  0.7124],
-        [ 0.7124, -0.7017]])
+ tensor([[ 0.7201,  0.6939],
+        [ 0.6939, -0.7201]])
 </code></pre></div>
 
 <p>Lastly, we can project the data into the active dimensions. In this case, we will just use one active dimension:</p>
@@ -610,52 +598,37 @@ Eigenvectors:
 <span class="n">_</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
 <span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">()</span><span class="o">.</span><span class="n">set_default_x</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">2</span><span class="p">))</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>  0%|          | 0/2000 [00:00&lt;?, ?it/s]
-
-
- Neural network successfully converged after 89 epochs.
+<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 75 epochs.
 </code></pre></div>
 
 <div class="highlight"><pre><span></span><code><span class="n">_</span> <span class="o">=</span> <span class="n">pairplot</span><span class="p">(</span><span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">10_000</span><span class="p">,)),</span> <span class="n">limits</span><span class="o">=</span><span class="p">[[</span><span class="o">-</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">]],</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">4</span><span class="p">))</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>Drawing 10000 posterior samples:   0%|          | 0/10000 [00:00&lt;?, ?it/s]
-</code></pre></div>
-
-<p><img alt="png" src="../07_sensitivity_analysis_files/07_sensitivity_analysis_18_1.png" /></p>
+<p><img alt="png" src="../07_sensitivity_analysis_files/07_sensitivity_analysis_18_0.png" /></p>
 <div class="highlight"><pre><span></span><code><span class="n">sensitivity</span> <span class="o">=</span> <span class="n">ActiveSubspace</span><span class="p">(</span><span class="n">posterior</span><span class="p">)</span>
 </code></pre></div>
 <p>This time, we begin by drawing samples from the posterior and then computing the desired property for each of the samples (i.e. you will probably have to run simulations for each theta and extract the property from the simulation output). As an example, we assume that the property is just the cube of the first dimension of the simulation output:</p>
-<div class="highlight"><pre><span></span><code><span class="n">theta</span><span class="p">,</span> <span class="n">x</span> <span class="o">=</span> <span class="n">simulate_for_sbi</span><span class="p">(</span><span class="n">simulator</span><span class="p">,</span> <span class="n">posterior</span><span class="p">,</span> <span class="mi">5000</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><span class="n">theta</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">5000</span><span class="p">,))</span>
+<span class="n">x</span> <span class="o">=</span> <span class="n">simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
 <span class="n">property_</span> <span class="o">=</span> <span class="n">x</span><span class="p">[:,</span> <span class="p">:</span><span class="mi">1</span><span class="p">]</span> <span class="o">**</span> <span class="mi">3</span>  <span class="c1"># E.g. metabolic cost.</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>Drawing 5000 posterior samples:   0%|          | 0/5000 [00:00&lt;?, ?it/s]
-
-
-
-  0%|          | 0/5000 [00:00&lt;?, ?it/s]
-</code></pre></div>
-
 <p>To investigate the sensitivity of a given parameter, we train a neural network to predict the <code>property_</code> from the parameters and then analyse the neural network as above:</p>
 <p><span class="arithmatex">\(M = \mathbb{E}_{p(\theta|x_o)}[\nabla_{\theta}f(\theta)^T \nabla_{\theta}f(\theta)\)</span>]</p>
 <p>where <span class="arithmatex">\(f(\cdot)\)</span> is the trained neural network.</p>
 <div class="highlight"><pre><span></span><code><span class="n">_</span> <span class="o">=</span> <span class="n">sensitivity</span><span class="o">.</span><span class="n">add_property</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">property_</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
 <span class="n">e_vals</span><span class="p">,</span> <span class="n">e_vecs</span> <span class="o">=</span> <span class="n">sensitivity</span><span class="o">.</span><span class="n">find_directions</span><span class="p">()</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code> Training neural network. Epochs trained:  25
-
-
-Drawing 1000 posterior samples:   0%|          | 0/1000 [00:00&lt;?, ?it/s]
+<div class="codehilite"><pre><span></span><code> Training neural network. Epochs trained:  29
 </code></pre></div>
 
 <div class="highlight"><pre><span></span><code><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Eigenvalues: </span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">e_vals</span><span class="p">,</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Eigenvectors: </span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">e_vecs</span><span class="p">)</span>
 </code></pre></div>
 <div class="codehilite"><pre><span></span><code>Eigenvalues: 
- tensor([1.7050e-06, 5.7066e-05])
+ tensor([2.2571e-06, 2.3152e-04])
 
 Eigenvectors: 
- tensor([[-0.1732,  0.9849],
-        [ 0.9849,  0.1732]])
+ tensor([[ 0.0278,  0.9996],
+        [ 0.9996, -0.0278]])
 </code></pre></div>
 
 <p>As we can see, one of the eigenvalues is much smaller than the other one. The larger eigenvalue represents (approximately) the vector <code>[1.0, 0.0]</code>. This makes sense, because only the <code>property_</code> is influenced only by the first output which, in turn, is influenced only by the first parameter.</p>
