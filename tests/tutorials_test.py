@@ -32,8 +32,10 @@ def test_tutorials(notebook_path):
             if "Requested MovieWriter" in str(e):
                 print("Skipping error in movie writer.")
             else:
-                raise CellExecutionError from e
+                raise RuntimeError(
+                    f"Error executing the notebook {notebook_path}: {e}"
+                ) from e
         except Exception as e:
-            raise AssertionError(
+            raise RuntimeError(
                 f"Error executing the notebook {notebook_path}: {e}"
             ) from e
