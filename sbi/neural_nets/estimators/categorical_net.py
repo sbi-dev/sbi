@@ -4,12 +4,103 @@
 from typing import Optional
 
 import torch
-from torch import Tensor, nn
+from torch import Tensor, nn, distributions
 from torch.distributions import Categorical
 from torch.nn import Sigmoid, Softmax
 
 from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
+from nflows.nn.nde.made import MADE
+from torch.nn import functional as F
+from nflows.utils import torchutils
+import numpy as np
 
+
+class CategoricalMADE(MADE):
+    def __init__(
+        self,
+        categories, # List[int] or Tensor[int]
+        hidden_features,
+        context_features=None,
+        num_blocks=2,
+        use_residual_blocks=True,
+        random_mask=False,
+        activation=F.relu,
+        dropout_probability=0.0,
+        use_batch_norm=False,
+        epsilon=1e-2,
+        custom_initialization=True,
+    ):
+
+        if use_residual_blocks and random_mask:
+            raise ValueError("Residual blocks can't be used with random masks.")
+
+        self.num_variables = len(categories)
+        self.max_categories = max(categories)
+        self.categories = categories
+
+        super().__init__(
+            self.num_variables,
+            hidden_features,
+            context_features=context_features,
+            num_blocks=num_blocks,
+            output_multiplier=self.max_categories,
+            use_residual_blocks=use_residual_blocks,
+            random_mask=random_mask,
+            activation=activation,
+            dropout_probability=dropout_probability,
+            use_batch_norm=use_batch_norm,
+        )
+
+        self.hidden_features = hidden_features
+        self.epsilon = epsilon
+
+        if custom_initialization:
+            self._initialize()
+
+    def forward(self, inputs, context=None):
+        return super().forward(inputs, context=context)
+    
+    def log_prob(self, inputs, context=None):
+        outputs = self.forward(inputs, context=context)
+        outputs = outputs.reshape(*inputs.shape, self.max_categories)
+        ps = F.softmax(outputs, dim=-1)
+
+        # TODO: trim the outputs to the actual number of categories
+        # outputs (batch_size, num_variables, max_categories)
+
+        log_prob = torch.zeros(inputs.shape[0])
+        for variable in range(self.num_variables):
+            ps_var = ps[:, variable, :self.categories[variable]] # trim the outputs to the actual number of categories
+            log_prob += Categorical(probs=ps_var).log_prob(input.squeeze(dim=-1))        
+        return log_prob
+
+    def sample(self, num_samples, context=None):
+
+        if context is not None:
+            context = torchutils.repeat_rows(context, num_samples)
+
+        with torch.no_grad():
+            
+            samples = torch.zeros(context.shape[0], self.num_variables)
+
+            for variable in range(self.num_variables):
+                outputs = self.forward(samples, context)
+                outputs = outputs.reshape(*samples.shape, self.max_categories)
+                ps = F.softmax(outputs, dim=-1)
+                ps_var = ps[:, variable, :self.categories[variable]]  # trim the outputs to the actual number of categories
+                samples[:, variable] = Categorical(probs=ps_var).sample(sample_shape=torch.Size(num_samples,)).detach()
+
+        return samples.reshape(-1, num_samples, self.num_variables)
+
+    def _initialize(self):
+        # TODO: initialize the weights and biases properly
+        # TODO: set empty categories to zero
+        self.final_layer.weight.data = self.epsilon * torch.randn(
+            self.num_variables * self.max_categories, self.hidden_features
+        )
+        self.final_layer.bias.data = self.epsilon * torch.randn(
+            self.num_variables * self.max_categories
+        )
 
 class CategoricalNet(nn.Module):
     """Conditional density (mass) estimation for a categorical random variable.
