@@ -37,6 +37,9 @@ class CategoricalMADE(MADE):
         self.num_variables = len(categories)
         self.max_categories = max(categories)
         self.categories = categories
+        self.mask = torch.zeros(self.num_variables, self.max_categories)
+        for i, c in enumerate(categories):
+            self.mask[i, :c] = 1
 
         super().__init__(
             self.num_variables,
@@ -60,18 +63,21 @@ class CategoricalMADE(MADE):
     def forward(self, inputs, context=None):
         return super().forward(inputs, context=context)
     
+    def compute_probs(self, outputs):
+        ps = F.softmax(outputs, dim=-1)*self.mask
+        ps = ps / ps.sum(dim=-1, keepdim=True)
+        return ps
+        
+    # outputs (batch_size, num_variables, max_categories)
     def log_prob(self, inputs, context=None):
         outputs = self.forward(inputs, context=context)
         outputs = outputs.reshape(*inputs.shape, self.max_categories)
-        ps = F.softmax(outputs, dim=-1)
-
-        # TODO: trim the outputs to the actual number of categories
-        # outputs (batch_size, num_variables, max_categories)
-
-        log_prob = torch.zeros(inputs.shape[0])
-        for variable in range(self.num_variables):
-            ps_var = ps[:, variable, :self.categories[variable]] # trim the outputs to the actual number of categories
-            log_prob += Categorical(probs=ps_var).log_prob(input.squeeze(dim=-1))        
+        ps = self.compute_probs(outputs)
+        
+        # categorical log prob
+        log_prob = torch.log(ps.gather(-1, inputs.unsqueeze(-1).long()).squeeze(-1))
+        log_prob = log_prob.sum(dim=-1)
+       
         return log_prob
 
     def sample(self, num_samples, context=None):
@@ -86,21 +92,13 @@ class CategoricalMADE(MADE):
             for variable in range(self.num_variables):
                 outputs = self.forward(samples, context)
                 outputs = outputs.reshape(*samples.shape, self.max_categories)
-                ps = F.softmax(outputs, dim=-1)
-                ps_var = ps[:, variable, :self.categories[variable]]  # trim the outputs to the actual number of categories
-                samples[:, variable] = Categorical(probs=ps_var).sample(sample_shape=torch.Size(num_samples,)).detach()
+                ps = self.compute_probs(outputs)
+                samples[:, variable] = Categorical(probs=ps[:,variable]).sample()
 
         return samples.reshape(-1, num_samples, self.num_variables)
 
     def _initialize(self):
-        # TODO: initialize the weights and biases properly
-        # TODO: set empty categories to zero
-        self.final_layer.weight.data = self.epsilon * torch.randn(
-            self.num_variables * self.max_categories, self.hidden_features
-        )
-        self.final_layer.bias.data = self.epsilon * torch.randn(
-            self.num_variables * self.max_categories
-        )
+        pass
 
 class CategoricalNet(nn.Module):
     """Conditional density (mass) estimation for a categorical random variable.
