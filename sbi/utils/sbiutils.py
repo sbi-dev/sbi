@@ -402,21 +402,6 @@ def nle_nre_apt_msg_on_invalid_x(
             )
 
 
-def warn_on_batched_x(batch_size):
-    """Warn if more than one x was passed."""
-
-    if batch_size > 1:
-        warnings.warn(
-            f"An x with a batch size of {batch_size} was passed. "
-            "Unless you are using `sample_batched` or `log_prob_batched`, this will "
-            "be interpreted as a batch of independent and identically distributed data"
-            " X={x_1, ..., x_n}, i.e., data generated based on the same underlying"
-            "(unknown) parameter. The resulting posterior will be with respect to"
-            " the entire batch, i.e,. p(theta | X).",
-            stacklevel=2,
-        )
-
-
 def check_warn_and_setstate(
     state_dict: Dict,
     key_name: str,
