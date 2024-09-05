@@ -509,9 +509,6 @@
     <span class="n">process_simulator</span><span class="p">,</span>
 <span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>WARNING (pytensor.tensor.blas): Using NumPy C-API based implementation for BLAS functions.
-</code></pre></div>
-
 <h2 id="defining-simulator-prior-and-running-inference">Defining simulator, prior, and running inference<a class="headerlink" href="#defining-simulator-prior-and-running-inference" title="Permanent link">&para;</a></h2>
 <p>Our  <em>simulator</em> (model) takes in 3 parameters (<span class="arithmatex">\(\theta\)</span>) and outputs simulations of the same dimensionality. It adds 1.0 and some Gaussian noise to the parameter set. For each dimension of <span class="arithmatex">\(\theta\)</span>, we consider a uniform <em>prior</em> between [-2,2].</p>
 <div class="highlight"><pre><span></span><code><span class="n">num_dim</span> <span class="o">=</span> <span class="mi">3</span>
@@ -537,10 +534,7 @@
 <span class="n">density_estimator</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
 <span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">(</span><span class="n">density_estimator</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>  0%|          | 0/2000 [00:00&lt;?, ?it/s]
-
-
- Neural network successfully converged after 68 epochs.
+<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 68 epochs.
 </code></pre></div>
 
 <h2 id="amortized-inference">Amortized inference<a class="headerlink" href="#amortized-inference" title="Permanent link">&para;</a></h2>
@@ -566,10 +560,7 @@
     <span class="n">points</span><span class="o">=</span><span class="n">theta_1</span> <span class="c1"># add ground truth thetas</span>
 <span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>Drawing 10000 posterior samples:   0%|          | 0/10000 [00:00&lt;?, ?it/s]
-</code></pre></div>
-
-<p><img alt="png" src="../01_gaussian_amortized_files/01_gaussian_amortized_11_1.png" /></p>
+<p><img alt="png" src="../01_gaussian_amortized_files/01_gaussian_amortized_11_0.png" /></p>
 <p>The inferred distirbutions over the parameters given the <strong>first</strong> observation <span class="arithmatex">\(x_{obs~1}\)</span> match the parameters <span class="arithmatex">\(\theta_{1}\)</span> (shown in orange), we used to generate our first observation <span class="arithmatex">\(x_{obs~1}\)</span>.</p>
 <p>Since the learned posterior is <strong>amortized</strong>, we can also draw samples from the posterior given the second observation <span class="arithmatex">\(x_{obs~2}\)</span> without having to re-run inference:</p>
 <div class="highlight"><pre><span></span><code><span class="n">posterior_samples_2</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">10000</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_obs_2</span><span class="p">)</span>
@@ -581,10 +572,7 @@
     <span class="n">points</span><span class="o">=</span><span class="n">theta_2</span> <span class="c1"># add ground truth thetas</span>
 <span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>Drawing 10000 posterior samples:   0%|          | 0/10000 [00:00&lt;?, ?it/s]
-</code></pre></div>
-
-<p><img alt="png" src="../01_gaussian_amortized_files/01_gaussian_amortized_14_1.png" /></p>
+<p><img alt="png" src="../01_gaussian_amortized_files/01_gaussian_amortized_14_0.png" /></p>
 <p>The inferred distirbutions over the parameters given the <strong>second</strong> observation  <span class="arithmatex">\(x_{obs~2}\)</span> also match the ground truth parameters <span class="arithmatex">\(\theta_{2}\)</span> we used to generate our second test observation  <span class="arithmatex">\(x_{obs~2}\)</span>.</p>
 <p>This in a nutshell demonstrates the benefit of amortized methods. </p>
 <h1 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h1>

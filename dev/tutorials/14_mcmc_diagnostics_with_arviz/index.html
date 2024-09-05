@@ -546,9 +546,6 @@
 <span class="c1"># Seeding</span>
 <span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>WARNING (pytensor.tensor.blas): Using NumPy C-API based implementation for BLAS functions.
-</code></pre></div>
-
 <div class="highlight"><pre><span></span><code><span class="c1"># Toy simulator for mixed data</span>
 <span class="k">def</span> <span class="nf">mixed_simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">):</span>
     <span class="n">beta</span><span class="p">,</span> <span class="n">ps</span> <span class="o">=</span> <span class="n">theta</span><span class="p">[:,</span> <span class="p">:</span><span class="mi">1</span><span class="p">],</span> <span class="n">theta</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">:]</span>
@@ -636,12 +633,7 @@ Attributes:
 <div class="highlight"><pre><span></span><code><span class="n">az</span><span class="o">.</span><span class="n">style</span><span class="o">.</span><span class="n">use</span><span class="p">(</span><span class="s2">&quot;arviz-darkgrid&quot;</span><span class="p">)</span>
 <span class="n">az</span><span class="o">.</span><span class="n">plot_rank</span><span class="p">(</span><span class="n">inference_data</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>array([&lt;Axes: title={&#39;center&#39;: &#39;theta\n0&#39;}, xlabel=&#39;Rank (all chains)&#39;, ylabel=&#39;Chain&#39;&gt;,
-       &lt;Axes: title={&#39;center&#39;: &#39;theta\n1&#39;}, xlabel=&#39;Rank (all chains)&#39;, ylabel=&#39;Chain&#39;&gt;],
-      dtype=object)
-</code></pre></div>
-
-<p><img alt="png" src="../14_mcmc_diagnostics_with_arviz_files/14_mcmc_diagnostics_with_arviz_10_1.png" /></p>
+<p><img alt="png" src="../14_mcmc_diagnostics_with_arviz_files/14_mcmc_diagnostics_with_arviz_10_0.png" /></p>
 <div class="highlight"><pre><span></span><code><span class="n">az</span><span class="o">.</span><span class="n">plot_autocorr</span><span class="p">(</span><span class="n">inference_data</span><span class="p">);</span>
 </code></pre></div>
 <p><img alt="png" src="../14_mcmc_diagnostics_with_arviz_files/14_mcmc_diagnostics_with_arviz_11_0.png" /></p>
@@ -654,11 +646,7 @@ Attributes:
 <h3 id="posterior-density-plots">Posterior density plots<a class="headerlink" href="#posterior-density-plots" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code><span class="n">az</span><span class="o">.</span><span class="n">plot_posterior</span><span class="p">(</span><span class="n">inference_data</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>array([&lt;Axes: title={&#39;center&#39;: &#39;theta\n0&#39;}&gt;,
-       &lt;Axes: title={&#39;center&#39;: &#39;theta\n1&#39;}&gt;], dtype=object)
-</code></pre></div>
-
-<p><img alt="png" src="../14_mcmc_diagnostics_with_arviz_files/14_mcmc_diagnostics_with_arviz_15_1.png" /></p>
+<p><img alt="png" src="../14_mcmc_diagnostics_with_arviz_files/14_mcmc_diagnostics_with_arviz_15_0.png" /></p>
 <div class="highlight"><pre><span></span><code><span class="nb">print</span><span class="p">(</span>
     <span class="sa">f</span><span class="s2">&quot;&quot;&quot;Given the </span><span class="si">{</span><span class="n">num_trials</span><span class="si">}</span><span class="s2"> we observed, the posterior is centered around</span>
 <span class="s2">    true underlying parameters theta_o: </span><span class="si">{</span><span class="n">theta_o</span><span class="si">}</span><span class="s2">&quot;&quot;&quot;</span>
@@ -670,10 +658,7 @@ Attributes:
 
 <div class="highlight"><pre><span></span><code><span class="n">az</span><span class="o">.</span><span class="n">plot_pair</span><span class="p">(</span><span class="n">inference_data</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>&lt;Axes: xlabel=&#39;theta\n0&#39;, ylabel=&#39;theta\n1&#39;&gt;
-</code></pre></div>
-
-<p><img alt="png" src="../14_mcmc_diagnostics_with_arviz_files/14_mcmc_diagnostics_with_arviz_17_1.png" /></p>
+<p><img alt="png" src="../14_mcmc_diagnostics_with_arviz_files/14_mcmc_diagnostics_with_arviz_17_0.png" /></p>
 <div class="highlight"><pre><span></span><code><span class="n">az</span><span class="o">.</span><span class="n">plot_pair</span><span class="p">(</span>
     <span class="n">inference_data</span><span class="p">,</span>
     <span class="n">var_names</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;theta&quot;</span><span class="p">],</span>
@@ -682,12 +667,7 @@ Attributes:
     <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">10</span><span class="p">),</span>
 <span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>array([[&lt;Axes: &gt;, None],
-       [&lt;Axes: xlabel=&#39;theta\n0&#39;, ylabel=&#39;theta\n1&#39;&gt;, &lt;Axes: &gt;]],
-      dtype=object)
-</code></pre></div>
-
-<p><img alt="png" src="../14_mcmc_diagnostics_with_arviz_files/14_mcmc_diagnostics_with_arviz_18_1.png" /></p>
+<p><img alt="png" src="../14_mcmc_diagnostics_with_arviz_files/14_mcmc_diagnostics_with_arviz_18_0.png" /></p>
 
 
 

@@ -530,9 +530,6 @@
 <span class="kn">from</span> <span class="nn">sbi.utils</span> <span class="kn">import</span> <span class="n">BoxUniform</span>
 <span class="kn">from</span> <span class="nn">sbi.analysis</span> <span class="kn">import</span> <span class="n">pairplot</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>WARNING (pytensor.tensor.blas): Using NumPy C-API based implementation for BLAS functions.
-</code></pre></div>
-
 <div class="highlight"><pre><span></span><code><span class="c1"># Example toy simulator</span>
 <span class="c1"># Define the prior</span>
 <span class="n">num_dims</span> <span class="o">=</span> <span class="mi">3</span>
@@ -607,9 +604,6 @@ pass for normalizing flows). </p>
 <span class="n">posterior_samples</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">10000</span><span class="p">,),</span> <span class="n">x_o</span><span class="p">)</span>
 </code></pre></div>
 <div class="codehilite"><pre><span></span><code> Neural network successfully converged after 125 epochs.
-
-
-Drawing 10000 posterior samples:   0%|          | 0/10000 [00:00&lt;?, ?it/s]
 </code></pre></div>
 
 <div class="highlight"><pre><span></span><code><span class="c1"># plot posterior samples</span>
@@ -644,9 +638,6 @@ Drawing 10000 posterior samples:   0%|          | 0/10000 [00:00&lt;?, ?it/s]
 <span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">(</span><span class="n">score_estimator</span><span class="p">)</span>
 <span class="n">posterior_samples</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">10000</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_o</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>Drawing 10000 posterior samples:   0%|          | 0/499 [00:00&lt;?, ?it/s]
-</code></pre></div>
-
 <div class="highlight"><pre><span></span><code><span class="c1"># plot posterior samples</span>
 <span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">pairplot</span><span class="p">(</span>
     <span class="n">posterior_samples</span><span class="p">,</span> <span class="n">limits</span><span class="o">=</span><span class="p">[[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">]],</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mi">5</span><span class="p">),</span>

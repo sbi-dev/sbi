@@ -479,7 +479,16 @@
         <li class="md-nav__item">
   <a href="#assessing-the-posterior-for-the-known-theta-x-pair" class="md-nav__link">
     <span class="md-ellipsis">
-      Assessing the posterior for the known \(\theta, x\) - pair
+      Assessing the posterior for the known (\(\theta, x\)) - pair
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#assessing-the-predictive-performance-of-the-posterior" class="md-nav__link">
+    <span class="md-ellipsis">
+      Assessing the predictive performance of the posterior
     </span>
   </a>
   
@@ -520,7 +529,7 @@
 <div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">torch</span>
 
 <span class="kn">from</span> <span class="nn">sbi.analysis</span> <span class="kn">import</span> <span class="n">pairplot</span>
-<span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">NPE</span><span class="p">,</span> <span class="n">simulate_for_sbi</span>
+<span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">NPE</span>
 <span class="kn">from</span> <span class="nn">sbi.utils</span> <span class="kn">import</span> <span class="n">BoxUniform</span>
 <span class="kn">from</span> <span class="nn">sbi.utils.user_input_checks</span> <span class="kn">import</span> <span class="p">(</span>
     <span class="n">check_sbi_inputs</span><span class="p">,</span>
@@ -528,9 +537,6 @@
     <span class="n">process_simulator</span><span class="p">,</span>
 <span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>WARNING (pytensor.tensor.blas): Using NumPy C-API based implementation for BLAS functions.
-</code></pre></div>
-
 <h2 id="parameter-inference-in-a-linear-gaussian-example">Parameter inference in a linear Gaussian example<a class="headerlink" href="#parameter-inference-in-a-linear-gaussian-example" title="Permanent link">&para;</a></h2>
 <p>Each of the implemented inference methods takes three inputs:<br />
 1. observational data (or summary statistics thereof) - <em>the observations</em><br />
@@ -553,8 +559,18 @@
 
 <span class="n">prior</span> <span class="o">=</span> <span class="n">BoxUniform</span><span class="p">(</span><span class="n">low</span><span class="o">=-</span><span class="mi">2</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">num_dim</span><span class="p">),</span> <span class="n">high</span><span class="o">=</span><span class="mi">2</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">num_dim</span><span class="p">))</span>
 </code></pre></div>
-<p>We have to ensure that your <em>simulator</em> and <em>prior</em> adhere to the requirements of <code>sbi</code> such as returning <code>torch.Tensor</code>s in a standardised shape. </p>
-<p>You can do so with the <code>process_simulator()</code> and <code>process_prior()</code> functions, which prepare them appropriately. Finally, you can call <code>check_sbi_input()</code> to make sure they are consistent which each other.</p>
+<p>Here, we are using this simple toy simulator. In practice, the simulator can be anything
+that takes parameters and returns simulated data. The data simulation process is
+decoupled from the algorithms implemented in the <code>sbi</code> package. That is, you can
+simulate your data beforehand, e.g., on a cluster or using a different programming
+language or environment. All that <code>sbi</code> needs is a <code>Tensor</code> of parameters <code>theta</code> and
+corresponding simulated data <code>x</code>. And, of course, observed data <code>x_o</code>. </p>
+<p>However, <code>sbi</code> also offers a function to run your simulations in parallel. To that end,
+we have to ensure that your <em>simulator</em> and <em>prior</em> adhere to the requirements of <code>sbi</code>
+such as returning <code>torch.Tensor</code>s in a standardised shape. </p>
+<p>You can do so with the <code>process_simulator()</code> and <code>process_prior()</code> functions, which
+prepare them appropriately. Finally, you can call <code>check_sbi_input()</code> to make sure they
+are consistent which each other.</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># Check prior, return PyTorch prior.</span>
 <span class="n">prior</span><span class="p">,</span> <span class="n">num_parameters</span><span class="p">,</span> <span class="n">prior_returns_numpy</span> <span class="o">=</span> <span class="n">process_prior</span><span class="p">(</span><span class="n">prior</span><span class="p">)</span>
 
@@ -575,14 +591,13 @@
 <blockquote>
 <p>Note: If you already have your own parameters, simulation pairs which were generated elsewhere (e.g., on a compute cluster), you would add them here.  </p>
 </blockquote>
-<div class="highlight"><pre><span></span><code><span class="n">theta</span><span class="p">,</span> <span class="n">x</span> <span class="o">=</span> <span class="n">simulate_for_sbi</span><span class="p">(</span><span class="n">simulator</span><span class="p">,</span> <span class="n">proposal</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span> <span class="n">num_simulations</span><span class="o">=</span><span class="mi">2000</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><span class="n">num_simulations</span> <span class="o">=</span> <span class="mi">2000</span>
+<span class="n">theta</span> <span class="o">=</span> <span class="n">prior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_simulations</span><span class="p">,))</span>
+<span class="n">x</span> <span class="o">=</span> <span class="n">simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;theta.shape&quot;</span><span class="p">,</span> <span class="n">theta</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;x.shape&quot;</span><span class="p">,</span> <span class="n">x</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>  0%|          | 0/2000 [00:00&lt;?, ?it/s]
-
-
-theta.shape torch.Size([2000, 3])
+<div class="codehilite"><pre><span></span><code>theta.shape torch.Size([2000, 3])
 x.shape torch.Size([2000, 3])
 </code></pre></div>
 
@@ -592,7 +607,7 @@ x.shape torch.Size([2000, 3])
 <p>Next, we train the <em>neural density estimator</em> to learn the association between the simulated data (or data features) and the underlying parameters:</p>
 <div class="highlight"><pre><span></span><code><span class="n">density_estimator</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 158 epochs.
+<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 255 epochs.
 </code></pre></div>
 
 <p>Finally, we use this <em>density estimator</em> to build the posterior distribution <span class="arithmatex">\(p(\theta|x)\)</span>, i.e., the distributions over paramters <span class="arithmatex">\(\theta\)</span> given observation <span class="arithmatex">\(x\)</span>. </p>
@@ -602,7 +617,7 @@ x.shape torch.Size([2000, 3])
 
 <span class="nb">print</span><span class="p">(</span><span class="n">posterior</span><span class="p">)</span> <span class="c1"># prints how the posterior was trained</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>Posterior conditional density p(θ|x) of type DirectPosterior. It samples the posterior network and rejects samples that
+<div class="codehilite"><pre><span></span><code>Posterior p(θ|x) of type DirectPosterior. It samples the posterior network and rejects samples that
             lie outside of the prior bounds.
 </code></pre></div>
 
@@ -615,25 +630,54 @@ x.shape torch.Size([2000, 3])
 <span class="c1"># generate our observation</span>
 <span class="n">x_obs</span> <span class="o">=</span> <span class="n">simulator</span><span class="p">(</span><span class="n">theta_true</span><span class="p">)</span>
 </code></pre></div>
-<p>Given this observation, we can sample from the posterior <span class="arithmatex">\(p(\theta|x_{obs})\)</span> and visualise the univariate and pairwise marginals for the three parameters via <code>analysis.pairplot()</code>.</p>
+<p>Given this observation, we can sample from the posterior <span class="arithmatex">\(p(\theta|x_{obs})\)</span> and
+visualise the posterior. Visualizing a three-dimensional distributions is challenging.
+Therefore, we use <code>sbi</code>&rsquo;s <code>pairplot</code> function that generates a upper triangular grid of
+plots, showing the univariate marginals on the diagnonal and every combination of
+pairwise marginals for the three parameters on the upper offdiagonal:</p>
 <div class="highlight"><pre><span></span><code><span class="n">samples</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">10000</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_obs</span><span class="p">)</span>
-<span class="n">_</span> <span class="o">=</span> <span class="n">pairplot</span><span class="p">(</span><span class="n">samples</span><span class="p">,</span> <span class="n">limits</span><span class="o">=</span><span class="p">[[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">]],</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span> <span class="mi">6</span><span class="p">),</span><span class="n">labels</span><span class="o">=</span><span class="p">[</span><span class="sa">r</span><span class="s2">&quot;$\theta_1$&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;$\theta_2$&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;$\theta_3$&quot;</span><span class="p">])</span>
+<span class="n">_</span> <span class="o">=</span> <span class="n">pairplot</span><span class="p">(</span><span class="n">samples</span><span class="p">,</span>
+             <span class="n">limits</span><span class="o">=</span><span class="p">[[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">]],</span>
+             <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span> <span class="mi">6</span><span class="p">),</span>
+             <span class="n">labels</span><span class="o">=</span><span class="p">[</span><span class="sa">r</span><span class="s2">&quot;$\theta_1$&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;$\theta_2$&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;$\theta_3$&quot;</span><span class="p">])</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>Drawing 10000 posterior samples:   0%|          | 0/10000 [00:00&lt;?, ?it/s]
-</code></pre></div>
-
-<p><img alt="png" src="../00_getting_started_files/00_getting_started_25_1.png" /></p>
-<h2 id="assessing-the-posterior-for-the-known-theta-x-pair">Assessing the posterior for the known <span class="arithmatex">\(\theta, x\)</span> - pair<a class="headerlink" href="#assessing-the-posterior-for-the-known-theta-x-pair" title="Permanent link">&para;</a></h2>
-<p>For this special case, we have access to the ground-truth parameters that generated the observation. We can thus assess if the inferred distributions over the parameters match the parameters <span class="arithmatex">\(\theta_{true}\)</span> we used to generate our test observation <span class="arithmatex">\(x_{obs}\)</span>.</p>
+<p><img alt="png" src="../00_getting_started_files/00_getting_started_25_0.png" /></p>
+<h2 id="assessing-the-posterior-for-the-known-theta-x-pair">Assessing the posterior for the known (<span class="arithmatex">\(\theta, x\)</span>) - pair<a class="headerlink" href="#assessing-the-posterior-for-the-known-theta-x-pair" title="Permanent link">&para;</a></h2>
+<p>For this special case, we have access to the ground-truth parameters that generated the
+observation. We can thus assess if the inferred distributions over the parameters match
+the parameters <span class="arithmatex">\(\theta_{true}\)</span> we used to generate our test observation <span class="arithmatex">\(x_{obs}\)</span>.</p>
+<p>Note that in general, the inferred posterior distribution is not neccessarily centered
+on the underlying &ldquo;ground-truth&rdquo; parameters <span class="arithmatex">\(\theta\)</span> because there is noise in simulator
+and limited data. However, it should lie &ldquo;within&rdquo; the posterior.</p>
 <div class="highlight"><pre><span></span><code><span class="n">samples</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">10000</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_obs</span><span class="p">)</span>
-<span class="n">_</span> <span class="o">=</span> <span class="n">pairplot</span><span class="p">(</span><span class="n">samples</span><span class="p">,</span> <span class="n">points</span><span class="o">=</span><span class="n">theta_true</span><span class="p">,</span> <span class="n">limits</span><span class="o">=</span><span class="p">[[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">]],</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span> <span class="mi">6</span><span class="p">),</span> <span class="n">labels</span><span class="o">=</span><span class="p">[</span><span class="sa">r</span><span class="s2">&quot;$\theta_1$&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;$\theta_2$&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;$\theta_3$&quot;</span><span class="p">])</span>
+<span class="n">pairplot</span><span class="p">(</span><span class="n">samples</span><span class="p">,</span>
+         <span class="n">points</span><span class="o">=</span><span class="n">theta_true</span><span class="p">,</span>
+         <span class="n">limits</span><span class="o">=</span><span class="p">[[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">]],</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span> <span class="mi">6</span><span class="p">),</span>
+         <span class="n">labels</span><span class="o">=</span><span class="p">[</span><span class="sa">r</span><span class="s2">&quot;$\theta_1$&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;$\theta_2$&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;$\theta_3$&quot;</span><span class="p">]);</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>Drawing 10000 posterior samples:   0%|          | 0/10000 [00:00&lt;?, ?it/s]
+<p><img alt="png" src="../00_getting_started_files/00_getting_started_28_0.png" /></p>
+<h2 id="assessing-the-predictive-performance-of-the-posterior">Assessing the predictive performance of the posterior<a class="headerlink" href="#assessing-the-predictive-performance-of-the-posterior" title="Permanent link">&para;</a></h2>
+<p>Another way to assess the quality of the posterior is checking whether parameters
+sampled from the posterior <span class="arithmatex">\(p(\theta \mid x_{obs})\)</span> can reproduce the observation
+<span class="arithmatex">\(x_{obs}\)</span> when we simulate data with them. This <em>posterior predictive distribution</em>
+should contain on the <span class="arithmatex">\(x_{obs}\)</span>. We can again use the <code>pairplot</code> function to
+visualize it. </p>
+<p>As you can see below, in this Gaussian toy example, the posterior predictive
+distribution is nicely centered on the data it was conditioned on.</p>
+<div class="highlight"><pre><span></span><code><span class="n">theta_posterior</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">10000</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_obs</span><span class="p">)</span>  <span class="c1"># sample from posterior</span>
+<span class="n">x_predictive</span> <span class="o">=</span> <span class="n">simulator</span><span class="p">(</span><span class="n">theta_posterior</span><span class="p">)</span>  <span class="c1"># simulate data from posterior</span>
+<span class="n">pairplot</span><span class="p">(</span><span class="n">x_predictive</span><span class="p">,</span>
+         <span class="n">points</span><span class="o">=</span><span class="n">x_obs</span><span class="p">,</span>  <span class="c1"># plot with x_obs as a point</span>
+         <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span> <span class="mi">6</span><span class="p">),</span>
+         <span class="n">labels</span><span class="o">=</span><span class="p">[</span><span class="sa">r</span><span class="s2">&quot;$x_1$&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;$x_2$&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;$x_3$&quot;</span><span class="p">]);</span>
 </code></pre></div>
-
-<p><img alt="png" src="../00_getting_started_files/00_getting_started_28_1.png" /></p>
-<p>The log-probability should ideally indicate that the true parameters, given the corresponding observation, are more likely than a different set of randomly chosen parameters from the prior distribution. </p>
-<p>Relative to the obtained log-probabilities, we can investigate the range of log-probabilities of the parameters sampled from the posterior.</p>
+<p><img alt="png" src="../00_getting_started_files/00_getting_started_30_0.png" /></p>
+<p>Finally, we can also compare the probabilities of different parameters under the
+posterior. The log-probability should ideally indicate that the true parameters, given
+the corresponding observation, are more likely than a different set of randomly chosen
+parameters from the prior distribution. </p>
+<p>Relative to the obtained log-probabilities, we can investigate the range of
+log-probabilities of the parameters sampled from the posterior.</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># first sample an alternative parameter set from the prior</span>
 <span class="n">theta_diff</span> <span class="o">=</span> <span class="n">prior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">1</span><span class="p">,))</span>
 </code></pre></div>
@@ -645,9 +689,9 @@ x.shape torch.Size([2000, 3])
 <span class="nb">print</span><span class="p">(</span> <span class="sa">r</span><span class="s1">&#39;low for different theta :&#39;</span><span class="p">,</span> <span class="n">log_probability_diff_theta</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span> <span class="sa">r</span><span class="s1">&#39;range of posterior samples: min:&#39;</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="n">log_probability_samples</span><span class="p">),</span><span class="s1">&#39; max :&#39;</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">log_probability_samples</span><span class="p">))</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>high for true theta : tensor([2.7324])
-low for different theta : tensor([-201.8379])
-range of posterior samples: min: tensor(-6.6965)  max : tensor(4.2212)
+<div class="codehilite"><pre><span></span><code>high for true theta : tensor([3.4911])
+low for different theta : tensor([-351.0345])
+range of posterior samples: min: tensor(-8.8757)  max : tensor(3.9791)
 </code></pre></div>
 
 <h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>

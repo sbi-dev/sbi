@@ -621,9 +621,6 @@ p(\text{probs}) = \text{Beta}(2, 2)
 <span class="kn">from</span> <span class="nn">sbi.utils.metrics</span> <span class="kn">import</span> <span class="n">c2st</span>
 <span class="kn">from</span> <span class="nn">sbi.utils.torchutils</span> <span class="kn">import</span> <span class="n">atleast_2d</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>WARNING (pytensor.tensor.blas): Using NumPy C-API based implementation for BLAS functions.
-</code></pre></div>
-
 <div class="highlight"><pre><span></span><code><span class="c1"># Toy simulator for mixed data</span>
 <span class="k">def</span> <span class="nf">mixed_simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">concentration_scaling</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Returns a sample from a mixed distribution given parameters theta.</span>
@@ -717,16 +714,6 @@ p(\text{probs}) = \text{Beta}(2, 2)
 <span class="p">)</span>
 <span class="n">true_samples</span> <span class="o">=</span> <span class="n">true_posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_samples</span><span class="p">,))</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>/Users/janteusen/qode/sbi/sbi/utils/user_input_checks.py:585: UserWarning: An x with a batch size of 10 was passed. Unless you are using `sample_batched` or `log_prob_batched`, this will be interpreted as a batch of independent and identically distributed data X={x_1, ..., x_n}, i.e., data generated based on the same underlying(unknown) parameter. The resulting posterior will be with respect to the entire batch, i.e,. p(theta | X).
-  warn_on_batched_x(batch_size=input_x_shape[0])
-/Users/janteusen/qode/sbi/sbi/inference/posteriors/mcmc_posterior.py:115: UserWarning: The default value for thinning in MCMC sampling has been changed from 10 to 1. This might cause the results differ from the last benchmark.
-  thin = _process_thin_default(thin)
-
-
-
-Running vectorized MCMC with 20 chains:   0%|          | 0/3000 [00:00&lt;?, ?it/s]
-</code></pre></div>
-
 <h3 id="train-mnle-and-generate-samples-via-mcmc">Train MNLE and generate samples via MCMC<a class="headerlink" href="#train-mnle-and-generate-samples-via-mcmc" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code><span class="c1"># Training data</span>
 <span class="n">num_simulations</span> <span class="o">=</span> <span class="mi">20000</span>
@@ -740,11 +727,7 @@ Running vectorized MCMC with 20 chains:   0%|          | 0/3000 [00:00&lt;?, ?it
 <span class="n">trainer</span> <span class="o">=</span> <span class="n">MNLE</span><span class="p">()</span>
 <span class="n">estimator</span> <span class="o">=</span> <span class="n">trainer</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">(</span><span class="n">training_batch_size</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>/Users/janteusen/qode/sbi/sbi/neural_nets/factory.py:204: UserWarning: The mixed neural likelihood estimator assumes that x contains continuous data in the first n-1 columns (e.g., reaction times) and categorical data in the last column (e.g., corresponding choices). If this is not the case for the passed `x` do not use this function.
-  return model_builders[model](batch_x=batch_x, batch_y=batch_theta, **kwargs)
-
-
- Neural network successfully converged after 65 epochs.
+<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 65 epochs.
 </code></pre></div>
 
 <div class="highlight"><pre><span></span><code><span class="c1"># Build posterior from the trained estimator and prior.</span>
@@ -752,9 +735,6 @@ Running vectorized MCMC with 20 chains:   0%|          | 0/3000 [00:00&lt;?, ?it
 
 <span class="n">mnle_samples</span> <span class="o">=</span> <span class="n">mnle_posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_samples</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_o</span><span class="p">,</span> <span class="o">**</span><span class="n">mcmc_kwargs</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>Running vectorized MCMC with 20 chains:   0%|          | 0/3000 [00:00&lt;?, ?it/s]
-</code></pre></div>
-
 <h3 id="compare-mnle-and-reference-posterior">Compare MNLE and reference posterior<a class="headerlink" href="#compare-mnle-and-reference-posterior" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code><span class="c1"># Plot them in one pairplot as contours (obtained via KDE on the samples).</span>
 <span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">pairplot</span><span class="p">(</span>
@@ -791,18 +771,6 @@ Running vectorized MCMC with 20 chains:   0%|          | 0/3000 [00:00&lt;?, ?it
 <span class="n">true_samples</span> <span class="o">=</span> <span class="n">true_posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_samples</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_o</span><span class="p">,</span> <span class="o">**</span><span class="n">mcmc_kwargs</span><span class="p">)</span>
 <span class="n">mnle_samples</span> <span class="o">=</span> <span class="n">mnle_posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_samples</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_o</span><span class="p">,</span> <span class="o">**</span><span class="n">mcmc_kwargs</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>/Users/janteusen/qode/sbi/sbi/utils/user_input_checks.py:585: UserWarning: An x with a batch size of 50 was passed. Unless you are using `sample_batched` or `log_prob_batched`, this will be interpreted as a batch of independent and identically distributed data X={x_1, ..., x_n}, i.e., data generated based on the same underlying(unknown) parameter. The resulting posterior will be with respect to the entire batch, i.e,. p(theta | X).
-  warn_on_batched_x(batch_size=input_x_shape[0])
-
-
-
-Running vectorized MCMC with 20 chains:   0%|          | 0/3000 [00:00&lt;?, ?it/s]
-
-
-
-Running vectorized MCMC with 20 chains:   0%|          | 0/3000 [00:00&lt;?, ?it/s]
-</code></pre></div>
-
 <div class="highlight"><pre><span></span><code><span class="c1"># Plot them in one pairplot as contours (obtained via KDE on the samples).</span>
 <span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">pairplot</span><span class="p">(</span>
     <span class="p">[</span>
@@ -905,25 +873,11 @@ Thus, to make MNLE work with experimental conditions, we need to include them in
     <span class="o">**</span><span class="n">mcmc_kwargs</span><span class="p">,</span>
 <span class="p">)</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_samples</span><span class="p">,),</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>/Users/janteusen/qode/sbi/sbi/utils/user_input_checks.py:585: UserWarning: An x with a batch size of 10 was passed. Unless you are using `sample_batched` or `log_prob_batched`, this will be interpreted as a batch of independent and identically distributed data X={x_1, ..., x_n}, i.e., data generated based on the same underlying(unknown) parameter. The resulting posterior will be with respect to the entire batch, i.e,. p(theta | X).
-  warn_on_batched_x(batch_size=input_x_shape[0])
-/Users/janteusen/qode/sbi/sbi/inference/posteriors/mcmc_posterior.py:115: UserWarning: The default value for thinning in MCMC sampling has been changed from 10 to 1. This might cause the results differ from the last benchmark.
-  thin = _process_thin_default(thin)
-
-
-
-Running vectorized MCMC with 20 chains:   0%|          | 0/3000 [00:00&lt;?, ?it/s]
-</code></pre></div>
-
 <h3 id="train-mnle-including-experimental-conditions">Train MNLE including experimental conditions<a class="headerlink" href="#train-mnle-including-experimental-conditions" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code><span class="n">trainer</span> <span class="o">=</span> <span class="n">MNLE</span><span class="p">(</span><span class="n">proposal</span><span class="p">)</span>
 <span class="n">estimator</span> <span class="o">=</span> <span class="n">trainer</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">(</span><span class="n">training_batch_size</span><span class="o">=</span><span class="mi">100</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>/Users/janteusen/qode/sbi/sbi/neural_nets/factory.py:204: UserWarning: The mixed neural likelihood estimator assumes that x contains continuous data in the first n-1 columns (e.g., reaction times) and categorical data in the last column (e.g., corresponding choices). If this is not the case for the passed `x` do not use this function.
-  return model_builders[model](batch_x=batch_x, batch_y=batch_theta, **kwargs)
-
-
- Neural network successfully converged after 56 epochs.
+<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 56 epochs.
 </code></pre></div>
 
 <h3 id="construct-conditional-potential-function">Construct conditional potential function<a class="headerlink" href="#construct-conditional-potential-function" title="Permanent link">&para;</a></h3>
@@ -949,9 +903,6 @@ Running vectorized MCMC with 20 chains:   0%|          | 0/3000 [00:00&lt;?, ?it
 <span class="p">)</span>
 <span class="n">conditional_samples</span> <span class="o">=</span> <span class="n">mnle_posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_samples</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_o</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>Running vectorized MCMC with 20 chains:   0%|          | 0/3000 [00:00&lt;?, ?it/s]
-</code></pre></div>
-
 <div class="highlight"><pre><span></span><code><span class="c1"># Finally, we can compare the ground truth conditional posterior with the</span>
 <span class="c1"># MNLE-conditional posterior.</span>
 <span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">pairplot</span><span class="p">(</span>

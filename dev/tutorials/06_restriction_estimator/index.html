@@ -537,9 +537,6 @@
 
 <span class="n">_</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>WARNING (pytensor.tensor.blas): Using NumPy C-API based implementation for BLAS functions.
-</code></pre></div>
-
 <p>We will define a simulator with two parameters and two simulation outputs. The simulator produces <code>NaN</code> whenever the first parameter is below <code>0.0</code>. If it is above <code>0.0</code> the simulator simply perturbs the parameter set with Gaussian noise:</p>
 <div class="highlight"><pre><span></span><code><span class="k">def</span> <span class="nf">simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">):</span>
     <span class="n">perturbed_theta</span> <span class="o">=</span> <span class="n">theta</span> <span class="o">+</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
@@ -553,10 +550,7 @@
 <div class="highlight"><pre><span></span><code><span class="n">theta</span><span class="p">,</span> <span class="n">x</span> <span class="o">=</span> <span class="n">simulate_for_sbi</span><span class="p">(</span><span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="mi">1000</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Simulation outputs: &quot;</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>  0%|          | 0/1000 [00:00&lt;?, ?it/s]
-
-
-Simulation outputs:  tensor([[ 0.3107, -0.1859],
+<div class="codehilite"><pre><span></span><code>Simulation outputs:  tensor([[ 0.3107, -0.1859],
         [    nan,     nan],
         [ 1.0307, -0.4300],
         ...,
@@ -595,10 +589,6 @@ Simulation outputs:  tensor([[ 0.3107, -0.1859],
                 113.8%.
 
 
-
-  0%|          | 0/1000 [00:00&lt;?, ?it/s]
-
-
 Simulation outputs:  tensor([[ 1.7930,  1.5322],
         [ 1.6024,  1.6551],
         [ 0.0756,  2.4023],
@@ -625,16 +615,10 @@ Simulation outputs:  tensor([[ 1.7930,  1.5322],
 <span class="n">posterior_samples</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">10_000</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">2</span><span class="p">))</span>
 <span class="n">_</span> <span class="o">=</span> <span class="n">pairplot</span><span class="p">(</span><span class="n">posterior_samples</span><span class="p">,</span> <span class="n">limits</span><span class="o">=</span><span class="p">[[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">]],</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>WARNING:root:Found 463 NaN simulations and 0 Inf simulations. They will be excluded from training.
-
-
- Neural network successfully converged after 45 epochs.
-
-
-Drawing 10000 posterior samples:   0%|          | 0/10000 [00:00&lt;?, ?it/s]
+<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 45 epochs.
 </code></pre></div>
 
-<p><img alt="png" src="../06_restriction_estimator_files/06_restriction_estimator_20_3.png" /></p>
+<p><img alt="png" src="../06_restriction_estimator_files/06_restriction_estimator_20_1.png" /></p>
 <h2 id="further-options-for-tuning-the-algorithm">Further options for tuning the algorithm<a class="headerlink" href="#further-options-for-tuning-the-algorithm" title="Permanent link">&para;</a></h2>
 <ul>
 <li>the whole procedure can be repeated many times (see the loop shown in &ldquo;Main syntax&rdquo; in this tutorial)</li>

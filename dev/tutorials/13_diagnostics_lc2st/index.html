@@ -729,9 +729,6 @@
 <span class="n">inference</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="o">=</span><span class="n">theta_train</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="n">x_train</span><span class="p">)</span>
 <span class="n">npe</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">train</span><span class="p">(</span><span class="n">training_batch_size</span><span class="o">=</span><span class="mi">256</span><span class="p">,</span> <span class="n">max_num_epochs</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>WARNING (pytensor.tensor.blas): Using NumPy C-API based implementation for BLAS functions.
-</code></pre></div>
-
 <p>Training neural network. Epochs trained: 1
  Training neural network. Epochs trained: 2
  Training neural network. Epochs trained: 3
@@ -795,9 +792,6 @@
 <span class="n">_</span> <span class="o">=</span> <span class="n">lc2st</span><span class="o">.</span><span class="n">train_under_null_hypothesis</span><span class="p">()</span> <span class="c1"># over 100 trials under (H0)</span>
 <span class="n">_</span> <span class="o">=</span> <span class="n">lc2st</span><span class="o">.</span><span class="n">train_on_observed_data</span><span class="p">()</span> <span class="c1"># on observed data</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>Training the classifiers under H0, permutation = True: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 100/100 [00:10&lt;00:00,  9.58it/s]
-</code></pre></div>
-
 <div class="highlight"><pre><span></span><code><span class="c1"># Define significance level for diagnostics</span>
 <span class="n">conf_alpha</span> <span class="o">=</span> <span class="mf">0.05</span>
 </code></pre></div>
@@ -1026,9 +1020,6 @@ $$ p(\theta \mid x) = q_{\phi}(\theta \mid x) \iff p(T_{\phi}^{-1}(\theta; x)\mi
 <span class="n">_</span> <span class="o">=</span> <span class="n">lc2st_nf</span><span class="o">.</span><span class="n">train_under_null_hypothesis</span><span class="p">()</span>
 <span class="n">_</span> <span class="o">=</span> <span class="n">lc2st_nf</span><span class="o">.</span><span class="n">train_on_observed_data</span><span class="p">()</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>Training the classifiers under H0, permutation = False: 100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 100/100 [00:08&lt;00:00, 11.83it/s]
-</code></pre></div>
-
 <div class="highlight"><pre><span></span><code><span class="c1"># Define significance level</span>
 <span class="n">conf_alpha</span> <span class="o">=</span> <span class="mf">0.05</span>
 </code></pre></div>

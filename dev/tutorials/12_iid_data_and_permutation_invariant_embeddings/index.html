@@ -625,9 +625,6 @@ x | \theta \sim \mathcal{N}(\theta,\; \Sigma=I) \\
 <span class="c1"># Seeding</span>
 <span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>WARNING (pytensor.tensor.blas): Using NumPy C-API based implementation for BLAS functions.
-</code></pre></div>
-
 <div class="highlight"><pre><span></span><code><span class="c1"># Gaussian simulator</span>
 <span class="n">theta_dim</span> <span class="o">=</span> <span class="mi">2</span>
 <span class="n">x_dim</span> <span class="o">=</span> <span class="n">theta_dim</span>
@@ -696,10 +693,7 @@ x | \theta \sim \mathcal{N}(\theta,\; \Sigma=I) \\
 <span class="n">theta</span><span class="p">,</span> <span class="n">x</span> <span class="o">=</span> <span class="n">simulate_for_sbi</span><span class="p">(</span><span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="mi">10000</span><span class="p">,</span> <span class="n">simulation_batch_size</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
 <span class="n">inferer</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">(</span><span class="n">training_batch_size</span><span class="o">=</span><span class="mi">1000</span><span class="p">);</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>  0%|          | 0/10 [00:00&lt;?, ?it/s]
-
-
- Neural network successfully converged after 71 epochs.
+<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 71 epochs.
 </code></pre></div>
 
 <div class="highlight"><pre><span></span><code><span class="c1"># Obtain posterior samples for different number of iid xos.</span>
@@ -824,10 +818,7 @@ c2st score for num_trials=20: 0.51
 <span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">(</span><span class="n">training_batch_size</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
 <span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">()</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>WARNING:root:Found 19000 NaN simulations and 0 Inf simulations. They are not excluded from training due to `exclude_invalid_x=False`.Training will likely fail, we strongly recommend `exclude_invalid_x=True` for Single-round NPE.
-
-
- Neural network successfully converged after 276 epochs.
+<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 276 epochs.
 </code></pre></div>
 
 <h3 id="amortized-inference">Amortized inference<a class="headerlink" href="#amortized-inference" title="Permanent link">&para;</a></h3>
@@ -847,22 +838,7 @@ c2st score for num_trials=20: 0.51
 <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">num_trials</span><span class="p">)):</span>
     <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;c2st score for num_trials=</span><span class="si">{</span><span class="n">num_trials</span><span class="p">[</span><span class="n">_</span><span class="p">]</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">cs</span><span class="p">[</span><span class="n">_</span><span class="p">]</span><span class="o">.</span><span class="n">item</span><span class="p">()</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>Drawing 1000 posterior samples:   0%|          | 0/1000 [00:00&lt;?, ?it/s]
-
-
-
-Drawing 1000 posterior samples:   0%|          | 0/1000 [00:00&lt;?, ?it/s]
-
-
-
-Drawing 1000 posterior samples:   0%|          | 0/1000 [00:00&lt;?, ?it/s]
-
-
-
-Drawing 1000 posterior samples:   0%|          | 0/1000 [00:00&lt;?, ?it/s]
-
-
-c2st score for num_trials=1: 0.52
+<div class="codehilite"><pre><span></span><code>c2st score for num_trials=1: 0.52
 c2st score for num_trials=5: 0.52
 c2st score for num_trials=15: 0.51
 c2st score for num_trials=20: 0.51
@@ -901,22 +877,7 @@ c2st score for num_trials=20: 0.51
     <span class="n">fontsize</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span>
 <span class="p">);</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>Drawing 1000 posterior samples:   0%|          | 0/1000 [00:00&lt;?, ?it/s]
-
-
-
-Drawing 1000 posterior samples:   0%|          | 0/1000 [00:00&lt;?, ?it/s]
-
-
-
-Drawing 1000 posterior samples:   0%|          | 0/1000 [00:00&lt;?, ?it/s]
-
-
-
-Drawing 1000 posterior samples:   0%|          | 0/1000 [00:00&lt;?, ?it/s]
-</code></pre></div>
-
-<p><img alt="png" src="../12_iid_data_and_permutation_invariant_embeddings_files/12_iid_data_and_permutation_invariant_embeddings_23_4.png" /></p>
+<p><img alt="png" src="../12_iid_data_and_permutation_invariant_embeddings_files/12_iid_data_and_permutation_invariant_embeddings_23_0.png" /></p>
 <div class="highlight"><pre><span></span><code><span class="c1"># We can easily obtain posteriors for many different x_os, instantly, because</span>
 <span class="c1"># NPE is fully amortized:</span>
 <span class="n">num_trials</span> <span class="o">=</span> <span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">6</span><span class="p">,</span> <span class="mi">8</span><span class="p">,</span> <span class="mi">12</span><span class="p">,</span> <span class="mi">14</span><span class="p">,</span> <span class="mi">18</span><span class="p">]</span>
@@ -949,22 +910,7 @@ Drawing 1000 posterior samples:   0%|          | 0/1000 [00:00&lt;?, ?it/s]
     <span class="n">fontsize</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span>
 <span class="p">);</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>Drawing 1000 posterior samples:   0%|          | 0/1000 [00:00&lt;?, ?it/s]
-
-
-
-Drawing 1000 posterior samples:   0%|          | 0/1000 [00:00&lt;?, ?it/s]
-
-
-
-Drawing 1000 posterior samples:   0%|          | 0/1000 [00:00&lt;?, ?it/s]
-
-
-
-Drawing 1000 posterior samples:   0%|          | 0/1000 [00:00&lt;?, ?it/s]
-</code></pre></div>
-
-<p><img alt="png" src="../12_iid_data_and_permutation_invariant_embeddings_files/12_iid_data_and_permutation_invariant_embeddings_24_4.png" /></p>
+<p><img alt="png" src="../12_iid_data_and_permutation_invariant_embeddings_files/12_iid_data_and_permutation_invariant_embeddings_24_0.png" /></p>
 
 
 

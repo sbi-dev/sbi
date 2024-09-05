@@ -499,9 +499,6 @@
 <span class="n">inference</span> <span class="o">=</span> <span class="n">NLE</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
 <span class="n">likelihood_estimator</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>WARNING (pytensor.tensor.blas): Using NumPy C-API based implementation for BLAS functions.
-</code></pre></div>
-
 <p>Neural network successfully converged after 104 epochs.</p>
 <p>And then we pass the options for which sampling method to use to the <code>build_posterior()</code> method:</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># Sampling with MCMC</span>
@@ -548,11 +545,7 @@
     <span class="n">potential_fn</span><span class="p">,</span> <span class="n">proposal</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span> <span class="n">theta_transform</span><span class="o">=</span><span class="n">parameter_transform</span>
 <span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>  0%|          | 0/2000 [00:00&lt;?, ?it/s]
-
-
-
-Converged with loss: 3.11
+<div class="codehilite"><pre><span></span><code>Converged with loss: 3.11
 Quality Score: -0.029    Good: Smaller than 0.5  Bad: Larger than 1.0            NOTE: Less sensitive to mode collapse.
 </code></pre></div>
 

@@ -608,15 +608,6 @@
 <span class="n">seed</span> <span class="o">=</span> <span class="mi">0</span>
 <span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="n">seed</span><span class="p">);</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>WARNING (pytensor.tensor.blas): Using NumPy C-API based implementation for BLAS functions.
-
-
-
-
-
-&lt;torch._C.Generator at 0x11f816d30&gt;
-</code></pre></div>
-
 <h3 id="the-simulator-model">The simulator model<a class="headerlink" href="#the-simulator-model" title="Permanent link">&para;</a></h3>
 <p>The simulator model that we consider has two parameters: <span class="arithmatex">\(r\)</span> and <span class="arithmatex">\(\theta\)</span>. On each run, it generates 100 two-dimensional points centered around <span class="arithmatex">\((r \cos(\theta), r \sin(\theta))\)</span> and perturbed by a Gaussian noise with variance 0.01. Instead of simply outputting the <span class="arithmatex">\((x,y)\)</span> coordinates of each data point, the model generates a grayscale image of the scattered points with dimensions 32 by 32. This image is further perturbed by an uniform noise with values betweeen 0 and 0.2. The code below defines such model.</p>
 <div class="highlight"><pre><span></span><code><span class="k">def</span> <span class="nf">simulator_model</span><span class="p">(</span><span class="n">parameter</span><span class="p">,</span> <span class="n">return_points</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
@@ -703,10 +694,7 @@
 <span class="n">ax</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">set_yticks</span><span class="p">([])</span>
 <span class="n">ax</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">&quot;noisy observed data (gray image with 32 x 32 pixels)&quot;</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>Text(0.5, 1.0, &#39;noisy observed data (gray image with 32 x 32 pixels)&#39;)
-</code></pre></div>
-
-<p><img alt="png" src="../04_embedding_networks_files/04_embedding_networks_7_1.png" /></p>
+<p><img alt="png" src="../04_embedding_networks_files/04_embedding_networks_7_0.png" /></p>
 <h2 id="choosing-an-embedding_net">Choosing an <code>embedding_net</code><a class="headerlink" href="#choosing-an-embedding_net" title="Permanent link">&para;</a></h2>
 <p>The outputs <span class="arithmatex">\(x\)</span> from the simulator are defined in a 1024 dimensional space (32 x 32 = 1024). To avoid having to setup a conditional neural density estimator to work directly on such high-dimensional vectors, one could use an <code>embedding_net</code> that would take the images as input and encode them into smaller vectors.</p>
 <p><code>sbi</code> provides pre-configured embedding networks of the following types:</p>
@@ -756,9 +744,6 @@
 <div class="highlight"><pre><span></span><code><span class="c1"># run the inference procedure on one round and 10000 simulated data points</span>
 <span class="n">theta</span><span class="p">,</span> <span class="n">x</span> <span class="o">=</span> <span class="n">simulate_for_sbi</span><span class="p">(</span><span class="n">simulator_wrapper</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">num_simulations</span><span class="o">=</span><span class="mi">10_000</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>  0%|          | 0/10000 [00:00&lt;?, ?it/s]
-</code></pre></div>
-
 <div class="highlight"><pre><span></span><code><span class="n">density_estimator</span> <span class="o">=</span> <span class="n">inferer</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">(</span><span class="n">training_batch_size</span><span class="o">=</span><span class="mi">256</span><span class="p">)</span>
 <span class="n">posterior</span> <span class="o">=</span> <span class="n">inferer</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">(</span><span class="n">density_estimator</span><span class="p">)</span>
 </code></pre></div>
@@ -772,9 +757,6 @@
 <span class="n">x_observed</span> <span class="o">=</span> <span class="n">simulator_model</span><span class="p">(</span><span class="n">true_parameter</span><span class="p">)</span>
 <span class="n">samples</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">set_default_x</span><span class="p">(</span><span class="n">x_observed</span><span class="p">)</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">50000</span><span class="p">,))</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>Drawing 50000 posterior samples:   0%|          | 0/50000 [00:00&lt;?, ?it/s]
-</code></pre></div>
-
 <p>The figure below shows the statistics of the generated samples.</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># create the figure</span>
 <span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">analysis</span><span class="o">.</span><span class="n">pairplot</span><span class="p">(</span>

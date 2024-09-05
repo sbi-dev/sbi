@@ -564,9 +564,6 @@
 <span class="n">posterior</span> <span class="o">=</span> <span class="n">ExamplePosterior</span><span class="p">()</span>
 <span class="n">posterior_samples</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">100</span><span class="p">,))</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>WARNING (pytensor.tensor.blas): Using NumPy C-API based implementation for BLAS functions.
-</code></pre></div>
-
 <p>We will start with the default plot and gradually make it prettier</p>
 <div class="highlight"><pre><span></span><code><span class="n">_</span> <span class="o">=</span> <span class="n">pairplot</span><span class="p">(</span>
     <span class="n">posterior_samples</span><span class="p">,</span>

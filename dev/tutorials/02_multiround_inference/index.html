@@ -511,9 +511,6 @@
     <span class="n">process_simulator</span><span class="p">,</span>
 <span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>WARNING (pytensor.tensor.blas): Using NumPy C-API based implementation for BLAS functions.
-</code></pre></div>
-
 <div class="highlight"><pre><span></span><code><span class="c1"># 2 rounds: first round simulates from the prior, second round simulates parameter set</span>
 <span class="c1"># that were sampled from the obtained posterior.</span>
 <span class="n">num_rounds</span> <span class="o">=</span> <span class="mi">2</span>
@@ -545,18 +542,7 @@
     <span class="n">posteriors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">posterior</span><span class="p">)</span>
     <span class="n">proposal</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">set_default_x</span><span class="p">(</span><span class="n">x_o</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>  0%|          | 0/500 [00:00&lt;?, ?it/s]
-
-
- Neural network successfully converged after 196 epochs.
-
-
-Drawing 500 posterior samples:   0%|          | 0/500 [00:00&lt;?, ?it/s]
-
-
-
-  0%|          | 0/500 [00:00&lt;?, ?it/s]
-
+<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 196 epochs.
 
 Using SNPE-C with atomic loss
  Neural network successfully converged after 37 epochs.
@@ -598,18 +584,7 @@ Using SNPE-C with atomic loss
     <span class="n">posteriors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">posterior</span><span class="p">)</span>
     <span class="n">proposal</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">set_default_x</span><span class="p">(</span><span class="n">x_o</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>  0%|          | 0/500 [00:00&lt;?, ?it/s]
-
-
- Neural network successfully converged after 277 epochs.
-
-
-Drawing 500 posterior samples:   0%|          | 0/500 [00:00&lt;?, ?it/s]
-
-
-
-  0%|          | 0/500 [00:00&lt;?, ?it/s]
-
+<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 277 epochs.
 
 Using SNPE-C with atomic loss
  Neural network successfully converged after 35 epochs.
@@ -624,10 +599,7 @@ Using SNPE-C with atomic loss
     <span class="n">posterior_samples</span><span class="p">,</span> <span class="n">limits</span><span class="o">=</span><span class="p">[[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">]],</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span>
 <span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>Drawing 10000 posterior samples:   0%|          | 0/10000 [00:00&lt;?, ?it/s]
-</code></pre></div>
-
-<p><img alt="png" src="../02_multiround_inference_files/02_multiround_inference_15_1.png" /></p>
+<p><img alt="png" src="../02_multiround_inference_files/02_multiround_inference_15_0.png" /></p>
 
 
 
