@@ -1,5 +1,15 @@
 # `sbi`: simulation-based inference toolkit
 
+`sbi` is a Python package for simulation-based inference, designed to meet the needs of
+both researchers and practitioners. Whether you need fine-grained control or an
+easy-to-use interface, `sbi` has you covered.
+
+With `sbi`, you can perform parameter inference using Bayesian inference: Given a
+simulator that models a real-world process, SBI estimates the full posterior
+distribution over the simulator’s parameters based on observed data. This distribution
+indicates the most likely parameter values while additionally quantifying uncertainty
+and revealing potential interactions between parameters.
+
 `sbi` provides access to simulation-based inference methods via a user-friendly
 interface:
 
