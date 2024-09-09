@@ -15,7 +15,7 @@ from sbi.utils import BoxUniform
 
 
 @pytest.mark.parametrize("samples", (torch.randn(100, 1),))
-@pytest.mark.parametrize("limits", ([(-1, 1)],))
+@pytest.mark.parametrize("limits", ([(-1, 1)], None))
 def test_pairplot1D(samples, limits):
     fig, axs = pairplot(**{k: v for k, v in locals().items() if v is not None})
     assert isinstance(fig, Figure)
@@ -24,7 +24,7 @@ def test_pairplot1D(samples, limits):
 
 
 @pytest.mark.parametrize("samples", (torch.randn(100, 2),))
-@pytest.mark.parametrize("limits", ([(-1, 1)],))
+@pytest.mark.parametrize("limits", ([(-1, 1)], None))
 def test_nan_inf(samples, limits):
     samples[0, 0] = np.nan
     samples[5, 1] = np.inf
@@ -37,7 +37,7 @@ def test_nan_inf(samples, limits):
 
 @pytest.mark.parametrize("samples", (torch.randn(100, 2), [torch.randn(100, 3)] * 2))
 @pytest.mark.parametrize("points", (torch.ones(1, 3),))
-@pytest.mark.parametrize("limits", ([(-3, 3)],))
+@pytest.mark.parametrize("limits", ([(-3, 3)], None))
 @pytest.mark.parametrize("subset", (None, [0, 1]))
 @pytest.mark.parametrize("upper", ("scatter",))
 @pytest.mark.parametrize(
