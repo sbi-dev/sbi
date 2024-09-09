@@ -165,7 +165,7 @@ def test_mnle_accuracy_with_different_samplers_and_trials(
     # True posterior samples
     transform = mcmc_transform(prior)
     true_posterior_samples = MCMCPosterior(
-        PotentialFunctionProvider(prior, atleast_2d(x_o)),
+        BinomialGammaPotential(prior, atleast_2d(x_o)),
         theta_transform=transform,
         proposal=prior,
         **mcmc_kwargs,
@@ -189,14 +189,9 @@ def test_mnle_accuracy_with_different_samplers_and_trials(
     )
 
 
-class PotentialFunctionProvider(BasePotential):
-    """Returns potential function for reference posterior of a mixed likelihood."""
-
-    allow_iid_x = True  # type: ignore
-
+class BinomialGammaPotential(BasePotential):
     def __init__(self, prior, x_o, concentration_scaling=1.0, device="cpu"):
         super().__init__(prior, x_o, device)
-
         self.concentration_scaling = concentration_scaling
 
     def __call__(self, theta, track_gradients: bool = True):
@@ -207,33 +202,25 @@ class PotentialFunctionProvider(BasePotential):
 
         return iid_ll + self.prior.log_prob(theta)
 
-    def iid_likelihood(self, theta: torch.Tensor) -> torch.Tensor:
-        """Returns the likelihood summed over a batch of i.i.d. data."""
-
-        lp_choices = torch.stack(
-            [
-                Binomial(probs=th.reshape(1, -1)).log_prob(self.x_o[:, 1:])
-                for th in theta[:, 1:]
-            ],
-            dim=1,
+    def iid_likelihood(self, theta):
+        batch_size = theta.shape[0]
+        num_trials = self.x_o.shape[0]
+        theta = theta.reshape(batch_size, 1, -1)
+        beta, rho = theta[:, :, :1], theta[:, :, 1:]
+        # vectorized
+        logprob_choices = Binomial(probs=rho).log_prob(
+            self.x_o[:, 1:].reshape(1, num_trials, -1)
         )
 
-        lp_rts = torch.stack(
-            [
-                InverseGamma(
-                    concentration=self.concentration_scaling * torch.ones_like(beta_i),
-                    rate=beta_i,
-                ).log_prob(self.x_o[:, :1])
-                for beta_i in theta[:, :1]
-            ],
-            dim=1,
-        )
+        logprob_rts = InverseGamma(
+            concentration=self.concentration_scaling * torch.ones_like(beta),
+            rate=beta,
+        ).log_prob(self.x_o[:, :1].reshape(1, num_trials, -1))
 
-        joint_likelihood = (lp_choices + lp_rts).reshape(
-            self.x_o.shape[0], theta.shape[0]
-        )
+        joint_likelihood = (logprob_choices + logprob_rts).squeeze()
 
-        return joint_likelihood.sum(0)
+        assert joint_likelihood.shape == torch.Size([theta.shape[0], self.x_o.shape[0]])
+        return joint_likelihood.sum(1)
 
 
 @pytest.mark.slow
@@ -295,7 +282,7 @@ def test_mnle_with_experimental_conditions(mcmc_params_accurate: dict):
     )
     prior_transform = mcmc_transform(prior)
     true_posterior_samples = MCMCPosterior(
-        PotentialFunctionProvider(
+        BinomialGammaPotential(
             prior,
             atleast_2d(x_o),
             concentration_scaling=float(theta_o[0, 2])
