@@ -271,7 +271,7 @@ def condition_mog(
     return logits, means, precfs_xx, sumlogdiag
 
 
-class ConditionedPotential:
+class ConditionedPotential(BasePotential):
     def __init__(
         self,
         potential_fn: BasePotential,
@@ -282,20 +282,26 @@ class ConditionedPotential:
         Return conditional posterior log-probability or $-\infty$ if outside prior.
 
         Args:
-            theta: Free parameters $\theta_i$, batch dimension 1.
+            potential_fn: Potential function to condition on.
+            condition: Fixed parameters $\theta_j$, batch size 1.
+            dims_to_sample: Which dimensions to sample from. The dimensions not
+                specified in `dims_to_sample` will be fixed to values given in
+                `condition`.
 
         Returns:
             Conditional posterior log-probability $\log(p(\theta_i|\theta_j, x))$,
             masked outside of prior.
         """
+        condition = torch.atleast_2d(condition)
+        if condition.shape[0] != 1:
+            raise ValueError("Condition with batch size > 1 not supported.")
+
         self.potential_fn = potential_fn
         self.condition = condition
         self.dims_to_sample = dims_to_sample
         self.device = self.potential_fn.device
 
-    def __call__(
-        self, theta: Tensor, x_o: Optional[Tensor] = None, track_gradients: bool = True
-    ) -> Tensor:
+    def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
         r"""
         Returns the conditional potential $\log(p(\theta_i|\theta_j, x))$.
 
