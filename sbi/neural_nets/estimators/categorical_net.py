@@ -29,7 +29,7 @@ class CategoricalMADE(MADE):
         use_batch_norm=False,
         epsilon=1e-2,
         custom_initialization=True,
-        #TODO: embedding_net: Optional[nn.Module] = None,
+        embedding_net: Optional[nn.Module] = nn.Identity(),
     ):
 
         if use_residual_blocks and random_mask:
@@ -55,6 +55,7 @@ class CategoricalMADE(MADE):
             use_batch_norm=use_batch_norm,
         )
 
+        self.embedding_net = embedding_net
         self.hidden_features = hidden_features
         self.epsilon = epsilon
 
@@ -62,7 +63,8 @@ class CategoricalMADE(MADE):
             self._initialize()
 
     def forward(self, inputs, context=None):
-        return super().forward(inputs, context=context)
+        embedded_inputs = self.embedding_net.forward(inputs)
+        return super().forward(embedded_inputs, context=context)
     
     def compute_probs(self, outputs):
         ps = F.softmax(outputs, dim=-1)*self.mask

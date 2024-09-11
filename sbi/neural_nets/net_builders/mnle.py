@@ -9,7 +9,7 @@ from torch import Tensor, nn
 
 from sbi.neural_nets.estimators import MixedDensityEstimator
 from sbi.neural_nets.estimators.mixed_density_estimator import _separate_input
-from sbi.neural_nets.net_builders.categorial import build_categoricalmassestimator
+from sbi.neural_nets.net_builders.categorial import build_categoricalmassestimator, build_autoregressive_categoricalmassestimator
 from sbi.neural_nets.net_builders.flow import (
     build_made,
     build_maf,
@@ -56,6 +56,7 @@ def build_mnle(
     z_score_x: Optional[str] = "independent",
     z_score_y: Optional[str] = "independent",
     flow_model: str = "nsf",
+    categorical_model: str = "made",
     embedding_net: nn.Module = nn.Identity(),
     combined_embedding_net: Optional[nn.Module] = None,
     num_transforms: int = 2,
@@ -102,6 +103,8 @@ def build_mnle(
             as z_score_x.
         flow_model: type of flow model to use for the continuous part of the
             data.
+        categorical_model: type of categorical net to use for the discrete part of
+            the data. Can be "made" or "categorical".
         embedding_net: Optional embedding network for y, required if y is > 1D.
         combined_embedding_net: Optional embedding for combining the discrete
             part of the input and the embedded condition into a joined
@@ -144,15 +147,30 @@ def build_mnle(
     combined_condition = torch.cat([disc_x, embedded_batch_y], dim=-1)
 
     # Set up a categorical RV neural net for modelling the discrete data.
-    discrete_net = build_categoricalmassestimator(
-        disc_x,
-        batch_y,
-        z_score_x="none",  # discrete data should not be z-scored.
-        z_score_y="none",  # y-embedding net already z-scores.
-        num_hidden=hidden_features,
-        num_layers=hidden_layers,
-        embedding_net=embedding_net,
-    )
+    if categorical_model == "made":
+        discrete_net = build_autoregressive_categoricalmassestimator(
+            disc_x,
+            batch_y,
+            z_score_x="none",  # discrete data should not be z-scored.
+            z_score_y="none",  # y-embedding net already z-scores.
+            num_hidden=hidden_features,
+            num_layers=hidden_layers,
+            embedding_net=embedding_net,
+        )
+    elif categorical_model == "categorical":
+        discrete_net = build_categoricalmassestimator(
+            disc_x,
+            batch_y,
+            z_score_x="none",  # discrete data should not be z-scored.
+            z_score_y="none",  # y-embedding net already z-scores.
+            num_hidden=hidden_features,
+            num_layers=hidden_layers,
+            embedding_net=embedding_net,
+        )
+    else:
+        raise ValueError(
+            f"Unknown categorical net {categorical_model}. Must be 'made' or 'categorical'."
+        )
 
     if combined_embedding_net is None:
         # set up linear embedding net for combining discrete and continuous
