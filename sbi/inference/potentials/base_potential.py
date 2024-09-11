@@ -1,8 +1,9 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import inspect
 from abc import ABCMeta, abstractmethod
-from typing import Optional
+from typing import Callable, Optional
 
 import torch
 from torch import Tensor
@@ -85,18 +86,39 @@ class BasePotential(metaclass=ABCMeta):
 class CallablePotentialWrapper(BasePotential):
     """If `potential_fn` is a callable it gets wrapped as this."""
 
-    allow_iid_x = True  # type: ignore
-
     def __init__(
         self,
-        callable_potential,
+        potential_fn: Callable,
         prior: Optional[Distribution],
         x_o: Optional[Tensor] = None,
         device: str = "cpu",
     ):
+        """Wraps a callable potential function.
+
+        Args:
+            potential_fn: Callable potential function, must have `theta` and `x_o` as
+                arguments.
+            prior: Prior distribution.
+            x_o: Observed data.
+            device: Device on which to evaluate the potential function.
+
+        """
         super().__init__(prior, x_o, device)
-        self.callable_potential = callable_potential
+
+        kwargs_of_callable = list(inspect.signature(potential_fn).parameters.keys())
+        required_keys = ["theta", "x_o"]
+        for key in required_keys:
+            assert key in kwargs_of_callable, (
+                "If you pass a `Callable` as `potential_fn` then it must have "
+                "`theta` and `x_o` as inputs, even if some of these keyword "
+                "arguments are unused."
+            )
+        self.potential_fn = potential_fn
 
     def __call__(self, theta, track_gradients: bool = True):
+        """Call the callable potential function on given theta.
+
+        Note, x_o is re-used from the initialization of the potential function.
+        """
         with torch.set_grad_enabled(track_gradients):
-            return self.callable_potential(theta=theta, x_o=self.x_o)
+            return self.potential_fn(theta=theta, x_o=self.x_o)

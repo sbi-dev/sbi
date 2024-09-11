@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import pytest
 import torch
-from torch import eye, ones, zeros
+from torch import Tensor, eye, ones, zeros
 from torch.distributions import MultivariateNormal
 
 from sbi.inference import (
@@ -14,6 +14,9 @@ from sbi.inference import (
     RejectionPosterior,
     VIPosterior,
 )
+from sbi.inference.potentials.base_potential import CallablePotentialWrapper
+from sbi.utils import BoxUniform
+from sbi.utils.conditional_density_utils import ConditionedPotential
 
 
 @pytest.mark.parametrize(
@@ -64,3 +67,25 @@ def test_callable_potential(sampling_method, mcmc_params_accurate: dict):
     sample_std = torch.std(approx_samples, dim=0)
     assert torch.allclose(sample_mean, torch.as_tensor(mean) - x_o, atol=0.2)
     assert torch.allclose(sample_std, torch.sqrt(torch.as_tensor(cov)), atol=0.1)
+
+
+@pytest.mark.parametrize(
+    "condition",
+    [
+        torch.rand(1, 2),
+        pytest.param(
+            torch.rand(2, 2),
+            marks=pytest.mark.xfail(
+                raises=ValueError,
+                match="Condition with batch size > 1 not supported",
+            ),
+        ),
+    ],
+)
+def test_conditioned_potential(condition: Tensor):
+    potential_fn = CallablePotentialWrapper(
+        potential_fn=lambda theta, x_o: theta,
+        prior=BoxUniform(low=zeros(2), high=ones(2)),
+    )
+
+    ConditionedPotential(potential_fn, condition=condition, dims_to_sample=[0])
