@@ -1,7 +1,6 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-import inspect
 from abc import abstractmethod
 from typing import Any, Callable, Dict, Optional, Union
 from warnings import warn
@@ -54,14 +53,6 @@ class NeuralPosterior:
 
         # Wrap as `CallablePotentialWrapper` if `potential_fn` is a Callable.
         if not isinstance(potential_fn, BasePotential):
-            kwargs_of_callable = list(inspect.signature(potential_fn).parameters.keys())
-            for key in ["theta", "x_o"]:
-                assert key in kwargs_of_callable, (
-                    "If you pass a `Callable` as `potential_fn` then it must have "
-                    "`theta` and `x_o` as inputs, even if some of these keyword "
-                    "arguments are unused."
-                )
-
             # If the `potential_fn` is a Callable then we wrap it as a
             # `CallablePotentialWrapper` which inherits from `BasePotential`.
             potential_device = "cpu" if device is None else device
