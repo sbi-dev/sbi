@@ -26,7 +26,6 @@ from sbi.utils import (
     test_posterior_net_for_multi_d_x,
     validate_theta_and_x,
     warn_if_zscoring_changes_data,
-    x_shape_from_simulation,
 )
 from sbi.utils.sbiutils import ImproperEmpirical, mask_sims_from_prior
 
@@ -282,7 +281,6 @@ class NPSE(NeuralInference):
                 theta[self.train_indices].to("cpu"),
                 x[self.train_indices].to("cpu"),
             )
-            self._x_shape = x_shape_from_simulation(x.to("cpu"))
 
             test_posterior_net_for_multi_d_x(
                 self._neural_net,
