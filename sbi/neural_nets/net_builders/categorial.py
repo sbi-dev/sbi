@@ -70,6 +70,7 @@ def build_autoregressive_categoricalmassestimator(
     z_score_y: Optional[str] = "independent",
     num_hidden: int = 20,
     num_layers: int = 2,
+    num_variables: int = 1,
     embedding_net: nn.Module = nn.Identity(),
 ):
     """Returns a density estimator for a categorical random variable.
@@ -97,15 +98,15 @@ def build_autoregressive_categoricalmassestimator(
             standardizing_net(batch_y, structured_y), embedding_net
         )
 
-
     categories = tensor([unique(variable).numel() for variable in batch_x.T])
+    categories = categories[-num_variables:]
 
     categorical_net = CategoricalMADE(
         categories=categories,
-        context_features=y_numel,
         hidden_features=num_hidden,
+        context_features=y_numel,
         num_blocks=num_layers,
-        #TODO: embedding_net=embedding_net,
+        # TODO: embedding_net=embedding_net,
     )
 
     return CategoricalMassEstimator(

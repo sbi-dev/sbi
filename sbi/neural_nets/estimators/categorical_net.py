@@ -76,27 +76,37 @@ class CategoricalMADE(MADE):
         ps = self.compute_probs(outputs)
         
         # categorical log prob
-        log_prob = torch.log(ps.gather(-1, inputs.unsqueeze(-1).long()).squeeze(-1))
+        log_prob = torch.log(ps.gather(-1, inputs.unsqueeze(-1).long()))
         log_prob = log_prob.sum(dim=-1)
        
         return log_prob
 
-    def sample(self, num_samples, context=None):
-
+    def sample(self, sample_shape, context=None):
+        # Ensure sample_shape is a tuple
+        if isinstance(sample_shape, int):
+            sample_shape = (sample_shape,)
+        sample_shape = torch.Size(sample_shape)
+        
+        # Calculate total number of samples
+        num_samples = torch.prod(torch.tensor(sample_shape)).item()
+        
+        # Prepare context
         if context is not None:
+            if context.ndim == 1:
+                context = context.unsqueeze(0)
             context = torchutils.repeat_rows(context, num_samples)
-
+        else:
+            context = torch.zeros(num_samples, self.context_dim)
+        
         with torch.no_grad():
-            
-            samples = torch.zeros(context.shape[0], self.num_variables)
-
+            samples = torch.zeros(num_samples, self.num_variables)
             for variable in range(self.num_variables):
                 outputs = self.forward(samples, context)
-                outputs = outputs.reshape(*samples.shape, self.num_categories)
+                outputs = outputs.reshape(num_samples, self.num_variables, self.num_categories)
                 ps = self.compute_probs(outputs)
                 samples[:, variable] = Categorical(probs=ps[:,variable]).sample()
-
-        return samples.reshape(-1, num_samples, self.num_variables)
+        
+        return samples.reshape(*sample_shape, self.num_variables)
 
     def _initialize(self):
         pass
