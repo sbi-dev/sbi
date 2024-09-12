@@ -69,7 +69,7 @@ class CategoricalMADE(MADE):
     def compute_probs(self, outputs):
         ps = F.softmax(outputs, dim=-1)*self.mask
         ps = ps / ps.sum(dim=-1, keepdim=True)
-        return ps
+        return ps.squeeze(-2)
         
     # outputs (batch_size, num_variables, num_categories)
     def log_prob(self, inputs, context=None):
@@ -78,7 +78,7 @@ class CategoricalMADE(MADE):
         ps = self.compute_probs(outputs)
         
         # categorical log prob
-        log_prob = torch.log(ps.gather(-1, inputs.unsqueeze(-1).long()))
+        log_prob = torch.log(ps.gather(-1, inputs.long()))
         log_prob = log_prob.sum(dim=-1)
        
         return log_prob
