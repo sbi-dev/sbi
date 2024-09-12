@@ -89,11 +89,11 @@ class PosteriorBasedPotential(BasePotential):
         For posterior-based methods, `x_o` is not allowed to be iid, as we assume that
         iid `x` is handled by a Permutation Invariant embedding net.
         """
-        if x_is_iid:
+        if x_is_iid and x_o is not None and x_o.shape[0] > 1:
             raise NotImplementedError(
-                "For NPE, iid `x` must be handled by a Permutation Invariant embedding \
-                    net. Therefore, the iid dimension of `x` is added to the event\
-                        dimension of `x`. Please set `x_is_iid=False`."
+                "For NPE, iid `x` must be handled by a permutation invariant embedding "
+                "net. Therefore, the iid dimension of `x` is added to the event "
+                "dimension of `x`. Please set `x_is_iid=False`."
             )
         else:
             super().set_x(x_o, x_is_iid=False)
