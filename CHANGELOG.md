@@ -1,3 +1,34 @@
+# v0.23.2
+
+## Bug Fixes
+
+- fixup for failing hmc test by @michaeldeistler in https://github.com/sbi-dev/sbi/pull/1247
+- fix: make RestrictedPrior a distribution to enable log_prob @janfb in https://github.com/sbi-dev/sbi/pull/1257
+- fix: npe iid handling by @janfb in https://github.com/sbi-dev/sbi/pull/1262
+- fix: tutorials test error handling, fix bugs in tutorials by @janfb in https://github.com/sbi-dev/sbi/pull/1264
+- fix #1260: include points in plotting limits by @janfb in https://github.com/sbi-dev/sbi/pull/1265
+- fix: conditioned potential error handling by @janfb in https://github.com/sbi-dev/sbi/pull/1275
+
+## Documentation
+
+- Rename SNPE to NPE in the README by @michaeldeistler in https://github.com/sbi-dev/sbi/pull/1248
+- update pickling FAQ by @michaeldeistler in https://github.com/sbi-dev/sbi/pull/1255
+- Adding example for custom DataLoader to tutorial 18 by @psteinb in https://github.com/sbi-dev/sbi/pull/1256
+- docs: add readme intro to docs landing page by @janfb in https://github.com/sbi-dev/sbi/pull/1272
+
+## Maintenance
+
+- Refactor simulate_for_sbi location by @samadpls in https://github.com/sbi-dev/sbi/pull/1253
+- build: devcontainer update by @janfb in https://github.com/sbi-dev/sbi/pull/1252
+- fix: docker notebook python version by @janfb in https://github.com/sbi-dev/sbi/pull/1258
+- refactor: remove outputs except plots from tutorials. by @janfb in https://github.com/sbi-dev/sbi/pull/1266
+- build: automatic nb stripping and pypi upload by @janfb in https://github.com/sbi-dev/sbi/pull/1267
+- refactor: remove deprecated x_shape where not needed. by @janfb in https://github.com/sbi-dev/sbi/pull/1271
+
+# v0.23.1
+
+- fix: include `score` folder by adding `__init__.py` (#1245 #1246)
+
 # v0.23.0
 
 ## Announcements
