@@ -56,7 +56,7 @@ def build_mnle(
     z_score_x: Optional[str] = "independent",
     z_score_y: Optional[str] = "independent",
     flow_model: str = "nsf",
-    categorical_model: str = "made",
+    categorical_model: str = "mlp",
     embedding_net: nn.Module = nn.Identity(),
     combined_embedding_net: Optional[nn.Module] = None,
     num_transforms: int = 2,
@@ -104,7 +104,7 @@ def build_mnle(
         flow_model: type of flow model to use for the continuous part of the
             data.
         categorical_model: type of categorical net to use for the discrete part of
-            the data. Can be "made" or "categorical".
+            the data. Can be "made" or "mlp".
         embedding_net: Optional embedding network for y, required if y is > 1D.
         combined_embedding_net: Optional embedding for combining the discrete
             part of the input and the embedded condition into a joined
@@ -157,7 +157,7 @@ def build_mnle(
             num_layers=hidden_layers,
             embedding_net=embedding_net,
         )
-    elif categorical_model == "categorical":
+    elif categorical_model == "mlp":
         discrete_net = build_categoricalmassestimator(
             disc_x,
             batch_y,
@@ -169,7 +169,7 @@ def build_mnle(
         )
     else:
         raise ValueError(
-            f"Unknown categorical net {categorical_model}. Must be 'made' or 'categorical'."
+            f"Unknown categorical net {categorical_model}. Must be 'made' or 'mlp'."
         )
 
     if combined_embedding_net is None:
