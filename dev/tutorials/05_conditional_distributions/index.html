@@ -672,8 +672,9 @@
 </code></pre></div>
 
 <p>Next, we follow the sampler interface and create a potential_function. The observation in this example is <code>x_o=[1, 1, 1, 1]</code>.</p>
-<div class="highlight"><pre><span></span><code><span class="n">potential_fn</span><span class="p">,</span> <span class="n">theta_transform</span> <span class="o">=</span> <span class="n">posterior_estimator_based_potential</span><span class="p">(</span>
-    <span class="n">posterior_estimator</span><span class="p">,</span> <span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span> <span class="n">x_o</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><span class="n">x_o</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>
+<span class="n">potential_fn</span><span class="p">,</span> <span class="n">theta_transform</span> <span class="o">=</span> <span class="n">posterior_estimator_based_potential</span><span class="p">(</span>
+    <span class="n">posterior_estimator</span><span class="p">,</span> <span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span> <span class="n">x_o</span><span class="o">=</span><span class="n">x_o</span>
 <span class="p">)</span>
 </code></pre></div>
 <p>Now we want to build the conditional potential (please read through the tutorial <a href="https://sbi-dev.github.io/sbi/dev/tutorials/09_sampler_interface/">09_sampler_interface</a> for an explanation of potential functions). For this, we have to pass a <code>condition</code>. In our case, we want to condition the forth parameter on <span class="arithmatex">\(\theta_4=0.2\)</span>. Regardless of how many parameters one wants to condition on, in <code>sbi</code>, one has to pass a <code>condition</code> value for all parameters. The first three values will simply be ignored. We can tell the algorithm which parameters should be kept fixed and which ones should be sampled with the argument <code>dims_to_sample</code>.</p>
