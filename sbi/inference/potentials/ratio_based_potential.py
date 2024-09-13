@@ -51,7 +51,7 @@ class RatioBasedPotential(BasePotential):
         self,
         ratio_estimator: nn.Module,
         prior: Distribution,
-        x_o: Optional[Tensor],
+        x_o: Optional[Tensor] = None,
         device: str = "cpu",
     ):
         r"""Returns the potential for ratio-based methods.

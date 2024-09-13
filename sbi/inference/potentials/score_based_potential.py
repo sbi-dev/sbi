@@ -60,7 +60,7 @@ class PosteriorScoreBasedPotential(BasePotential):
         self,
         score_estimator: ConditionalScoreEstimator,
         prior: Optional[Distribution],
-        x_o: Optional[Tensor],
+        x_o: Optional[Tensor] = None,
         iid_method: str = "iid_bridge",
         device: str = "cpu",
     ):

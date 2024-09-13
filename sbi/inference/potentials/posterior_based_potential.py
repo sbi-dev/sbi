@@ -63,7 +63,7 @@ class PosteriorBasedPotential(BasePotential):
         self,
         posterior_estimator: ConditionalDensityEstimator,
         prior: Distribution,
-        x_o: Optional[Tensor],
+        x_o: Optional[Tensor] = None,
         device: str = "cpu",
     ):
         r"""Returns the potential for posterior-based methods.
