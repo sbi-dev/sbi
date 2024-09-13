@@ -60,7 +60,7 @@ class LikelihoodBasedPotential(BasePotential):
         self,
         likelihood_estimator: ConditionalDensityEstimator,
         prior: Distribution,
-        x_o: Optional[Tensor],
+        x_o: Optional[Tensor] = None,
         device: str = "cpu",
     ):
         r"""Returns the potential function for likelihood-based methods.
