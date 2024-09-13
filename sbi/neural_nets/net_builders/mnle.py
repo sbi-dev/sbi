@@ -8,8 +8,14 @@ import torch
 from torch import Tensor, nn
 
 from sbi.neural_nets.estimators import MixedDensityEstimator
-from sbi.neural_nets.estimators.mixed_density_estimator import _separate_input
-from sbi.neural_nets.net_builders.categorial import build_categoricalmassestimator, build_autoregressive_categoricalmassestimator
+from sbi.neural_nets.estimators.mixed_density_estimator import (
+    _is_discrete,
+    _separate_input,
+)
+from sbi.neural_nets.net_builders.categorial import (
+    build_autoregressive_categoricalmassestimator,
+    build_categoricalmassestimator,
+)
 from sbi.neural_nets.net_builders.flow import (
     build_made,
     build_maf,
@@ -26,10 +32,7 @@ from sbi.neural_nets.net_builders.flow import (
     build_zuko_unaf,
 )
 from sbi.neural_nets.net_builders.mdn import build_mdn
-from sbi.utils.sbiutils import (
-    standardizing_net,
-    z_score_parser,
-)
+from sbi.utils.sbiutils import standardizing_net, z_score_parser
 from sbi.utils.user_input_checks import check_data_device
 
 model_builders = {
@@ -128,13 +131,14 @@ def build_mnle(
 
     warnings.warn(
         "The mixed neural likelihood estimator assumes that x contains "
-        "continuous data in the first n-1 columns (e.g., reaction times) and "
-        "categorical data in the last column (e.g., corresponding choices). If "
+        "continuous data in the first n-k columns (e.g., reaction times) and "
+        "categorical data in the last k columns (e.g., corresponding choices). If "
         "this is not the case for the passed `x` do not use this function.",
         stacklevel=2,
     )
     # Separate continuous and discrete data.
-    cont_x, disc_x = _separate_input(batch_x)
+    num_disc = int(torch.sum(_is_discrete(batch_x)))
+    cont_x, disc_x = _separate_input(batch_x, num_discrete_columns=num_disc)
 
     # Set up y-embedding net with z-scoring.
     z_score_y_bool, structured_y = z_score_parser(z_score_y)
@@ -158,6 +162,7 @@ def build_mnle(
             embedding_net=embedding_net,
         )
     elif categorical_model == "mlp":
+        assert num_disc == 1, "MLP only supports 1D input."
         discrete_net = build_categoricalmassestimator(
             disc_x,
             batch_y,

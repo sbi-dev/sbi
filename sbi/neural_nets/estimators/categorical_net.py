@@ -4,21 +4,20 @@
 from typing import Optional
 
 import torch
-from torch import Tensor, nn, distributions
+from nflows.nn.nde.made import MADE
+from nflows.utils import torchutils
+from torch import Tensor, nn
 from torch.distributions import Categorical
 from torch.nn import Sigmoid, Softmax
+from torch.nn import functional as F
 
 from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
-from nflows.nn.nde.made import MADE
-from torch.nn import functional as F
-from nflows.utils import torchutils
-import numpy as np
 
 
 class CategoricalMADE(MADE):
     def __init__(
         self,
-        categories, # List[int] or Tensor[int]
+        categories,  # Tensor[int]
         hidden_features,
         context_features=None,
         num_blocks=2,
@@ -31,7 +30,6 @@ class CategoricalMADE(MADE):
         custom_initialization=True,
         embedding_net: Optional[nn.Module] = nn.Identity(),
     ):
-
         if use_residual_blocks and random_mask:
             raise ValueError("Residual blocks can't be used with random masks.")
 
@@ -65,22 +63,22 @@ class CategoricalMADE(MADE):
     def forward(self, inputs, context=None):
         embedded_inputs = self.embedding_net.forward(inputs)
         return super().forward(embedded_inputs, context=context)
-    
+
     def compute_probs(self, outputs):
-        ps = F.softmax(outputs, dim=-1)*self.mask
+        ps = F.softmax(outputs, dim=-1) * self.mask
         ps = ps / ps.sum(dim=-1, keepdim=True)
-        return ps.squeeze(-2)
-        
+        return ps
+
     # outputs (batch_size, num_variables, num_categories)
     def log_prob(self, inputs, context=None):
         outputs = self.forward(inputs, context=context)
         outputs = outputs.reshape(*inputs.shape, self.num_categories)
         ps = self.compute_probs(outputs)
-        
+
         # categorical log prob
-        log_prob = torch.log(ps.gather(-1, inputs.long()))
-        log_prob = log_prob.sum(dim=-1)
-       
+        log_prob = torch.log(ps.gather(-1, inputs.unsqueeze(-1).long()))
+        log_prob = log_prob.squeeze(-1).sum(dim=-1)
+
         return log_prob
 
     def sample(self, sample_shape, context=None):
@@ -88,10 +86,10 @@ class CategoricalMADE(MADE):
         if isinstance(sample_shape, int):
             sample_shape = (sample_shape,)
         sample_shape = torch.Size(sample_shape)
-        
+
         # Calculate total number of samples
         num_samples = torch.prod(torch.tensor(sample_shape)).item()
-        
+
         # Prepare context
         if context is not None:
             if context.ndim == 1:
@@ -99,19 +97,22 @@ class CategoricalMADE(MADE):
             context = torchutils.repeat_rows(context, num_samples)
         else:
             context = torch.zeros(num_samples, self.context_dim)
-        
+
         with torch.no_grad():
             samples = torch.zeros(num_samples, self.num_variables)
             for variable in range(self.num_variables):
                 outputs = self.forward(samples, context)
-                outputs = outputs.reshape(num_samples, self.num_variables, self.num_categories)
+                outputs = outputs.reshape(
+                    num_samples, self.num_variables, self.num_categories
+                )
                 ps = self.compute_probs(outputs)
-                samples[:, variable] = Categorical(probs=ps[:,variable]).sample()
-        
+                samples[:, variable] = Categorical(probs=ps[:, variable]).sample()
+
         return samples.reshape(*sample_shape, self.num_variables)
 
     def _initialize(self):
         pass
+
 
 class CategoricalNet(nn.Module):
     """Conditional density (mass) estimation for a categorical random variable.
@@ -145,6 +146,7 @@ class CategoricalNet(nn.Module):
         self.activation = Sigmoid()
         self.softmax = Softmax(dim=1)
         self.num_categories = num_categories
+        self.num_variables = 1
 
         # Maybe add embedding net in front.
         if embedding_net is not None:

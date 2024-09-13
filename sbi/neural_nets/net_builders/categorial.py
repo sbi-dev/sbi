@@ -1,16 +1,19 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import warnings
 from typing import Optional
 
-from torch import Tensor, nn, unique, tensor
+from torch import Tensor, nn, tensor, unique
 
-from sbi.neural_nets.estimators import CategoricalMassEstimator, CategoricalNet, CategoricalMADE
-from sbi.utils.nn_utils import get_numel
-from sbi.utils.sbiutils import (
-    standardizing_net,
-    z_score_parser,
+from sbi.neural_nets.estimators import (
+    CategoricalMADE,
+    CategoricalMassEstimator,
+    CategoricalNet,
 )
+from sbi.neural_nets.estimators.mixed_density_estimator import _is_discrete
+from sbi.utils.nn_utils import get_numel
+from sbi.utils.sbiutils import standardizing_net, z_score_parser
 from sbi.utils.user_input_checks import check_data_device
 
 
@@ -70,7 +73,7 @@ def build_autoregressive_categoricalmassestimator(
     z_score_y: Optional[str] = "independent",
     num_hidden: int = 20,
     num_layers: int = 2,
-    num_variables: int = 1,
+    categories: Optional[Tensor] = None,
     embedding_net: nn.Module = nn.Identity(),
 ):
     """Returns a density estimator for a categorical random variable.
@@ -87,6 +90,11 @@ def build_autoregressive_categoricalmassestimator(
 
     if z_score_x != "none":
         raise ValueError("Categorical input should not be z-scored.")
+    if categories is None:
+        warnings.warn(
+            "Inferring categories from batch_x. Ensure all categories are present.",
+            stacklevel=2,
+        )
 
     check_data_device(batch_x, batch_y)
 
@@ -98,15 +106,16 @@ def build_autoregressive_categoricalmassestimator(
             standardizing_net(batch_y, structured_y), embedding_net
         )
 
-    categories = tensor([unique(variable).numel() for variable in batch_x.T])
-    categories = categories[-num_variables:]
+    batch_x_discrete = batch_x[:, _is_discrete(batch_x)]
+    inferred_categories = tensor([unique(col).numel() for col in batch_x_discrete.T])
+    categories = categories if categories is not None else inferred_categories
 
     categorical_net = CategoricalMADE(
         categories=categories,
         hidden_features=num_hidden,
         context_features=y_numel,
         num_blocks=num_layers,
-        # TODO: embedding_net=embedding_net,
+        embedding_net=embedding_net,
     )
 
     return CategoricalMassEstimator(
