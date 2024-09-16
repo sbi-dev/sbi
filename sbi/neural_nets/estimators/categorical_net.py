@@ -61,8 +61,8 @@ class CategoricalMADE(MADE):
             self._initialize()
 
     def forward(self, inputs, context=None):
-        embedded_inputs = self.embedding_net.forward(inputs)
-        return super().forward(embedded_inputs, context=context)
+        embedded_context = self.embedding_net.forward(context)
+        return super().forward(inputs, context=embedded_context)
 
     def compute_probs(self, outputs):
         ps = F.softmax(outputs, dim=-1) * self.mask
