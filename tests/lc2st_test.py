@@ -110,13 +110,13 @@ def test_running_lc2st(method, classifier, cv_folds, num_ensemble, z_score):
 
 @pytest.mark.slow
 @pytest.mark.parametrize("method", (LC2ST, LC2ST_NF))
-def test_lc2st_true_negativ_rate(method):
-    """Tests the true negative rate of the LC2ST-(NF) test:
+def test_lc2st_true_positiv_rate(method):
+    """Tests the true positiv rate of the LC2ST-(NF) test:
     for a "bad" estimator, the LC2ST-(NF) should reject the null hypothesis."""
     num_runs = 100
     confidence_level = 0.95
 
-    # use little training data and num_epochs to obtain "bad" estimator.
+    # use small num_train and num_epochs to obtain "bad" estimator
     # (no convergence to the true posterior)
     num_train = 100
     num_epochs = 2
@@ -189,15 +189,15 @@ def test_lc2st_true_negativ_rate(method):
 
 @pytest.mark.slow
 @pytest.mark.parametrize("method", (LC2ST, LC2ST_NF))
-def test_lc2st_true_positiv_rate(method):
-    """Tests the true negative rate of the LC2ST-(NF) test:
-    for a "good" estimator, the LC2ST-(NF) should accept the null hypothesis."""
+def test_lc2st_false_positiv_rate(method):
+    """Tests the false positiv rate of the LC2ST-(NF) test:
+    for a "good" estimator, the LC2ST-(NF) should not reject the null hypothesis."""
     num_runs = 100
     confidence_level = 0.95
 
-    # good estimator: big training and num_epochs = accept
+    # use big num_train and num_epochs to obtain "good" estimator
     # (convergence of the estimator)
-    num_train = 5_000
+    num_train = 10_000
     num_epochs = 200
 
     num_cal = 1_000
@@ -215,7 +215,7 @@ def test_lc2st_true_positiv_rate(method):
     # Train the neural posterior estimators
     inference = NPE(prior, density_estimator='maf')
     inference = inference.append_simulations(theta=theta_train, x=x_train)
-    npe = inference.train(training_batch_size=100, max_num_epochs=num_epochs)
+    npe = inference.train(training_batch_size=1000, max_num_epochs=num_epochs)
 
     thetas = prior.sample((num_cal,))
     xs = simulator(thetas)
@@ -259,8 +259,8 @@ def test_lc2st_true_positiv_rate(method):
 
     proportion_rejected = torch.tensor(results).float().mean()
 
-    assert (
-        proportion_rejected < 1 - confidence_level
-    ), f"LC2ST p-values too small, test should be accepted \
-        at least {confidence_level * 100}% of the time, but was accepted \
-        only {(1 - proportion_rejected) * 100}% of the time."
+    assert proportion_rejected < (
+        1 - confidence_level
+    ), f"LC2ST p-values too small, test should be rejected \
+        less then {(1 - confidence_level) * 100}% of the time, \
+        but was rejected {proportion_rejected * 100}% of the time."
