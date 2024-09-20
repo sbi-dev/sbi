@@ -140,6 +140,10 @@ class CNNEmbedding(nn.Module):
             cnn_layers += [conv_layer, nn.ReLU(inplace=True), pool]
             # Calculate change of output size of each CNN layer
             cnn_output_size = get_new_cnn_output_size(cnn_output_size, conv_layer, pool)
+            assert (
+            cnn_output_size > 0
+            ), f"""CNN output size is zero at layer {ii}. Either decrease num_cnn_layers
+                 or adjust the kernel_size and pool_kernel_size accordingly."""
 
         self.cnn_subnet = nn.Sequential(*cnn_layers)
 
