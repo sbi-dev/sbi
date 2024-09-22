@@ -197,7 +197,7 @@ def test_lc2st_false_positiv_rate(method):
 
     # use big num_train and num_epochs to obtain "good" estimator
     # (convergence of the estimator)
-    num_train = 10_000
+    num_train = 1_000
     num_epochs = 200
 
     num_cal = 1_000
@@ -215,7 +215,7 @@ def test_lc2st_false_positiv_rate(method):
     # Train the neural posterior estimators
     inference = NPE(prior, density_estimator='maf')
     inference = inference.append_simulations(theta=theta_train, x=x_train)
-    npe = inference.train(training_batch_size=1000, max_num_epochs=num_epochs)
+    npe = inference.train(training_batch_size=100, max_num_epochs=num_epochs)
 
     thetas = prior.sample((num_cal,))
     xs = simulator(thetas)
