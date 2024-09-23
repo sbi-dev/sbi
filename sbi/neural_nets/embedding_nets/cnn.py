@@ -143,9 +143,7 @@ class CNNEmbedding(nn.Module):
             cnn_output_size = get_new_cnn_output_size(cnn_output_size, conv_layer, pool)
 
             assert (
-                cnn_output_size[0] > 0 and cnn_output_size[1] > 0
-                if len(cnn_output_size) > 1
-                else True  # check for 2D conv
+                all(cnn_output_size)
             ), f"""CNN output size is zero at layer {ii + 1}. Either reduce
                  num_cnn_layers to {ii} or adjust the kernel_size
                  and pool_kernel_size accordingly."""
