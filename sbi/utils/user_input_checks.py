@@ -17,6 +17,7 @@ from sbi.utils.torchutils import BoxUniform, atleast_2d
 from sbi.utils.user_input_checks_utils import (
     CustomPriorWrapper,
     MultipleIndependent,
+    OneDimPriorWrapper,
     PytorchReturnTypeWrapper,
 )
 
@@ -219,6 +220,11 @@ def process_pytorch_prior(prior: Distribution) -> Tuple[Distribution, int, bool]
 
     # This will fail for float64 priors.
     check_prior_return_type(prior)
+
+    # Potentially required wrapper if the prior returns an additional sample dimension
+    # for `.log_prob()`.
+    if prior.log_prob(prior.sample(torch.Size((10,)))).shape == torch.Size([10, 1]):
+        prior = OneDimPriorWrapper(prior, validate_args=False)
 
     theta_numel = prior.sample().numel()
 

@@ -10,7 +10,14 @@ import pytest
 import torch
 from pyknos.mdn.mdn import MultivariateGaussianMDN
 from torch import Tensor, eye, nn, ones, zeros
-from torch.distributions import Beta, Distribution, Gamma, MultivariateNormal, Uniform
+from torch.distributions import (
+    Beta,
+    Distribution,
+    Exponential,
+    Gamma,
+    MultivariateNormal,
+    Uniform,
+)
 
 from sbi.inference import NPE_A, NPE_C, simulate_for_sbi
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
@@ -27,6 +34,7 @@ from sbi.utils.user_input_checks import (
 from sbi.utils.user_input_checks_utils import (
     CustomPriorWrapper,
     MultipleIndependent,
+    OneDimPriorWrapper,
     PytorchReturnTypeWrapper,
 )
 
@@ -93,6 +101,11 @@ torch.set_default_tensor_type(torch.FloatTensor)
             BoxUniform(zeros(3, dtype=torch.float64), ones(3, dtype=torch.float64)),
             dict(),
         ),
+        (
+            OneDimPriorWrapper,
+            Exponential(torch.tensor([3.0])),
+            dict(),
+        ),
     ),
 )
 def test_prior_wrappers(wrapper, prior, kwargs):
@@ -117,6 +130,9 @@ def test_prior_wrappers(wrapper, prior, kwargs):
     within_support(prior, prior.sample((2,)))
     # Test transform
     mcmc_transform(prior)
+
+    # For 1D priors, the `log_prob()` should not have a batch dim.
+    assert len(prior.log_prob(prior.sample((10,))).shape) == 1
 
 
 def test_reinterpreted_batch_dim_prior():
@@ -268,7 +284,6 @@ def test_prepare_sbi_problem(simulator: Callable, prior):
         prior: prior as defined by the user (pytorch, scipy, custom)
         x_shape: shape of data as defined by the user.
     """
-
     prior, _, prior_returns_numpy = process_prior(prior)
     simulator = process_simulator(simulator, prior, prior_returns_numpy)
     check_sbi_inputs(simulator, prior)
@@ -308,6 +323,7 @@ def test_prepare_sbi_problem(simulator: Callable, prior):
                 MultivariateNormal(zeros(2), eye(2)),
             ),
         ),
+        (diagonal_linear_gaussian, Exponential(torch.tensor([3.0]))),
     ),
 )
 def test_inference_with_user_sbi_problems(
