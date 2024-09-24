@@ -373,3 +373,69 @@ def build_support(
             support = constraints.interval(lower_bound, upper_bound)
 
     return support
+
+
+class OneDimPriorWrapper(Distribution):
+    """Wrap batched 1D distributions to get rid of the batch dim of `.log_prob()`.
+
+    1D pytorch distributions such as `torch.distributions.Exponential`, `.Uniform`, or
+    `.Normal` do not, by default return __any__ sample or batch dimension. E.g.:
+    ```python
+    dist = torch.distributions.Exponential(torch.tensor(3.0))
+    dist.sample((10,)).shape  # (10,)
+    ```
+
+    `sbi` will raise an error that the sample dimension is missing. A simple solution is
+    to add a batch dimension to `dist` as follows:
+    ```python
+    dist = torch.distributions.Exponential(torch.tensor([3.0]))
+    dist.sample((10,)).shape  # (10, 1)
+    ```
+
+    Unfortunately, this `dist` will return the batch dimension also for `.log_prob():
+    ```python
+    dist = torch.distributions.Exponential(torch.tensor([3.0]))
+    samples = dist.sample((10,))
+    dist.log_prob(samples).shape  # (10, 1)
+    ```
+
+    This will lead to unexpected errors in `sbi`. The point of this class is to wrap
+    those batched 1D distributions to get rid of their batch dimension in `.log_prob()`.
+    """
+
+    def __init__(
+        self,
+        prior: Distribution,
+        validate_args=None,
+    ) -> None:
+        super().__init__(
+            batch_shape=prior.batch_shape,
+            event_shape=prior.event_shape,
+            validate_args=(
+                prior._validate_args if validate_args is None else validate_args
+            ),
+        )
+        self.prior = prior
+
+    def sample(self, *args, **kwargs) -> Tensor:
+        return self.prior.sample(*args, **kwargs)
+
+    def log_prob(self, *args, **kwargs) -> Tensor:
+        """Override the log_prob method to get rid of the additional batch dimension."""
+        return self.prior.log_prob(*args, **kwargs)[..., 0]
+
+    @property
+    def arg_constraints(self) -> Dict[str, constraints.Constraint]:
+        return self.prior.arg_constraints
+
+    @property
+    def support(self):
+        return self.prior.support
+
+    @property
+    def mean(self) -> Tensor:
+        return self.prior.mean
+
+    @property
+    def variance(self) -> Tensor:
+        return self.prior.variance
