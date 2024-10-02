@@ -127,6 +127,7 @@ class CNNEmbedding(nn.Module):
         cnn_output_size = input_shape
         stride = 1
         padding = 1
+
         for ii in range(num_conv_layers):
             # Defining another 2D convolution layer
             conv_layer = conv_module(
@@ -140,6 +141,12 @@ class CNNEmbedding(nn.Module):
             cnn_layers += [conv_layer, nn.ReLU(inplace=True), pool]
             # Calculate change of output size of each CNN layer
             cnn_output_size = get_new_cnn_output_size(cnn_output_size, conv_layer, pool)
+
+            assert all(
+                cnn_output_size
+            ), f"""CNN output size is zero at layer {ii + 1}. Either reduce
+                 num_cnn_layers to {ii} or adjust the kernel_size
+                 and pool_kernel_size accordingly."""
 
         self.cnn_subnet = nn.Sequential(*cnn_layers)
 
