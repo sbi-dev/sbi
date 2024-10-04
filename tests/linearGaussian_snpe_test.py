@@ -558,8 +558,8 @@ def test_sample_conditional(mcmc_params_accurate: dict):
     # Evaluate the conditional density be drawing samples and smoothing with a Gaussian
     # kde.
     potential_fn, theta_transform = posterior_estimator_based_potential(
-        posterior_estimator, prior=prior
-    ).set_x(x_o, x_is_iid=False)
+        posterior_estimator, prior=prior, x_o=x_o
+    )
     (
         conditioned_potential_fn,
         restricted_tf,

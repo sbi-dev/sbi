@@ -2,28 +2,31 @@
 
 ## Bug Fixes
 
-- fixup for failing hmc test by @michaeldeistler in https://github.com/sbi-dev/sbi/pull/1247
-- fix: make RestrictedPrior a distribution to enable log_prob @janfb in https://github.com/sbi-dev/sbi/pull/1257
-- fix: npe iid handling by @janfb in https://github.com/sbi-dev/sbi/pull/1262
-- fix: tutorials test error handling, fix bugs in tutorials by @janfb in https://github.com/sbi-dev/sbi/pull/1264
-- fix #1260: include points in plotting limits by @janfb in https://github.com/sbi-dev/sbi/pull/1265
-- fix: conditioned potential error handling by @janfb in https://github.com/sbi-dev/sbi/pull/1275
+- fixup for failing hmc test by @michaeldeistler (#1247)
+- fix: make RestrictedPrior a distribution to enable log_prob @janfb (#1257)
+- fix: npe iid handling by @janfb (#1262)
+- fix: tutorials test error handling, fix bugs in tutorials by @janfb (#1264)
+- fix #1260: include points in plotting limits by @janfb (#1265)
+- fix: conditioned potential error handling by @janfb, @michaeldeistler (#1275, #1289)
+- fix: Allow 1D pytorch distributions by @michaeldeistler (#1286)
 
 ## Documentation
 
-- Rename SNPE to NPE in the README by @michaeldeistler in https://github.com/sbi-dev/sbi/pull/1248
-- update pickling FAQ by @michaeldeistler in https://github.com/sbi-dev/sbi/pull/1255
-- Adding example for custom DataLoader to tutorial 18 by @psteinb in https://github.com/sbi-dev/sbi/pull/1256
-- docs: add readme intro to docs landing page by @janfb in https://github.com/sbi-dev/sbi/pull/1272
+- Rename SNPE to NPE in the README by @michaeldeistler (#1248)
+- update pickling FAQ by @michaeldeistler (#1255)
+- Adding example for custom DataLoader to tutorial 18 by @psteinb (#1256)
+- docs: add readme intro to docs landing page by @janfb (#1272)
+- Change sampling method for LC2ST to `sample_batched()` by @JuliaLinhart (#1279)
 
 ## Maintenance
 
-- Refactor simulate_for_sbi location by @samadpls in https://github.com/sbi-dev/sbi/pull/1253
-- build: devcontainer update by @janfb in https://github.com/sbi-dev/sbi/pull/1252
-- fix: docker notebook python version by @janfb in https://github.com/sbi-dev/sbi/pull/1258
-- refactor: remove outputs except plots from tutorials. by @janfb in https://github.com/sbi-dev/sbi/pull/1266
-- build: automatic nb stripping and pypi upload by @janfb in https://github.com/sbi-dev/sbi/pull/1267
-- refactor: remove deprecated x_shape where not needed. by @janfb in https://github.com/sbi-dev/sbi/pull/1271
+- Refactor simulate_for_sbi location by @samadpls (#1253)
+- build: devcontainer update by @janfb (#1252)
+- fix: docker notebook python version by @janfb (#1258)
+- refactor: remove outputs except plots from tutorials. by @janfb (#1266)
+- build: automatic nb stripping and pypi upload by @janfb (#1267)
+- refactor: remove deprecated x_shape where not needed by @janfb (#1271)
+- more explicit error message for CNN shapes by @Ankush7890 (#1281)
 
 # v0.23.1
 
