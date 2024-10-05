@@ -4,11 +4,114 @@
 from typing import Optional
 
 import torch
+from nflows.nn.nde.made import MADE
+from nflows.utils import torchutils
 from torch import Tensor, nn
 from torch.distributions import Categorical
 from torch.nn import Sigmoid, Softmax
+from torch.nn import functional as F
 
 from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
+
+
+class CategoricalMADE(MADE):
+    def __init__(
+        self,
+        categories,  # Tensor[int]
+        hidden_features,
+        context_features=None,
+        num_blocks=2,
+        use_residual_blocks=True,
+        random_mask=False,
+        activation=F.relu,
+        dropout_probability=0.0,
+        use_batch_norm=False,
+        epsilon=1e-2,
+        custom_initialization=True,
+        embedding_net: Optional[nn.Module] = nn.Identity(),
+    ):
+        if use_residual_blocks and random_mask:
+            raise ValueError("Residual blocks can't be used with random masks.")
+
+        self.num_variables = len(categories)
+        self.num_categories = int(max(categories))
+        self.categories = categories
+        self.mask = torch.zeros(self.num_variables, self.num_categories)
+        for i, c in enumerate(categories):
+            self.mask[i, :c] = 1
+
+        super().__init__(
+            self.num_variables,
+            hidden_features,
+            context_features=context_features,
+            num_blocks=num_blocks,
+            output_multiplier=self.num_categories,
+            use_residual_blocks=use_residual_blocks,
+            random_mask=random_mask,
+            activation=activation,
+            dropout_probability=dropout_probability,
+            use_batch_norm=use_batch_norm,
+        )
+
+        self.embedding_net = embedding_net
+        self.hidden_features = hidden_features
+        self.epsilon = epsilon
+
+        if custom_initialization:
+            self._initialize()
+
+    def forward(self, inputs, context=None):
+        embedded_context = self.embedding_net.forward(context)
+        return super().forward(inputs, context=embedded_context)
+
+    def compute_probs(self, outputs):
+        ps = F.softmax(outputs, dim=-1) * self.mask
+        ps = ps / ps.sum(dim=-1, keepdim=True)
+        return ps
+
+    # outputs (batch_size, num_variables, num_categories)
+    def log_prob(self, inputs, context=None):
+        outputs = self.forward(inputs, context=context)
+        outputs = outputs.reshape(*inputs.shape, self.num_categories)
+        ps = self.compute_probs(outputs)
+
+        # categorical log prob
+        log_prob = torch.log(ps.gather(-1, inputs.unsqueeze(-1).long()))
+        log_prob = log_prob.squeeze(-1).sum(dim=-1)
+
+        return log_prob
+
+    def sample(self, sample_shape, context=None):
+        # Ensure sample_shape is a tuple
+        if isinstance(sample_shape, int):
+            sample_shape = (sample_shape,)
+        sample_shape = torch.Size(sample_shape)
+
+        # Calculate total number of samples
+        num_samples = torch.prod(torch.tensor(sample_shape)).item()
+
+        # Prepare context
+        if context is not None:
+            if context.ndim == 1:
+                context = context.unsqueeze(0)
+            context = torchutils.repeat_rows(context, num_samples)
+        else:
+            context = torch.zeros(num_samples, self.context_dim)
+
+        with torch.no_grad():
+            samples = torch.zeros(num_samples, self.num_variables)
+            for variable in range(self.num_variables):
+                outputs = self.forward(samples, context)
+                outputs = outputs.reshape(
+                    num_samples, self.num_variables, self.num_categories
+                )
+                ps = self.compute_probs(outputs)
+                samples[:, variable] = Categorical(probs=ps[:, variable]).sample()
+
+        return samples.reshape(*sample_shape, self.num_variables)
+
+    def _initialize(self):
+        pass
 
 
 class CategoricalNet(nn.Module):
@@ -43,6 +146,7 @@ class CategoricalNet(nn.Module):
         self.activation = Sigmoid()
         self.softmax = Softmax(dim=1)
         self.num_categories = num_categories
+        self.num_variables = 1
 
         # Maybe add embedding net in front.
         if embedding_net is not None:
