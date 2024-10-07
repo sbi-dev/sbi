@@ -4,11 +4,11 @@
 import pickle
 
 import pytest
-from sbi.inference.posteriors.vi_posterior import VIPosterior
 import torch
 
 from sbi import utils as utils
 from sbi.inference import NLE, NPE, NRE
+from sbi.inference.posteriors.vi_posterior import VIPosterior
 
 
 @pytest.mark.parametrize(
