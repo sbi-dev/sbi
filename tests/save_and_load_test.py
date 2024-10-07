@@ -8,6 +8,7 @@ import torch
 
 from sbi import utils as utils
 from sbi.inference import NLE, NPE, NRE
+from sbi.inference.posteriors.vi_posterior import VIPosterior
 
 
 @pytest.mark.parametrize(
@@ -33,6 +34,12 @@ def test_picklability(inference_method, sampling_method: str, tmp_path):
     posterior = inference.build_posterior(sample_with=sampling_method).set_default_x(
         x_o
     )
+
+    # After sample and log_prob, the posterior should still be picklable
+    if isinstance(posterior, VIPosterior):
+        posterior.train(max_num_iters=10)
+    _ = posterior.sample((1,))
+    _ = posterior.log_prob(torch.zeros(1, num_dim))
 
     with open(f"{tmp_path}/saved_posterior.pickle", "wb") as handle:
         pickle.dump(posterior, handle)
