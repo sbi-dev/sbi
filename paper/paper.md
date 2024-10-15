@@ -201,7 +201,7 @@ but has also fostered the application of SBI in various fields of research
 [@groschner2022biophysical;@bondarenko2023embryo; @confavreux2023meta;
 @myers2024disinhibition; @avecilla2022neural; @lowet2023theta; @bernaerts2023combined;
 @mishra2022neural; @dyer2022black; @hashemi2023amortized; @hahn2022accelerated;
-@lemos2024field; @deistler2022energy; @rossler2023skewed @dingeldein2023simulation;
+@lemos2024field; @deistler2022energy; @rossler2023skewed; @dingeldein2023simulation;
 @jin2023bayesian; @boelts2023simulation; @gao2024deep; @wang2024comprehensive].
 
 # Description
