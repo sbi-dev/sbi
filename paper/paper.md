@@ -195,10 +195,8 @@ To aid in the effective application of these algorithms to a wide range of probl
 
 The `sbi` package is already used extensively by the machine learning research community
 [@deistler2022truncated; @glocklervariational; @muratore2022neural;
-@gloeckler2023adversarial;
-@dyer2022calibrating; @wiqvist2021sequential; @spurio2023bayesian;
-@dirmeier2023simulation;@gloeckler2024allinone;
-@hermans2022crisis; @linhart2024c2st; @boelts2022flexible]
+@gloeckler2023adversarial; @dyer2022calibrating; @wiqvist2021sequential;
+@spurio2023bayesian; @dirmeier2023simulation;@gloeckler2024allinone; @hermans2022crisis; @linhart2024c2st; @boelts2022flexible]
 but has also fostered the application of SBI in various fields of research
 [@groschner2022biophysical;@bondarenko2023embryo; @confavreux2023meta;
 @myers2024disinhibition; @avecilla2022neural; @lowet2023theta; @bernaerts2023combined;
