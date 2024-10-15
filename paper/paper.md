@@ -12,10 +12,12 @@ authors:
   - name: Jan Boelts
     affiliation: "1, 2, 3"
     note: "Maintainer, core contributor"
+    equal-contrib: true
 
   - name: Michael Deistler
     affiliation: "1, 2"
     note: "Maintainer, core contributor"
+    equal-contrib: true
 
   - name: Manuel Gloeckler
     affiliation: "1, 2"
@@ -120,6 +122,8 @@ authors:
     affiliation: "1, 2, 25"
 
 affiliations:
+  - index: 1
+    name: Machine Learning in Science, University of Tübingen
   - index: 2
     name: Tübingen AI Center
   - index: 3
@@ -196,15 +200,15 @@ The `sbi` package is already used extensively by the machine learning research c
 @dirmeier2023simulation;@gloeckler2024allinone;
 @hermans2022crisis; @linhart2024c2st; @boelts2022flexible]
 but has also fostered the application of SBI in various fields of research
-[e.g., @groschner2022biophysical;@bondarenko2023embryo; @confavreux2023meta;
-@myers2024disinhibition;
-@avecilla2022neural; @lowet2023theta; @bernaerts2023combined; @mishra2022neural; @dyer2022black;
-@hashemi2023amortized; @hahn2022accelerated; @lemos2024field; @deistler2022energy; @rossler2023skewed; @dingeldein2023simulation; @jin2023bayesian;
-@boelts2023simulation; @gao2024deep; @wang2024comprehensive].
+[@groschner2022biophysical;@bondarenko2023embryo; @confavreux2023meta;
+@myers2024disinhibition; @avecilla2022neural; @lowet2023theta; @bernaerts2023combined;
+@mishra2022neural; @dyer2022black; @hashemi2023amortized; @hahn2022accelerated;
+@lemos2024field; @deistler2022energy; @rossler2023skewed @dingeldein2023simulation;
+@jin2023bayesian; @boelts2023simulation; @gao2024deep; @wang2024comprehensive].
 
 # Description
 
-`sbi` is a flexible and extensive toolkit for running simulation-based Bayesian inference workflows. `sbi` supports any kind of (offline) simulator and prior, a wide range of inference methods, neural networks, and samplers, as well as diagnostic methods and analysis tools (Fig. \autoref{fig:fig1}).
+`sbi` is a flexible and extensive toolkit for running simulation-based Bayesian inference workflows. `sbi` supports any kind of (offline) simulator and prior, a wide range of inference methods, neural networks, and samplers, as well as diagnostic methods and analysis tools (\autoref{fig:fig1}).
 
 ![**Features of the `sbi` package.** Components that were added since the initial release described in @tejerocantero2020sbi are marked in red.\label{fig:fig1}](sbi_toolbox.png)
 
@@ -218,7 +222,7 @@ diagnostics and analysis).
 **Simulator \& prior:** The `sbi` toolkit requires only simulation parameters and
 simulated data as input, without needing direct access to the simulator itself. However,
 if the simulator can be provided as a Python callable, `sbi` can optionally parallelize
-simulations using Joblib [@joblib]. Additionally, `sbi` can automatically handle failed
+simulations using `joblib` [@joblib]. Additionally, `sbi` can automatically handle failed
 simulations or missing values, it supports both discrete and continuous parameters and
 observations (or mixtures thereof) and it provides utilities to flexibly define priors.
 
@@ -232,10 +236,10 @@ focused on one observation to improve simulation efficiency with active learning
 
 **Neural networks and training:** `sbi` implements a wide variety of state-of-the-art
 conditional density estimators for NPE and NLE, including a variety of normalizing flows
-[@papamakarios2021normalizing; @greenberg2019automatic] (via @nflows and @zuko),
-diffusion models [@song2021scorebased; @geffner2023compositional;
+[@papamakarios2021normalizing; @greenberg2019automatic] (via `nflows` [@nflow-repo] and
+`zuko` [@zuko-repo]), diffusion models [@song2021scorebased; @geffner2023compositional;
 @sharrock2022sequential], mixture density networks [@Bishop_94], and flow matching
-[@lipman2023flow; @dax2023flow] (via @zuko), as well as ensembles of any of these
+[@lipman2023flow; @dax2023flow] (via `zuko`), as well as ensembles of any of these
 networks. `sbi` also implements a large set of embedding networks that can automatically
 learn summary statistics of (potentially) high-dimensional simulation outputs (including
 multi-layer-perceptrons, convolutional networks, and permutation invariant networks).
@@ -274,8 +278,8 @@ maintained in July 2024).
 The `BayesFlow` [@bayesflow_2023_software] package focuses on a set of amortized SBI algorithms
 based on posterior and likelihood estimation that have been developed in the respective research labs
 that maintain the package [@radev2020bayesflow].
-The @swyft package specializes in algorithms based on neural ratio estimation.
-The @sbijax package [@dirmeier2024simulationbasedinferencepythonpackage] implements a set
+The `swyft` package [@swyft] specializes in algorithms based on neural ratio estimation.
+The `sbijax` package [@dirmeier2024simulationbasedinferencepythonpackage] implements a set
 of inference methods in JAX.
 
 # Acknowledgements
