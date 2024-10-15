@@ -174,12 +174,12 @@ bibliography: paper.bib
 
 ---
 
-## Abstract
+# Abstract
 
 Scientists and engineers use simulators to model empirically observed phenomena. However, tuning the parameters of a simulator to ensure its outputs match observed data presents a significant challenge. Simulation-based inference (SBI) addresses this by enabling Bayesian inference for simulators, identifying parameters that match observed data and align with prior knowledge. Unlike traditional Bayesian inference, SBI only needs access to simulations from the model and does not require evaluations of the likelihood-function. In addition, SBI algorithms do not require gradients through the simulator, allow for massive parallelization of simulations, and can perform inference for different observations without further simulations or training, thereby amortizing inference.
 Over the past years, we have developed, maintained, and extended `sbi`, a PyTorch-based package that implements Bayesian SBI algorithms based on neural networks. The `sbi` toolkit implements a wide range of inference methods, neural network architectures, sampling methods, and diagnostic tools. In addition, it provides well-tested default settings but also offers flexibility to fully customize every step of the simulation-based inference workflow. Taken together, the `sbi` toolkit enables scientists and engineers to apply state-of-the-art SBI methods to black-box simulators, opening up new possibilities for aligning simulations with empirically observed data.
 
-## Statement of need
+# Statement of need
 
 Bayesian inference is a principled approach for determining parameters consistent with empirical observations: Given a prior over parameters, a forward-model (defining the likelihood), and observations, it returns a posterior distribution.
 The posterior distribution captures the entire space of parameters that are compatible with the observations and the prior and it quantifies parameter uncertainty.
@@ -202,7 +202,7 @@ but has also fostered the application of SBI in various fields of research
 @hashemi2023amortized; @hahn2022accelerated; @lemos2024field; @deistler2022energy; @rossler2023skewed; @dingeldein2023simulation; @jin2023bayesian;
 @boelts2023simulation; @gao2024deep; @wang2024comprehensive].
 
-## Description
+# Description
 
 `sbi` is a flexible and extensive toolkit for running simulation-based Bayesian inference workflows. `sbi` supports any kind of (offline) simulator and prior, a wide range of inference methods, neural networks, and samplers, as well as diagnostic methods and analysis tools (Fig. \autoref{fig:fig1}).
 
@@ -264,7 +264,7 @@ learning researchers and domain-practitioners. We have created an open architect
 embraced community-driven development practices to encourage collaboration with other
 machine learning researchers and applied scientists to join us in this long-term vision.
 
-## Related software
+# Related software
 
 Since the original release of the `sbi` package, several other packages that implement
 neural network-based SBI algorithms have emerged. The @lampe package offers neural
@@ -278,7 +278,7 @@ The @swyft package specializes in algorithms based on neural ratio estimation.
 The @sbijax package [@dirmeier2024simulationbasedinferencepythonpackage] implements a set
 of inference methods in JAX.
 
-## Acknowledgements
+# Acknowledgements
 
 This work has been supported by the German Federal Ministry of Education and Research
 (BMBF, projects `Simalesam`, FKZ 01IS21055 A-B and `DeepHumanVision`, FKZ: 031L0197B,
@@ -306,4 +306,4 @@ Initiative and Networking Fund through the Helmholtz AI platform grant. MD, MG, 
 MP, SB, JKL, AS, ZS, JB are members of the International Max Planck Research School for
 Intelligent Systems (IMPRS-IS).
 
-## References
+# References
