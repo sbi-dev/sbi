@@ -9,21 +9,21 @@ tags:
   - Conditional Density Estimation
 
 authors:
-  - name: Jan Boelts^[Maintainer, equal contribution]
+  - name: Jan Boelts^[Maintainer]
     affiliation: "1, 2, 3"
-    note: "Maintainer, core contributor"
     corresponding: true
+    equal-contrib: true
 
-  - name: Michael Deistler^*
+  - name: Michael Deistler*
     affiliation: "1, 2"
-    note: "Maintainer, core contributor"
+    equal-contrib: true
     corresponding: true
 
-  - name: Manuel Gloeckler
+  - name: Manuel Gloeckler^[Core contributor]
     affiliation: "1, 2"
     note: "Core contributor"
 
-  - name: Álvaro Tejero-Cantero
+  - name: Álvaro Tejero-Cantero†
     affiliation: "3, 4"
     note: "Core contributor"
 
