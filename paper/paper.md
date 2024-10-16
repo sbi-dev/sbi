@@ -13,47 +13,49 @@ authors:
     affiliation: "1, 2, 3"
     corresponding: true
     equal-contrib: true
+    role: "Maintainer, core contributor"
 
-  - name: Michael Deistler*
+  - name: Michael Deistler^*
     affiliation: "1, 2"
-    equal-contrib: true
     corresponding: true
+    equal-contrib: true
+    role: "Maintainer, core contributor"
 
   - name: Manuel Gloeckler^[Core contributor]
     affiliation: "1, 2"
-    note: "Core contributor"
+    role: "Core contributor"
 
-  - name: Álvaro Tejero-Cantero†
+  - name: Álvaro Tejero-Cantero^†
     affiliation: "3, 4"
-    note: "Core contributor"
+    role: "Core contributor"
 
   - name: Jan-Matthis Lueckmann
     affiliation: "5"
-    note: "Core contributor"
+    role: "Core contributor"
 
   - name: Guy Moss
     affiliation: "1, 2"
-    note: "Core contributor"
+    role: "Core contributor"
 
   - name: Peter Steinbach
     affiliation: "6"
-    note: "Major contributor"
+    role: "Major contributor"
 
   - name: Thomas Moreau
     affiliation: "7"
-    note: "Major contributor"
+    role: "Major contributor"
 
   - name: Fabio Muratore
     affiliation: "8"
-    note: "Major contributor"
+    role: "Major contributor"
 
   - name: Julia Linhart
     affiliation: "7"
-    note: "Major contributor"
+    role: "Major contributor"
 
   - name: Conor Durkan
     affiliation: "9"
-    note: "Major contributor"
+    role: "Major contributor"
 
   - name: Julius Vetter
     affiliation: "1, 2"
