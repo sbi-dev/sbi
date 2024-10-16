@@ -9,7 +9,7 @@ tags:
   - Conditional Density Estimation
 
 authors:
-  - name: Jan Boelts^[Maintainer]^[Core contributor]
+  - name: Jan Boelts^[Maintainer]
     affiliation: "1, 2, 3"
     note: "Maintainer, core contributor"
     equal-contrib: true
