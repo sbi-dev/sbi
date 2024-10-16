@@ -15,17 +15,17 @@ authors:
     equal-contrib: true
     role: "Maintainer, core contributor"
 
-  - name: Michael Deistler^*
+  - name: Michael Deistler
     affiliation: "1, 2"
     corresponding: true
     equal-contrib: true
     role: "Maintainer, core contributor"
 
-  - name: Manuel Gloeckler^[Core contributor]
+  - name: Manuel Gloeckler
     affiliation: "1, 2"
     role: "Core contributor"
 
-  - name: Álvaro Tejero-Cantero^†
+  - name: Álvaro Tejero-Cantero
     affiliation: "3, 4"
     role: "Core contributor"
 
