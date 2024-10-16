@@ -237,7 +237,7 @@ focused on one observation to improve simulation efficiency with active learning
 
 **Neural networks and training:** `sbi` implements a wide variety of state-of-the-art
 conditional density estimators for NPE and NLE, including a variety of normalizing flows
-[@papamakarios2021normalizing; @greenberg2019automatic] (via `nflows` [@nflow-repo] and
+[@papamakarios2021normalizing; @greenberg2019automatic] (via `nflows` [@nflows-repo] and
 `zuko` [@zuko-repo]), diffusion models [@song2021scorebased; @geffner2023compositional;
 @sharrock2022sequential], mixture density networks [@Bishop_94], and flow matching
 [@lipman2023flow; @dax2023flow] (via `zuko`), as well as ensembles of any of these
@@ -260,7 +260,7 @@ expected coverage [@hermans2022crisis; @deistler2022truncated], local C2ST
 [@linhart2024c2st], and TARP [@lemos2023sampling]. Additionally, `sbi` offers a variety
 of visualization tools for the posterior, including marginal and conditional corner
 plots to visualize high-dimensional distributions, calibration plots, and wrappers for
-Arviz [@arviz] diagnostic plots.
+Arviz [@arviz_2019] diagnostic plots.
 
 With `sbi`, our goal is to advance scientific discovery and computational engineering by
 making Bayesian inference accessible to a broad range of models, including those with
@@ -276,7 +276,7 @@ neural network-based SBI algorithms have emerged. The @lampe package offers neur
 posterior and neural ratio estimation, primarily targeting SBI researchers with a
 low-level API and full flexibility over the training loop (Lampe stopped being
 maintained in July 2024).
-The `BayesFlow` [@bayesflow_2023_software] package focuses on a set of amortized SBI algorithms
+The `BayesFlow` package [@bayesflow_2023_software] focuses on a set of amortized SBI algorithms
 based on posterior and likelihood estimation that have been developed in the respective research labs
 that maintain the package [@radev2020bayesflow].
 The `swyft` package [@swyft] specializes in algorithms based on neural ratio estimation.
