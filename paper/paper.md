@@ -1,5 +1,5 @@
 ---
-title: '`sbi` reloaded: A toolkit for simulation-based inference workflows'
+title: '`sbi` reloaded: a toolkit for simulation-based inference workflows'
 tags:
   - Python
   - PyTorch
@@ -13,7 +13,7 @@ authors:
     affiliation: "1, 2, 3"
     note: "Maintainer, core contributor"
 
-  - name: Michael Deistler^[Maintainer, core contributor, equal contribution]
+  - name: Michael Deistler^*^
     affiliation: "1, 2"
     note: "Maintainer, core contributor"
 
