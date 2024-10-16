@@ -9,47 +9,47 @@ tags:
   - Conditional Density Estimation
 
 authors:
-  - name: Jan Boelts ^[Maintainer, equal contribution] ^[Core contributor]
+  - name: Jan Boelts^[Maintainer, core contributor, equal contribution]
     affiliation: "1, 2, 3"
     note: "Maintainer, core contributor"
 
-  - name: Michael Deistler ^[Maintainer] ^[Core contributor]
+  - name: Michael Deistler^[Maintainer, core contributor, equal contribution]
     affiliation: "1, 2"
     note: "Maintainer, core contributor"
 
-  - name: Manuel Gloeckler
+  - name: Manuel Gloeckler^[Core contributor]
     affiliation: "1, 2"
     note: "Core contributor"
 
-  - name: Álvaro Tejero-Cantero
+  - name: Álvaro Tejero-Cantero^[Core contributor]
     affiliation: "3, 4"
     note: "Core contributor"
 
-  - name: Jan-Matthis Lueckmann
+  - name: Jan-Matthis Lueckmann^[Core contributor]
     affiliation: "5"
     note: "Core contributor"
 
-  - name: Guy Moss
+  - name: Guy Moss^[Core contributor]
     affiliation: "1, 2"
     note: "Core contributor"
 
-  - name: Peter Steinbach
+  - name: Peter Steinbach^[Major contributor]
     affiliation: "6"
     note: "Major contributor"
 
-  - name: Thomas Moreau
+  - name: Thomas Moreau^[Major contributor]
     affiliation: "7"
     note: "Major contributor"
 
-  - name: Fabio Muratore
+  - name: Fabio Muratore^[Major contributor]
     affiliation: "8"
     note: "Major contributor"
 
-  - name: Julia Linhart
+  - name: Julia Linhart^[Major contributor]
     affiliation: "7"
     note: "Major contributor"
 
-  - name: Conor Durkan
+  - name: Conor Durkan^[Major contributor]
     affiliation: "9"
     note: "Major contributor"
 
