@@ -17,39 +17,39 @@ authors:
     affiliation: "1, 2"
     note: "Maintainer, core contributor"
 
-  - name: Manuel Gloeckler^[Core contributor]
+  - name: Manuel Gloeckler
     affiliation: "1, 2"
     note: "Core contributor"
 
-  - name: Álvaro Tejero-Cantero^[Core contributor]
+  - name: Álvaro Tejero-Cantero
     affiliation: "3, 4"
     note: "Core contributor"
 
-  - name: Jan-Matthis Lueckmann^[Core contributor]
+  - name: Jan-Matthis Lueckmann
     affiliation: "5"
     note: "Core contributor"
 
-  - name: Guy Moss^[Core contributor]
+  - name: Guy Moss
     affiliation: "1, 2"
     note: "Core contributor"
 
-  - name: Peter Steinbach^[Major contributor]
+  - name: Peter Steinbach
     affiliation: "6"
     note: "Major contributor"
 
-  - name: Thomas Moreau^[Major contributor]
+  - name: Thomas Moreau
     affiliation: "7"
     note: "Major contributor"
 
-  - name: Fabio Muratore^[Major contributor]
+  - name: Fabio Muratore
     affiliation: "8"
     note: "Major contributor"
 
-  - name: Julia Linhart^[Major contributor]
+  - name: Julia Linhart
     affiliation: "7"
     note: "Major contributor"
 
-  - name: Conor Durkan^[Major contributor]
+  - name: Conor Durkan
     affiliation: "9"
     note: "Major contributor"
 
