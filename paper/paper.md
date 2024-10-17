@@ -197,7 +197,7 @@ Recently, simulation-based inference (SBI) algorithms based on neural networks h
 To aid in the effective application of these algorithms to a wide range of problems, we developed the `sbi` toolkit. `sbi` implements a variety of state-of-the-art SBI algorithms, offering both high-level interfaces, extensive documentation and tutorials for practitioners, as well as low-level interfaces for experienced users and SBI researchers (giving full control over simulations, the training loop, and the sampling procedure). Since the original release of the `sbi` package [@tejerocantero2020sbi], the community of contributors has expanded significantly, resulting in a large number of improvements that have made `sbi` more flexible, performant, and reliable. `sbi` now supports a wider range of amortized and sequential inference methods, neural network architectures (including normalizing flows, flow- and score-matching, and various embedding network architectures), samplers (including MCMC, variational inference, importance sampling, and rejection sampling), diagnostic tools, visualization tools, and a comprehensive set of tutorials on how to use these features.
 
 The `sbi` package is already used extensively by the machine learning research community
-[@deistler2022truncated; @glocklervariational; @muratore2022neural;
+[@deistler2022truncated; @gloecklervariational; @muratore2022neural;
 @gloeckler2023adversarial; @dyer2022calibrating; @wiqvist2021sequential;
 @spurio2023bayesian; @dirmeier2023simulation;@gloeckler2024allinone; @hermans2022crisis; @linhart2024c2st; @boelts2022flexible]
 but has also fostered the application of SBI in various fields of research
@@ -277,8 +277,8 @@ posterior and neural ratio estimation, primarily targeting SBI researchers with 
 low-level API and full flexibility over the training loop (Lampe stopped being
 maintained in July 2024).
 The `BayesFlow` package [@bayesflow_2023_software] focuses on a set of amortized SBI algorithms
-based on posterior and likelihood estimation that have been developed in the respective research labs
-that maintain the package [@radev2020bayesflow].
+based on posterior and likelihood estimation that have been developed in the respective
+research labs [@radev2020bayesflow].
 The `swyft` package [@swyft] specializes in algorithms based on neural ratio estimation.
 The `sbijax` package [@dirmeier2024simulationbasedinferencepythonpackage] implements a set
 of inference methods in JAX.
@@ -286,23 +286,23 @@ of inference methods in JAX.
 # Acknowledgements
 
 This work has been supported by the German Federal Ministry of Education and Research
-(BMBF, projects `Simalesam`, FKZ 01IS21055 A-B and `DeepHumanVision`, FKZ: 031L0197B,
+(BMBF, projects "Simalesam", FKZ 01IS21055 A-B and "DeepHumanVision", FKZ: 031L0197B,
 and the Tübingen AI Center FKZ: 01IS18039A), the German Research Foundation (DFG)
 through Germany’s Excellence Strategy (EXC-Number 2064/1, PN 390727645) and SFB1233 (PN
-276693517), SFB 1089 (PN 227953431), SPP 2041 (PN 34721065), SPP 2041 `Computational
-Connectomics`, SPP 2298-2 (PN 543917411), SFB 1233 `Robust Vision`, and Germany’s
-Excellence Strategy EXC-Number 2064/1/Project number 390727645, the `Certification and
-Foundations of Safe Machine Learning Systems in Healthcare` project funded by the Carl
-Zeiss Foundation, the Else Kröner Fresenius Stiftung (Project ClinbrAIn), and the
-European Union (ERC, `DeepCoMechTome`, ref. 101089288). CD was supported by the EPSRC
+276693517), SFB 1089 (PN 227953431), SPP 2041 (PN 34721065), SPP 2041 "Computational
+Connectomics", SPP 2298-2 (PN 543917411), SFB 1233 "Robust Vision", and Germany's
+Excellence Strategy EXC-Number 2064/1/Project number 390727645, the "Certification and
+Foundations of Safe Machine Learning Systems in Healthcare" project funded by the Carl
+Zeiss Foundation, the Else Kröner Fresenius Stiftung (Project "ClinbrAIn"), and the
+European Union (ERC, "DeepCoMechTome", ref. 101089288). CD was supported by the EPSRC
 Centre for Doctoral Training in Data Science, funded by the UK Engineering and Physical
 Sciences Research Council (grant EP/L016427/1) and the University of Edinburgh. BKM is
 part of the ELLIS PhD program, receiving travel support from the ELISE mobility program
-which has received funding from the European Union’s Horizon 2020 research and
+which has received funding from the European Union's Horizon 2020 research and
 innovation programme under ELISE grant agreement No 951847. DSG is supported by
 Helmholtz AI. JL is a recipient of the Pierre-Aguilar Scholarship and thankful for the
 funding of the Capital Fund Management (CFM). ANK is supported by an FWO grant
-(G097022N). TG was supported by “Third Wave of AI”, funded by the Excellence Program of
+(G097022N). TG was supported by "Third Wave of AI”, funded by the Excellence Program of
 the Hessian Ministry of Higher Education, Science, Research and Art. TM and PLCR were
 supported from a national grant managed by the French National Research Agency (Agence
 Nationale de la Recherche) attributed to the ExaDoST project of the NumPEx PEPR program,
