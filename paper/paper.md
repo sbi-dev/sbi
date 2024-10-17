@@ -223,7 +223,7 @@ diagnostics and analysis).
 **Simulator \& prior:** The `sbi` toolkit requires only simulation parameters and
 simulated data as input, without needing direct access to the simulator itself. However,
 if the simulator can be provided as a Python callable, `sbi` can optionally parallelize
-simulations using `joblib` [@joblib]. Additionally, `sbi` can automatically handle failed
+running the simulations from a given prior using `joblib` [@joblib]. Additionally, `sbi` can automatically handle failed
 simulations or missing values, it supports both discrete and continuous parameters and
 observations (or mixtures thereof) and it provides utilities to flexibly define priors.
 
@@ -231,12 +231,13 @@ observations (or mixtures thereof) and it provides utilities to flexibly define 
 them Neural Posterior Estimation (NPE) with various conditional estimators, Neural
 Likelihood Estimation (NLE), and Neural Ratio Estimation (NRE). Each of these methods
 can be run either in an *amortized* mode, where the neural network is trained once on a
-set of pre-existing set of simulations and then performs inference on *any* observation
+set of pre-existing simulation results and then performs inference on *any* observation
 without further simulations or retraining, or in a *sequential* mode where inference is
-focused on one observation to improve simulation efficiency with active learning.
+focused on one observation to improve simulation efficiency with active learning,
+running simulations with parameters likely to have resulted in the observation.
 
 **Neural networks and training:** `sbi` implements a wide variety of state-of-the-art
-conditional density estimators for NPE and NLE, including a variety of normalizing flows
+conditional density estimators for NPE and NLE, including normalizing flows
 [@papamakarios2021normalizing; @greenberg2019automatic] (via `nflows` [@nflows-repo] and
 `zuko` [@zuko-repo]), diffusion models [@song2021scorebased; @geffner2023compositional;
 @sharrock2022sequential], mixture density networks [@Bishop_94], and flow matching
@@ -251,14 +252,14 @@ default values, but `sbi` also allows full access over the training loop when de
 MCMC (with chains vectorized across observations), variational inference, rejection
 sampling, or importance sampling, as well as wrappers to use MCMC samplers from Pyro and
 PyMC [@bingham2019pyro; @abril2023pymc]. `sbi` can perform inference for single
-observations or for multiple i.i.d.observations, and can use importance sampling to
+observations or for multiple *i.i.d.* observations, and can use importance sampling to
 correct for potential inaccuracies in the posterior if the likelihood is available.
 
 **Diagnostics and analysis:** The `sbi` toolkit also implements a large set of
 diagnostic tools, such as simulation-based calibration (SBC) [@talts2018validating],
 expected coverage [@hermans2022crisis; @deistler2022truncated], local C2ST
-[@linhart2024c2st], and TARP [@lemos2023sampling]. Additionally, `sbi` offers a variety
-of visualization tools for the posterior, including marginal and conditional corner
+[@linhart2024c2st], and TARP [@lemos2023sampling]. Additionally, `sbi` offers
+visualization tools for the posterior, including marginal and conditional corner
 plots to visualize high-dimensional distributions, calibration plots, and wrappers for
 Arviz [@arviz_2019] diagnostic plots.
 
