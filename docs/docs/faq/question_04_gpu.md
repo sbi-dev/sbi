@@ -43,4 +43,4 @@ operations that benefit from being executed on the GPU.
 A speed-up through training on the GPU will most likely become visible when
 using convolutional modules in your neural networks. E.g., when passing an
 embedding net for image processing like in this example:
-[https://github.com/sbi-dev/sbi/blob/main/tutorials/05_embedding_net.ipynb](https://github.com/sbi-dev/sbi/blob/main/tutorials/05_embedding_net.ipynb).
+[https://github.com/sbi-dev/sbi/blob/main/tutorials/04_embedding_networks.ipynb](https://github.com/sbi-dev/sbi/blob/main/tutorials/04_embedding_networks.ipynb).
