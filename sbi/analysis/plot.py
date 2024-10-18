@@ -2152,7 +2152,7 @@ def plot_tarp(
     ax.plot(alpha, ecp, color="blue", label="TARP")
     ax.plot(alpha, alpha, color="black", linestyle="--", label="ideal")
     ax.set_xlabel(r"Credibility Level $\alpha$")
-    ax.set_ylabel(r"Expected Coverage Probility")
+    ax.set_ylabel(r"Expected Coverage Probability")
     ax.set_xlim(0.0, 1.0)
     ax.set_ylim(0.0, 1.0)
     ax.set_title(title or "")
