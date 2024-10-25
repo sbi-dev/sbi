@@ -14,7 +14,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.41">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.42">
     
     
       
@@ -1000,7 +1000,7 @@
 
     <div class="doc doc-contents first">
             <p class="doc doc-class-bases">
-              Bases: <code>PosteriorEstimator</code></p>
+              Bases: <code><span title="sbi.inference.trainers.npe.npe_base.PosteriorEstimator">PosteriorEstimator</span></code></p>
 
 
 
@@ -1754,7 +1754,7 @@ last round. In the last round, NPE-A can use a Mixture of Gaussians.</p>
                 <code>prior</code>
             </td>
             <td>
-                  <code>Optional[Distribution]</code>
+                  <code><span title="typing.Optional">Optional</span>[<span title="torch.distributions.Distribution">Distribution</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -1773,7 +1773,7 @@ distribution) can be used.</p>
                 <code>density_estimator</code>
             </td>
             <td>
-                  <code>Union[str, Callable]</code>
+                  <code><span title="typing.Union">Union</span>[str, <span title="typing.Callable">Callable</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -1835,7 +1835,7 @@ last round. This overrides the <code>num_components</code> value passed to
                 <code>logging_level</code>
             </td>
             <td>
-                  <code>Union[int, str]</code>
+                  <code><span title="typing.Union">Union</span>[int, str]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -1852,7 +1852,7 @@ INFO, WARNING, DEBUG, ERROR and CRITICAL.</p>
                 <code>summary_writer</code>
             </td>
             <td>
-                  <code>Optional[TensorboardSummaryWriter]</code>
+                  <code><span title="typing.Optional">Optional</span>[<span title="sbi.sbi_types.TensorboardSummaryWriter">TensorboardSummaryWriter</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -2074,7 +2074,7 @@ and then returns a <code>DirectPosterior</code>.</p>
                 <code>density_estimator</code>
             </td>
             <td>
-                  <code>Optional[TorchModule]</code>
+                  <code><span title="typing.Optional">Optional</span>[<span title="sbi.sbi_types.TorchModule">TorchModule</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -2091,7 +2091,7 @@ If <code>None</code>, use the latest neural density estimator that was trained.<
                 <code>prior</code>
             </td>
             <td>
-                  <code>Optional[Distribution]</code>
+                  <code><span title="typing.Optional">Optional</span>[<span title="torch.distributions.Distribution">Distribution</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -2117,7 +2117,7 @@ If <code>None</code>, use the latest neural density estimator that was trained.<
       <tbody>
           <tr class="doc-section-item">
             <td>
-                  <code>DirectPosterior</code>
+                  <code><a class="autorefs autorefs-internal" title="sbi.inference.posteriors.direct_posterior.DirectPosterior" href="../posteriors/#sbi.inference.posteriors.direct_posterior.DirectPosterior">DirectPosterior</a></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -2239,7 +2239,7 @@ SNPE-A.</p>
                 <code>density_estimator</code>
             </td>
             <td>
-                  <code>Optional[TorchModule]</code>
+                  <code><span title="typing.Optional">Optional</span>[<span title="sbi.sbi_types.TorchModule">TorchModule</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -2266,7 +2266,7 @@ If <code>None</code>, use the latest neural density estimator that was trained.<
       <tbody>
           <tr class="doc-section-item">
             <td>
-                  <code>NPE_A_MDN</code>
+                  <code><span title="sbi.inference.trainers.npe.npe_a.NPE_A_MDN">NPE_A_MDN</span></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -2526,7 +2526,7 @@ we train until validation loss increases (see also <code>stop_after_epochs</code
                 <code>clip_max_norm</code>
             </td>
             <td>
-                  <code>Optional[float]</code>
+                  <code><span title="typing.Optional">Optional</span>[float]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -2543,7 +2543,7 @@ prevent exploding gradients. Use None for no clipping.</p>
                 <code>calibration_kernel</code>
             </td>
             <td>
-                  <code>Optional[Callable]</code>
+                  <code><span title="typing.Optional">Optional</span>[<span title="typing.Callable">Callable</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -2631,7 +2631,7 @@ loss and leakage after the training.</p>
                 <code>dataloader_kwargs</code>
             </td>
             <td>
-                  <code>Optional[Dict]</code>
+                  <code><span title="typing.Optional">Optional</span>[<span title="typing.Dict">Dict</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -2677,7 +2677,7 @@ on the number of mixture components.</p>
       <tbody>
           <tr class="doc-section-item">
             <td>
-                  <code>ConditionalDensityEstimator</code>
+                  <code><a class="autorefs autorefs-internal" title="sbi.neural_nets.estimators.base.ConditionalDensityEstimator" href="../models/#sbi.neural_nets.estimators.ConditionalDensityEstimator">ConditionalDensityEstimator</a></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -2960,7 +2960,7 @@ on the number of mixture components.</p>
 
     <div class="doc doc-contents first">
             <p class="doc doc-class-bases">
-              Bases: <code>PosteriorEstimator</code></p>
+              Bases: <code><span title="sbi.inference.trainers.npe.npe_base.PosteriorEstimator">PosteriorEstimator</span></code></p>
 
 
 
@@ -4319,7 +4319,7 @@ the atomic loss.</p>
                 <code>prior</code>
             </td>
             <td>
-                  <code>Optional[Distribution]</code>
+                  <code><span title="typing.Optional">Optional</span>[<span title="torch.distributions.Distribution">Distribution</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -4336,7 +4336,7 @@ parameters, e.g. which ranges are meaningful for them.</p>
                 <code>density_estimator</code>
             </td>
             <td>
-                  <code>Union[str, Callable]</code>
+                  <code><span title="typing.Union">Union</span>[str, <span title="typing.Callable">Callable</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -4375,7 +4375,7 @@ estimator. The density estimator needs to provide the methods
                 <code>logging_level</code>
             </td>
             <td>
-                  <code>Union[int, str]</code>
+                  <code><span title="typing.Union">Union</span>[int, str]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -4392,7 +4392,7 @@ INFO, WARNING, DEBUG, ERROR and CRITICAL.</p>
                 <code>summary_writer</code>
             </td>
             <td>
-                  <code>Optional[TensorboardSummaryWriter]</code>
+                  <code><span title="typing.Optional">Optional</span>[<span title="sbi.sbi_types.TensorboardSummaryWriter">TensorboardSummaryWriter</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -4683,7 +4683,7 @@ we train until validation loss increases (see also <code>stop_after_epochs</code
                 <code>clip_max_norm</code>
             </td>
             <td>
-                  <code>Optional[float]</code>
+                  <code><span title="typing.Optional">Optional</span>[float]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -4700,7 +4700,7 @@ prevent exploding gradients. Use None for no clipping.</p>
                 <code>calibration_kernel</code>
             </td>
             <td>
-                  <code>Optional[Callable]</code>
+                  <code><span title="typing.Optional">Optional</span>[<span title="typing.Callable">Callable</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -4825,7 +4825,7 @@ loss and leakage after the training.</p>
                 <code>dataloader_kwargs</code>
             </td>
             <td>
-                  <code>Optional[Dict]</code>
+                  <code><span title="typing.Optional">Optional</span>[<span title="typing.Dict">Dict</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -4852,7 +4852,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
       <tbody>
           <tr class="doc-section-item">
             <td>
-                  <code>Module</code>
+                  <code><span title="torch.nn.Module">Module</span></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -5081,7 +5081,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 
     <div class="doc doc-contents first">
             <p class="doc doc-class-bases">
-              Bases: <code>NeuralInference</code></p>
+              Bases: <code><span title="sbi.inference.trainers.base.NeuralInference">NeuralInference</span></code></p>
 
 
         <p>Implements the Flow Matching Posterior Estimator (FMPE) for
@@ -5756,7 +5756,7 @@ simulation-based inference.</p>
                 <code>prior</code>
             </td>
             <td>
-                  <code>Optional[Distribution]</code>
+                  <code><span title="typing.Optional">Optional</span>[<span title="torch.distributions.Distribution">Distribution</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -5772,7 +5772,7 @@ simulation-based inference.</p>
                 <code>density_estimator</code>
             </td>
             <td>
-                  <code>Union[str, Callable]</code>
+                  <code><span title="typing.Union">Union</span>[str, <span title="typing.Callable">Callable</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -5806,7 +5806,7 @@ field for flow matching. Can be a string, e.g., &lsquo;mlp&rsquo; or &lsquo;resn
                 <code>logging_level</code>
             </td>
             <td>
-                  <code>Union[int, str]</code>
+                  <code><span title="typing.Union">Union</span>[int, str]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -5822,7 +5822,7 @@ field for flow matching. Can be a string, e.g., &lsquo;mlp&rsquo; or &lsquo;resn
                 <code>summary_writer</code>
             </td>
             <td>
-                  <code>Optional[SummaryWriter]</code>
+                  <code><span title="typing.Optional">Optional</span>[<span title="torch.utils.tensorboard.writer.SummaryWriter">SummaryWriter</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -5957,7 +5957,7 @@ field for flow matching. Can be a string, e.g., &lsquo;mlp&rsquo; or &lsquo;resn
                 <code>density_estimator</code>
             </td>
             <td>
-                  <code>Optional[ConditionalDensityEstimator]</code>
+                  <code><span title="typing.Optional">Optional</span>[<a class="autorefs autorefs-internal" title="sbi.neural_nets.estimators.ConditionalDensityEstimator" href="../models/#sbi.neural_nets.estimators.ConditionalDensityEstimator">ConditionalDensityEstimator</a>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -5973,7 +5973,7 @@ field for flow matching. Can be a string, e.g., &lsquo;mlp&rsquo; or &lsquo;resn
                 <code>prior</code>
             </td>
             <td>
-                  <code>Optional[Distribution]</code>
+                  <code><span title="typing.Optional">Optional</span>[<span title="torch.distributions.Distribution">Distribution</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -6005,7 +6005,7 @@ field for flow matching. Can be a string, e.g., &lsquo;mlp&rsquo; or &lsquo;resn
                 <code>direct_sampling_parameters</code>
             </td>
             <td>
-                  <code>Optional[Dict[str, Any]]</code>
+                  <code><span title="typing.Optional">Optional</span>[<span title="typing.Dict">Dict</span>[str, <span title="typing.Any">Any</span>]]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -6031,7 +6031,7 @@ field for flow matching. Can be a string, e.g., &lsquo;mlp&rsquo; or &lsquo;resn
       <tbody>
           <tr class="doc-section-item">
 <td><code>DirectPosterior</code></td>            <td>
-                  <code>DirectPosterior</code>
+                  <code><a class="autorefs autorefs-internal" title="sbi.inference.posteriors.direct_posterior.DirectPosterior" href="../posteriors/#sbi.inference.posteriors.direct_posterior.DirectPosterior">DirectPosterior</a></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -6261,7 +6261,7 @@ field for flow matching. Can be a string, e.g., &lsquo;mlp&rsquo; or &lsquo;resn
                 <code>clip_max_norm</code>
             </td>
             <td>
-                  <code>Optional[float]</code>
+                  <code><span title="typing.Optional">Optional</span>[float]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -6331,7 +6331,7 @@ results.</p>
                 <code>dataloader_kwargs</code>
             </td>
             <td>
-                  <code>Optional[dict]</code>
+                  <code><span title="typing.Optional">Optional</span>[dict]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -6357,7 +6357,7 @@ results.</p>
       <tbody>
           <tr class="doc-section-item">
 <td><code>DensityEstimator</code></td>            <td>
-                  <code>ConditionalDensityEstimator</code>
+                  <code><a class="autorefs autorefs-internal" title="sbi.neural_nets.estimators.ConditionalDensityEstimator" href="../models/#sbi.neural_nets.estimators.ConditionalDensityEstimator">ConditionalDensityEstimator</a></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -6716,7 +6716,7 @@ results.</p>
 
     <div class="doc doc-contents first">
             <p class="doc doc-class-bases">
-              Bases: <code>NeuralInference</code></p>
+              Bases: <code><span title="sbi.inference.NeuralInference">NeuralInference</span></code></p>
 
 
 
@@ -7808,7 +7808,7 @@ not tested yet.</p>
                 <code>prior</code>
             </td>
             <td>
-                  <code>Optional[Distribution]</code>
+                  <code><span title="typing.Optional">Optional</span>[<span title="torch.distributions.Distribution">Distribution</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -7824,7 +7824,7 @@ not tested yet.</p>
                 <code>score_estimator</code>
             </td>
             <td>
-                  <code>Union[str, Callable]</code>
+                  <code><span title="typing.Union">Union</span>[str, <span title="typing.Callable">Callable</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -7874,7 +7874,7 @@ network.</p>
                 <code>logging_level</code>
             </td>
             <td>
-                  <code>Union[int, str]</code>
+                  <code><span title="typing.Union">Union</span>[int, str]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -7891,7 +7891,7 @@ string.</p>
                 <code>summary_writer</code>
             </td>
             <td>
-                  <code>Optional[SummaryWriter]</code>
+                  <code><span title="typing.Optional">Optional</span>[<span title="torch.utils.tensorboard.writer.SummaryWriter">SummaryWriter</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -8113,7 +8113,7 @@ from.</p>
                 <code>theta</code>
             </td>
             <td>
-                  <code>Tensor</code>
+                  <code><span title="torch.Tensor">Tensor</span></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -8129,7 +8129,7 @@ from.</p>
                 <code>x</code>
             </td>
             <td>
-                  <code>Tensor</code>
+                  <code><span title="torch.Tensor">Tensor</span></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -8145,7 +8145,7 @@ from.</p>
                 <code>proposal</code>
             </td>
             <td>
-                  <code>Optional[DirectPosterior]</code>
+                  <code><span title="typing.Optional">Optional</span>[<a class="autorefs autorefs-internal" title="sbi.inference.posteriors.DirectPosterior" href="../posteriors/#sbi.inference.posteriors.direct_posterior.DirectPosterior">DirectPosterior</a>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -8163,7 +8163,7 @@ Pass <code>None</code> if the parameters were sampled from the prior. If not
                 <code>exclude_invalid_x</code>
             </td>
             <td>
-                  <code>Optional[bool]</code>
+                  <code><span title="typing.Optional">Optional</span>[bool]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -8183,7 +8183,7 @@ be <code>True</code> in the first round and <code>False</code> in later rounds.<
                 <code>data_device</code>
             </td>
             <td>
-                  <code>Optional[str]</code>
+                  <code><span title="typing.Optional">Optional</span>[str]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -8211,7 +8211,7 @@ much VRAM can set to &lsquo;cpu&rsquo; to store data on system memory instead.</
       <tbody>
           <tr class="doc-section-item">
             <td>
-                  <code>NPSE</code>
+                  <code><a class="autorefs autorefs-internal" title="sbi.inference.trainers.npse.npse.NPSE" href="#sbi.inference.trainers.npse.npse.NPSE">NPSE</a></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -8418,7 +8418,7 @@ following functionality over the raw neural density estimator:
                 <code>score_estimator</code>
             </td>
             <td>
-                  <code>Optional[ConditionalScoreEstimator]</code>
+                  <code><span title="typing.Optional">Optional</span>[<span title="sbi.neural_nets.estimators.score_estimator.ConditionalScoreEstimator">ConditionalScoreEstimator</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -8435,7 +8435,7 @@ If <code>None</code>, use the latest neural score estimator that was trained.</p
                 <code>prior</code>
             </td>
             <td>
-                  <code>Optional[Distribution]</code>
+                  <code><span title="typing.Optional">Optional</span>[<span title="torch.distributions.Distribution">Distribution</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -8480,7 +8480,7 @@ define a probabilistic ODE and solves it with a numerical ODE solver.</p>
       <tbody>
           <tr class="doc-section-item">
             <td>
-                  <code>ScorePosterior</code>
+                  <code><a class="autorefs autorefs-internal" title="sbi.inference.posteriors.score_posterior.ScorePosterior" href="../posteriors/#sbi.inference.posteriors.score_posterior.ScorePosterior">ScorePosterior</a></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -8728,7 +8728,7 @@ we train until validation loss increases (see also <code>stop_after_epochs</code
                 <code>clip_max_norm</code>
             </td>
             <td>
-                  <code>Optional[float]</code>
+                  <code><span title="typing.Optional">Optional</span>[float]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -8745,7 +8745,7 @@ prevent exploding gradients. Use None for no clipping.</p>
                 <code>calibration_kernel</code>
             </td>
             <td>
-                  <code>Optional[Callable]</code>
+                  <code><span title="typing.Optional">Optional</span>[<span title="typing.Callable">Callable</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -8852,7 +8852,7 @@ loss after the training.</p>
                 <code>dataloader_kwargs</code>
             </td>
             <td>
-                  <code>Optional[dict]</code>
+                  <code><span title="typing.Optional">Optional</span>[dict]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -8879,7 +8879,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
       <tbody>
           <tr class="doc-section-item">
             <td>
-                  <code>ConditionalScoreEstimator</code>
+                  <code><span title="sbi.neural_nets.estimators.score_estimator.ConditionalScoreEstimator">ConditionalScoreEstimator</span></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -9396,7 +9396,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 
     <div class="doc doc-contents first">
             <p class="doc doc-class-bases">
-              Bases: <code>LikelihoodEstimator</code></p>
+              Bases: <code><span title="sbi.inference.trainers.nle.nle_base.LikelihoodEstimator">LikelihoodEstimator</span></code></p>
 
 
 
@@ -9531,7 +9531,7 @@ Autoregressive Flows_, Papamakarios et al., AISTATS 2019,
                 <code>prior</code>
             </td>
             <td>
-                  <code>Optional[Distribution]</code>
+                  <code><span title="typing.Optional">Optional</span>[<span title="torch.distributions.Distribution">Distribution</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -9549,7 +9549,7 @@ prior must be passed to <code>.build_posterior()</code>.</p>
                 <code>density_estimator</code>
             </td>
             <td>
-                  <code>Union[str, Callable]</code>
+                  <code><span title="typing.Union">Union</span>[str, <span title="typing.Callable">Callable</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -9588,7 +9588,7 @@ estimator. The density estimator needs to provide the methods
                 <code>logging_level</code>
             </td>
             <td>
-                  <code>Union[int, str]</code>
+                  <code><span title="typing.Union">Union</span>[int, str]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -9605,7 +9605,7 @@ INFO, WARNING, DEBUG, ERROR and CRITICAL.</p>
                 <code>summary_writer</code>
             </td>
             <td>
-                  <code>Optional[TensorboardSummaryWriter]</code>
+                  <code><span title="typing.Optional">Optional</span>[<span title="sbi.sbi_types.TensorboardSummaryWriter">TensorboardSummaryWriter</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -9741,7 +9741,7 @@ sampling.</p>
 
     <div class="doc doc-contents first">
             <p class="doc doc-class-bases">
-              Bases: <code>RatioEstimator</code></p>
+              Bases: <code><span title="sbi.inference.trainers.nre.nre_base.RatioEstimator">RatioEstimator</span></code></p>
 
 
 
@@ -10023,7 +10023,7 @@ sampling.</p>
                 <code>prior</code>
             </td>
             <td>
-                  <code>Optional[Distribution]</code>
+                  <code><span title="typing.Optional">Optional</span>[<span title="torch.distributions.Distribution">Distribution</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -10041,7 +10041,7 @@ prior must be passed to <code>.build_posterior()</code>.</p>
                 <code>classifier</code>
             </td>
             <td>
-                  <code>Union[str, Callable]</code>
+                  <code><span title="typing.Union">Union</span>[str, <span title="typing.Callable">Callable</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -10079,7 +10079,7 @@ inference and potentially for z-scoring. It needs to return a PyTorch
                 <code>logging_level</code>
             </td>
             <td>
-                  <code>Union[int, str]</code>
+                  <code><span title="typing.Union">Union</span>[int, str]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -10096,7 +10096,7 @@ INFO, WARNING, DEBUG, ERROR and CRITICAL.</p>
                 <code>summary_writer</code>
             </td>
             <td>
-                  <code>Optional[TensorboardSummaryWriter]</code>
+                  <code><span title="typing.Optional">Optional</span>[<span title="sbi.sbi_types.TensorboardSummaryWriter">TensorboardSummaryWriter</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -10320,7 +10320,7 @@ we train until validation loss increases (see also <code>stop_after_epochs</code
                 <code>clip_max_norm</code>
             </td>
             <td>
-                  <code>Optional[float]</code>
+                  <code><span title="typing.Optional">Optional</span>[float]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -10408,7 +10408,7 @@ loss and leakage after the training.</p>
                 <code>dataloader_kwargs</code>
             </td>
             <td>
-                  <code>Optional[Dict]</code>
+                  <code><span title="typing.Optional">Optional</span>[<span title="typing.Dict">Dict</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -10425,7 +10425,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
                 <code>loss_kwargs</code>
             </td>
             <td>
-                  <code>Optional[Dict[str, Any]]</code>
+                  <code><span title="typing.Optional">Optional</span>[<span title="typing.Dict">Dict</span>[str, <span title="typing.Any">Any</span>]]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -10451,7 +10451,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
       <tbody>
           <tr class="doc-section-item">
             <td>
-                  <code>Module</code>
+                  <code><span title="torch.nn.Module">Module</span></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -10592,7 +10592,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 
     <div class="doc doc-contents first">
             <p class="doc doc-class-bases">
-              Bases: <code>RatioEstimator</code></p>
+              Bases: <code><span title="sbi.inference.trainers.nre.nre_base.RatioEstimator">RatioEstimator</span></code></p>
 
 
 
@@ -10870,7 +10870,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
                 <code>prior</code>
             </td>
             <td>
-                  <code>Optional[Distribution]</code>
+                  <code><span title="typing.Optional">Optional</span>[<span title="torch.distributions.Distribution">Distribution</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -10888,7 +10888,7 @@ prior must be passed to <code>.build_posterior()</code>.</p>
                 <code>classifier</code>
             </td>
             <td>
-                  <code>Union[str, Callable]</code>
+                  <code><span title="typing.Union">Union</span>[str, <span title="typing.Callable">Callable</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -10926,7 +10926,7 @@ inference and potentially for z-scoring. It needs to return a PyTorch
                 <code>logging_level</code>
             </td>
             <td>
-                  <code>Union[int, str]</code>
+                  <code><span title="typing.Union">Union</span>[int, str]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -10943,7 +10943,7 @@ INFO, WARNING, DEBUG, ERROR and CRITICAL.</p>
                 <code>summary_writer</code>
             </td>
             <td>
-                  <code>Optional[TensorboardSummaryWriter]</code>
+                  <code><span title="typing.Optional">Optional</span>[<span title="sbi.sbi_types.TensorboardSummaryWriter">TensorboardSummaryWriter</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -11183,7 +11183,7 @@ we train until validation loss increases (see also <code>stop_after_epochs</code
                 <code>clip_max_norm</code>
             </td>
             <td>
-                  <code>Optional[float]</code>
+                  <code><span title="typing.Optional">Optional</span>[float]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -11271,7 +11271,7 @@ loss and leakage after the training.</p>
                 <code>dataloader_kwargs</code>
             </td>
             <td>
-                  <code>Optional[Dict]</code>
+                  <code><span title="typing.Optional">Optional</span>[<span title="typing.Dict">Dict</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -11298,7 +11298,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
       <tbody>
           <tr class="doc-section-item">
             <td>
-                  <code>Module</code>
+                  <code><span title="torch.nn.Module">Module</span></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -11433,7 +11433,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 
     <div class="doc doc-contents first">
             <p class="doc doc-class-bases">
-              Bases: <code>RatioEstimator</code></p>
+              Bases: <code><span title="sbi.inference.trainers.nre.nre_base.RatioEstimator">RatioEstimator</span></code></p>
 
 
 
@@ -11885,7 +11885,7 @@ in rounds after the first.</p>
                 <code>prior</code>
             </td>
             <td>
-                  <code>Optional[Distribution]</code>
+                  <code><span title="typing.Optional">Optional</span>[<span title="torch.distributions.Distribution">Distribution</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -11903,7 +11903,7 @@ prior must be passed to <code>.build_posterior()</code>.</p>
                 <code>classifier</code>
             </td>
             <td>
-                  <code>Union[str, Callable]</code>
+                  <code><span title="typing.Union">Union</span>[str, <span title="typing.Callable">Callable</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -11941,7 +11941,7 @@ inference and potentially for z-scoring. It needs to return a PyTorch
                 <code>logging_level</code>
             </td>
             <td>
-                  <code>Union[int, str]</code>
+                  <code><span title="typing.Union">Union</span>[int, str]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -11958,7 +11958,7 @@ INFO, WARNING, DEBUG, ERROR and CRITICAL.</p>
                 <code>summary_writer</code>
             </td>
             <td>
-                  <code>Optional[TensorboardSummaryWriter]</code>
+                  <code><span title="typing.Optional">Optional</span>[<span title="sbi.sbi_types.TensorboardSummaryWriter">TensorboardSummaryWriter</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -12249,7 +12249,7 @@ we train until validation loss increases (see also <code>stop_after_epochs</code
                 <code>clip_max_norm</code>
             </td>
             <td>
-                  <code>Optional[float]</code>
+                  <code><span title="typing.Optional">Optional</span>[float]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -12353,7 +12353,7 @@ loss and leakage after the training.</p>
                 <code>dataloader_kwargs</code>
             </td>
             <td>
-                  <code>Optional[Dict]</code>
+                  <code><span title="typing.Optional">Optional</span>[<span title="typing.Dict">Dict</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -12380,7 +12380,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
       <tbody>
           <tr class="doc-section-item">
             <td>
-                  <code>Module</code>
+                  <code><span title="torch.nn.Module">Module</span></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -12541,7 +12541,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 
     <div class="doc doc-contents first">
             <p class="doc doc-class-bases">
-              Bases: <code>NRE_A</code></p>
+              Bases: <code><a class="autorefs autorefs-internal" title="sbi.inference.trainers.nre.nre_a.NRE_A" href="#sbi.inference.trainers.nre.nre_a.NRE_A">NRE_A</a></code></p>
 
 
 
@@ -12863,7 +12863,7 @@ NeurIPS 2022. <a href="https://arxiv.org/abs/2208.13624">https://arxiv.org/abs/2
                 <code>prior</code>
             </td>
             <td>
-                  <code>Optional[Distribution]</code>
+                  <code><span title="typing.Optional">Optional</span>[<span title="torch.distributions.Distribution">Distribution</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -12881,7 +12881,7 @@ prior must be passed to <code>.build_posterior()</code>.</p>
                 <code>classifier</code>
             </td>
             <td>
-                  <code>Union[str, Callable]</code>
+                  <code><span title="typing.Union">Union</span>[str, <span title="typing.Callable">Callable</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -12919,7 +12919,7 @@ PyTorch <code>nn.Module</code> implementing the classifier.</p>
                 <code>logging_level</code>
             </td>
             <td>
-                  <code>Union[int, str]</code>
+                  <code><span title="typing.Union">Union</span>[int, str]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -12936,7 +12936,7 @@ INFO, WARNING, DEBUG, ERROR and CRITICAL.</p>
                 <code>summary_writer</code>
             </td>
             <td>
-                  <code>Optional[TensorboardSummaryWriter]</code>
+                  <code><span title="typing.Optional">Optional</span>[<span title="sbi.sbi_types.TensorboardSummaryWriter">TensorboardSummaryWriter</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -13236,7 +13236,7 @@ dataloader_kwargs: Additional or updated kwargs to be passed to the training
 
     <div class="doc doc-contents first">
             <p class="doc doc-class-bases">
-              Bases: <code>ABCBASE</code></p>
+              Bases: <code><span title="sbi.inference.abc.abc_base.ABCBASE">ABCBASE</span></code></p>
 
 
         <p>Monte-Carlo Approximate Bayesian Computation (Rejection ABC).</p>
@@ -13724,7 +13724,7 @@ dataloader_kwargs: Additional or updated kwargs to be passed to the training
                 <code>x_o</code>
             </td>
             <td>
-                  <code>Union[Tensor, ndarray]</code>
+                  <code><span title="typing.Union">Union</span>[<span title="torch.Tensor">Tensor</span>, <span title="numpy.ndarray">ndarray</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -13756,7 +13756,7 @@ dataloader_kwargs: Additional or updated kwargs to be passed to the training
                 <code>eps</code>
             </td>
             <td>
-                  <code>Optional[float]</code>
+                  <code><span title="typing.Optional">Optional</span>[float]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -13773,7 +13773,7 @@ simulated data.</p>
                 <code>quantile</code>
             </td>
             <td>
-                  <code>Optional[float]</code>
+                  <code><span title="typing.Optional">Optional</span>[float]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -13874,7 +13874,7 @@ object from which one can sample.</p>
                 <code>kde_kwargs</code>
             </td>
             <td>
-                  <code>Optional[Dict[str, Any]]</code>
+                  <code><span title="typing.Optional">Optional</span>[<span title="typing.Dict">Dict</span>[str, <span title="typing.Any">Any</span>]]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -14327,7 +14327,7 @@ microsatellites. Molecular biology and evolution, 16(12), 1791-1798.</p>
                 <code>simulator</code>
             </td>
             <td>
-                  <code>Callable</code>
+                  <code><span title="typing.Callable">Callable</span></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -14364,7 +14364,7 @@ distribution) can be used.</p>
                 <code>distance</code>
             </td>
             <td>
-                  <code>Union[str, Callable]</code>
+                  <code><span title="typing.Union">Union</span>[str, <span title="typing.Callable">Callable</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -14382,7 +14382,7 @@ a custom callable function or one of <code>l1</code>, <code>l2</code>, <code>mse
                 <code>requires_iid_data</code>
             </td>
             <td>
-                  <code>Optional[None]</code>
+                  <code><span title="typing.Optional">Optional</span>[None]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -14400,7 +14400,7 @@ but in case a custom distance is used, this information is pivotal.</p>
                 <code>distance_kwargs</code>
             </td>
             <td>
-                  <code>Optional[Dict]</code>
+                  <code><span title="typing.Optional">Optional</span>[<span title="typing.Dict">Dict</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -14608,7 +14608,7 @@ all simulations at the same time.</p>
 
     <div class="doc doc-contents first">
             <p class="doc doc-class-bases">
-              Bases: <code>ABCBASE</code></p>
+              Bases: <code><span title="sbi.inference.abc.abc_base.ABCBASE">ABCBASE</span></code></p>
 
 
         <p>Sequential Monte Carlo Approximate Bayesian Computation.</p>
@@ -16216,7 +16216,7 @@ all simulations at the same time.</p>
                 <code>x_o</code>
             </td>
             <td>
-                  <code>Union[Tensor, ndarray]</code>
+                  <code><span title="typing.Union">Union</span>[<span title="torch.Tensor">Tensor</span>, <span title="numpy.ndarray">ndarray</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -16314,7 +16314,7 @@ distances.</p>
                 <code>ess_min</code>
             </td>
             <td>
-                  <code>Optional[float]</code>
+                  <code><span title="typing.Optional">Optional</span>[float]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -16466,7 +16466,7 @@ object from which one can sample.</p>
                 <code>kde_kwargs</code>
             </td>
             <td>
-                  <code>Optional[Dict[str, Any]]</code>
+                  <code><span title="typing.Optional">Optional</span>[<span title="typing.Dict">Dict</span>[str, <span title="typing.Any">Any</span>]]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -17107,7 +17107,7 @@ populations.</p>
                 <code>simulator</code>
             </td>
             <td>
-                  <code>Callable</code>
+                  <code><span title="typing.Callable">Callable</span></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -17126,7 +17126,7 @@ can be used.</p>
                 <code>prior</code>
             </td>
             <td>
-                  <code>Distribution</code>
+                  <code><span title="torch.distributions.Distribution">Distribution</span></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -17145,7 +17145,7 @@ distribution) can be used.</p>
                 <code>distance</code>
             </td>
             <td>
-                  <code>Union[str, Callable]</code>
+                  <code><span title="typing.Union">Union</span>[str, <span title="typing.Callable">Callable</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -17163,7 +17163,7 @@ a custom callable function or one of <code>l1</code>, <code>l2</code>, <code>mse
                 <code>requires_iid_data</code>
             </td>
             <td>
-                  <code>Optional[None]</code>
+                  <code><span title="typing.Optional">Optional</span>[None]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -17181,7 +17181,7 @@ but in case a custom distance is used, this information is pivotal.</p>
                 <code>distance_kwargs</code>
             </td>
             <td>
-                  <code>Optional[Dict]</code>
+                  <code><span title="typing.Optional">Optional</span>[<span title="typing.Dict">Dict</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -17268,7 +17268,7 @@ sampling.</p>
                 <code>kernel</code>
             </td>
             <td>
-                  <code>Optional[str]</code>
+                  <code><span title="typing.Optional">Optional</span>[str]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -18048,7 +18048,7 @@ num_particles simulations to run the regression for sass.</p>
                 <code>simulator</code>
             </td>
             <td>
-                  <code>Callable</code>
+                  <code><span title="typing.Callable">Callable</span></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -18069,7 +18069,7 @@ arrays for efficient parallelization. You can use
                 <code>proposal</code>
             </td>
             <td>
-                  <code>Any</code>
+                  <code><span title="typing.Any">Any</span></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -18118,7 +18118,7 @@ from.</p>
                 <code>simulation_batch_size</code>
             </td>
             <td>
-                  <code>Union[int, None]</code>
+                  <code><span title="typing.Union">Union</span>[int, None]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -18139,7 +18139,7 @@ sets and distribute them among num_workers.</p>
                 <code>seed</code>
             </td>
             <td>
-                  <code>Optional[int]</code>
+                  <code><span title="typing.Optional">Optional</span>[int]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -18415,7 +18415,7 @@ or adding a batch dimension to the simulator output, if needed.</p>
                 <code>prior</code>
             </td>
             <td>
-                  <code>Union[Sequence[Distribution], Distribution, rv_frozen, multi_rv_frozen]</code>
+                  <code><span title="typing.Union">Union</span>[<span title="typing.Sequence">Sequence</span>[<span title="torch.distributions.Distribution">Distribution</span>], <span title="torch.distributions.Distribution">Distribution</span>, <span title="scipy.stats._distn_infrastructure.rv_frozen">rv_frozen</span>, <span title="scipy.stats._multivariate.multi_rv_frozen">multi_rv_frozen</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -18432,7 +18432,7 @@ or a sequence of such objects.</p>
                 <code>custom_prior_wrapper_kwargs</code>
             </td>
             <td>
-                  <code>Optional[Dict]</code>
+                  <code><span title="typing.Optional">Optional</span>[<span title="typing.Dict">Dict</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -18485,7 +18485,7 @@ constraints.
       <tbody>
           <tr class="doc-section-item">
 <td><code>prior</code></td>            <td>
-                  <code>Distribution</code>
+                  <code><span title="torch.distributions.Distribution">Distribution</span></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -18671,7 +18671,7 @@ constraints.
                 <code>user_simulator</code>
             </td>
             <td>
-                  <code>Callable</code>
+                  <code><span title="typing.Callable">Callable</span></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -18687,7 +18687,7 @@ constraints.
                 <code>prior</code>
             </td>
             <td>
-                  <code>Distribution</code>
+                  <code><span title="torch.distributions.Distribution">Distribution</span></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -18730,7 +18730,7 @@ from <code>process_prior</code>.</p>
       <tbody>
           <tr class="doc-section-item">
 <td><code>simulator</code></td>            <td>
-                  <code>Callable</code>
+                  <code><span title="typing.Callable">Callable</span></code>
             </td>
             <td>
               <div class="doc-md-description">
