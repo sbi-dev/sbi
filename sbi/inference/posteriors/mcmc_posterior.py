@@ -1049,6 +1049,19 @@ class MCMCPosterior(NeuralPosterior):
 
         return inference_data
 
+    def __getstate__(self) -> Dict:
+        """Get state of MCMCPosterior.
+
+        Removes the posterior sampler from the state, as it may not be picklable.
+
+        Returns:
+            Dict: State of MCMCPosterior.
+        """
+        state = self.__dict__.copy()
+        state["_posterior_sampler"] = None
+
+        return state
+
 
 def _process_thin_default(thin: int) -> int:
     """
