@@ -73,7 +73,7 @@ def build_autoregressive_categoricalmassestimator(
     z_score_y: Optional[str] = "independent",
     num_hidden: int = 20,
     num_layers: int = 2,
-    categories: Optional[Tensor] = None,
+    num_categories: Optional[Tensor] = None,
     embedding_net: nn.Module = nn.Identity(),
 ):
     """Returns a density estimator for a categorical random variable.
@@ -86,13 +86,14 @@ def build_autoregressive_categoricalmassestimator(
         num_hidden: Number of hidden units per layer.
         num_layers: Number of hidden layers.
         embedding_net: Embedding net for y.
+        num_categories: number of categories for each variable.
     """
 
     if z_score_x != "none":
         raise ValueError("Categorical input should not be z-scored.")
-    if categories is None:
+    if num_categories is None:
         warnings.warn(
-            "Inferring categories from batch_x. Ensure all categories are present.",
+            "Inferring num_categories from batch_x. Ensure all categories are present.",
             stacklevel=2,
         )
 
@@ -108,10 +109,12 @@ def build_autoregressive_categoricalmassestimator(
 
     batch_x_discrete = batch_x[:, _is_discrete(batch_x)]
     inferred_categories = tensor([unique(col).numel() for col in batch_x_discrete.T])
-    categories = categories if categories is not None else inferred_categories
+    num_categories = (
+        num_categories if num_categories is not None else inferred_categories
+    )
 
     categorical_net = CategoricalMADE(
-        categories=categories,
+        num_categories=num_categories,
         hidden_features=num_hidden,
         context_features=y_numel,
         num_blocks=num_layers,

@@ -60,6 +60,7 @@ def build_mnle(
     z_score_y: Optional[str] = "independent",
     flow_model: str = "nsf",
     categorical_model: str = "mlp",
+    num_categorical_columns: Optional[Tensor] = None,
     embedding_net: nn.Module = nn.Identity(),
     combined_embedding_net: Optional[nn.Module] = None,
     num_transforms: int = 2,
@@ -108,6 +109,8 @@ def build_mnle(
             data.
         categorical_model: type of categorical net to use for the discrete part of
             the data. Can be "made" or "mlp".
+        num_categorical_columns: Number of categorical columns of each variable in the
+            input data. If None, the function will infer this from the data.
         embedding_net: Optional embedding network for y, required if y is > 1D.
         combined_embedding_net: Optional embedding for combining the discrete
             part of the input and the embedded condition into a joined
@@ -137,7 +140,10 @@ def build_mnle(
         stacklevel=2,
     )
     # Separate continuous and discrete data.
-    num_disc = int(torch.sum(_is_discrete(batch_x)))
+    if num_categorical_columns is None:
+        num_disc = int(torch.sum(_is_discrete(batch_x)))
+    else:
+        num_disc = len(num_categorical_columns)
     cont_x, disc_x = _separate_input(batch_x, num_discrete_columns=num_disc)
 
     # Set up y-embedding net with z-scoring.
@@ -160,6 +166,7 @@ def build_mnle(
             num_hidden=hidden_features,
             num_layers=hidden_layers,
             embedding_net=embedding_net,
+            num_categories=num_categorical_columns,
         )
     elif categorical_model == "mlp":
         assert num_disc == 1, "MLP only supports 1D input."
