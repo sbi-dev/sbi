@@ -147,8 +147,8 @@ class MixedDensityEstimator(ConditionalDensityEstimator):
             f"{input_batch_dim} do not match."
         )
 
-        num_disc = self.discrete_net.net.num_variables
-        cont_input, disc_input = _separate_input(input, num_discrete_columns=num_disc)
+        num_discrete_variables = self.discrete_net.net.num_variables
+        cont_input, disc_input = _separate_input(input, num_discrete_variables)
         # Embed continuous condition
         embedded_condition = self.condition_embedding(condition)
         # expand and repeat to match batch of inputs.

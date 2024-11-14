@@ -1,7 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Optional
+from typing import Callable, Optional
 
 import torch
 from nflows.nn.nde.made import MADE
@@ -15,29 +15,46 @@ from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
 
 
 class CategoricalMADE(MADE):
+    """Conditional density (mass) estimation for a n-dim categorical random variable.
+
+    Takes as input parameters theta and learns the parameters p of a Categorical.
+
+    Defines log prob and sample functions.
+    """
+
     def __init__(
         self,
-        categories,  # Tensor[int]
-        hidden_features,
-        context_features=None,
-        num_blocks=2,
-        use_residual_blocks=True,
-        random_mask=False,
-        activation=F.relu,
-        dropout_probability=0.0,
-        use_batch_norm=False,
-        epsilon=1e-2,
-        custom_initialization=True,
+        num_categories: Tensor,  # Tensor[int]
+        hidden_features: int,
+        context_features: Optional[int] = None,
+        num_blocks: int = 2,
+        use_residual_blocks: bool = True,
+        random_mask: bool = False,
+        activation: Callable = F.relu,
+        dropout_probability: float = 0.0,
+        use_batch_norm: bool = False,
+        epsilon: float = 1e-2,
+        custom_initialization: bool = True,
         embedding_net: Optional[nn.Module] = nn.Identity(),
     ):
+        """Initialize the neural net.
+
+        Args:
+            num_categories: number of categories for each variable. len(categories)
+                defines the number of input units, i.e., dimensionality of the features.
+                max(categories) defines the number of output units, i.e., the largest
+                number of categories.
+            num_hidden: number of hidden units per layer.
+            num_layers: number of hidden layers.
+            embedding_net: emebedding net for input.
+        """
         if use_residual_blocks and random_mask:
             raise ValueError("Residual blocks can't be used with random masks.")
 
-        self.num_variables = len(categories)
-        self.num_categories = int(max(categories))
-        self.categories = categories
+        self.num_variables = len(num_categories)
+        self.num_categories = int(torch.max(num_categories))
         self.mask = torch.zeros(self.num_variables, self.num_categories)
-        for i, c in enumerate(categories):
+        for i, c in enumerate(num_categories):
             self.mask[i, :c] = 1
 
         super().__init__(
@@ -60,7 +77,18 @@ class CategoricalMADE(MADE):
         if custom_initialization:
             self._initialize()
 
-    def forward(self, inputs, context=None):
+    def forward(self, inputs: Tensor, context: Optional[Tensor] = None) -> Tensor:
+        r"""Forward pass of the categorical density estimator network to compute the
+        conditional density at a given time.
+
+        Args:
+            input: Original data, x0. (batch_size, *input_shape)
+            condition: Conditioning variable. (batch_size, *condition_shape)
+
+        Returns:
+            Predicted categorical probabilities. (batch_size, *input_shape,
+                num_categories)
+        """
         embedded_context = self.embedding_net.forward(context)
         return super().forward(inputs, context=embedded_context)
 
@@ -69,8 +97,16 @@ class CategoricalMADE(MADE):
         ps = ps / ps.sum(dim=-1, keepdim=True)
         return ps
 
-    # outputs (batch_size, num_variables, num_categories)
-    def log_prob(self, inputs, context=None):
+    def log_prob(self, inputs: Tensor, context: Optional[Tensor] = None) -> Tensor:
+        r"""Return log-probability of samples.
+
+        Args:
+            input: Input datapoints of shape `(batch_size, *input_shape)`.
+            context: Context of shape `(batch_size, *condition_shape)`.
+
+        Returns:
+            Log-probabilities of shape `(batch_size, num_variables, num_categories)`.
+        """
         outputs = self.forward(inputs, context=context)
         outputs = outputs.reshape(*inputs.shape, self.num_categories)
         ps = self.compute_probs(outputs)
