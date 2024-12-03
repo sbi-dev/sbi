@@ -1,6 +1,6 @@
 [![PyPI version](https://badge.fury.io/py/sbi.svg)](https://badge.fury.io/py/sbi)
 [![Contributions welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat)](https://github.com/sbi-dev/sbi/blob/master/CONTRIBUTING.md)
-[![Tests](https://github.com/sbi-dev/sbi/workflows/Tests/badge.svg?branch=main)](https://github.com/sbi-dev/sbi/actions)
+[![Tests](https://github.com/sbi-dev/sbi/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/sbi-dev/sbi/actions)
 [![codecov](https://codecov.io/gh/sbi-dev/sbi/branch/main/graph/badge.svg)](https://codecov.io/gh/sbi-dev/sbi)
 [![GitHub license](https://img.shields.io/github/license/sbi-dev/sbi)](https://github.com/sbi-dev/sbi/blob/master/LICENSE.txt)
 [![DOI](https://joss.theoj.org/papers/10.21105/joss.02505/status.svg)](https://doi.org/10.21105/joss.02505)
@@ -8,7 +8,7 @@
 ## `sbi`: Simulation-Based Inference
 
 [Getting Started](https://sbi-dev.github.io/sbi/latest/tutorials/00_getting_started/) |
-[Documentation](https://sbi-dev.github.io/sbi/)
+[Documentation](https://sbi-dev.github.io/sbi/) | [Discord Server](https://discord.gg/q7unZdVM)
 
 `sbi` is a Python package for simulation-based inference, designed to meet the needs of
 both researchers and practitioners. Whether you need fine-grained control or an
