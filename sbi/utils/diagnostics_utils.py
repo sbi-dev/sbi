@@ -1,9 +1,12 @@
+import warnings
+
 import torch
 from joblib import Parallel, delayed
 from torch import Tensor
 from tqdm import tqdm
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
+from sbi.inference.posteriors.mcmc_posterior import MCMCPosterior
 from sbi.inference.posteriors.vi_posterior import VIPosterior
 from sbi.sbi_types import Shape
 
@@ -40,7 +43,7 @@ def get_posterior_samples_on_batch(
             )
         else:
             raise NotImplementedError
-    except NotImplementedError:
+    except (NotImplementedError, AssertionError):
         # We need a function with extra training step for new x for VIPosterior.
         def sample_fun(
             posterior: NeuralPosterior, sample_shape: Shape, x: Tensor, seed: int = 0
@@ -50,6 +53,14 @@ def get_posterior_samples_on_batch(
                 posterior.train()
             torch.manual_seed(seed)
             return posterior.sample(sample_shape, x=x, show_progress_bars=False)
+
+        if isinstance(posterior, (VIPosterior, MCMCPosterior)):
+            warnings.warn(
+                "Using non-batched sampling. Depending on the number of different xs "
+                f"( {batch_size}) and the number of parallel workers {num_workers}, "
+                "this might be slow.",
+                stacklevel=2,
+            )
 
         # Run in parallel with progress bar.
         seeds = torch.randint(0, 2**32, (batch_size,))
