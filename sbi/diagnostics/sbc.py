@@ -2,7 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import warnings
-from typing import Callable, Dict, List, Union
+from typing import Callable, Dict, List, Optional, Union
 
 import torch
 from scipy.stats import kstest, uniform
@@ -26,6 +26,7 @@ def run_sbc(
     num_workers: int = 1,
     show_progress_bar: bool = True,
     use_batched_sampling: bool = True,
+    batch_size: Optional[int] = None,
     **kwargs,
 ):
     """Run simulation-based calibration (SBC) (parallelized across sbc runs).
@@ -49,6 +50,8 @@ def run_sbc(
             `num_sbc_samples` inferences.
         show_progress_bar: whether to display a progress over sbc runs.
         use_batched_sampling: whether to use batched sampling for posterior samples.
+        batch_size: batch size for batched sampling. Useful for batched sampling with
+            large batches of xs for avoiding memory overflow.
 
     Returns:
         ranks: ranks of the ground truth parameters under the inferred
@@ -89,6 +92,7 @@ def run_sbc(
         num_workers,
         show_progress_bar,
         use_batched_sampling=use_batched_sampling,
+        batch_size=batch_size,
     )
 
     # take a random draw from each posterior to get data averaged posterior samples.
