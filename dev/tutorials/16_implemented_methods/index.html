@@ -14,7 +14,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.47">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.48">
     
     
       
@@ -547,10 +547,13 @@
 
 <span class="n">inference</span> <span class="o">=</span> <span class="n">NPE_A</span><span class="p">(</span><span class="n">prior</span><span class="p">)</span>
 <span class="n">proposal</span> <span class="o">=</span> <span class="n">prior</span>
-<span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_rounds</span><span class="p">):</span>
+<span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_rounds</span><span class="p">):</span>
     <span class="n">theta</span> <span class="o">=</span> <span class="n">proposal</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_sims</span><span class="p">,))</span>
     <span class="n">x</span> <span class="o">=</span> <span class="n">simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
-    <span class="n">_</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">proposal</span><span class="o">=</span><span class="n">proposal</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
+    <span class="c1"># NPE-A trains a Gaussian density estimator in all but the last round. In the last round,</span>
+    <span class="c1"># it trains a mixture of Gaussians, which is why we have to pass the `final_round` flag.</span>
+    <span class="n">final_round</span> <span class="o">=</span> <span class="kc">True</span> <span class="k">if</span> <span class="n">r</span> <span class="o">==</span> <span class="n">num_rounds</span> <span class="o">-</span> <span class="mi">1</span> <span class="k">else</span> <span class="kc">False</span>
+    <span class="n">_</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">proposal</span><span class="o">=</span><span class="n">proposal</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">(</span><span class="n">final_round</span><span class="o">=</span><span class="n">final_round</span><span class="p">)</span>
     <span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">()</span><span class="o">.</span><span class="n">set_default_x</span><span class="p">(</span><span class="n">x_o</span><span class="p">)</span>
     <span class="n">proposal</span> <span class="o">=</span> <span class="n">posterior</span>
 </code></pre></div>
