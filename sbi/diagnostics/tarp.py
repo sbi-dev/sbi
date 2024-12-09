@@ -28,6 +28,8 @@ def run_tarp(
     distance: Callable = l2,
     num_bins: Optional[int] = 30,
     z_score_theta: bool = True,
+    use_batched_sampling: bool = True,
+    batch_size: Optional[int] = None,
 ) -> Tuple[Tensor, Tensor]:
     """
     Estimates coverage of samples given true values thetas with the TARP method.
@@ -54,6 +56,9 @@ def run_tarp(
         num_bins: number of bins to use for the credibility values.
             If ``None``, then ``num_sims // 10`` bins are used.
         z_score_theta : whether to normalize parameters before coverage test.
+        use_batched_sampling: whether to use batched sampling for posterior samples.
+        batch_size: batch size for batched sampling. Useful for batched sampling with
+            large batches of xs for avoiding memory overflow.
 
     Returns:
         ecp: Expected coverage probability (``ecp``), see equation 4 of the paper
@@ -67,6 +72,8 @@ def run_tarp(
         (num_posterior_samples,),
         num_workers,
         show_progress_bar=show_progress_bar,
+        use_batched_sampling=use_batched_sampling,
+        batch_size=batch_size,
     )
     assert posterior_samples.shape == (
         num_posterior_samples,
