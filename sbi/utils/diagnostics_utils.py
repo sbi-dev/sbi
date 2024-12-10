@@ -1,5 +1,4 @@
 import warnings
-from typing import Optional
 
 import torch
 from joblib import Parallel, delayed
@@ -19,7 +18,6 @@ def get_posterior_samples_on_batch(
     num_workers: int = 1,
     show_progress_bar: bool = False,
     use_batched_sampling: bool = True,
-    batch_size: Optional[int] = None,
 ) -> Tensor:
     """Get posterior samples for a batch of xs.
 
@@ -30,27 +28,17 @@ def get_posterior_samples_on_batch(
         num_workers: number of workers to use for parallelization.
         show_progress_bars: whether to show progress bars.
         use_batched_sampling: whether to use batched sampling if possible.
-        batch_size: batch size for batched sampling. Useful for batched sampling with
-            large batches of xs for avoiding memory overflow.
+
     Returns:
         posterior_samples: of shape (num_samples, batch_size, dim_parameters).
     """
     num_xs = len(xs)
-    if batch_size is None:
-        batch_size = num_xs
 
     if use_batched_sampling:
         try:
-            # distribute the batch of xs into smaller batches
-            batched_xs = xs.split(batch_size)
-            posterior_samples = torch.cat(
-                [  # has shape (num_samples, num_xs, dim_parameters)
-                    posterior.sample_batched(
-                        sample_shape, x=xs_batch, show_progress_bars=show_progress_bar
-                    )
-                    for xs_batch in batched_xs
-                ],
-                dim=1,
+            # has shape (num_samples, num_xs, dim_parameters)
+            posterior_samples = posterior.sample_batched(
+                sample_shape, x=xs, show_progress_bars=show_progress_bar
             )
         except (NotImplementedError, AssertionError):
             warnings.warn(
