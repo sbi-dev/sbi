@@ -1,29 +1,31 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+from typing import Union
+
 import pytest
 import torch
 from pyro.distributions import InverseGamma
-from torch.distributions import Beta, Binomial, Categorical, Gamma
+from torch import Tensor
+from torch.distributions import Beta, Binomial, Distribution, Gamma
 
 from sbi.inference import MNLE, MCMCPosterior
 from sbi.inference.posteriors.rejection_posterior import RejectionPosterior
 from sbi.inference.posteriors.vi_posterior import VIPosterior
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.inference.potentials.likelihood_based_potential import (
-    MixedLikelihoodBasedPotential,
+    likelihood_estimator_based_potential,
 )
 from sbi.neural_nets import likelihood_nn
 from sbi.neural_nets.embedding_nets import FCEmbedding
 from sbi.utils import BoxUniform, mcmc_transform
-from sbi.utils.conditional_density_utils import ConditionedPotential
 from sbi.utils.torchutils import atleast_2d, process_device
 from sbi.utils.user_input_checks_utils import MultipleIndependent
 from tests.test_utils import check_c2st
 
 
 # toy simulator for mixed data
-def mixed_simulator(theta, stimulus_condition=2.0):
+def mixed_simulator(theta: Tensor, stimulus_condition: Union[Tensor, float] = 2.0):
     """Simulator for mixed data."""
     # Extract parameters
     beta, ps = theta[:, :1], theta[:, 1:]
@@ -190,11 +192,28 @@ def test_mnle_accuracy_with_different_samplers_and_trials(
 
 
 class BinomialGammaPotential(BasePotential):
-    def __init__(self, prior, x_o, concentration_scaling=1.0, device="cpu"):
+    """Binomial-Gamma potential for mixed data."""
+
+    def __init__(
+        self,
+        prior: Distribution,
+        x_o: Tensor,
+        concentration_scaling: Union[Tensor, float] = 1.0,
+        device="cpu",
+    ):
         super().__init__(prior, x_o, device)
+
+        # concentration_scaling needs to be a float or match the batch size
+        if isinstance(concentration_scaling, Tensor):
+            num_trials = x_o.shape[0]
+            assert concentration_scaling.shape[0] == num_trials
+
+            # Reshape to match convention (batch_size, num_trials, *event_shape)
+            concentration_scaling = concentration_scaling.reshape(1, num_trials, -1)
+
         self.concentration_scaling = concentration_scaling
 
-    def __call__(self, theta, track_gradients: bool = True):
+    def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
         theta = atleast_2d(theta)
 
         with torch.set_grad_enabled(track_gradients):
@@ -202,11 +221,12 @@ class BinomialGammaPotential(BasePotential):
 
         return iid_ll + self.prior.log_prob(theta)
 
-    def iid_likelihood(self, theta):
+    def iid_likelihood(self, theta: Tensor) -> Tensor:
         batch_size = theta.shape[0]
         num_trials = self.x_o.shape[0]
         theta = theta.reshape(batch_size, 1, -1)
         beta, rho = theta[:, :, :1], theta[:, :, 1:]
+
         # vectorized
         logprob_choices = Binomial(probs=rho).log_prob(
             self.x_o[:, 1:].reshape(1, num_trials, -1)
@@ -233,18 +253,22 @@ def test_mnle_with_experimental_conditions(mcmc_params_accurate: dict):
     categorical parameter is set to a fixed value (conditioned posterior), and the
     accuracy of the conditioned posterior is tested against the true posterior.
     """
-    num_simulations = 6000
-    num_samples = 500
+    num_simulations = 10000
+    num_samples = 1000
 
-    def sim_wrapper(theta):
+    def sim_wrapper(
+        theta_and_condition: Tensor, last_idx_parameters: int = 2
+    ) -> Tensor:
         # simulate with experiment conditions
-        return mixed_simulator(theta[:, :2], theta[:, 2:] + 1)
+        theta = theta_and_condition[:, :last_idx_parameters]
+        condition = theta_and_condition[:, last_idx_parameters:]
+        return mixed_simulator(theta, condition)
 
     proposal = MultipleIndependent(
         [
             Gamma(torch.tensor([1.0]), torch.tensor([0.5])),
             Beta(torch.tensor([2.0]), torch.tensor([2.0])),
-            Categorical(probs=torch.ones(1, 3)),
+            BoxUniform(torch.tensor([0.0]), torch.tensor([1.0])),
         ],
         validate_args=False,
     )
@@ -254,22 +278,27 @@ def test_mnle_with_experimental_conditions(mcmc_params_accurate: dict):
     assert x.shape == (num_simulations, 2)
 
     num_trials = 10
-    theta_o = proposal.sample((1,))
-    theta_o[0, 2] = 2.0  # set condition to 2 as in original simulator.
-    x_o = sim_wrapper(theta_o.repeat(num_trials, 1))
+    theta_and_condition = proposal.sample((num_trials,))
+    # use only a single parameter (iid trials)
+    theta_o = theta_and_condition[:1, :2].repeat(num_trials, 1)
+    # but different conditions
+    condition_o = theta_and_condition[:, 2:]
+    theta_and_conditions_o = torch.cat((theta_o, condition_o), dim=1)
+
+    x_o = sim_wrapper(theta_and_conditions_o)
 
     mcmc_kwargs = dict(
         method="slice_np_vectorized", init_strategy="proposal", **mcmc_params_accurate
     )
 
     # MNLE
-    trainer = MNLE(proposal)
-    estimator = trainer.append_simulations(theta, x).train(training_batch_size=1000)
+    estimator_fun = likelihood_nn(model="mnle", z_score_x=None)
+    trainer = MNLE(proposal, estimator_fun)
+    estimator = trainer.append_simulations(theta, x).train()
 
-    potential_fn = MixedLikelihoodBasedPotential(estimator, proposal, x_o)
-
-    conditioned_potential_fn = ConditionedPotential(
-        potential_fn, condition=theta_o, dims_to_sample=[0, 1]
+    potential_fn, _ = likelihood_estimator_based_potential(estimator, proposal, x_o)
+    conditioned_potential_fn = potential_fn.condition_on(
+        condition_o, dims_to_sample=[0, 1]
     )
 
     # True posterior samples
@@ -283,10 +312,7 @@ def test_mnle_with_experimental_conditions(mcmc_params_accurate: dict):
     prior_transform = mcmc_transform(prior)
     true_posterior_samples = MCMCPosterior(
         BinomialGammaPotential(
-            prior,
-            atleast_2d(x_o),
-            concentration_scaling=float(theta_o[0, 2])
-            + 1.0,  # add one because the sim_wrapper adds one (see above)
+            prior, atleast_2d(x_o), concentration_scaling=condition_o
         ),
         theta_transform=prior_transform,
         proposal=prior,
@@ -303,5 +329,5 @@ def test_mnle_with_experimental_conditions(mcmc_params_accurate: dict):
     check_c2st(
         cond_samples,
         true_posterior_samples,
-        alg=f"MNLE trained with {num_simulations}",
+        alg=f"MNLE trained with {num_simulations} simulations",
     )

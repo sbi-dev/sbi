@@ -60,8 +60,8 @@ def warn_if_zscoring_changes_data(x: Tensor, duplicate_tolerance: float = 0.1) -
 
         if num_unique_z < num_unique * (1 - duplicate_tolerance):
             warnings.warn(
-                "Z-scoring these simulation outputs resulted in {num_unique_z} unique "
-                "datapoints. Before z-scoring, it had been {num_unique}. This can "
+                f"Z-scoring these simulation outputs resulted in {num_unique_z} unique "
+                f"datapoints. Before z-scoring, it had been {num_unique}. This can "
                 "occur due to numerical inaccuracies when the data covers a large "
                 "range of values. Consider either setting `z_score_x=False` (but "
                 "beware that this can be problematic for training the NN) or exclude "

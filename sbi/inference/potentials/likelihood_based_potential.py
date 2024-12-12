@@ -1,7 +1,8 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Callable, Optional, Tuple
+import warnings
+from typing import Callable, List, Optional, Tuple
 
 import torch
 from torch import Tensor
@@ -115,6 +116,38 @@ class LikelihoodBasedPotential(BasePotential):
                 )
             return log_likelihood_batches + self.prior.log_prob(theta)  # type: ignore
 
+    def condition_on(self, condition: Tensor, dims_to_sample: List[int]) -> Callable:
+        """Returns a potential conditioned on a subset of theta dimensions.
+
+        The condition is a part of theta, but is assumed to correspond to a batch of iid
+        x_o.
+
+        Args:
+            condition: The condition to fix.
+            dims_to_sample: The indices of the parameters to sample.
+
+        Returns:
+            A potential function conditioned on the condition.
+        """
+
+        def conditioned_potential(
+            theta: Tensor, x_o: Optional[Tensor] = None, track_gradients: bool = True
+        ) -> Tensor:
+            assert (
+                len(dims_to_sample) == theta.shape[1] - condition.shape[1]
+            ), "dims_to_sample must match the number of parameters to sample."
+            theta_without_condition = theta[:, dims_to_sample]
+
+            return _log_likelihood_with_iid_condition(
+                x=x_o or self.x_o,
+                theta_without_condition=theta_without_condition,
+                condition=condition,
+                estimator=self.likelihood_estimator,
+                track_gradients=track_gradients,
+            )
+
+        return conditioned_potential
+
 
 def _log_likelihoods_over_trials(
     x: Tensor,
@@ -172,6 +205,67 @@ def _log_likelihoods_over_trials(
     return log_likelihood_trial_sum
 
 
+def _log_likelihood_with_iid_condition(
+    x: Tensor,
+    theta_without_condition: Tensor,
+    condition: Tensor,
+    estimator: ConditionalDensityEstimator,
+    track_gradients: bool = False,
+) -> Tensor:
+    """Return log likelihoods summed over iid trials of `x` with a matching batch of
+    conditions.
+
+    This function is different from `_log_likelihoods_over_trials` in that it moves the
+    iid batch dimension of `x` onto the batch dimension of `theta`. This is useful when
+    the likelihood estimator is conditioned on a batch of conditions that are iid with
+    the batch of `x`. It avoid the evaluation of the likelihood for every combination of
+    `x` and `condition`. Instead, it manually constructs a batch covering all
+    combination of iid trial and theta batch and reshapes to sum over the iid
+    likelihoods.
+
+    Args:
+        x: Batch of iid data of shape `(iid_dim, *event_shape)`.
+        theta_without_condition: Batch of parameters `(batch_dim, *event_shape)`
+        condition: Batch of conditions of shape `(iid_dim, *condition_shape)`.
+        estimator: DensityEstimator.
+        track_gradients: Whether to track gradients.
+
+    Returns:
+        log_likelihood_trial_sum: log likelihood for each parameter, summed over all
+            batch entries (iid trials) in `x`.
+    """
+    assert (
+        condition.shape[0] == x.shape[0]
+    ), "Condition and iid x must have the same batch size."
+    num_trials = x.shape[0]
+    num_theta = theta_without_condition.shape[0]
+    x = reshape_to_sample_batch_event(
+        x, event_shape=x.shape[1:], leading_is_sample=True
+    )
+
+    # move the iid batch dimension onto the batch dimension of theta and repeat it there
+    x_expanded = x.reshape(1, num_trials, -1).repeat_interleave(num_theta, dim=1)
+    # for this to work we construct theta and condition to cover all combinations in the
+    # trial batch and the theta batch.
+    theta = torch.cat(
+        [
+            theta_without_condition.repeat(num_trials, 1),  # repeat ABAB
+            condition.repeat_interleave(num_theta, dim=0),  # repeat AABB
+        ],
+        dim=-1,
+    )
+
+    with torch.set_grad_enabled(track_gradients):
+        # Calculate likelihood in one batch. Returns (1, num_trials * theta_batch_size)
+        log_likelihood_trial_batch = estimator.log_prob(x_expanded, condition=theta)
+        # Reshape to (x-trials x parameters), sum over trial-log likelihoods.
+        log_likelihood_trial_sum = log_likelihood_trial_batch.reshape(
+            num_trials, num_theta
+        ).sum(0)
+
+    return log_likelihood_trial_sum
+
+
 def mixed_likelihood_estimator_based_potential(
     likelihood_estimator: MixedDensityEstimator,
     prior: Distribution,
@@ -191,6 +285,13 @@ def mixed_likelihood_estimator_based_potential(
         The potential function $p(x_o|\theta)p(\theta)$ and a transformation that maps
         to unconstrained space.
     """
+
+    warnings.warn(
+        "This function is deprecated and will be removed in a future release. Use "
+        "`likelihood_estimator_based_potential` instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
 
     device = str(next(likelihood_estimator.discrete_net.parameters()).device)
 
@@ -212,6 +313,13 @@ class MixedLikelihoodBasedPotential(LikelihoodBasedPotential):
     ):
         super().__init__(likelihood_estimator, prior, x_o, device)
 
+        warnings.warn(
+            "This function is deprecated and will be removed in a future release. Use "
+            "`LikelihoodBasedPotential` instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
     def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
         prior_log_prob = self.prior.log_prob(theta)  # type: ignore
 
@@ -231,7 +339,6 @@ class MixedLikelihoodBasedPotential(LikelihoodBasedPotential):
         with torch.set_grad_enabled(track_gradients):
             # Call the specific log prob method of the mixed likelihood estimator as
             # this optimizes the evaluation of the discrete data part.
-            # TODO log_prob_iid
             log_likelihood_trial_batch = self.likelihood_estimator.log_prob(
                 input=x,
                 condition=theta.to(self.device),
