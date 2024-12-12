@@ -134,12 +134,12 @@ class LikelihoodBasedPotential(BasePotential):
             theta: Tensor, x_o: Optional[Tensor] = None, track_gradients: bool = True
         ) -> Tensor:
             assert (
-                len(dims_to_sample) == theta.shape[1] - condition.shape[1]
+                len(dims_to_sample) == theta.shape[1]
             ), "dims_to_sample must match the number of parameters to sample."
             theta_without_condition = theta[:, dims_to_sample]
 
             return _log_likelihood_with_iid_condition(
-                x=x_o or self.x_o,
+                x=x_o if x_o is not None else self.x_o,
                 theta_without_condition=theta_without_condition,
                 condition=condition,
                 estimator=self.likelihood_estimator,
