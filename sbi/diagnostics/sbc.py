@@ -48,8 +48,7 @@ def run_sbc(
         num_workers: number of CPU cores to use in parallel for running
             `num_sbc_samples` inferences.
         show_progress_bar: whether to display a progress over sbc runs.
-        use_batched_sampling: whether to use batched sampling for posterior
-            samples.
+        use_batched_sampling: whether to use batched sampling for posterior samples.
 
     Returns:
         ranks: ranks of the ground truth parameters under the inferred
