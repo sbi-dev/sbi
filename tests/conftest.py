@@ -5,9 +5,33 @@ import pytest
 import torch
 
 from sbi.utils.sbiutils import seed_all_backends
+from pytest_harvest import get_session_results_dct
 
 # Seed for `set_seed` fixture. Change to random state of all seeded tests.
 seed = 1
+
+
+# Pytest harvest
+@pytest.fixture(scope="session", autouse=True)
+def collect_results(request):
+    """
+    Automatically runs after the test session.
+    We'll collect the test results and store them for later use (e.g. in a dataframe).
+    """
+    print(request)
+    yield  # Run all tests first
+    # At this point, tests are all done. Let's harvest the results:
+    session_results = get_session_results_dct(request.session)
+
+    # Now `session_results` is a dict with entries for each test function.
+    # You can transform it into a DataFrame if you want.
+    try:
+        import pandas as pd
+
+        df = pd.DataFrame.from_dict(session_results, orient='index')
+        print("\nHarvested Test Results:\n", df)
+    except ImportError:
+        print("\nHarvested Test Results (raw dictionary):\n", session_results)
 
 
 # Use seed automatically for every test function.
