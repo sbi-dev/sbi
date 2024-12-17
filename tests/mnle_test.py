@@ -14,6 +14,7 @@ from sbi.inference.posteriors.rejection_posterior import RejectionPosterior
 from sbi.inference.posteriors.vi_posterior import VIPosterior
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.inference.potentials.likelihood_based_potential import (
+    _log_likelihood_over_iid_conditions,
     likelihood_estimator_based_potential,
 )
 from sbi.neural_nets import likelihood_nn
@@ -37,6 +38,15 @@ def mixed_simulator(theta: Tensor, stimulus_condition: Union[Tensor, float] = 2.
     ).sample()
 
     return torch.cat((rts, choices), dim=1)
+
+
+def wrapped_simulator(
+    theta_and_condition: Tensor, last_idx_parameters: int = 2
+) -> Tensor:
+    # simulate with experiment conditions
+    theta = theta_and_condition[:, :last_idx_parameters]
+    condition = theta_and_condition[:, last_idx_parameters:]
+    return mixed_simulator(theta, condition)
 
 
 @pytest.mark.mcmc
@@ -256,14 +266,6 @@ def test_mnle_with_experimental_conditions(mcmc_params_accurate: dict):
     num_simulations = 10000
     num_samples = 1000
 
-    def sim_wrapper(
-        theta_and_condition: Tensor, last_idx_parameters: int = 2
-    ) -> Tensor:
-        # simulate with experiment conditions
-        theta = theta_and_condition[:, :last_idx_parameters]
-        condition = theta_and_condition[:, last_idx_parameters:]
-        return mixed_simulator(theta, condition)
-
     proposal = MultipleIndependent(
         [
             Gamma(torch.tensor([1.0]), torch.tensor([0.5])),
@@ -274,7 +276,7 @@ def test_mnle_with_experimental_conditions(mcmc_params_accurate: dict):
     )
 
     theta = proposal.sample((num_simulations,))
-    x = sim_wrapper(theta)
+    x = wrapped_simulator(theta)
     assert x.shape == (num_simulations, 2)
 
     num_trials = 10
@@ -285,7 +287,7 @@ def test_mnle_with_experimental_conditions(mcmc_params_accurate: dict):
     condition_o = theta_and_condition[:, 2:]
     theta_and_conditions_o = torch.cat((theta_o, condition_o), dim=1)
 
-    x_o = sim_wrapper(theta_and_conditions_o)
+    x_o = wrapped_simulator(theta_and_conditions_o)
 
     mcmc_kwargs = dict(
         method="slice_np_vectorized", init_strategy="proposal", **mcmc_params_accurate
@@ -331,3 +333,82 @@ def test_mnle_with_experimental_conditions(mcmc_params_accurate: dict):
         true_posterior_samples,
         alg=f"MNLE trained with {num_simulations} simulations",
     )
+
+
+@pytest.mark.parametrize("num_thetas", [1, 10])
+@pytest.mark.parametrize("num_trials", [1, 5])
+@pytest.mark.parametrize("num_xs", [1, 3])
+@pytest.mark.parametrize(
+    "num_conditions",
+    [
+        1,
+        pytest.param(
+            2,
+            marks=pytest.mark.xfail(
+                reason="Batched theta_condition is not " "supported"
+            ),
+        ),
+    ],
+)
+def test_log_likelihood_over_iid_conditions(
+    num_thetas, num_trials, num_xs, num_conditions
+):
+    """Test log likelihood over iid conditions using MNLE.
+
+    Args:
+        num_thetas: batch of theta to condition on.
+        num_trials: number of i.i.d. trials in x
+        num_xs: batch of x, e.g., different subjects in a study.
+        num_conditions: number of batches of conditions, e.g., different conditions
+            for each x (not implemented yet).
+    """
+
+    # train mnle on mixed data
+    trainer = MNLE(
+        density_estimator=likelihood_nn(model="mnle", z_score_x=None),
+    )
+    proposal = MultipleIndependent(
+        [
+            Gamma(torch.tensor([1.0]), torch.tensor([0.5])),
+            Beta(torch.tensor([2.0]), torch.tensor([2.0])),
+            BoxUniform(torch.tensor([0.0]), torch.tensor([1.0])),
+        ],
+        validate_args=False,
+    )
+
+    num_simulations = 100
+    theta = proposal.sample((num_simulations,))
+    x = wrapped_simulator(theta)
+    estimator = trainer.append_simulations(theta, x).train(max_num_epochs=1)
+
+    # condition on multiple conditions
+    theta_o = proposal.sample((num_xs,))[:, :2]
+
+    x_o = torch.zeros(num_trials, num_xs, 2)
+    condition_o = proposal.sample((
+        num_conditions,
+        num_trials,
+    ))[:, 2:].reshape(num_trials, 1)
+    for i in range(num_xs):
+        # simulate with same iid theta but different conditions
+        x_o[:, i, :] = mixed_simulator(theta_o[i].repeat(num_trials, 1), condition_o)
+
+    # batched conditioning
+    theta = proposal.sample((num_thetas,))[:, :2]
+    # x_o has shape (batch, iid, *event)
+    # condition_o has shape (batch, iid, num_conditions)
+    ll_batched = _log_likelihood_over_iid_conditions(x_o, theta, condition_o, estimator)
+
+    # looped conditioning
+    ll_single = []
+    for i in range(num_trials):
+        theta_and_condition = torch.cat(
+            (theta, condition_o[i].repeat(num_thetas, 1)), dim=1
+        )
+        x_i = x_o[:, i].reshape(num_xs, 1, -1).repeat(1, num_thetas, 1)
+        ll_single.append(estimator.log_prob(input=x_i, condition=theta_and_condition))
+    ll_single = torch.stack(ll_single).sum(0)  # sum over trials
+
+    assert ll_batched.shape == torch.Size([num_xs, num_thetas])
+    assert ll_batched.shape == ll_single.shape
+    assert torch.allclose(ll_batched, ll_single, atol=1e-5)

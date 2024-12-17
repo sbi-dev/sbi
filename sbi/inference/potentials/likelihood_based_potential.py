@@ -116,19 +116,27 @@ class LikelihoodBasedPotential(BasePotential):
                 )
             return log_likelihood_batches + self.prior.log_prob(theta)  # type: ignore
 
-    def condition_on(self, condition: Tensor, dims_to_sample: List[int]) -> Callable:
-        """Returns a potential conditioned on a subset of theta dimensions.
+    def condition_on_theta(
+        self, theta_condition: Tensor, dims_to_sample: List[int]
+    ) -> Callable:
+        """Returns a potential function conditioned on a subset of theta dimensions.
 
         The condition is a part of theta, but is assumed to correspond to a batch of iid
-        x_o.
+        x_o. For example, it can be a batch of experimental conditions that corresponds
+        to a batch of i.i.d. trials in x_o.
 
         Args:
-            condition: The condition to fix.
-            dims_to_sample: The indices of the parameters to sample.
+            theta_condition: The condition values to be conditioned.
+            dims_to_sample: The indices of the columns in theta that will be sampled,
+                i.e., that *not* conditioned. For example, if original theta has shape
+                `(batch_dim, 3)`, and `dims_to_sample=[0, 1]`, then the potential will
+                set `theta[:, 3] = theta_condition` at inference time.
 
         Returns:
-            A potential function conditioned on the condition.
+            A potential function conditioned on the theta_condition.
         """
+
+        assert self.x_is_iid, "Conditioning is only supported for iid data."
 
         def conditioned_potential(
             theta: Tensor, x_o: Optional[Tensor] = None, track_gradients: bool = True
@@ -138,10 +146,10 @@ class LikelihoodBasedPotential(BasePotential):
             ), "dims_to_sample must match the number of parameters to sample."
             theta_without_condition = theta[:, dims_to_sample]
 
-            return _log_likelihood_with_iid_condition(
+            return _log_likelihood_over_iid_conditions(
                 x=x_o if x_o is not None else self.x_o,
                 theta_without_condition=theta_without_condition,
-                condition=condition,
+                condition=theta_condition,
                 estimator=self.likelihood_estimator,
                 track_gradients=track_gradients,
             )
@@ -205,63 +213,75 @@ def _log_likelihoods_over_trials(
     return log_likelihood_trial_sum
 
 
-def _log_likelihood_with_iid_condition(
+def _log_likelihood_over_iid_conditions(
     x: Tensor,
     theta_without_condition: Tensor,
     condition: Tensor,
     estimator: ConditionalDensityEstimator,
     track_gradients: bool = False,
 ) -> Tensor:
-    """Return log likelihoods summed over iid trials of `x` with a matching batch of
-    conditions.
+    """Returns $\\log(p(x_o|\theta, condition)$, where x_o is a batch of iid data, and
+    condition is a matching batch of conditions.
 
     This function is different from `_log_likelihoods_over_trials` in that it moves the
-    iid batch dimension of `x` onto the batch dimension of `theta`. This is useful when
+    iid batch dimension of `x` onto the batch dimension of `theta`. This is needed when
     the likelihood estimator is conditioned on a batch of conditions that are iid with
-    the batch of `x`. It avoid the evaluation of the likelihood for every combination of
-    `x` and `condition`. Instead, it manually constructs a batch covering all
-    combination of iid trial and theta batch and reshapes to sum over the iid
+    the batch of `x`. It avoids the evaluation of the likelihood for every combination
+    of `x` and `condition`. Instead, it manually constructs a batch covering all
+    combination of iid trials and theta batch and reshapes to sum over the iid
     likelihoods.
 
     Args:
-        x: Batch of iid data of shape `(iid_dim, *event_shape)`.
-        theta_without_condition: Batch of parameters `(batch_dim, *event_shape)`
-        condition: Batch of conditions of shape `(iid_dim, *condition_shape)`.
+        x: data with shape `(sample_dim, x_batch_dim, *x_event_shape)`, where sample_dim
+            holds the i.i.d. trials and batch_dim holds a batch of xs, e.g., non-iid
+            observations.
+        theta_without_condition: Batch of parameters `(theta_batch_dim,
+            num_parameters)`.
+        condition: Batch of conditions of shape `(sample_dim, num_conditions)`, must
+            match x's `sample_dim`.
         estimator: DensityEstimator.
         track_gradients: Whether to track gradients.
 
     Returns:
-        log_likelihood_trial_sum: log likelihood for each parameter, summed over all
-            batch entries (iid trials) in `x`.
+        log_likelihood: log likelihood for each x in x_batch_dim, for each theta in
+            theta_batch_dim, summed over all i.i.d. trials. Shape
+            `(x_batch_dim, theta_batch_dim)`.
     """
+    assert x.dim() > 2, "x must have shape (sample_dim, batch_dim, *event_shape)."
     assert (
-        condition.shape[0] == x.shape[0]
-    ), "Condition and iid x must have the same batch size."
-    num_trials = x.shape[0]
-    num_theta = theta_without_condition.shape[0]
-    x = reshape_to_sample_batch_event(
-        x, event_shape=x.shape[1:], leading_is_sample=True
-    )
+        condition.dim() == 2
+    ), "condition must have shape (sample_dim, num_conditions)."
+    assert (
+        theta_without_condition.dim() == 2
+    ), "theta must have shape (batch_dim, num_parameters)."
+    num_trials, num_xs = x.shape[:2]
+    num_thetas = theta_without_condition.shape[0]
+    assert (
+        condition.shape[0] == num_trials
+    ), "Condition batch size must match the number of iid trials in x."
 
     # move the iid batch dimension onto the batch dimension of theta and repeat it there
-    x_expanded = x.reshape(1, num_trials, -1).repeat_interleave(num_theta, dim=1)
-    # for this to work we construct theta and condition to cover all combinations in the
-    # trial batch and the theta batch.
-    theta = torch.cat(
+    x.transpose_(0, 1)
+    x_repeated = x.repeat_interleave(num_thetas, dim=1)
+
+    # construct theta and condition to cover all trial-theta combinations
+    theta_with_condition = torch.cat(
         [
             theta_without_condition.repeat(num_trials, 1),  # repeat ABAB
-            condition.repeat_interleave(num_theta, dim=0),  # repeat AABB
+            condition.repeat_interleave(num_thetas, dim=0),  # repeat AABB
         ],
         dim=-1,
     )
 
     with torch.set_grad_enabled(track_gradients):
-        # Calculate likelihood in one batch. Returns (1, num_trials * theta_batch_size)
-        log_likelihood_trial_batch = estimator.log_prob(x_expanded, condition=theta)
+        # Calculate likelihood in one batch. Returns (1, num_trials * num_theta)
+        log_likelihood_trial_batch = estimator.log_prob(
+            x_repeated, condition=theta_with_condition
+        )
         # Reshape to (x-trials x parameters), sum over trial-log likelihoods.
         log_likelihood_trial_sum = log_likelihood_trial_batch.reshape(
-            num_trials, num_theta
-        ).sum(0)
+            num_xs, num_trials, num_thetas
+        ).sum(1)
 
     return log_likelihood_trial_sum
 
