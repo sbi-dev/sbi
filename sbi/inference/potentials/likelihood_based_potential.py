@@ -145,9 +145,15 @@ class LikelihoodBasedPotential(BasePotential):
                 len(dims_to_sample) == theta.shape[1]
             ), "dims_to_sample must match the number of parameters to sample."
             theta_without_condition = theta[:, dims_to_sample]
+            x_o = x_o if x_o is not None else self.x_o
+            # x needs shape (sample_dim (iid), batch_dim (xs), *event_shape)
+            if x_o.dim() < 3:
+                x_o = reshape_to_sample_batch_event(
+                    x_o, event_shape=x_o.shape[1:], leading_is_sample=self.x_is_iid
+                )
 
             return _log_likelihood_over_iid_conditions(
-                x=x_o if x_o is not None else self.x_o,
+                x=x_o,
                 theta_without_condition=theta_without_condition,
                 condition=theta_condition,
                 estimator=self.likelihood_estimator,
@@ -261,8 +267,7 @@ def _log_likelihood_over_iid_conditions(
     ), "Condition batch size must match the number of iid trials in x."
 
     # move the iid batch dimension onto the batch dimension of theta and repeat it there
-    x.transpose_(0, 1)
-    x_repeated = x.repeat_interleave(num_thetas, dim=1)
+    x_repeated = torch.transpose(x, 0, 1).repeat_interleave(num_thetas, dim=1)
 
     # construct theta and condition to cover all trial-theta combinations
     theta_with_condition = torch.cat(

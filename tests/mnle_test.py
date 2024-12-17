@@ -395,8 +395,8 @@ def test_log_likelihood_over_iid_conditions(
 
     # batched conditioning
     theta = proposal.sample((num_thetas,))[:, :2]
-    # x_o has shape (batch, iid, *event)
-    # condition_o has shape (batch, iid, num_conditions)
+    # x_o has shape (iid, batch, *event)
+    # condition_o has shape (iid, num_conditions)
     ll_batched = _log_likelihood_over_iid_conditions(x_o, theta, condition_o, estimator)
 
     # looped conditioning
