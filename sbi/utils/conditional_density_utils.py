@@ -293,7 +293,7 @@ class ConditionedPotential(BasePotential):
             masked outside of prior.
         """
         condition = torch.atleast_2d(condition)
-        if condition.shape[0] != 1:
+        if condition.shape[0] > 1:
             raise ValueError("Condition with batch size > 1 not supported.")
 
         self.potential_fn = potential_fn
