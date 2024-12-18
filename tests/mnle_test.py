@@ -405,7 +405,7 @@ def test_log_likelihood_over_iid_conditions(
         theta_and_condition = torch.cat(
             (theta, condition_o[i].repeat(num_thetas, 1)), dim=1
         )
-        x_i = x_o[:, i].reshape(num_xs, 1, -1).repeat(1, num_thetas, 1)
+        x_i = x_o[i].reshape(num_xs, 1, -1).repeat(1, num_thetas, 1)
         ll_single.append(estimator.log_prob(input=x_i, condition=theta_and_condition))
     ll_single = torch.stack(ll_single).sum(0)  # sum over trials
 
