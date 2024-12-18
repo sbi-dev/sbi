@@ -1,11 +1,10 @@
-from abc import ABC, abstractmethod
+
+import math
+import os
+from typing import Callable
 
 import torch
-from torch.distributions import Distribution, Independent, Uniform, Normal
-from typing import Callable
-import math
-
-import os
+from torch.distributions import Distribution, Independent, Normal, Uniform
 
 from .base_task import Task
 

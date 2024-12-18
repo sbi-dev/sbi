@@ -1,10 +1,9 @@
+import os
 from abc import ABC, abstractmethod
+from typing import Callable
 
 import torch
 from torch.distributions import Distribution
-from typing import Callable
-
-import os
 
 PATH = os.path.dirname(__file__)
 

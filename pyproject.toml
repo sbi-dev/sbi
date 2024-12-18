@@ -131,7 +131,8 @@ testpaths = ["tests"]
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "gpu: marks tests that require a gpu (deselect with '-m \"not gpu\"')",
-    "mcmc: marks tests that require MCMC sampling (deselect with '-m \"not mcmc\"')"
+    "mcmc: marks tests that require MCMC sampling (deselect with '-m \"not mcmc\"')",
+    "benchmark: marks test that are soley for benchmarking purposes"
 ]
 xfail_strict = true
 
