@@ -31,16 +31,19 @@ def pytest_collection_modifyitems(config, items):
     )
     if not gpu_device_available:
         skip_gpu = pytest.mark.skip(reason="No devices available")
+        skip_bm = pytest.mark.skip(reason="Benchmarking disabled")
         for item in items:
             if "gpu" in item.keywords:
                 item.add_marker(skip_gpu)
 
-    # Filter tests to only those with the 'bm' marker
+            if not config.getoption("--bm"):
+                item.add_marker(skip_bm)
+
+    # Filter tests to only those with the 'benchmark' marker
     if config.getoption("--bm"):
-        # Filter tests to only those with the 'bm' marker
+        # Filter tests to only those with the 'benchmark' marker
         filtered_items = []
         for item in items:
-            # Using newer pytest versions (>=4.6):
             if item.get_closest_marker("benchmark"):
                 filtered_items.append(item)
 

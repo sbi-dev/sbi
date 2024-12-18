@@ -29,6 +29,8 @@ def test_benchmark_npe_methods(
         x_o = task.get_observation(i)
         posterior_samples = task.get_reference_posterior_samples(i)
         approx_posterior_samples = posterior.sample((1000,), x=x_o)
+        if isinstance(approx_posterior_samples, tuple):
+            approx_posterior_samples = approx_posterior_samples[0]
         c2st_val = c2st(posterior_samples[:1000], approx_posterior_samples)
         metrics.append(c2st_val)
 
@@ -62,6 +64,8 @@ def test_benchmark_nre_methods(task_name, results_bag, num_simulations=1000, see
         x_o = task.get_observation(i)
         posterior_samples = task.get_reference_posterior_samples(i)
         approx_posterior_samples = posterior.sample((1000,), x=x_o)
+        if isinstance(approx_posterior_samples, tuple):
+            approx_posterior_samples = approx_posterior_samples[0]
         c2st_val = c2st(posterior_samples[:1000], approx_posterior_samples)
         metrics.append(c2st_val)
 
@@ -73,22 +77,3 @@ def test_benchmark_nre_methods(task_name, results_bag, num_simulations=1000, see
     results_bag.num_simulations = num_simulations
     results_bag.task_name = task_name
     results_bag.method = "NRE"
-
-
-# Pytest harvest
-
-
-# @pytest.mark.benchmark
-# def test_synthesis(fixture_store):
-#     """
-#     In this test we inspect the contents of the fixture store so far, and
-#     check that the 'results_bag' entry contains a dict <test_id>: <results_bag>
-#     """
-#     # print the keys in the store
-#     print(dict(fixture_store))
-#     results = fixture_store["results_bag"]
-
-#     for k, v in results.items():
-#         print(k)
-#         for kk, vv in v.items():
-#             print(kk, vv)
