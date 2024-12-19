@@ -7,12 +7,18 @@
 
 ## Collect a list of relevant changes
 
-- [ ] Edit `changelog.md`, add a new version number header and report changes below it.
+- [ ] Edit `changelog.md`: Add a new version number header and report changes below it.
+
+  Trick: To get a list of all changes since the last PR, you can start creating a
+  release via GitHub already (https://github.com/sbi-dev/sbi/releases, see below), add a
+  tag and then let GitHub automatically draft the release notes. Note that some changes
+  might not be worth mentioning, or others might be missing or needing more explanation.
 - [ ] Use one line per change, include links to the pull requests that implemented each of
   the changes.
 - [ ] **Credit contributors**!
 - [ ] If there are new package dependencies or updated version constraints for the existing
   dependencies, add/modify the corresponding entries in `pyproject.toml`.
+- [ ] Test the installation in a fresh conda env to make sure all dependencies match.
 
 ## Run tests locally and make sure they pass
 

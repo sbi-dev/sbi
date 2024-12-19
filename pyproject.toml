@@ -31,8 +31,8 @@ keywords = ["Bayesian inference", "simulation-based inference", "PyTorch"]
 dependencies = [
     "arviz",
     "joblib>=1.0.0",
-    "jupyter",
     "matplotlib",
+    "notebook <= 6.4.12",
     "numpy<2.0.0",
     "pillow",
     "pyknos>=0.16.0",
@@ -59,7 +59,6 @@ doc = [
     "mkdocstrings[python] >= 0.18",
     "nbconvert",
     "nbformat",
-    "notebook <= 6.4.12",
     "traitlets <= 5.9.0",
 ]
 dev = [
