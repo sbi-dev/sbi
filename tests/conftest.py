@@ -1,6 +1,10 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+import pickle
 import shutil
+from logging import warning
+from pathlib import Path
+from shutil import rmtree
 
 import pytest
 import torch
@@ -79,7 +83,7 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
         terminalreporter.write_line(colored_line)
 
         if harvested_fixture_data is not None:
-            terminalreporter.write_line("Harvested Fixture Data:")
+            terminalreporter.write_line("Amortized inference:")
 
             results = harvested_fixture_data["results_bag"]
 
@@ -131,7 +135,7 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
                     val = data.get((m, t), "N/A")
                     # Convert metric to string with formatting if needed
                     # e.g. format(val, ".3f") if val is a float
-                    val_str = str(val)
+                    val_str = format(val, ".3f")
                     row += val_str.center(task_col_widths[t] + 2)
                 terminalreporter.write_line(row)
 
@@ -149,3 +153,48 @@ def mcmc_params_accurate() -> dict:
 def mcmc_params_fast() -> dict:
     """Fixture for MCMC parameters for fast tests."""
     return dict(num_chains=1, thin=1, warmup_steps=1)
+
+
+# Pytest harvest xdist support - not sure if we need it (for me xdist is always slower).
+
+
+# Define the folder in which temporary worker's results will be stored
+RESULTS_PATH = Path('./.xdist_results/')
+RESULTS_PATH.mkdir(exist_ok=True)
+
+
+def pytest_harvest_xdist_init():
+    # reset the recipient folder
+    if RESULTS_PATH.exists():
+        rmtree(RESULTS_PATH)
+    RESULTS_PATH.mkdir(exist_ok=False)
+    return True
+
+
+def pytest_harvest_xdist_worker_dump(worker_id, session_items, fixture_store):
+    # persist session_items and fixture_store in the file system
+    with open(RESULTS_PATH / ('%s.pkl' % worker_id), 'wb') as f:
+        try:
+            pickle.dump((session_items, fixture_store), f)
+        except Exception as e:
+            warning(
+                "Error while pickling worker %s's harvested results: " "[%s] %s",
+                (worker_id, e.__class__, e),
+            )
+    return True
+
+
+def pytest_harvest_xdist_load():
+    # restore the saved objects from file system
+    workers_saved_material = dict()
+    for pkl_file in RESULTS_PATH.glob('*.pkl'):
+        wid = pkl_file.stem
+        with pkl_file.open('rb') as f:
+            workers_saved_material[wid] = pickle.load(f)
+    return workers_saved_material
+
+
+def pytest_harvest_xdist_cleanup():
+    # delete all temporary pickle files
+    rmtree(RESULTS_PATH)
+    return True

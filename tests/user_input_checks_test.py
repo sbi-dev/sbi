@@ -85,7 +85,7 @@ def matrix_simulator(theta):
 
 
 # Set default tensor locally to reach tensors in fixtures.
-torch.set_default_tensor_type(torch.FloatTensor)
+torch.set_default_dtype(torch.float32)
 
 
 @pytest.mark.parametrize(

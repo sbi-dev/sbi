@@ -1,13 +1,10 @@
 import math
-import os
 from typing import Callable
 
 import torch
 from torch.distributions import Distribution, Independent, Normal, Uniform
 
 from .base_task import Task
-
-PATH = os.path.dirname(__file__)
 
 
 def _map_fun(parameters: torch.Tensor, p: torch.Tensor) -> torch.Tensor:
