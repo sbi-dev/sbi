@@ -81,7 +81,7 @@ class NFlowsFlow(ConditionalDensityEstimator):
         Args:
             input: Inputs to evaluate the log probability on. Of shape
                 `(sample_dim, batch_dim, *event_shape)`.
-            condition: Conditions of shape `(sample_dim, batch_dim, *event_shape)`.
+            condition: Conditions of shape `(batch_dim, *event_shape)`.
 
         Raises:
             AssertionError: If `input_batch_dim != condition_batch_dim`.
@@ -126,7 +126,7 @@ class NFlowsFlow(ConditionalDensityEstimator):
 
         Args:
             sample_shape: Shape of the samples to return.
-            condition: Conditions of shape `(sample_dim, batch_dim, *event_shape)`.
+            condition: Conditions of shape `(batch_dim, *event_shape)`.
 
         Returns:
             Samples of shape `(*sample_shape, condition_batch_dim)`.
@@ -147,7 +147,7 @@ class NFlowsFlow(ConditionalDensityEstimator):
 
         Args:
             sample_shape: Shape of the samples to return.
-            condition: Conditions of shape (sample_dim, batch_dim, *event_shape).
+            condition: Conditions of shape (batch_dim, *event_shape).
 
         Returns:
             Samples of shape `(*sample_shape, condition_batch_dim, *input_event_shape)`
