@@ -491,14 +491,12 @@
 <div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">torch</span> <span class="kn">import</span> <span class="n">ones</span><span class="p">,</span> <span class="n">eye</span>
 <span class="kn">import</span> <span class="nn">torch</span>
 <span class="kn">from</span> <span class="nn">torch.distributions</span> <span class="kn">import</span> <span class="n">MultivariateNormal</span>
-<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
 
 <span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">NPE</span><span class="p">,</span> <span class="n">ImportanceSamplingPosterior</span>
 <span class="kn">from</span> <span class="nn">sbi.utils</span> <span class="kn">import</span> <span class="n">BoxUniform</span>
-<span class="kn">from</span> <span class="nn">sbi.inference.potentials.base_potential</span> <span class="kn">import</span> <span class="n">BasePotential</span>
 <span class="kn">from</span> <span class="nn">sbi.analysis</span> <span class="kn">import</span> <span class="n">marginal_plot</span>
 </code></pre></div>
-<p>We first define a simulator and a prior which both have functions for sampling (as required for SBI) and log_prob evaluations (as required for importance sampling).</p>
+<p>We first define a simulator and a prior which both have a <code>sample</code> function (as required for <code>sbi</code>) and <code>log_prob</code> evaluations (as required for importance sampling).</p>
 <p>Next we train an NPE model for inference.</p>
 <p>Now we perfrom inference with the model.</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># define prior and simulator</span>
@@ -556,9 +554,16 @@
 <p><img alt="png" src="../15_importance_sampled_posteriors_files/15_importance_sampled_posteriors_9_0.png" /></p>
 <p>While NPE is not completely off, it does not provide a perfect fit to the posterior. In cases where the likelihood is tractable, we can fix this with importance sampling.</p>
 <h3 id="importance-sampling-with-the-sbi-toolbox">Importance sampling with the SBI toolbox<a class="headerlink" href="#importance-sampling-with-the-sbi-toolbox" title="Permanent link">&para;</a></h3>
-<p>With the SBI toolbox, importance sampling is a one-liner. SBI supports two methods for importance sampling:
-- <code>"importance"</code>: returns <code>n_samples</code> weighted samples (as above) corresponding to <code>n_samples * sample_efficiency</code> samples from the posterior. This results in unbiased samples, but the number of effective samples may be small when the SBI estimate is inaccurate.
-- <code>"sir"</code> (sampling-importance-resampling): performs rejection sampling on a batched basis with batch size <code>oversampling_factor</code>.  This is a guaranteed way to obtain <code>N / oversampling_factor</code> samples, but these may be biased as the weight normalization is not performed across the entire set of samples.</p>
+<p>With the <code>sbi</code> toolbox, importance sampling is a one-liner. <code>sbi</code> supports two methods
+for importance sampling:
+- <code>"importance"</code>: returns <code>n_samples</code> weighted samples (as above) corresponding to
+  <code>n_samples * sample_efficiency</code> samples from the posterior. This results in unbiased
+  samples, but the number of effective samples may be small when the <code>sbi</code> estimate is
+  inaccurate.
+- <code>"sir"</code> (sampling-importance-resampling): performs rejection sampling on a batched
+  basis with batch size <code>oversampling_factor</code>.  This is a guaranteed way to obtain <code>N /
+  oversampling_factor</code> samples, but these may be biased as the weight normalization is
+  not performed across the entire set of samples.</p>
 <div class="highlight"><pre><span></span><code><span class="n">posterior_sir</span> <span class="o">=</span> <span class="n">ImportanceSamplingPosterior</span><span class="p">(</span>
     <span class="n">potential_fn</span><span class="o">=</span><span class="n">log_prob_fn</span><span class="p">,</span>
     <span class="n">proposal</span><span class="o">=</span><span class="n">posterior</span><span class="p">,</span>

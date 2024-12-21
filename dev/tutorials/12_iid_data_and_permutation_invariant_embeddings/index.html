@@ -757,7 +757,9 @@ c2st score for num_trials=20: 0.51
 </code></pre></div>
 
 <h2 id="iid-inference-with-npe-using-permutation-invariant-embedding-nets">IID inference with NPE using permutation-invariant embedding nets<a class="headerlink" href="#iid-inference-with-npe-using-permutation-invariant-embedding-nets" title="Permanent link">&para;</a></h2>
-<p>For NPE we need to define an embedding net that handles the set-like structure of iid-data, i.e., that it permutation invariant and can handle different number of trials.</p>
+<p>For NPE we need to define an embedding net that handles the set-like structure of
+iid-data, i.e., a permutation invariant networks that can handle different numbers and
+orderings of trials.</p>
 <p>We implemented several embedding net classes that allow to construct such a permutation- and number-of-trials invariant embedding net.</p>
 <p>To become permutation invariant, the neural net first learns embeddings for single trials and then performs a permutation invariant operation on those embeddings, e.g., by taking the sum or the mean (Chen et al. 2018, Radev et al. 2021).</p>
 <p>To become invariant w.r.t. the number-of-trials, we train the net with varying number of trials for each parameter setting. This means that, unlike for (S)NLE and (S)NRE, (S)NPE requires to run the simulator multiple times for individual parameter sets to generate the training data.</p>

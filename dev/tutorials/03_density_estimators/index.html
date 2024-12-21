@@ -506,7 +506,7 @@
 <h1 id="customizing-the-density-estimator">Customizing the density estimator<a class="headerlink" href="#customizing-the-density-estimator" title="Permanent link">&para;</a></h1>
 <p><code>sbi</code> allows to specify a custom density estimator for each of the implemented methods. For all options, check the API reference <a href="https://sbi-dev.github.io/sbi/reference/models/">here</a>.</p>
 <h2 id="changing-the-type-of-density-estimator">Changing the type of density estimator<a class="headerlink" href="#changing-the-type-of-density-estimator" title="Permanent link">&para;</a></h2>
-<p>One option is to use one of set of preconfigured density estimators by passing a string in the <code>density_estimator</code> keyword argument to the inference object (<code>NPE</code> or <code>NLE</code>), e.g., &ldquo;maf&rdquo; to use a Masked Autoregressive Flow, of &ldquo;nsf&rdquo; to use a Neural Spline Flow with default hyperparameters.</p>
+<p>One option is using one of the preconfigured density estimators by passing a string in the <code>density_estimator</code> keyword argument to the inference object (<code>NPE</code> or <code>NLE</code>), e.g., &ldquo;maf&rdquo; for a Masked Autoregressive Flow, of &ldquo;nsf&rdquo; for a Neural Spline Flow with default hyperparameters.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">torch</span>
 
 <span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">NPE</span><span class="p">,</span> <span class="n">NRE</span>
@@ -529,9 +529,9 @@
 <span class="p">)</span>
 <span class="n">inference</span> <span class="o">=</span> <span class="n">NPE</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span> <span class="n">density_estimator</span><span class="o">=</span><span class="n">density_estimator_build_fun</span><span class="p">)</span>
 </code></pre></div>
-<p>It is also possible to pass an <code>embedding_net</code> to <code>posterior_nn()</code> which learn summary
-statistics from high-dimensional simulation outputs. You can find a more detailed
-tutorial on this in <a href="../04_embedding_networks/">04_embedding_networks</a>.</p>
+<p>It is also possible to pass an <code>embedding_net</code> to <code>posterior_nn()</code> to automatically
+learn summary statistics from high-dimensional simulation outputs. You can find a more
+detailed tutorial on this in <a href="../04_embedding_networks/">04_embedding_networks</a>.</p>
 <h2 id="building-new-density-estimators-from-scratch">Building new density estimators from scratch<a class="headerlink" href="#building-new-density-estimators-from-scratch" title="Permanent link">&para;</a></h2>
 <p>Finally, it is also possible to implement your own density estimator from scratch, e.g., including embedding nets to preprocess data, or to a density estimator architecture of your choice.</p>
 <p>For this, the <code>density_estimator</code> argument needs to be a function that takes <code>theta</code> and <code>x</code> batches as arguments to then construct the density estimator after the first set of simulations was generated. Our factory functions in <code>sbi/neural_nets/factory.py</code> return such a function.</p>
