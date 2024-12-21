@@ -2305,17 +2305,17 @@ nn.Identity().</p>
 
 
         <p>Base class for density estimators.</p>
-<p>The density estimator class is a wrapper around neural networks that
-allows to evaluate the <code>log_prob</code>, <code>sample</code>, and provide the <code>loss</code> of <span class="arithmatex">\(\theta,x\)</span>
-pairs. Here <span class="arithmatex">\(\theta\)</span> would be the <code>input</code> and <span class="arithmatex">\(x\)</span> would be the <code>condition</code>.</p>
+<p>The density estimator class is a wrapper around neural networks that allows to
+evaluate the <code>log_prob</code>, <code>sample</code>, and provide the <code>loss</code> of <span class="arithmatex">\(\theta,x\)</span> pairs. Here
+<span class="arithmatex">\(\theta\)</span> would be the <code>input</code> and <span class="arithmatex">\(x\)</span> would be the <code>condition</code>.</p>
 
 
 <details class="note" open>
   <summary>Note</summary>
   <p>We assume that the input to the density estimator is a tensor of shape
-(batch_size, input_size), where input_size is the dimensionality of the input.
-The condition is a tensor of shape (batch_size, *condition_shape), where
-condition_shape is the shape of the condition tensor.</p>
+(sample_dim, batch_dim, *input_shape), where input_shape is the dimensionality
+of the input. The condition is a tensor of shape (batch_size, *condition_shape),
+where condition_shape is the shape of the condition tensor.</p>
 </details>
 
 
@@ -2431,15 +2431,15 @@ condition_shape is the shape of the condition tensor.</p>
 <span class="normal">223</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span> <span class="nc">ConditionalDensityEstimator</span><span class="p">(</span><span class="n">ConditionalEstimator</span><span class="p">):</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Base class for density estimators.</span>
 
-<span class="sd">    The density estimator class is a wrapper around neural networks that</span>
-<span class="sd">    allows to evaluate the `log_prob`, `sample`, and provide the `loss` of $\theta,x$</span>
-<span class="sd">    pairs. Here $\theta$ would be the `input` and $x$ would be the `condition`.</span>
+<span class="sd">    The density estimator class is a wrapper around neural networks that allows to</span>
+<span class="sd">    evaluate the `log_prob`, `sample`, and provide the `loss` of $\theta,x$ pairs. Here</span>
+<span class="sd">    $\theta$ would be the `input` and $x$ would be the `condition`.</span>
 
 <span class="sd">    Note:</span>
 <span class="sd">        We assume that the input to the density estimator is a tensor of shape</span>
-<span class="sd">        (batch_size, input_size), where input_size is the dimensionality of the input.</span>
-<span class="sd">        The condition is a tensor of shape (batch_size, *condition_shape), where</span>
-<span class="sd">        condition_shape is the shape of the condition tensor.</span>
+<span class="sd">        (sample_dim, batch_dim, *input_shape), where input_shape is the dimensionality</span>
+<span class="sd">        of the input. The condition is a tensor of shape (batch_size, *condition_shape),</span>
+<span class="sd">        where condition_shape is the shape of the condition tensor.</span>
 
 <span class="sd">    &quot;&quot;&quot;</span>
 
