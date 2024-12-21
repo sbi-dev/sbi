@@ -14,7 +14,7 @@ from sbi.inference.posteriors.rejection_posterior import RejectionPosterior
 from sbi.inference.posteriors.vi_posterior import VIPosterior
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.inference.potentials.likelihood_based_potential import (
-    _log_likelihood_over_iid_conditions,
+    _log_likelihood_over_iid_trials_and_local_theta,
     likelihood_estimator_based_potential,
 )
 from sbi.neural_nets import likelihood_nn
@@ -299,8 +299,8 @@ def test_mnle_with_experimental_conditions(mcmc_params_accurate: dict):
     estimator = trainer.append_simulations(theta, x).train()
 
     potential_fn, _ = likelihood_estimator_based_potential(estimator, proposal, x_o)
-    conditioned_potential_fn = potential_fn.condition_on(
-        condition_o, dims_to_sample=[0, 1]
+    conditioned_potential_fn = potential_fn.condition_on_theta(
+        condition_o, dims_global_theta=[0, 1]
     )
 
     # True posterior samples
@@ -350,7 +350,7 @@ def test_mnle_with_experimental_conditions(mcmc_params_accurate: dict):
         ),
     ],
 )
-def test_log_likelihood_over_iid_conditions(
+def test_log_likelihood_over_local_iid_theta(
     num_thetas, num_trials, num_xs, num_conditions
 ):
     """Test log likelihood over iid conditions using MNLE.
@@ -397,7 +397,9 @@ def test_log_likelihood_over_iid_conditions(
     theta = proposal.sample((num_thetas,))[:, :2]
     # x_o has shape (iid, batch, *event)
     # condition_o has shape (iid, num_conditions)
-    ll_batched = _log_likelihood_over_iid_conditions(x_o, theta, condition_o, estimator)
+    ll_batched = _log_likelihood_over_iid_trials_and_local_theta(
+        x_o, theta, condition_o, estimator
+    )
 
     # looped conditioning
     ll_single = []
