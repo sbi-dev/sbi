@@ -1,4 +1,5 @@
 [![PyPI version](https://badge.fury.io/py/sbi.svg)](https://badge.fury.io/py/sbi)
+[![Conda Version](https://img.shields.io/conda/vn/conda-forge/sbi.svg)](https://github.com/conda-forge/sbi-feedstock)
 [![Contributions welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat)](https://github.com/sbi-dev/sbi/blob/master/CONTRIBUTING.md)
 [![Tests](https://github.com/sbi-dev/sbi/actions/workflows/ci.yml/badge.svg)](https://github.com/sbi-dev/sbi/actions)
 [![codecov](https://codecov.io/gh/sbi-dev/sbi/branch/main/graph/badge.svg)](https://codecov.io/gh/sbi-dev/sbi)
@@ -62,22 +63,36 @@ posterior = inference.build_posterior()
 performance in some cases. We recommend using a virtual environment with
 [`conda`](https://docs.conda.io/en/latest/miniconda.html) for an easy setup.
 
-To install `sbi`, follow these steps:
+If `conda` is installed on the system, an environment for installing `sbi` can be created as follows:
 
-1. **Create a Conda Environment** (if using Conda):
+```
+conda create -n sbi_env python=3.9 && conda activate sbi_env
+```
 
-   ```bash
-   conda create -n sbi_env python=3.9 && conda activate sbi_env
-   ```
+### From PyPI
 
-2. **Install `sbi`**: Independent of whether you are using `conda` or not, `sbi` can be
-   installed using `pip`:
+To install `sbi` from PyPI run
 
-  ```commandline
-  pip install sbi
-  ```
+```
+python -m pip install sbi
+```
 
-3. **Test the installation**:
+### From conda-forge
+
+To install and add `sbi` to a project with [`pixi`](https://pixi.sh/), from the project directory run
+
+```
+pixi add sbi
+```
+
+and to install into a particular conda environment with [`conda`](https://docs.conda.io/projects/conda/), in the activated environment run
+
+```
+conda install --channel conda-forge sbi
+```
+
+### Test the installation
+
 Open a Python prompt and run
 
 ```python
