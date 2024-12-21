@@ -14,7 +14,7 @@
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.48">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.49">
     
     
       
@@ -469,19 +469,25 @@
 
 
 <h1 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">&para;</a></h1>
-<p><code>sbi</code> requires Python 3.8 or higher. A GPU is not required, but can lead to
+<p><code>sbi</code> requires Python 3.9 or higher. A GPU is not required, but can lead to
 speed-up in some cases. We recommend using a
 <a href="https://docs.conda.io/en/latest/miniconda.html"><code>conda</code></a> virtual environment
 (<a href="https://docs.conda.io/en/latest/miniconda.html">Miniconda installation
 instructions</a>). If <code>conda</code> is
 installed on the system, an environment for installing <code>sbi</code> can be created as
 follows:</p>
-<div class="highlight"><pre><span></span><code># Create an environment for sbi (indicate Python 3.8 or higher); activate it
-$ conda create -n sbi_env python=3.10 &amp;&amp; conda activate sbi_env
+<div class="highlight"><pre><span></span><code><span class="gp"># </span>Create<span class="w"> </span>an<span class="w"> </span>environment<span class="w"> </span><span class="k">for</span><span class="w"> </span>sbi<span class="w"> </span><span class="o">(</span>indicate<span class="w"> </span>Python<span class="w"> </span><span class="m">3</span>.8<span class="w"> </span>or<span class="w"> </span>higher<span class="o">)</span><span class="p">;</span><span class="w"> </span>activate<span class="w"> </span>it
+<span class="gp">$ </span>conda<span class="w"> </span>create<span class="w"> </span>-n<span class="w"> </span>sbi_env<span class="w"> </span><span class="nv">python</span><span class="o">=</span><span class="m">3</span>.12<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>conda<span class="w"> </span>activate<span class="w"> </span>sbi_env
 </code></pre></div>
 <p>Independent of whether you are using <code>conda</code> or not, <code>sbi</code> can be installed
 using <code>pip</code>:</p>
-<div class="highlight"><pre><span></span><code>pip install sbi
+<div class="highlight"><pre><span></span><code>python -m pip install sbi
+</code></pre></div>
+<p>To install and add <code>sbi</code> to a project with <a href="https://pixi.sh/"><code>pixi</code></a>, from the project directory run</p>
+<div class="highlight"><pre><span></span><code>pixi add sbi
+</code></pre></div>
+<p>and to install into a particular conda environment with <a href="https://docs.conda.io/projects/conda/"><code>conda</code></a>, in the activated environment run</p>
+<div class="highlight"><pre><span></span><code>conda install --channel conda-forge sbi
 </code></pre></div>
 <p>To test the installation, drop into a Python prompt and run</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi.examples.minimal</span> <span class="kn">import</span> <span class="n">simple</span>
@@ -552,7 +558,7 @@ using <code>pip</code>:</p>
     <script id="__config" type="application/json">{"base": "..", "features": ["content.code.copy"], "search": "../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
-      <script src="../assets/javascripts/bundle.83f73b43.min.js"></script>
+      <script src="../assets/javascripts/bundle.88dd0f4e.min.js"></script>
       
         <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-MML-AM_CHTML"></script>
       
