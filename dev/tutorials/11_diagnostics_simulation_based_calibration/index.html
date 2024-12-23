@@ -626,7 +626,10 @@ this technique with sbi.</p>
 
 <span class="kn">from</span> <span class="nn">sbi.analysis.plot</span> <span class="kn">import</span> <span class="n">sbc_rank_plot</span>
 <span class="kn">from</span> <span class="nn">sbi.diagnostics</span> <span class="kn">import</span> <span class="n">check_sbc</span><span class="p">,</span> <span class="n">check_tarp</span><span class="p">,</span> <span class="n">run_sbc</span><span class="p">,</span> <span class="n">run_tarp</span>
-<span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">NPE</span><span class="p">,</span> <span class="n">simulate_for_sbi</span>
+<span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">NPE</span>
+
+<span class="c1"># Set random seed</span>
+<span class="n">_</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="mi">42</span><span class="p">)</span>
 </code></pre></div>
 <div class="highlight"><pre><span></span><code><span class="n">num_dim</span> <span class="o">=</span> <span class="mi">2</span>
 <span class="n">num_simulations</span> <span class="o">=</span> <span class="mi">10_000</span>
@@ -657,36 +660,31 @@ this technique with sbi.</p>
     <span class="p">)</span><span class="o">.</span><span class="n">sample</span><span class="p">()</span>
     <span class="k">return</span> <span class="n">value</span>
 
-
-<span class="n">_</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
 <span class="n">theta</span> <span class="o">=</span> <span class="n">prior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_simulations</span><span class="p">,))</span>
 <span class="n">x</span> <span class="o">=</span> <span class="n">simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
 </code></pre></div>
-<div class="highlight"><pre><span></span><code><span class="n">_</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
-
-<span class="c1"># let&#39;s sample an observation from the parameters we</span>
+<div class="highlight"><pre><span></span><code><span class="c1"># let&#39;s sample an observation from the parameters we</span>
 <span class="c1"># just produced</span>
 <span class="n">theta_o</span> <span class="o">=</span> <span class="n">prior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">1</span><span class="p">,))</span>
 <span class="n">x_o</span> <span class="o">=</span> <span class="n">simulator</span><span class="p">(</span><span class="n">theta_o</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;theta:&quot;</span><span class="p">,</span> <span class="n">theta_o</span><span class="o">.</span><span class="n">numpy</span><span class="p">())</span>
 <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;x    :&quot;</span><span class="p">,</span> <span class="n">x_o</span><span class="o">.</span><span class="n">numpy</span><span class="p">())</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>theta: [[1.9352932 1.3774877]]
-x    : [[1.941461  1.4396194]]
+<div class="codehilite"><pre><span></span><code>theta: [[3.8389134 1.6634762]]
+x    : [[3.9267206 1.6138272]]
 </code></pre></div>
 
-<div class="highlight"><pre><span></span><code><span class="n">_</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
-
-<span class="c1"># we use a mdn model to have a fast turnaround with training the NPE</span>
+<div class="highlight"><pre><span></span><code><span class="c1"># we use a mdn model to have a fast turnaround with training the NPE</span>
 <span class="n">inferer</span> <span class="o">=</span> <span class="n">NPE</span><span class="p">(</span><span class="n">prior</span><span class="p">,</span> <span class="n">density_estimator</span><span class="o">=</span><span class="s2">&quot;nsf&quot;</span><span class="p">)</span>
 <span class="c1"># append simulations and run training.</span>
 <span class="n">inferer</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">(</span><span class="n">training_batch_size</span><span class="o">=</span><span class="mi">200</span><span class="p">);</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 66 epochs.
+<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 93 epochs.
 </code></pre></div>
 
 <div class="highlight"><pre><span></span><code><span class="n">posterior</span> <span class="o">=</span> <span class="n">inferer</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">()</span>
 <span class="n">posterior_samples</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">10_000</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_o</span><span class="p">)</span>
+
 <span class="c1"># Generate predictive samples by simulating from posterior samples.</span>
 <span class="n">posterior_predictive_samples</span> <span class="o">=</span> <span class="n">simulator</span><span class="p">(</span><span class="n">posterior_samples</span><span class="p">)</span>
 </code></pre></div>
@@ -709,6 +707,7 @@ x    : [[1.941461  1.4396194]]
 <h3 id="running-sbc">Running SBC<a class="headerlink" href="#running-sbc" title="Permanent link">&para;</a></h3>
 <p>We have a working and trained posterior at this point! Hurray! Let&rsquo;s look at the SBC metrics now.</p>
 <div class="highlight"><pre><span></span><code><span class="n">num_sbc_samples</span> <span class="o">=</span> <span class="mi">200</span>  <span class="c1"># choose a number of sbc runs, should be ~100s</span>
+
 <span class="c1"># generate ground truth parameters and corresponding simulated observations for SBC.</span>
 <span class="n">thetas</span> <span class="o">=</span> <span class="n">prior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_sbc_samples</span><span class="p">,))</span>
 <span class="n">xs</span> <span class="o">=</span> <span class="n">simulator</span><span class="p">(</span><span class="n">thetas</span><span class="p">)</span>
@@ -742,7 +741,7 @@ x    : [[1.941461  1.4396194]]
 </code></pre></div>
 <div class="codehilite"><pre><span></span><code>kolmogorov-smirnov p-values
 
-    check_stats[&#39;ks_pvals&#39;] = [0.1201229 0.2126625]
+    check_stats[&#39;ks_pvals&#39;] = [0.1561183 0.9964161]
 </code></pre></div>
 
 <p>The Kolmogorov-Smirnov (KS test, see also <a href="https://en.wikipedia.org/wiki/Kolmogorov%E2%80%93Smirnov_test#Two-sample_Kolmogorov%E2%80%93Smirnov_test">here</a>) as used by <code>check_sbc</code> provides p-values <code>pvals</code> on the null hypothesis that the samples from <code>ranks</code> are drawn from a uniform distribution (in other words <code>H_0: PDF(ranks) == PDF(uniform)</code>). We are provided two values as our problem is two-dimensional - one p-value for each dimension.</p>
@@ -753,14 +752,14 @@ Therefore, the values we see here should ideally be much larger than <code>0.05<
 <span class="p">)</span>
 </code></pre></div>
 <div class="codehilite"><pre><span></span><code>c2st accuracies 
-check_stats[&#39;c2st_ranks&#39;] = [0.475 0.53 ]
+check_stats[&#39;c2st_ranks&#39;] = [0.57  0.485]
 </code></pre></div>
 
 <p>The second tier of metrics comparing <code>ranks</code> with a uniform distributions is a <code>c2st</code> test (see <a href="http://arxiv.org/abs/1610.06545">here</a> for details). This is a nonparametric two sample test based on training a classifier to differentiate two ensembles. Here, these two ensembles are the observed <code>ranks</code> and samples from a uniform distribution. The values reported are the accuracies from n-fold cross-validation. If you see values around <code>0.5</code>, the classifier was unable to differentiate both ensembles, i.e. <code>ranks</code> are very uniform. If the values are high towards <code>1</code>, this matches the case where <code>ranks</code> is very unlike a uniform distribution.</p>
 <h3 id="data-averaged-posterior-dap-versus-prior">Data averaged posterior (DAP) versus prior<a class="headerlink" href="#data-averaged-posterior-dap-versus-prior" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;- c2st accuracies check_stats[&#39;c2st_dap&#39;] = </span><span class="si">{</span><span class="n">check_stats</span><span class="p">[</span><span class="s1">&#39;c2st_dap&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>- c2st accuracies check_stats[&#39;c2st_dap&#39;] = [0.45   0.4875]
+<div class="codehilite"><pre><span></span><code>- c2st accuracies check_stats[&#39;c2st_dap&#39;] = [0.5125 0.4775]
 </code></pre></div>
 
 <p>The last metric reported is again based on <code>c2st</code> computed per dimension of <code>theta</code>. If you see values around <code>0.5</code>, the <code>c2st</code> classifier was unable to differentiate both ensembles for each dimension of <code>theta</code>, i.e. <code>dap</code> are much like (if not identical to) the prior. If the values are very high towards <code>1</code>, this represents the case where <code>dap</code> is very unlike the prior distribution.</p>
@@ -792,7 +791,7 @@ check_stats[&#39;c2st_ranks&#39;] = [0.475 0.53 ]
 <span class="n">check_stats</span> <span class="o">=</span> <span class="n">check_sbc</span><span class="p">(</span><span class="n">ranks</span><span class="p">,</span> <span class="n">thetas</span><span class="p">,</span> <span class="n">dap_samples</span><span class="p">,</span> <span class="mi">1_000</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="n">check_stats</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>{&#39;ks_pvals&#39;: tensor([0.0468]), &#39;c2st_ranks&#39;: tensor([0.5025], dtype=torch.float64), &#39;c2st_dap&#39;: tensor([0.4500, 0.4850], dtype=torch.float64)}
+<div class="codehilite"><pre><span></span><code>{&#39;ks_pvals&#39;: tensor([0.3516]), &#39;c2st_ranks&#39;: tensor([0.5000], dtype=torch.float64), &#39;c2st_dap&#39;: tensor([0.5100, 0.4750], dtype=torch.float64)}
 </code></pre></div>
 
 <p>In the code above, we depart from the default behavior of <code>run_sbc</code>. The standard behavior of <code>run_sbc</code> is to calculate the SBC ranks of parameters <span class="arithmatex">\(\theta\)</span> by comparing the marginal values of the predicted parameter <span class="arithmatex">\(\theta_i\)</span> to the reference value <span class="arithmatex">\(\theta_o\)</span>, i.e. we are ranking each parameter only within its marginal dimension <code>idx</code> which evaluates <code>theta_i[idx] &lt; theta_o[idx]</code> to perform sbc ranking.  </p>
@@ -811,7 +810,7 @@ check_stats[&#39;c2st_ranks&#39;] = [0.475 0.53 ]
 <span class="n">check_stats</span> <span class="o">=</span> <span class="n">check_sbc</span><span class="p">(</span><span class="n">ranks</span><span class="p">,</span> <span class="n">thetas</span><span class="p">,</span> <span class="n">dap_samples</span><span class="p">,</span> <span class="mi">1_000</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="n">check_stats</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>{&#39;ks_pvals&#39;: tensor([1.7612e-37, 1.3333e-34]), &#39;c2st_ranks&#39;: tensor([0.5900, 0.5725], dtype=torch.float64), &#39;c2st_dap&#39;: tensor([0.4350, 0.4950], dtype=torch.float64)}
+<div class="codehilite"><pre><span></span><code>{&#39;ks_pvals&#39;: tensor([2.3607e-38, 5.3656e-30]), &#39;c2st_ranks&#39;: tensor([0.6100, 0.6250], dtype=torch.float64), &#39;c2st_dap&#39;: tensor([0.4750, 0.5225], dtype=torch.float64)}
 </code></pre></div>
 
 <p>We can see that the Kolmogorov-Smirnov p-values vanish (<code>'ks_pvals': tensor([0., 0.])</code>). Thus, we can reject the hypothesis that the <code>ranks</code> PDF is a uniform PDF. The <code>c2st</code> accuracies show values higher than <code>0.5</code>. This is supports as well that the <code>ranks</code> distribution is not a uniform PDF.</p>
@@ -827,7 +826,7 @@ check_stats[&#39;c2st_ranks&#39;] = [0.475 0.53 ]
 <span class="nb">print</span><span class="p">(</span><span class="n">check_stats</span><span class="p">)</span>
 <span class="n">f</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">sbc_rank_plot</span><span class="p">(</span><span class="n">ranks</span><span class="p">,</span> <span class="mi">1_000</span><span class="p">,</span> <span class="n">plot_type</span><span class="o">=</span><span class="s2">&quot;hist&quot;</span><span class="p">,</span> <span class="n">num_bins</span><span class="o">=</span><span class="mi">30</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>{&#39;ks_pvals&#39;: tensor([1.6989e-28, 1.6361e-21]), &#39;c2st_ranks&#39;: tensor([0.6200, 0.5475], dtype=torch.float64), &#39;c2st_dap&#39;: tensor([0.4525, 0.4475], dtype=torch.float64)}
+<div class="codehilite"><pre><span></span><code>{&#39;ks_pvals&#39;: tensor([4.8637e-27, 3.7769e-30]), &#39;c2st_ranks&#39;: tensor([0.5400, 0.5950], dtype=torch.float64), &#39;c2st_dap&#39;: tensor([0.4800, 0.5150], dtype=torch.float64)}
 </code></pre></div>
 
 <p><img alt="png" src="../11_diagnostics_simulation_based_calibration_files/11_diagnostics_simulation_based_calibration_44_1.png" /></p>
@@ -852,11 +851,11 @@ check_stats[&#39;c2st_ranks&#39;] = [0.475 0.53 ]
 <span class="nb">print</span><span class="p">(</span><span class="n">check_stats</span><span class="p">)</span>
 <span class="n">f</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">sbc_rank_plot</span><span class="p">(</span><span class="n">ranks</span><span class="p">,</span> <span class="mi">1_000</span><span class="p">,</span> <span class="n">plot_type</span><span class="o">=</span><span class="s2">&quot;hist&quot;</span><span class="p">,</span> <span class="n">num_bins</span><span class="o">=</span><span class="mi">30</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>{&#39;ks_pvals&#39;: tensor([0.0006, 0.0003]), &#39;c2st_ranks&#39;: tensor([0.4800, 0.4900], dtype=torch.float64), &#39;c2st_dap&#39;: tensor([0.4375, 0.4850], dtype=torch.float64)}
+<div class="codehilite"><pre><span></span><code>{&#39;ks_pvals&#39;: tensor([0.0005, 0.0174]), &#39;c2st_ranks&#39;: tensor([0.5350, 0.5400], dtype=torch.float64), &#39;c2st_dap&#39;: tensor([0.5050, 0.4675], dtype=torch.float64)}
 </code></pre></div>
 
 <p><img alt="png" src="../11_diagnostics_simulation_based_calibration_files/11_diagnostics_simulation_based_calibration_48_1.png" /></p>
-<p>The rank histograms now look more like a very wide gaussian distribution centered in the middle. The KS p-values again vanish unsurprisingly (we must reject the hypothesis that both distributions are from the same uniform PDF) and the c2st_ranks indicate that the rank histogram is not uniform too. As our posterior samples are distributed too broad now, we obtain more &ldquo;medium&rdquo; range ranks and hence produce the peak of ranks in the center of the histogram.</p>
+<p>The rank histograms now look more like a very wide gaussian distribution centered in the middle. The KS p-values are again small (we must reject the hypothesis that both distributions are from the same uniform PDF) and the c2st_ranks indicate that the rank histogram is not uniform too. As our posterior samples are distributed too broad now, we obtain more &ldquo;medium&rdquo; range ranks and hence produce the peak of ranks in the center of the histogram.</p>
 <p>We can repeat this exercise by making our posterior too thin, i.e. the variance of the posterior is too small. Let&rsquo;s cut it by half (<code>dispersion=0.5</code>).</p>
 <div class="highlight"><pre><span></span><code><span class="n">posterior_</span> <span class="o">=</span> <span class="n">DispersedPosterior</span><span class="p">(</span><span class="n">posterior</span><span class="p">,</span> <span class="n">dispersion</span><span class="o">=</span><span class="mf">0.5</span><span class="p">)</span>
 </code></pre></div>
@@ -865,11 +864,11 @@ check_stats[&#39;c2st_ranks&#39;] = [0.475 0.53 ]
 <span class="nb">print</span><span class="p">(</span><span class="n">check_stats</span><span class="p">)</span>
 <span class="n">f</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">sbc_rank_plot</span><span class="p">(</span><span class="n">ranks</span><span class="p">,</span> <span class="mi">1_000</span><span class="p">,</span> <span class="n">plot_type</span><span class="o">=</span><span class="s2">&quot;hist&quot;</span><span class="p">,</span> <span class="n">num_bins</span><span class="o">=</span><span class="mi">30</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>{&#39;ks_pvals&#39;: tensor([2.8365e-01, 1.3149e-04]), &#39;c2st_ranks&#39;: tensor([0.4950, 0.5300], dtype=torch.float64), &#39;c2st_dap&#39;: tensor([0.4175, 0.4750], dtype=torch.float64)}
+<div class="codehilite"><pre><span></span><code>{&#39;ks_pvals&#39;: tensor([0.0190, 0.0468]), &#39;c2st_ranks&#39;: tensor([0.5250, 0.5250], dtype=torch.float64), &#39;c2st_dap&#39;: tensor([0.4825, 0.5250], dtype=torch.float64)}
 </code></pre></div>
 
 <p><img alt="png" src="../11_diagnostics_simulation_based_calibration_files/11_diagnostics_simulation_based_calibration_52_1.png" /></p>
-<p>The histogram of ranks now shoots above the allowed (greyed) area for a uniform distributed around the extrema. We made the posterior samples too thin, so we received more extreme counts of ranks. The KS p-values vanish again and the <code>c2st</code> metric of the ranks is also larger than <code>0.5</code> which underlines that our rank distribution is not uniformly distributed.</p>
+<p>The histogram of ranks now shoots above the allowed (greyed) area for a uniform distributed around the extrema. We made the posterior samples too thin, so we received more extreme counts of ranks. The KS p-values are small again and the <code>c2st</code> metric of the ranks is also larger than <code>0.5</code> which underlines that our rank distribution is not uniformly distributed.</p>
 <p>We again see, <strong>the rank distribution is capable of identifying pathologies of the estimated posterior</strong>:</p>
 <ul>
 <li>a <strong>centrally peaked rank distribution</strong> shows a systematic <strong>over-estimation of the posterior variance</strong><br />
@@ -910,7 +909,7 @@ and check, whether they correspond to the given <span class="arithmatex">\(\alph
 <span class="nb">print</span><span class="p">(</span><span class="n">atc</span><span class="p">,</span> <span class="s2">&quot;Should be close to 0&quot;</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="n">ks_pval</span><span class="p">,</span> <span class="s2">&quot;Should be larger than 0.05&quot;</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>0.757999837398529 Should be close to 0
+<div class="codehilite"><pre><span></span><code>-0.7949994206428528 Should be close to 0
 0.999115261755522 Should be larger than 0.05
 </code></pre></div>
 
