@@ -1,0 +1,893 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://sbi-dev.github.io/sbi/v0.23.3/contribute/">
+      
+      
+        <link rel="prev" href="../faq/">
+      
+      
+        <link rel="next" href="../code_of_conduct/">
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.49">
+    
+    
+      
+        <title>How to contribute - sbi</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.6f8fc17f.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+  
+  
+    
+    
+  
+  
+  <style>:root{--md-admonition-icon--note:url('data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M1 7.775V2.75C1 1.784 1.784 1 2.75 1h5.025c.464 0 .91.184 1.238.513l6.25 6.25a1.75 1.75 0 0 1 0 2.474l-5.026 5.026a1.75 1.75 0 0 1-2.474 0l-6.25-6.25A1.75 1.75 0 0 1 1 7.775m1.5 0c0 .066.026.13.073.177l6.25 6.25a.25.25 0 0 0 .354 0l5.025-5.025a.25.25 0 0 0 0-.354l-6.25-6.25a.25.25 0 0 0-.177-.073H2.75a.25.25 0 0 0-.25.25ZM6 5a1 1 0 1 1 0 2 1 1 0 0 1 0-2"/></svg>');}</style>
+
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../static/global.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#how-to-contribute" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="sbi" class="md-header__button md-logo" aria-label="sbi" data-md-component="logo">
+      
+  <img src="../static/logo.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            sbi
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              How to contribute
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="http://github.com/sbi-dev/sbi" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.7.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    sbi-dev/sbi
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="sbi" class="md-nav__button md-logo" aria-label="sbi" data-md-component="logo">
+      
+  <img src="../static/logo.svg" alt="logo">
+
+    </a>
+    sbi
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="http://github.com/sbi-dev/sbi" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.7.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    sbi-dev/sbi
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Tutorials and Examples
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    API Reference
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../faq/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    FAQ
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Contributing
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Contributing
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    How to contribute
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  <span class="md-ellipsis">
+    How to contribute
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#user-experiences-bugs-and-feature-requests" class="md-nav__link">
+    <span class="md-ellipsis">
+      User experiences, bugs, and feature requests
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#contributing-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      Contributing code
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Contributing code">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#contribution-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      Contribution workflow
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#style-conventions-and-testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      Style conventions and testing
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#contributing-to-the-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Contributing to the documentation
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../code_of_conduct/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Code of Conduct
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../citation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Citation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../credits/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Credits
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#user-experiences-bugs-and-feature-requests" class="md-nav__link">
+    <span class="md-ellipsis">
+      User experiences, bugs, and feature requests
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#contributing-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      Contributing code
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Contributing code">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#contribution-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      Contribution workflow
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#style-conventions-and-testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      Style conventions and testing
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#contributing-to-the-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Contributing to the documentation
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+  
+
+
+<h1 id="how-to-contribute">How to contribute<a class="headerlink" href="#how-to-contribute" title="Permanent link">&para;</a></h1>
+<div class="admonition important">
+<p class="admonition-title">Important</p>
+<p>By participating in the <code>sbi</code> community, all members are expected to comply with
+our <a href="../code_of_conduct/">Code of Conduct</a>. This ensures a positive and inclusive
+environment for everyone involved.</p>
+</div>
+<h2 id="user-experiences-bugs-and-feature-requests">User experiences, bugs, and feature requests<a class="headerlink" href="#user-experiences-bugs-and-feature-requests" title="Permanent link">&para;</a></h2>
+<p>If you are using <code>sbi</code> to infer the parameters of a simulator, we would be
+delighted to know how it worked for you. If it didn&rsquo;t work according to plan,
+please open up an <a href="https://github.com/sbi-dev/sbi/issues">issue</a> or
+<a href="https://github.com/sbi-dev/sbi/discussions">discussion</a> and tell us more about
+your use case: the dimensionality of the input parameters and of the output,
+as well as the setup you used to run inference (i.e., number of simulations,
+number of rounds, etc.).</p>
+<p>To report bugs and suggest features &ndash; including better documentation &ndash;
+please equally head over to <a href="https://github.com/sbi-dev/sbi/issues">issues on GitHub</a>
+and tell us everything.</p>
+<h2 id="contributing-code">Contributing code<a class="headerlink" href="#contributing-code" title="Permanent link">&para;</a></h2>
+<p>Contributions to the <code>sbi</code> package are always welcome! The preferred way to do
+it is via pull requests onto our <a href="https://github.com/sbi-dev/sbi">main repository</a>.
+To give credit to contributors, we consider adding contributors who repeatedly
+and substantially contributed to <code>sbi</code> to the list of authors of the package at
+the end of every year. Additionally, we mention all contributors in the releases.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>To avoid doing duplicated work, we strongly suggest that you go take
+a look at our current <a href="https://github.com/sbi-dev/sbi/issues">open issues</a> and
+<a href="https://github.com/sbi-dev/sbi/pulls">pull requests</a> to see if someone else is
+already doing it. Also, in case you&rsquo;re planning to work on something that has not
+yet been proposed by others (e.g. adding a new feature, adding a new example),
+it is preferable to first open a new issue explaining what you intend to
+propose and then working on your pull request after getting some feedback from
+others.</p>
+</div>
+<h3 id="contribution-workflow">Contribution workflow<a class="headerlink" href="#contribution-workflow" title="Permanent link">&para;</a></h3>
+<p>The following steps describe all parts of the workflow for doing a contribution
+such as installing locally <code>sbi</code> from source, creating a <code>conda</code> environment,
+setting up your <code>git</code> repository, etc. We&rsquo;ve taken strong inspiration from the
+contribution guides of
+<a href="https://scikit-learn.org/stable/developers/contributing.html"><code>scikit-learn</code></a>
+and <a href="https://mne.tools/stable/development/contributing.html"><code>mne</code></a>:</p>
+<p><strong>Step 1</strong>: <a href="https://github.com/">Create an account</a> on GitHub if you do not
+already have one.</p>
+<p><strong>Step 2</strong>: Fork the <a href="https://github.com/sbi-dev/sbi">project repository</a>: click
+on the ‘Fork’ button near the top of the page. This will create a copy of the
+<code>sbi</code> codebase under your GitHub user account. See more details on how to fork
+a repository <a href="https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/fork-a-repo">here</a>.</p>
+<p><strong>Step 3</strong>: Clone your fork of the <code>sbi</code> repo from your GitHub account to your
+local disk:
+<div class="highlight"><pre><span></span><code>git clone git@github.com:$USERNAME/sbi.git
+cd sbi
+</code></pre></div></p>
+<p><strong>Step 4</strong>: Install a recent version of Python (we currently recommend 3.10)
+for instance using <a href="https://github.com/conda-forge/miniforge"><code>miniforge</code></a>. We
+strongly recommend you create a specific <code>conda</code> environment for doing
+development on <code>sbi</code> as per:
+<div class="highlight"><pre><span></span><code>conda create -n sbi_dev python=3.10
+conda activate sbi_dev
+</code></pre></div></p>
+<p><strong>Step 5</strong>: Install <code>sbi</code> in editable mode with
+<div class="highlight"><pre><span></span><code>pip install -e &quot;.[dev]&quot;
+</code></pre></div>
+This installs the <code>sbi</code> package into the current environment by creating a
+link to the source code directory (instead of copying the code to pip’s <code>site_packages</code>
+directory, which is what normally happens). This means that any edits you make
+to the <code>sbi</code> source code will be reflected the next time you open a Python interpreter
+and <code>import sbi</code> (the <code>-e</code> flag of pip stands for an “editable” installation,
+and the <code>dev</code> flag installs development and testing dependencies). This requires
+at least Python 3.8.</p>
+<p><strong>Step 6</strong>: Add the upstream remote. This saves a reference to the main <code>sbi</code>
+repository, which you can use to keep your repository synchronized with the latest
+changes:
+<div class="highlight"><pre><span></span><code>git remote add upstream git@github.com:sbi-dev/sbi.git
+</code></pre></div>
+Check that the upstream and origin remote aliases are configured correctly by
+running <code>git remote -v</code> which should display:
+<div class="highlight"><pre><span></span><code>origin  git@github.com:$USERNAME/sbi.git (fetch)
+origin  git@github.com:$USERNAME/sbi.git (push)
+upstream        git@github.com:sbi-dev/sbi.git (fetch)
+upstream        git@github.com:sbi-dev/sbi.git (push)
+</code></pre></div></p>
+<p><strong>Step 7</strong>: Install <code>pre-commit</code> to run code style checks before each commit:
+<div class="highlight"><pre><span></span><code>pip install pre-commit
+pre-commit install
+</code></pre></div></p>
+<p>You should now have a working installation of <code>sbi</code> and a git repository
+properly configured for making contributions. The following steps describe the
+process of modifying code and submitting a pull request:</p>
+<p><strong>Step 8</strong>: Synchronize your main branch with the upstream/main branch. See more
+details on <a href="https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/syncing-a-fork">GitHub Docs</a>:
+<div class="highlight"><pre><span></span><code>git checkout main
+git fetch upstream
+git merge upstream/main
+</code></pre></div></p>
+<p><strong>Step 9</strong>: Create a feature branch to hold your development changes:
+<div class="highlight"><pre><span></span><code>git checkout -b my_feature
+</code></pre></div>
+and start making changes. Always use a feature branch! It’s good practice
+to never work on the main branch, as this allows you to easily get back to a
+working state of the code if needed (e.g., if you’re working on multiple
+changes at once, or need to pull in recent changes from someone else to get
+your new feature to work properly). In most cases you should make PRs into the
+upstream’s main branch.</p>
+<p><strong>Step 10</strong>: Develop your code on your feature branch on the computer, using
+Git to do the version control. When you’re done editing, add changed files
+using <code>git add</code> and then <code>git commit</code> to record your changes:
+<div class="highlight"><pre><span></span><code>git add modified_files
+git commit -m &quot;description of your commit&quot;
+</code></pre></div>
+Then push the changes to your GitHub account with:
+<div class="highlight"><pre><span></span><code>git push -u origin my_feature
+</code></pre></div>
+The <code>-u</code> flag ensures that your local branch will be automatically linked with
+the remote branch, so you can later use <code>git push</code> and <code>git pull</code> without any
+extra arguments.</p>
+<p><strong>Step 11</strong>: Follow <a href="https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request-from-a-fork">these</a>
+instructions to create a pull request from your fork.
+This will send a notification to <code>sbi</code> maintainers and trigger reviews and comments
+regarding your contribution.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>It is often helpful to keep your local feature branch synchronized
+with the latest changes of the main <code>sbi</code> repository:
+<div class="highlight"><pre><span></span><code>git fetch upstream
+git merge upstream/main
+</code></pre></div></p>
+</div>
+<h3 id="style-conventions-and-testing">Style conventions and testing<a class="headerlink" href="#style-conventions-and-testing" title="Permanent link">&para;</a></h3>
+<p>All our docstrings and comments are written following the <a href="http://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings">Google
+Style</a>.</p>
+<p>For code linting and formating, we use <a href="https://docs.astral.sh/ruff/"><code>ruff</code></a>,
+which is installed alongside <code>sbi</code>.</p>
+<p>You can exclude slow tests and those which require a GPU with
+<div class="highlight"><pre><span></span><code>pytest -m &quot;not slow and not gpu&quot;
+</code></pre></div>
+Additionally, we recommend to run tests with
+<div class="highlight"><pre><span></span><code>pytest -n auto -m &quot;not slow and not gpu&quot;
+</code></pre></div>
+in parallel. GPU tests should probably not be run this way. If you see unexpected
+behavior (tests fail if they shouldn&rsquo;t), try to run them without <code>-n auto</code> and
+see if it persists. When writing new tests and debugging things, it may make sense
+to also run them without <code>-n auto</code>.</p>
+<p>When you create a PR onto <code>main</code>, our Continuous Integration (CI) actions on
+GitHub will perform the following checks:</p>
+<ul>
+<li><strong><a href="https://docs.astral.sh/ruff/formatter/"><code>ruff</code></a></strong> for linting and formatting
+  (including <code>black</code>, <code>isort</code>, and <code>flake8</code>)</li>
+<li><strong><a href="https://github.com/Microsoft/pyright"><code>pyright</code></a></strong> for static type checking.</li>
+<li><strong><a href="https://docs.pytest.org/en/stable/index.html"><code>pytest</code></a></strong> for running a subset of
+  fast tests from our test suite.</li>
+</ul>
+<p>If any of these fail, try reproducing and solving the error locally:</p>
+<ul>
+<li><strong><code>ruff</code></strong>: Make sure you have <code>pre-commit</code> installed locally with the same version as
+ specified in the
+ <a href="https://github.com/sbi-dev/sbi/blob/main/pyproject.toml"><code>pyproject.toml</code></a>. Execute it
+  using <code>pre-commit run --all-files</code>. <code>ruff</code> tends to give informative error messages
+  that help you fix the problem. Note that pre-commit only detects problems with <code>ruff</code>
+  linting and formatting, but does not fix them. You can fix them either by running
+  <code>ruff check . --fix(linting)</code>, followed by <code>ruff format . --fix(formatting)</code>, or by
+  hand.</li>
+<li><strong><code>pyright</code></strong>: Run it locally using <code>pyright sbi/</code> and ensure you are using
+the same
+  <code>pyright</code> version as used in the CI (which is the case if you have installed
+  it with <code>pip install -e ".[dev]"</code> but note that you have to rerun it once
+  someone updates the version in the <code>pyproject.toml</code>).</li>
+<li>Known issues and fixes:<ul>
+<li>If using <code>**kwargs</code>, you either have to specify all possible types of
+<code>kwargs</code>, e.g. <code>**kwargs: Union[int, boolean]</code> or use <code>**kwargs: Any</code></li>
+</ul>
+</li>
+<li><strong><code>pytest</code></strong>: On GitHub Actions you can see which test failed. Reproduce it
+locally, e.g., using <code>pytest -n auto tests/linearGaussian_snpe_test.py</code>. Note
+that this will run for a few minutes and should result in passes and expected
+fails (xfailed).</li>
+<li>Commit and push again until CI tests pass. Don&rsquo;t hesitate to ask for help by
+  commenting on the PR.</li>
+</ul>
+<h2 id="contributing-to-the-documentation">Contributing to the documentation<a class="headerlink" href="#contributing-to-the-documentation" title="Permanent link">&para;</a></h2>
+<p>Most of the documentation for <code>sbi</code> is written in markdown and the website is generated
+using <code>mkdocs</code> with <code>mkdocstrings</code> and <code>mike</code>. The tutorials and examples are converted
+from jupyter notebooks into markdown files to be shown on the website. To work on
+improvements of the documentation, you should first  install the <code>doc</code> dependencies:</p>
+<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[doc]&quot;</span>
+</code></pre></div>
+<p>Then, you can build the website locally by executing in the <code>docs</code> folder</p>
+<div class="highlight"><pre><span></span><code>mkdocs<span class="w"> </span>serve
+</code></pre></div>
+<p>This will build the website on a local host address shown in the terminal. Changes to
+the website files or a browser refresh will immediately rebuild the website.</p>
+<p>If you updated the tutorials or examples, you need to convert them to markdown first:</p>
+<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>docs
+jupyter<span class="w"> </span>nbconvert<span class="w"> </span>--to<span class="w"> </span>markdown<span class="w"> </span>../tutorials/*.ipynb<span class="w"> </span>--output-dir<span class="w"> </span>docs/tutorials/
+mkdocs<span class="w"> </span>serve
+</code></pre></div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        <div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/sbi-dev/sbi" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 512"><!--! Font Awesome Free 6.7.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M186.1 328.7c0 20.9-10.9 55.1-36.7 55.1s-36.7-34.2-36.7-55.1 10.9-55.1 36.7-55.1 36.7 34.2 36.7 55.1M480 278.2c0 31.9-3.2 65.7-17.5 95-37.9 76.6-142.1 74.8-216.7 74.8-75.8 0-186.2 2.7-225.6-74.8-14.6-29-20.2-63.1-20.2-95 0-41.9 13.9-81.5 41.5-113.6-5.2-15.8-7.7-32.4-7.7-48.8 0-21.5 4.9-32.3 14.6-51.8 45.3 0 74.3 9 108.8 36 29-6.9 58.8-10 88.7-10 27 0 54.2 2.9 80.4 9.2 34-26.7 63-35.2 107.8-35.2 9.8 19.5 14.6 30.3 14.6 51.8 0 16.4-2.6 32.7-7.7 48.2 27.5 32.4 39 72.3 39 114.2m-64.3 50.5c0-43.9-26.7-82.6-73.5-82.6-18.9 0-37 3.4-56 6-14.9 2.3-29.8 3.2-45.1 3.2-15.2 0-30.1-.9-45.1-3.2-18.7-2.6-37-6-56-6-46.8 0-73.5 38.7-73.5 82.6 0 87.8 80.4 101.3 150.4 101.3h48.2c70.3 0 150.6-13.4 150.6-101.3m-82.6-55.1c-25.8 0-36.7 34.2-36.7 55.1s10.9 55.1 36.7 55.1 36.7-34.2 36.7-55.1-10.9-55.1-36.7-55.1"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "..", "features": ["content.code.copy"], "search": "../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.88dd0f4e.min.js"></script>
+      
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-MML-AM_CHTML"></script>
+      
+    
+  </body>
+</html>
