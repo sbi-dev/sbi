@@ -1,8 +1,11 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Optional, Tuple
+from abc import abstractmethod
+from typing import Callable, Optional, Tuple
 
+from regex import T
+from sklearn import base
 import torch
 from torch import Tensor
 from torch.distributions import Distribution
@@ -229,3 +232,92 @@ def build_freeform_jacobian_transform(
         exact=exact,
     )
     return transform
+
+
+class ScoreFnIID:
+    def __init__(
+        self,
+        score_estimator: ConditionalScoreEstimator,
+        prior: Distribution,
+        device: str = "cpu",
+    ):
+        r"""Returns the score function for score-based methods.
+
+        Args:
+            score_estimator: The neural network modelling the score.
+            prior: The prior distribution.
+            x_o: The observed data at which to evaluate the posterior.
+            device: The device on which to evaluate the potential.
+        """
+
+        self.score_estimator = score_estimator.to(device)
+        self.prior = prior
+        self.score_estimator.eval()
+
+    @abstractmethod
+    def __call__(
+        self,
+        theta: Tensor,
+    ) -> Tensor:
+        pass
+
+    def prior_score_fn(self, theta: Tensor) -> Tensor:
+        theta = theta.detach().clone().requires_grad_(True)
+        prior_log_prob = self.prior.log_prob(theta)
+        prior_score = torch.autograd.grad(
+            prior_log_prob,
+            theta,
+            grad_outputs=torch.ones_like(prior_log_prob),
+            create_graph=True,
+        )[0]
+        return prior_score
+
+
+class FNPEScoreFN(ScoreFnIID):
+    def __init__(
+        self,
+        score_estimator: ConditionalScoreEstimator,
+        prior: Distribution,
+        device: str = "cpu",
+        prior_score_weight: Optional[Callable] = None,
+    ):
+        super().__init__(score_estimator, prior, device)
+
+        if prior_score_weight is None:
+            t_max = score_estimator.t_max
+
+            def prior_score_weight_fn(t):
+                return (t_max - t) / t_max
+
+        self.prior_score_weight_fn = prior_score_weight_fn
+
+    def __call__(
+        self,
+        theta: Tensor,
+        time: Optional[Tensor] = None,
+    ) -> Tensor:
+        r"""Returns the score function for score-based methods.
+
+        Args:
+            theta: The parameters at which to evaluate the potential.
+
+        Returns:
+            The score function.
+        """
+        if time is None:
+            time = torch.tensor([self.score_estimator.t_min])
+
+        N = theta.shape[0]
+
+        # Compute the per-sample score
+        theta = ensure_theta_batched(theta)
+        base_score = self.score_estimator(theta)
+
+        # Compute the prior score
+        prior_score = self.prior_score_fn(theta)
+        prior_score = self.prior_score_weight_fn(time) * prior_score
+
+        # Accumulate
+        score = (1 - N) * prior_score + base_score.sum(0)
+
+        return score
