@@ -124,7 +124,7 @@ class CategoricalMADE(MADE):
         sample_shape = torch.Size(sample_shape)
 
         # Calculate total number of samples
-        num_samples = torch.prod(torch.tensor(sample_shape)).item()
+        num_samples = int(torch.prod(torch.tensor(sample_shape)))
 
         # Prepare context
         if context is not None:

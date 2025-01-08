@@ -107,11 +107,12 @@ def build_autoregressive_categoricalmassestimator(
             standardizing_net(batch_y, structured_y), embedding_net
         )
 
-    batch_x_discrete = batch_x[:, _is_discrete(batch_x)]
-    inferred_categories = tensor([unique(col).numel() for col in batch_x_discrete.T])
-    num_categories = (
-        num_categories if num_categories is not None else inferred_categories
-    )
+    if num_categories is None:
+        batch_x_discrete = batch_x[:, _is_discrete(batch_x)]
+        inferred_categories = tensor([
+            unique(col).numel() for col in batch_x_discrete.T
+        ])
+        num_categories = inferred_categories
 
     categorical_net = CategoricalMADE(
         num_categories=num_categories,
