@@ -73,6 +73,7 @@ class CategoricalMADE(MADE):
         self.embedding_net = embedding_net
         self.hidden_features = hidden_features
         self.epsilon = epsilon
+        self.context_features = context_features
 
         if custom_initialization:
             self._initialize()
@@ -132,17 +133,15 @@ class CategoricalMADE(MADE):
                 context = context.unsqueeze(0)
             context = torchutils.repeat_rows(context, num_samples)
         else:
-            context = torch.zeros(num_samples, self.context_dim)
+            context = torch.zeros(num_samples, self.context_features)
 
         with torch.no_grad():
             samples = torch.zeros(num_samples, self.num_variables)
-            for variable in range(self.num_variables):
+            for i in range(self.num_variables):
                 outputs = self.forward(samples, context)
-                outputs = outputs.reshape(
-                    num_samples, self.num_variables, self.num_categories
-                )
+                outputs = outputs.reshape(*samples.shape, self.num_categories)
                 ps = self.compute_probs(outputs)
-                samples[:, variable] = Categorical(probs=ps[:, variable]).sample()
+                samples[:, i] = Categorical(probs=ps[:, i]).sample()
 
         return samples.reshape(*sample_shape, self.num_variables)
 
