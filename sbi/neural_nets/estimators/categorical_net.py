@@ -34,7 +34,7 @@ class CategoricalMADE(MADE):
         use_batch_norm: bool = False,
         epsilon: float = 1e-2,
         custom_initialization: bool = True,
-        embedding_net: Optional[nn.Module] = nn.Identity(),
+        embedding_net: nn.Module = nn.Identity(),
     ):
         """Initialize the neural net.
 
@@ -128,21 +128,26 @@ class CategoricalMADE(MADE):
 
         # Prepare context
         if context is not None:
-            if context.ndim == 1:
+            batch_dim = context.shape[0]
+            if context.ndim == 2:
                 context = context.unsqueeze(0)
-            context = torchutils.repeat_rows(context, num_samples)
+            if batch_dim == 1:
+                context = torchutils.repeat_rows(context, num_samples)
         else:
-            context = torch.zeros(num_samples, self.context_features)
+            context_dim = 0 if self.context_features is None else self.context_features
+            context = torch.zeros(num_samples, context_dim)
+            batch_dim = 1
 
         with torch.no_grad():
-            samples = torch.zeros(num_samples, self.num_variables)
+            samples = torch.zeros(num_samples, batch_dim, self.num_variables)
+            print(samples.shape, context.shape)
             for i in range(self.num_variables):
                 outputs = self.forward(samples, context)
                 outputs = outputs.reshape(*samples.shape, self.num_categories)
                 ps = self.compute_probs(outputs)
-                samples[:, i] = Categorical(probs=ps[:, i]).sample()
+                samples[:, :, i] = Categorical(probs=ps[:, :, i]).sample()
 
-        return samples.reshape(*sample_shape, self.num_variables)
+        return samples.reshape(*sample_shape, batch_dim, self.num_variables)
 
     def _initialize(self):
         pass
