@@ -13,7 +13,6 @@ from sbi.neural_nets.estimators.mixed_density_estimator import (
     _separate_input,
 )
 from sbi.neural_nets.net_builders.categorial import (
-    build_autoregressive_categoricalmassestimator,
     build_categoricalmassestimator,
 )
 from sbi.neural_nets.net_builders.flow import (
@@ -59,7 +58,6 @@ def build_mnle(
     z_score_x: Optional[str] = "independent",
     z_score_y: Optional[str] = "independent",
     flow_model: str = "nsf",
-    categorical_model: str = "mlp",
     num_categorical_columns: Optional[Tensor] = None,
     embedding_net: nn.Module = nn.Identity(),
     combined_embedding_net: Optional[nn.Module] = None,
@@ -157,32 +155,16 @@ def build_mnle(
     combined_condition = torch.cat([disc_x, embedded_batch_y], dim=-1)
 
     # Set up a categorical RV neural net for modelling the discrete data.
-    if categorical_model == "made":
-        discrete_net = build_autoregressive_categoricalmassestimator(
-            disc_x,
-            batch_y,
-            z_score_x="none",  # discrete data should not be z-scored.
-            z_score_y="none",  # y-embedding net already z-scores.
-            num_hidden=hidden_features,
-            num_layers=hidden_layers,
-            embedding_net=embedding_net,
-            num_categories=num_categorical_columns,
-        )
-    elif categorical_model == "mlp":
-        assert num_disc == 1, "MLP only supports 1D input."
-        discrete_net = build_categoricalmassestimator(
-            disc_x,
-            batch_y,
-            z_score_x="none",  # discrete data should not be z-scored.
-            z_score_y="none",  # y-embedding net already z-scores.
-            num_hidden=hidden_features,
-            num_layers=hidden_layers,
-            embedding_net=embedding_net,
-        )
-    else:
-        raise ValueError(
-            f"Unknown categorical net {categorical_model}. Must be 'made' or 'mlp'."
-        )
+    discrete_net = build_categoricalmassestimator(
+        disc_x,
+        batch_y,
+        z_score_x="none",  # discrete data should not be z-scored.
+        z_score_y="none",  # y-embedding net already z-scores.
+        num_hidden=hidden_features,
+        num_layers=hidden_layers,
+        embedding_net=embedding_net,
+        num_categories=num_categorical_columns,
+    )
 
     if combined_embedding_net is None:
         # set up linear embedding net for combining discrete and continuous

@@ -8,7 +8,6 @@ from nflows.nn.nde.made import MADE
 from nflows.utils import torchutils
 from torch import Tensor, nn
 from torch.distributions import Categorical
-from torch.nn import Sigmoid, Softmax
 from torch.nn import functional as F
 
 from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
@@ -87,7 +86,7 @@ class CategoricalMADE(MADE):
             condition: Conditioning variable. (batch_size, *condition_shape)
 
         Returns:
-            Predicted categorical probabilities. (batch_size, *input_shape,
+            Predicted categorical logits. (batch_size, *input_shape,
                 num_categories)
         """
         embedded_context = self.embedding_net.forward(context)
@@ -149,106 +148,6 @@ class CategoricalMADE(MADE):
         pass
 
 
-class CategoricalNet(nn.Module):
-    """Conditional density (mass) estimation for a categorical random variable.
-
-    Takes as input parameters theta and learns the parameters p of a Categorical.
-
-    Defines log prob and sample functions.
-    """
-
-    def __init__(
-        self,
-        num_input: int,
-        num_categories: int,
-        num_hidden: int = 20,
-        num_layers: int = 2,
-        embedding_net: Optional[nn.Module] = None,
-    ):
-        """Initialize the neural net.
-
-        Args:
-            num_input: number of input units, i.e., dimensionality of the features.
-            num_categories: number of output units, i.e., number of categories.
-            num_hidden: number of hidden units per layer.
-            num_layers: number of hidden layers.
-            embedding_net: emebedding net for input.
-        """
-        super().__init__()
-
-        self.num_hidden = num_hidden
-        self.num_input = num_input
-        self.activation = Sigmoid()
-        self.softmax = Softmax(dim=1)
-        self.num_categories = num_categories
-        self.num_variables = 1
-
-        # Maybe add embedding net in front.
-        if embedding_net is not None:
-            self.input_layer = nn.Sequential(
-                embedding_net, nn.Linear(num_input, num_hidden)
-            )
-        else:
-            self.input_layer = nn.Linear(num_input, num_hidden)
-
-        # Repeat hidden units hidden layers times.
-        self.hidden_layers = nn.ModuleList()
-        for _ in range(num_layers):
-            self.hidden_layers.append(nn.Linear(num_hidden, num_hidden))
-
-        self.output_layer = nn.Linear(num_hidden, num_categories)
-
-    def forward(self, condition: Tensor) -> Tensor:
-        """Return categorical probability predicted from a batch of inputs.
-
-        Args:
-            condition: batch of context parameters for the net.
-
-        Returns:
-            Tensor: batch of predicted categorical probabilities.
-        """
-        # forward path
-        condition = self.activation(self.input_layer(condition))
-
-        # iterate n hidden layers, input condition and calculate tanh activation
-        for layer in self.hidden_layers:
-            condition = self.activation(layer(condition))
-
-        return self.softmax(self.output_layer(condition))
-
-    def log_prob(self, input: Tensor, condition: Tensor) -> Tensor:
-        """Return categorical log probability of categories input, given condition.
-
-        Args:
-            input: categories to evaluate.
-            condition: parameters.
-
-        Returns:
-            Tensor: log probs with shape (input.shape[0],)
-        """
-        # Predict categorical ps and evaluate.
-        ps = self.forward(condition)
-        # Squeeze the last dimension (event dim) because `Categorical` has
-        # `event_shape=()` but our data usually has an event_shape of `(1,)`.
-        return Categorical(probs=ps).log_prob(input.squeeze(dim=-1))
-
-    def sample(self, sample_shape: torch.Size, condition: Tensor) -> Tensor:
-        """Returns samples from categorical random variable with probs predicted from
-        the neural net.
-
-        Args:
-            sample_shape: number of samples to obtain.
-            condition: batch of parameters for prediction.
-
-        Returns:
-            Tensor: Samples with shape (num_samples, 1)
-        """
-
-        # Predict Categorical ps and sample.
-        ps = self.forward(condition)
-        return Categorical(probs=ps).sample(sample_shape=sample_shape)
-
-
 class CategoricalMassEstimator(ConditionalDensityEstimator):
     """Conditional density (mass) estimation for a categorical random variable.
 
@@ -256,12 +155,12 @@ class CategoricalMassEstimator(ConditionalDensityEstimator):
     """
 
     def __init__(
-        self, net: CategoricalNet, input_shape: torch.Size, condition_shape: torch.Size
+        self, net: CategoricalMADE, input_shape: torch.Size, condition_shape: torch.Size
     ) -> None:
         """Initialize the mass estimator.
 
         Args:
-            net: CategoricalNet.
+            net: CategoricalMADE.
             input_shape: Shape of the input data.
             condition_shape: Shape of the condition data
         """
