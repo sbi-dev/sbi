@@ -24,5 +24,5 @@ from sbi.neural_nets.net_builders.flowmatching_nets import (
     build_resnet_flowmatcher,
 )
 from sbi.neural_nets.net_builders.mdn import build_mdn
-from sbi.neural_nets.net_builders.mnle import build_mnle
+from sbi.neural_nets.net_builders.mixed_nets import build_mnle, build_mnpe
 from sbi.neural_nets.net_builders.score_nets import build_score_estimator

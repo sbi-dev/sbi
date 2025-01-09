@@ -11,10 +11,12 @@ from sbi.neural_nets.estimators.categorical_net import CategoricalMassEstimator
 
 
 class MixedDensityEstimator(ConditionalDensityEstimator):
-    """Class performing Mixed Neural Likelihood Estimation.
+    """Class performing Mixed Neural Density Estimation.
 
-    MNLE combines a Categorical net and a neural density estimator to model data
-    with mixed types, e.g., as they occur in decision-making models.
+    This estimator combines a Categorical net and a neural density estimator to model
+    data with mixed types (discrete and continuous), e.g., as they occur in
+    decision-making models. It can be used for both likelihood and posterior estimation
+    of mixed data.
     """
 
     def __init__(
@@ -26,7 +28,8 @@ class MixedDensityEstimator(ConditionalDensityEstimator):
         embedding_net: nn.Module = nn.Identity(),
         log_transform_input: bool = False,
     ):
-        """Initialize class for combining density estimators for MNLE.
+        """Initialize class for combining density estimators for mixed neural
+        density estimation.
 
         Args:
             discrete_net: neural net to model discrete part of the data.
@@ -51,8 +54,9 @@ class MixedDensityEstimator(ConditionalDensityEstimator):
 
     def forward(self, input: Tensor):
         raise NotImplementedError(
-            """The forward method is not implemented for MNLE, use '.sample(...)' to
-            generate samples though a forward pass."""
+            """The forward method is not implemented for mixed neural density
+            estimation,use '.sample(...)' to generate samples though a forward
+            pass."""
         )
 
     def sample(
