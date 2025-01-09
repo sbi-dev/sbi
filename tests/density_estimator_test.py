@@ -11,9 +11,7 @@ from torch import eye, zeros
 from torch.distributions import MultivariateNormal
 
 from sbi.neural_nets.embedding_nets import CNNEmbedding
-from sbi.neural_nets.estimators.shape_handling import (
-    reshape_to_sample_batch_event,
-)
+from sbi.neural_nets.estimators.shape_handling import reshape_to_sample_batch_event
 from sbi.neural_nets.net_builders import (
     build_categoricalmassestimator,
     build_made,
@@ -22,6 +20,7 @@ from sbi.neural_nets.net_builders import (
     build_mdn,
     build_mlp_flowmatcher,
     build_mnle,
+    build_mnpe,
     build_nsf,
     build_resnet_flowmatcher,
     build_zuko_bpf,
@@ -316,6 +315,7 @@ def _build_density_estimator_and_tensors(
     # make last dim discrete for mixed density estimators
     batch_input[:, -1] = torch.randint(0, 4, (1000,))
     batch_condition = torch.randn((1000, *condition_event_shape))
+
     if len(condition_event_shape) > 1:
         embedding_net = CNNEmbedding(condition_event_shape, kernel_size=1)
         z_score_y = "structured"
@@ -323,7 +323,11 @@ def _build_density_estimator_and_tensors(
         embedding_net = torch.nn.Identity()
         z_score_y = "independent"
 
-    if density_estimator_build_fn in [build_mnle, build_categoricalmassestimator]:
+    if density_estimator_build_fn in [
+        build_mnle,
+        build_mnpe,
+        build_categoricalmassestimator,
+    ]:
         density_estimator = density_estimator_build_fn(
             batch_x=batch_input,
             batch_y=batch_condition,
@@ -362,10 +366,26 @@ def _build_density_estimator_and_tensors(
         [build_mnle, 1, (2,), (7, 7), 10],
         [build_mnle, 1, (2,), (2, 7), 10],
         [build_mnle, 1, (2,), (7, 2), 10],
+        # Add MNPE test cases (note: x and y roles are swapped)
+        (build_mnpe, 1, (2,), (7,), 1),
+        (build_mnpe, 1, (2,), (7,), 10),
+        [build_mnpe, 1, (2,), (7, 7), 10],
+        [build_mnpe, 1, (2,), (2, 7), 10],
+        [build_mnpe, 1, (2,), (7, 2), 10],
         [build_categoricalmassestimator, 1, (1,), (7, 7), 10],
         [build_categoricalmassestimator, 2, (1,), (7, 7), 10],
         pytest.param(
             build_mnle,
+            2,
+            (1,),
+            (7,),
+            10,
+            marks=pytest.mark.xfail(
+                reason="Sample dim > 1 not supported for Mixed Density Estimation"
+            ),
+        ),
+        pytest.param(
+            build_mnpe,
             2,
             (1,),
             (7,),
