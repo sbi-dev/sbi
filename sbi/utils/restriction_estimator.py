@@ -692,7 +692,7 @@ class RestrictedPrior(Distribution):
                 max_sampling_batch_size=max_sampling_batch_size,
                 alternative_method="sample_with='sir'",
             )
-            # NOTE: This currently requires a float acceptance rate. As previous versions
+            # NOTE: This currently requires a float acceptance rate. A previous version
             # of accept_reject_sample returned a float. In favour to batched sampling
             # it now returns a tensor.
             acceptance_rate = acceptance_rate.min().item()

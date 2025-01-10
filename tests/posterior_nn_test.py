@@ -140,13 +140,13 @@ def test_batched_sample_log_prob_with_different_x(
         log_probs = posterior.log_prob(samples, x=x_o)
         assert torch.allclose(
             log_probs, batched_log_probs[:, 0], atol=1e-1, rtol=1e-1
-        ), "Log probs wrong"
+        ), "Batched log probs different from non-batched log probs"
     else:
         for idx in range(x_o_batch_dim):
             log_probs = posterior.log_prob(samples[:, idx], x=x_o[idx])
             assert torch.allclose(
                 log_probs, batched_log_probs[:, idx], atol=1e-1, rtol=1e-1
-            ), "Log probs wrong"
+            ), "Batched log probs different from non-batched log probs"
 
 
 @pytest.mark.mcmc
