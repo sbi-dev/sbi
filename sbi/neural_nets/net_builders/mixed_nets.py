@@ -68,6 +68,7 @@ def _build_mixed_density_estimator(
     hidden_layers: int = 2,
     tail_bound: float = 10.0,
     log_transform_x: bool = True,
+    is_mnpe: bool = False,
     **kwargs,
 ) -> MixedDensityEstimator:
     """Base function for building mixed neural density estimators.
@@ -146,17 +147,30 @@ def _build_mixed_density_estimator(
         num_disc = len(num_categorical_columns)
     cont_x, disc_x = _separate_input(batch_x, num_discrete_columns=num_disc)
 
-    # Set up y-embedding net with z-scoring.
-    z_score_y_bool, structured_y = z_score_parser(z_score_y)
-    if z_score_y_bool:
-        embedding_net = nn.Sequential(
-            standardizing_net(batch_y, structured_y), embedding_net
-        )
-    # Get size of the embedded condition data.
-    print("embedding_net", embedding_net)
-    print("batch_x.shape:", batch_x.shape)
-    print("batch_y.shape:", batch_y.shape)
-    embedded_batch_y = embedding_net(batch_y)
+    # The embedding net is applied to the continuous part of the parameters
+    # MNPE: parameters are in batch_x, MNLE: parameters are in batch_y
+    if is_mnpe:
+        z_score_x_bool, structured_x = z_score_parser(z_score_x)
+        if z_score_x_bool:
+            embedding_net_x = nn.Sequential(
+                standardizing_net(cont_x, structured_x), embedding_net
+            )
+        else:
+            embedding_net_x = embedding_net
+        embedding_net_y = nn.Identity()
+    else:
+        z_score_y_bool, structured_y = z_score_parser(z_score_y)
+        if z_score_y_bool:
+            embedding_net_y = nn.Sequential(
+                standardizing_net(batch_y, structured_y), embedding_net
+            )
+        else:
+            embedding_net_y = embedding_net
+        embedding_net_x = nn.Identity()
+
+    # embed
+    embedded_batch_x = embedding_net_x(cont_x)
+    embedded_batch_y = embedding_net_y(batch_y)
     combined_condition = torch.cat([disc_x, embedded_batch_y], dim=-1)
 
     # Set up a categorical RV neural net for modelling the discrete data.
@@ -185,7 +199,7 @@ def _build_mixed_density_estimator(
     continuous_net = model_builders[flow_model](
         # TODO: add support for optional log-transform in flow builders.
         batch_x=(
-            torch.log(cont_x) if log_transform_x else cont_x
+            torch.log(embedded_batch_x + 1e-10) if log_transform_x else embedded_batch_x
         ),  # log transform manually.
         batch_y=combined_condition,
         z_score_x=z_score_x,
@@ -203,7 +217,7 @@ def _build_mixed_density_estimator(
     return MixedDensityEstimator(
         discrete_net=discrete_net,
         continuous_net=continuous_net,
-        embedding_net=embedding_net,  # pass embedding for continuous condition part.
+        embedding_net=embedding_net_y,  # pass embedding for continuous condition part.
         log_transform_input=log_transform_x,
         input_shape=batch_x[0].shape,
         condition_shape=batch_y[0].shape,
@@ -227,7 +241,9 @@ def build_mnle(
     Returns:
         MixedDensityEstimator for MNLE.
     """
-    return _build_mixed_density_estimator(batch_x=batch_x, batch_y=batch_y, **kwargs)
+    return _build_mixed_density_estimator(
+        batch_x=batch_x, batch_y=batch_y, is_mnpe=False, **kwargs
+    )
 
 
 def build_mnpe(
@@ -247,4 +263,6 @@ def build_mnpe(
     Returns:
         MixedDensityEstimator for MNPE.
     """
-    return _build_mixed_density_estimator(batch_x=batch_x, batch_y=batch_y, **kwargs)
+    return _build_mixed_density_estimator(
+        batch_x=batch_x, batch_y=batch_y, is_mnpe=True, **kwargs
+    )

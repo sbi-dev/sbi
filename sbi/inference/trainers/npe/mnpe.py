@@ -32,7 +32,8 @@ class MNPE(NPE_C):
 
         Like NPE-C, but designed to be applied to data with mixed types, e.g.,
         continuous parameters and discrete parameters like they occur in models with
-        switching components.
+        switching components. The emebedding net will only operate on the continuous
+        parameters, note this to design the dimension of the embedding net.
 
         Args:
             prior: A probability distribution that expresses prior knowledge about the
