@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import Tuple
+from typing import Tuple, Union
 
 import pytest
 import torch
@@ -441,8 +441,10 @@ def test_boxuniform_device_handling(arg_device, device):
     NPE_C(prior=prior, device=arg_device)
 
 
+@pytest.mark.gpu
 @pytest.mark.parametrize("method", [NPE_A, NPE_C])
-def test_multiround_mdn_training_on_device(method):
+@pytest.mark.parametrize("device", ["cpu", "gpu"])
+def test_multiround_mdn_training_on_device(method: Union[NPE_A, NPE_C], device: str):
     num_dim = 2
     num_rounds = 2
     num_simulations = 100
