@@ -418,9 +418,9 @@ class MCMCPosterior(NeuralPosterior):
             else init_strategy_parameters
         )
 
-        assert (
-            method == "slice_np_vectorized"
-        ), "Batched sampling only supported for vectorized samplers!"
+        assert method == "slice_np_vectorized", (
+            "Batched sampling only supported for vectorized samplers!"
+        )
 
         # warn if num_chains is larger than num requested samples
         if num_chains > torch.Size(sample_shape).numel():
@@ -1003,9 +1003,9 @@ class MCMCPosterior(NeuralPosterior):
         Returns:
             inference_data: Arviz InferenceData object.
         """
-        assert (
-            self._posterior_sampler is not None
-        ), """No samples have been generated, call .sample() first."""
+        assert self._posterior_sampler is not None, (
+            """No samples have been generated, call .sample() first."""
+        )
 
         sampler: Union[
             MCMC, SliceSamplerSerial, SliceSamplerVectorized, PyMCSampler

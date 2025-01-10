@@ -129,9 +129,9 @@ class NPSE(NeuralInference):
         Returns:
             NeuralInference object (returned so that this function is chainable).
         """
-        assert (
-            proposal is None
-        ), "Multi-round NPSE is not yet implemented. Please use single-round NPSE."
+        assert proposal is None, (
+            "Multi-round NPSE is not yet implemented. Please use single-round NPSE."
+        )
         current_round = 0
 
         if exclude_invalid_x is None:

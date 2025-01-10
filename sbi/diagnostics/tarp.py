@@ -133,9 +133,9 @@ def _run_tarp(
     """
     num_posterior_samples, num_tarp_samples, _ = posterior_samples.shape
 
-    assert (
-        references.shape == thetas.shape
-    ), "references must have the same shape as thetas"
+    assert references.shape == thetas.shape, (
+        "references must have the same shape as thetas"
+    )
 
     if num_bins is None:
         num_bins = num_tarp_samples // 10

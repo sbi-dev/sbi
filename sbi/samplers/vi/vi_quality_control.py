@@ -74,12 +74,12 @@ def basic_checks(posterior, N: int = int(5e4)):
         assert (
             prior.support.check(samples)  # type: ignore
         ).all(), "Some of the samples are not within the prior support."
-    assert (
-        torch.isfinite(posterior.log_prob(samples))
-    ).all(), "The log probability is not finite for some samples"
-    assert (
-        torch.isfinite(posterior.log_prob(prior_samples))
-    ).all(), "The log probability is not finite for some samples"
+    assert (torch.isfinite(posterior.log_prob(samples))).all(), (
+        "The log probability is not finite for some samples"
+    )
+    assert (torch.isfinite(posterior.log_prob(prior_samples))).all(), (
+        "The log probability is not finite for some samples"
+    )
 
 
 def psis_diagnostics(

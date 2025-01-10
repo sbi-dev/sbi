@@ -101,9 +101,9 @@ class CNNEmbedding(nn.Module):
         """
         super(CNNEmbedding, self).__init__()
 
-        assert isinstance(
-            input_shape, Tuple
-        ), "input_shape must be a Tuple of size 1 or 2, e.g., (width, [height])."
+        assert isinstance(input_shape, Tuple), (
+            "input_shape must be a Tuple of size 1 or 2, e.g., (width, [height])."
+        )
         assert (
             0 < len(input_shape) < 3
         ), """input_shape must be a Tuple of size 1 or 2, e.g.,
@@ -115,9 +115,9 @@ class CNNEmbedding(nn.Module):
 
         if out_channels_per_layer is None:
             out_channels_per_layer = [6, 12]
-        assert (
-            len(out_channels_per_layer) == num_conv_layers
-        ), "out_channels needs as many entries as num_cnn_layers."
+        assert len(out_channels_per_layer) == num_conv_layers, (
+            "out_channels needs as many entries as num_cnn_layers."
+        )
 
         # define input shape with channel
         self.input_shape = (in_channels, *input_shape)

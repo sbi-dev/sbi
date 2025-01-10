@@ -125,11 +125,11 @@ class PosteriorBasedPotential(BasePotential):
             theta_batch_size = theta.shape[0]
             x_batch_size = x.shape[0]
 
-            assert (
-                theta_batch_size == x_batch_size or x_batch_size == 1
-            ), f"Batch size mismatch: {theta_batch_size} and {x_batch_size}.\
+            assert theta_batch_size == x_batch_size or x_batch_size == 1, (
+                f"Batch size mismatch: {theta_batch_size} and {x_batch_size}.\
                 When performing batched sampling for multiple `x`, the batch size of\
                 `theta` must match the batch size of `x`."
+            )
 
             if x_batch_size == 1:
                 # If a single `x` is passed (i.e. batchsize==1), we squeeze

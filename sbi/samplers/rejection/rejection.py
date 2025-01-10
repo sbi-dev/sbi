@@ -179,9 +179,9 @@ def rejection_sample(
 
         # When in case of leakage a batch size was used there could be too many samples.
         samples = torch.cat(accepted)[:num_samples]
-        assert (
-            samples.shape[0] == num_samples
-        ), "Number of accepted samples must match required samples."
+        assert samples.shape[0] == num_samples, (
+            "Number of accepted samples must match required samples."
+        )
 
     return samples, as_tensor(acceptance_rate)
 
@@ -358,8 +358,8 @@ def accept_reject_sample(
     samples = [torch.cat(accepted[i], dim=0)[:num_samples] for i in range(num_xos)]
     samples = torch.stack(samples, dim=1)
     samples = samples.reshape(num_samples, *candidates.shape[1:])
-    assert (
-        samples.shape[0] == num_samples
-    ), "Number of accepted samples must match required samples."
+    assert samples.shape[0] == num_samples, (
+        "Number of accepted samples must match required samples."
+    )
 
     return samples, as_tensor(acceptance_rate)

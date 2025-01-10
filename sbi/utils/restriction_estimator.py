@@ -560,9 +560,9 @@ class AcceptRejectFunction:
             else:
                 raise NameError(f"`safety_margin` {safety_margin} not supported.")
         else:
-            assert (
-                allowed_false_negatives is not None
-            ), "`allowed_false_negatives` must be set."
+            assert allowed_false_negatives is not None, (
+                "`allowed_false_negatives` must be set."
+            )
             quantile_index = floor(num_valid * allowed_false_negatives)
             self._classifier_thr, _ = torch.kthvalue(clf_probs, quantile_index + 1)
 

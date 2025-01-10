@@ -177,9 +177,9 @@ class LikelihoodEstimator(NeuralInference, ABC):
                 theta[self.train_indices].to("cpu"),
                 x[self.train_indices].to("cpu"),
             )
-            assert (
-                len(x_shape_from_simulation(x.to("cpu"))) < 3
-            ), "SNLE cannot handle multi-dimensional simulator output."
+            assert len(x_shape_from_simulation(x.to("cpu"))) < 3, (
+                "SNLE cannot handle multi-dimensional simulator output."
+            )
             del theta, x
 
         self._neural_net.to(self._device)
