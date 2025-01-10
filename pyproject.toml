@@ -106,6 +106,7 @@ ignore = [
 [tool.ruff.lint.extend-per-file-ignores]
 "__init__.py" = ["E402", "F401", "F403"]  # allow unused imports and undefined names
 "test_*.py" = ["F403", "F405"]
+"tutorials/*.ipynb" = ["E501"]  # allow long lines in notebooks
 
 [tool.ruff.lint.isort]
 case-sensitive = true

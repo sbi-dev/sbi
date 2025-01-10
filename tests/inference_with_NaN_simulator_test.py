@@ -226,9 +226,9 @@ def test_restricted_prior_log_prob(prior):
     restricted_prior_probs = torch.exp(restricted_prior.log_prob(theta))
 
     valid_thetas = restricted_prior._accept_reject_fn(theta).bool()
-    assert torch.all(
-        restricted_prior_probs[valid_thetas] > 0.0
-    ), "Accepted theta have zero probability."
-    assert torch.all(
-        restricted_prior_probs[torch.logical_not(valid_thetas)] == 0.0
-    ), "Rejected theta has non-zero probablity."
+    assert torch.all(restricted_prior_probs[valid_thetas] > 0.0), (
+        "Accepted theta have zero probability."
+    )
+    assert torch.all(restricted_prior_probs[torch.logical_not(valid_thetas)] == 0.0), (
+        "Rejected theta has non-zero probablity."
+    )

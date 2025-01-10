@@ -131,12 +131,12 @@ def test_consistent_sbc_results(density_estimator, cov_method):
         num_posterior_samples=num_posterior_samples,
     )
 
-    assert (
-        checks["ks_pvals"] > 0.05
-    ).all(), f"KS p-values too small: {checks['ks_pvals']}"
-    assert (
-        checks["c2st_ranks"] < 0.6
-    ).all(), f"C2ST ranks too large: {checks['c2st_ranks']}"
+    assert (checks["ks_pvals"] > 0.05).all(), (
+        f"KS p-values too small: {checks['ks_pvals']}"
+    )
+    assert (checks["c2st_ranks"] < 0.6).all(), (
+        f"C2ST ranks too large: {checks['c2st_ranks']}"
+    )
     assert (checks["c2st_dap"] < 0.6).all(), f"C2ST DAP too large: {checks['c2st_dap']}"
 
 

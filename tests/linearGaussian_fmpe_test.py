@@ -96,9 +96,9 @@ def test_c2st_fmpe_on_linearGaussian(num_dim: int, prior_str: str):
 
         max_dkl = 0.15
 
-        assert (
-            dkl < max_dkl
-        ), f"D-KL={dkl} is more than 2 stds above the average performance."
+        assert dkl < max_dkl, (
+            f"D-KL={dkl} is more than 2 stds above the average performance."
+        )
 
         # test probs
         probs = posterior.log_prob(samples).exp()
@@ -110,9 +110,9 @@ def test_c2st_fmpe_on_linearGaussian(num_dim: int, prior_str: str):
     elif prior_str == "uniform":
         # Check whether the returned probability outside of the support is zero.
         posterior_prob = get_prob_outside_uniform_prior(posterior, prior, num_dim)
-        assert (
-            posterior_prob == 0.0
-        ), "The posterior probability outside of the prior support is not zero"
+        assert posterior_prob == 0.0, (
+            "The posterior probability outside of the prior support is not zero"
+        )
 
         # Check whether normalization (i.e. scaling up the density due
         # to leakage into regions without prior support) scales up the density by the
@@ -377,9 +377,9 @@ def test_fmpe_map():
     map_ = posterior.map(show_progress_bars=True, num_iter=20)
 
     # Check whether the MAP is close to the ground truth.
-    assert torch.allclose(
-        map_, gt_posterior.mean, atol=0.2
-    ), f"{map_} != {gt_posterior.mean}"
+    assert torch.allclose(map_, gt_posterior.mean, atol=0.2), (
+        f"{map_} != {gt_posterior.mean}"
+    )
 
 
 def test_multi_round_handling_fmpe():

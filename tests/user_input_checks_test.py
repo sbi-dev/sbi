@@ -193,9 +193,9 @@ def test_process_prior(prior):
         batch_size,
         parameter_dim,
     )), "Number of sampled parameters must match batch size."
-    assert (
-        prior.log_prob(theta).shape[0] == batch_size
-    ), "Number of log probs must match number of input values."
+    assert prior.log_prob(theta).shape[0] == batch_size, (
+        "Number of log probs must match number of input values."
+    )
 
 
 @pytest.mark.parametrize(
@@ -236,9 +236,9 @@ def test_process_simulator(simulator: Callable, prior: Distribution, x_shape: Tu
     x = simulator(prior.sample((n_batch,)))
 
     assert isinstance(x, Tensor), "Processed simulator must return Tensor."
-    assert (
-        x.shape[0] == n_batch
-    ), "Processed simulator must return as many data points as parameters in batch."
+    assert x.shape[0] == n_batch, (
+        "Processed simulator must return as many data points as parameters in batch."
+    )
     assert x.shape[1:] == x_shape
 
 
@@ -561,9 +561,9 @@ def test_simulate_for_sbi(
             simulation_batch_size=simulation_batch_size,
             num_workers=num_workers,
         )
-        assert (
-            theta.numel() == 0
-        ), "Theta should be an empty tensor when num_simulations=0"
+        assert theta.numel() == 0, (
+            "Theta should be an empty tensor when num_simulations=0"
+        )
         assert x.numel() == 0, "x should be an empty tensor when num_simulations=0"
     else:
         if not use_process_simulator and num_workers > 1:
@@ -583,9 +583,9 @@ def test_simulate_for_sbi(
                 simulation_batch_size=simulation_batch_size,
                 num_workers=num_workers,
             )
-            assert (
-                theta.shape[0] == num_simulations
-            ), "Theta should have num_simulations rows"
+            assert theta.shape[0] == num_simulations, (
+                "Theta should have num_simulations rows"
+            )
             assert x.shape[0] == num_simulations, "x should have num_simulations rows"
             assert theta.shape[1] == num_dim, "Theta should have num_dim columns"
             assert x.shape[1] == num_dim, "x should have num_dim columns"

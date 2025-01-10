@@ -233,9 +233,9 @@ def test_batched_mcmc_sample_log_prob_with_different_x(
         samples_separate2_m = torch.mean(samples_separate2, dim=0, dtype=torch.float32)
         samples_sep_m = torch.stack([samples_separate1_m, samples_separate2_m], dim=0)
 
-        assert torch.allclose(
-            samples_m, samples_sep_m, atol=0.2, rtol=0.2
-        ), "Batched sampling is not consistent with separate sampling."
+        assert torch.allclose(samples_m, samples_sep_m, atol=0.2, rtol=0.2), (
+            "Batched sampling is not consistent with separate sampling."
+        )
 
 
 @pytest.mark.slow

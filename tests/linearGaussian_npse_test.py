@@ -96,9 +96,9 @@ def test_c2st_npse_on_linearGaussian(
 
         max_dkl = 0.15
 
-        assert (
-            dkl < max_dkl
-        ), f"D-KL={dkl} is more than 2 stds above the average performance."
+        assert dkl < max_dkl, (
+            f"D-KL={dkl} is more than 2 stds above the average performance."
+        )
 
 
 def test_c2st_npse_on_linearGaussian_different_dims():

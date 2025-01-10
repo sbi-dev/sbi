@@ -315,9 +315,9 @@ def test_train_with_different_data_and_training_device(
         density_estimator=estimator if data_device == "cpu" else None,
         prior=prior,
     ).set_default_x(x_o)
-    assert posterior._device == str(
-        weights_device
-    ), "inferred posterior device not correct."
+    assert posterior._device == str(weights_device), (
+        "inferred posterior device not correct."
+    )
 
 
 @pytest.mark.parametrize("inference_method", [NPE_A, NPE_C, NRE_A, NRE_B, NRE_C, NLE])
@@ -406,12 +406,12 @@ def test_vi_on_gpu(num_dim: int, q: str, vi_method: str, sampling_method: str):
     samples = posterior.sample((1,), method=sampling_method)
     logprobs = posterior.log_prob(samples)
 
-    assert (
-        str(samples.device) == device
-    ), f"The devices after training do not match: {samples.device} vs {device}"
-    assert (
-        str(logprobs.device) == device
-    ), f"The devices after training do not match: {logprobs.device} vs {device}"
+    assert str(samples.device) == device, (
+        f"The devices after training do not match: {samples.device} vs {device}"
+    )
+    assert str(logprobs.device) == device, (
+        f"The devices after training do not match: {logprobs.device} vs {device}"
+    )
 
 
 @pytest.mark.gpu

@@ -344,9 +344,7 @@ def test_mnle_with_experimental_conditions(mcmc_params_accurate: dict):
         1,
         pytest.param(
             2,
-            marks=pytest.mark.xfail(
-                reason="Batched theta_condition is not " "supported"
-            ),
+            marks=pytest.mark.xfail(reason="Batched theta_condition is not supported"),
         ),
     ],
 )

@@ -180,11 +180,11 @@ def test_lc2st_true_positiv_rate(method):
 
     proportion_rejected = torch.tensor(results).float().mean()
 
-    assert (
-        proportion_rejected > confidence_level
-    ), f"LC2ST p-values too big, test should be rejected \
+    assert proportion_rejected > confidence_level, (
+        f"LC2ST p-values too big, test should be rejected \
         at least {confidence_level * 100}% of the time, but was rejected \
         only {proportion_rejected * 100}% of the time."
+    )
 
 
 @pytest.mark.slow
@@ -259,8 +259,8 @@ def test_lc2st_false_positiv_rate(method):
 
     proportion_rejected = torch.tensor(results).float().mean()
 
-    assert proportion_rejected < (
-        1 - confidence_level
-    ), f"LC2ST p-values too small, test should be rejected \
+    assert proportion_rejected < (1 - confidence_level), (
+        f"LC2ST p-values too small, test should be rejected \
         less then {(1 - confidence_level) * 100}% of the time, \
         but was rejected {proportion_rejected * 100}% of the time."
+    )
