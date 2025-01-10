@@ -8,6 +8,8 @@ import torch
 from torch import Tensor, float32
 from torch.distributions import Distribution, constraints
 
+from sbi.utils.torchutils import process_device
+
 
 class CustomPriorWrapper(Distribution):
     def __init__(
@@ -171,16 +173,22 @@ class MultipleIndependent(Distribution):
         dists: Sequence[Distribution],
         validate_args=None,
         arg_constraints: Optional[Dict[str, constraints.Constraint]] = None,
+        device: Optional[str] = None,
     ):
         self._check_distributions(dists)
         if validate_args is not None:
             [d.set_default_validate_args(validate_args) for d in dists]
 
-        self.dists = dists
+        # Device handling
+        device = dists[0].sample().device.type if device is None else device
+        device = process_device(device)  # You'll need to import this from torchutils
+
+        # Move all distributions to the specified device
+        self.dists = [self._move_dist_to_device(d, device) for d in dists]
+
         # numel() instead of event_shape because for all dists both is possible,
         # event_shape=[1] or batch_shape=[1]
         self.dims_per_dist = [d.sample().numel() for d in self.dists]
-
         self.ndims = int(torch.sum(torch.as_tensor(self.dims_per_dist)).item())
         self.custom_arg_constraints = arg_constraints or {}
         self.validate_args = validate_args
@@ -192,6 +200,126 @@ class MultipleIndependent(Distribution):
             ]),  # Event shape is the sum of all ndims.
             validate_args=validate_args,
         )
+
+    def _move_dist_to_device(self, dist: Distribution, device: str) -> Distribution:
+        """
+        Helper to move a distribution's parameters to the specified device.
+        This is quite ugly but pytorch does not has a simple way to move parameters
+        of all distributions to a device.
+        """
+        try:
+            # For distributions that implement their own to() method
+            if hasattr(dist, 'to'):
+                return dist.to(device)
+
+            # Handle Independent distributions (including BoxUniform)
+            if isinstance(dist, torch.distributions.Independent):
+                if type(dist).__name__ == 'BoxUniform':
+                    # BoxUniform needs low and high arguments
+                    base_dist = dist.base_dist
+                    return type(dist)(
+                        low=base_dist.low.to(device),
+                        high=base_dist.high.to(device),
+                        reinterpreted_batch_ndims=dist.reinterpreted_batch_ndims,
+                        device=device,
+                    )
+                else:
+                    # Handle other Independent distributions
+                    base_dist_on_device = self._move_dist_to_device(
+                        dist.base_dist, device
+                    )
+                    return type(dist)(
+                        base_dist_on_device,
+                        reinterpreted_batch_ndims=dist.reinterpreted_batch_ndims,
+                    )
+
+            # Handle distributions with _param attribute (e.g., Bernoulli)
+            if hasattr(dist, '_param'):
+                return type(dist)(dist._param.to(device))
+
+            # Handle distributions with _parameters dict
+            elif hasattr(dist, '_parameters'):
+                new_params = {
+                    name: param.to(device) if isinstance(param, torch.Tensor) else param
+                    for name, param in dist._parameters.items()
+                }
+                return type(dist)(**new_params)
+
+            # Try to get parameters through the Distribution interface
+            params = {}
+            # Map of distribution types to their required parameter names
+            dist_param_map = {
+                'Beta': ['concentration0', 'concentration1'],
+                'Binomial': ['total_count', 'probs'],
+                'Categorical': ['probs'],
+                'Cauchy': ['loc', 'scale'],
+                'Chi2': ['df'],
+                'Dirichlet': ['concentration'],
+                'Exponential': ['rate'],
+                'Gamma': ['concentration', 'rate'],
+                'Geometric': ['probs'],
+                'Gumbel': ['loc', 'scale'],
+                'HalfNormal': ['scale'],
+                'Laplace': ['loc', 'scale'],
+                'LogNormal': ['loc', 'scale'],
+                'Multinomial': ['total_count', 'probs'],
+                'MultivariateNormal': ['loc', 'covariance_matrix'],
+                'Normal': ['loc', 'scale'],
+                'Pareto': ['scale', 'alpha'],
+                'Poisson': ['rate'],
+                'StudentT': ['df', 'loc', 'scale'],
+                'Uniform': ['low', 'high'],
+                'VonMises': ['loc', 'concentration'],
+                'Weibull': ['scale', 'concentration'],
+            }
+
+            # Get parameter names specific to this distribution type
+            dist_type = type(dist).__name__
+            specific_params = dist_param_map.get(
+                dist_type,
+                [
+                    'loc',
+                    'scale',
+                    'rate',
+                    'prob',
+                    'probs',
+                    'logits',
+                    'concentration',
+                    'concentration0',
+                    'concentration1',
+                    'low',
+                    'high',
+                    'base_dist',
+                    'df',
+                    'alpha',
+                    'total_count',
+                    'covariance_matrix',
+                ],
+            )
+
+            for name in specific_params:
+                if hasattr(dist, name):
+                    param = getattr(dist, name)
+                    if isinstance(param, torch.Tensor):
+                        params[name] = param.to(device)
+                    elif isinstance(param, Distribution):
+                        # Recursively move nested distribution
+                        params[name] = self._move_dist_to_device(param, device)
+                    else:
+                        params[name] = param
+
+            if params:
+                return type(dist)(**params)
+
+            return dist  # Return unchanged if no parameters found
+
+        except Exception as e:
+            warnings.warn(
+                f"Failed to move distribution {type(dist)} to device {device}: "
+                f"{str(e)}",
+                stacklevel=2,
+            )
+            return dist
 
     @property
     def arg_constraints(self) -> Dict[str, constraints.Constraint]:
