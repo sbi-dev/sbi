@@ -102,7 +102,7 @@ def test_importance_posterior_sample_log_prob(snplre_method: type):
 def test_batched_sample_log_prob_with_different_x(
     snpe_method: type,
     x_o_batch_dim: bool,
-    prior,
+    prior: str,
 ):
     num_dim = 2
     num_simulations = 1000
