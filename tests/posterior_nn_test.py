@@ -135,14 +135,17 @@ def test_batched_sample_log_prob_with_different_x(
     assert batched_log_probs.shape == (10, max(x_o_batch_dim, 1)), "logprob shape wrong"
 
     # Test consistency with non-batched log_prob
+    # NOTE: Leakage factor is a MC estimate, so we need to relax the tolerance here.
     if x_o_batch_dim == 0:
-        log_probs = posterior.log_prob(samples)
-        assert torch.allclose(log_probs, batched_log_probs[:, 0]), "Log probs wrong"
+        log_probs = posterior.log_prob(samples, x=x_o)
+        assert torch.allclose(
+            log_probs, batched_log_probs[:, 0], atol=1e-1, rtol=1e-1
+        ), "Log probs wrong"
     else:
         for idx in range(x_o_batch_dim):
-            log_probs = posterior.log_prob(samples, x_o[idx])
+            log_probs = posterior.log_prob(samples[:, idx], x=x_o[idx])
             assert torch.allclose(
-                log_probs, batched_log_probs[:, idx]
+                log_probs, batched_log_probs[:, idx], atol=1e-1, rtol=1e-1
             ), "Log probs wrong"
 
 
