@@ -1,11 +1,9 @@
+import contextlib
 import importlib
 import inspect
 import pkgutil
 import random
-import contextlib
 import sys
-
-from torch import le
 
 
 def import_first_function(module_name: str):
@@ -43,6 +41,7 @@ def find_submodules(package_name):
     walk_submodules(package)
     return submodules
 
+
 def reset_environment():
     # This is a helper which resets the environment
     for module_name in list(sys.modules.keys()):
@@ -57,7 +56,6 @@ def test_for_circular_imports():
 
     errors = []
     for module_name in modules:
-
         # Try to import
         if "sbi.examples" in module_name:
             # This is not really a module :/ Hence skip it...
