@@ -22,6 +22,7 @@ from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
 )
 from sbi.utils import check_estimator_arg, check_prior, x_shape_from_simulation
+from sbi.utils.torchutils import assert_all_finite
 
 
 class LikelihoodEstimator(NeuralInference, ABC):
@@ -381,4 +382,6 @@ class LikelihoodEstimator(NeuralInference, ABC):
             theta, event_shape=self._neural_net.condition_shape
         )
         x = reshape_to_batch_event(x, event_shape=self._neural_net.input_shape)
-        return self._neural_net.loss(x, condition=theta)
+        loss = self._neural_net.loss(x, condition=theta)
+        assert_all_finite(loss, "NLE loss")
+        return loss

@@ -10,6 +10,7 @@ from torch.distributions import Distribution
 from sbi.inference.trainers.nre.nre_a import NRE_A
 from sbi.sbi_types import TensorboardSummaryWriter
 from sbi.utils.sbiutils import del_entries
+from sbi.utils.torchutils import assert_all_finite
 
 
 class BNRE(NRE_A):
@@ -142,4 +143,6 @@ class BNRE(NRE_A):
             .square()
         )
 
-        return bce + regularization_strength * regularizer
+        loss = bce + regularization_strength * regularizer
+        assert_all_finite(loss, "BNRE loss")
+        return loss
