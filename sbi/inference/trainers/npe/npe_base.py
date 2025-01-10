@@ -42,6 +42,7 @@ from sbi.utils import (
     warn_if_zscoring_changes_data,
 )
 from sbi.utils.sbiutils import ImproperEmpirical, mask_sims_from_prior
+from sbi.utils.torchutils import assert_all_finite
 
 
 class PosteriorEstimator(NeuralInference, ABC):
@@ -609,6 +610,7 @@ class PosteriorEstimator(NeuralInference, ABC):
             # Must be extended ones other Estimators are implemented. See #966,
             loss = -self._log_prob_proposal_posterior(theta, x, masks, proposal)
 
+        assert_all_finite(loss, "NPE loss")
         return calibration_kernel(x) * loss
 
     def _check_proposal(self, proposal):

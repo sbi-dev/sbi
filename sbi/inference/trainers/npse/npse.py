@@ -28,6 +28,7 @@ from sbi.utils import (
     warn_if_zscoring_changes_data,
 )
 from sbi.utils.sbiutils import ImproperEmpirical, mask_sims_from_prior
+from sbi.utils.torchutils import assert_all_finite
 
 
 class NPSE(NeuralInference):
@@ -510,6 +511,7 @@ class NPSE(NeuralInference):
                 "Multi-round NPSE with arbitrary proposals is not implemented"
             )
 
+        assert_all_finite(loss, "NPSE loss")
         return calibration_kernel(x) * loss
 
     def _converged(self, epoch: int, stop_after_epochs: int) -> bool:
