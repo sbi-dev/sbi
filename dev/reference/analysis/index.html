@@ -998,7 +998,7 @@ see the source code in <code>_get_default_fig_kwargs()</code></p>
 <span class="normal">832</span>
 <span class="normal">833</span>
 <span class="normal">834</span>
-<span class="normal">835</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">pairplot</span><span class="p">(</span>
+<span class="normal">835</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">pairplot</span><span class="p">(</span>
     <span class="n">samples</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">],</span> <span class="n">List</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">],</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">],</span>
     <span class="n">points</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span>
         <span class="n">Union</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">],</span> <span class="n">List</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">],</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span>
@@ -1505,7 +1505,7 @@ see the source code in <code>_get_default_fig_kwargs()</code></p>
 <span class="normal">937</span>
 <span class="normal">938</span>
 <span class="normal">939</span>
-<span class="normal">940</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">marginal_plot</span><span class="p">(</span>
+<span class="normal">940</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">marginal_plot</span><span class="p">(</span>
     <span class="n">samples</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">],</span> <span class="n">List</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">],</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">],</span>
     <span class="n">points</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span>
         <span class="n">Union</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">],</span> <span class="n">List</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">],</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span>
@@ -1966,7 +1966,7 @@ in <code>sbi.analysis.plot</code> for details.</p>
 <span class="normal">1229</span>
 <span class="normal">1230</span>
 <span class="normal">1231</span>
-<span class="normal">1232</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">conditional_pairplot</span><span class="p">(</span>
+<span class="normal">1232</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">conditional_pairplot</span><span class="p">(</span>
     <span class="n">density</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
     <span class="n">condition</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
     <span class="n">limits</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">List</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">],</span>
@@ -2038,7 +2038,7 @@ in <code>sbi.analysis.plot</code> for details.</p>
     <span class="n">dim</span><span class="p">,</span> <span class="n">limits</span><span class="p">,</span> <span class="n">eps_margins</span> <span class="o">=</span> <span class="n">prepare_for_conditional_plot</span><span class="p">(</span><span class="n">condition</span><span class="p">,</span> <span class="n">opts</span><span class="p">)</span>
     <span class="n">diag_func</span> <span class="o">=</span> <span class="n">get_conditional_diag_func</span><span class="p">(</span><span class="n">opts</span><span class="p">,</span> <span class="n">limits</span><span class="p">,</span> <span class="n">eps_margins</span><span class="p">,</span> <span class="n">resolution</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">offdiag_func</span><span class="p">(</span><span class="n">row</span><span class="p">,</span> <span class="n">col</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">offdiag_func</span><span class="p">(</span><span class="n">row</span><span class="p">,</span> <span class="n">col</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
         <span class="n">p_image</span> <span class="o">=</span> <span class="p">(</span>
             <span class="n">eval_conditional_density</span><span class="p">(</span>
                 <span class="n">opts</span><span class="p">[</span><span class="s2">&quot;density&quot;</span><span class="p">],</span>
@@ -2275,7 +2275,7 @@ or <code>(len(subset), len(subset))</code> if <code>subset</code> was specified.
 <span class="normal">180</span>
 <span class="normal">181</span>
 <span class="normal">182</span>
-<span class="normal">183</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">conditional_corrcoeff</span><span class="p">(</span>
+<span class="normal">183</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">conditional_corrcoeff</span><span class="p">(</span>
     <span class="n">density</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
     <span class="n">limits</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
     <span class="n">condition</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>

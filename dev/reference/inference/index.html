@@ -1353,8 +1353,8 @@
 <span class="normal">369</span>
 <span class="normal">370</span>
 <span class="normal">371</span>
-<span class="normal">372</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span> <span class="nc">NPE_A</span><span class="p">(</span><span class="n">PosteriorEstimator</span><span class="p">):</span>
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">372</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NPE_A</span><span class="p">(</span><span class="n">PosteriorEstimator</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;mdn_snpe_a&quot;</span><span class="p">,</span>
@@ -1431,7 +1431,7 @@
         <span class="p">)</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">train</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">final_round</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
         <span class="n">training_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">200</span><span class="p">,</span>
@@ -1554,7 +1554,7 @@
 
         <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">train</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">correct_for_proposal</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">correct_for_proposal</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TorchModule</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;NPE_A_MDN&quot;</span><span class="p">:</span>
@@ -1608,7 +1608,7 @@
         <span class="p">)</span>
         <span class="k">return</span> <span class="n">wrapped_density_estimator</span>
 
-    <span class="k">def</span> <span class="nf">build_posterior</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">build_posterior</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TorchModule</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -1645,7 +1645,7 @@
         <span class="p">)</span>
         <span class="k">return</span> <span class="n">deepcopy</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_posterior</span><span class="p">)</span>  <span class="c1"># type: ignore</span>
 
-    <span class="k">def</span> <span class="nf">_log_prob_proposal_posterior</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_log_prob_proposal_posterior</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">theta</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
         <span class="n">x</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
@@ -1668,7 +1668,7 @@
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_neural_net</span><span class="o">.</span><span class="n">log_prob</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">_expand_mog</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">eps</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-5</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_expand_mog</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">eps</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-5</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Replicate a singe Gaussian trained with Algorithm 1 before continuing</span>
 <span class="sd">        with Algorithm 2. The weights and biases of the associated MDN layers</span>
@@ -1960,7 +1960,7 @@ file location (default is <code>&lt;current working directory&gt;/logs</code>.)<
 <span class="normal">102</span>
 <span class="normal">103</span>
 <span class="normal">104</span>
-<span class="normal">105</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">105</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;mdn_snpe_a&quot;</span><span class="p">,</span>
@@ -2165,7 +2165,7 @@ If <code>None</code>, use the latest neural density estimator that was trained.<
 <span class="normal">316</span>
 <span class="normal">317</span>
 <span class="normal">318</span>
-<span class="normal">319</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">build_posterior</span><span class="p">(</span>
+<span class="normal">319</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_posterior</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TorchModule</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -2331,7 +2331,7 @@ If <code>None</code>, use the latest neural density estimator that was trained.<
 <span class="normal">279</span>
 <span class="normal">280</span>
 <span class="normal">281</span>
-<span class="normal">282</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">correct_for_proposal</span><span class="p">(</span>
+<span class="normal">282</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">correct_for_proposal</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TorchModule</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;NPE_A_MDN&quot;</span><span class="p">:</span>
@@ -2811,7 +2811,7 @@ on the number of mixture components.</p>
 <span class="normal">225</span>
 <span class="normal">226</span>
 <span class="normal">227</span>
-<span class="normal">228</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">train</span><span class="p">(</span>
+<span class="normal">228</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">final_round</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">training_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">200</span><span class="p">,</span>
@@ -3609,8 +3609,8 @@ on the number of mixture components.</p>
 <span class="normal">667</span>
 <span class="normal">668</span>
 <span class="normal">669</span>
-<span class="normal">670</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span> <span class="nc">NPE_C</span><span class="p">(</span><span class="n">PosteriorEstimator</span><span class="p">):</span>
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">670</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NPE_C</span><span class="p">(</span><span class="n">PosteriorEstimator</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;maf&quot;</span><span class="p">,</span>
@@ -3673,7 +3673,7 @@ on the number of mixture components.</p>
         <span class="n">kwargs</span> <span class="o">=</span> <span class="n">del_entries</span><span class="p">(</span><span class="nb">locals</span><span class="p">(),</span> <span class="n">entries</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;self&quot;</span><span class="p">,</span> <span class="s2">&quot;__class__&quot;</span><span class="p">))</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">train</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">num_atoms</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span>
         <span class="n">training_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">200</span><span class="p">,</span>
@@ -3769,7 +3769,7 @@ on the number of mixture components.</p>
 
         <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">train</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">_set_state_for_mog_proposal</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_set_state_for_mog_proposal</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Set state variables that are used at each training step of non-atomic SNPE-C.</span>
 
 <span class="sd">        Three things are computed:</span>
@@ -3793,7 +3793,7 @@ on the number of mixture components.</p>
                 <span class="bp">self</span><span class="o">.</span><span class="n">_maybe_z_scored_prior</span><span class="o">.</span><span class="n">loc</span><span class="p">,</span>  <span class="c1"># type: ignore</span>
             <span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">_set_maybe_z_scored_prior</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_set_maybe_z_scored_prior</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Compute and store potentially standardized prior (if z-scoring was done).</span>
 
 <span class="sd">        The proposal posterior is:</span>
@@ -3844,7 +3844,7 @@ on the number of mixture components.</p>
         <span class="k">else</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_maybe_z_scored_prior</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prior</span>
 
-    <span class="k">def</span> <span class="nf">_log_prob_proposal_posterior</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_log_prob_proposal_posterior</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">theta</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
         <span class="n">x</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
@@ -3886,7 +3886,7 @@ on the number of mixture components.</p>
                 <span class="p">)</span>
             <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_log_prob_proposal_posterior_atomic</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">masks</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">_log_prob_proposal_posterior_atomic</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_log_prob_proposal_posterior_atomic</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">theta</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">masks</span><span class="p">:</span> <span class="n">Tensor</span>
     <span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return log probability of the proposal posterior for atomic proposals.</span>
@@ -3972,7 +3972,7 @@ on the number of mixture components.</p>
 
         <span class="k">return</span> <span class="n">log_prob_proposal_posterior</span>
 
-    <span class="k">def</span> <span class="nf">_log_prob_proposal_posterior_mog</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_log_prob_proposal_posterior_mog</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">theta</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">proposal</span><span class="p">:</span> <span class="n">DirectPosterior</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return log-probability of the proposal posterior for MoG proposal.</span>
@@ -4041,7 +4041,7 @@ on the number of mixture components.</p>
 
         <span class="k">return</span> <span class="n">log_prob_proposal_posterior</span>
 
-    <span class="k">def</span> <span class="nf">_automatic_posterior_transformation</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_automatic_posterior_transformation</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">logits_p</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
         <span class="n">means_p</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
@@ -4106,7 +4106,7 @@ on the number of mixture components.</p>
 
         <span class="k">return</span> <span class="n">logits_pp</span><span class="p">,</span> <span class="n">means_pp</span><span class="p">,</span> <span class="n">precisions_pp</span><span class="p">,</span> <span class="n">covariances_pp</span>
 
-    <span class="k">def</span> <span class="nf">_precisions_proposal_posterior</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_precisions_proposal_posterior</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">precisions_p</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">precisions_d</span><span class="p">:</span> <span class="n">Tensor</span>
     <span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the precisions and covariances of the proposal posterior.</span>
@@ -4132,7 +4132,7 @@ on the number of mixture components.</p>
 
         <span class="k">return</span> <span class="n">precisions_pp</span><span class="p">,</span> <span class="n">covariances_pp</span>
 
-    <span class="k">def</span> <span class="nf">_means_proposal_posterior</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_means_proposal_posterior</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">covariances_pp</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
         <span class="n">means_p</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
@@ -4175,7 +4175,7 @@ on the number of mixture components.</p>
         <span class="k">return</span> <span class="n">means_pp</span>
 
     <span class="nd">@staticmethod</span>
-    <span class="k">def</span> <span class="nf">_logits_proposal_posterior</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_logits_proposal_posterior</span><span class="p">(</span>
         <span class="n">means_pp</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
         <span class="n">precisions_pp</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
         <span class="n">covariances_pp</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
@@ -4242,7 +4242,7 @@ on the number of mixture components.</p>
 
         <span class="k">return</span> <span class="n">logits_pp</span>
 
-    <span class="k">def</span> <span class="nf">_maybe_z_score_theta</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">theta</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_maybe_z_score_theta</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">theta</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return potentially standardized theta if z-scoring was requested.&quot;&quot;&quot;</span>
 
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">z_score_theta</span><span class="p">:</span>
@@ -4486,7 +4486,7 @@ file location (default is <code>&lt;current working directory&gt;/logs</code>.)<
 <span class="normal">90</span>
 <span class="normal">91</span>
 <span class="normal">92</span>
-<span class="normal">93</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">93</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;maf&quot;</span><span class="p">,</span>
@@ -4959,7 +4959,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 <span class="normal">186</span>
 <span class="normal">187</span>
 <span class="normal">188</span>
-<span class="normal">189</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">train</span><span class="p">(</span>
+<span class="normal">189</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">num_atoms</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span>
     <span class="n">training_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">200</span><span class="p">,</span>
@@ -5402,12 +5402,12 @@ simulation-based inference.</p>
 <span class="normal">335</span>
 <span class="normal">336</span>
 <span class="normal">337</span>
-<span class="normal">338</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span> <span class="nc">FMPE</span><span class="p">(</span><span class="n">NeuralInference</span><span class="p">):</span>
+<span class="normal">338</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FMPE</span><span class="p">(</span><span class="n">NeuralInference</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Implements the Flow Matching Posterior Estimator (FMPE) for</span>
 <span class="sd">    simulation-based inference.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">],</span>
         <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;mlp&quot;</span><span class="p">,</span>
@@ -5442,7 +5442,7 @@ simulation-based inference.</p>
             <span class="n">show_progress_bars</span><span class="o">=</span><span class="n">show_progress_bars</span><span class="p">,</span>
         <span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">append_simulations</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">append_simulations</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">theta</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
         <span class="n">x</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
@@ -5499,7 +5499,7 @@ simulation-based inference.</p>
 
         <span class="k">return</span> <span class="bp">self</span>
 
-    <span class="k">def</span> <span class="nf">train</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">training_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">200</span><span class="p">,</span>
         <span class="n">learning_rate</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">5e-4</span><span class="p">,</span>
@@ -5660,7 +5660,7 @@ simulation-based inference.</p>
 
         <span class="k">return</span> <span class="n">deepcopy</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_neural_net</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">build_posterior</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">build_posterior</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">ConditionalDensityEstimator</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -5887,7 +5887,7 @@ field for flow matching. Can be a string, e.g., &lsquo;mlp&rsquo; or &lsquo;resn
 <span class="normal">65</span>
 <span class="normal">66</span>
 <span class="normal">67</span>
-<span class="normal">68</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">68</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">],</span>
     <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;mlp&quot;</span><span class="p">,</span>
@@ -6094,7 +6094,7 @@ field for flow matching. Can be a string, e.g., &lsquo;mlp&rsquo; or &lsquo;resn
 <span class="normal">335</span>
 <span class="normal">336</span>
 <span class="normal">337</span>
-<span class="normal">338</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">build_posterior</span><span class="p">(</span>
+<span class="normal">338</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_posterior</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">ConditionalDensityEstimator</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -6529,7 +6529,7 @@ results.</p>
 <span class="normal">283</span>
 <span class="normal">284</span>
 <span class="normal">285</span>
-<span class="normal">286</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">train</span><span class="p">(</span>
+<span class="normal">286</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">training_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">200</span><span class="p">,</span>
     <span class="n">learning_rate</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">5e-4</span><span class="p">,</span>
@@ -7241,8 +7241,8 @@ results.</p>
 <span class="normal">545</span>
 <span class="normal">546</span>
 <span class="normal">547</span>
-<span class="normal">548</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span> <span class="nc">NPSE</span><span class="p">(</span><span class="n">NeuralInference</span><span class="p">):</span>
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">548</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NPSE</span><span class="p">(</span><span class="n">NeuralInference</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">score_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;mlp&quot;</span><span class="p">,</span>
@@ -7306,7 +7306,7 @@ results.</p>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">_proposal_roundwise</span> <span class="o">=</span> <span class="p">[]</span>
 
-    <span class="k">def</span> <span class="nf">append_simulations</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">append_simulations</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">theta</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
         <span class="n">x</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
@@ -7384,7 +7384,7 @@ results.</p>
 
         <span class="k">return</span> <span class="bp">self</span>
 
-    <span class="k">def</span> <span class="nf">train</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">training_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">200</span><span class="p">,</span>
         <span class="n">learning_rate</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">5e-4</span><span class="p">,</span>
@@ -7459,7 +7459,7 @@ results.</p>
         <span class="c1"># Calibration kernels proposed in Lueckmann, Gonçalves et al., 2017.</span>
         <span class="k">if</span> <span class="n">calibration_kernel</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
 
-            <span class="k">def</span> <span class="nf">default_calibration_kernel</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
+            <span class="k">def</span><span class="w"> </span><span class="nf">default_calibration_kernel</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
                 <span class="k">return</span> <span class="n">ones</span><span class="p">([</span><span class="nb">len</span><span class="p">(</span><span class="n">x</span><span class="p">)],</span> <span class="n">device</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">)</span>
 
             <span class="n">calibration_kernel</span> <span class="o">=</span> <span class="n">default_calibration_kernel</span>
@@ -7624,7 +7624,7 @@ results.</p>
 
         <span class="k">return</span> <span class="n">deepcopy</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_neural_net</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">build_posterior</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">build_posterior</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">score_estimator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">ConditionalScoreEstimator</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -7683,7 +7683,7 @@ results.</p>
 
         <span class="k">return</span> <span class="n">deepcopy</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_posterior</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">_loss_proposal_posterior</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_loss_proposal_posterior</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">theta</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
         <span class="n">x</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
@@ -7692,7 +7692,7 @@ results.</p>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;Multi-round NPSE is not yet implemented.&quot;</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">_loss</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_loss</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">theta</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
         <span class="n">x</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
@@ -7723,7 +7723,7 @@ results.</p>
 
         <span class="k">return</span> <span class="n">calibration_kernel</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">*</span> <span class="n">loss</span>
 
-    <span class="k">def</span> <span class="nf">_converged</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">epoch</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">stop_after_epochs</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_converged</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">epoch</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">stop_after_epochs</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Check if training has converged.</span>
 
 <span class="sd">        Unlike the `._converged` method in base.py, this method does not reset to the</span>
@@ -8010,7 +8010,7 @@ string.</p>
 <span class="normal">93</span>
 <span class="normal">94</span>
 <span class="normal">95</span>
-<span class="normal">96</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">96</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">score_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;mlp&quot;</span><span class="p">,</span>
@@ -8300,7 +8300,7 @@ much VRAM can set to &lsquo;cpu&rsquo; to store data on system memory instead.</
 <span class="normal">171</span>
 <span class="normal">172</span>
 <span class="normal">173</span>
-<span class="normal">174</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">append_simulations</span><span class="p">(</span>
+<span class="normal">174</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">append_simulations</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">theta</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
@@ -8550,7 +8550,7 @@ define a probabilistic ODE and solves it with a numerical ODE solver.</p>
 <span class="normal">470</span>
 <span class="normal">471</span>
 <span class="normal">472</span>
-<span class="normal">473</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">build_posterior</span><span class="p">(</span>
+<span class="normal">473</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_posterior</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">score_estimator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">ConditionalScoreEstimator</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -9130,7 +9130,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 <span class="normal">411</span>
 <span class="normal">412</span>
 <span class="normal">413</span>
-<span class="normal">414</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">train</span><span class="p">(</span>
+<span class="normal">414</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">training_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">200</span><span class="p">,</span>
     <span class="n">learning_rate</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">5e-4</span><span class="p">,</span>
@@ -9205,7 +9205,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
     <span class="c1"># Calibration kernels proposed in Lueckmann, Gonçalves et al., 2017.</span>
     <span class="k">if</span> <span class="n">calibration_kernel</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
 
-        <span class="k">def</span> <span class="nf">default_calibration_kernel</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
+        <span class="k">def</span><span class="w"> </span><span class="nf">default_calibration_kernel</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
             <span class="k">return</span> <span class="n">ones</span><span class="p">([</span><span class="nb">len</span><span class="p">(</span><span class="n">x</span><span class="p">)],</span> <span class="n">device</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">)</span>
 
         <span class="n">calibration_kernel</span> <span class="o">=</span> <span class="n">default_calibration_kernel</span>
@@ -9444,8 +9444,8 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 <span class="normal">48</span>
 <span class="normal">49</span>
 <span class="normal">50</span>
-<span class="normal">51</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span> <span class="nc">NLE_A</span><span class="p">(</span><span class="n">LikelihoodEstimator</span><span class="p">):</span>
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">51</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NLE_A</span><span class="p">(</span><span class="n">LikelihoodEstimator</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;maf&quot;</span><span class="p">,</span>
@@ -9676,7 +9676,7 @@ sampling.</p>
 <span class="normal">48</span>
 <span class="normal">49</span>
 <span class="normal">50</span>
-<span class="normal">51</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">51</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;maf&quot;</span><span class="p">,</span>
@@ -9863,8 +9863,8 @@ sampling.</p>
 <span class="normal">124</span>
 <span class="normal">125</span>
 <span class="normal">126</span>
-<span class="normal">127</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span> <span class="nc">NRE_A</span><span class="p">(</span><span class="n">RatioEstimator</span><span class="p">):</span>
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">127</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NRE_A</span><span class="p">(</span><span class="n">RatioEstimator</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">classifier</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;resnet&quot;</span><span class="p">,</span>
@@ -9901,7 +9901,7 @@ sampling.</p>
         <span class="n">kwargs</span> <span class="o">=</span> <span class="n">del_entries</span><span class="p">(</span><span class="nb">locals</span><span class="p">(),</span> <span class="n">entries</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;self&quot;</span><span class="p">,</span> <span class="s2">&quot;__class__&quot;</span><span class="p">))</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">train</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">training_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">200</span><span class="p">,</span>
         <span class="n">learning_rate</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">5e-4</span><span class="p">,</span>
@@ -9953,7 +9953,7 @@ sampling.</p>
         <span class="n">kwargs</span> <span class="o">=</span> <span class="n">del_entries</span><span class="p">(</span><span class="nb">locals</span><span class="p">(),</span> <span class="n">entries</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;self&quot;</span><span class="p">,</span> <span class="s2">&quot;__class__&quot;</span><span class="p">))</span>
         <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">train</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">,</span> <span class="n">num_atoms</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">_loss</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">theta</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">num_atoms</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_loss</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">theta</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">num_atoms</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the binary cross-entropy loss for the trained classifier.</span>
 
 <span class="sd">        The classifier takes as input a $(\theta,x)$ pair. It is trained to predict 1</span>
@@ -10165,7 +10165,7 @@ sampling.</p>
 <span class="normal">48</span>
 <span class="normal">49</span>
 <span class="normal">50</span>
-<span class="normal">51</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">51</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">classifier</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;resnet&quot;</span><span class="p">,</span>
@@ -10514,7 +10514,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 <span class="normal">100</span>
 <span class="normal">101</span>
 <span class="normal">102</span>
-<span class="normal">103</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">train</span><span class="p">(</span>
+<span class="normal">103</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">training_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">200</span><span class="p">,</span>
     <span class="n">learning_rate</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">5e-4</span><span class="p">,</span>
@@ -10712,8 +10712,8 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 <span class="normal">122</span>
 <span class="normal">123</span>
 <span class="normal">124</span>
-<span class="normal">125</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span> <span class="nc">NRE_B</span><span class="p">(</span><span class="n">RatioEstimator</span><span class="p">):</span>
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">125</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NRE_B</span><span class="p">(</span><span class="n">RatioEstimator</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">classifier</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;resnet&quot;</span><span class="p">,</span>
@@ -10750,7 +10750,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
         <span class="n">kwargs</span> <span class="o">=</span> <span class="n">del_entries</span><span class="p">(</span><span class="nb">locals</span><span class="p">(),</span> <span class="n">entries</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;self&quot;</span><span class="p">,</span> <span class="s2">&quot;__class__&quot;</span><span class="p">))</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">train</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">num_atoms</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span>
         <span class="n">training_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">200</span><span class="p">,</span>
@@ -10799,7 +10799,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
         <span class="n">kwargs</span> <span class="o">=</span> <span class="n">del_entries</span><span class="p">(</span><span class="nb">locals</span><span class="p">(),</span> <span class="n">entries</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;self&quot;</span><span class="p">,</span> <span class="s2">&quot;__class__&quot;</span><span class="p">))</span>
         <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">train</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">_loss</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">theta</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">num_atoms</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_loss</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">theta</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">num_atoms</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
 <span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Return cross-entropy (via softmax activation) loss for 1-out-of-`num_atoms`</span>
 <span class="sd">        classification.</span>
 
@@ -11012,7 +11012,7 @@ sampling.</p>
 <span class="normal">48</span>
 <span class="normal">49</span>
 <span class="normal">50</span>
-<span class="normal">51</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">51</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">classifier</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;resnet&quot;</span><span class="p">,</span>
@@ -11358,7 +11358,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 <span class="normal"> 97</span>
 <span class="normal"> 98</span>
 <span class="normal"> 99</span>
-<span class="normal">100</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">train</span><span class="p">(</span>
+<span class="normal">100</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">num_atoms</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span>
     <span class="n">training_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">200</span><span class="p">,</span>
@@ -11634,8 +11634,8 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 <span class="normal">203</span>
 <span class="normal">204</span>
 <span class="normal">205</span>
-<span class="normal">206</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span> <span class="nc">NRE_C</span><span class="p">(</span><span class="n">RatioEstimator</span><span class="p">):</span>
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">206</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NRE_C</span><span class="p">(</span><span class="n">RatioEstimator</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">classifier</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;resnet&quot;</span><span class="p">,</span>
@@ -11686,7 +11686,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
         <span class="n">kwargs</span> <span class="o">=</span> <span class="n">del_entries</span><span class="p">(</span><span class="nb">locals</span><span class="p">(),</span> <span class="n">entries</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;self&quot;</span><span class="p">,</span> <span class="s2">&quot;__class__&quot;</span><span class="p">))</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">train</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">num_classes</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">5</span><span class="p">,</span>
         <span class="n">gamma</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span>
@@ -11748,7 +11748,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
         <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;loss_kwargs&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;gamma&quot;</span><span class="p">:</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;gamma&quot;</span><span class="p">)}</span>
         <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">train</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">_loss</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_loss</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">theta</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">num_atoms</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">gamma</span><span class="p">:</span> <span class="nb">float</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
 <span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Return cross-entropy loss (via &#39;&#39;multi-class sigmoid&#39;&#39; activation) for</span>
@@ -11815,7 +11815,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
         <span class="k">return</span> <span class="o">-</span><span class="n">torch</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">p_marginal</span> <span class="o">*</span> <span class="n">log_prob_marginal</span> <span class="o">+</span> <span class="n">p_joint</span> <span class="o">*</span> <span class="n">log_prob_joint</span><span class="p">)</span>
 
     <span class="nd">@staticmethod</span>
-    <span class="k">def</span> <span class="nf">_get_prior_probs_marginal_and_joint</span><span class="p">(</span><span class="n">gamma</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_get_prior_probs_marginal_and_joint</span><span class="p">(</span><span class="n">gamma</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]:</span>
 <span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Return a tuple (p_marginal, p_joint) where `p_marginal := `$p_0$,</span>
 <span class="sd">        `p_joint := `$p_K \cdot K$.</span>
 
@@ -12041,7 +12041,7 @@ sampling.</p>
 <span class="normal">62</span>
 <span class="normal">63</span>
 <span class="normal">64</span>
-<span class="normal">65</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">65</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">classifier</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;resnet&quot;</span><span class="p">,</span>
@@ -12453,7 +12453,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 <span class="normal">124</span>
 <span class="normal">125</span>
 <span class="normal">126</span>
-<span class="normal">127</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">train</span><span class="p">(</span>
+<span class="normal">127</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">num_classes</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">5</span><span class="p">,</span>
     <span class="n">gamma</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span>
@@ -12681,8 +12681,8 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 <span class="normal">142</span>
 <span class="normal">143</span>
 <span class="normal">144</span>
-<span class="normal">145</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span> <span class="nc">BNRE</span><span class="p">(</span><span class="n">NRE_A</span><span class="p">):</span>
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">145</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">BNRE</span><span class="p">(</span><span class="n">NRE_A</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">classifier</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;resnet&quot;</span><span class="p">,</span>
@@ -12724,7 +12724,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
         <span class="n">kwargs</span> <span class="o">=</span> <span class="n">del_entries</span><span class="p">(</span><span class="nb">locals</span><span class="p">(),</span> <span class="n">entries</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;self&quot;</span><span class="p">,</span> <span class="s2">&quot;__class__&quot;</span><span class="p">))</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">train</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">regularization_strength</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">100.0</span><span class="p">,</span>
         <span class="n">training_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">200</span><span class="p">,</span>
@@ -12778,7 +12778,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
         <span class="p">}</span>
         <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">train</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">_loss</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_loss</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">theta</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">num_atoms</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">regularization_strength</span><span class="p">:</span> <span class="nb">float</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the binary cross-entropy loss for the trained classifier.</span>
@@ -13010,7 +13010,7 @@ sampling.</p>
 <span class="normal">53</span>
 <span class="normal">54</span>
 <span class="normal">55</span>
-<span class="normal">56</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">56</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">classifier</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;resnet&quot;</span><span class="p">,</span>
@@ -13156,7 +13156,7 @@ dataloader_kwargs: Additional or updated kwargs to be passed to the training
 <span class="normal">107</span>
 <span class="normal">108</span>
 <span class="normal">109</span>
-<span class="normal">110</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">train</span><span class="p">(</span>
+<span class="normal">110</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">regularization_strength</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">100.0</span><span class="p">,</span>
     <span class="n">training_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">200</span><span class="p">,</span>
@@ -13463,10 +13463,10 @@ dataloader_kwargs: Additional or updated kwargs to be passed to the training
 <span class="normal">229</span>
 <span class="normal">230</span>
 <span class="normal">231</span>
-<span class="normal">232</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span> <span class="nc">MCABC</span><span class="p">(</span><span class="n">ABCBASE</span><span class="p">):</span>
+<span class="normal">232</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">MCABC</span><span class="p">(</span><span class="n">ABCBASE</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Monte-Carlo Approximate Bayesian Computation (Rejection ABC).&quot;&quot;&quot;</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">simulator</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span>
         <span class="n">prior</span><span class="p">,</span>
@@ -13523,7 +13523,7 @@ dataloader_kwargs: Additional or updated kwargs to be passed to the training
             <span class="n">show_progress_bars</span><span class="o">=</span><span class="n">show_progress_bars</span><span class="p">,</span>
         <span class="p">)</span>
 
-    <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">x_o</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">ndarray</span><span class="p">],</span>
         <span class="n">num_simulations</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
@@ -13601,7 +13601,7 @@ dataloader_kwargs: Additional or updated kwargs to be passed to the training
             <span class="p">)</span>
 
             <span class="c1"># Add sass transform to simulator and x_o.</span>
-            <span class="k">def</span> <span class="nf">simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">):</span>
+            <span class="k">def</span><span class="w"> </span><span class="nf">simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">):</span>
                 <span class="k">return</span> <span class="n">sass_transform</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_batched_simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">))</span>
 
             <span class="n">x_o</span> <span class="o">=</span> <span class="n">sass_transform</span><span class="p">(</span><span class="n">x_o</span><span class="p">)</span>
@@ -14132,7 +14132,7 @@ kde True), distances and simulated data x.</p>
 <span class="normal">229</span>
 <span class="normal">230</span>
 <span class="normal">231</span>
-<span class="normal">232</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span>
+<span class="normal">232</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">x_o</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">ndarray</span><span class="p">],</span>
     <span class="n">num_simulations</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
@@ -14210,7 +14210,7 @@ kde True), distances and simulated data x.</p>
         <span class="p">)</span>
 
         <span class="c1"># Add sass transform to simulator and x_o.</span>
-        <span class="k">def</span> <span class="nf">simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">):</span>
+        <span class="k">def</span><span class="w"> </span><span class="nf">simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">):</span>
             <span class="k">return</span> <span class="n">sass_transform</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_batched_simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">))</span>
 
         <span class="n">x_o</span> <span class="o">=</span> <span class="n">sass_transform</span><span class="p">(</span><span class="n">x_o</span><span class="p">)</span>
@@ -14525,7 +14525,7 @@ all simulations at the same time.</p>
 <span class="normal">72</span>
 <span class="normal">73</span>
 <span class="normal">74</span>
-<span class="normal">75</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">75</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">simulator</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">,</span>
@@ -15395,10 +15395,10 @@ all simulations at the same time.</p>
 <span class="normal">795</span>
 <span class="normal">796</span>
 <span class="normal">797</span>
-<span class="normal">798</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span> <span class="nc">SMCABC</span><span class="p">(</span><span class="n">ABCBASE</span><span class="p">):</span>
+<span class="normal">798</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SMCABC</span><span class="p">(</span><span class="n">ABCBASE</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Sequential Monte Carlo Approximate Bayesian Computation.&quot;&quot;&quot;</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">simulator</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span>
         <span class="n">prior</span><span class="p">:</span> <span class="n">Distribution</span><span class="p">,</span>
@@ -15487,13 +15487,13 @@ all simulations at the same time.</p>
         <span class="bp">self</span><span class="o">.</span><span class="n">kernel_variance</span> <span class="o">=</span> <span class="kc">None</span>
 
         <span class="c1"># Define simulator that keeps track of budget.</span>
-        <span class="k">def</span> <span class="nf">simulate_with_budget</span><span class="p">(</span><span class="n">theta</span><span class="p">):</span>
+        <span class="k">def</span><span class="w"> </span><span class="nf">simulate_with_budget</span><span class="p">(</span><span class="n">theta</span><span class="p">):</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">simulation_counter</span> <span class="o">+=</span> <span class="n">theta</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
             <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_batched_simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">_simulate_with_budget</span> <span class="o">=</span> <span class="n">simulate_with_budget</span>
 
-    <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">x_o</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">ndarray</span><span class="p">],</span>
         <span class="n">num_particles</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
@@ -15599,7 +15599,7 @@ all simulations at the same time.</p>
             <span class="c1"># Udpate simulator and xo</span>
             <span class="n">x_o</span> <span class="o">=</span> <span class="n">sass_transform</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">x_o</span><span class="p">)</span>
 
-            <span class="k">def</span> <span class="nf">sass_simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">):</span>
+            <span class="k">def</span><span class="w"> </span><span class="nf">sass_simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">):</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">simulation_counter</span> <span class="o">+=</span> <span class="n">theta</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
                 <span class="k">return</span> <span class="n">sass_transform</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_batched_simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">))</span>
 
@@ -15729,7 +15729,7 @@ all simulations at the same time.</p>
         <span class="k">else</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">final_particles</span>
 
-    <span class="k">def</span> <span class="nf">_set_xo_and_sample_initial_population</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_set_xo_and_sample_initial_population</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">x_o</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span>
         <span class="n">num_particles</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
@@ -15782,7 +15782,7 @@ all simulations at the same time.</p>
             <span class="n">x</span><span class="p">[</span><span class="n">sortidx</span><span class="p">][:</span><span class="n">num_particles</span><span class="p">],</span>
         <span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">_sample_next_population</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_sample_next_population</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">particles</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
         <span class="n">log_weights</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
@@ -15899,7 +15899,7 @@ all simulations at the same time.</p>
             <span class="n">new_x</span><span class="p">[</span><span class="n">sort_idx</span><span class="p">],</span>
         <span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">_get_next_epsilon</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">distances</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">quantile</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_get_next_epsilon</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">distances</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">quantile</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return epsilon for next round based on quantile of this round&#39;s distances.</span>
 
 <span class="sd">        Note: distances are made unique to avoid repeated distances from simulations</span>
@@ -15931,7 +15931,7 @@ all simulations at the same time.</p>
         <span class="c1"># The new epsilon is given by that distance.</span>
         <span class="k">return</span> <span class="n">distances</span><span class="p">[</span><span class="n">qidx</span><span class="p">]</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
 
-    <span class="k">def</span> <span class="nf">_calculate_new_log_weights</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_calculate_new_log_weights</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">new_particles</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
         <span class="n">old_particles</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
@@ -15944,7 +15944,7 @@ all simulations at the same time.</p>
 
         <span class="c1"># Contstruct function to get kernel log prob for given old particle.</span>
         <span class="c1"># The kernel is centered on each old particle as in all three variants (A,B,C).</span>
-        <span class="k">def</span> <span class="nf">kernel_log_prob</span><span class="p">(</span><span class="n">new_particle</span><span class="p">):</span>
+        <span class="k">def</span><span class="w"> </span><span class="nf">kernel_log_prob</span><span class="p">(</span><span class="n">new_particle</span><span class="p">):</span>
             <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_new_kernel</span><span class="p">(</span><span class="n">old_particles</span><span class="p">)</span><span class="o">.</span><span class="n">log_prob</span><span class="p">(</span><span class="n">new_particle</span><span class="p">)</span>
 
         <span class="c1"># We still have to loop over particles here because</span>
@@ -15960,7 +15960,7 @@ all simulations at the same time.</p>
         <span class="k">return</span> <span class="n">prior_log_probs</span> <span class="o">-</span> <span class="n">log_weighted_sum</span>
 
     <span class="nd">@staticmethod</span>
-    <span class="k">def</span> <span class="nf">sample_from_population_with_weights</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">sample_from_population_with_weights</span><span class="p">(</span>
         <span class="n">particles</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">weights</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">num_samples</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return samples from particles sampled with weights.&quot;&quot;&quot;</span>
@@ -15974,7 +15974,7 @@ all simulations at the same time.</p>
         <span class="c1"># return those indices from trace</span>
         <span class="k">return</span> <span class="n">particles</span><span class="p">[</span><span class="n">indices</span><span class="p">]</span>
 
-    <span class="k">def</span> <span class="nf">_sample_and_perturb</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_sample_and_perturb</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">particles</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">weights</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">num_samples</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Sample and perturb batch of new parameters from trace.</span>
@@ -16000,7 +16000,7 @@ all simulations at the same time.</p>
 
         <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">(</span><span class="n">parameters</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">get_kernel_variance</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_kernel_variance</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">particles</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
         <span class="n">weights</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
@@ -16043,7 +16043,7 @@ all simulations at the same time.</p>
         <span class="k">else</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Kernel, &#39;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">kernel</span><span class="si">}</span><span class="s2">&#39; not supported.&quot;</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">get_new_kernel</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">thetas</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Distribution</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_new_kernel</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">thetas</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Distribution</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return new kernel distribution for a given set of paramters.&quot;&quot;&quot;</span>
 
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">kernel</span> <span class="o">==</span> <span class="s2">&quot;gaussian&quot;</span><span class="p">:</span>
@@ -16062,7 +16062,7 @@ all simulations at the same time.</p>
         <span class="k">else</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Kernel, &#39;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">kernel</span><span class="si">}</span><span class="s2">&#39; not supported.&quot;</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">resample_if_ess_too_small</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">resample_if_ess_too_small</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">particles</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
         <span class="n">log_weights</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
@@ -16086,7 +16086,7 @@ all simulations at the same time.</p>
 
         <span class="k">return</span> <span class="n">particles</span><span class="p">,</span> <span class="n">log_weights</span>
 
-    <span class="k">def</span> <span class="nf">run_lra_update_weights</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">run_lra_update_weights</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">particles</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
         <span class="n">xs</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
@@ -16118,7 +16118,7 @@ all simulations at the same time.</p>
 
         <span class="k">return</span> <span class="n">adjusted_particels</span><span class="p">,</span> <span class="n">adjusted_log_weights</span>
 
-    <span class="k">def</span> <span class="nf">run_sass_set_xo</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">run_sass_set_xo</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">num_particles</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
         <span class="n">num_pilot_simulations</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
@@ -16155,7 +16155,7 @@ all simulations at the same time.</p>
         <span class="p">)</span>
         <span class="k">return</span> <span class="n">sass_transform</span>
 
-    <span class="k">def</span> <span class="nf">get_particle_ranges</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_particle_ranges</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">particles</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">weights</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">samples_per_dim</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">100</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return range of particles in each parameter dimension.&quot;&quot;&quot;</span>
@@ -16821,7 +16821,7 @@ populations.</p>
 <span class="normal">352</span>
 <span class="normal">353</span>
 <span class="normal">354</span>
-<span class="normal">355</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span>
+<span class="normal">355</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">x_o</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">ndarray</span><span class="p">],</span>
     <span class="n">num_particles</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
@@ -16927,7 +16927,7 @@ populations.</p>
         <span class="c1"># Udpate simulator and xo</span>
         <span class="n">x_o</span> <span class="o">=</span> <span class="n">sass_transform</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">x_o</span><span class="p">)</span>
 
-        <span class="k">def</span> <span class="nf">sass_simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">):</span>
+        <span class="k">def</span><span class="w"> </span><span class="nf">sass_simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">):</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">simulation_counter</span> <span class="o">+=</span> <span class="n">theta</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
             <span class="k">return</span> <span class="n">sass_transform</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_batched_simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">))</span>
 
@@ -17393,7 +17393,7 @@ sampling.</p>
 <span class="normal">116</span>
 <span class="normal">117</span>
 <span class="normal">118</span>
-<span class="normal">119</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">119</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">simulator</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Distribution</span><span class="p">,</span>
@@ -17482,7 +17482,7 @@ sampling.</p>
     <span class="bp">self</span><span class="o">.</span><span class="n">kernel_variance</span> <span class="o">=</span> <span class="kc">None</span>
 
     <span class="c1"># Define simulator that keeps track of budget.</span>
-    <span class="k">def</span> <span class="nf">simulate_with_budget</span><span class="p">(</span><span class="n">theta</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">simulate_with_budget</span><span class="p">(</span><span class="n">theta</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">simulation_counter</span> <span class="o">+=</span> <span class="n">theta</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_batched_simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
 
@@ -17549,7 +17549,7 @@ sampling.</p>
 <span class="normal">666</span>
 <span class="normal">667</span>
 <span class="normal">668</span>
-<span class="normal">669</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">get_kernel_variance</span><span class="p">(</span>
+<span class="normal">669</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_kernel_variance</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">particles</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
     <span class="n">weights</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
@@ -17629,7 +17629,7 @@ sampling.</p>
 <span class="normal">685</span>
 <span class="normal">686</span>
 <span class="normal">687</span>
-<span class="normal">688</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">get_new_kernel</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">thetas</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Distribution</span><span class="p">:</span>
+<span class="normal">688</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_new_kernel</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">thetas</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Distribution</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Return new kernel distribution for a given set of paramters.&quot;&quot;&quot;</span>
 
     <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">kernel</span> <span class="o">==</span> <span class="s2">&quot;gaussian&quot;</span><span class="p">:</span>
@@ -17683,7 +17683,7 @@ sampling.</p>
 <span class="normal">795</span>
 <span class="normal">796</span>
 <span class="normal">797</span>
-<span class="normal">798</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">get_particle_ranges</span><span class="p">(</span>
+<span class="normal">798</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_particle_ranges</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span> <span class="n">particles</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">weights</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">samples_per_dim</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">100</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Return range of particles in each parameter dimension.&quot;&quot;&quot;</span>
@@ -17743,7 +17743,7 @@ too small.</p>
 <span class="normal">709</span>
 <span class="normal">710</span>
 <span class="normal">711</span>
-<span class="normal">712</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">resample_if_ess_too_small</span><span class="p">(</span>
+<span class="normal">712</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">resample_if_ess_too_small</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">particles</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
     <span class="n">log_weights</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
@@ -17820,7 +17820,7 @@ particles.</p>
 <span class="normal">741</span>
 <span class="normal">742</span>
 <span class="normal">743</span>
-<span class="normal">744</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">run_lra_update_weights</span><span class="p">(</span>
+<span class="normal">744</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">run_lra_update_weights</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">particles</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
     <span class="n">xs</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
@@ -17910,7 +17910,7 @@ num_particles simulations to run the regression for sass.</p>
 <span class="normal">778</span>
 <span class="normal">779</span>
 <span class="normal">780</span>
-<span class="normal">781</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">run_sass_set_xo</span><span class="p">(</span>
+<span class="normal">781</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">run_sass_set_xo</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">num_particles</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
     <span class="n">num_pilot_simulations</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
@@ -17985,7 +17985,7 @@ num_particles simulations to run the regression for sass.</p>
 <span class="normal">598</span>
 <span class="normal">599</span>
 <span class="normal">600</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@staticmethod</span>
-<span class="k">def</span> <span class="nf">sample_from_population_with_weights</span><span class="p">(</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">sample_from_population_with_weights</span><span class="p">(</span>
     <span class="n">particles</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">weights</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">num_samples</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Return samples from particles sampled with weights.&quot;&quot;&quot;</span>
@@ -18272,7 +18272,7 @@ proposal.</p>
 <span class="normal">116</span>
 <span class="normal">117</span>
 <span class="normal">118</span>
-<span class="normal">119</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">simulate_for_sbi</span><span class="p">(</span>
+<span class="normal">119</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">simulate_for_sbi</span><span class="p">(</span>
     <span class="n">simulator</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span>
     <span class="n">proposal</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
     <span class="n">num_simulations</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
@@ -18337,7 +18337,7 @@ proposal.</p>
             <span class="n">batch_seeds</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="n">low</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">high</span><span class="o">=</span><span class="mi">1_000_000</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">batches</span><span class="p">),))</span>
 
             <span class="c1"># define seeded simulator.</span>
-            <span class="k">def</span> <span class="nf">simulator_seeded</span><span class="p">(</span><span class="n">theta</span><span class="p">:</span> <span class="n">ndarray</span><span class="p">,</span> <span class="n">seed</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
+            <span class="k">def</span><span class="w"> </span><span class="nf">simulator_seeded</span><span class="p">(</span><span class="n">theta</span><span class="p">:</span> <span class="n">ndarray</span><span class="p">,</span> <span class="n">seed</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
                 <span class="n">seed_all_backends</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
                 <span class="k">return</span> <span class="n">simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
 
@@ -18358,7 +18358,7 @@ proposal.</p>
                     <span class="s2">&quot;For multiprocessing, we switch to numpy arrays. Make sure to &quot;</span>
                     <span class="s2">&quot;preprocess your simulator with `process_simulator` to handle numpy&quot;</span>
                     <span class="s2">&quot; arrays.&quot;</span>
-                <span class="p">)</span> <span class="kn">from</span> <span class="nn">err</span>
+                <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">err</span>
 
         <span class="k">else</span><span class="p">:</span>
             <span class="n">simulation_outputs</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
@@ -18576,7 +18576,7 @@ constraints.
 <span class="normal">93</span>
 <span class="normal">94</span>
 <span class="normal">95</span>
-<span class="normal">96</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">process_prior</span><span class="p">(</span>
+<span class="normal">96</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">process_prior</span><span class="p">(</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">Distribution</span><span class="p">],</span> <span class="n">Distribution</span><span class="p">,</span> <span class="n">rv_frozen</span><span class="p">,</span> <span class="n">multi_rv_frozen</span><span class="p">],</span>
     <span class="n">custom_prior_wrapper_kwargs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Distribution</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">bool</span><span class="p">]:</span>
@@ -18770,7 +18770,7 @@ of parameters.</p>
 <span class="normal">474</span>
 <span class="normal">475</span>
 <span class="normal">476</span>
-<span class="normal">477</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">process_simulator</span><span class="p">(</span>
+<span class="normal">477</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">process_simulator</span><span class="p">(</span>
     <span class="n">user_simulator</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Distribution</span><span class="p">,</span>
     <span class="n">is_numpy_simulator</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>

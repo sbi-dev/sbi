@@ -507,10 +507,10 @@
 <p><code>sbi</code> allows to specify a custom density estimator for each of the implemented methods. For all options, check the API reference <a href="https://sbi-dev.github.io/sbi/reference/models/">here</a>.</p>
 <h2 id="changing-the-type-of-density-estimator">Changing the type of density estimator<a class="headerlink" href="#changing-the-type-of-density-estimator" title="Permanent link">&para;</a></h2>
 <p>One option is using one of the preconfigured density estimators by passing a string in the <code>density_estimator</code> keyword argument to the inference object (<code>NPE</code> or <code>NLE</code>), e.g., &ldquo;maf&rdquo; for a Masked Autoregressive Flow, of &ldquo;nsf&rdquo; for a Neural Spline Flow with default hyperparameters.</p>
-<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">torch</span>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
 
-<span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">NPE</span><span class="p">,</span> <span class="n">NRE</span>
-<span class="kn">from</span> <span class="nn">sbi.utils</span> <span class="kn">import</span> <span class="n">BoxUniform</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference</span><span class="w"> </span><span class="kn">import</span> <span class="n">NPE</span><span class="p">,</span> <span class="n">NRE</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">BoxUniform</span>
 </code></pre></div>
 <div class="highlight"><pre><span></span><code><span class="n">prior</span> <span class="o">=</span> <span class="n">BoxUniform</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">2</span><span class="p">),</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">2</span><span class="p">))</span>
 <span class="n">inference</span> <span class="o">=</span> <span class="n">NPE</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span> <span class="n">density_estimator</span><span class="o">=</span><span class="s2">&quot;maf&quot;</span><span class="p">)</span>
@@ -522,7 +522,7 @@
 <p>Alternatively, you can use a set of utils functions to configure a density estimator yourself, e.g., use a MAF with hyperparameters chosen for your problem at hand.</p>
 <p>Here, because we want to use N*P*E, we specifiy a neural network targeting the <em>posterior</em> (using the utils function <code>posterior_nn</code>). In this example, we will create a neural spline flow (<code>'nsf'</code>) with <code>60</code> hidden units and <code>3</code> transform layers:</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># For SNLE: likelihood_nn(). For SNRE: classifier_nn()</span>
-<span class="kn">from</span> <span class="nn">sbi.neural_nets</span> <span class="kn">import</span> <span class="n">posterior_nn</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.neural_nets</span><span class="w"> </span><span class="kn">import</span> <span class="n">posterior_nn</span>
 
 <span class="n">density_estimator_build_fun</span> <span class="o">=</span> <span class="n">posterior_nn</span><span class="p">(</span>
     <span class="n">model</span><span class="o">=</span><span class="s2">&quot;nsf&quot;</span><span class="p">,</span> <span class="n">hidden_features</span><span class="o">=</span><span class="mi">60</span><span class="p">,</span> <span class="n">num_transforms</span><span class="o">=</span><span class="mi">3</span>

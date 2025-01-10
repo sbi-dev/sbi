@@ -613,24 +613,24 @@ p(\beta) = \text{Gamma}(1, 0.5) \\
 p(\text{probs}) = \text{Beta}(2, 2)
 \]</div>
 <p>Because the <code>InverseGamma</code> and the <code>Binomial</code> likelihoods are well-defined we can perform MCMC on this problem and obtain reference-posterior samples.</p>
-<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
-<span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">from</span> <span class="nn">pyro.distributions</span> <span class="kn">import</span> <span class="n">InverseGamma</span>
-<span class="kn">from</span> <span class="nn">torch</span> <span class="kn">import</span> <span class="n">Tensor</span>
-<span class="kn">from</span> <span class="nn">torch.distributions</span> <span class="kn">import</span> <span class="n">Beta</span><span class="p">,</span> <span class="n">Binomial</span><span class="p">,</span> <span class="n">Gamma</span>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pyro.distributions</span><span class="w"> </span><span class="kn">import</span> <span class="n">InverseGamma</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch</span><span class="w"> </span><span class="kn">import</span> <span class="n">Tensor</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.distributions</span><span class="w"> </span><span class="kn">import</span> <span class="n">Beta</span><span class="p">,</span> <span class="n">Binomial</span><span class="p">,</span> <span class="n">Gamma</span>
 
-<span class="kn">from</span> <span class="nn">sbi.analysis</span> <span class="kn">import</span> <span class="n">pairplot</span>
-<span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">MNLE</span><span class="p">,</span> <span class="n">MCMCPosterior</span>
-<span class="kn">from</span> <span class="nn">sbi.inference.potentials.likelihood_based_potential</span> <span class="kn">import</span> <span class="n">LikelihoodBasedPotential</span>
-<span class="kn">from</span> <span class="nn">sbi.neural_nets</span> <span class="kn">import</span> <span class="n">likelihood_nn</span>
-<span class="kn">from</span> <span class="nn">sbi.utils</span> <span class="kn">import</span> <span class="n">BoxUniform</span><span class="p">,</span> <span class="n">MultipleIndependent</span><span class="p">,</span> <span class="n">mcmc_transform</span>
-<span class="kn">from</span> <span class="nn">sbi.utils.metrics</span> <span class="kn">import</span> <span class="n">c2st</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.analysis</span><span class="w"> </span><span class="kn">import</span> <span class="n">pairplot</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference</span><span class="w"> </span><span class="kn">import</span> <span class="n">MNLE</span><span class="p">,</span> <span class="n">MCMCPosterior</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference.potentials.likelihood_based_potential</span><span class="w"> </span><span class="kn">import</span> <span class="n">LikelihoodBasedPotential</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.neural_nets</span><span class="w"> </span><span class="kn">import</span> <span class="n">likelihood_nn</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">BoxUniform</span><span class="p">,</span> <span class="n">MultipleIndependent</span><span class="p">,</span> <span class="n">mcmc_transform</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.utils.metrics</span><span class="w"> </span><span class="kn">import</span> <span class="n">c2st</span>
 
 
-<span class="kn">from</span> <span class="nn">example_01_utils</span> <span class="kn">import</span> <span class="n">BinomialGammaPotential</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">example_01_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">BinomialGammaPotential</span>
 </code></pre></div>
 <div class="highlight"><pre><span></span><code><span class="c1"># Toy simulator for mixed data</span>
-<span class="k">def</span> <span class="nf">mixed_simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">concentration_scaling</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">mixed_simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">concentration_scaling</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Returns a sample from a mixed distribution given parameters theta.</span>
 
 <span class="sd">    Args:</span>
@@ -793,7 +793,7 @@ Thus, to make MNLE work with experimental conditions, we need to include them in
 
 <span class="c1"># define a simulator wrapper in which the experimental condition are contained</span>
 <span class="c1"># in theta and passed to the simulator.</span>
-<span class="k">def</span> <span class="nf">sim_wrapper</span><span class="p">(</span><span class="n">theta_and_conditions</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">sim_wrapper</span><span class="p">(</span><span class="n">theta_and_conditions</span><span class="p">):</span>
     <span class="c1"># simulate with experiment conditions</span>
     <span class="k">return</span> <span class="n">mixed_simulator</span><span class="p">(</span>
         <span class="c1"># we assume the first two parameters are beta and rho</span>

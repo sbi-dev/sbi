@@ -489,23 +489,23 @@ class. <code>sbi</code> will wrap this class to make it a fully functional torch
   return a log probs array of shape <code>(n,)</code>.</li>
 </ul>
 <p>For <code>sbi</code> &gt; 0.17.2 this could look like the following:</p>
-<div class="highlight"><pre><span></span><code><span class="k">class</span> <span class="nc">CustomUniformPrior</span><span class="p">:</span>
+<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">CustomUniformPrior</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;User defined numpy uniform prior.</span>
 
 <span class="sd">    Custom prior with user-defined valid .sample and .log_prob methods.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">lower</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">upper</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">return_numpy</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">lower</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">upper</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">return_numpy</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">lower</span> <span class="o">=</span> <span class="n">lower</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">upper</span> <span class="o">=</span> <span class="n">upper</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">dist</span> <span class="o">=</span> <span class="n">BoxUniform</span><span class="p">(</span><span class="n">lower</span><span class="p">,</span> <span class="n">upper</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">return_numpy</span> <span class="o">=</span> <span class="n">return_numpy</span>
 
-    <span class="k">def</span> <span class="nf">sample</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sample_shape</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">([])):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">sample</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sample_shape</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">([])):</span>
         <span class="n">samples</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dist</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">sample_shape</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">samples</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">return_numpy</span> <span class="k">else</span> <span class="n">samples</span>
 
-    <span class="k">def</span> <span class="nf">log_prob</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">values</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">log_prob</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">values</span><span class="p">):</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">return_numpy</span><span class="p">:</span>
             <span class="n">values</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">as_tensor</span><span class="p">(</span><span class="n">values</span><span class="p">)</span>
         <span class="n">log_probs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dist</span><span class="o">.</span><span class="n">log_prob</span><span class="p">(</span><span class="n">values</span><span class="p">)</span>
@@ -513,7 +513,7 @@ class. <code>sbi</code> will wrap this class to make it a fully functional torch
 </code></pre></div>
 <p>Once you have such a class, you can wrap it into a <code>Distribution</code> using the
 <code>process_prior</code> function <code>sbi</code> provides:</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi.utils</span> <span class="kn">import</span> <span class="n">process_prior</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">process_prior</span>
 
 <span class="n">custom_prior</span> <span class="o">=</span> <span class="n">CustomUniformPrior</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">2</span><span class="p">),</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">2</span><span class="p">))</span>
 <span class="n">prior</span><span class="p">,</span> <span class="o">*</span><span class="n">_</span> <span class="o">=</span> <span class="n">process_prior</span><span class="p">(</span><span class="n">custom_prior</span><span class="p">)</span>  <span class="c1"># Keeping only the first return.</span>
@@ -526,7 +526,7 @@ this is handled automatically. However, when using a custom prior, it is not.
 Thus, if your prior has bounded support (like the one above), it makes sense to
 pass the bounds to the wrapper function such that <code>sbi</code> can pass them to torch
 <code>Distributions</code>:</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi.utils</span> <span class="kn">import</span> <span class="n">process_prior</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">process_prior</span>
 
 <span class="n">custom_prior</span> <span class="o">=</span> <span class="n">CustomUniformPrior</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">2</span><span class="p">),</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">2</span><span class="p">))</span>
 <span class="n">prior</span> <span class="o">=</span> <span class="n">process_prior</span><span class="p">(</span><span class="n">custom_prior</span><span class="p">,</span>

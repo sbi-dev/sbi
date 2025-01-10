@@ -535,19 +535,19 @@
 <li>Run MCMC using <code>pyro</code> MCMC samplers via <code>sbi</code> interface</li>
 <li>Use <code>arviz</code> to visualize the posterior, predictive distributions and MCMC diagnostics.</li>
 </ol>
-<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">arviz</span> <span class="k">as</span> <span class="nn">az</span>
-<span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">from</span> <span class="nn">pyro.distributions</span> <span class="kn">import</span> <span class="n">InverseGamma</span>
-<span class="kn">from</span> <span class="nn">torch.distributions</span> <span class="kn">import</span> <span class="n">Beta</span><span class="p">,</span> <span class="n">Binomial</span><span class="p">,</span> <span class="n">Gamma</span>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">arviz</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">az</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pyro.distributions</span><span class="w"> </span><span class="kn">import</span> <span class="n">InverseGamma</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.distributions</span><span class="w"> </span><span class="kn">import</span> <span class="n">Beta</span><span class="p">,</span> <span class="n">Binomial</span><span class="p">,</span> <span class="n">Gamma</span>
 
-<span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">MNLE</span><span class="p">,</span> <span class="n">MCMCPosterior</span><span class="p">,</span> <span class="n">likelihood_estimator_based_potential</span>
-<span class="kn">from</span> <span class="nn">sbi.utils</span> <span class="kn">import</span> <span class="n">MultipleIndependent</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference</span><span class="w"> </span><span class="kn">import</span> <span class="n">MNLE</span><span class="p">,</span> <span class="n">MCMCPosterior</span><span class="p">,</span> <span class="n">likelihood_estimator_based_potential</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">MultipleIndependent</span>
 
 <span class="c1"># Seeding</span>
 <span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span>
 </code></pre></div>
 <div class="highlight"><pre><span></span><code><span class="c1"># Toy simulator for mixed data</span>
-<span class="k">def</span> <span class="nf">mixed_simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">mixed_simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">):</span>
     <span class="n">beta</span><span class="p">,</span> <span class="n">ps</span> <span class="o">=</span> <span class="n">theta</span><span class="p">[:,</span> <span class="p">:</span><span class="mi">1</span><span class="p">],</span> <span class="n">theta</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">:]</span>
 
     <span class="n">choices</span> <span class="o">=</span> <span class="n">Binomial</span><span class="p">(</span><span class="n">probs</span><span class="o">=</span><span class="n">ps</span><span class="p">)</span><span class="o">.</span><span class="n">sample</span><span class="p">()</span>

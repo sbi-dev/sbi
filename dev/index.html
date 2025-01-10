@@ -667,11 +667,11 @@ indicates the most likely parameter values while additionally quantifying uncert
 and revealing potential interactions between parameters.</p>
 <p><code>sbi</code> provides access to simulation-based inference methods via a user-friendly
 interface:</p>
-<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">NPE</span>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference</span><span class="w"> </span><span class="kn">import</span> <span class="n">NPE</span>
 
 <span class="c1"># define shifted Gaussian simulator.</span>
-<span class="k">def</span> <span class="nf">simulator</span><span class="p">(</span><span class="n">θ</span><span class="p">):</span> <span class="k">return</span> <span class="n">θ</span> <span class="o">+</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn_like</span><span class="p">(</span><span class="n">θ</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">simulator</span><span class="p">(</span><span class="n">θ</span><span class="p">):</span> <span class="k">return</span> <span class="n">θ</span> <span class="o">+</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn_like</span><span class="p">(</span><span class="n">θ</span><span class="p">)</span>
 <span class="c1"># draw parameters from Gaussian prior.</span>
 <span class="n">θ</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">1000</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
 <span class="c1"># simulate data</span>

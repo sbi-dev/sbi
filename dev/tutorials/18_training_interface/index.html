@@ -539,18 +539,18 @@
 <h1 id="more-flexibility-over-the-training-loop-and-samplers">More flexibility over the training loop and samplers<a class="headerlink" href="#more-flexibility-over-the-training-loop-and-samplers" title="Permanent link">&para;</a></h1>
 <p>Note, you can find the original version of this notebook at <a href="https://github.com/sbi-dev/sbi/blob/main/tutorials/18_training_interface.ipynb">tutorials/18_training_interface.ipynb</a> in the <code>sbi</code> repository.</p>
 <p>In the previous tutorials, we showed how <code>sbi</code> can be used to train neural networks and sample from the posterior. If you are an <code>sbi</code> power-user, then you might want more control over individual stages of this process. For example, you might want to write a custom training loop or more flexibility over the samplers that are used. In this tutorial, we will explain how you can achieve this.</p>
-<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">from</span> <span class="nn">torch</span> <span class="kn">import</span> <span class="n">ones</span><span class="p">,</span> <span class="n">eye</span>
-<span class="kn">from</span> <span class="nn">torch.optim</span> <span class="kn">import</span> <span class="n">Adam</span><span class="p">,</span> <span class="n">AdamW</span>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch</span><span class="w"> </span><span class="kn">import</span> <span class="n">ones</span><span class="p">,</span> <span class="n">eye</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.optim</span><span class="w"> </span><span class="kn">import</span> <span class="n">Adam</span><span class="p">,</span> <span class="n">AdamW</span>
 
-<span class="kn">from</span> <span class="nn">sbi.utils</span> <span class="kn">import</span> <span class="n">BoxUniform</span>
-<span class="kn">from</span> <span class="nn">sbi.analysis</span> <span class="kn">import</span> <span class="n">pairplot</span>
-<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Callable</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">BoxUniform</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.analysis</span><span class="w"> </span><span class="kn">import</span> <span class="n">pairplot</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Callable</span>
 </code></pre></div>
 <p>As in the previous tutorials, we first define the prior and simulator and use them to generate simulated data: </p>
 <div class="highlight"><pre><span></span><code><span class="n">prior</span> <span class="o">=</span> <span class="n">BoxUniform</span><span class="p">(</span><span class="o">-</span><span class="mi">3</span> <span class="o">*</span> <span class="n">ones</span><span class="p">((</span><span class="mi">2</span><span class="p">,)),</span> <span class="mi">3</span> <span class="o">*</span> <span class="n">ones</span><span class="p">((</span><span class="mi">2</span><span class="p">,)))</span>
 
-<span class="k">def</span> <span class="nf">simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">):</span>
     <span class="k">return</span> <span class="n">theta</span> <span class="o">+</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn_like</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span> <span class="o">*</span> <span class="mf">0.1</span>
 
 <span class="n">num_simulations</span> <span class="o">=</span> <span class="mi">2000</span>
@@ -560,7 +560,7 @@
 <p>Below, we will first describe how you can run <code>Neural Posterior Estimation (NPE)</code>. We will attach code snippets for <code>Neural Likelihood Estimation (NLE)</code> and <code>Neural Ratio Estimation (NRE)</code> at the end.</p>
 <h2 id="neural-posterior-estimation">Neural Posterior Estimation<a class="headerlink" href="#neural-posterior-estimation" title="Permanent link">&para;</a></h2>
 <p>First, we have to decide on what <code>DensityEstimator</code> to use. In this tutorial, we will use a <code>Neural Spline Flow</code> (NSF) taken from the <a href="https://github.com/bayesiains/nflows"><code>nflows</code></a> package.</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi.neural_nets.net_builders</span> <span class="kn">import</span> <span class="n">build_nsf</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.neural_nets.net_builders</span><span class="w"> </span><span class="kn">import</span> <span class="n">build_nsf</span>
 
 <span class="n">density_estimator</span> <span class="o">=</span> <span class="n">build_nsf</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
 </code></pre></div>
@@ -625,7 +625,7 @@ Shape of samples: torch.Size([1000, 2])     # Removed batch dimension.
 <li>automatically reject samples outside of the prior bounds  </li>
 <li>compute the Maximum-a-posteriori (MAP) estimate</li>
 </ul>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi.inference.posteriors</span> <span class="kn">import</span> <span class="n">DirectPosterior</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference.posteriors</span><span class="w"> </span><span class="kn">import</span> <span class="n">DirectPosterior</span>
 
 <span class="n">posterior</span> <span class="o">=</span> <span class="n">DirectPosterior</span><span class="p">(</span><span class="n">density_estimator</span><span class="p">,</span> <span class="n">prior</span><span class="p">)</span>
 </code></pre></div>
@@ -646,9 +646,9 @@ Shape of samples: torch.Size([1000, 2])
 <h3 id="custom-data-loaders">Custom Data Loaders<a class="headerlink" href="#custom-data-loaders" title="Permanent link">&para;</a></h3>
 <p>One helpful advantage of having access to the training loop is that you can now use your own DataLoaders during training of the density estimator. In this fashion, larger datasets can be used as input to <code>sbi</code> where <code>x</code> is potentially an image or something else. While this will require <a href="https://sbi-dev.github.io/sbi/latest/tutorials/04_embedding_networks/">embedding the input data</a>, a more fine grained control over loading the data is possible and allows to manage the memory requirement during training.</p>
 <p>First, we build a Dataset that complies with the <code>torch.util.data.Dataset</code> API. Note, the class below is meant for illustration purposes. In practice, this class can also read the data from disk etc.</p>
-<div class="highlight"><pre><span></span><code><span class="k">class</span> <span class="nc">NPEData</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">Dataset</span><span class="p">):</span>
+<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NPEData</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">Dataset</span><span class="p">):</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span>
                  <span class="n">num_samples</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
                  <span class="n">prior</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">distributions</span><span class="o">.</span><span class="n">Distribution</span><span class="p">,</span>
                  <span class="n">simulator</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span>
@@ -662,10 +662,10 @@ Shape of samples: torch.Size([1000, 2])
         <span class="bp">self</span><span class="o">.</span><span class="n">theta</span> <span class="o">=</span> <span class="n">prior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_samples</span><span class="p">,))</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">x</span> <span class="o">=</span> <span class="n">simulator</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">theta</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="fm">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">theta</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
 
-    <span class="k">def</span> <span class="fm">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">index</span><span class="p">:</span><span class="nb">int</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">index</span><span class="p">:</span><span class="nb">int</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">theta</span><span class="p">[</span><span class="n">index</span><span class="p">,</span><span class="o">...</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">x</span><span class="p">[</span><span class="n">index</span><span class="p">,</span><span class="o">...</span><span class="p">]</span>
 </code></pre></div>
 <p>We can now proceed to create a DataLoader and conduct our training loop as illustrated above.</p>
@@ -673,7 +673,7 @@ Shape of samples: torch.Size([1000, 2])
 <span class="n">train_loader</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">DataLoader</span><span class="p">(</span><span class="n">train_data</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">128</span><span class="p">)</span>
 </code></pre></div>
 <p>For sake of demonstration, let&rsquo;s create another estimator using a masked autoregressive flow (maf). For this, we create a second dataset and use only parts of the data to construct the maf estimator.</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi.neural_nets.net_builders</span> <span class="kn">import</span> <span class="n">build_maf</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.neural_nets.net_builders</span><span class="w"> </span><span class="kn">import</span> <span class="n">build_maf</span>
 
 <span class="n">dummy_data</span> <span class="o">=</span> <span class="n">NPEData</span><span class="p">(</span><span class="mi">64</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">simulator</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">43</span><span class="p">)</span>
 <span class="n">dummy_loader</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">DataLoader</span><span class="p">(</span><span class="n">dummy_data</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
@@ -721,8 +721,8 @@ Shape of samples: torch.Size([1000, 2])     # Removed batch dimension.
 <p><img alt="png" src="../18_training_interface_files/18_training_interface_31_0.png" /></p>
 <h2 id="neural-likelihood-estimation">Neural Likelihood Estimation<a class="headerlink" href="#neural-likelihood-estimation" title="Permanent link">&para;</a></h2>
 <p>The workflow for Neural Likelihood Estimation is very similar. Unlike for NPE, we have to sample with MCMC (or variational inference) though, so we will build an <code>MCMCPosterior</code> after training:</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi.inference.posteriors</span> <span class="kn">import</span> <span class="n">MCMCPosterior</span>
-<span class="kn">from</span> <span class="nn">sbi.inference.potentials</span> <span class="kn">import</span> <span class="n">likelihood_estimator_based_potential</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference.posteriors</span><span class="w"> </span><span class="kn">import</span> <span class="n">MCMCPosterior</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference.potentials</span><span class="w"> </span><span class="kn">import</span> <span class="n">likelihood_estimator_based_potential</span>
 </code></pre></div>
 <div class="highlight"><pre><span></span><code><span class="c1"># Note that the order of x and theta are reversed in comparison to NPE.</span>
 <span class="n">density_estimator</span> <span class="o">=</span> <span class="n">build_nsf</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">theta</span><span class="p">)</span>
@@ -753,16 +753,16 @@ Shape of samples: torch.Size([1000, 2])     # Removed batch dimension.
 <p><img alt="png" src="../18_training_interface_files/18_training_interface_36_0.png" /></p>
 <h2 id="neural-ratio-estimation">Neural Ratio Estimation<a class="headerlink" href="#neural-ratio-estimation" title="Permanent link">&para;</a></h2>
 <p>Finally, for NRE, at this point, you have to implement the loss function yourself:</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi.neural_nets.net_builders</span> <span class="kn">import</span> <span class="n">build_resnet_classifier</span>
-<span class="kn">from</span> <span class="nn">sbi.inference.potentials</span> <span class="kn">import</span> <span class="n">ratio_estimator_based_potential</span>
-<span class="kn">from</span> <span class="nn">sbi</span> <span class="kn">import</span> <span class="n">utils</span> <span class="k">as</span> <span class="n">utils</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.neural_nets.net_builders</span><span class="w"> </span><span class="kn">import</span> <span class="n">build_resnet_classifier</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference.potentials</span><span class="w"> </span><span class="kn">import</span> <span class="n">ratio_estimator_based_potential</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi</span><span class="w"> </span><span class="kn">import</span> <span class="n">utils</span> <span class="k">as</span> <span class="n">utils</span>
 </code></pre></div>
 <div class="highlight"><pre><span></span><code><span class="n">net</span> <span class="o">=</span> <span class="n">build_resnet_classifier</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">theta</span><span class="p">)</span>
 </code></pre></div>
 <div class="highlight"><pre><span></span><code><span class="n">opt</span> <span class="o">=</span> <span class="n">Adam</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">net</span><span class="o">.</span><span class="n">parameters</span><span class="p">()),</span> <span class="n">lr</span><span class="o">=</span><span class="mf">5e-4</span><span class="p">)</span>
 
 
-<span class="k">def</span> <span class="nf">classifier_logits</span><span class="p">(</span><span class="n">net</span><span class="p">,</span> <span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">num_atoms</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">classifier_logits</span><span class="p">(</span><span class="n">net</span><span class="p">,</span> <span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">num_atoms</span><span class="p">):</span>
     <span class="n">batch_size</span> <span class="o">=</span> <span class="n">theta</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
     <span class="n">repeated_x</span> <span class="o">=</span> <span class="n">utils</span><span class="o">.</span><span class="n">repeat_rows</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">num_atoms</span><span class="p">)</span>
     <span class="n">probs</span> <span class="o">=</span> <span class="n">ones</span><span class="p">(</span><span class="n">batch_size</span><span class="p">,</span> <span class="n">batch_size</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">eye</span><span class="p">(</span><span class="n">batch_size</span><span class="p">))</span> <span class="o">/</span> <span class="p">(</span><span class="n">batch_size</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>

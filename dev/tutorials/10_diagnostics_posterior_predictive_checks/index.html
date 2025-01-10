@@ -499,7 +499,7 @@
 <p>A PPC usually should not be used as a <a href="http://proceedings.mlr.press/v130/lueckmann21a.html">validation metric</a>. Nonetheless a PPC is a good start for an inference diagnosis and can provide an intuition about any bias introduced in inference: does <span class="arithmatex">\(x_{\text{pp}}\)</span> systematically differ from <span class="arithmatex">\(x_o\)</span>?</p>
 <h2 id="conceptual-code-for-ppc">Conceptual Code for PPC<a class="headerlink" href="#conceptual-code-for-ppc" title="Permanent link">&para;</a></h2>
 <p>The following illustrates the main approach of PPCs. We have a trained neural posterior and want to check the correlation between the observation(s) <span class="arithmatex">\(x_o\)</span> and the posterior sample(s) <span class="arithmatex">\(x_{\text{pp}}\)</span>.</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi.analysis</span> <span class="kn">import</span> <span class="n">pairplot</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.analysis</span><span class="w"> </span><span class="kn">import</span> <span class="n">pairplot</span>
 
 <span class="c1"># A PPC is performed after we trained a neural posterior `posterior`</span>
 <span class="n">posterior</span><span class="o">.</span><span class="n">set_default_x</span><span class="p">(</span><span class="n">x_o</span><span class="p">)</span> <span class="c1"># x_o loaded from disk for example</span>
@@ -518,14 +518,14 @@
 </code></pre></div>
 <h2 id="performing-a-ppc-of-a-toy-example">Performing a PPC of a toy example<a class="headerlink" href="#performing-a-ppc-of-a-toy-example" title="Permanent link">&para;</a></h2>
 <p>Below we provide an example Posterior Predictive Check (PPC) of some toy example:</p>
-<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">torch</span>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
 
-<span class="kn">from</span> <span class="nn">sbi.analysis</span> <span class="kn">import</span> <span class="n">pairplot</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.analysis</span><span class="w"> </span><span class="kn">import</span> <span class="n">pairplot</span>
 
 <span class="n">_</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
 </code></pre></div>
 <p>We work on an inference problem over three parameters using any of the techniques implemented in <code>sbi</code>. In this tutorial, we load the dummy posterior (from a python module <code>toy_posterior_for_07_cc</code> alongside this notebook):</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">toy_posterior_for_07_cc</span> <span class="kn">import</span> <span class="n">ExamplePosterior</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">toy_posterior_for_07_cc</span><span class="w"> </span><span class="kn">import</span> <span class="n">ExamplePosterior</span>
 
 <span class="n">posterior</span> <span class="o">=</span> <span class="n">ExamplePosterior</span><span class="p">()</span>
 </code></pre></div>
@@ -548,7 +548,7 @@
 </code></pre></div>
 <p><img alt="png" src="../10_diagnostics_posterior_predictive_checks_files/10_diagnostics_posterior_predictive_checks_11_0.png" /></p>
 <p>Now we can use our simulator to generate some data <span class="arithmatex">\(x_{\text{PP}}\)</span>. We will use the poterior samples <span class="arithmatex">\(\theta_{\text{posterior}}\)</span> as input parameters. Note that the simulation part is not in the <code>sbi</code> scope, so any simulator -including a non-Python one- can be used at this stage. In our case we&rsquo;ll use a dummy simulator for the sake of demonstration:</p>
-<div class="highlight"><pre><span></span><code><span class="k">def</span> <span class="nf">dummy_simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">dummy_simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot; a function performing a simulation emulating a real simulator outside sbi</span>
 
 <span class="sd">    Args:</span>

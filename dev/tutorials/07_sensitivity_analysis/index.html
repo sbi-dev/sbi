@@ -515,19 +515,19 @@
 <h1 id="active-subspaces-for-sensitivity-analysis">Active subspaces for sensitivity analysis<a class="headerlink" href="#active-subspaces-for-sensitivity-analysis" title="Permanent link">&para;</a></h1>
 <p>A standard method to analyse dynamical systems such as models of neural dynamics is to use a sensitivity analysis. We can use the posterior obtained with <code>sbi</code>, to perform such analyses.</p>
 <h2 id="main-syntax">Main syntax<a class="headerlink" href="#main-syntax" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi.analysis</span> <span class="kn">import</span> <span class="n">ActiveSubspace</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.analysis</span><span class="w"> </span><span class="kn">import</span> <span class="n">ActiveSubspace</span>
 
 <span class="n">sensitivity</span> <span class="o">=</span> <span class="n">ActiveSubspace</span><span class="p">(</span><span class="n">posterior</span><span class="o">.</span><span class="n">set_default_x</span><span class="p">(</span><span class="n">x_o</span><span class="p">))</span>
 <span class="n">e_vals</span><span class="p">,</span> <span class="n">e_vecs</span> <span class="o">=</span> <span class="n">sensitivity</span><span class="o">.</span><span class="n">find_directions</span><span class="p">(</span><span class="n">posterior_log_prob_as_property</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="n">projected_data</span> <span class="o">=</span> <span class="n">sensitivity</span><span class="o">.</span><span class="n">project</span><span class="p">(</span><span class="n">theta_project</span><span class="p">,</span> <span class="n">num_dimensions</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
 </code></pre></div>
 <h2 id="example-and-further-explanation">Example and further explanation<a class="headerlink" href="#example-and-further-explanation" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">from</span> <span class="nn">torch.distributions</span> <span class="kn">import</span> <span class="n">MultivariateNormal</span>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.distributions</span><span class="w"> </span><span class="kn">import</span> <span class="n">MultivariateNormal</span>
 
-<span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">NPE</span>
-<span class="kn">from</span> <span class="nn">sbi.analysis</span> <span class="kn">import</span> <span class="n">ActiveSubspace</span><span class="p">,</span> <span class="n">pairplot</span>
-<span class="kn">from</span> <span class="nn">sbi.simulators</span> <span class="kn">import</span> <span class="n">linear_gaussian</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference</span><span class="w"> </span><span class="kn">import</span> <span class="n">NPE</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.analysis</span><span class="w"> </span><span class="kn">import</span> <span class="n">ActiveSubspace</span><span class="p">,</span> <span class="n">pairplot</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.simulators</span><span class="w"> </span><span class="kn">import</span> <span class="n">linear_gaussian</span>
 
 <span class="n">_</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
 </code></pre></div>
@@ -535,7 +535,7 @@
 <div class="highlight"><pre><span></span><code><span class="n">prior</span> <span class="o">=</span> <span class="n">MultivariateNormal</span><span class="p">(</span><span class="mf">0.0</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">2</span><span class="p">),</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="mi">2</span><span class="p">))</span>
 
 
-<span class="k">def</span> <span class="nf">simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">):</span>
     <span class="k">return</span> <span class="n">linear_gaussian</span><span class="p">(</span>
         <span class="n">theta</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.8</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">2</span><span class="p">),</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([[</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">0.98</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.98</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">]])</span>
     <span class="p">)</span>
@@ -589,7 +589,7 @@ Eigenvectors:
 <p>As a neuroscience example, in Deistler et al. 2021, we obtained the posterior distribution given burst durations and delays between bursts. After having obtained the posterior, we then wanted to analyse the sensitivity of metabolic cost w.r.t. circuit parameters. The framework we presented above can easily be extended to study such questions.</p>
 <div class="highlight"><pre><span></span><code><span class="n">prior</span> <span class="o">=</span> <span class="n">MultivariateNormal</span><span class="p">(</span><span class="mf">0.0</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">2</span><span class="p">),</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="mi">2</span><span class="p">))</span>
 
-<span class="k">def</span> <span class="nf">simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">):</span>
     <span class="k">return</span> <span class="n">linear_gaussian</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.8</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">2</span><span class="p">),</span> <span class="n">torch</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="mi">2</span><span class="p">))</span>
 
 <span class="n">theta</span> <span class="o">=</span> <span class="n">prior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">2000</span><span class="p">,))</span>

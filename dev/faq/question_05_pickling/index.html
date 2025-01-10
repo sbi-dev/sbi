@@ -487,7 +487,7 @@
 
 <h1 id="how-should-i-save-and-load-objects-in-sbi">How should I save and load objects in <code>sbi</code>?<a class="headerlink" href="#how-should-i-save-and-load-objects-in-sbi" title="Permanent link">&para;</a></h1>
 <p><code>NeuralPosterior</code> objects are picklable.</p>
-<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">pickle</span>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">pickle</span>
 
 <span class="c1"># ... run inference</span>
 <span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">()</span>
@@ -501,14 +501,14 @@ loaded under <code>sbi v0.23.0</code> or newer.</p>
 loaded under <code>sbi v0.18.0</code> or newer.</p>
 <p>Note: if you try to load a posterior that was saved under <code>sbi v0.14.x</code> or
 earlier under <code>sbi v0.15.x</code> until <code>sbi v0.17.x</code>, you have to add:</p>
-<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">sys</span>
-<span class="kn">from</span> <span class="nn">sbi.utils</span> <span class="kn">import</span> <span class="n">user_input_checks_utils</span>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">user_input_checks_utils</span>
 
 <span class="n">sys</span><span class="o">.</span><span class="n">modules</span><span class="p">[</span><span class="s2">&quot;sbi.user_input.user_input_checks_utils&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">user_input_checks_utils</span>
 </code></pre></div>
 <p>to your script before loading the posterior.</p>
 <p>As of <code>sbi v0.18.0</code>, <code>NeuralInference</code> objects are also picklable.</p>
-<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">pickle</span>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">pickle</span>
 
 <span class="c1"># ... run inference</span>
 <span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">()</span>
@@ -526,12 +526,12 @@ following two changes in behavior:</p>
 <h2 id="i-trained-a-model-on-a-gpu-can-i-load-it-on-a-cpu">I trained a model on a GPU. Can I load it on a CPU?<a class="headerlink" href="#i-trained-a-model-on-a-gpu-can-i-load-it-on-a-cpu" title="Permanent link">&para;</a></h2>
 <p>The code snippet below allows to load inference objects on a CPU if they were
 saved on a GPU. Note that the neural net also needs to be moved to CPU.</p>
-<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">io</span>
-<span class="kn">import</span> <span class="nn">pickle</span>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">io</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pickle</span>
 
 <span class="c1">#https://stackoverflow.com/questions/57081727/load-pickle-file-obtained-from-gpu-to-cpu</span>
-<span class="k">class</span> <span class="nc">CPU_Unpickler</span><span class="p">(</span><span class="n">pickle</span><span class="o">.</span><span class="n">Unpickler</span><span class="p">):</span>
-    <span class="k">def</span> <span class="nf">find_class</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">module</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">CPU_Unpickler</span><span class="p">(</span><span class="n">pickle</span><span class="o">.</span><span class="n">Unpickler</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">find_class</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">module</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
         <span class="k">if</span> <span class="n">module</span> <span class="o">==</span> <span class="s1">&#39;torch.storage&#39;</span> <span class="ow">and</span> <span class="n">name</span> <span class="o">==</span> <span class="s1">&#39;_load_from_bytes&#39;</span><span class="p">:</span>
             <span class="k">return</span> <span class="k">lambda</span> <span class="n">b</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">(</span><span class="n">b</span><span class="p">),</span> <span class="n">map_location</span><span class="o">=</span><span class="s1">&#39;cpu&#39;</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>

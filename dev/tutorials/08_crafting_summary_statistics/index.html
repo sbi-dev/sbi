@@ -475,14 +475,14 @@ neural networks can be used to learn summary statistics from such data. In this
 notebook, we will instead focus on hand-crafting summary statistics. We demonstrate that
 the choice of summary statistics can be crucial for the performance of the inference
 algorithm.</p>
-<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">matplotlib</span> <span class="k">as</span> <span class="nn">mpl</span>
-<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
-<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
-<span class="kn">import</span> <span class="nn">torch</span>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mpl</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
 
-<span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">NPE</span>
-<span class="kn">from</span> <span class="nn">sbi.analysis</span> <span class="kn">import</span> <span class="n">pairplot</span>
-<span class="kn">from</span> <span class="nn">sbi.utils</span> <span class="kn">import</span> <span class="n">BoxUniform</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference</span><span class="w"> </span><span class="kn">import</span> <span class="n">NPE</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.analysis</span><span class="w"> </span><span class="kn">import</span> <span class="n">pairplot</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">BoxUniform</span>
 </code></pre></div>
 <div class="highlight"><pre><span></span><code><span class="c1"># remove top and right axis from plots</span>
 <span class="n">mpl</span><span class="o">.</span><span class="n">rcParams</span><span class="p">[</span><span class="s2">&quot;axes.spines.right&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span>
@@ -503,7 +503,7 @@ algorithm.</p>
 </code></pre></div>
 <h2 id="12-simulator">1.2 Simulator<a class="headerlink" href="#12-simulator" title="Permanent link">&para;</a></h2>
 <p>Defining some helper functions first:</p>
-<div class="highlight"><pre><span></span><code><span class="k">def</span> <span class="nf">create_t_x</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">create_t_x</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Return an t, x array for plotting based on params&quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">theta</span><span class="o">.</span><span class="n">ndim</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
         <span class="n">theta</span> <span class="o">=</span> <span class="n">theta</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">newaxis</span><span class="p">,</span> <span class="p">:]</span>
@@ -521,7 +521,7 @@ algorithm.</p>
     <span class="k">return</span> <span class="n">t</span><span class="p">,</span> <span class="n">x</span>
 
 
-<span class="k">def</span> <span class="nf">eval</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">eval</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Evaluate the quadratic function at `t`&quot;&quot;&quot;</span>
 
     <span class="k">if</span> <span class="n">theta</span><span class="o">.</span><span class="n">ndim</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
@@ -542,7 +542,7 @@ algorithm.</p>
 <span class="arithmatex">\(\textbf{get_3_values()}\)</span> returns 3 function evaluations at <span class="arithmatex">\(x=-0.5, x=0\)</span> and <span class="arithmatex">\(x=0.75\)</span>.
 <br>
 <span class="arithmatex">\(\textbf{get_MSE()}\)</span> returns the mean squared error between true and a quadratic function corresponding to a prior distributions sample.</p>
-<div class="highlight"><pre><span></span><code><span class="k">def</span> <span class="nf">get_3_values</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_3_values</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Return 3 &#39;x&#39; values corresponding to t=-0.5,0,0.75 as summary statistic vector</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -554,7 +554,7 @@ algorithm.</p>
         <span class="p">]</span>
     <span class="p">)</span><span class="o">.</span><span class="n">T</span>
 </code></pre></div>
-<div class="highlight"><pre><span></span><code><span class="k">def</span> <span class="nf">get_MSE</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">theta_o</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_MSE</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">theta_o</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Return the mean-squared error (MSE) i.e. Euclidean distance from the</span>
 <span class="sd">    observation function</span>

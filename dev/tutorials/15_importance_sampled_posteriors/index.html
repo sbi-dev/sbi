@@ -488,26 +488,26 @@
 \]</div>
 <p>Instead of sampling <span class="arithmatex">\(\theta_i\sim p(\theta_i|x)\)</span>, we can thus sample <span class="arithmatex">\(\theta_i\sim q(\theta_i|x)\)</span> and attach a corresponding importance weight <span class="arithmatex">\(w_i\)</span> to each sample. Intuitively, the importance weights downweight samples where <span class="arithmatex">\(q(\theta|x)\)</span> overestimates <span class="arithmatex">\(p(\theta|x)\)</span> and upweight samples where <span class="arithmatex">\(p(\theta|x)\)</span> underestimates <span class="arithmatex">\(q(\theta|x)\)</span>.</p>
 <h1 id="implementation">Implementation<a class="headerlink" href="#implementation" title="Permanent link">&para;</a></h1>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">torch</span> <span class="kn">import</span> <span class="n">ones</span><span class="p">,</span> <span class="n">eye</span>
-<span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">from</span> <span class="nn">torch.distributions</span> <span class="kn">import</span> <span class="n">MultivariateNormal</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">torch</span><span class="w"> </span><span class="kn">import</span> <span class="n">ones</span><span class="p">,</span> <span class="n">eye</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.distributions</span><span class="w"> </span><span class="kn">import</span> <span class="n">MultivariateNormal</span>
 
-<span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">NPE</span><span class="p">,</span> <span class="n">ImportanceSamplingPosterior</span>
-<span class="kn">from</span> <span class="nn">sbi.utils</span> <span class="kn">import</span> <span class="n">BoxUniform</span>
-<span class="kn">from</span> <span class="nn">sbi.analysis</span> <span class="kn">import</span> <span class="n">marginal_plot</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference</span><span class="w"> </span><span class="kn">import</span> <span class="n">NPE</span><span class="p">,</span> <span class="n">ImportanceSamplingPosterior</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">BoxUniform</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.analysis</span><span class="w"> </span><span class="kn">import</span> <span class="n">marginal_plot</span>
 </code></pre></div>
 <p>We first define a simulator and a prior which both have a <code>sample</code> function (as required for <code>sbi</code>) and <code>log_prob</code> evaluations (as required for importance sampling).</p>
 <p>Next we train an NPE model for inference.</p>
 <p>Now we perfrom inference with the model.</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># define prior and simulator</span>
-<span class="k">class</span> <span class="nc">Simulator</span><span class="p">:</span>
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">Simulator</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">pass</span>
 
-    <span class="k">def</span> <span class="nf">log_likelihood</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">log_likelihood</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">MultivariateNormal</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">eye</span><span class="p">(</span><span class="mi">2</span><span class="p">))</span><span class="o">.</span><span class="n">log_prob</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">sample</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">theta</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">sample</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">theta</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">theta</span> <span class="o">+</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="n">theta</span><span class="o">.</span><span class="n">shape</span><span class="p">))</span>
 
 <span class="n">prior</span> <span class="o">=</span> <span class="n">BoxUniform</span><span class="p">(</span><span class="o">-</span><span class="mi">5</span> <span class="o">*</span> <span class="n">ones</span><span class="p">((</span><span class="mi">2</span><span class="p">,)),</span> <span class="mi">5</span> <span class="o">*</span> <span class="n">ones</span><span class="p">((</span><span class="mi">2</span><span class="p">,)))</span>

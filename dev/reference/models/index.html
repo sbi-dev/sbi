@@ -883,7 +883,7 @@ Ignored if density estimator is not an mdn.</p>
 <span class="normal">369</span>
 <span class="normal">370</span>
 <span class="normal">371</span>
-<span class="normal">372</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">posterior_nn</span><span class="p">(</span>
+<span class="normal">372</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">posterior_nn</span><span class="p">(</span>
     <span class="n">model</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">z_score_theta</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;independent&quot;</span><span class="p">,</span>
     <span class="n">z_score_x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;independent&quot;</span><span class="p">,</span>
@@ -950,7 +950,7 @@ Ignored if density estimator is not an mdn.</p>
         <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
     <span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">build_fn_snpe_a</span><span class="p">(</span><span class="n">batch_theta</span><span class="p">,</span> <span class="n">batch_x</span><span class="p">,</span> <span class="n">num_components</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">build_fn_snpe_a</span><span class="p">(</span><span class="n">batch_theta</span><span class="p">,</span> <span class="n">batch_x</span><span class="p">,</span> <span class="n">num_components</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Build function for SNPE-A</span>
 
 <span class="sd">        Extract the number of components from the kwargs, such that they are exposed as</span>
@@ -965,7 +965,7 @@ Ignored if density estimator is not an mdn.</p>
             <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
         <span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">build_fn</span><span class="p">(</span><span class="n">batch_theta</span><span class="p">,</span> <span class="n">batch_x</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">build_fn</span><span class="p">(</span><span class="n">batch_theta</span><span class="p">,</span> <span class="n">batch_x</span><span class="p">):</span>
         <span class="k">if</span> <span class="n">model</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">model_builders</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Model </span><span class="si">{</span><span class="n">model</span><span class="si">}</span><span class="s2"> in not implemented&quot;</span><span class="p">)</span>
 
@@ -1249,7 +1249,7 @@ Ignored if density estimator is not an mdn.</p>
 <span class="normal">204</span>
 <span class="normal">205</span>
 <span class="normal">206</span>
-<span class="normal">207</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">likelihood_nn</span><span class="p">(</span>
+<span class="normal">207</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">likelihood_nn</span><span class="p">(</span>
     <span class="n">model</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">z_score_theta</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;independent&quot;</span><span class="p">,</span>
     <span class="n">z_score_x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;independent&quot;</span><span class="p">,</span>
@@ -1314,7 +1314,7 @@ Ignored if density estimator is not an mdn.</p>
         <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
     <span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">build_fn</span><span class="p">(</span><span class="n">batch_theta</span><span class="p">,</span> <span class="n">batch_x</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">build_fn</span><span class="p">(</span><span class="n">batch_theta</span><span class="p">,</span> <span class="n">batch_x</span><span class="p">):</span>
         <span class="k">if</span> <span class="n">model</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">model_builders</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Model </span><span class="si">{</span><span class="n">model</span><span class="si">}</span><span class="s2"> in not implemented&quot;</span><span class="p">)</span>
 
@@ -1553,7 +1553,7 @@ simulation outputs.</p>
 <span class="normal">130</span>
 <span class="normal">131</span>
 <span class="normal">132</span>
-<span class="normal">133</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">classifier_nn</span><span class="p">(</span>
+<span class="normal">133</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">classifier_nn</span><span class="p">(</span>
     <span class="n">model</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">z_score_theta</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;independent&quot;</span><span class="p">,</span>
     <span class="n">z_score_x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;independent&quot;</span><span class="p">,</span>
@@ -1610,7 +1610,7 @@ simulation outputs.</p>
         <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
     <span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">build_fn</span><span class="p">(</span><span class="n">batch_theta</span><span class="p">,</span> <span class="n">batch_x</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">build_fn</span><span class="p">(</span><span class="n">batch_theta</span><span class="p">,</span> <span class="n">batch_x</span><span class="p">):</span>
         <span class="k">if</span> <span class="n">model</span> <span class="o">==</span> <span class="s2">&quot;linear&quot;</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">build_linear_classifier</span><span class="p">(</span>
                 <span class="n">batch_x</span><span class="o">=</span><span class="n">batch_theta</span><span class="p">,</span> <span class="n">batch_y</span><span class="o">=</span><span class="n">batch_x</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span>
@@ -1876,7 +1876,7 @@ density estimator is a normalizing flow (i.e. currently either a <code>maf</code
 <span class="normal">266</span>
 <span class="normal">267</span>
 <span class="normal">268</span>
-<span class="normal">269</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">flowmatching_nn</span><span class="p">(</span>
+<span class="normal">269</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">flowmatching_nn</span><span class="p">(</span>
     <span class="n">model</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">z_score_theta</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;independent&quot;</span><span class="p">,</span>
     <span class="n">z_score_x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;independent&quot;</span><span class="p">,</span>
@@ -1919,7 +1919,7 @@ density estimator is a normalizing flow (i.e. currently either a <code>maf</code
 
     <span class="n">model_str</span> <span class="o">=</span> <span class="n">model</span> <span class="o">+</span> <span class="s2">&quot;_flowmatcher&quot;</span>
 
-    <span class="k">def</span> <span class="nf">build_fn</span><span class="p">(</span><span class="n">batch_theta</span><span class="p">,</span> <span class="n">batch_x</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">build_fn</span><span class="p">(</span><span class="n">batch_theta</span><span class="p">,</span> <span class="n">batch_x</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">model_builders</span><span class="p">[</span><span class="n">model_str</span><span class="p">](</span>
             <span class="n">batch_x</span><span class="o">=</span><span class="n">batch_theta</span><span class="p">,</span>
             <span class="n">batch_y</span><span class="o">=</span><span class="n">batch_x</span><span class="p">,</span>
@@ -2202,7 +2202,7 @@ nn.Identity().</p>
 <span class="normal">451</span>
 <span class="normal">452</span>
 <span class="normal">453</span>
-<span class="normal">454</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">posterior_score_nn</span><span class="p">(</span>
+<span class="normal">454</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">posterior_score_nn</span><span class="p">(</span>
     <span class="n">sde_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">score_net_type</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;mlp&quot;</span><span class="p">,</span>
     <span class="n">z_score_theta</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;independent&quot;</span><span class="p">,</span>
@@ -2268,7 +2268,7 @@ nn.Identity().</p>
         <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
     <span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">build_fn</span><span class="p">(</span><span class="n">batch_theta</span><span class="p">,</span> <span class="n">batch_x</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">build_fn</span><span class="p">(</span><span class="n">batch_theta</span><span class="p">,</span> <span class="n">batch_x</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Build function wrapper for the build_score_estimator function that</span>
 <span class="sd">        is required for the score posterior class.</span>
 
@@ -2428,7 +2428,7 @@ where condition_shape is the shape of the condition tensor.</p>
 <span class="normal">220</span>
 <span class="normal">221</span>
 <span class="normal">222</span>
-<span class="normal">223</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span> <span class="nc">ConditionalDensityEstimator</span><span class="p">(</span><span class="n">ConditionalEstimator</span><span class="p">):</span>
+<span class="normal">223</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">ConditionalDensityEstimator</span><span class="p">(</span><span class="n">ConditionalEstimator</span><span class="p">):</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Base class for density estimators.</span>
 
 <span class="sd">    The density estimator class is a wrapper around neural networks that allows to</span>
@@ -2443,7 +2443,7 @@ where condition_shape is the shape of the condition tensor.</p>
 
 <span class="sd">    &quot;&quot;&quot;</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">net</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span> <span class="n">input_shape</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">,</span> <span class="n">condition_shape</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Base class for density estimators.</span>
@@ -2459,12 +2459,12 @@ where condition_shape is the shape of the condition tensor.</p>
         <span class="bp">self</span><span class="o">.</span><span class="n">net</span> <span class="o">=</span> <span class="n">net</span>
 
     <span class="nd">@property</span>
-    <span class="k">def</span> <span class="nf">embedding_net</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">]:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">embedding_net</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">]:</span>
 <span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Return the embedding network if it exists.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="kc">None</span>
 
     <span class="nd">@abstractmethod</span>
-    <span class="k">def</span> <span class="nf">log_prob</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">input</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">condition</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">log_prob</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">input</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">condition</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
 <span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Return the log probabilities of the inputs given a condition or multiple</span>
 <span class="sd">        i.e. batched conditions.</span>
 
@@ -2484,7 +2484,7 @@ where condition_shape is the shape of the condition tensor.</p>
         <span class="k">pass</span>
 
     <span class="nd">@abstractmethod</span>
-    <span class="k">def</span> <span class="nf">loss</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">input</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">condition</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">loss</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">input</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">condition</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
 <span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Return the loss for training the density estimator.</span>
 
 <span class="sd">        Args:</span>
@@ -2499,7 +2499,7 @@ where condition_shape is the shape of the condition tensor.</p>
         <span class="k">pass</span>
 
     <span class="nd">@abstractmethod</span>
-    <span class="k">def</span> <span class="nf">sample</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sample_shape</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">,</span> <span class="n">condition</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">sample</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sample_shape</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">,</span> <span class="n">condition</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
 <span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Return samples from the density estimator.</span>
 
 <span class="sd">        Args:</span>
@@ -2512,7 +2512,7 @@ where condition_shape is the shape of the condition tensor.</p>
 
         <span class="k">pass</span>
 
-    <span class="k">def</span> <span class="nf">sample_and_log_prob</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">sample_and_log_prob</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">sample_shape</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">,</span> <span class="n">condition</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">Tensor</span><span class="p">]:</span>
 <span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Return samples and their density from the density estimator.</span>
@@ -2662,7 +2662,7 @@ evaluated (and which is also the event_shape of samples).</p>
 <span class="normal">144</span>
 <span class="normal">145</span>
 <span class="normal">146</span>
-<span class="normal">147</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">147</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span> <span class="n">net</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span> <span class="n">input_shape</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">,</span> <span class="n">condition_shape</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Base class for density estimators.</span>
@@ -2816,7 +2816,7 @@ i.e. batched conditions.</p>
 <span class="normal">170</span>
 <span class="normal">171</span>
 <span class="normal">172</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
-<span class="k">def</span> <span class="nf">log_prob</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">input</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">condition</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">log_prob</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">input</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">condition</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Return the log probabilities of the inputs given a condition or multiple</span>
 <span class="sd">    i.e. batched conditions.</span>
 
@@ -2944,7 +2944,7 @@ i.e. batched conditions.</p>
 <span class="normal">185</span>
 <span class="normal">186</span>
 <span class="normal">187</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
-<span class="k">def</span> <span class="nf">loss</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">input</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">condition</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">loss</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">input</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">condition</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Return the loss for training the density estimator.</span>
 
 <span class="sd">    Args:</span>
@@ -3065,7 +3065,7 @@ i.e. batched conditions.</p>
 <span class="normal">199</span>
 <span class="normal">200</span>
 <span class="normal">201</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
-<span class="k">def</span> <span class="nf">sample</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sample_shape</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">,</span> <span class="n">condition</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">sample</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sample_shape</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">,</span> <span class="n">condition</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Return samples from the density estimator.</span>
 
 <span class="sd">    Args:</span>
@@ -3195,7 +3195,7 @@ then be overwritten to provide a more efficient implementation.</p>
 <span class="normal">220</span>
 <span class="normal">221</span>
 <span class="normal">222</span>
-<span class="normal">223</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">sample_and_log_prob</span><span class="p">(</span>
+<span class="normal">223</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">sample_and_log_prob</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span> <span class="n">sample_shape</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">,</span> <span class="n">condition</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">Tensor</span><span class="p">]:</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Return samples and their density from the density estimator.</span>

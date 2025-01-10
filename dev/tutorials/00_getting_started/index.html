@@ -526,12 +526,12 @@
 <p><code>sbi</code> provides a simple interface to run state-of-the-art algorithms for simulation-based inference.</p>
 <p><strong>The overall goal of simulation-based inference is to algorithmically identify model parameters which are consistent with data.</strong></p>
 <p>In this tutorial we demonstrate how to get started with the <code>sbi</code> toolbox and how to perform parameter inference on a simple model.</p>
-<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">torch</span>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
 
-<span class="kn">from</span> <span class="nn">sbi.analysis</span> <span class="kn">import</span> <span class="n">pairplot</span>
-<span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">NPE</span>
-<span class="kn">from</span> <span class="nn">sbi.utils</span> <span class="kn">import</span> <span class="n">BoxUniform</span>
-<span class="kn">from</span> <span class="nn">sbi.utils.user_input_checks</span> <span class="kn">import</span> <span class="p">(</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.analysis</span><span class="w"> </span><span class="kn">import</span> <span class="n">pairplot</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference</span><span class="w"> </span><span class="kn">import</span> <span class="n">NPE</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">BoxUniform</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.utils.user_input_checks</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">check_sbi_inputs</span><span class="p">,</span>
     <span class="n">process_prior</span><span class="p">,</span>
     <span class="n">process_simulator</span><span class="p">,</span>
@@ -553,7 +553,7 @@
 </blockquote>
 <div class="highlight"><pre><span></span><code><span class="n">num_dim</span> <span class="o">=</span> <span class="mi">3</span>
 
-<span class="k">def</span> <span class="nf">simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">):</span>
     <span class="c1"># linear gaussian</span>
     <span class="k">return</span> <span class="n">theta</span> <span class="o">+</span> <span class="mf">1.0</span> <span class="o">+</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn_like</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span> <span class="o">*</span> <span class="mf">0.1</span>
 

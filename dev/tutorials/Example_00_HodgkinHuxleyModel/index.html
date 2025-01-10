@@ -565,17 +565,17 @@ synthetically (in practice, this would be an experimental observation).</p>
 <a href="https://github.com/sbi-dev/sbi/blob/main/tutorials/Example_00_HodgkinHuxleyModel.ipynb">tutorials/Example_00_HodgkinHuxleyModel.ipynb</a>.</p>
 <p>First we are going to import basic packages.</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># visualization</span>
-<span class="kn">import</span> <span class="nn">matplotlib</span> <span class="k">as</span> <span class="nn">mpl</span>
-<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
-<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
-<span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mpl</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
 
-<span class="kn">from</span> <span class="nn">sbi</span> <span class="kn">import</span> <span class="n">analysis</span> <span class="k">as</span> <span class="n">analysis</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi</span><span class="w"> </span><span class="kn">import</span> <span class="n">analysis</span> <span class="k">as</span> <span class="n">analysis</span>
 
 <span class="c1"># sbi</span>
-<span class="kn">from</span> <span class="nn">sbi</span> <span class="kn">import</span> <span class="n">utils</span> <span class="k">as</span> <span class="n">utils</span>
-<span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">NPE</span><span class="p">,</span> <span class="n">simulate_for_sbi</span>
-<span class="kn">from</span> <span class="nn">sbi.utils.user_input_checks</span> <span class="kn">import</span> <span class="p">(</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi</span><span class="w"> </span><span class="kn">import</span> <span class="n">utils</span> <span class="k">as</span> <span class="n">utils</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference</span><span class="w"> </span><span class="kn">import</span> <span class="n">NPE</span><span class="p">,</span> <span class="n">simulate_for_sbi</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.utils.user_input_checks</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">check_sbi_inputs</span><span class="p">,</span>
     <span class="n">process_prior</span><span class="p">,</span>
     <span class="n">process_simulator</span><span class="p">,</span>
@@ -613,16 +613,16 @@ g_{Na}\)</span>,<span class="arithmatex">\(\bar g_K\)</span>)</p>
 \]</div>
 <p>Above, <span class="arithmatex">\(V\)</span> represents the membrane potential, <span class="arithmatex">\(C_m\)</span> is the membrane capacitance, <span class="arithmatex">\(g_{\text{l}}\)</span> is the leak conductance, <span class="arithmatex">\(E_{\text{l}}\)</span> is the membrane reversal potential, <span class="arithmatex">\(\bar{g}_c\)</span> is the density of channels of type <span class="arithmatex">\(c\)</span> (<span class="arithmatex">\(\text{Na}^+\)</span>, <span class="arithmatex">\(\text{K}^+\)</span>, M), <span class="arithmatex">\(E_c\)</span> is the reversal potential of <span class="arithmatex">\(c\)</span>, (<span class="arithmatex">\(m\)</span>, <span class="arithmatex">\(h\)</span>, <span class="arithmatex">\(n\)</span>, <span class="arithmatex">\(p\)</span>) are the respective channel gating kinetic variables, and <span class="arithmatex">\(\sigma \eta(t)\)</span> is the intrinsic neural noise. The right hand side of the voltage dynamics is composed of a leak current, a voltage-dependent <span class="arithmatex">\(\text{Na}^+\)</span> current, a delayed-rectifier <span class="arithmatex">\(\text{K}^+\)</span> current, a slow voltage-dependent <span class="arithmatex">\(\text{K}^+\)</span> current responsible for spike-frequency adaptation, and an injected current <span class="arithmatex">\(I_{\text{inj}}\)</span>. Channel gating variables <span class="arithmatex">\(q\)</span> have dynamics fully characterized by the neuron membrane potential <span class="arithmatex">\(V\)</span>, given the respective steady-state <span class="arithmatex">\(q_{\infty}(V)\)</span> and time constant <span class="arithmatex">\(\tau_{q}(V)\)</span> (details in Pospischil et al. 2008).</p>
 <p>The input current <span class="arithmatex">\(I_{\text{inj}}\)</span> is defined as</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">HH_helper_functions</span> <span class="kn">import</span> <span class="n">syn_current</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">HH_helper_functions</span><span class="w"> </span><span class="kn">import</span> <span class="n">syn_current</span>
 
 <span class="c1"># current, onset time of stimulation, offset time of stimulation, time step, time, area of some</span>
 <span class="n">I_inj</span><span class="p">,</span> <span class="n">t_on</span><span class="p">,</span> <span class="n">t_off</span><span class="p">,</span> <span class="n">dt</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">A_soma</span> <span class="o">=</span> <span class="n">syn_current</span><span class="p">()</span>
 </code></pre></div>
 <p>The Hodgkin-Huxley simulator takes the parameters as input together with other arguments such as the initial voltage state, the integration timestep, time and injected current:</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">HH_helper_functions</span> <span class="kn">import</span> <span class="n">HHsimulator</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">HH_helper_functions</span><span class="w"> </span><span class="kn">import</span> <span class="n">HHsimulator</span>
 </code></pre></div>
 <p>Putting the input current and the simulator together:</p>
-<div class="highlight"><pre><span></span><code><span class="k">def</span> <span class="nf">run_HH_model</span><span class="p">(</span><span class="n">params</span><span class="p">):</span>
+<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">run_HH_model</span><span class="p">(</span><span class="n">params</span><span class="p">):</span>
 
     <span class="n">params</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">params</span><span class="p">)</span>
 
@@ -677,13 +677,13 @@ g_{Na}\)</span>,<span class="arithmatex">\(\bar g_K\)</span>)</p>
 <p><img alt="png" src="../Example_00_HodgkinHuxleyModel_files/Example_00_HodgkinHuxleyModel_19_0.png" /></p>
 <p>As can be seen, the voltage traces can be quite diverse for different parameter values.</p>
 <p>Often, we are not interested in matching the exact trace, but only in matching certain features thereof. In this example of the Hodgkin-Huxley model, the summary features are the number of spikes, the mean resting potential, the standard deviation of the resting potential, and the first four voltage moments: mean, standard deviation, skewness and kurtosis. Using the function <code>calculate_summary_statistics()</code> imported below, we obtain these statistics from the output of the Hodgkin Huxley simulator.</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">HH_helper_functions</span> <span class="kn">import</span> <span class="n">calculate_summary_statistics</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">HH_helper_functions</span><span class="w"> </span><span class="kn">import</span> <span class="n">calculate_summary_statistics</span>
 </code></pre></div>
 <blockquote>
 <p>Note: the summary features depend on the simulator and observations under investigation. Check out our tutorials on crafting summary statistics. </p>
 </blockquote>
 <p>Lastly, we define a function that performs all of the above steps at once, to have one object we pass to the inference method as our simulator. The function <code>simulation_wrapper</code> takes in the parameters, runs the Hodgkin Huxley model and then returns the summary statistics.</p>
-<div class="highlight"><pre><span></span><code><span class="k">def</span> <span class="nf">simulation_wrapper</span><span class="p">(</span><span class="n">params</span><span class="p">):</span>
+<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">simulation_wrapper</span><span class="p">(</span><span class="n">params</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Returns summary statistics from conductance values in `params`.</span>
 

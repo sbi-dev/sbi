@@ -485,9 +485,9 @@
 </li>
 </ul>
 <p>Below, we will demonstrate how these samplers can be used in <code>sbi</code>. First, we train the neural network as always:</p>
-<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">torch</span>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
 
-<span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">NLE</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference</span><span class="w"> </span><span class="kn">import</span> <span class="n">NLE</span>
 
 <span class="c1"># dummy Gaussian simulator for demonstration</span>
 <span class="n">num_dim</span> <span class="o">=</span> <span class="mi">2</span>
@@ -524,7 +524,7 @@
 <h2 id="main-syntax-for-nle-and-nre">Main syntax (for NLE and NRE)<a class="headerlink" href="#main-syntax-for-nle-and-nre" title="Permanent link">&para;</a></h2>
 <p>As above, we begin by training the neural network as always:</p>
 <p>Then, for full flexibility on using the sampler, we do not use the <code>.build_posterior()</code> method, but instead we explicitly define the potential function and the sampling algorithm (see below for explanation):</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">MCMCPosterior</span><span class="p">,</span> <span class="n">likelihood_estimator_based_potential</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference</span><span class="w"> </span><span class="kn">import</span> <span class="n">MCMCPosterior</span><span class="p">,</span> <span class="n">likelihood_estimator_based_potential</span>
 
 <span class="n">potential_fn</span><span class="p">,</span> <span class="n">parameter_transform</span> <span class="o">=</span> <span class="n">likelihood_estimator_based_potential</span><span class="p">(</span>
     <span class="n">likelihood_estimator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">x_o</span>
@@ -534,7 +534,7 @@
 <span class="p">)</span>
 </code></pre></div>
 <p>If you want to use variational inference or rejection sampling, you have to replace the last line with <code>VIPosterior</code> or <code>RejectionPosterior</code>:</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">RejectionPosterior</span><span class="p">,</span> <span class="n">VIPosterior</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference</span><span class="w"> </span><span class="kn">import</span> <span class="n">RejectionPosterior</span><span class="p">,</span> <span class="n">VIPosterior</span>
 
 <span class="c1"># For VI, we have to train.</span>
 <span class="n">posterior</span> <span class="o">=</span> <span class="n">VIPosterior</span><span class="p">(</span>
@@ -585,7 +585,7 @@ Quality Score: -0.029    Good: Smaller than 0.5  Bad: Larger than 1.0           
 </code></pre></div>
 <h2 id="main-syntax-for-npe">Main syntax for NPE<a class="headerlink" href="#main-syntax-for-npe" title="Permanent link">&para;</a></h2>
 <p>NPE usually does not require MCMC or rejection sampling (if you still need it, you can use the same syntax as above with the <code>posterior_estimator_based_potential</code> function). Instead, NPE samples from the neural network. If the support of the prior is bounded, some samples can lie outside of the support of the prior. The <code>DirectPosterior</code> class automatically rejects these samples:</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">NPE</span><span class="p">,</span> <span class="n">DirectPosterior</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference</span><span class="w"> </span><span class="kn">import</span> <span class="n">NPE</span><span class="p">,</span> <span class="n">DirectPosterior</span>
 
 <span class="n">inference</span> <span class="o">=</span> <span class="n">NPE</span><span class="p">()</span>
 <span class="n">posterior_estimator</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>

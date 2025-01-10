@@ -620,13 +620,13 @@ this technique with sbi.</p>
 <h2 id="a-healthy-posterior">A healthy posterior<a class="headerlink" href="#a-healthy-posterior" title="Permanent link">&para;</a></h2>
 <p>Let&rsquo;s take the gaussian linear simulator from the previous tutorials and run inference with NPE on it.</p>
 <p><strong>Note:</strong> SBC requires running inference several times. Using SBC with amortized methods like NPE is hence a justified endavour: repeated inference is cheap and SBC can be performed with little runtime penalty. This does not hold for sequential methods or anything relying on MCMC or VI. Should you require methods of MCMC or VI, consider exploiting parallelization and set <code>num_workers&gt;1</code> in the sbc functions.</p>
-<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">from</span> <span class="nn">torch</span> <span class="kn">import</span> <span class="n">eye</span><span class="p">,</span> <span class="n">ones</span>
-<span class="kn">from</span> <span class="nn">torch.distributions</span> <span class="kn">import</span> <span class="n">MultivariateNormal</span>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch</span><span class="w"> </span><span class="kn">import</span> <span class="n">eye</span><span class="p">,</span> <span class="n">ones</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.distributions</span><span class="w"> </span><span class="kn">import</span> <span class="n">MultivariateNormal</span>
 
-<span class="kn">from</span> <span class="nn">sbi.analysis.plot</span> <span class="kn">import</span> <span class="n">sbc_rank_plot</span>
-<span class="kn">from</span> <span class="nn">sbi.diagnostics</span> <span class="kn">import</span> <span class="n">check_sbc</span><span class="p">,</span> <span class="n">check_tarp</span><span class="p">,</span> <span class="n">run_sbc</span><span class="p">,</span> <span class="n">run_tarp</span>
-<span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">NPE</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.analysis.plot</span><span class="w"> </span><span class="kn">import</span> <span class="n">sbc_rank_plot</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.diagnostics</span><span class="w"> </span><span class="kn">import</span> <span class="n">check_sbc</span><span class="p">,</span> <span class="n">check_tarp</span><span class="p">,</span> <span class="n">run_sbc</span><span class="p">,</span> <span class="n">run_tarp</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference</span><span class="w"> </span><span class="kn">import</span> <span class="n">NPE</span>
 
 <span class="c1"># Set random seed</span>
 <span class="n">_</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="mi">42</span><span class="p">)</span>
@@ -646,7 +646,7 @@ this technique with sbi.</p>
 <span class="n">default_likelihood_scale</span> <span class="o">=</span> <span class="mf">0.01</span>  <span class="c1"># let&#39;s smear theta only by a little bit</span>
 
 
-<span class="k">def</span> <span class="nf">simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">loc</span><span class="o">=</span><span class="n">default_likelihood_loc</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="n">default_likelihood_scale</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">loc</span><span class="o">=</span><span class="n">default_likelihood_loc</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="n">default_likelihood_scale</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;linear gaussian inspired by sbibm</span>
 <span class="sd">    https://github.com/sbi-benchmark/sbibm/blob/15f068a08a938383116ffd92b92de50c580810a3/sbibm/tasks/gaussian_linear/task.py#L74</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -690,7 +690,7 @@ x    : [[3.9267206 1.6138272]]
 </code></pre></div>
 <div class="highlight"><pre><span></span><code><span class="c1"># let&#39;s do some posterior predictive checks to see if the</span>
 <span class="c1"># posterior predictive samples cluster aournd the observation `x_o`.</span>
-<span class="kn">from</span> <span class="nn">sbi.analysis</span> <span class="kn">import</span> <span class="n">pairplot</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.analysis</span><span class="w"> </span><span class="kn">import</span> <span class="n">pairplot</span>
 
 <span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">pairplot</span><span class="p">(</span>
     <span class="n">samples</span><span class="o">=</span><span class="n">posterior_predictive_samples</span><span class="p">,</span>
@@ -801,7 +801,7 @@ check_stats[&#39;c2st_ranks&#39;] = [0.57  0.485]
 <p>Next, we would like to explore some pathologies visible in sbc plots which can hint at our estimated posterior being somewhat wrong or completely off.</p>
 <h2 id="a-shifted-posterior-mean">A shifted posterior mean<a class="headerlink" href="#a-shifted-posterior-mean" title="Permanent link">&para;</a></h2>
 <p>In this scenario, we emulate the situation that our posterior estimates incorrectly with a constant shift. We reuse our trained NPE posterior from above and wrap it so that all samples returned expose a constant shift by <code>+0.1</code>.</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">utils_13_diagnosis_sbc</span> <span class="kn">import</span> <span class="n">BiasedPosterior</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">utils_13_diagnosis_sbc</span><span class="w"> </span><span class="kn">import</span> <span class="n">BiasedPosterior</span>
 
 <span class="c1"># this posterior shifts the expected value of the prior by .1</span>
 <span class="n">posterior_</span> <span class="o">=</span> <span class="n">BiasedPosterior</span><span class="p">(</span><span class="n">posterior</span><span class="p">,</span> <span class="n">shift</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>
@@ -841,7 +841,7 @@ check_stats[&#39;c2st_ranks&#39;] = [0.57  0.485]
 </ul>
 <h2 id="a-dispersed-posterior">A dispersed posterior<a class="headerlink" href="#a-dispersed-posterior" title="Permanent link">&para;</a></h2>
 <p>In this scenario we emulate the situation if our posterior estimates incorrectly with a dispersion, i.e. the posterior is too wide or too thin. We reuse our trained NPE posterior from above and wrap it so that all samples return a dispersion by 100% more wide (<code>dispersion=2.0</code>), i.e. the variance is overestimated by a factor of 2.</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">utils_13_diagnosis_sbc</span> <span class="kn">import</span> <span class="n">DispersedPosterior</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">utils_13_diagnosis_sbc</span><span class="w"> </span><span class="kn">import</span> <span class="n">DispersedPosterior</span>
 
 <span class="c1"># this posterior which disperses the expected posterior value of the prior by 2.</span>
 <span class="n">posterior_</span> <span class="o">=</span> <span class="n">DispersedPosterior</span><span class="p">(</span><span class="n">posterior</span><span class="p">,</span> <span class="n">dispersion</span><span class="o">=</span><span class="mf">2.0</span><span class="p">)</span>
@@ -914,7 +914,7 @@ and check, whether they correspond to the given <span class="arithmatex">\(\alph
 </code></pre></div>
 
 <div class="highlight"><pre><span></span><code><span class="c1"># Or, we can perform a visual check.</span>
-<span class="kn">from</span> <span class="nn">sbi.analysis.plot</span> <span class="kn">import</span> <span class="n">plot_tarp</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.analysis.plot</span><span class="w"> </span><span class="kn">import</span> <span class="n">plot_tarp</span>
 <span class="n">plot_tarp</span><span class="p">(</span><span class="n">ecp</span><span class="p">,</span> <span class="n">alpha</span><span class="p">);</span>
 </code></pre></div>
 <p><img alt="png" src="../11_diagnostics_simulation_based_calibration_files/11_diagnostics_simulation_based_calibration_60_0.png" /></p>

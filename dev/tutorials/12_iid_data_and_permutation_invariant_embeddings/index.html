@@ -604,19 +604,19 @@ x | \theta \sim \mathcal{N}(\theta,\; \Sigma=I) \\
 \]</div>
 <p>For this toy problem, the ground-truth posterior is well defined, it is again a Gaussian, centered on the mean of <span class="arithmatex">\(\mathbf{x_o}\)</span> and with variance scaled by the number of trials <span class="arithmatex">\(N\)</span>, i.e., the more trials we observe, the more information about the underlying <span class="arithmatex">\(\theta_o\)</span> we have and the more concentrated the posteriors becomes.</p>
 <p>We will illustrate this below:</p>
-<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
-<span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">from</span> <span class="nn">torch</span> <span class="kn">import</span> <span class="n">eye</span><span class="p">,</span> <span class="n">zeros</span>
-<span class="kn">from</span> <span class="nn">torch.distributions</span> <span class="kn">import</span> <span class="n">MultivariateNormal</span>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch</span><span class="w"> </span><span class="kn">import</span> <span class="n">eye</span><span class="p">,</span> <span class="n">zeros</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.distributions</span><span class="w"> </span><span class="kn">import</span> <span class="n">MultivariateNormal</span>
 
-<span class="kn">from</span> <span class="nn">sbi.analysis</span> <span class="kn">import</span> <span class="n">pairplot</span>
-<span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">NLE</span><span class="p">,</span> <span class="n">NPE</span><span class="p">,</span> <span class="n">simulate_for_sbi</span>
-<span class="kn">from</span> <span class="nn">sbi.simulators.linear_gaussian</span> <span class="kn">import</span> <span class="p">(</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.analysis</span><span class="w"> </span><span class="kn">import</span> <span class="n">pairplot</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference</span><span class="w"> </span><span class="kn">import</span> <span class="n">NLE</span><span class="p">,</span> <span class="n">NPE</span><span class="p">,</span> <span class="n">simulate_for_sbi</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.simulators.linear_gaussian</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">linear_gaussian</span><span class="p">,</span>
     <span class="n">true_posterior_linear_gaussian_mvn_prior</span><span class="p">,</span>
 <span class="p">)</span>
-<span class="kn">from</span> <span class="nn">sbi.utils.metrics</span> <span class="kn">import</span> <span class="n">c2st</span>
-<span class="kn">from</span> <span class="nn">sbi.utils.user_input_checks</span> <span class="kn">import</span> <span class="p">(</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.utils.metrics</span><span class="w"> </span><span class="kn">import</span> <span class="n">c2st</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.utils.user_input_checks</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">check_sbi_inputs</span><span class="p">,</span>
     <span class="n">process_prior</span><span class="p">,</span>
     <span class="n">process_simulator</span><span class="p">,</span>
@@ -648,7 +648,7 @@ x | \theta \sim \mathcal{N}(\theta,\; \Sigma=I) \\
 
 
 <span class="c1"># Use built-in function to obtain ground-truth posterior given x_o</span>
-<span class="k">def</span> <span class="nf">get_true_posterior_samples</span><span class="p">(</span><span class="n">x_o</span><span class="p">,</span> <span class="n">num_samples</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_true_posterior_samples</span><span class="p">(</span><span class="n">x_o</span><span class="p">,</span> <span class="n">num_samples</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
     <span class="k">return</span> <span class="n">true_posterior_linear_gaussian_mvn_prior</span><span class="p">(</span>
         <span class="n">x_o</span><span class="p">,</span> <span class="n">likelihood_shift</span><span class="p">,</span> <span class="n">likelihood_cov</span><span class="p">,</span> <span class="n">prior_mean</span><span class="p">,</span> <span class="n">prior_cov</span>
     <span class="p">)</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_samples</span><span class="p">,))</span>
@@ -786,8 +786,8 @@ orderings of trials.</p>
 <span class="n">theta</span> <span class="o">=</span> <span class="n">theta</span><span class="o">.</span><span class="n">repeat_interleave</span><span class="p">(</span><span class="n">max_num_trials</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
 </code></pre></div>
 <h3 id="build-embedding-net">Build embedding net<a class="headerlink" href="#build-embedding-net" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi.neural_nets.embedding_nets</span> <span class="kn">import</span> <span class="n">FCEmbedding</span><span class="p">,</span> <span class="n">PermutationInvariantEmbedding</span>
-<span class="kn">from</span> <span class="nn">sbi.neural_nets</span> <span class="kn">import</span> <span class="n">posterior_nn</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.neural_nets.embedding_nets</span><span class="w"> </span><span class="kn">import</span> <span class="n">FCEmbedding</span><span class="p">,</span> <span class="n">PermutationInvariantEmbedding</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.neural_nets</span><span class="w"> </span><span class="kn">import</span> <span class="n">posterior_nn</span>
 
 <span class="c1"># embedding</span>
 <span class="n">latent_dim</span> <span class="o">=</span> <span class="mi">10</span>

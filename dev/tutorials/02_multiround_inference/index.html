@@ -500,12 +500,12 @@
 <p>Running multi-round inference can be more efficient in the number of simulations, but it will lead to the posterior no longer being amortized (i.e. it will be accurate only for a specific observation <code>x_o</code>, not for any <code>x</code>).</p>
 <p>Note, you can find the original version of this notebook at <a href="https://github.com/sbi-dev/sbi/blob/main/tutorials/02_multiround_inference.ipynb">tutorials/02_multiround_inference.ipynb</a> in the <code>sbi</code> repository.</p>
 <h2 id="main-syntax">Main syntax<a class="headerlink" href="#main-syntax" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">torch</span>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
 
-<span class="kn">from</span> <span class="nn">sbi.analysis</span> <span class="kn">import</span> <span class="n">pairplot</span>
-<span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">NPE</span><span class="p">,</span> <span class="n">simulate_for_sbi</span>
-<span class="kn">from</span> <span class="nn">sbi.utils</span> <span class="kn">import</span> <span class="n">BoxUniform</span>
-<span class="kn">from</span> <span class="nn">sbi.utils.user_input_checks</span> <span class="kn">import</span> <span class="p">(</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.analysis</span><span class="w"> </span><span class="kn">import</span> <span class="n">pairplot</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference</span><span class="w"> </span><span class="kn">import</span> <span class="n">NPE</span><span class="p">,</span> <span class="n">simulate_for_sbi</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">BoxUniform</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.utils.user_input_checks</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">check_sbi_inputs</span><span class="p">,</span>
     <span class="n">process_prior</span><span class="p">,</span>
     <span class="n">process_simulator</span><span class="p">,</span>
@@ -551,7 +551,7 @@ Using SNPE-C with atomic loss
 <h2 id="linear-gaussian-example">Linear Gaussian example<a class="headerlink" href="#linear-gaussian-example" title="Permanent link">&para;</a></h2>
 <p>Below, we give a full example of inferring the posterior distribution over multiple rounds.</p>
 <p>First, we define a simple prior and simulator and ensure that they comply with <code>sbi</code> by using <code>process_simulator()</code>, <code>process_prior()</code> and <code>check_sbi_inputs()</code>:</p>
-<div class="highlight"><pre><span></span><code><span class="k">def</span> <span class="nf">linear_gaussian</span><span class="p">(</span><span class="n">theta</span><span class="p">):</span>
+<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">linear_gaussian</span><span class="p">(</span><span class="n">theta</span><span class="p">):</span>
     <span class="k">return</span> <span class="n">theta</span> <span class="o">+</span> <span class="mf">1.0</span> <span class="o">+</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn_like</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span> <span class="o">*</span> <span class="mf">0.1</span>
 </code></pre></div>
 <div class="highlight"><pre><span></span><code><span class="c1"># Check prior, return PyTorch prior.</span>

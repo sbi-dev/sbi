@@ -685,12 +685,12 @@
 - Prior: <span class="arithmatex">\(p(\theta) = \mathcal{U}(-10,10)\)</span>
 - Simulator: <span class="arithmatex">\(p(x|\theta) = 0.5 \mathcal{N}(\theta, \mathbf{I}_2)+ 0.5 \mathcal{N}(\theta, 0.1 \times \mathbf{I}_2)\)</span>
 - Dimensionality: <span class="arithmatex">\(\theta \in \mathbb{R}^2\)</span>, <span class="arithmatex">\(x \in \mathbb{R}^2\)</span></p>
-<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
-<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
-<span class="kn">import</span> <span class="nn">torch</span>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
 </code></pre></div>
 <h3 id="sbi-task">SBI Task<a class="headerlink" href="#sbi-task" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi.simulators.gaussian_mixture</span> <span class="kn">import</span> <span class="p">(</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.simulators.gaussian_mixture</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">gaussian_mixture</span><span class="p">,</span>
     <span class="n">uniform_prior_gaussian_mixture</span><span class="p">,</span>
 <span class="p">)</span>
@@ -714,7 +714,7 @@
 <blockquote>
 <p>Note: You can play with the number of training samples or epochs to see whether this influences the quality of the posterior estimator and how it is reflected in the diagnostics.</p>
 </blockquote>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">NPE</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference</span><span class="w"> </span><span class="kn">import</span> <span class="n">NPE</span>
 
 <span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="mi">42</span><span class="p">)</span> <span class="c1"># seed for reproducibility</span>
 
@@ -736,7 +736,7 @@
 <h3 id="evaluate-the-posterior-estimator">Evaluate the posterior estimator<a class="headerlink" href="#evaluate-the-posterior-estimator" title="Permanent link">&para;</a></h3>
 <p>We choose to evaluate the posterior estimator at three different observations, simulated from parameters independently sampled from the prior: 
 <span class="arithmatex">\(<span class="arithmatex">\(\theta^\star_i \sim p(\theta) \quad \rightarrow \quad x^\star_i \sim p(x\mid \theta_i), \quad i=1,2,3~.\)</span>\)</span></p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi.simulators.gaussian_mixture</span> <span class="kn">import</span> <span class="p">(</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.simulators.gaussian_mixture</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">samples_true_posterior_gaussian_mixture_uniform_prior</span><span class="p">,</span>
 <span class="p">)</span>
 
@@ -762,7 +762,7 @@
 <blockquote>
 <p>Note: we choose the default configuration with a MLP classifier (<code>classifier='mlp'</code>). You can also choose to use the default Random Forest classifier (<code>classifier='random_forest'</code>) or use your own custom <code>sklearn</code> classifier by specifying <code>clf_class</code> and <code>clf_kwargs</code> during the initialization of the <code>LC2ST</code> class. You can also use an ensemble classifier by setting <code>num_ensemble</code> &gt; 1 for more stable classifier predictions (see the <code>EnsembleClassifier</code> class in <code>sbi/diagnostics/lc2st.py</code>).</p>
 </blockquote>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi.diagnostics.lc2st</span> <span class="kn">import</span> <span class="n">LC2ST</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.diagnostics.lc2st</span><span class="w"> </span><span class="kn">import</span> <span class="n">LC2ST</span>
 
 <span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="mi">42</span><span class="p">)</span> <span class="c1"># seed for reproducibility</span>
 
@@ -835,7 +835,7 @@
 <p>Note: The predominance of high (resp. low) probabilities indicates a classifier that is mostly confident about predicting the class corresponding to the estimated (resp. true) posterior. This in turn means that the estimator associates too much (resp. not enough) mass to the evaluation space, i.e. is overall over confident (resp. under confident).</p>
 </blockquote>
 <div class="highlight"><pre><span></span><code><span class="c1"># P-P plots</span>
-<span class="kn">from</span> <span class="nn">sbi.analysis.plot</span> <span class="kn">import</span> <span class="n">pp_plot_lc2st</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.analysis.plot</span><span class="w"> </span><span class="kn">import</span> <span class="n">pp_plot_lc2st</span>
 
 <span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="nb">len</span><span class="p">(</span><span class="n">thetas_star</span><span class="p">),</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">12</span><span class="p">,</span><span class="mi">3</span><span class="p">))</span>
 <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">thetas_star</span><span class="p">)):</span>
@@ -870,8 +870,8 @@
 <blockquote>
 <p>Note: High (resp. low) predicted probability indicates that the classifier is confident about the fact that the sample belongs to the estimated posterior (resp. to the true posterior). This means that the estimator associates too much (resp. not enough) mass to this sample. In other words it is &ldquo;over-confident&rdquo; (resp. &ldquo;under-confident&rdquo;). </p>
 </blockquote>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi.analysis.plot</span> <span class="kn">import</span> <span class="n">marginal_plot_with_probs_intensity</span>
-<span class="kn">from</span> <span class="nn">sbi.utils.analysis_utils</span> <span class="kn">import</span> <span class="n">get_probs_per_marginal</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.analysis.plot</span><span class="w"> </span><span class="kn">import</span> <span class="n">marginal_plot_with_probs_intensity</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.utils.analysis_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_probs_per_marginal</span>
 
 <span class="n">label</span> <span class="o">=</span> <span class="s2">&quot;Probabilities (class 0)&quot;</span>
 <span class="c1"># label = r&quot;$\hat{p}(\Theta\sim q_{\phi}(\theta \mid x_0) \mid x_0)$&quot;</span>
@@ -992,7 +992,7 @@ $$ p(\theta \mid x) = q_{\phi}(\theta \mid x) \iff p(T_{\phi}^{-1}(\theta; x)\mi
 </blockquote>
 <h3 id="set-up-ell-c2st-nf">Set up <span class="arithmatex">\(\ell\)</span>-C2ST-NF<a class="headerlink" href="#set-up-ell-c2st-nf" title="Permanent link">&para;</a></h3>
 <p>The setup of the NF version is the same as for the original <span class="arithmatex">\(\ell\)</span>-C2ST, but the trained classifiers can be used to compute test results and diagnostics for any new observation <strong>and new posterior estimator</strong>.</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi.diagnostics.lc2st</span> <span class="kn">import</span> <span class="n">LC2ST_NF</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.diagnostics.lc2st</span><span class="w"> </span><span class="kn">import</span> <span class="n">LC2ST_NF</span>
 
 <span class="n">flow_inverse_transform</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">npe</span><span class="o">.</span><span class="n">net</span><span class="o">.</span><span class="n">_transform</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">context</span><span class="o">=</span><span class="n">x</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
 <span class="n">flow_base_dist</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">distributions</span><span class="o">.</span><span class="n">MultivariateNormal</span><span class="p">(</span>
@@ -1048,7 +1048,7 @@ $$ p(\theta \mid x) = q_{\phi}(\theta \mid x) \iff p(T_{\phi}^{-1}(\theta; x)\mi
 <h5 id="p-p-plots_1">P-P plots<a class="headerlink" href="#p-p-plots_1" title="Permanent link">&para;</a></h5>
 <p><strong>Results:</strong> As before, the plots below show a general trend of overconfident behavior (red curves on the right side of the black dots).</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># P-P plots</span>
-<span class="kn">from</span> <span class="nn">sbi.analysis.plot</span> <span class="kn">import</span> <span class="n">pp_plot_lc2st</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.analysis.plot</span><span class="w"> </span><span class="kn">import</span> <span class="n">pp_plot_lc2st</span>
 
 <span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="nb">len</span><span class="p">(</span><span class="n">thetas_star</span><span class="p">),</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">12</span><span class="p">,</span><span class="mi">3</span><span class="p">))</span>
 <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">thetas_star</span><span class="p">)):</span>
@@ -1077,8 +1077,8 @@ $$ p(\theta \mid x) = q_{\phi}(\theta \mid x) \iff p(T_{\phi}^{-1}(\theta; x)\mi
 <p><img alt="png" src="../13_diagnostics_lc2st_files/13_diagnostics_lc2st_34_0.png" /></p>
 <h5 id="heatmap-of-classifier-probabilities">Heatmap of classifier probabilities<a class="headerlink" href="#heatmap-of-classifier-probabilities" title="Permanent link">&para;</a></h5>
 <p>For the NF case and as displayed in the plots below, we can choose to plot the heatmap of predicted classifier probabilities in the base distribution space, instead of the parameter space, which can be easier to interpret if the posterior space is highly structured.</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi.analysis.plot</span> <span class="kn">import</span> <span class="n">marginal_plot_with_probs_intensity</span>
-<span class="kn">from</span> <span class="nn">sbi.utils.analysis_utils</span> <span class="kn">import</span> <span class="n">get_probs_per_marginal</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.analysis.plot</span><span class="w"> </span><span class="kn">import</span> <span class="n">marginal_plot_with_probs_intensity</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.utils.analysis_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_probs_per_marginal</span>
 
 <span class="n">label</span> <span class="o">=</span> <span class="s2">&quot;Probabilities (class 0)&quot;</span>
 <span class="c1"># label = r&quot;$\hat{p}(Z\sim\mathcal{N}(0,1)\mid x_0)$&quot;</span>
