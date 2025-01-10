@@ -7,6 +7,7 @@ from torch import eye, ones, zeros
 from torch.distributions import MultivariateNormal
 
 from sbi import utils as utils
+from sbi.diagnostics import run_sbc
 from sbi.inference import (
     NPE_A,
     NPE_C,
@@ -112,6 +113,13 @@ def test_inference_with_nan_simulator(method: type, percent_nans: float):
 
     # Compute the c2st and assert it is near chance level of 0.5.
     check_c2st(samples, target_samples, alg=f"{method}")
+
+    # run sbc
+    num_sbc_samples = 100
+    thetas = prior.sample((num_sbc_samples,))
+    xs = simulator(thetas)
+    ranks, daps = run_sbc(thetas, xs, posterior, num_posterior_samples=1000)
+    assert torch.isfinite(ranks).all()
 
 
 @pytest.mark.slow

@@ -13,7 +13,10 @@ from tqdm.auto import tqdm
 from sbi.inference import DirectPosterior
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.posteriors.vi_posterior import VIPosterior
-from sbi.utils.diagnostics_utils import get_posterior_samples_on_batch
+from sbi.utils.diagnostics_utils import (
+    get_posterior_samples_on_batch,
+    remove_nans_and_infs,
+)
 from sbi.utils.metrics import c2st
 
 
@@ -54,6 +57,9 @@ def run_sbc(
         ranks: ranks of the ground truth parameters under the inferred
         dap_samples: samples from the data averaged posterior.
     """
+
+    thetas, xs = remove_nans_and_infs(thetas, xs)
+
     num_sbc_samples = thetas.shape[0]
 
     if num_sbc_samples < 100:

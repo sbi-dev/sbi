@@ -12,6 +12,8 @@ from sklearn.neural_network import MLPClassifier
 from torch import Tensor
 from tqdm import tqdm
 
+from sbi.utils.diagnostics_utils import remove_nans_and_infs
+
 
 class LC2ST:
     def __init__(

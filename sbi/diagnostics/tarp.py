@@ -13,7 +13,10 @@ from scipy.stats import kstest
 from torch import Tensor
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
-from sbi.utils.diagnostics_utils import get_posterior_samples_on_batch
+from sbi.utils.diagnostics_utils import (
+    get_posterior_samples_on_batch,
+    remove_nans_and_infs,
+)
 from sbi.utils.metrics import l2
 
 
@@ -61,6 +64,9 @@ def run_tarp(
         ecp: Expected coverage probability (``ecp``), see equation 4 of the paper
         alpha: credibility values, see equation 2 of the paper
     """
+
+    thetas, xs = remove_nans_and_infs(thetas, xs)
+
     num_tarp_samples, dim_theta = thetas.shape
 
     posterior_samples = get_posterior_samples_on_batch(
