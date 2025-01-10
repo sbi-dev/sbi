@@ -6,7 +6,7 @@ from __future__ import annotations
 import pytest
 import torch
 from torch import eye, ones, zeros
-from torch.distributions import MultivariateNormal
+from torch.distributions import Independent, MultivariateNormal, Uniform
 
 from sbi.inference import (
     NLE_A,
@@ -98,13 +98,20 @@ def test_importance_posterior_sample_log_prob(snplre_method: type):
 
 @pytest.mark.parametrize("snpe_method", [NPE_A, NPE_C])
 @pytest.mark.parametrize("x_o_batch_dim", (0, 1, 2))
+@pytest.mark.parametrize("prior", ("mvn", "uniform"))
 def test_batched_sample_log_prob_with_different_x(
-    snpe_method: type, x_o_batch_dim: bool
+    snpe_method: type,
+    x_o_batch_dim: bool,
+    prior,
 ):
     num_dim = 2
     num_simulations = 1000
 
-    prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
+    # We also want to test on bounded support! Which will invoke leakage correction.
+    if prior == "mvn":
+        prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
+    elif prior == "uniform":
+        prior = Independent(Uniform(-1.0 * ones(num_dim), 1.0 * ones(num_dim)), 1)
     simulator = diagonal_linear_gaussian
 
     inference = snpe_method(prior=prior)
@@ -116,6 +123,7 @@ def test_batched_sample_log_prob_with_different_x(
 
     posterior = DirectPosterior(posterior_estimator=posterior_estimator, prior=prior)
 
+    torch.manual_seed(0)
     samples = posterior.sample_batched((10,), x_o)
     batched_log_probs = posterior.log_prob_batched(samples, x_o)
 
@@ -125,6 +133,17 @@ def test_batched_sample_log_prob_with_different_x(
         else (10, num_dim)
     ), "Sample shape wrong"
     assert batched_log_probs.shape == (10, max(x_o_batch_dim, 1)), "logprob shape wrong"
+
+    # Test consistency with non-batched log_prob
+    if x_o_batch_dim == 0:
+        log_probs = posterior.log_prob(samples)
+        assert torch.allclose(log_probs, batched_log_probs[:, 0]), "Log probs wrong"
+    else:
+        for idx in range(x_o_batch_dim):
+            log_probs = posterior.log_prob(samples, x_o[idx])
+            assert torch.allclose(
+                log_probs, batched_log_probs[:, idx]
+            ), "Log probs wrong"
 
 
 @pytest.mark.mcmc
