@@ -153,6 +153,9 @@ def _build_mixed_density_estimator(
             standardizing_net(batch_y, structured_y), embedding_net
         )
     # Get size of the embedded condition data.
+    print("embedding_net", embedding_net)
+    print("batch_x.shape:", batch_x.shape)
+    print("batch_y.shape:", batch_y.shape)
     embedded_batch_y = embedding_net(batch_y)
     combined_condition = torch.cat([disc_x, embedded_batch_y], dim=-1)
 

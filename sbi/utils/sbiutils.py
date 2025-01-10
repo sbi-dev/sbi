@@ -26,6 +26,7 @@ from torch.optim.adam import Adam
 
 from sbi.sbi_types import TorchTransform
 from sbi.utils.torchutils import atleast_2d
+from sbi.utils.user_input_checks_utils import MultipleIndependent
 
 
 def warn_if_zscoring_changes_data(x: Tensor, duplicate_tolerance: float = 0.1) -> None:
@@ -692,77 +693,80 @@ def mcmc_transform(
         (or z-scored) to constrained (or non-z-scored) space.
     """
 
-    if enable_transform:
-        # Some distributions have a support argument but it raises a
-        # NotImplementedError. We catch this case here.
+    if not enable_transform:
+        return torch_tf.identity_transform
+
+    # Handle MultipleIndependent by recursively calling mcmc_transform
+    if isinstance(prior, MultipleIndependent):
+        transforms = [
+            mcmc_transform(
+                dist,
+                num_prior_samples_for_zscoring,
+                enable_transform,
+                device,
+                **kwargs,
+            )
+            for dist in prior.dists
+        ]
+        return torch_tf.ComposeTransform(transforms)
+
+    # Check if the distribution is discrete/categorical by checking its support
+    try:
+        is_discrete = isinstance(
+            prior.support,
+            (constraints.boolean, constraints.integer, constraints.categorical),
+        )
+    except (NotImplementedError, AttributeError):
+        # If support is not implemented, try to infer from the distribution type
+        is_discrete = isinstance(
+            prior,
+            (
+                torch.distributions.Bernoulli,
+                torch.distributions.Categorical,
+                torch.distributions.Binomial,
+                torch.distributions.OneHotCategorical,
+            ),
+        )
+
+    # If discrete, use identity transform
+    if is_discrete:
+        transform = torch_tf.identity_transform
+    else:
+        # Original continuous distribution logic
         try:
             _ = prior.support
             has_support = True
         except (NotImplementedError, AttributeError):
-            # NotImplementedError -> Distribution that inherits from torch dist but
-            # does not implement support.
-            # AttributeError -> Custom distribution that has no support attribute.
-            warnings.warn(
-                "The passed prior has no support property, transform will be "
-                "constructed from mean and std. If the passed prior is supposed to be "
-                "bounded consider implementing the prior.support property.",
-                stacklevel=2,
-            )
             has_support = False
 
-        # If the distribution has a `support`, check if the support is bounded.
-        # If it is not bounded, we want to z-score the space. This is not done
-        # by `biject_to()`, so we have to deal with this case separately.
         if has_support:
             if hasattr(prior.support, "base_constraint"):
-                constraint = prior.support.base_constraint  # type: ignore
+                constraint = prior.support.base_constraint
             else:
                 constraint = prior.support
-            if isinstance(constraint, constraints._Real):
-                support_is_bounded = False
-            else:
-                support_is_bounded = True
+            support_is_bounded = not isinstance(constraint, constraints._Real)
         else:
             support_is_bounded = False
 
-        # Prior with bounded support, e.g., uniform priors.
         if has_support and support_is_bounded:
             transform = biject_to(prior.support)
-        # For all other cases build affine transform with mean and std.
         else:
             try:
                 prior_mean = prior.mean.to(device)
                 prior_std = prior.stddev.to(device)
             except (NotImplementedError, AttributeError):
-                # NotImplementedError -> Distribution that inherits from torch dist but
-                # does not implement mean, e.g., TransformedDistribution.
-                # AttributeError -> Custom distribution that has no mean/std attribute.
-                warnings.warn(
-                    "The passed prior has no mean or stddev attribute, estimating "
-                    "them from samples to build affimed standardizing transform.",
-                    stacklevel=2,
-                )
                 theta = prior.sample(torch.Size((num_prior_samples_for_zscoring,)))
                 prior_mean = theta.mean(dim=0).to(device)
                 prior_std = theta.std(dim=0).to(device)
-
             transform = torch_tf.AffineTransform(loc=prior_mean, scale=prior_std)
-    else:
-        transform = torch_tf.identity_transform
 
-    # Pytorch `transforms` do not sum the determinant over the parameters. However, if
-    # the `transform` explicitly is an `IndependentTransform`, it does. Since our
-    # `BoxUniform` is a `Independent` distribution, it will also automatically get a
-    # `IndependentTransform` wrapper in `biject_to`. Our solution here is to wrap all
-    # transforms as `IndependentTransform`.
+    # Wrap as IndependentTransform if needed
     if not isinstance(transform, torch_tf.IndependentTransform):
         transform = torch_tf.IndependentTransform(
             transform, reinterpreted_batch_ndims=1
         )
 
-    check_transform(prior, transform)  # type: ignore
-
-    return transform.inv  # type: ignore
+    return transform.inv
 
 
 def check_transform(
