@@ -8,6 +8,16 @@ from .base_task import Task
 
 
 def _map_fun(parameters: torch.Tensor, p: torch.Tensor) -> torch.Tensor:
+    """
+    Maps the parameters and points to a new space using a rotation.
+
+    Args:
+        parameters (torch.Tensor): The parameters for the mapping.
+        p (torch.Tensor): The points to be mapped.
+
+    Returns:
+        torch.Tensor: The mapped points.
+    """
     ang = torch.tensor([-math.pi / 4.0])
     c = torch.cos(ang)
     s = torch.sin(ang)
@@ -17,13 +27,30 @@ def _map_fun(parameters: torch.Tensor, p: torch.Tensor) -> torch.Tensor:
 
 
 def simulator(
-    parameters,
-    r_loc=0.1,
-    r_scale=0.01,
-    a_low=-math.pi / 2.0,
-    a_high=math.pi / 2.0,
-    base_offset=0.25,
-):
+    parameters: torch.Tensor,
+    r_loc: float = 0.1,
+    r_scale: float = 0.01,
+    a_low: float = -math.pi / 2.0,
+    a_high: float = math.pi / 2.0,
+    base_offset: float = 0.25,
+) -> torch.Tensor:
+    """
+    Simulator function for the Two Moons task.
+
+    Args:
+        parameters (torch.Tensor): The parameters for the simulator.
+        r_loc (float, optional): The mean of the radius distribution. Defaults to 0.1.
+        r_scale (float, optional): The standard deviation of the radius distribution.
+        Defaults to 0.01.
+        a_low (float, optional): The lower bound of the angle distribution. Defaults to
+            -math.pi / 2.0.
+        a_high (float, optional): The upper bound of the angle distribution. Defaults to
+            math.pi / 2.0.
+        base_offset (float, optional): The base offset for the points. Defaults to 0.25.
+
+    Returns:
+        torch.Tensor: The simulated data.
+    """
     num_samples = parameters.shape[0]
 
     a_dist = Uniform(
@@ -47,17 +74,50 @@ def simulator(
 
 
 class TwoMoons(Task):
+    """
+    Task for the Two Moons model.
+
+    This task uses a uniform prior and a custom simulator.
+    """
+
     def __init__(self):
+        """
+        Initializes the TwoMoons task.
+        """
         super().__init__("two_moons")
 
     def theta_dim(self) -> int:
+        """
+        Returns the dimensionality of the parameter space.
+
+        Returns:
+            int: The dimensionality of the parameter space.
+        """
         return 2
 
     def x_dim(self) -> int:
+        """
+        Returns the dimensionality of the observation space.
+
+        Returns:
+            int: The dimensionality of the observation space.
+        """
         return 2
 
     def get_prior(self) -> Distribution:
+        """
+        Returns the prior distribution over parameters.
+
+        Returns:
+            Distribution: The prior distribution.
+        """
         return Independent(Uniform(-torch.ones(2), torch.ones(2)), 1)
 
     def get_simulator(self) -> Callable:
+        """
+        Returns the simulator function.
+
+        Returns:
+            Callable: The simulator function.
+        """
         return simulator

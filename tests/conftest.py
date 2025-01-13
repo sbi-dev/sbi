@@ -16,7 +16,6 @@ seed = 1
 harvested_fixture_data = None
 
 
-
 # Use seed automatically for every test function.
 @pytest.fixture(autouse=True)
 def set_seed():
@@ -70,6 +69,7 @@ def pytest_addoption(parser):
         help="Run mini-benchmark tests with specified mode",
     )
 
+
 @pytest.fixture
 def benchmark_mode(request):
     """Fixture to access the --bm value in test files."""
@@ -87,6 +87,21 @@ def finalize_fixture_store(request, fixture_store):
 
 
 def pytest_terminal_summary(terminalreporter, exitstatus, config):
+    """
+    Custom pytest terminal summary to display mini SBIBM results with relative coloring
+    per task.
+
+    This function is called after the test session ends and generates a summary
+    of the results if the `--bm` option is specified. It displays the results
+    in a formatted table with methods as rows and tasks as columns, applying
+    relative coloring to metrics based on their performance within each task.
+
+    Args:
+        terminalreporter (TerminalReporter): The terminal reporter object for writing
+            output.
+        exitstatus (int): The exit status of the test session.
+        config (Config): The pytest config object.
+    """
     if config.getoption("--bm"):
         terminal_width = shutil.get_terminal_size().columns
         summary_text = " mini SBIBM results "
@@ -108,14 +123,12 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
                 method = info.get('method')
                 task = info.get('task_name')
                 metric = info.get('metric')
-                # You can also choose another metric or value to display
 
                 if method is not None and task is not None:
                     methods.add(method)
                     tasks.add(task)
                     data[(method, task)] = metric
 
-            # Sort methods and tasks for consistent display
             methods = sorted(methods)
             tasks = sorted(tasks)
 
@@ -124,14 +137,11 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
                 return
 
             # Determine column widths
-            # We'll allow some spacing and ensure each column fits its longest entry
             method_col_width = max(len(m) for m in methods)
-            task_col_widths = {}
-            for t in tasks:
-                task_col_widths[t] = max(len(t), 10)  # at least length 10
+            task_col_widths = {t: max(len(t), 10) for t in tasks}
 
-            # Print the header row: tasks
-            header = " " * (method_col_width + 2)  # space for method column
+            # Print the header row
+            header = " " * (method_col_width + 2)
             for t in tasks:
                 header += t.center(task_col_widths[t] + 2)
             terminalreporter.write_line(header)
@@ -140,17 +150,40 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
             sep_line = "-" * len(header)
             terminalreporter.write_line(sep_line)
 
-            # Print each row: method followed by metrics for each task
+            # Calculate min and max for each task
+            min_max_per_task = {}
+            for t in tasks:
+                task_metrics = [data.get((m, t), float('inf')) for m in methods]
+                min_max_per_task[t] = (min(task_metrics), max(task_metrics))
+
+            # Print each row with colored values
             for m in methods:
                 row = m.ljust(method_col_width + 2)
                 for t in tasks:
                     val = data.get((m, t), "N/A")
-                    # Convert metric to string with formatting if needed
-                    # e.g. format(val, ".3f") if val is a float
-                    val_str = format(val, ".3f")
-                    row += val_str.center(task_col_widths[t] + 2)
-                terminalreporter.write_line(row)
+                    if val == "N/A":
+                        val_str = "N/A"
+                        row += val_str.center(task_col_widths[t] + 2)
+                    else:
+                        val = float(val)
+                        min_val, max_val = min_max_per_task[t]
+                        normalized_val = (
+                            (val - min_val) / (max_val - min_val)
+                            if max_val > min_val
+                            else 0.5
+                        )
 
+                        # Determine color based on normalized value
+                        if normalized_val == 1.0:
+                            color = "\033[92m"  # Green for best
+                        elif normalized_val == 0.0:
+                            color = "\033[91m"  # Red for worst
+                        else:
+                            color = f"\033[9{int(2 + normalized_val * 3)}m"
+
+                        val_str = format(val, ".3f")
+                        row += f"{color}{val_str}\033[0m".center(task_col_widths[t] + 2)
+                terminalreporter.write_line(row)
         else:
             terminalreporter.write_line("No harvested fixture data found yet.")
 
