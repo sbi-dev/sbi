@@ -17,7 +17,7 @@ class Diffuser:
 
     def __init__(
         self,
-        score_based_potential: 'PosteriorScoreBasedPotential',  # noqa: F821
+        score_based_potential: 'PosteriorScoreBasedPotential',  # noqa: F821 # type: ignore
         predictor: Union[str, Predictor],
         corrector: Optional[Union[str, Corrector]] = None,
         predictor_params: Optional[dict] = None,
@@ -62,7 +62,7 @@ class Diffuser:
     def set_predictor(
         self,
         predictor: Union[str, Predictor],
-        score_based_potential: 'PosteriorScoreBasedPotential',  # noqa: F821
+        score_based_potential: 'PosteriorScoreBasedPotential',  # noqa: F821 # type: ignore
         **kwargs,
     ):
         """Set the predictor for the diffusion-based sampler."""

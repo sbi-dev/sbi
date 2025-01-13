@@ -46,7 +46,7 @@ class DivergenceOptimizer(ABC):
 
     def __init__(
         self,
-        potential_fn: 'BasePotential',  # noqa: F821
+        potential_fn: 'BasePotential',  # noqa: F821 # type: ignore
         q: PyroTransformedDistribution,
         prior: Optional[Distribution] = None,
         n_particles: int = 256,
