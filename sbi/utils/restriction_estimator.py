@@ -15,8 +15,8 @@ from torch.optim.adam import Adam
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler, WeightedRandomSampler
 
-from sbi.samplers.importance.sir import sampling_importance_resampling
 from sbi.samplers import rejection
+from sbi.samplers.importance.sir import sampling_importance_resampling
 from sbi.sbi_types import Shape
 from sbi.utils.sbiutils import (
     get_simulations_since_round,

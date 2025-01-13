@@ -7,12 +7,13 @@ from typing import Callable, Type
 import torch
 from torch import Tensor
 
-
 PREDICTORS = {}
 
 
 def get_predictor(
-    name: str, score_based_potential: 'PosteriorScoreBasedPotential', **kwargs
+    name: str,
+    score_based_potential: 'PosteriorScoreBasedPotential',  # noqa: F821
+    **kwargs,
 ) -> "Predictor":
     """Helper function to get predictor by name.
 
@@ -51,7 +52,7 @@ class Predictor(ABC):
 
     def __init__(
         self,
-        potential_fn: 'PosteriorScoreBasedPotential',
+        potential_fn: 'PosteriorScoreBasedPotential',  # noqa: F821
     ):
         """Initialize predictor.
 
@@ -91,7 +92,7 @@ class Predictor(ABC):
 class EulerMaruyama(Predictor):
     def __init__(
         self,
-        potential_fn: 'PosteriorScoreBasedPotential',
+        potential_fn: 'PosteriorScoreBasedPotential',  # noqa: F821
         eta: float = 1.0,
     ):
         """Simple Euler-Maruyama discretization of the associated family of reverse
