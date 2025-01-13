@@ -2,6 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 import pickle
 import shutil
+import re
 from logging import warning
 from pathlib import Path
 from shutil import rmtree
@@ -85,22 +86,26 @@ def finalize_fixture_store(request, fixture_store):
     global harvested_fixture_data
     harvested_fixture_data = dict(fixture_store)
 
+def strip_ansi_escape_codes(text):
+    ansi_escape = re.compile(r'\x1b\[.*?m')
+    return ansi_escape.sub('', text)
+
+
+# Function to center text with ANSI colors, adjusting for escape codes
+def center_colored_text(text, width):
+    visible_length = len(strip_ansi_escape_codes(text))
+    padding = max(0, (width - visible_length) // 2)
+    return " " * padding + text + " " * (width - visible_length - padding)
+
 
 def pytest_terminal_summary(terminalreporter, exitstatus, config):
     """
-    Custom pytest terminal summary to display mini SBIBM results with relative coloring
-    per task.
+    Custom pytest terminal summary to display mini SBIBM results with relative coloring per task.
 
     This function is called after the test session ends and generates a summary
     of the results if the `--bm` option is specified. It displays the results
     in a formatted table with methods as rows and tasks as columns, applying
     relative coloring to metrics based on their performance within each task.
-
-    Args:
-        terminalreporter (TerminalReporter): The terminal reporter object for writing
-            output.
-        exitstatus (int): The exit status of the test session.
-        config (Config): The pytest config object.
     """
     if config.getoption("--bm"):
         terminal_width = shutil.get_terminal_size().columns
@@ -174,15 +179,26 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
                         )
 
                         # Determine color based on normalized value
-                        if normalized_val == 1.0:
+                        if normalized_val == 0.0:
                             color = "\033[92m"  # Green for best
-                        elif normalized_val == 0.0:
+                        elif normalized_val == 1.0:
                             color = "\033[91m"  # Red for worst
                         else:
                             color = f"\033[9{int(2 + normalized_val * 3)}m"
 
                         val_str = format(val, ".3f")
-                        row += f"{color}{val_str}\033[0m".center(task_col_widths[t] + 2)
+                        colored_val_str = f"{color}{val_str}\033[0m"
+
+                        # Correct spacing by adjusting for visible length
+                        # padding = (
+                        #     task_col_widths[t]
+                        #     + 2
+                        #     - len(strip_ansi_escape_codes(colored_val_str))
+                        # )
+                        row += center_colored_text(
+                            colored_val_str, task_col_widths[t] + 2
+                        )
+
                 terminalreporter.write_line(row)
         else:
             terminalreporter.write_line("No harvested fixture data found yet.")
