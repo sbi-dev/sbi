@@ -95,9 +95,17 @@ def get_posterior_samples_on_batch(
     return posterior_samples
 
 
-def remove_nans_and_infs(thetas: Tensor, xs: Tensor) -> Tuple[Tensor, Tensor]:
-    """Remove NaNs and Infs from the data."""
-    is_valid_x, num_nans, num_infs = handle_invalid_x(xs)
+def remove_nans_and_infs_in_x(thetas: Tensor, xs: Tensor) -> Tuple[Tensor, Tensor]:
+    """Remove NaNs and Infs entries in x from both the theta and x.
+
+    Args:
+        thetas: Tensor of shape (num_samples, dim_parameters).
+        xs: Tensor of shape (num_samples, dim_observations).
+
+    Returns:
+        Tuple of filtered thetas and xs, both of shape (num_valid_samples, ...).
+    """
+    is_valid_x, num_nans, num_infs = handle_invalid_x(xs, exclude_invalid_x=True)
     if num_nans > 0 or num_infs > 0:
         warnings.warn(
             f"Found {num_nans} NaNs and {num_infs} Infs in the data. "
@@ -106,7 +114,4 @@ def remove_nans_and_infs(thetas: Tensor, xs: Tensor) -> Tuple[Tensor, Tensor]:
             stacklevel=2,
         )
 
-    thetas = thetas[is_valid_x]
-    xs = xs[is_valid_x]
-
-    return thetas, xs
+    return thetas[is_valid_x], xs[is_valid_x]

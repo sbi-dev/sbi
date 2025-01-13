@@ -15,7 +15,7 @@ from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.posteriors.vi_posterior import VIPosterior
 from sbi.utils.diagnostics_utils import (
     get_posterior_samples_on_batch,
-    remove_nans_and_infs,
+    remove_nans_and_infs_in_x,
 )
 from sbi.utils.metrics import c2st
 
@@ -58,7 +58,7 @@ def run_sbc(
         dap_samples: samples from the data averaged posterior.
     """
 
-    thetas, xs = remove_nans_and_infs(thetas, xs)
+    thetas, xs = remove_nans_and_infs_in_x(thetas, xs)
 
     num_sbc_samples = thetas.shape[0]
 

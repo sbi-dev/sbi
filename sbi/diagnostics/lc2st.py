@@ -12,7 +12,7 @@ from sklearn.neural_network import MLPClassifier
 from torch import Tensor
 from tqdm import tqdm
 
-from sbi.utils.diagnostics_utils import remove_nans_and_infs
+from sbi.utils.diagnostics_utils import remove_nans_and_infs_in_x
 
 
 class LC2ST:
@@ -84,6 +84,9 @@ class LC2ST:
         [1] : https://arxiv.org/abs/2306.03580, https://github.com/JuliaLinhart/lc2st
         [2] : https://github.com/sbi-dev/sbi/blob/main/sbi/utils/metrics.py
         """
+
+        # check inputs
+        thetas, xs = remove_nans_and_infs_in_x(thetas, xs)
 
         assert thetas.shape[0] == xs.shape[0] == posterior_samples.shape[0], (
             "Number of samples must match"
