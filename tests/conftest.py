@@ -16,6 +16,7 @@ seed = 1
 harvested_fixture_data = None
 
 
+
 # Use seed automatically for every test function.
 @pytest.fixture(autouse=True)
 def set_seed():
@@ -60,8 +61,19 @@ def pytest_addoption(parser):
         "--bm",
         action="store_true",
         default=False,
-        help="Print the harvest results at the end of the test session",
+        help="Run mini-benchmark tests with specified mode",
     )
+    parser.addoption(
+        "--bm-mode",
+        action="store",
+        default=None,
+        help="Run mini-benchmark tests with specified mode",
+    )
+
+@pytest.fixture
+def benchmark_mode(request):
+    """Fixture to access the --bm value in test files."""
+    return request.config.getoption("--bm-mode")
 
 
 @pytest.fixture(scope="session", autouse=True)
