@@ -387,7 +387,7 @@ def nle_nre_apt_msg_on_invalid_x(
 
     if num_nans + num_infs > 0:
         if exclude_invalid_x:
-            logging.warn(
+            logging.warning(
                 f"Found {num_nans} NaN simulations and {num_infs} Inf simulations."
                 f"These will be discarded from training due to "
                 f"`exclude_invalid_x=True`. Please be aware that this gives "

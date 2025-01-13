@@ -1,4 +1,5 @@
 import warnings
+from typing import Tuple
 
 import torch
 from joblib import Parallel, delayed
@@ -9,6 +10,7 @@ from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.posteriors.mcmc_posterior import MCMCPosterior
 from sbi.inference.posteriors.vi_posterior import VIPosterior
 from sbi.sbi_types import Shape
+from sbi.utils import handle_invalid_x
 
 
 def get_posterior_samples_on_batch(
@@ -91,3 +93,25 @@ def get_posterior_samples_on_batch(
         posterior_samples.shape[:2]
     }."""
     return posterior_samples
+
+
+def remove_nans_and_infs_in_x(thetas: Tensor, xs: Tensor) -> Tuple[Tensor, Tensor]:
+    """Remove NaNs and Infs entries in x from both the theta and x.
+
+    Args:
+        thetas: Tensor of shape (num_samples, dim_parameters).
+        xs: Tensor of shape (num_samples, dim_observations).
+
+    Returns:
+        Tuple of filtered thetas and xs, both of shape (num_valid_samples, ...).
+    """
+    is_valid_x, num_nans, num_infs = handle_invalid_x(xs, exclude_invalid_x=True)
+    if num_nans > 0 or num_infs > 0:
+        warnings.warn(
+            f"Found {num_nans} NaNs and {num_infs} Infs in the data. "
+            f"These will be ignored below. Beware that only {is_valid_x.sum()} "
+            f"/ {len(xs)} samples are left.",
+            stacklevel=2,
+        )
+
+    return thetas[is_valid_x], xs[is_valid_x]
