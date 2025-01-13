@@ -215,23 +215,23 @@ def test_deepcopy_support(q: str):
     )
     posterior_copy = deepcopy(posterior)
     posterior.set_default_x(torch.tensor(np.zeros((num_dim,)).astype(np.float32)))
-    assert (
-        posterior._x != posterior_copy._x
-    ), "Default x attributed of original and copied but modified VIPosterior must be\
+    assert posterior._x != posterior_copy._x, (
+        "Default x attributed of original and copied but modified VIPosterior must be\
         the different, on change (otherwise it is not a deep copy)."
+    )
     posterior_copy = deepcopy(posterior)
-    assert (
-        posterior._x == posterior_copy._x
-    ).all(), "Default x attributed of original and copied VIPosterior must be the same."
+    assert (posterior._x == posterior_copy._x).all(), (
+        "Default x attributed of original and copied VIPosterior must be the same."
+    )
 
     # Try if they are the same
     torch.manual_seed(0)
     s1 = posterior._q.rsample()
     torch.manual_seed(0)
     s2 = posterior_copy._q.rsample()
-    assert torch.allclose(
-        s1, s2
-    ), "Samples from original and unpickled VIPosterior must be close."
+    assert torch.allclose(s1, s2), (
+        "Samples from original and unpickled VIPosterior must be close."
+    )
 
     # Produces nonleaf tensors in the cache... -> Can lead to failure of deepcopy.
     posterior.q.rsample()
@@ -262,9 +262,9 @@ def test_pickle_support(q: str):
     with tempfile.NamedTemporaryFile(suffix=".pt") as f:
         torch.save(posterior, f.name)
         posterior_loaded = torch.load(f.name)
-        assert (
-            posterior._x == posterior_loaded._x
-        ).all(), "Mhh, something with the pickled is strange"
+        assert (posterior._x == posterior_loaded._x).all(), (
+            "Mhh, something with the pickled is strange"
+        )
 
     # Try if they are the same
     torch.manual_seed(0)
@@ -291,52 +291,52 @@ def test_vi_posterior_inferface():
     posterior2 = VIPosterior(potential_fn)
 
     # Raising errors if untrained
-    assert isinstance(
-        posterior.q.support, type(posterior2.q.support)
-    ), "The support indicated by 'theta_transform' is different than that of 'prior'."
+    assert isinstance(posterior.q.support, type(posterior2.q.support)), (
+        "The support indicated by 'theta_transform' is different than that of 'prior'."
+    )
 
     with pytest.raises(Exception) as execinfo:
         posterior.sample()
 
-    assert (
-        "The variational posterior was not fit" in execinfo.value.args[0]
-    ), "An expected error was raised but the error message is different than expected."
+    assert "The variational posterior was not fit" in execinfo.value.args[0], (
+        "An expected error was raised but the error message is different than expected."
+    )
 
     with pytest.raises(Exception) as execinfo:
         posterior.log_prob(prior.sample())
 
-    assert (
-        "The variational posterior was not fit" in execinfo.value.args[0]
-    ), "An expected error was raised but the error message is different than expected."
+    assert "The variational posterior was not fit" in execinfo.value.args[0], (
+        "An expected error was raised but the error message is different than expected."
+    )
 
     # Passing Hyperparameters in train
     posterior.train(max_num_iters=20)
 
     posterior.train(max_num_iters=20, optimizer=torch.optim.SGD)
-    assert isinstance(
-        posterior._optimizer._optimizer, torch.optim.SGD
-    ), "Assert chaning the optimizer base class did not work"
+    assert isinstance(posterior._optimizer._optimizer, torch.optim.SGD), (
+        "Assert chaning the optimizer base class did not work"
+    )
     posterior.train(max_num_iters=20, stick_the_landing=True)
 
-    assert (
-        posterior._optimizer.stick_the_landing
-    ), "The sticking_the_landing argument is not correctly passed."
+    assert posterior._optimizer.stick_the_landing, (
+        "The sticking_the_landing argument is not correctly passed."
+    )
 
     posterior.vi_method = "alpha"
     posterior.train(max_num_iters=20)
     posterior.train(max_num_iters=20, alpha=0.9)
 
-    assert (
-        posterior._optimizer.alpha == 0.9
-    ), "The Hyperparameter alpha is not passed to the corresponding optmizer"
+    assert posterior._optimizer.alpha == 0.9, (
+        "The Hyperparameter alpha is not passed to the corresponding optmizer"
+    )
 
     posterior.vi_method = "IW"
     posterior.train(max_num_iters=20)
     posterior.train(max_num_iters=20, K=32)
 
-    assert (
-        posterior._optimizer.K == 32
-    ), "The Hyperparameter K is not passed to the corresponding optmizer"
+    assert posterior._optimizer.K == 32, (
+        "The Hyperparameter K is not passed to the corresponding optmizer"
+    )
 
     # Passing Hyperparameters in sample
     posterior.sample()

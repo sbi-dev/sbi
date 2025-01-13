@@ -775,9 +775,9 @@ def pairplot(
 
     # checks.
     if fig_kwargs_filled["legend"]:
-        assert len(fig_kwargs_filled["samples_labels"]) >= len(
-            samples
-        ), "Provide at least as many labels as samples."
+        assert len(fig_kwargs_filled["samples_labels"]) >= len(samples), (
+            "Provide at least as many labels as samples."
+        )
     if offdiag is not None:
         warn("offdiag is deprecated, use upper or lower instead.", stacklevel=2)
         upper = offdiag
@@ -1594,9 +1594,9 @@ def _sbc_rank_plot(
             ranks_list[idx]: np.ndarray = rank.numpy()  # type: ignore
 
     plot_types = ["hist", "cdf"]
-    assert (
-        plot_type in plot_types
-    ), "plot type {plot_type} not implemented, use one in {plot_types}."
+    assert plot_type in plot_types, (
+        "plot type {plot_type} not implemented, use one in {plot_types}."
+    )
 
     if legend_kwargs is None:
         legend_kwargs = dict(loc="best", handlelength=0.8)
@@ -1609,9 +1609,9 @@ def _sbc_rank_plot(
         params_in_subplots = True
 
     for ranki in ranks_list:
-        assert (
-            ranki.shape == ranks_list[0].shape
-        ), "all ranks in list must have the same shape."
+        assert ranki.shape == ranks_list[0].shape, (
+            "all ranks in list must have the same shape."
+        )
 
     num_rows = int(np.ceil(num_parameters / num_cols))
     if figsize is None:
@@ -1636,9 +1636,9 @@ def _sbc_rank_plot(
             )
             ax = np.atleast_1d(ax)  # type: ignore
         else:
-            assert (
-                ax.size >= num_parameters
-            ), "There must be at least as many subplots as parameters."
+            assert ax.size >= num_parameters, (
+                "There must be at least as many subplots as parameters."
+            )
             num_rows = ax.shape[0] if ax.ndim > 1 else 1
         assert ax is not None
 
@@ -2221,9 +2221,9 @@ def pairplot_dep(
 
     # checks.
     if opts["legend"]:
-        assert len(opts["samples_labels"]) >= len(
-            samples
-        ), "Provide at least as many labels as samples."
+        assert len(opts["samples_labels"]) >= len(samples), (
+            "Provide at least as many labels as samples."
+        )
     if opts["upper"] is not None:
         opts["offdiag"] = opts["upper"]
 

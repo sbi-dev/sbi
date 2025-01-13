@@ -288,9 +288,7 @@ class NeuralPosterior:
         return desc
 
     def __str__(self):
-        desc = (
-            f"Posterior p(θ|x) of type {self.__class__.__name__}. " f"{self._purpose}"
-        )
+        desc = f"Posterior p(θ|x) of type {self.__class__.__name__}. {self._purpose}"
         return desc
 
     def __getstate__(self) -> Dict:

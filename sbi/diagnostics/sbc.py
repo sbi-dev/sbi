@@ -69,9 +69,9 @@ def run_sbc(
             stacklevel=2,
         )
 
-    assert (
-        thetas.shape[0] == xs.shape[0]
-    ), "Unequal number of parameters and observations."
+    assert thetas.shape[0] == xs.shape[0], (
+        "Unequal number of parameters and observations."
+    )
 
     if "sbc_batch_size" in kwargs:
         warnings.warn(

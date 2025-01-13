@@ -133,9 +133,9 @@ class MixedDensityEstimator(ConditionalDensityEstimator):
             Sample-wise log probabilities, shape `(input_sample_dim, input_batch_dim)`.
         """
 
-        assert (
-            input.dim() > 2
-        ), "Input must be of shape (sample_dim, batch_dim, *event_shape)."
+        assert input.dim() > 2, (
+            "Input must be of shape (sample_dim, batch_dim, *event_shape)."
+        )
         input_sample_dim, input_batch_dim = input.shape[:2]
         condition_batch_dim = condition.shape[0]
         combined_batch_size = input_sample_dim * input_batch_dim

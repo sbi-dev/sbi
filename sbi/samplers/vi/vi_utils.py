@@ -95,9 +95,9 @@ def check_parameters_modules_attribute(q: PyroTransformedDistribution) -> None:
     else:
         assert isinstance(q.parameters, Callable), "The parameters must be callable"
         parameters = q.parameters()
-        assert isinstance(
-            parameters, Iterable
-        ), "The parameters return value must be iterable"
+        assert isinstance(parameters, Iterable), (
+            "The parameters return value must be iterable"
+        )
         trainable = 0
         for p in parameters:
             assert isinstance(p, torch.Tensor)
@@ -115,13 +115,13 @@ def check_parameters_modules_attribute(q: PyroTransformedDistribution) -> None:
     else:
         assert isinstance(q.modules, Callable), "The parameters must be callable"
         modules = q.modules()
-        assert isinstance(
-            modules, Iterable
-        ), "The parameters return value must be iterable"
+        assert isinstance(modules, Iterable), (
+            "The parameters return value must be iterable"
+        )
         for m in modules:
-            assert isinstance(
-                m, Module
-            ), "The modules must contain PyTorch Module objects"
+            assert isinstance(m, Module), (
+                "The modules must contain PyTorch Module objects"
+            )
 
 
 def check_sample_shape_and_support(q: Distribution, prior: Distribution) -> None:
@@ -134,12 +134,12 @@ def check_sample_shape_and_support(q: Distribution, prior: Distribution) -> None
         prior: Prior to check certain attributes which should be satisfied.
 
     """
-    assert (
-        q.event_shape == prior.event_shape
-    ), "The event shape of q must match that of the prior"
-    assert (
-        q.batch_shape == prior.batch_shape
-    ), "The batch sahpe of q must match that of the prior"
+    assert q.event_shape == prior.event_shape, (
+        "The event shape of q must match that of the prior"
+    )
+    assert q.batch_shape == prior.batch_shape, (
+        "The batch sahpe of q must match that of the prior"
+    )
 
     sample_shape = torch.Size((1000,))
     samples = q.sample(sample_shape)
@@ -153,15 +153,15 @@ def check_sample_shape_and_support(q: Distribution, prior: Distribution) -> None
         assert all(
             prior.support.check(samples)  # type: ignore
         ), "The support of q must match that of the prior"
-    assert (
-        samples.shape == samples_prior.shape
-    ), "Something is wrong with sample shape and event_shape or batch_shape attributes."
-    assert torch.isfinite(
-        q.log_prob(samples_prior)
-    ).all(), "Invalid values in logprob on prior samples."
-    assert torch.isfinite(
-        prior.log_prob(samples)
-    ).all(), "Invalid values in logprob on q samples."
+    assert samples.shape == samples_prior.shape, (
+        "sample_shape and event_shape or batch_shape do not match."
+    )
+    assert torch.isfinite(q.log_prob(samples_prior)).all(), (
+        "Invalid values in logprob on prior samples."
+    )
+    assert torch.isfinite(prior.log_prob(samples)).all(), (
+        "Invalid values in logprob on q samples."
+    )
 
 
 def check_variational_distribution(q: Distribution, prior: Distribution) -> None:

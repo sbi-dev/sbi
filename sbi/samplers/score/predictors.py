@@ -37,9 +37,9 @@ def register_predictor(name: str) -> Callable:
     """
 
     def decorator(predictor: Type[Predictor]) -> Callable:
-        assert issubclass(
-            predictor, Predictor
-        ), "Predictor must be a subclass of Predictor."
+        assert issubclass(predictor, Predictor), (
+            "Predictor must be a subclass of Predictor."
+        )
         PREDICTORS[name] = predictor
         return predictor
 

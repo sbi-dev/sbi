@@ -279,9 +279,9 @@ def test_correctness_of_batched_vs_seperate_sample_and_log_prob(
     samples_separate2_m = torch.mean(samples_separate2, dim=0, dtype=torch.float32)
     samples_sep_m = torch.cat([samples_separate1_m, samples_separate2_m], dim=0)
 
-    assert torch.allclose(
-        samples_m, samples_sep_m, atol=0.5, rtol=0.5
-    ), "Batched sampling is not consistent with separate sampling."
+    assert torch.allclose(samples_m, samples_sep_m, atol=0.5, rtol=0.5), (
+        "Batched sampling is not consistent with separate sampling."
+    )
 
     # Batched vs separate log_prob
     log_probs = density_estimator.log_prob(inputs, condition=condition)
@@ -294,9 +294,9 @@ def test_correctness_of_batched_vs_seperate_sample_and_log_prob(
     )
     log_probs_sep = torch.hstack([log_probs_separate1, log_probs_separate2])
 
-    assert torch.allclose(
-        log_probs, log_probs_sep, atol=1e-2, rtol=1e-2
-    ), "Batched log_prob is not consistent with separate log_prob."
+    assert torch.allclose(log_probs, log_probs_sep, atol=1e-2, rtol=1e-2), (
+        "Batched log_prob is not consistent with separate log_prob."
+    )
 
 
 def _build_density_estimator_and_tensors(

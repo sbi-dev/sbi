@@ -112,9 +112,9 @@ class EnsemblePosterior(NeuralPosterior):
             A device string, that is the same for all posteriors.
         """
         devices = [posterior._device for posterior in posteriors]
-        assert all(
-            device == devices[0] for device in devices
-        ), "Only supported if all posteriors are on the same device."
+        assert all(device == devices[0] for device in devices), (
+            "Only supported if all posteriors are on the same device."
+        )
         return devices[0]
 
     @property

@@ -95,11 +95,11 @@ class RatioBasedPotential(BasePotential):
 
             theta_batch_size = theta.shape[0]
             x_batch_size = self.x_o.shape[0]
-            assert (
-                theta_batch_size == x_batch_size
-            ), f"Batch size mismatch: {theta_batch_size} and {x_batch_size}.\
+            assert theta_batch_size == x_batch_size, (
+                f"Batch size mismatch: {theta_batch_size} and {x_batch_size}.\
                 When performing batched sampling for multiple `x`, the batch size of\
                 `theta` must match the batch size of `x`."
+            )
             with torch.set_grad_enabled(track_gradients):
                 log_ratio_batches = self.ratio_estimator(theta, self.x_o)
                 log_ratio_batches = log_ratio_batches.reshape(-1)
@@ -130,9 +130,9 @@ def _log_ratios_over_trials(
     theta_repeated, x_repeated = match_theta_and_x_batch_shapes(
         theta=atleast_2d(theta), x=atleast_2d(x)
     )
-    assert (
-        x_repeated.shape[0] == theta_repeated.shape[0]
-    ), "x and theta must match in batch shape."
+    assert x_repeated.shape[0] == theta_repeated.shape[0], (
+        "x and theta must match in batch shape."
+    )
     assert (
         next(net.parameters()).device == x.device and x.device == theta.device
     ), f"""device mismatch: net, x, theta: {next(net.parameters()).device}, {x.device},

@@ -104,11 +104,11 @@ class LikelihoodBasedPotential(BasePotential):
             # Calculate likelihood for each (theta,x) pair separately
             theta_batch_size = theta.shape[0]
             x_batch_size = self.x_o.shape[0]
-            assert (
-                theta_batch_size == x_batch_size
-            ), f"Batch size mismatch: {theta_batch_size} and {x_batch_size}.\
+            assert theta_batch_size == x_batch_size, (
+                f"Batch size mismatch: {theta_batch_size} and {x_batch_size}.\
                 When performing batched sampling for multiple `x`, the batch size of\
                 `theta` must match the batch size of `x`."
+            )
             x = self.x_o.unsqueeze(0)
             with torch.set_grad_enabled(track_gradients):
                 log_likelihood_batches = self.likelihood_estimator.log_prob(
@@ -143,9 +143,9 @@ class LikelihoodBasedPotential(BasePotential):
         def conditioned_potential(
             theta: Tensor, x_o: Optional[Tensor] = None, track_gradients: bool = True
         ) -> Tensor:
-            assert (
-                len(dims_global_theta) == theta.shape[1]
-            ), "dims_global_theta must match the number of parameters to sample."
+            assert len(dims_global_theta) == theta.shape[1], (
+                "dims_global_theta must match the number of parameters to sample."
+            )
             global_theta = theta[:, dims_global_theta]
             x_o = x_o if x_o is not None else self.x_o
             # x needs shape (sample_dim (iid), batch_dim (xs), *event_shape)
@@ -257,15 +257,15 @@ def _log_likelihood_over_iid_trials_and_local_theta(
             theta_batch_dim)`.
     """
     assert x.dim() > 2, "x must have shape (sample_dim, batch_dim, *event_shape)."
-    assert (
-        local_theta.dim() == 2
-    ), "condition must have shape (sample_dim, num_conditions)."
+    assert local_theta.dim() == 2, (
+        "condition must have shape (sample_dim, num_conditions)."
+    )
     assert global_theta.dim() == 2, "theta must have shape (batch_dim, num_parameters)."
     num_trials, num_xs = x.shape[:2]
     num_thetas = global_theta.shape[0]
-    assert (
-        local_theta.shape[0] == num_trials
-    ), "Condition batch size must match the number of iid trials in x."
+    assert local_theta.shape[0] == num_trials, (
+        "Condition batch size must match the number of iid trials in x."
+    )
 
     # move the iid batch dimension onto the batch dimension of theta and repeat it there
     x_repeated = torch.transpose(x, 0, 1).repeat_interleave(num_thetas, dim=1)

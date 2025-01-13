@@ -232,18 +232,18 @@ def test_c2st_nre_variants_on_linearGaussian_with_multiple_trials(
 
         max_dkl = 0.15
 
-        assert (
-            dkl < max_dkl
-        ), f"KLd={dkl} is more than 2 stds above the average performance."
+        assert dkl < max_dkl, (
+            f"KLd={dkl} is more than 2 stds above the average performance."
+        )
 
         assert ((map_ - gt_posterior.mean) ** 2).sum() < 0.5
 
     if prior_str == "uniform":
         # Check whether the returned probability outside of the support is zero.
         posterior_prob = get_prob_outside_uniform_prior(posterior, prior, num_dim)
-        assert (
-            posterior_prob == 0.0
-        ), "The posterior probability outside of the prior support is not zero"
+        assert posterior_prob == 0.0, (
+            "The posterior probability outside of the prior support is not zero"
+        )
 
         assert ((map_ - ones(num_dim)) ** 2).sum() < 0.5
 

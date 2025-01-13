@@ -218,9 +218,9 @@ def test_c2st_and_map_nle_on_linearGaussian_different(
         if prior_str == "uniform":
             # Check whether the returned probability outside of the support is zero.
             posterior_prob = get_prob_outside_uniform_prior(posterior, prior, num_dim)
-            assert (
-                posterior_prob == 0.0
-            ), "The posterior probability outside of the prior support is not zero"
+            assert posterior_prob == 0.0, (
+                "The posterior probability outside of the prior support is not zero"
+            )
 
             assert ((map_ - ones(num_dim)) ** 2).sum() < 0.5
         else:

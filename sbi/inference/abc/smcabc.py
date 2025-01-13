@@ -95,9 +95,9 @@ class SMCABC(ABCBASE):
         )
 
         kernels = ("gaussian", "uniform")
-        assert (
-            kernel in kernels
-        ), f"Kernel '{kernel}' not supported. Choose one from {kernels}."
+        assert kernel in kernels, (
+            f"Kernel '{kernel}' not supported. Choose one from {kernels}."
+        )
         self.kernel = kernel
 
         algorithm_variants = ("A", "B", "C")
@@ -198,13 +198,13 @@ class SMCABC(ABCBASE):
         if kde_kwargs is None:
             kde_kwargs = {}
         assert isinstance(epsilon_decay, float) and epsilon_decay > 0.0
-        assert not (
-            self.distance.requires_iid_data and lra
-        ), "Currently there is no support to run inference "
+        assert not (self.distance.requires_iid_data and lra), (
+            "Currently there is no support to run inference "
+        )
         "on multiple observations together with lra."
-        assert not (
-            self.distance.requires_iid_data and sass
-        ), "Currently there is no support to run inference "
+        assert not (self.distance.requires_iid_data and sass), (
+            "Currently there is no support to run inference "
+        )
         "on multiple observations together with sass."
 
         # Pilot run for SASS.
@@ -363,9 +363,9 @@ class SMCABC(ABCBASE):
     ) -> Tuple[Tensor, float, Tensor, Tensor]:
         """Return particles, epsilon and distances of initial population."""
 
-        assert (
-            num_particles <= num_initial_pop
-        ), "number of initial round simulations must be greater than population size"
+        assert num_particles <= num_initial_pop, (
+            "number of initial round simulations must be greater than population size"
+        )
 
         assert (x_o.shape[0] == 1) or self.distance.requires_iid_data, (
             "Your data contain iid data-points, but the choice of "

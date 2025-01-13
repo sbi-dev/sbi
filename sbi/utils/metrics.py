@@ -257,9 +257,9 @@ def wasserstein_2_squared(
         [1] Peyré, G., & Cuturi, M. (2019). Computational optimal transport:
             With applications to data science.
     """
-    assert (
-        x.ndim == y.ndim
-    ), "Please make sure that 'x' and 'y' are both either batched or not."
+    assert x.ndim == y.ndim, (
+        "Please make sure that 'x' and 'y' are both either batched or not."
+    )
     if x.ndim == 2:
         nx, ny = x.shape[0], y.shape[0]
         a = torch.ones(nx) / nx
@@ -313,9 +313,9 @@ def regularized_ot_dual(
         Optimal transport coupling of shape (B, m, n) or (m, n)
     """
 
-    assert (
-        a.ndim == b.ndim
-    ), "Please make sure that 'a' and 'b' are both either batched or not."
+    assert a.ndim == b.ndim, (
+        "Please make sure that 'a' and 'b' are both either batched or not."
+    )
     f"currently a.ndim={a.ndim} and b.ndim={b.ndim}"
 
     batched = True

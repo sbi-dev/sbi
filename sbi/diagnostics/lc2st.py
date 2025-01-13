@@ -83,9 +83,9 @@ class LC2ST:
         [2] : https://github.com/sbi-dev/sbi/blob/main/sbi/utils/metrics.py
         """
 
-        assert (
-            thetas.shape[0] == xs.shape[0] == posterior_samples.shape[0]
-        ), "Number of samples must match"
+        assert thetas.shape[0] == xs.shape[0] == posterior_samples.shape[0], (
+            "Number of samples must match"
+        )
 
         # set observed data for classification
         self.theta_p = posterior_samples
@@ -283,9 +283,9 @@ class LC2ST:
         Returns:
             L-C2ST statistic at `x_o`.
         """
-        assert (
-            self.trained_clfs is not None
-        ), "No trained classifiers found. Run `train_on_observed_data` first."
+        assert self.trained_clfs is not None, (
+            "No trained classifiers found. Run `train_on_observed_data` first."
+        )
         _, scores = self.get_scores(
             theta_o=theta_o,
             x_o=x_o,
@@ -372,9 +372,9 @@ class LC2ST:
                     joint_q_perm[:, self.theta_q.shape[1] :],
                 )
             else:
-                assert (
-                    self.null_distribution is not None
-                ), "You need to provide a null distribution"
+                assert self.null_distribution is not None, (
+                    "You need to provide a null distribution"
+                )
                 theta_p_t = self.null_distribution.sample((self.theta_p.shape[0],))
                 theta_q_t = self.null_distribution.sample((self.theta_p.shape[0],))
                 x_p_t, x_q_t = self.x_p, self.x_q
@@ -419,9 +419,9 @@ class LC2ST:
                     Run `train_under_null_hypothesis`."
             )
         else:
-            assert (
-                len(self.trained_clfs_null) == self.num_trials_null
-            ), "You need one classifier per trial."
+            assert len(self.trained_clfs_null) == self.num_trials_null, (
+                "You need one classifier per trial."
+            )
 
         probs_null, stats_null = [], []
         for t in tqdm(
@@ -433,9 +433,9 @@ class LC2ST:
             if self.permutation:
                 theta_o_t = theta_o
             else:
-                assert (
-                    self.null_distribution is not None
-                ), "You need to provide a null distribution"
+                assert self.null_distribution is not None, (
+                    "You need to provide a null distribution"
+                )
 
                 theta_o_t = self.null_distribution.sample((theta_o.shape[0],))
 

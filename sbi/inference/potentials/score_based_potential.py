@@ -41,9 +41,9 @@ def score_estimator_based_potential(
         score_estimator, prior, x_o, device=device
     )
 
-    assert (
-        enable_transform is False
-    ), "Transforms are not yet supported for score estimators."
+    assert enable_transform is False, (
+        "Transforms are not yet supported for score estimators."
+    )
 
     if prior is not None:
         theta_transform = mcmc_transform(
@@ -107,9 +107,9 @@ class PosteriorScoreBasedPotential(BasePotential):
         x_density_estimator = reshape_to_batch_event(
             self.x_o, event_shape=self.score_estimator.condition_shape
         )
-        assert (
-            x_density_estimator.shape[0] == 1
-        ), "PosteriorScoreBasedPotential supports only x batchsize of 1`."
+        assert x_density_estimator.shape[0] == 1, (
+            "PosteriorScoreBasedPotential supports only x batchsize of 1`."
+        )
 
         self.score_estimator.eval()
 

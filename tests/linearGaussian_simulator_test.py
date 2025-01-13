@@ -31,12 +31,12 @@ def test_standardlinearGaussian_simulator(D: int, N: int):
     assert xs.shape == torch.Size([N, D])
 
     # Check mean and std.
-    assert torch.allclose(
-        xs.mean(axis=0), true_parameters, atol=5e-2
-    ), f"Expected mean of zero, obtained {xs.mean(axis=0)}"
-    assert torch.allclose(
-        xs.std(axis=0), torch.ones(D), atol=5e-2
-    ), f"Expected std of one, obtained {xs.std(axis=0)}"
+    assert torch.allclose(xs.mean(axis=0), true_parameters, atol=5e-2), (
+        f"Expected mean of zero, obtained {xs.mean(axis=0)}"
+    )
+    assert torch.allclose(xs.std(axis=0), torch.ones(D), atol=5e-2), (
+        f"Expected std of one, obtained {xs.std(axis=0)}"
+    )
 
 
 @pytest.mark.parametrize("D, N", ((1, 10000), (5, 100000)))
@@ -61,9 +61,9 @@ def test_linearGaussian_simulator(D: int, N: int):
     assert xs.shape == torch.Size([N, D])
 
     # Check mean and std.
-    assert torch.allclose(
-        xs.mean(axis=0), true_parameters, atol=5e-2
-    ), f"Expected mean of zero, obtained {xs.mean(axis=0)}"
-    assert torch.allclose(
-        xs.std(axis=0), torch.ones(D), atol=5e-2
-    ), f"Expected std of one, obtained {xs.std(axis=0)}"
+    assert torch.allclose(xs.mean(axis=0), true_parameters, atol=5e-2), (
+        f"Expected mean of zero, obtained {xs.mean(axis=0)}"
+    )
+    assert torch.allclose(xs.std(axis=0), torch.ones(D), atol=5e-2), (
+        f"Expected std of one, obtained {xs.std(axis=0)}"
+    )

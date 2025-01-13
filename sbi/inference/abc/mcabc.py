@@ -130,9 +130,9 @@ class MCABC(ABCBASE):
         """
 
         # Exactly one of eps or quantile need to be passed.
-        assert (eps is not None) ^ (
-            quantile is not None
-        ), "Eps or quantile must be passed, but not both."
+        assert (eps is not None) ^ (quantile is not None), (
+            "Eps or quantile must be passed, but not both."
+        )
         if kde_kwargs is None:
             kde_kwargs = {}
 

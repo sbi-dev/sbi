@@ -210,9 +210,9 @@ class MultipleIndependent(Distribution):
     def _check_distribution(self, dist: Distribution):
         """Check type and shape of a single input distribution."""
 
-        assert not isinstance(
-            dist, (MultipleIndependent, Sequence)
-        ), "Nesting of combined distributions is not possible."
+        assert not isinstance(dist, (MultipleIndependent, Sequence)), (
+            "Nesting of combined distributions is not possible."
+        )
         assert isinstance(
             dist, Distribution
         ), """priors passed to MultipleIndependent must be PyTorch distributions. Make
@@ -274,15 +274,15 @@ class MultipleIndependent(Distribution):
         if value.ndim < 2:
             value = value.unsqueeze(0)
 
-        assert (
-            value.ndim == 2
-        ), f"value in log_prob must have ndim <= 2, it is {value.ndim}."
+        assert value.ndim == 2, (
+            f"value in log_prob must have ndim <= 2, it is {value.ndim}."
+        )
 
         batch_shape, num_value_dims = value.shape
 
-        assert (
-            num_value_dims == self.ndims
-        ), f"Number of dimensions must match dimensions of this joint: {self.ndims}."
+        assert num_value_dims == self.ndims, (
+            f"Number of dimensions must match dimensions of this joint: {self.ndims}."
+        )
 
         return value
 
@@ -361,9 +361,9 @@ def build_support(
     # Both are specified.
     else:
         num_dimensions = lower_bound.numel()
-        assert (
-            num_dimensions == upper_bound.numel()
-        ), "There must be an equal number of independent bounds."
+        assert num_dimensions == upper_bound.numel(), (
+            "There must be an equal number of independent bounds."
+        )
         if num_dimensions > 1:
             support = constraints._IndependentConstraint(
                 constraints.interval(lower_bound, upper_bound),
