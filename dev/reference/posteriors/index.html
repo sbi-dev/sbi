@@ -7131,9 +7131,9 @@ SNLE or SNRE train neural networks to approximate the likelihood(-ratios).
             <span class="k">else</span> <span class="n">init_strategy_parameters</span>
         <span class="p">)</span>
 
-        <span class="k">assert</span> <span class="p">(</span>
-            <span class="n">method</span> <span class="o">==</span> <span class="s2">&quot;slice_np_vectorized&quot;</span>
-        <span class="p">),</span> <span class="s2">&quot;Batched sampling only supported for vectorized samplers!&quot;</span>
+        <span class="k">assert</span> <span class="n">method</span> <span class="o">==</span> <span class="s2">&quot;slice_np_vectorized&quot;</span><span class="p">,</span> <span class="p">(</span>
+            <span class="s2">&quot;Batched sampling only supported for vectorized samplers!&quot;</span>
+        <span class="p">)</span>
 
         <span class="c1"># warn if num_chains is larger than num requested samples</span>
         <span class="k">if</span> <span class="n">num_chains</span> <span class="o">&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">(</span><span class="n">sample_shape</span><span class="p">)</span><span class="o">.</span><span class="n">numel</span><span class="p">():</span>
@@ -7716,9 +7716,9 @@ SNLE or SNRE train neural networks to approximate the likelihood(-ratios).
 <span class="sd">        Returns:</span>
 <span class="sd">            inference_data: Arviz InferenceData object.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">assert</span> <span class="p">(</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_posterior_sampler</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
-        <span class="p">),</span> <span class="s2">&quot;&quot;&quot;No samples have been generated, call .sample() first.&quot;&quot;&quot;</span>
+        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">_posterior_sampler</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">,</span> <span class="p">(</span>
+<span class="w">            </span><span class="sd">&quot;&quot;&quot;No samples have been generated, call .sample() first.&quot;&quot;&quot;</span>
+        <span class="p">)</span>
 
         <span class="n">sampler</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span>
             <span class="n">MCMC</span><span class="p">,</span> <span class="n">SliceSamplerSerial</span><span class="p">,</span> <span class="n">SliceSamplerVectorized</span><span class="p">,</span> <span class="n">PyMCSampler</span>
@@ -8512,9 +8512,9 @@ sbi slice samplers, only the samples are added.</p>
 <span class="sd">    Returns:</span>
 <span class="sd">        inference_data: Arviz InferenceData object.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">assert</span> <span class="p">(</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_posterior_sampler</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
-    <span class="p">),</span> <span class="s2">&quot;&quot;&quot;No samples have been generated, call .sample() first.&quot;&quot;&quot;</span>
+    <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">_posterior_sampler</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">,</span> <span class="p">(</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;No samples have been generated, call .sample() first.&quot;&quot;&quot;</span>
+    <span class="p">)</span>
 
     <span class="n">sampler</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span>
         <span class="n">MCMC</span><span class="p">,</span> <span class="n">SliceSamplerSerial</span><span class="p">,</span> <span class="n">SliceSamplerVectorized</span><span class="p">,</span> <span class="n">PyMCSampler</span>
@@ -9972,9 +9972,9 @@ parameter generation and mcmc sampling.</p>
         <span class="k">else</span> <span class="n">init_strategy_parameters</span>
     <span class="p">)</span>
 
-    <span class="k">assert</span> <span class="p">(</span>
-        <span class="n">method</span> <span class="o">==</span> <span class="s2">&quot;slice_np_vectorized&quot;</span>
-    <span class="p">),</span> <span class="s2">&quot;Batched sampling only supported for vectorized samplers!&quot;</span>
+    <span class="k">assert</span> <span class="n">method</span> <span class="o">==</span> <span class="s2">&quot;slice_np_vectorized&quot;</span><span class="p">,</span> <span class="p">(</span>
+        <span class="s2">&quot;Batched sampling only supported for vectorized samplers!&quot;</span>
+    <span class="p">)</span>
 
     <span class="c1"># warn if num_chains is larger than num requested samples</span>
     <span class="k">if</span> <span class="n">num_chains</span> <span class="o">&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">(</span><span class="n">sample_shape</span><span class="p">)</span><span class="o">.</span><span class="n">numel</span><span class="p">():</span>

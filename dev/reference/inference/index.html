@@ -7341,9 +7341,9 @@ results.</p>
 <span class="sd">        Returns:</span>
 <span class="sd">            NeuralInference object (returned so that this function is chainable).</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">assert</span> <span class="p">(</span>
-            <span class="n">proposal</span> <span class="ow">is</span> <span class="kc">None</span>
-        <span class="p">),</span> <span class="s2">&quot;Multi-round NPSE is not yet implemented. Please use single-round NPSE.&quot;</span>
+        <span class="k">assert</span> <span class="n">proposal</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">,</span> <span class="p">(</span>
+            <span class="s2">&quot;Multi-round NPSE is not yet implemented. Please use single-round NPSE.&quot;</span>
+        <span class="p">)</span>
         <span class="n">current_round</span> <span class="o">=</span> <span class="mi">0</span>
 
         <span class="k">if</span> <span class="n">exclude_invalid_x</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
@@ -8336,9 +8336,9 @@ much VRAM can set to &lsquo;cpu&rsquo; to store data on system memory instead.</
 <span class="sd">    Returns:</span>
 <span class="sd">        NeuralInference object (returned so that this function is chainable).</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">assert</span> <span class="p">(</span>
-        <span class="n">proposal</span> <span class="ow">is</span> <span class="kc">None</span>
-    <span class="p">),</span> <span class="s2">&quot;Multi-round NPSE is not yet implemented. Please use single-round NPSE.&quot;</span>
+    <span class="k">assert</span> <span class="n">proposal</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">,</span> <span class="p">(</span>
+        <span class="s2">&quot;Multi-round NPSE is not yet implemented. Please use single-round NPSE.&quot;</span>
+    <span class="p">)</span>
     <span class="n">current_round</span> <span class="o">=</span> <span class="mi">0</span>
 
     <span class="k">if</span> <span class="n">exclude_invalid_x</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
@@ -13599,9 +13599,9 @@ dataloader_kwargs: Additional or updated kwargs to be passed to the training
 <span class="sd">        &quot;&quot;&quot;</span>
 
         <span class="c1"># Exactly one of eps or quantile need to be passed.</span>
-        <span class="k">assert</span> <span class="p">(</span><span class="n">eps</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">)</span> <span class="o">^</span> <span class="p">(</span>
-            <span class="n">quantile</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
-        <span class="p">),</span> <span class="s2">&quot;Eps or quantile must be passed, but not both.&quot;</span>
+        <span class="k">assert</span> <span class="p">(</span><span class="n">eps</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">)</span> <span class="o">^</span> <span class="p">(</span><span class="n">quantile</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">),</span> <span class="p">(</span>
+            <span class="s2">&quot;Eps or quantile must be passed, but not both.&quot;</span>
+        <span class="p">)</span>
         <span class="k">if</span> <span class="n">kde_kwargs</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">kde_kwargs</span> <span class="o">=</span> <span class="p">{}</span>
 
@@ -14208,9 +14208,9 @@ kde True), distances and simulated data x.</p>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="c1"># Exactly one of eps or quantile need to be passed.</span>
-    <span class="k">assert</span> <span class="p">(</span><span class="n">eps</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">)</span> <span class="o">^</span> <span class="p">(</span>
-        <span class="n">quantile</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
-    <span class="p">),</span> <span class="s2">&quot;Eps or quantile must be passed, but not both.&quot;</span>
+    <span class="k">assert</span> <span class="p">(</span><span class="n">eps</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">)</span> <span class="o">^</span> <span class="p">(</span><span class="n">quantile</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">),</span> <span class="p">(</span>
+        <span class="s2">&quot;Eps or quantile must be passed, but not both.&quot;</span>
+    <span class="p">)</span>
     <span class="k">if</span> <span class="n">kde_kwargs</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">kde_kwargs</span> <span class="o">=</span> <span class="p">{}</span>
 
@@ -15490,9 +15490,9 @@ all simulations at the same time.</p>
         <span class="p">)</span>
 
         <span class="n">kernels</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;gaussian&quot;</span><span class="p">,</span> <span class="s2">&quot;uniform&quot;</span><span class="p">)</span>
-        <span class="k">assert</span> <span class="p">(</span>
-            <span class="n">kernel</span> <span class="ow">in</span> <span class="n">kernels</span>
-        <span class="p">),</span> <span class="sa">f</span><span class="s2">&quot;Kernel &#39;</span><span class="si">{</span><span class="n">kernel</span><span class="si">}</span><span class="s2">&#39; not supported. Choose one from </span><span class="si">{</span><span class="n">kernels</span><span class="si">}</span><span class="s2">.&quot;</span>
+        <span class="k">assert</span> <span class="n">kernel</span> <span class="ow">in</span> <span class="n">kernels</span><span class="p">,</span> <span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Kernel &#39;</span><span class="si">{</span><span class="n">kernel</span><span class="si">}</span><span class="s2">&#39; not supported. Choose one from </span><span class="si">{</span><span class="n">kernels</span><span class="si">}</span><span class="s2">.&quot;</span>
+        <span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">kernel</span> <span class="o">=</span> <span class="n">kernel</span>
 
         <span class="n">algorithm_variants</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="s2">&quot;C&quot;</span><span class="p">)</span>
@@ -15593,13 +15593,13 @@ all simulations at the same time.</p>
         <span class="k">if</span> <span class="n">kde_kwargs</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">kde_kwargs</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">epsilon_decay</span><span class="p">,</span> <span class="nb">float</span><span class="p">)</span> <span class="ow">and</span> <span class="n">epsilon_decay</span> <span class="o">&gt;</span> <span class="mf">0.0</span>
-        <span class="k">assert</span> <span class="ow">not</span> <span class="p">(</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">distance</span><span class="o">.</span><span class="n">requires_iid_data</span> <span class="ow">and</span> <span class="n">lra</span>
-        <span class="p">),</span> <span class="s2">&quot;Currently there is no support to run inference &quot;</span>
+        <span class="k">assert</span> <span class="ow">not</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">distance</span><span class="o">.</span><span class="n">requires_iid_data</span> <span class="ow">and</span> <span class="n">lra</span><span class="p">),</span> <span class="p">(</span>
+            <span class="s2">&quot;Currently there is no support to run inference &quot;</span>
+        <span class="p">)</span>
         <span class="s2">&quot;on multiple observations together with lra.&quot;</span>
-        <span class="k">assert</span> <span class="ow">not</span> <span class="p">(</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">distance</span><span class="o">.</span><span class="n">requires_iid_data</span> <span class="ow">and</span> <span class="n">sass</span>
-        <span class="p">),</span> <span class="s2">&quot;Currently there is no support to run inference &quot;</span>
+        <span class="k">assert</span> <span class="ow">not</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">distance</span><span class="o">.</span><span class="n">requires_iid_data</span> <span class="ow">and</span> <span class="n">sass</span><span class="p">),</span> <span class="p">(</span>
+            <span class="s2">&quot;Currently there is no support to run inference &quot;</span>
+        <span class="p">)</span>
         <span class="s2">&quot;on multiple observations together with sass.&quot;</span>
 
         <span class="c1"># Pilot run for SASS.</span>
@@ -15758,9 +15758,9 @@ all simulations at the same time.</p>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">Tensor</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return particles, epsilon and distances of initial population.&quot;&quot;&quot;</span>
 
-        <span class="k">assert</span> <span class="p">(</span>
-            <span class="n">num_particles</span> <span class="o">&lt;=</span> <span class="n">num_initial_pop</span>
-        <span class="p">),</span> <span class="s2">&quot;number of initial round simulations must be greater than population size&quot;</span>
+        <span class="k">assert</span> <span class="n">num_particles</span> <span class="o">&lt;=</span> <span class="n">num_initial_pop</span><span class="p">,</span> <span class="p">(</span>
+            <span class="s2">&quot;number of initial round simulations must be greater than population size&quot;</span>
+        <span class="p">)</span>
 
         <span class="k">assert</span> <span class="p">(</span><span class="n">x_o</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span><span class="p">)</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">distance</span><span class="o">.</span><span class="n">requires_iid_data</span><span class="p">,</span> <span class="p">(</span>
             <span class="s2">&quot;Your data contain iid data-points, but the choice of &quot;</span>
@@ -16921,13 +16921,13 @@ populations.</p>
     <span class="k">if</span> <span class="n">kde_kwargs</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">kde_kwargs</span> <span class="o">=</span> <span class="p">{}</span>
     <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">epsilon_decay</span><span class="p">,</span> <span class="nb">float</span><span class="p">)</span> <span class="ow">and</span> <span class="n">epsilon_decay</span> <span class="o">&gt;</span> <span class="mf">0.0</span>
-    <span class="k">assert</span> <span class="ow">not</span> <span class="p">(</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">distance</span><span class="o">.</span><span class="n">requires_iid_data</span> <span class="ow">and</span> <span class="n">lra</span>
-    <span class="p">),</span> <span class="s2">&quot;Currently there is no support to run inference &quot;</span>
+    <span class="k">assert</span> <span class="ow">not</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">distance</span><span class="o">.</span><span class="n">requires_iid_data</span> <span class="ow">and</span> <span class="n">lra</span><span class="p">),</span> <span class="p">(</span>
+        <span class="s2">&quot;Currently there is no support to run inference &quot;</span>
+    <span class="p">)</span>
     <span class="s2">&quot;on multiple observations together with lra.&quot;</span>
-    <span class="k">assert</span> <span class="ow">not</span> <span class="p">(</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">distance</span><span class="o">.</span><span class="n">requires_iid_data</span> <span class="ow">and</span> <span class="n">sass</span>
-    <span class="p">),</span> <span class="s2">&quot;Currently there is no support to run inference &quot;</span>
+    <span class="k">assert</span> <span class="ow">not</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">distance</span><span class="o">.</span><span class="n">requires_iid_data</span> <span class="ow">and</span> <span class="n">sass</span><span class="p">),</span> <span class="p">(</span>
+        <span class="s2">&quot;Currently there is no support to run inference &quot;</span>
+    <span class="p">)</span>
     <span class="s2">&quot;on multiple observations together with sass.&quot;</span>
 
     <span class="c1"># Pilot run for SASS.</span>
@@ -17485,9 +17485,9 @@ sampling.</p>
     <span class="p">)</span>
 
     <span class="n">kernels</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;gaussian&quot;</span><span class="p">,</span> <span class="s2">&quot;uniform&quot;</span><span class="p">)</span>
-    <span class="k">assert</span> <span class="p">(</span>
-        <span class="n">kernel</span> <span class="ow">in</span> <span class="n">kernels</span>
-    <span class="p">),</span> <span class="sa">f</span><span class="s2">&quot;Kernel &#39;</span><span class="si">{</span><span class="n">kernel</span><span class="si">}</span><span class="s2">&#39; not supported. Choose one from </span><span class="si">{</span><span class="n">kernels</span><span class="si">}</span><span class="s2">.&quot;</span>
+    <span class="k">assert</span> <span class="n">kernel</span> <span class="ow">in</span> <span class="n">kernels</span><span class="p">,</span> <span class="p">(</span>
+        <span class="sa">f</span><span class="s2">&quot;Kernel &#39;</span><span class="si">{</span><span class="n">kernel</span><span class="si">}</span><span class="s2">&#39; not supported. Choose one from </span><span class="si">{</span><span class="n">kernels</span><span class="si">}</span><span class="s2">.&quot;</span>
+    <span class="p">)</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">kernel</span> <span class="o">=</span> <span class="n">kernel</span>
 
     <span class="n">algorithm_variants</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="s2">&quot;C&quot;</span><span class="p">)</span>

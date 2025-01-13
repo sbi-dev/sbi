@@ -552,7 +552,7 @@
     <span class="n">x</span> <span class="o">=</span> <span class="n">simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
     <span class="c1"># NPE-A trains a Gaussian density estimator in all but the last round. In the last round,</span>
     <span class="c1"># it trains a mixture of Gaussians, which is why we have to pass the `final_round` flag.</span>
-    <span class="n">final_round</span> <span class="o">=</span> <span class="kc">True</span> <span class="k">if</span> <span class="n">r</span> <span class="o">==</span> <span class="n">num_rounds</span> <span class="o">-</span> <span class="mi">1</span> <span class="k">else</span> <span class="kc">False</span>
+    <span class="n">final_round</span> <span class="o">=</span> <span class="n">r</span> <span class="o">==</span> <span class="n">num_rounds</span> <span class="o">-</span> <span class="mi">1</span>
     <span class="n">_</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">proposal</span><span class="o">=</span><span class="n">proposal</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">(</span><span class="n">final_round</span><span class="o">=</span><span class="n">final_round</span><span class="p">)</span>
     <span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">()</span><span class="o">.</span><span class="n">set_default_x</span><span class="p">(</span><span class="n">x_o</span><span class="p">)</span>
     <span class="n">proposal</span> <span class="o">=</span> <span class="n">posterior</span>
@@ -717,8 +717,8 @@ Schölkopf (NeurIPS 2023) <br> <a href="https://arxiv.org/abs/2305.17161">[Paper
 </code></pre></div>
 <h2 id="diagnostics-and-utilities">Diagnostics and utilities<a class="headerlink" href="#diagnostics-and-utilities" title="Permanent link">&para;</a></h2>
 <p><strong>Simulation-based calibration</strong><br>by Talts, Betancourt, Simpson, Vehtari, Gelman (arxiv 2018) <br><a href="https://arxiv.org/abs/1804.06788">[Paper]</a>)</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.diagnostics</span><span class="w"> </span><span class="kn">import</span> <span class="n">run_sbc</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.analysis</span><span class="w"> </span><span class="kn">import</span> <span class="n">sbc_rank_plot</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.analysis</span><span class="w"> </span><span class="kn">import</span> <span class="n">sbc_rank_plot</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.diagnostics</span><span class="w"> </span><span class="kn">import</span> <span class="n">run_sbc</span>
 
 <span class="n">thetas</span> <span class="o">=</span> <span class="n">prior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">1000</span><span class="p">,))</span>
 <span class="n">xs</span> <span class="o">=</span> <span class="n">simulator</span><span class="p">(</span><span class="n">thetas</span><span class="p">)</span>
@@ -764,8 +764,8 @@ Schölkopf (NeurIPS 2023) <br> <a href="https://arxiv.org/abs/2305.17161">[Paper
 </code></pre></div>
 <p><strong>TARP: Sampling-Based Accuracy Testing of Posterior Estimators for General Inference</strong></p>
 <p>Lemos, Coogan, Hezaveh &amp; Perreault-Levasseur (ICML 2023)<br><a href="https://arxiv.org/abs/2302.03026">[Paper]</a></p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.diagnostics.tarp</span><span class="w"> </span><span class="kn">import</span> <span class="n">run_tarp</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.analysis</span><span class="w"> </span><span class="kn">import</span> <span class="n">plot_tarp</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.analysis</span><span class="w"> </span><span class="kn">import</span> <span class="n">plot_tarp</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.diagnostics.tarp</span><span class="w"> </span><span class="kn">import</span> <span class="n">run_tarp</span>
 
 <span class="n">thetas</span> <span class="o">=</span> <span class="n">prior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">1000</span><span class="p">,))</span>
 <span class="n">xs</span> <span class="o">=</span> <span class="n">simulator</span><span class="p">(</span><span class="n">thetas</span><span class="p">)</span>

@@ -557,9 +557,10 @@
 <h2 id="plotting-functionality">Plotting functionality<a class="headerlink" href="#plotting-functionality" title="Permanent link">&para;</a></h2>
 <p>Here we will have a look at the different options for finetuning <code>pairplots</code> and <code>marginal_plots</code>.</p>
 <p>Lets first draw some samples from the posterior used in a previous tutorial.</p>
-<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span> 
-<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.analysis</span><span class="w"> </span><span class="kn">import</span> <span class="n">pairplot</span>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">toy_posterior_for_07_cc</span><span class="w"> </span><span class="kn">import</span> <span class="n">ExamplePosterior</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.analysis</span><span class="w"> </span><span class="kn">import</span> <span class="n">pairplot</span>
 
 <span class="n">posterior</span> <span class="o">=</span> <span class="n">ExamplePosterior</span><span class="p">()</span>
 <span class="n">posterior_samples</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">100</span><span class="p">,))</span>

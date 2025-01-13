@@ -1093,9 +1093,9 @@ see the source code in <code>_get_default_fig_kwargs()</code></p>
 
     <span class="c1"># checks.</span>
     <span class="k">if</span> <span class="n">fig_kwargs_filled</span><span class="p">[</span><span class="s2">&quot;legend&quot;</span><span class="p">]:</span>
-        <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">fig_kwargs_filled</span><span class="p">[</span><span class="s2">&quot;samples_labels&quot;</span><span class="p">])</span> <span class="o">&gt;=</span> <span class="nb">len</span><span class="p">(</span>
-            <span class="n">samples</span>
-        <span class="p">),</span> <span class="s2">&quot;Provide at least as many labels as samples.&quot;</span>
+        <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">fig_kwargs_filled</span><span class="p">[</span><span class="s2">&quot;samples_labels&quot;</span><span class="p">])</span> <span class="o">&gt;=</span> <span class="nb">len</span><span class="p">(</span><span class="n">samples</span><span class="p">),</span> <span class="p">(</span>
+            <span class="s2">&quot;Provide at least as many labels as samples.&quot;</span>
+        <span class="p">)</span>
     <span class="k">if</span> <span class="n">offdiag</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">warn</span><span class="p">(</span><span class="s2">&quot;offdiag is deprecated, use upper or lower instead.&quot;</span><span class="p">,</span> <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
         <span class="n">upper</span> <span class="o">=</span> <span class="n">offdiag</span>
