@@ -1,8 +1,8 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 import pickle
-import shutil
 import re
+import shutil
 from logging import warning
 from pathlib import Path
 from shutil import rmtree
@@ -86,6 +86,7 @@ def finalize_fixture_store(request, fixture_store):
     global harvested_fixture_data
     harvested_fixture_data = dict(fixture_store)
 
+
 def strip_ansi_escape_codes(text):
     ansi_escape = re.compile(r'\x1b\[.*?m')
     return ansi_escape.sub('', text)
@@ -100,7 +101,8 @@ def center_colored_text(text, width):
 
 def pytest_terminal_summary(terminalreporter, exitstatus, config):
     """
-    Custom pytest terminal summary to display mini SBIBM results with relative coloring per task.
+    Custom pytest terminal summary to display mini SBIBM results with relative coloring
+    per task.
 
     This function is called after the test session ends and generates a summary
     of the results if the `--bm` option is specified. It displays the results
@@ -189,12 +191,6 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
                         val_str = format(val, ".3f")
                         colored_val_str = f"{color}{val_str}\033[0m"
 
-                        # Correct spacing by adjusting for visible length
-                        # padding = (
-                        #     task_col_widths[t]
-                        #     + 2
-                        #     - len(strip_ansi_escape_codes(colored_val_str))
-                        # )
                         row += center_colored_text(
                             colored_val_str, task_col_widths[t] + 2
                         )
