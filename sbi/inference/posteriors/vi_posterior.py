@@ -13,12 +13,12 @@ from tqdm.auto import tqdm
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials.base_potential import BasePotential
-from sbi.samplers.vi import (
+from sbi.samplers.vi.vi_divergence_optimizers import get_VI_method
+from sbi.samplers.vi.vi_pyro_flows import get_flow_builder
+from sbi.samplers.vi.vi_quality_control import get_quality_metric
+from sbi.samplers.vi.vi_utils import (
     adapt_variational_distribution,
     check_variational_distribution,
-    get_VI_method,
-    get_flow_builder,
-    get_quality_metric,
     make_object_deepcopy_compatible,
     move_all_tensor_to_device,
 )

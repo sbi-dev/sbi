@@ -16,7 +16,7 @@ from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler, WeightedRandomSampler
 
 from sbi.samplers.importance.sir import sampling_importance_resampling
-from sbi.samplers.rejection.rejection import accept_reject_sample
+from sbi.samplers import rejection
 from sbi.sbi_types import Shape
 from sbi.utils.sbiutils import (
     get_simulations_since_round,
@@ -684,7 +684,7 @@ class RestrictedPrior(Distribution):
         sample_with = self._sample_with if sample_with is None else sample_with
 
         if sample_with == "rejection":
-            samples, acceptance_rate = accept_reject_sample(
+            samples, acceptance_rate = rejection.accept_reject_sample(
                 proposal=self._prior,
                 accept_reject_fn=self._accept_reject_fn,
                 num_samples=num_samples,

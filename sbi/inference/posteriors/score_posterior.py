@@ -16,7 +16,9 @@ from sbi.neural_nets.estimators.score_estimator import ConditionalScoreEstimator
 from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
 )
-from sbi.samplers.score import Corrector, Diffuser, Predictor
+from sbi.samplers.score.correctors import Corrector
+from sbi.samplers.score.diffuser import Diffuser
+from sbi.samplers.score.predictors import Predictor
 from sbi.sbi_types import Shape
 from sbi.utils import check_prior
 from sbi.utils.torchutils import ensure_theta_batched

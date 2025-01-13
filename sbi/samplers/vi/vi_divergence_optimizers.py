@@ -25,7 +25,6 @@ from torch.optim.lr_scheduler import (
 from torch.optim.rmsprop import RMSprop
 from torch.optim.sgd import SGD
 
-from sbi.inference.potentials.base_potential import BasePotential
 from sbi.samplers.vi.vi_utils import (
     filter_kwrags_for_func,
     make_object_deepcopy_compatible,
@@ -47,7 +46,7 @@ class DivergenceOptimizer(ABC):
 
     def __init__(
         self,
-        potential_fn: BasePotential,
+        potential_fn: 'BasePotential',
         q: PyroTransformedDistribution,
         prior: Optional[Distribution] = None,
         n_particles: int = 256,
