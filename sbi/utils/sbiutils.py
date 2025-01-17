@@ -689,7 +689,6 @@ def mcmc_transform(
     Returns: A transformation that transforms whose `forward()` maps from unconstrained
         (or z-scored) to constrained (or non-z-scored) space.
     """
-
     if enable_transform:
         # Some distributions have a support argument but it raises a
         # NotImplementedError. We catch this case here.
@@ -716,18 +715,60 @@ def mcmc_transform(
                 constraint = prior.support.base_constraint  # type: ignore
             else:
                 constraint = prior.support
-            if isinstance(constraint, constraints._Real):
-                support_is_bounded = False
-            else:
-                support_is_bounded = True
-        else:
-            support_is_bounded = False
 
-        # Prior with bounded support, e.g., uniform priors.
-        if has_support and support_is_bounded:
-            transform = biject_to(prior.support)
-        # For all other cases build affine transform with mean and std.
+            # Check if the support is discrete
+            if hasattr(prior.support, "is_discrete"):
+                is_discrete = prior.support.is_discrete  # type: ignore
+            else:
+                is_discrete = False
+
+            if is_discrete:
+                # For discrete distributions, use mean/std transform
+                try:
+                    prior_mean = prior.mean.to(device)
+                    prior_std = prior.stddev.to(device)
+                except (NotImplementedError, AttributeError):
+                    warnings.warn(
+                        "The passed discrete prior has no mean or stddev attribute, "
+                        "estimating them from samples to build affine standardizing "
+                        "transform.",
+                        stacklevel=2,
+                    )
+                    theta = prior.sample(torch.Size((num_prior_samples_for_zscoring,)))
+                    prior_mean = theta.mean(dim=0).to(device)
+                    prior_std = theta.std(dim=0).to(device)
+                transform = torch_tf.AffineTransform(loc=prior_mean, scale=prior_std)
+            else:
+                # For continuous distributions, check if support is bounded
+                if isinstance(constraint, constraints._Real):
+                    support_is_bounded = False
+                else:
+                    support_is_bounded = True
+
+                if support_is_bounded:
+                    transform = biject_to(prior.support)
+                else:
+                    # Use mean/std transform for unbounded continuous distributions
+                    try:
+                        prior_mean = prior.mean.to(device)
+                        prior_std = prior.stddev.to(device)
+                    except (NotImplementedError, AttributeError):
+                        warnings.warn(
+                            "The passed prior has no mean or stddev attribute, "
+                            "estimating them from samples to build affine "
+                            "standardizing transform.",
+                            stacklevel=2,
+                        )
+                        theta = prior.sample(
+                            torch.Size((num_prior_samples_for_zscoring,))
+                        )
+                        prior_mean = theta.mean(dim=0).to(device)
+                        prior_std = theta.std(dim=0).to(device)
+                    transform = torch_tf.AffineTransform(
+                        loc=prior_mean, scale=prior_std
+                    )
         else:
+            # No support property, use mean/std transform
             try:
                 prior_mean = prior.mean.to(device)
                 prior_std = prior.stddev.to(device)
@@ -737,13 +778,12 @@ def mcmc_transform(
                 # AttributeError -> Custom distribution that has no mean/std attribute.
                 warnings.warn(
                     "The passed prior has no mean or stddev attribute, estimating "
-                    "them from samples to build affimed standardizing transform.",
+                    "them from samples to build affine standardizing transform.",
                     stacklevel=2,
                 )
                 theta = prior.sample(torch.Size((num_prior_samples_for_zscoring,)))
                 prior_mean = theta.mean(dim=0).to(device)
                 prior_std = theta.std(dim=0).to(device)
-
             transform = torch_tf.AffineTransform(loc=prior_mean, scale=prior_std)
     else:
         transform = torch_tf.identity_transform

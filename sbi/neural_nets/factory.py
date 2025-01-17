@@ -31,7 +31,7 @@ from sbi.neural_nets.net_builders.flowmatching_nets import (
     build_resnet_flowmatcher,
 )
 from sbi.neural_nets.net_builders.mdn import build_mdn
-from sbi.neural_nets.net_builders.mnle import build_mnle
+from sbi.neural_nets.net_builders.mixed_nets import build_mnle, build_mnpe
 from sbi.neural_nets.net_builders.score_nets import build_score_estimator
 from sbi.utils.nn_utils import check_net_device
 
@@ -42,6 +42,7 @@ model_builders = {
     "maf_rqs": build_maf_rqs,
     "nsf": build_nsf,
     "mnle": build_mnle,
+    "mnpe": build_mnpe,
     "zuko_nice": build_zuko_nice,
     "zuko_maf": build_zuko_maf,
     "zuko_nsf": build_zuko_nsf,
