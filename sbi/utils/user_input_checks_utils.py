@@ -8,7 +8,7 @@ import torch
 from torch import Tensor, float32
 from torch.distributions import Distribution, constraints
 
-from sbi.utils.torchutils import process_device
+from sbi.utils.torchutils import BoxUniform, process_device
 
 
 class CustomPriorWrapper(Distribution):
@@ -181,9 +181,10 @@ class MultipleIndependent(Distribution):
 
         # Device handling
         device = dists[0].sample().device.type if device is None else device
-        device = process_device(device)  # You'll need to import this from torchutils
+        device = process_device(device)
 
         # Move all distributions to the specified device
+        # self.dists = dists
         self.dists = [self._move_dist_to_device(d, device) for d in dists]
 
         # numel() instead of event_shape because for all dists both is possible,
@@ -208,48 +209,25 @@ class MultipleIndependent(Distribution):
         of all distributions to a device.
         """
         try:
-            # For distributions that implement their own to() method
-            if hasattr(dist, 'to'):
-                return dist.to(device)
-
             # Handle Independent distributions (including BoxUniform)
             if isinstance(dist, torch.distributions.Independent):
-                if type(dist).__name__ == 'BoxUniform':
-                    # BoxUniform needs low and high arguments
-                    base_dist = dist.base_dist
-                    return type(dist)(
-                        low=base_dist.low.to(device),
-                        high=base_dist.high.to(device),
+                # Handle other Independent distributions
+                if isinstance(dist, BoxUniform):
+                    return BoxUniform(
+                        low=dist.base_dist.low,
+                        high=dist.base_dist.high,
                         reinterpreted_batch_ndims=dist.reinterpreted_batch_ndims,
                         device=device,
                     )
                 else:
-                    # Handle other Independent distributions
-                    base_dist_on_device = self._move_dist_to_device(
-                        dist.base_dist, device
-                    )
-                    return type(dist)(
-                        base_dist_on_device,
-                        reinterpreted_batch_ndims=dist.reinterpreted_batch_ndims,
-                    )
-
-            # Handle distributions with _param attribute (e.g., Bernoulli)
-            if hasattr(dist, '_param'):
-                return type(dist)(dist._param.to(device))
-
-            # Handle distributions with _parameters dict
-            elif hasattr(dist, '_parameters'):
-                new_params = {
-                    name: param.to(device) if isinstance(param, torch.Tensor) else param
-                    for name, param in dist._parameters.items()
-                }
-                return type(dist)(**new_params)
+                    return self._move_dist_to_device(dist.base_dist, device)
 
             # Try to get parameters through the Distribution interface
             params = {}
             # Map of distribution types to their required parameter names
             dist_param_map = {
                 'Beta': ['concentration0', 'concentration1'],
+                'Bernoulli': ['probs'],
                 'Binomial': ['total_count', 'probs'],
                 'Categorical': ['probs'],
                 'Cauchy': ['loc', 'scale'],
@@ -375,7 +353,6 @@ class MultipleIndependent(Distribution):
 
     def log_prob(self, value) -> Tensor:
         value = self._prepare_value(value)
-
         # Evaluate value per distribution, taking into account that individual
         # distributions can be multivariate.
         num_samples = value.shape[0]
