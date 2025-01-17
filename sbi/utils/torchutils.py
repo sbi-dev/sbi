@@ -314,14 +314,17 @@ class BoxUniform(Independent):
         device = low.device.type if device is None else device
         device = process_device(device)
 
+        self.low = torch.as_tensor(
+            low, dtype=torch.float32, device=torch.device(device)
+        )
+        self.high = torch.as_tensor(
+            high, dtype=torch.float32, device=torch.device(device)
+        )
+
         super().__init__(
             Uniform(
-                low=torch.as_tensor(
-                    low, dtype=torch.float32, device=torch.device(device)
-                ),
-                high=torch.as_tensor(
-                    high, dtype=torch.float32, device=torch.device(device)
-                ),
+                low=self.low,
+                high=self.high,
                 validate_args=False,
             ),
             reinterpreted_batch_ndims,

@@ -26,7 +26,6 @@ from torch.optim.adam import Adam
 
 from sbi.sbi_types import TorchTransform
 from sbi.utils.torchutils import atleast_2d
-from sbi.utils.user_input_checks_utils import MultipleIndependent
 
 
 def warn_if_zscoring_changes_data(x: Tensor, duplicate_tolerance: float = 0.1) -> None:
@@ -662,6 +661,80 @@ def match_theta_and_x_batch_shapes(theta: Tensor, x: Tensor) -> Tuple[Tensor, Te
     return theta_repeated, x_repeated
 
 
+class CustomConcatTransform(torch_tf.Transform):
+    """Concatenates multiple transforms and applies each to specific dimensions."""
+
+    def __init__(self, transforms: List[TorchTransform], dims: List[int]) -> None:
+        super().__init__()
+
+        self.transforms = transforms
+        self.dims = []
+        current_dim = 0
+        for dim in dims:
+            self.dims.append(slice(current_dim, current_dim + dim))
+            current_dim += dim
+
+        # Cache for inverse transform
+        self._inv = None
+
+    def _call(self, x: Tensor) -> Tensor:
+        """Apply each transform to its respective dimensions."""
+        results = []
+        for transform, dim_slice in zip(self.transforms, self.dims):
+            results.append(transform(x[..., dim_slice]))
+        return torch.cat(results, dim=-1)
+
+    def _inverse(self, y: Tensor) -> Tensor:
+        """Apply inverse of each transform to its respective dimensions."""
+        results = []
+        for transform, dim_slice in zip(self.transforms, self.dims):
+            results.append(transform.inv(y[..., dim_slice]))
+        return torch.cat(results, dim=-1)
+
+    def log_abs_det_jacobian(self, x: Tensor, y: Tensor) -> Tensor:
+        """Sum the log det jacobians of individual transforms."""
+        results = []
+        for transform, dim_slice in zip(self.transforms, self.dims):
+            results.append(
+                transform.log_abs_det_jacobian(x[..., dim_slice], y[..., dim_slice])
+            )
+        return torch.sum(torch.stack(results), dim=0)
+
+    @property
+    def domain(self) -> constraints.Constraint:
+        """Get the domain constraint of the transform."""
+        # For concatenated transforms, we use the most restrictive domain
+        # This is typically constraints.real for standardization transforms
+        return constraints.real
+
+    @property
+    def codomain(self) -> constraints.Constraint:
+        """Get the codomain constraint of the transform."""
+        # For concatenated transforms, we use the most restrictive codomain
+        # This is typically constraints.real for standardization transforms
+        return constraints.real
+
+    def with_cache(self, cache_size: int = 1) -> "CustomConcatTransform":
+        """Returns a transform with caching enabled."""
+        transforms_with_cache = [
+            t.with_cache(cache_size) if hasattr(t, "with_cache") else t
+            for t in self.transforms
+        ]
+        return CustomConcatTransform(
+            transforms_with_cache, [d.stop - d.start for d in self.dims]
+        )
+
+    @property
+    def inv(self) -> "CustomConcatTransform":
+        """Get the inverse transform."""
+        if self._inv is None:
+            self._inv = CustomConcatTransform(
+                [t.inv for t in self.transforms], [d.stop - d.start for d in self.dims]
+            )
+            self._inv._inv = self
+        return self._inv
+
+
 def mcmc_transform(
     prior: Distribution,
     num_prior_samples_for_zscoring: int = 1000,
@@ -692,81 +765,118 @@ def mcmc_transform(
     Returns: A transformation that transforms whose `forward()` maps from unconstrained
         (or z-scored) to constrained (or non-z-scored) space.
     """
-
-    if not enable_transform:
-        return torch_tf.identity_transform
-
-    # Handle MultipleIndependent by recursively calling mcmc_transform
-    if isinstance(prior, MultipleIndependent):
-        transforms = [
-            mcmc_transform(
-                dist,
-                num_prior_samples_for_zscoring,
-                enable_transform,
-                device,
-                **kwargs,
-            )
-            for dist in prior.dists
-        ]
-        return torch_tf.ComposeTransform(transforms)
-
-    # Check if the distribution is discrete/categorical by checking its support
-    try:
-        is_discrete = isinstance(
-            prior.support,
-            (constraints.boolean, constraints.integer, constraints.categorical),
-        )
-    except (NotImplementedError, AttributeError):
-        # If support is not implemented, try to infer from the distribution type
-        is_discrete = isinstance(
-            prior,
-            (
-                torch.distributions.Bernoulli,
-                torch.distributions.Categorical,
-                torch.distributions.Binomial,
-                torch.distributions.OneHotCategorical,
-            ),
-        )
-
-    # If discrete, use identity transform
-    if is_discrete:
-        transform = torch_tf.identity_transform
-    else:
-        # Original continuous distribution logic
+    if enable_transform:
+        # Some distributions have a support argument but it raises a
+        # NotImplementedError. We catch this case here.
         try:
             _ = prior.support
             has_support = True
         except (NotImplementedError, AttributeError):
+            # NotImplementedError -> Distribution that inherits from torch dist but
+            # does not implement support.
+            # AttributeError -> Custom distribution that has no support attribute.
+            warnings.warn(
+                "The passed prior has no support property, transform will be "
+                "constructed from mean and std. If the passed prior is supposed to be "
+                "bounded consider implementing the prior.support property.",
+                stacklevel=2,
+            )
             has_support = False
 
+        # If the distribution has a `support`, check if the support is bounded.
+        # If it is not bounded, we want to z-score the space. This is not done
+        # by `biject_to()`, so we have to deal with this case separately.
         if has_support:
             if hasattr(prior.support, "base_constraint"):
-                constraint = prior.support.base_constraint
+                constraint = prior.support.base_constraint  # type: ignore
             else:
                 constraint = prior.support
-            support_is_bounded = not isinstance(constraint, constraints._Real)
-        else:
-            support_is_bounded = False
 
-        if has_support and support_is_bounded:
-            transform = biject_to(prior.support)
+            # Check if the support is discrete
+            if hasattr(prior.support, "is_discrete"):
+                is_discrete = prior.support.is_discrete  # type: ignore
+            else:
+                is_discrete = False
+
+            if is_discrete:
+                # For discrete distributions, use mean/std transform
+                try:
+                    prior_mean = prior.mean.to(device)
+                    prior_std = prior.stddev.to(device)
+                except (NotImplementedError, AttributeError):
+                    warnings.warn(
+                        "The passed discrete prior has no mean or stddev attribute, "
+                        "estimating them from samples to build affine standardizing "
+                        "transform.",
+                        stacklevel=2,
+                    )
+                    theta = prior.sample(torch.Size((num_prior_samples_for_zscoring,)))
+                    prior_mean = theta.mean(dim=0).to(device)
+                    prior_std = theta.std(dim=0).to(device)
+                transform = torch_tf.AffineTransform(loc=prior_mean, scale=prior_std)
+            else:
+                # For continuous distributions, check if support is bounded
+                if isinstance(constraint, constraints._Real):
+                    support_is_bounded = False
+                else:
+                    support_is_bounded = True
+
+                if support_is_bounded:
+                    transform = biject_to(prior.support)
+                else:
+                    # Use mean/std transform for unbounded continuous distributions
+                    try:
+                        prior_mean = prior.mean.to(device)
+                        prior_std = prior.stddev.to(device)
+                    except (NotImplementedError, AttributeError):
+                        warnings.warn(
+                            "The passed prior has no mean or stddev attribute, "
+                            "estimating them from samples to build affine "
+                            "standardizing transform.",
+                            stacklevel=2,
+                        )
+                        theta = prior.sample(
+                            torch.Size((num_prior_samples_for_zscoring,))
+                        )
+                        prior_mean = theta.mean(dim=0).to(device)
+                        prior_std = theta.std(dim=0).to(device)
+                    transform = torch_tf.AffineTransform(
+                        loc=prior_mean, scale=prior_std
+                    )
         else:
+            # No support property, use mean/std transform
             try:
                 prior_mean = prior.mean.to(device)
                 prior_std = prior.stddev.to(device)
             except (NotImplementedError, AttributeError):
+                # NotImplementedError -> Distribution that inherits from torch dist but
+                # does not implement mean, e.g., TransformedDistribution.
+                # AttributeError -> Custom distribution that has no mean/std attribute.
+                warnings.warn(
+                    "The passed prior has no mean or stddev attribute, estimating "
+                    "them from samples to build affine standardizing transform.",
+                    stacklevel=2,
+                )
                 theta = prior.sample(torch.Size((num_prior_samples_for_zscoring,)))
                 prior_mean = theta.mean(dim=0).to(device)
                 prior_std = theta.std(dim=0).to(device)
             transform = torch_tf.AffineTransform(loc=prior_mean, scale=prior_std)
+    else:
+        transform = torch_tf.identity_transform
 
-    # Wrap as IndependentTransform if needed
+    # Pytorch `transforms` do not sum the determinant over the parameters. However, if
+    # the `transform` explicitly is an `IndependentTransform`, it does. Since our
+    # `BoxUniform` is a `Independent` distribution, it will also automatically get a
+    # `IndependentTransform` wrapper in `biject_to`. Our solution here is to wrap all
+    # transforms as `IndependentTransform`.
     if not isinstance(transform, torch_tf.IndependentTransform):
         transform = torch_tf.IndependentTransform(
             transform, reinterpreted_batch_ndims=1
         )
 
-    return transform.inv
+    check_transform(prior, transform)  # type: ignore
+
+    return transform.inv  # type: ignore
 
 
 def check_transform(
