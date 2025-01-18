@@ -24,7 +24,7 @@ def score_estimator_based_potential(
     score_estimator: ConditionalScoreEstimator,
     prior: Optional[Distribution],
     x_o: Optional[Tensor],
-    enable_transform: bool = False,
+    enable_transform: bool = True,
 ) -> Tuple["PosteriorScoreBasedPotential", TorchTransform]:
     r"""Returns the potential function gradient for score estimators.
 
@@ -38,10 +38,6 @@ def score_estimator_based_potential(
 
     potential_fn = PosteriorScoreBasedPotential(
         score_estimator, prior, x_o, device=device
-    )
-
-    assert enable_transform is False, (
-        "Transforms are not yet supported for score estimators."
     )
 
     if prior is not None:
@@ -73,16 +69,38 @@ class PosteriorScoreBasedPotential(BasePotential):
                 `iid_bridge` as proposed in Geffner et al. is implemented.
             device: The device on which to evaluate the potential.
         """
-
-        super().__init__(prior, x_o, device=device)
         self.score_estimator = score_estimator
         self.score_estimator.eval()
         self.iid_method = iid_method
+        super().__init__(prior, x_o, device=device)
+
+    def set_x(
+        self,
+        x_o: Optional[Tensor],
+        x_is_iid: Optional[bool] = False,
+        rebuild_flow: Optional[bool] = True,
+    ):
+        super().set_x(x_o, x_is_iid)
+        if rebuild_flow and self._x_o is not None:
+            x_density_estimator = reshape_to_batch_event(
+                self.x_o, event_shape=self.score_estimator.condition_shape
+            )
+            assert (
+                x_density_estimator.shape[0] == 1
+            ), "PosteriorScoreBasedPotential supports only x batchsize of 1`."
+            # For large number of evals, we want a high-tolerance flow.
+            # This flow will be used mainly for MAP calculations, hence we want to save
+            # it instead of rebuilding it every time.
+            flow = self.get_continuous_normalizing_flow(
+                condition=x_density_estimator, atol=1e-2, rtol=1e-3, exact=True
+            )
+            self.flow = flow
 
     def __call__(
         self,
         theta: Tensor,
         track_gradients: bool = True,
+        rebuild_flow: bool = True,
         atol: float = 1e-5,
         rtol: float = 1e-6,
         exact: bool = True,
@@ -92,6 +110,7 @@ class PosteriorScoreBasedPotential(BasePotential):
         Args:
             theta: The parameters at which to evaluate the potential.
             track_gradients: Whether to track gradients.
+            rebuild_flow: Whether to rebuild the CNF for accurate log_prob evaluation.
             atol: Absolute tolerance for the ODE solver.
             rtol: Relative tolerance for the ODE solver.
             exact: Whether to use the exact ODE solver.
@@ -103,18 +122,20 @@ class PosteriorScoreBasedPotential(BasePotential):
         theta_density_estimator = reshape_to_sample_batch_event(
             theta, theta.shape[1:], leading_is_sample=True
         )
-        x_density_estimator = reshape_to_batch_event(
-            self.x_o, event_shape=self.score_estimator.condition_shape
-        )
-        assert x_density_estimator.shape[0] == 1, (
-            "PosteriorScoreBasedPotential supports only x batchsize of 1`."
-        )
-
         self.score_estimator.eval()
+        if rebuild_flow or self.flow is None:
+            x_density_estimator = reshape_to_batch_event(
+                self.x_o, event_shape=self.score_estimator.condition_shape
+            )
+            assert (
+                x_density_estimator.shape[0] == 1
+            ), "PosteriorScoreBasedPotential supports only x batchsize of 1`."
 
-        flow = self.get_continuous_normalizing_flow(
-            condition=x_density_estimator, atol=atol, rtol=rtol, exact=exact
-        )
+            flow = self.get_continuous_normalizing_flow(
+                condition=x_density_estimator, atol=atol, rtol=rtol, exact=exact
+            )
+        else:
+            flow = self.flow
 
         with torch.set_grad_enabled(track_gradients):
             log_probs = flow.log_prob(theta_density_estimator).squeeze(-1)
@@ -134,7 +155,7 @@ class PosteriorScoreBasedPotential(BasePotential):
         r"""Returns the potential function gradient for score-based methods.
 
         Args:
-            theta: The parameters at which to evaluate the potential.
+            theta: The parameters at which to evaluate the potential gradient.
             time: The diffusion time. If None, then `t_min` of the
                 self.score_estimator is used (i.e. we evaluate the gradient of the
                 actual data distribution).

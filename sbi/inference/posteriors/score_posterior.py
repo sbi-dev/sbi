@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+from functools import partial
 from typing import Dict, Optional, Union
 
 import torch
@@ -16,11 +17,13 @@ from sbi.neural_nets.estimators.score_estimator import ConditionalScoreEstimator
 from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
 )
+from sbi.samplers.rejection import rejection
 from sbi.samplers.score.correctors import Corrector
 from sbi.samplers.score.diffuser import Diffuser
 from sbi.samplers.score.predictors import Predictor
 from sbi.sbi_types import Shape
 from sbi.utils import check_prior
+from sbi.utils.sbiutils import gradient_ascent, within_support
 from sbi.utils.torchutils import ensure_theta_batched
 
 
@@ -138,8 +141,18 @@ class ScorePosterior(NeuralPosterior):
         x = reshape_to_batch_event(x, self.score_estimator.condition_shape)
         self.potential_fn.set_x(x)
 
+        num_samples = torch.Size(sample_shape).numel()
+
         if self.sample_with == "ode":
-            samples = self.sample_via_zuko(sample_shape=sample_shape, x=x)
+            samples = rejection.accept_reject_sample(
+                proposal=self.sample_via_zuko,
+                accept_reject_fn=lambda theta: within_support(self.prior, theta),
+                num_samples=num_samples,
+                show_progress_bars=show_progress_bars,
+                max_sampling_batch_size=max_sampling_batch_size,
+                proposal_sampling_kwargs={"x": x},
+            )[0]
+            samples = samples.reshape(sample_shape + self.score_estimator.input_shape)
         elif self.sample_with == "sde":
             samples = self._sample_via_diffusion(
                 sample_shape=sample_shape,
@@ -152,6 +165,25 @@ class ScorePosterior(NeuralPosterior):
                 max_sampling_batch_size=max_sampling_batch_size,
                 show_progress_bars=show_progress_bars,
             )
+            proposal_sampling_kwargs = {
+                "predictor": predictor,
+                "corrector": corrector,
+                "predictor_params": predictor_params,
+                "corrector_params": corrector_params,
+                "steps": steps,
+                "ts": ts,
+                "max_sampling_batch_size": max_sampling_batch_size,
+                "show_progress_bars": show_progress_bars,
+            }
+            samples = rejection.accept_reject_sample(
+                proposal=self._sample_via_diffusion,
+                accept_reject_fn=lambda theta: within_support(self.prior, theta),
+                num_samples=num_samples,
+                show_progress_bars=show_progress_bars,
+                max_sampling_batch_size=max_sampling_batch_size,
+                proposal_sampling_kwargs=proposal_sampling_kwargs,
+            )[0]
+            samples = samples.reshape(sample_shape + self.score_estimator.input_shape)
 
         return samples
 
@@ -222,12 +254,12 @@ class ScorePosterior(NeuralPosterior):
             )
         samples = torch.cat(samples, dim=0)[:num_samples]
 
-        return samples.reshape(sample_shape + self.score_estimator.input_shape)
+        return samples
 
     def sample_via_zuko(
         self,
-        x: Tensor,
         sample_shape: Shape = torch.Size(),
+        x: Optional[Tensor] = None,
     ) -> Tensor:
         r"""Return samples from posterior distribution with probability flow ODE.
 
@@ -243,10 +275,13 @@ class ScorePosterior(NeuralPosterior):
         """
         num_samples = torch.Size(sample_shape).numel()
 
+        x = self._x_else_default_x(x)
+        x = reshape_to_batch_event(x, self.score_estimator.condition_shape)
+
         flow = self.potential_fn.get_continuous_normalizing_flow(condition=x)
         samples = flow.sample(torch.Size((num_samples,)))
 
-        return samples.reshape(sample_shape + self.score_estimator.input_shape)
+        return samples
 
     def log_prob(
         self,
@@ -303,7 +338,7 @@ class ScorePosterior(NeuralPosterior):
         x: Optional[Tensor] = None,
         num_iter: int = 1000,
         num_to_optimize: int = 1000,
-        learning_rate: float = 1e-5,
+        learning_rate: float = 0.01,
         init_method: Union[str, Tensor] = "posterior",
         num_init_samples: int = 1000,
         save_best_every: int = 1000,
@@ -351,17 +386,77 @@ class ScorePosterior(NeuralPosterior):
         Returns:
             The MAP estimate.
         """
-        raise NotImplementedError(
-            "MAP estimation is currently not working accurately for ScorePosterior."
+        if x is not None:
+            raise ValueError(
+                "Passing `x` directly to `.map()` has been deprecated."
+                "Use `.self_default_x()` to set `x`, and then run `.map()` "
+            )
+
+        if self.default_x is None:
+            raise ValueError(
+                "Default `x` has not been set."
+                "To set the default, use the `.set_default_x()` method."
+            )
+
+        if self._map is None or force_update:
+            self.potential_fn.set_x(self.default_x)
+            callable_potential_fn = CallableDifferentiablePotentialFunction(
+                self.potential_fn
+            )
+            if init_method == "posterior":
+                inits = self.sample((num_init_samples,))
+            elif init_method == "proposal":
+                inits = self.proposal.sample((num_init_samples,))  # type: ignore
+            elif isinstance(init_method, Tensor):
+                inits = init_method
+            else:
+                raise ValueError
+
+            self._map = gradient_ascent(
+                potential_fn=callable_potential_fn,
+                inits=inits,
+                theta_transform=self.theta_transform,
+                num_iter=num_iter,
+                num_to_optimize=num_to_optimize,
+                learning_rate=learning_rate,
+                save_best_every=save_best_every,
+                show_progress_bars=show_progress_bars,
+            )[0]
+
+        return self._map
+
+
+class DifferentiablePotentialFunction(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, input, call_function, gradient_function):
+        # Save the methods as callables
+        ctx.call_function = call_function
+        ctx.gradient_function = gradient_function
+        ctx.save_for_backward(input)
+
+        # Perform the forward computation
+        output = call_function(input)
+        return output
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        (input,) = ctx.saved_tensors
+        grad = ctx.gradient_function(input)
+        while len(grad_output.shape) < len(grad.shape):
+            grad_output = grad_output.unsqueeze(-1)
+        grad_input = grad_output * grad
+        return grad_input, None, None
+
+
+# Wrapper class to manage state
+class CallableDifferentiablePotentialFunction:
+    def __init__(self, posterior_score_based_potential):
+        self.posterior_score_based_potential = posterior_score_based_potential
+
+    def __call__(self, input):
+        prepared_potential = partial(
+            self.posterior_score_based_potential.__call__, rebuild_flow=False
         )
-        return super().map(
-            x=x,
-            num_iter=num_iter,
-            num_to_optimize=num_to_optimize,
-            learning_rate=learning_rate,
-            init_method=init_method,
-            num_init_samples=num_init_samples,
-            save_best_every=save_best_every,
-            show_progress_bars=show_progress_bars,
-            force_update=force_update,
+        return DifferentiablePotentialFunction.apply(
+            input, prepared_potential, self.posterior_score_based_potential.gradient
         )
