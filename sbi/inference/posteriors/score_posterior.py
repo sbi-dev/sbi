@@ -49,7 +49,7 @@ class ScorePosterior(NeuralPosterior):
         prior: Distribution,
         max_sampling_batch_size: int = 10_000,
         device: Optional[str] = None,
-        enable_transform: bool = False,
+        enable_transform: bool = True,
         sample_with: str = "sde",
     ):
         """
