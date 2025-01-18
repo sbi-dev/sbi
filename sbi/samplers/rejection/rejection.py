@@ -1,11 +1,10 @@
 import logging
 import warnings
-from typing import Any, Callable, Dict, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Optional, Tuple
 
 import torch
 import torch.distributions.transforms as torch_tf
-from torch import Tensor, as_tensor, nn
-from torch.distributions import Distribution
+from torch import Tensor, as_tensor
 from tqdm.auto import tqdm
 
 from sbi.utils.sbiutils import gradient_ascent
@@ -188,7 +187,7 @@ def rejection_sample(
 
 @torch.no_grad()
 def accept_reject_sample(
-    proposal: Union[nn.Module, Distribution],
+    proposal: Callable,
     accept_reject_fn: Callable,
     num_samples: int,
     show_progress_bars: bool = False,
@@ -278,7 +277,7 @@ def accept_reject_sample(
     num_samples_possible = 0
     while num_remaining > 0:
         # Sample and reject.
-        candidates = proposal.sample(
+        candidates = proposal(
             (sampling_batch_size,),  # type: ignore
             **proposal_sampling_kwargs,
         )

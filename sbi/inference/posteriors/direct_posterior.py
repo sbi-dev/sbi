@@ -132,7 +132,7 @@ class DirectPosterior(NeuralPosterior):
             )
 
         samples = rejection.accept_reject_sample(
-            proposal=self.posterior_estimator,
+            proposal=self.posterior_estimator.sample,
             accept_reject_fn=lambda theta: within_support(self.prior, theta),
             num_samples=num_samples,
             show_progress_bars=show_progress_bars,
@@ -176,7 +176,7 @@ class DirectPosterior(NeuralPosterior):
         )
 
         samples = rejection.accept_reject_sample(
-            proposal=self.posterior_estimator,
+            proposal=self.posterior_estimator.sample,
             accept_reject_fn=lambda theta: within_support(self.prior, theta),
             num_samples=num_samples,
             show_progress_bars=show_progress_bars,
@@ -373,7 +373,7 @@ class DirectPosterior(NeuralPosterior):
         def acceptance_at(x: Tensor) -> Tensor:
             # [1:] to remove batch-dimension for `reshape_to_batch_event`.
             return rejection.accept_reject_sample(
-                proposal=self.posterior_estimator,
+                proposal=self.posterior_estimator.sample,
                 accept_reject_fn=lambda theta: within_support(self.prior, theta),
                 num_samples=num_rejection_samples,
                 show_progress_bars=show_progress_bars,
