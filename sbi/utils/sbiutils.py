@@ -947,7 +947,7 @@ def gradient_ascent(
                     )
                     best_theta_iter = optimize_inits[  # type: ignore
                         torch.argmax(log_probs_of_optimized)
-                    ].view(1, -1)
+                    ].unsqueeze(0)  # add batch dim
                     best_log_prob_iter = potential_fn(
                         theta_transform.inv(best_theta_iter)
                     )

@@ -24,6 +24,7 @@ from sbi.inference import (
     ratio_estimator_based_potential,
 )
 from sbi.inference.posteriors.importance_posterior import ImportanceSamplingPosterior
+from sbi.inference.posteriors.mcmc_posterior import MCMCPosterior
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.neural_nets.embedding_nets import FCEmbedding
 from sbi.neural_nets.factory import (
@@ -33,7 +34,11 @@ from sbi.neural_nets.factory import (
     posterior_nn,
 )
 from sbi.simulators import diagonal_linear_gaussian, linear_gaussian
-from sbi.utils.torchutils import BoxUniform, gpu_available, process_device
+from sbi.utils.torchutils import (
+    BoxUniform,
+    gpu_available,
+    process_device,
+)
 from sbi.utils.user_input_checks import (
     validate_theta_and_x,
 )
@@ -465,3 +470,49 @@ def test_multiround_mdn_training_on_device(method: Union[NPE_A, NPE_C], device: 
         proposal = trainer.build_posterior().set_default_x(torch.zeros(num_dim))
         theta = proposal.sample((num_simulations,))
         x = simulator(theta)
+
+
+@pytest.mark.gpu
+@pytest.mark.parametrize("device", ["cpu", "gpu"])
+def test_conditioned_posterior_on_gpu(device: str, mcmc_params_fast: dict):
+    device = process_device(device)
+    num_dims = 3
+
+    proposal = BoxUniform(
+        low=-torch.ones(num_dims, device=device),
+        high=torch.ones(num_dims, device=device),
+    )
+
+    inference = NPE_C(device=device, show_progress_bars=False)
+
+    num_simulations = 100
+    theta = proposal.sample((num_simulations,))
+    x = torch.randn_like(theta)
+    x_o = torch.zeros(1, num_dims).to(device)
+    inference = inference.append_simulations(theta, x)
+
+    estimator = inference.train(max_num_epochs=2)
+
+    # condition on one dim of theta
+    condition_o = torch.ones(1, 1).to(device)
+    prior = BoxUniform(
+        low=-torch.ones(num_dims - 1, device=device),
+        high=torch.ones(num_dims - 1, device=device),
+    )
+    prior_transform = utils.mcmc_transform(prior, device=device)
+
+    potential_fn, _ = likelihood_estimator_based_potential(estimator, proposal, x_o)
+    conditioned_potential_fn = potential_fn.condition_on_theta(
+        condition_o, dims_global_theta=[0, 1]
+    )
+
+    conditional_posterior = MCMCPosterior(
+        potential_fn=conditioned_potential_fn,
+        theta_transform=prior_transform,
+        proposal=prior,
+        device=device,
+        **mcmc_params_fast,
+    ).set_default_x(x_o)
+    samples = conditional_posterior.sample((1,), x=x_o)
+    conditional_posterior.potential_fn(samples)
+    conditional_posterior.map()
