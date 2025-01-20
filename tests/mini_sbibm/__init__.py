@@ -1,10 +1,18 @@
+from .base_task import Task
 from .gaussian_linear import GaussianLinear
 from .linear_mvg import LinearMVG2d
 from .slcp import Slcp
 from .two_moons import TwoMoons
 
+TASKS = {
+    "two_moons": TwoMoons,
+    "linear_mvg_2d": LinearMVG2d,
+    "gaussian_linear": GaussianLinear,
+    "slcp": Slcp,
+}
 
-def get_task(name: str):
+
+def get_task(name: str, *args, **kwargs) -> Task:
     """
     Retrieve a task instance based on the given name.
 
@@ -19,13 +27,7 @@ def get_task(name: str):
     Raises:
         ValueError: If the provided task name is unknown.
     """
-    if name == "two_moons":
-        return TwoMoons()
-    elif name == "linear_mvg_2d":
-        return LinearMVG2d()
-    elif name == "gaussian_linear":
-        return GaussianLinear()
-    elif name == "slcp":
-        return Slcp()
-    else:
-        raise ValueError(f"Unknown task {name}")
+    try:
+        return TASKS[name](*args, **kwargs)
+    except KeyError as err:
+        raise ValueError(f"Unknown task {name}") from err
