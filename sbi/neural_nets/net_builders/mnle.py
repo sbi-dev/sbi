@@ -64,7 +64,7 @@ def build_mnle(
     hidden_features: int = 50,
     hidden_layers: int = 2,
     tail_bound: float = 10.0,
-    log_transform_x: bool = True,
+    log_transform_x: bool = False,
     **kwargs,
 ):
     """Returns a density estimator for mixed data types.

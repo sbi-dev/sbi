@@ -162,7 +162,9 @@ def test_mnle_accuracy_with_different_samplers_and_trials(
     x = mixed_simulator(theta, stimulus_condition=1.0)
 
     # MNLE
-    density_estimator = likelihood_nn(model="mnle", flow_model=flow_model)
+    density_estimator = likelihood_nn(
+        model="mnle", flow_model=flow_model, log_transform_x=True
+    )
     trainer = MNLE(prior, density_estimator=density_estimator)
     trainer.append_simulations(theta, x).train(training_batch_size=200)
     posterior = trainer.build_posterior()
@@ -294,7 +296,7 @@ def test_mnle_with_experimental_conditions(mcmc_params_accurate: dict):
     )
 
     # MNLE
-    estimator_fun = likelihood_nn(model="mnle", z_score_x=None)
+    estimator_fun = likelihood_nn(model="mnle", log_transform_x=True)
     trainer = MNLE(proposal, estimator_fun)
     estimator = trainer.append_simulations(theta, x).train()
 
@@ -362,9 +364,7 @@ def test_log_likelihood_over_local_iid_theta(
     """
 
     # train mnle on mixed data
-    trainer = MNLE(
-        density_estimator=likelihood_nn(model="mnle", z_score_x=None),
-    )
+    trainer = MNLE()
     proposal = MultipleIndependent(
         [
             Gamma(torch.tensor([1.0]), torch.tensor([0.5])),
