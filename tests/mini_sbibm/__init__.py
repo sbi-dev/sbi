@@ -1,3 +1,7 @@
+# This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+# NOTE: This is inspired by the sbibm-package <https://github.com/sbi-benchmark/sbibm>
+
 from .base_task import Task
 from .gaussian_linear import GaussianLinear
 from .linear_mvg import LinearMVG2d
