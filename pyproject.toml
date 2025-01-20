@@ -73,6 +73,7 @@ dev = [
     "pytest",
     "pytest-cov",
     "pytest-xdist",
+    "pytest-harvest",
     "torchtestcase",
 ]
 
