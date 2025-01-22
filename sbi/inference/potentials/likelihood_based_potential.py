@@ -143,9 +143,14 @@ class LikelihoodBasedPotential(BasePotential):
         def conditioned_potential(
             theta: Tensor, x_o: Optional[Tensor] = None, track_gradients: bool = True
         ) -> Tensor:
-            assert len(dims_global_theta) == theta.shape[1], (
+            assert len(dims_global_theta) == theta.shape[-1], (
                 "dims_global_theta must match the number of parameters to sample."
             )
+            if theta.dim() > 2:
+                assert theta.shape[0] == 1, (
+                    "condition_on_theta does not support sample shape for theta."
+                )
+                theta = theta.squeeze(0)
             global_theta = theta[:, dims_global_theta]
             x_o = x_o if x_o is not None else self.x_o
             # x needs shape (sample_dim (iid), batch_dim (xs), *event_shape)
@@ -155,7 +160,7 @@ class LikelihoodBasedPotential(BasePotential):
                 )
 
             return _log_likelihood_over_iid_trials_and_local_theta(
-                x=x_o,
+                x=x_o.to(self.device),
                 global_theta=global_theta,
                 local_theta=local_theta,
                 estimator=self.likelihood_estimator,
@@ -266,6 +271,10 @@ def _log_likelihood_over_iid_trials_and_local_theta(
     assert local_theta.shape[0] == num_trials, (
         "Condition batch size must match the number of iid trials in x."
     )
+    if num_xs > 1:
+        raise NotImplementedError(
+            "Batched sampling for multiple `x` is not supported for iid conditions."
+        )
 
     # move the iid batch dimension onto the batch dimension of theta and repeat it there
     x_repeated = torch.transpose(x, 0, 1).repeat_interleave(num_thetas, dim=1)
@@ -289,7 +298,8 @@ def _log_likelihood_over_iid_trials_and_local_theta(
             num_xs, num_trials, num_thetas
         ).sum(1)
 
-    return log_likelihood_trial_sum
+    # remove xs batch dimension
+    return log_likelihood_trial_sum.squeeze(0)
 
 
 def mixed_likelihood_estimator_based_potential(

@@ -40,9 +40,10 @@ def mixed_simulator(theta: Tensor, stimulus_condition: Union[Tensor, float] = 2.
     return torch.cat((rts, choices), dim=1)
 
 
-def wrapped_simulator(
+def mixed_simulator_with_conditions(
     theta_and_condition: Tensor, last_idx_parameters: int = 2
 ) -> Tensor:
+    """Simulator for mixed data with experimental conditions."""
     # simulate with experiment conditions
     theta = theta_and_condition[:, :last_idx_parameters]
     condition = theta_and_condition[:, last_idx_parameters:]
@@ -278,7 +279,7 @@ def test_mnle_with_experimental_conditions(mcmc_params_accurate: dict):
     )
 
     theta = proposal.sample((num_simulations,))
-    x = wrapped_simulator(theta)
+    x = mixed_simulator_with_conditions(theta)
     assert x.shape == (num_simulations, 2)
 
     num_trials = 10
@@ -289,7 +290,7 @@ def test_mnle_with_experimental_conditions(mcmc_params_accurate: dict):
     condition_o = theta_and_condition[:, 2:]
     theta_and_conditions_o = torch.cat((theta_o, condition_o), dim=1)
 
-    x_o = wrapped_simulator(theta_and_conditions_o)
+    x_o = mixed_simulator_with_conditions(theta_and_conditions_o)
 
     mcmc_kwargs = dict(
         method="slice_np_vectorized", init_strategy="proposal", **mcmc_params_accurate
@@ -313,6 +314,9 @@ def test_mnle_with_experimental_conditions(mcmc_params_accurate: dict):
         ],
         validate_args=False,
     )
+    # test theta with sample shape.
+    conditioned_potential_fn(prior.sample((10,)).unsqueeze(0))
+
     prior_transform = mcmc_transform(prior)
     true_posterior_samples = MCMCPosterior(
         BinomialGammaPotential(
@@ -339,14 +343,28 @@ def test_mnle_with_experimental_conditions(mcmc_params_accurate: dict):
 
 @pytest.mark.parametrize("num_thetas", [1, 10])
 @pytest.mark.parametrize("num_trials", [1, 5])
-@pytest.mark.parametrize("num_xs", [1, 3])
+@pytest.mark.parametrize(
+    "num_xs",
+    [
+        1,
+        pytest.param(
+            2,
+            marks=pytest.mark.xfail(
+                reason="Batched x not supported for iid trials.",
+                raises=NotImplementedError,
+            ),
+        ),
+    ],
+)
 @pytest.mark.parametrize(
     "num_conditions",
     [
         1,
         pytest.param(
             2,
-            marks=pytest.mark.xfail(reason="Batched theta_condition is not supported"),
+            marks=pytest.mark.xfail(
+                reason="Batched theta_condition is not supported",
+            ),
         ),
     ],
 )
@@ -376,7 +394,7 @@ def test_log_likelihood_over_local_iid_theta(
 
     num_simulations = 100
     theta = proposal.sample((num_simulations,))
-    x = wrapped_simulator(theta)
+    x = mixed_simulator_with_conditions(theta)
     estimator = trainer.append_simulations(theta, x).train(max_num_epochs=1)
 
     # condition on multiple conditions
@@ -407,8 +425,10 @@ def test_log_likelihood_over_local_iid_theta(
         )
         x_i = x_o[i].reshape(num_xs, 1, -1).repeat(1, num_thetas, 1)
         ll_single.append(estimator.log_prob(input=x_i, condition=theta_and_condition))
-    ll_single = torch.stack(ll_single).sum(0)  # sum over trials
+    ll_single = (
+        torch.stack(ll_single).sum(0).squeeze(0)
+    )  # sum over trials, squeeze x batch.
 
-    assert ll_batched.shape == torch.Size([num_xs, num_thetas])
+    assert ll_batched.shape == torch.Size([num_thetas])
     assert ll_batched.shape == ll_single.shape
     assert torch.allclose(ll_batched, ll_single, atol=1e-5)
