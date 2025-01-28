@@ -28,10 +28,13 @@ def import_first_function(module_name: str):
     else:
         pass
 
+
 def reset_environment():
-    """This is a helper which resets the environment by deleting all modules associated with the sbi package."""
+    """This is a helper which resets the environment by deleting all sbi modules."""
+
     for module_name in list(sys.modules.keys()):
         if module_name.startswith("sbi"):
+            print(f"Deleting {module_name}")
             del sys.modules[module_name]
 
 
@@ -100,3 +103,5 @@ def test_for_circular_imports():
     assert len(errors) == 0, "\n".join(errors)
 
     reset_environment()
+
+  
