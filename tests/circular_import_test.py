@@ -31,8 +31,8 @@ def import_first_function(module_name: str):
 
 def reset_environment():
     """This is a helper which resets the environment by deleting all sbi modules."""
-    # NOTE: Do not mess with sys.modules directly this will lead to wierd sporadic
-    # errors with pickle!
+    # NOTE: Beware when working with sys.modules directly as this can lead to side
+    # effects, e.g., sporadic errors with pickle!
     for module_name in list(sys.modules.keys()):
         if module_name.startswith("sbi"):
             if module_name in globals():
