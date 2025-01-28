@@ -99,3 +99,5 @@ def test_for_circular_imports():
                 print(f"Circular import detected in {module_name}")
 
     assert len(errors) == 0, "\n".join(errors)
+
+    reset_environment()
