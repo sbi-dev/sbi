@@ -29,18 +29,9 @@ def import_first_function(module_name: str):
         pass
 
 def reset_environment():
-    """This is a helper which resets the environment by deleting all modules except required ones."""
-    required_modules = {
-        "sys",
-        "importlib",
-        "inspect",
-        "pkgutil",
-        "contextlib",
-        "random",
-        "types",
-    }
+    """This is a helper which resets the environment by deleting all modules associated with the sbi package."""
     for module_name in list(sys.modules.keys()):
-        if module_name not in required_modules:
+        if module_name.startswith("sbi"):
             del sys.modules[module_name]
 
 
