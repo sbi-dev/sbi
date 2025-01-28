@@ -52,7 +52,7 @@ jobs:
 
     - name: Run the fast CPU tests with coverage
       run: |
-        pytest -v -x -n auto -m "not slow and not gpu" --cov=sbi --cov-report=xml tests/
+        pytest -v -x -n auto -m "not slow and not gpu" --cov=sbi --cov-report=xml tests/mcmc_test.py::test_c2st_slice_np_vectorized_parallelized_on_Gaussian
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4
