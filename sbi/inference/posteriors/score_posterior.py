@@ -154,17 +154,6 @@ class ScorePosterior(NeuralPosterior):
             )[0]
             samples = samples.reshape(sample_shape + self.score_estimator.input_shape)
         elif self.sample_with == "sde":
-            samples = self._sample_via_diffusion(
-                sample_shape=sample_shape,
-                predictor=predictor,
-                corrector=corrector,
-                predictor_params=predictor_params,
-                corrector_params=corrector_params,
-                steps=steps,
-                ts=ts,
-                max_sampling_batch_size=max_sampling_batch_size,
-                show_progress_bars=show_progress_bars,
-            )
             proposal_sampling_kwargs = {
                 "predictor": predictor,
                 "corrector": corrector,
