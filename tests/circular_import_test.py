@@ -103,5 +103,3 @@ def test_for_circular_imports():
     assert len(errors) == 0, "\n".join(errors)
 
     reset_environment()
-
-  
