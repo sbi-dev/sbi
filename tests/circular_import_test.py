@@ -34,8 +34,10 @@ def reset_environment():
 
     for module_name in list(sys.modules.keys()):
         if module_name.startswith("sbi"):
-            print(f"Deleting {module_name}")
-            del sys.modules[module_name]
+            if module_name in globals():
+                del globals()[module_name]
+            elif module_name in locals():
+                del locals()[module_name]
 
 
 def find_submodules(package_name: str):
@@ -78,6 +80,7 @@ def test_for_circular_imports():
     # Permute the list of modules
     random.shuffle(modules)
 
+
     errors = []
     for module_name in modules:
         # Try to import
@@ -102,4 +105,3 @@ def test_for_circular_imports():
 
     assert len(errors) == 0, "\n".join(errors)
 
-    reset_environment()
