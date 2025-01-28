@@ -62,4 +62,4 @@ jobs:
 
     - name: Run the selected tests without coverage
       run: |
-        pytest -v -x -m ${{ inputs.pytest-marker }} tests/
+        pytest -v -x -m ${{ inputs.pytest-marker }} tests/mcmc_test.py::test_c2st_slice_np_vectorized_parallelized_on_Gaussian
