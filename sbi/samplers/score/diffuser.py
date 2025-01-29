@@ -7,10 +7,8 @@ import torch
 from torch import Tensor
 from tqdm.auto import tqdm
 
-from sbi.inference.potentials.score_based_potential import (
-    PosteriorScoreBasedPotential,
-)
-from sbi.samplers.score import Corrector, Predictor, get_corrector, get_predictor
+from sbi.samplers.score.correctors import Corrector, get_corrector
+from sbi.samplers.score.predictors import Predictor, get_predictor
 
 
 class Diffuser:
@@ -19,7 +17,7 @@ class Diffuser:
 
     def __init__(
         self,
-        score_based_potential: PosteriorScoreBasedPotential,
+        score_based_potential: 'PosteriorScoreBasedPotential',  # noqa: F821 # type: ignore
         predictor: Union[str, Predictor],
         corrector: Optional[Union[str, Corrector]] = None,
         predictor_params: Optional[dict] = None,
@@ -64,7 +62,7 @@ class Diffuser:
     def set_predictor(
         self,
         predictor: Union[str, Predictor],
-        score_based_potential: PosteriorScoreBasedPotential,
+        score_based_potential: 'PosteriorScoreBasedPotential',  # noqa: F821 # type: ignore
         **kwargs,
     ):
         """Set the predictor for the diffusion-based sampler."""
