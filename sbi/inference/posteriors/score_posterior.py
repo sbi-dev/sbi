@@ -179,6 +179,7 @@ class ScorePosterior(NeuralPosterior):
     def _sample_via_diffusion(
         self,
         sample_shape: Shape = torch.Size(),
+        x: Optional[Tensor] = None,
         predictor: Union[str, Predictor] = "euler_maruyama",
         corrector: Optional[Union[str, Corrector]] = None,
         predictor_params: Optional[Dict] = None,
@@ -315,12 +316,66 @@ class ScorePosterior(NeuralPosterior):
         self,
         sample_shape: torch.Size,
         x: Tensor,
+        predictor: Union[str, Predictor] = "euler_maruyama",
+        corrector: Optional[Union[str, Corrector]] = None,
+        predictor_params: Optional[Dict] = None,
+        corrector_params: Optional[Dict] = None,
+        steps: int = 500,
+        ts: Optional[Tensor] = None,
         max_sampling_batch_size: int = 10000,
         show_progress_bars: bool = True,
     ) -> Tensor:
-        raise NotImplementedError(
-            "Batched sampling is not implemented for ScorePosterior."
+        num_samples = torch.Size(sample_shape).numel()
+        x = reshape_to_batch_event(x, self.score_estimator.condition_shape)
+        condition_dim = len(self.score_estimator.condition_shape)
+        batch_shape = x.shape[:-condition_dim]
+        batch_size = batch_shape.numel()
+        self.potential_fn.set_x(x)
+
+        max_sampling_batch_size = (
+            self.max_sampling_batch_size
+            if max_sampling_batch_size is None
+            else max_sampling_batch_size
         )
+
+        if self.sample_with == "ode":
+            samples = rejection.accept_reject_sample(
+                proposal=self.sample_via_zuko,
+                accept_reject_fn=lambda theta: within_support(self.prior, theta),
+                num_samples=num_samples,
+                num_xos=batch_size,
+                show_progress_bars=show_progress_bars,
+                max_sampling_batch_size=max_sampling_batch_size,
+                proposal_sampling_kwargs={"x": x},
+            )[0]
+            samples = samples.reshape(
+                sample_shape + batch_shape + self.score_estimator.input_shape
+            )
+        elif self.sample_with == "sde":
+            proposal_sampling_kwargs = {
+                "predictor": predictor,
+                "corrector": corrector,
+                "predictor_params": predictor_params,
+                "corrector_params": corrector_params,
+                "steps": steps,
+                "ts": ts,
+                "max_sampling_batch_size": max_sampling_batch_size,
+                "show_progress_bars": show_progress_bars,
+            }
+            samples = rejection.accept_reject_sample(
+                proposal=self._sample_via_diffusion,
+                accept_reject_fn=lambda theta: within_support(self.prior, theta),
+                num_samples=num_samples,
+                num_xos=batch_size,
+                show_progress_bars=show_progress_bars,
+                max_sampling_batch_size=max_sampling_batch_size,
+                proposal_sampling_kwargs=proposal_sampling_kwargs,
+            )[0]
+            samples = samples.reshape(
+                sample_shape + batch_shape + self.score_estimator.input_shape
+            )
+
+        return samples
 
     def map(
         self,
