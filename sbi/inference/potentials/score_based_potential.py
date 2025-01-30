@@ -178,6 +178,8 @@ class PosteriorScoreBasedPotential(BasePotential):
                 )
             else:
                 assert self.prior is not None, "Prior is required for iid methods."
+                # NOTE: Add here different methods for accumulating the score.
+                # TODO: Warn for FNPE -> Kinda needs a "corrector"
                 score_fn_iid = FNPEScoreFn(
                     self.score_estimator, self.prior, device=self.device
                 )

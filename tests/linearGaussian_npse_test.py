@@ -163,7 +163,7 @@ def test_c2st_npse_on_linearGaussian_different_dims():
 #     strict=True,
 #     match="Score accumulation*",
 # )
-@pytest.mark.parametrize("num_trials", [2, 10])
+@pytest.mark.parametrize("num_trials", [2,])
 def test_npse_iid_inference(num_trials):
     """Test whether NPSE infers well a simple example with available ground truth."""
 

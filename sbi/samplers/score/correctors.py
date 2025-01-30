@@ -1,6 +1,8 @@
+import math
 from abc import ABC, abstractmethod
 from typing import Callable, Optional, Type
 
+import torch
 from torch import Tensor
 
 from sbi.samplers.score.predictors import Predictor
@@ -63,3 +65,66 @@ class Corrector(ABC):
     @abstractmethod
     def correct(self, theta: Tensor, t0: Tensor, t1: Optional[Tensor] = None) -> Tensor:
         pass
+
+
+@register_corrector("langevin")
+class LangevinCorrector(Corrector):
+    def __init__(
+        self,
+        predictor: Predictor,
+        step_size: float = 1e-4,
+        num_steps: int = 5,
+    ):
+        """Basic Langevin corrector.
+
+        Ref: https://en.wikipedia.org/wiki/Langevin_dynamics
+
+        Args:
+            predictor: Associated predictor.
+            step_size (optional): Unadjusted Langevin dynamics are only valid for small
+                step sizes. Defaults to 1e-4.
+            num_steps (optional): Number of steps to correct. Defaults to 5.
+        """
+        super().__init__(predictor)
+        self.step_size = step_size
+        self.std = math.sqrt(2 * self.step_size)
+        self.num_steps = num_steps
+
+    def correct(self, theta: Tensor, t0: Tensor, t1: Optional[Tensor] = None) -> Tensor:
+        # TODO: Why is this impacting performance
+        for _ in range(self.num_steps):
+            score = self.predictor.potential_fn.gradient(theta, t1)
+            eps = self.std * torch.randn_like(theta, device=self.device)
+            theta = theta + self.step_size * score + eps
+
+        return theta
+
+
+@register_corrector("gibbs")
+class GibbsCorrector(Corrector):
+    def __init__(self, predictor: Predictor, num_steps: int = 5):
+        """(Pseudo) Gibbs sampling corrector. Iteratively adds back noise according to
+        the correct forward SDE, then removes noise using the predictor. Hence,
+        approximatly sampling form the joint distribution using Gibbs sampling (if the
+        two conditional distributions are compatible).
+
+        Args:
+            predictor (Predictor): Associated predictor.
+            num_steps (int, optional): Number of steps. Defaults to 5.
+        """
+        super().__init__(predictor)
+        self.num_steps = num_steps
+
+    def noise(self, theta: Tensor, t0: Tensor, t1: Tensor) -> Tensor:
+        f = self.predictor.drift(theta, t0)
+        g = self.predictor.diffusion(theta, t0)
+        eps = torch.randn_like(theta, device=self.device)
+        dt = t1 - t0
+        dt_sqrt = torch.sqrt(dt)
+        return theta + f * dt + g * eps * dt_sqrt
+
+    def correct(self, theta: Tensor, t0: Tensor, t1: Tensor) -> Tensor:
+        for _ in range(self.num_steps):
+            theta = self.noise(theta, t0, t1)
+            theta = self.predictor(theta, t1, t0)
+        return theta
