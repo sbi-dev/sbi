@@ -1,4 +1,5 @@
 from torch import Tensor
+import torch
 from torch.distributions import Distribution, Independent, Normal
 
 # Automatic denoising -----------------------------------------------------
@@ -130,3 +131,60 @@ def marginalize_gaussian(p: Normal, m: Tensor, s: Tensor) -> Normal:
     std = var**0.5
 
     return Normal(mu, std)
+
+
+def mv_diag_or_dense(A_diag_or_dense: Tensor, b: Tensor) -> Tensor:
+    """Dot product of a diagonal matrix and a dense matrix.
+
+    Args:
+        A_diag_or_dense (Tensor): Diagonal matrix.
+        b (Tensor): Dense matrix.
+
+    Returns:
+        Tensor: Dot product.
+    """
+    if A_diag_or_dense.ndim == 1:
+        return A_diag_or_dense * b
+    else:
+        return torch.matmul(A_diag_or_dense, b)
+
+
+def solve_diag_or_dense(A_diag_or_dense: Tensor, b: Tensor) -> Tensor:
+    """Solve a linear system with a diagonal matrix or a dense matrix.
+
+    Args:
+        A_diag_or_dense (Tensor): Diagonal matrix or dense matrix.
+        b (Tensor): Dense matrix.
+
+    Returns:
+        Tensor: Solution to the linear system.
+    """
+    if A_diag_or_dense.ndim == 1:
+        return b / A_diag_or_dense
+    else:
+        return torch.linalg.solve(A_diag_or_dense, b)
+
+
+def add_diag_or_dense(A_diag_or_dense: Tensor, B_diag_or_dense: Tensor) -> Tensor:
+    """Add two diagonal matrices or two dense matrices.
+
+    Args:
+        A_diag_or_dense (Tensor): Diagonal matrix or dense matrix.
+        B_diag_or_dense (Tensor): Diagonal matrix or dense matrix.
+
+    Returns:
+        Tensor: Sum of the matrices.
+    """
+    if (
+        A_diag_or_dense.ndim == 1
+        and B_diag_or_dense.ndim == 1
+        or A_diag_or_dense.ndim == 2
+        and B_diag_or_dense.ndim == 2
+    ):
+        return A_diag_or_dense + B_diag_or_dense
+    elif A_diag_or_dense.ndim == 2 and B_diag_or_dense.ndim == 1:
+        return A_diag_or_dense + torch.diag(B_diag_or_dense)
+    elif A_diag_or_dense.ndim == 1 and B_diag_or_dense.ndim == 2:
+        return torch.diag(A_diag_or_dense) + B_diag_or_dense
+    else:
+        raise ValueError("Incompatible dimensions for addition")
