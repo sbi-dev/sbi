@@ -228,7 +228,7 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         Returns:
             Approximate marginal mean at a given time.
         """
-        return self.mean_t_fn(times) * self.mean_0
+        return self.mean_t_fn(times) * self.mean_0  # type: ignore
 
     def approx_marginal_std(self, times: Tensor) -> Tensor:
         r"""Approximate the marginal standard deviation of the target distribution at a
@@ -240,8 +240,8 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         Returns:
             Approximate marginal standard deviation at a given time.
         """
-        vars = self.mean_t_fn(times) ** 2 * self.std_0**2 + self.std_fn(times) ** 2
-        return torch.sqrt(vars)
+        variances = self.mean_t_fn(times) ** 2 * self.std_0**2 + self.std_fn(times) ** 2  # type: ignore
+        return torch.sqrt(variances)
 
     def mean_t_fn(self, times: Tensor) -> Tensor:
         r"""Conditional mean function, E[xt|x0], specifying the "mean factor" at a given

@@ -70,7 +70,7 @@ class NFlowsFlow(ConditionalDensityEstimator):
         input = input.reshape(-1, input.shape[-1])
         condition = condition.reshape(-1, *self.condition_shape)
 
-        noise, _ = self.net._transorm(input, context=condition)
+        noise, _ = self.net._transorm(input, context=condition)  # type: ignore
         noise = noise.reshape(batch_shape)
         return noise
 
