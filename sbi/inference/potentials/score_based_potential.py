@@ -10,6 +10,7 @@ from zuko.distributions import NormalizingFlow
 from zuko.transforms import FreeFormJacobianTransform
 
 from sbi.inference.potentials.base_potential import BasePotential
+from sbi.inference.potentials.score_fn_iid import FNPEScoreFn
 from sbi.neural_nets.estimators.score_estimator import ConditionalScoreEstimator
 from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
@@ -18,8 +19,6 @@ from sbi.neural_nets.estimators.shape_handling import (
 from sbi.sbi_types import TorchTransform
 from sbi.utils.sbiutils import mcmc_transform, within_support
 from sbi.utils.torchutils import ensure_theta_batched
-
-from sbi.inference.potentials.score_fn_iid import FNPEScoreFn
 
 
 def score_estimator_based_potential(
@@ -250,4 +249,3 @@ def build_freeform_jacobian_transform(
         exact=exact,
     )
     return transform
-

@@ -157,12 +157,12 @@ def test_c2st_npse_on_linearGaussian_different_dims():
     check_c2st(samples, target_samples, alg="npse_different_dims_and_resume_training")
 
 
-@pytest.mark.xfail(
-    reason="iid_bridge not working.",
-    raises=AssertionError,
-    strict=True,
-    match="Score accumulation*",
-)
+# @pytest.mark.xfail(
+#     reason="iid_bridge not working.",
+#     raises=AssertionError,
+#     strict=True,
+#     match="Score accumulation*",
+# )
 @pytest.mark.parametrize("num_trials", [2, 10])
 def test_npse_iid_inference(num_trials):
     """Test whether NPSE infers well a simple example with available ground truth."""

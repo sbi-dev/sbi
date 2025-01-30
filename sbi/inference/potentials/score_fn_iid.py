@@ -1,11 +1,11 @@
-from typing import Callable, Optional, Union
-from sbi.neural_nets.estimators.score_estimator import ConditionalScoreEstimator
-from torch.distributions import Distribution
-
 from abc import abstractmethod
+from typing import Callable, Optional
+
 import torch
 from torch import Tensor
+from torch.distributions import Distribution
 
+from sbi.neural_nets.estimators.score_estimator import ConditionalScoreEstimator
 from sbi.utils.torchutils import ensure_theta_batched
 
 
