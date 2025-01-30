@@ -139,7 +139,7 @@ class ScorePosterior(NeuralPosterior):
 
         x = self._x_else_default_x(x)
         x = reshape_to_batch_event(x, self.score_estimator.condition_shape)
-        self.potential_fn.set_x(x)
+        self.potential_fn.set_x(x, x_is_iid=True)
 
         num_samples = torch.Size(sample_shape).numel()
 
