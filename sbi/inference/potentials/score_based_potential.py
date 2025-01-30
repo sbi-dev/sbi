@@ -85,6 +85,9 @@ class PosteriorScoreBasedPotential(BasePotential):
             x_density_estimator = reshape_to_batch_event(
                 self.x_o, event_shape=self.score_estimator.condition_shape
             )
+            assert x_density_estimator.shape[0] == 1 or not self.x_is_iid, (
+                "PosteriorScoreBasedPotential does not support IID observations`."
+            )
             # For large number of evals, we want a high-tolerance flow.
             # This flow will be used mainly for MAP calculations, hence we want to save
             # it instead of rebuilding it every time.
@@ -210,8 +213,8 @@ class PosteriorScoreBasedPotential(BasePotential):
 def build_freeform_jacobian_transform(
     score_estimator: ConditionalScoreEstimator,
     x_o: Tensor,
-    atol: float = 1e-5,
-    rtol: float = 1e-6,
+    atol: float = 1e-6,
+    rtol: float = 1e-5,
     exact: bool = True,
 ) -> FreeFormJacobianTransform:
     """Builds the free-form Jacobian for the probability flow ODE, used for log-prob.
