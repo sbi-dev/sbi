@@ -19,6 +19,8 @@ from sbi.sbi_types import TorchTransform
 from sbi.utils.sbiutils import mcmc_transform, within_support
 from sbi.utils.torchutils import ensure_theta_batched
 
+from sbi.inference.potentials.score_fn_iid import FNPEScoreFn
+
 
 def score_estimator_based_potential(
     score_estimator: ConditionalScoreEstimator,
@@ -176,9 +178,11 @@ class PosteriorScoreBasedPotential(BasePotential):
                     input=theta, condition=self.x_o, time=time
                 )
             else:
-                raise NotImplementedError(
-                    "Score accumulation for IID data is not yet implemented."
+                assert self.prior is not None, "Prior is required for iid methods."
+                score_fn_iid = FNPEScoreFn(
+                    self.score_estimator, self.prior, device=self.device
                 )
+                score = score_fn_iid(theta, self.x_o, time)
 
         return score
 
@@ -246,3 +250,4 @@ def build_freeform_jacobian_transform(
         exact=exact,
     )
     return transform
+
