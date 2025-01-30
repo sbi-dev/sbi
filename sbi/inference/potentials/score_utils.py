@@ -1,5 +1,5 @@
-from torch import Tensor
 import torch
+from torch import Tensor
 from torch.distributions import Distribution, Independent, Normal
 
 # Automatic denoising -----------------------------------------------------

@@ -5,8 +5,6 @@ import torch
 from torch import Tensor
 from torch.distributions import Distribution
 
-from sbi.neural_nets.estimators.score_estimator import ConditionalScoreEstimator
-from sbi.utils.torchutils import ensure_theta_batched
 from sbi.inference.potentials.score_utils import (
     add_diag_or_dense,
     denoise,
@@ -14,6 +12,8 @@ from sbi.inference.potentials.score_utils import (
     mv_diag_or_dense,
     solve_diag_or_dense,
 )
+from sbi.neural_nets.estimators.score_estimator import ConditionalScoreEstimator
+from sbi.utils.torchutils import ensure_theta_batched
 
 
 class ScoreFnIID:
@@ -220,11 +220,11 @@ class AbstractGaussCorrectedScoreFn(ScoreFnIID):
         std = self.score_estimator.std_t_fn(a)
 
         if precisions_posteriors.ndim == 3:
-            I = torch.eye(precisions_posteriors.shape[-1])
+            Ident = torch.eye(precisions_posteriors.shape[-1])
         else:
-            I = torch.ones_like(precisions_posteriors)
+            Ident = torch.ones_like(precisions_posteriors)
 
-        marginal_precisions = m**2 / std**2 * I + precisions_posteriors
+        marginal_precisions = m**2 / std**2 * Ident + precisions_posteriors
         return marginal_precisions
 
     def marginal_prior_score_fn(self, a: Tensor, theta: Tensor) -> Tensor:
@@ -304,3 +304,41 @@ class AbstractGaussCorrectedScoreFn(ScoreFnIID):
         score = solve_diag_or_dense(Lam, score)
 
         return score
+
+
+class GaussCorrectedScoreFn(AbstractGaussCorrectedScoreFn):
+    def __init__(
+        self,
+        score_estimator: ConditionalScoreEstimator,
+        prior: Distribution,
+        posterior_precision: Tensor,
+    ) -> None:
+        r"""Initializes the GaussCorrectedScoreFn class.
+
+        Args:
+            score_estimator: The neural network modelling the score.
+            prior: The prior distribution.
+        """
+        super().__init__(score_estimator, prior)
+        self.posterior_precision = posterior_precision
+
+    def posterior_precision_est_fn(self, x_o: Tensor) -> Tensor:
+        r"""Estimates the posterior precision.
+
+        Args:
+            x_o: Observed data.
+
+        Returns:
+            Estimated posterior precision.
+        """
+        return self.posterior_precision
+
+
+class AutoGaussCorrectedScoreFn(AbstractGaussCorrectedScoreFn):
+    # TODO: Move over..
+    pass
+
+
+class JacCorrectedScoreFn(AbstractGaussCorrectedScoreFn):
+    pass
+    # TODO: Move over...
