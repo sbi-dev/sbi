@@ -12,6 +12,7 @@ from sbi.inference import (
     NLE_A,
     NPE_A,
     NPE_C,
+    NPSE,
     NRE_A,
     NRE_B,
     NRE_C,
@@ -226,6 +227,76 @@ def test_batched_mcmc_sample_log_prob_with_different_x(
         samples_separate2 = posterior.sample(
             sample_shape, x_o[1], num_chains=num_chains, warmup_steps=500
         )
+
+        # Check if means are approx. same
+        samples_m = torch.mean(samples, dim=0, dtype=torch.float32)
+        samples_separate1_m = torch.mean(samples_separate1, dim=0, dtype=torch.float32)
+        samples_separate2_m = torch.mean(samples_separate2, dim=0, dtype=torch.float32)
+        samples_sep_m = torch.stack([samples_separate1_m, samples_separate2_m], dim=0)
+
+        assert torch.allclose(samples_m, samples_sep_m, atol=0.2, rtol=0.2), (
+            "Batched sampling is not consistent with separate sampling."
+        )
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("npse_method", [NPSE])
+@pytest.mark.parametrize("x_o_batch_dim", (0, 1, 2))
+@pytest.mark.parametrize("sampling_method", ["sde", "ode"])
+@pytest.mark.parametrize(
+    "sample_shape",
+    (
+        (5,),  # less than num_chains
+        (4, 2),  # 2D batch
+    ),
+)
+def test_batched_score_sample_with_different_x(
+    npse_method: type,
+    x_o_batch_dim: bool,
+    sampling_method: str,
+    sample_shape: torch.Size,
+):
+    num_dim = 2
+    num_simulations = 100
+
+    prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
+    simulator = diagonal_linear_gaussian
+
+    inference = npse_method(prior=prior)
+    theta = prior.sample((num_simulations,))
+    x = simulator(theta)
+    inference.append_simulations(theta, x).train(max_num_epochs=2)
+
+    x_o = ones(num_dim) if x_o_batch_dim == 0 else ones(x_o_batch_dim, num_dim)
+
+    posterior = inference.build_posterior(sample_with=sampling_method)
+
+    samples = posterior.sample_batched(
+        sample_shape,
+        x_o,
+    )
+
+    assert (
+        samples.shape == (*sample_shape, x_o_batch_dim, num_dim)
+        if x_o_batch_dim > 0
+        else (*sample_shape, num_dim)
+    ), "Sample shape wrong"
+
+    # test only for 1 sample_shape case to avoid repeating this test.
+    if x_o_batch_dim > 1 and sample_shape == (5,):
+        assert samples.shape[1] == x_o_batch_dim, "Batch dimension wrong"
+        inference = npse_method(prior=prior)
+        _ = inference.append_simulations(theta, x).train()
+        posterior = inference.build_posterior(sample_with=sampling_method)
+
+        x_o = torch.stack([0.5 * ones(num_dim), -0.5 * ones(num_dim)], dim=0)
+        # test with multiple chains to test whether correct chains are
+        # concatenated.
+        sample_shape = (1000,)  # use enough samples for accuracy comparison
+        samples = posterior.sample_batched(sample_shape, x_o)
+
+        samples_separate1 = posterior.sample(sample_shape, x_o[0])
+        samples_separate2 = posterior.sample(sample_shape, x_o[1])
 
         # Check if means are approx. same
         samples_m = torch.mean(samples, dim=0, dtype=torch.float32)

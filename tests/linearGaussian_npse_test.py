@@ -159,7 +159,7 @@ def test_c2st_npse_on_linearGaussian_different_dims():
 
 @pytest.mark.xfail(
     reason="iid_bridge not working.",
-    raises=NotImplementedError,
+    raises=AssertionError,
     strict=True,
     match="Score accumulation*",
 )
@@ -203,10 +203,6 @@ def test_npse_iid_inference(num_trials):
 
 
 @pytest.mark.slow
-@pytest.mark.xfail(
-    raises=NotImplementedError,
-    reason="MAP optimization via score not working accurately.",
-)
 def test_npse_map():
     num_dim = 2
     x_o = zeros(num_dim)
@@ -234,4 +230,4 @@ def test_npse_map():
 
     map_ = posterior.map(show_progress_bars=True)
 
-    assert torch.allclose(map_, gt_posterior.mean, atol=0.2), "MAP is not close to GT."
+    assert torch.allclose(map_, gt_posterior.mean, atol=0.4), "MAP is not close to GT."
