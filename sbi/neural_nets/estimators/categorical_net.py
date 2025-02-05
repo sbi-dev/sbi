@@ -77,42 +77,42 @@ class CategoricalMADE(MADE):
         if custom_initialization:
             self._initialize()
 
-    def forward(self, inputs: Tensor, context: Optional[Tensor] = None) -> Tensor:
+    def forward(self, input: Tensor, condition: Optional[Tensor] = None) -> Tensor:
         r"""Forward pass of the categorical density estimator network to compute the
         conditional density at a given time.
 
         Args:
-            input: Original data, x0. (batch_size, *input_shape)
-            condition: Conditioning variable. (batch_size, *condition_shape)
+            input: Inputs datapoints of shape `(batch_size, *input_shape)`
+            condition: Conditioning variable. `(batch_size, *condition_shape)`
 
         Returns:
-            Predicted categorical logits. (batch_size, *input_shape,
-                num_categories)
+            Predicted categorical logits. `(batch_size, *input_shape,
+                num_categories)`
         """
-        embedded_context = self.embedding_net.forward(context)
-        return super().forward(inputs, context=embedded_context)
+        embedded_context = self.embedding_net.forward(condition)
+        return super().forward(input, context=embedded_context)
 
     def compute_probs(self, outputs):
         ps = F.softmax(outputs, dim=-1) * self.mask
         ps = ps / ps.sum(dim=-1, keepdim=True)
         return ps
 
-    def log_prob(self, inputs: Tensor, context: Optional[Tensor] = None) -> Tensor:
+    def log_prob(self, input: Tensor, condition: Optional[Tensor] = None) -> Tensor:
         r"""Return log-probability of samples.
 
         Args:
             input: Input datapoints of shape `(batch_size, *input_shape)`.
-            context: Context of shape `(batch_size, *condition_shape)`.
+            condition: Conditioning variable. `(batch_size, *condition_shape)`.
 
         Returns:
             Log-probabilities of shape `(batch_size, num_variables, num_categories)`.
         """
-        outputs = self.forward(inputs, context=context)
-        outputs = outputs.reshape(*inputs.shape, self.num_categories)
+        outputs = self.forward(input, condition=condition)
+        outputs = outputs.reshape(*input.shape, self.num_categories)
         ps = self.compute_probs(outputs)
 
         # categorical log prob
-        log_prob = torch.log(ps.gather(-1, inputs.unsqueeze(-1).long()))
+        log_prob = torch.log(ps.gather(-1, input.unsqueeze(-1).long()))
         log_prob = log_prob.squeeze(-1).sum(dim=-1)
 
         return log_prob
