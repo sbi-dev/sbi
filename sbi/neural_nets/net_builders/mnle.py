@@ -105,8 +105,6 @@ def build_mnle(
             as z_score_x.
         flow_model: type of flow model to use for the continuous part of the
             data.
-        categorical_model: type of categorical net to use for the discrete part of
-            the data. Can be "made" or "mlp".
         num_categorical_columns: Number of categorical columns of each variable in the
             input data. If None, the function will infer this from the data.
         embedding_net: Optional embedding network for y, required if y is > 1D.

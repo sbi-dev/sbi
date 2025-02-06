@@ -33,7 +33,6 @@ class CategoricalMADE(MADE):
         dropout_probability: float = 0.0,
         use_batch_norm: bool = False,
         epsilon: float = 1e-2,
-        custom_initialization: bool = True,
         embedding_net: nn.Module = nn.Identity(),
     ):
         """Initialize the neural net.
@@ -74,9 +73,6 @@ class CategoricalMADE(MADE):
         self.epsilon = epsilon
         self.context_features = context_features
 
-        if custom_initialization:
-            self._initialize()
-
     def forward(self, input: Tensor, condition: Optional[Tensor] = None) -> Tensor:
         r"""Forward pass of the categorical density estimator network to compute the
         conditional density at a given time.
@@ -89,13 +85,9 @@ class CategoricalMADE(MADE):
             Predicted categorical logits. `(batch_size, *input_shape,
                 num_categories)`
         """
-        embedded_context = self.embedding_net.forward(condition)
-        return super().forward(input, context=embedded_context)
-
-    def compute_probs(self, outputs):
-        ps = F.softmax(outputs, dim=-1) * self.mask
-        ps = ps / ps.sum(dim=-1, keepdim=True)
-        return ps
+        embedded_condition = self.embedding_net.forward(condition)
+        out = super().forward(input, context=embedded_condition)
+        return out.masked_fill(~self.mask.bool().flatten(), float("-inf"))
 
     def log_prob(self, input: Tensor, condition: Optional[Tensor] = None) -> Tensor:
         r"""Return log-probability of samples.
@@ -109,12 +101,7 @@ class CategoricalMADE(MADE):
         """
         outputs = self.forward(input, condition=condition)
         outputs = outputs.reshape(*input.shape, self.num_categories)
-        ps = self.compute_probs(outputs)
-
-        # categorical log prob
-        log_prob = torch.log(ps.gather(-1, input.unsqueeze(-1).long()))
-        log_prob = log_prob.squeeze(-1).sum(dim=-1)
-
+        log_prob = Categorical(logits=outputs).log_prob(input).sum(dim=-1)
         return log_prob
 
     def sample(self, sample_shape, context=None):
@@ -139,18 +126,15 @@ class CategoricalMADE(MADE):
             batch_dim = 1
 
         with torch.no_grad():
-            samples = torch.zeros(num_samples, batch_dim, self.num_variables)
-            print(samples.shape, context.shape)
+            samples = torch.randn(num_samples, batch_dim, self.num_variables)
             for i in range(self.num_variables):
                 outputs = self.forward(samples, context)
                 outputs = outputs.reshape(*samples.shape, self.num_categories)
-                ps = self.compute_probs(outputs)
-                samples[:, :, i] = Categorical(probs=ps[:, :, i]).sample()
+                samples[:, :, : i + 1] = Categorical(
+                    logits=outputs[:, :, : i + 1]
+                ).sample()
 
         return samples.reshape(*sample_shape, batch_dim, self.num_variables)
-
-    def _initialize(self):
-        pass
 
 
 class CategoricalMassEstimator(ConditionalDensityEstimator):
