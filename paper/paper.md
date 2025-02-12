@@ -273,10 +273,10 @@ machine learning researchers and applied scientists to join us in this long-term
 # Related software
 
 Since the original release of the `sbi` package, several other packages that implement
-neural network-based SBI algorithms have emerged. The @lampe package offers neural
-posterior and neural ratio estimation, primarily targeting SBI researchers with a
-low-level API and full flexibility over the training loop (Lampe stopped being
-maintained in July 2024).
+neural network-based SBI algorithms have emerged.
+The `lampe` [@rozet_2021_lampe] package offers neural posterior and neural ratio estimation,
+primarily targeting SBI researchers with a low-level API and full flexibility over the
+training loop. Its development has stopped in favor of the `sbi` project in July 2024.
 The `BayesFlow` package [@bayesflow_2023_software] focuses on a set of amortized SBI algorithms
 based on posterior and likelihood estimation that have been developed in the respective
 research labs [@radev2020bayesflow].
