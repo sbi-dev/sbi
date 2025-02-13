@@ -679,8 +679,8 @@ class SMCABC(ABCBASE):
             )
 
         elif self.kernel == "uniform":
-            low = thetas - self.kernel_variance
-            high = thetas + self.kernel_variance
+            low = thetas - self.kernel_variance  # type: ignore
+            high = thetas + self.kernel_variance  # type: ignore
             # Move batch shape to event shape to get Uniform that is multivariate in
             # parameter dimension.
             return BoxUniform(low=low, high=high)

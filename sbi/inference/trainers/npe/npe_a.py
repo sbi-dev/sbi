@@ -425,7 +425,7 @@ class NPE_A_MDN(ConditionalDensityEstimator):
                 logits_pp,
                 m_pp,
                 prec_pp,
-            ) = proposal.posterior_estimator._posthoc_correction(default_x)
+            ) = proposal.posterior_estimator._posthoc_correction(default_x)  # type: ignore
             self._logits_pp, self._m_pp, self._prec_pp = (
                 logits_pp.detach(),
                 m_pp.detach(),
@@ -536,7 +536,7 @@ class NPE_A_MDN(ConditionalDensityEstimator):
             num_samples, logits_p, m_p, prec_factors_p
         )
 
-        embedded_context = self._neural_net.net._embedding_net(x)
+        embedded_context = self._neural_net.net._embedding_net(x)  # type: ignore
         if embedded_context is not None:
             # Merge the context dimension with sample dimension in order to
             # apply the transform.
@@ -546,8 +546,9 @@ class NPE_A_MDN(ConditionalDensityEstimator):
             )
 
         theta, _ = self._neural_net.net._transform.inverse(
-            theta, context=embedded_context
-        )
+            theta,  # type: ignore
+            context=embedded_context,
+        )  # type: ignore
 
         if embedded_context is not None:
             # Split the context dimension from sample dimension.
@@ -574,9 +575,9 @@ class NPE_A_MDN(ConditionalDensityEstimator):
         x = x.squeeze(dim=0)
 
         # Evaluate the density estimator.
-        embedded_x = self._neural_net.net._embedding_net(x)
+        embedded_x = self._neural_net.net._embedding_net(x)  # type: ignore
         dist = self._neural_net.net._distribution  # defined to avoid black formatting.
-        logits_d, m_d, prec_d, _, _ = dist.get_mixture_components(embedded_x)
+        logits_d, m_d, prec_d, _, _ = dist.get_mixture_components(embedded_x)  # type: ignore
         norm_logits_d = logits_d - torch.logsumexp(logits_d, dim=-1, keepdim=True)
         norm_logits_d = atleast_2d(norm_logits_d)
 
@@ -704,8 +705,8 @@ class NPE_A_MDN(ConditionalDensityEstimator):
         prior will not be exactly have mean=0 and std=1.
         """
         if self.z_score_theta:
-            scale = self._neural_net.net._transform._transforms[0]._scale
-            shift = self._neural_net.net._transform._transforms[0]._shift
+            scale = self._neural_net.net._transform._transforms[0]._scale  # type: ignore
+            shift = self._neural_net.net._transform._transforms[0]._shift  # type: ignore
 
             # Following the definition of the linear transform in
             # `standardizing_transform` in `sbiutils.py`:
@@ -739,7 +740,7 @@ class NPE_A_MDN(ConditionalDensityEstimator):
         """Return potentially standardized theta if z-scoring was requested."""
 
         if self.z_score_theta:
-            theta, _ = self._neural_net.net._transform(theta)
+            theta, _ = self._neural_net.net._transform(theta)  # type: ignore
 
         return theta
 
@@ -784,7 +785,7 @@ class NPE_A_MDN(ConditionalDensityEstimator):
 
         precisions_p = precisions_d_rep - precisions_pp_rep
         if isinstance(self._maybe_z_scored_prior, MultivariateNormal):
-            precisions_p += self._maybe_z_scored_prior.precision_matrix
+            precisions_p += self._maybe_z_scored_prior.precision_matrix  # type: ignore
 
         # Check if precision matrix is positive definite.
         for _, batches in enumerate(precisions_p):
