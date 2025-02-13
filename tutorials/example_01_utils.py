@@ -54,7 +54,7 @@ class BinomialGammaPotential(BasePotential):
             rate=beta,
         ).log_prob(self.x_o[:, :1].reshape(1, num_trials, -1))
 
-        joint_likelihood = (logprob_choices + logprob_rts).squeeze()
+        joint_likelihood = torch.sum(logprob_choices, dim=2) + logprob_rts.squeeze()
 
         assert joint_likelihood.shape == torch.Size([theta.shape[0], self.x_o.shape[0]])
         return joint_likelihood.sum(1)
