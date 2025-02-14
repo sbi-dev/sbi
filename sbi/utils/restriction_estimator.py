@@ -685,7 +685,7 @@ class RestrictedPrior(Distribution):
 
         if sample_with == "rejection":
             samples, acceptance_rate = rejection.accept_reject_sample(
-                proposal=self._prior,
+                proposal=self._prior.sample,
                 accept_reject_fn=self._accept_reject_fn,
                 num_samples=num_samples,
                 show_progress_bars=show_progress_bars,
