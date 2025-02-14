@@ -62,14 +62,14 @@ class ScoreFnIID:
         Returns:
             The computed prior score.
         """
-        theta = theta.detach().clone().requires_grad_(True)
-        prior_log_prob = self.prior.log_prob(theta)
-        prior_score = torch.autograd.grad(
-            prior_log_prob,
-            theta,
-            grad_outputs=torch.ones_like(prior_log_prob),
-            create_graph=True,
-        )[0]
+        with torch.enable_grad():
+            theta = theta.detach().clone().requires_grad_(True)
+            prior_log_prob = self.prior.log_prob(theta)
+            prior_score = torch.autograd.grad(
+                prior_log_prob,
+                theta,
+                grad_outputs=torch.ones_like(prior_log_prob),
+            )[0]
         return prior_score
 
 
@@ -156,7 +156,7 @@ class AbstractGaussCorrectedScoreFn(ScoreFnIID):
         super().__init__(score_estimator, prior)
 
     @abstractmethod
-    def posterior_precision_est_fn(self, x_o: Tensor) -> Tensor:
+    def posterior_precision_est_fn(self, conditions: Tensor) -> Tensor:
         r"""Abstract method to estimate the posterior precision.
 
         Args:
@@ -167,7 +167,7 @@ class AbstractGaussCorrectedScoreFn(ScoreFnIID):
         """
         pass
 
-    def denoising_prior(self, m: Tensor, std: Tensor, theta: Tensor) -> Distribution:
+    def denoising_prior(self, m: Tensor, std: Tensor, inputs: Tensor) -> Distribution:
         r"""Denoise the prior distribution.
 
         Args:
@@ -178,9 +178,9 @@ class AbstractGaussCorrectedScoreFn(ScoreFnIID):
         Returns:
             Denoised prior distribution.
         """
-        return denoise(self.prior, m, std, theta)
+        return denoise(self.prior, m, std, inputs)
 
-    def marginal_prior(self, a: Tensor, theta: Tensor) -> Distribution:
+    def marginal_prior(self, time: Tensor, inputs: Tensor) -> Distribution:
         r"""Compute the marginal prior distribution.
 
         Args:
@@ -190,12 +190,12 @@ class AbstractGaussCorrectedScoreFn(ScoreFnIID):
         Returns:
             Marginal prior distribution.
         """
-        m = self.score_estimator.mean_t_fn(a)
-        std = self.score_estimator.std_t_fn(a)
+        m = self.score_estimator.mean_t_fn(time)
+        std = self.score_estimator.std_fn(time)
         return marginalize(self.prior, m, std)
 
     def marginal_posterior_precision_est_fn(
-        self, a: Tensor, theta: Tensor, x_o: Tensor, N: int
+        self, time: Tensor, inputs: Tensor, conditions: Tensor, N: int
     ) -> Tensor:
         r"""Estimates the marginal posterior precision.
 
@@ -208,7 +208,7 @@ class AbstractGaussCorrectedScoreFn(ScoreFnIID):
         Returns:
             Estimated marginal posterior precision.
         """
-        precisions_posteriors = self.posterior_precision_est_fn(x_o)
+        precisions_posteriors = self.posterior_precision_est_fn(conditions)
         precisions_posteriors = torch.atleast_2d(precisions_posteriors)
 
         # If one constant precision is given, tile it
@@ -216,8 +216,8 @@ class AbstractGaussCorrectedScoreFn(ScoreFnIID):
             precisions_posteriors = precisions_posteriors.repeat(N, 1)
 
         # Denoising posterior via Bayes rule
-        m = self.score_estimator.mean_t_fn(a)
-        std = self.score_estimator.std_t_fn(a)
+        m = self.score_estimator.mean_t_fn(time)
+        std = self.score_estimator.std_fn(time)
 
         if precisions_posteriors.ndim == 3:
             Ident = torch.eye(precisions_posteriors.shape[-1])
@@ -227,7 +227,7 @@ class AbstractGaussCorrectedScoreFn(ScoreFnIID):
         marginal_precisions = m**2 / std**2 * Ident + precisions_posteriors
         return marginal_precisions
 
-    def marginal_prior_score_fn(self, a: Tensor, theta: Tensor) -> Tensor:
+    def marginal_prior_score_fn(self, time: Tensor, inputs: Tensor) -> Tensor:
         r"""Computes the score of the marginal prior distribution.
 
         Args:
@@ -237,16 +237,20 @@ class AbstractGaussCorrectedScoreFn(ScoreFnIID):
         Returns:
             Marginal prior score.
         """
-        p = self.marginal_prior(a, theta)
-        log_p = p.log_prob(theta)
-        return torch.autograd.grad(
-            log_p,
-            theta,
-            grad_outputs=torch.ones_like(log_p),
-            create_graph=True,
-        )[0]
+        with torch.enable_grad():
+            inputs = inputs.clone().detach().requires_grad_(True)
+            p = self.marginal_prior(time, inputs)
+            log_p = p.log_prob(inputs)
+            return torch.autograd.grad(
+                log_p,
+                inputs,
+                grad_outputs=torch.ones_like(log_p),
+                create_graph=True,
+            )[0]
 
-    def marginal_denoising_prior_precision_fn(self, a: Tensor, theta: Tensor) -> Tensor:
+    def marginal_denoising_prior_precision_fn(
+        self, time: Tensor, inputs: Tensor
+    ) -> Tensor:
         r"""Computes the precision of the marginal denoising prior.
 
         Args:
@@ -256,12 +260,14 @@ class AbstractGaussCorrectedScoreFn(ScoreFnIID):
         Returns:
             Marginal denoising prior precision.
         """
-        m = self.score_estimator.mean_t_fn(a)
-        std = self.score_estimator.std_t_fn(a)
-        p_denoise = self.denoising_prior(m, std, theta)
+        m = self.score_estimator.mean_t_fn(time)
+        std = self.score_estimator.std_fn(time)
+        p_denoise = self.denoising_prior(m, std, inputs)
         return 1 / p_denoise.variance
 
-    def __call__(self, a: Tensor, theta: Tensor, x_o: Tensor, **kwargs) -> Tensor:
+    def __call__(
+        self, inputs: Tensor, conditions: Tensor, time: Tensor, **kwargs
+    ) -> Tensor:
         r"""Returns the corrected score function.
 
         Args:
@@ -272,36 +278,48 @@ class AbstractGaussCorrectedScoreFn(ScoreFnIID):
         Returns:
             Corrected score function.
         """
-        base_score = self.score_estimator(a, theta, x_o, **kwargs)
-        prior_score = self.marginal_prior_score_fn(a, theta)
-        N = base_score.shape[0]
+        N = conditions.shape[0]
+        base_score = self.score_estimator(inputs, conditions, time, **kwargs)
+        prior_score = self.marginal_prior_score_fn(time, inputs)
+
+        print(f"base_score: {base_score.shape}")
+        print(f"prior_score: {prior_score.shape}")
 
         # Marginal prior precision
-        prior_precision = self.marginal_denoising_prior_precision_fn(a, theta)
+        prior_precision = self.marginal_denoising_prior_precision_fn(time, inputs)
         # Marginal posterior variance estimates
         posterior_precisions = self.marginal_posterior_precision_est_fn(
-            a, theta, x_o, N
+            time, inputs, conditions, N
         )
+
+        print(f"prior_precision: {prior_precision.shape}")
+        print(f"posterior_precisions: {posterior_precisions.shape}")
 
         # Total precision
         term1 = (1 - N) * prior_precision
-        term2 = torch.sum(posterior_precisions, dim=0)
-        Lam = add_diag_or_dense(term1, term2)
+        term2 = torch.sum(posterior_precisions, dim=-2, keepdim=True).unsqueeze(0)
+        print(f"term1: {term1.shape}")
+        print(f"term2: {term2.shape}")
+        Lam = add_diag_or_dense(term1, term2, batch_dims=1)
+
+        print(Lam.shape)
 
         # Weighted scores
-        weighted_prior_score = mv_diag_or_dense(prior_precision, prior_score)
-        weighted_posterior_scores = torch.stack([
-            mv_diag_or_dense(p, base_score[i])
-            for i, p in enumerate(posterior_precisions)
-        ])
+        weighted_prior_score = mv_diag_or_dense(
+            prior_precision, prior_score, batch_dims=2
+        )
+        print(f"weighted_prior_score: {weighted_prior_score.shape}")
+        weighted_posterior_scores = mv_diag_or_dense(
+            posterior_precisions.unsqueeze(0), base_score, batch_dims=2
+        )
 
         # Accumulate the scores
         score = (1 - N) * weighted_prior_score + torch.sum(
-            weighted_posterior_scores, dim=0
+            weighted_posterior_scores, dim=-2, keepdim=True
         )
-
+        print(f"score: {score.shape}")
         # Solve the linear system
-        score = solve_diag_or_dense(Lam, score)
+        score = solve_diag_or_dense(Lam, score, batch_dims=2)
 
         return score
 

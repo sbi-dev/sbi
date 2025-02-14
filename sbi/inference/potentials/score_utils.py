@@ -133,7 +133,7 @@ def marginalize_gaussian(p: Normal, m: Tensor, s: Tensor) -> Normal:
     return Normal(mu, std)
 
 
-def mv_diag_or_dense(A_diag_or_dense: Tensor, b: Tensor) -> Tensor:
+def mv_diag_or_dense(A_diag_or_dense: Tensor, b: Tensor, batch_dims: int = 1) -> Tensor:
     """Dot product of a diagonal matrix and a dense matrix.
 
     Args:
@@ -143,13 +143,16 @@ def mv_diag_or_dense(A_diag_or_dense: Tensor, b: Tensor) -> Tensor:
     Returns:
         Tensor: Dot product.
     """
-    if A_diag_or_dense.ndim == 1:
+    A_dims = A_diag_or_dense.ndim - batch_dims
+    if A_dims == 1:
         return A_diag_or_dense * b
     else:
         return torch.matmul(A_diag_or_dense, b)
 
 
-def solve_diag_or_dense(A_diag_or_dense: Tensor, b: Tensor) -> Tensor:
+def solve_diag_or_dense(
+    A_diag_or_dense: Tensor, b: Tensor, batch_dims: int = 0
+) -> Tensor:
     """Solve a linear system with a diagonal matrix or a dense matrix.
 
     Args:
@@ -159,32 +162,34 @@ def solve_diag_or_dense(A_diag_or_dense: Tensor, b: Tensor) -> Tensor:
     Returns:
         Tensor: Solution to the linear system.
     """
-    if A_diag_or_dense.ndim == 1:
+    A_dim = A_diag_or_dense.ndim - batch_dims
+    if A_dim == 1:
         return b / A_diag_or_dense
     else:
         return torch.linalg.solve(A_diag_or_dense, b)
 
 
-def add_diag_or_dense(A_diag_or_dense: Tensor, B_diag_or_dense: Tensor) -> Tensor:
-    """Add two diagonal matrices or two dense matrices.
+def add_diag_or_dense(
+    A_diag_or_dense: Tensor, B_diag_or_dense: Tensor, batch_dims: int = 0
+) -> Tensor:
+    """Add two diagonal matrices or two dense matrices, considering batch dimensions.
 
     Args:
         A_diag_or_dense (Tensor): Diagonal matrix or dense matrix.
         B_diag_or_dense (Tensor): Diagonal matrix or dense matrix.
+        batch_dims (int): Number of batch dimensions.
 
     Returns:
         Tensor: Sum of the matrices.
     """
-    if (
-        A_diag_or_dense.ndim == 1
-        and B_diag_or_dense.ndim == 1
-        or A_diag_or_dense.ndim == 2
-        and B_diag_or_dense.ndim == 2
-    ):
+    A_ndim = A_diag_or_dense.ndim - batch_dims
+    B_ndim = B_diag_or_dense.ndim - batch_dims
+
+    if (A_ndim == 1 and B_ndim == 1) or (A_ndim == 2 and B_ndim == 2):
         return A_diag_or_dense + B_diag_or_dense
-    elif A_diag_or_dense.ndim == 2 and B_diag_or_dense.ndim == 1:
-        return A_diag_or_dense + torch.diag(B_diag_or_dense)
-    elif A_diag_or_dense.ndim == 1 and B_diag_or_dense.ndim == 2:
-        return torch.diag(A_diag_or_dense) + B_diag_or_dense
+    elif A_ndim == 2 and B_ndim == 1:
+        return A_diag_or_dense + torch.diag_embed(B_diag_or_dense)
+    elif A_ndim == 1 and B_ndim == 2:
+        return torch.diag_embed(A_diag_or_dense) + B_diag_or_dense
     else:
         raise ValueError("Incompatible dimensions for addition")

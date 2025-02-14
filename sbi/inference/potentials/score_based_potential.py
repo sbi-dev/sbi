@@ -10,7 +10,7 @@ from zuko.distributions import NormalizingFlow
 from zuko.transforms import FreeFormJacobianTransform
 
 from sbi.inference.potentials.base_potential import BasePotential
-from sbi.inference.potentials.score_fn_iid import FNPEScoreFn
+from sbi.inference.potentials.score_fn_iid import FNPEScoreFn, GaussCorrectedScoreFn
 from sbi.neural_nets.estimators.score_estimator import ConditionalScoreEstimator
 from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
@@ -57,7 +57,7 @@ class PosteriorScoreBasedPotential(BasePotential):
         score_estimator: ConditionalScoreEstimator,
         prior: Optional[Distribution],
         x_o: Optional[Tensor] = None,
-        iid_method: str = "iid_bridge",
+        iid_method: str = "fnpe",
         device: str = "cpu",
     ):
         r"""Returns the score function for score-based methods.
@@ -79,9 +79,11 @@ class PosteriorScoreBasedPotential(BasePotential):
         self,
         x_o: Optional[Tensor],
         x_is_iid: Optional[bool] = False,
+        iid_method: Optional[str] = "fnpe",
         rebuild_flow: Optional[bool] = True,
     ):
         super().set_x(x_o, x_is_iid)
+        self.iid_method = iid_method
         if rebuild_flow and self._x_o is not None:
             x_density_estimator = reshape_to_batch_event(
                 self.x_o, event_shape=self.score_estimator.condition_shape
@@ -180,9 +182,19 @@ class PosteriorScoreBasedPotential(BasePotential):
                 assert self.prior is not None, "Prior is required for iid methods."
                 # NOTE: Add here different methods for accumulating the score.
                 # TODO: Warn for FNPE -> Kinda needs a "corrector"
-                score_fn_iid = FNPEScoreFn(
-                    self.score_estimator, self.prior, device=self.device
-                )
+                if self.iid_method == "fnpe":
+                    score_fn_iid = FNPEScoreFn(
+                        self.score_estimator, self.prior, device=self.device
+                    )
+                elif self.iid_method == "gauss":
+                    score_fn_iid = GaussCorrectedScoreFn(
+                        self.score_estimator, self.prior, 2 * torch.ones_like(theta[-1])
+                    )
+                else:
+                    raise NotImplementedError(
+                        f"Method {self.iid_method} for iid score accumulation not \
+                        implemented."
+                    )
                 score = score_fn_iid(theta, self.x_o, time)
 
         return score
