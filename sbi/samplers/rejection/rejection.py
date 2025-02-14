@@ -214,8 +214,10 @@ def accept_reject_sample(
            density during evaluation of the posterior.
 
     Args:
-        posterior_nn: Neural net representing the posterior.
-        accept_reject_fn: Function that evaluatuates which samples are accepted or
+        proposal: A callable that takes `sample_shape` as arguments (and kwargs as
+        needed). Returns samples from the proposal distribution with shape
+        (*sample_shape, event_dim).
+        accept_reject_fn: Function that evaluates which samples are accepted or
             rejected. Must take a batch of parameters and return a boolean tensor which
             indicates which parameters get accepted.
         num_samples: Desired number of samples.

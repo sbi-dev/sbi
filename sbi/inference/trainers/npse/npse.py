@@ -193,7 +193,11 @@ class NPSE(NeuralInference):
         dataloader_kwargs: Optional[dict] = None,
     ) -> ConditionalScoreEstimator:
         r"""Returns a score estimator that approximates the score
-        $\nabla_\theta \log p(\theta|x)$.
+        $\nabla_\theta \log p(\theta|x)$. The denoising score matching loss has a high
+        variance, which makes it more difficult to detect converegence. To reduce this
+        variance, we evaluate the validation loss at a fixed set of times. We also use
+        the exponential moving average of the training and validation losses, as opposed
+        to the other `trainer` classes, which track the loss directly.
 
         Args:
             training_batch_size: Training batch size.
@@ -358,6 +362,12 @@ class NPSE(NeuralInference):
             # moving average of the training loss.
             if len(self._summary["training_loss"]) == 0:
                 self._summary["training_loss"].append(train_loss_average)
+            else:
+                previous_loss = self._summary["training_loss"][-1]
+                self._summary["training_loss"].append(
+                    (1.0 - ema_loss_decay) * previous_loss
+                    + ema_loss_decay * train_loss_average
+                )
 
             # Calculate validation performance.
             self._neural_net.eval()
@@ -400,7 +410,6 @@ class NPSE(NeuralInference):
                         force_first_round_loss=force_first_round_loss,
                     )
 
-                    # print("val_losses: ", val_losses.shape)
                     val_loss_sum += val_losses.sum().item()
 
             # Take mean over all validation samples.
@@ -408,8 +417,6 @@ class NPSE(NeuralInference):
                 len(val_loader) * val_loader.batch_size * times_batch  # type: ignore
             )
 
-            # NOTE: Due to the inherently noisy nature we do instead log a exponential
-            # moving average of the validation loss.
             if len(self._summary["validation_loss"]) == 0:
                 val_loss_ema = val_loss
             else:
