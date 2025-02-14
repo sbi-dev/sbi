@@ -51,22 +51,22 @@ def denoise_gaussian(p: Normal, m: Tensor, s: Tensor, x_t: Tensor) -> Normal:
 
     Args:
         p: The prior Gaussian distribution.
-        m: The scaling factor m.
-        s: The standard deviation of the noise s.
-        x_t: The observation X_t.
+        m: The scaling factor.
+        s: The standard deviation of the noise.
+        x_t: The observed data.
 
     Returns:
         The posterior Gaussian distribution.
     """
-    mu0 = p.loc
-    std0 = p.scale
+    mean_0 = p.loc
+    std_0 = p.scale
 
     # Calculate the posterior mean and variance
-    var = 1 / (1 / std0**2 + m**2 / s**2)
-    mu = var * (mu0 / std0**2 + m * x_t / s**2)
-    std = var**0.5
+    posterior_variance = 1 / (1 / std_0**2 + m**2 / s**2)
+    posterior_mean = posterior_variance * (mean_0 / std_0**2 + m * x_t / s**2)
+    posterior_std = torch.sqrt(posterior_variance)
 
-    return Normal(mu, std)
+    return Normal(posterior_mean, posterior_std)
 
 
 # Automatic marginalization -----------------------------------------------
@@ -116,51 +116,54 @@ def marginalize_gaussian(p: Normal, m: Tensor, s: Tensor) -> Normal:
 
     Args:
         p: The prior Gaussian distribution.
-        m: The scaling factor m.
-        s: The standard deviation of the noise s.
+        m: The scaling factor.
+        s: The standard deviation of the noise.
 
     Returns:
         The marginal Gaussian distribution.
     """
-    mu0 = p.loc
-    std0 = p.scale
+    mean_0 = p.loc
+    std_0 = p.scale
 
     # Calculate the marginal mean and variance
-    mu = m * mu0
-    var = (m * std0) ** 2 + s**2
-    std = var**0.5
+    marginal_mean = m * mean_0
+    marginal_variance = (m * std_0) ** 2 + s**2
+    marginal_std = torch.sqrt(marginal_variance)
 
-    return Normal(mu, std)
+    return Normal(marginal_mean, marginal_std)
 
 
-def mv_diag_or_dense(A_diag_or_dense: Tensor, b: Tensor, batch_dims: int = 1) -> Tensor:
-    """Dot product of a diagonal matrix and a dense matrix.
+# Utility functions --------------------------------------------------------
+
+def mv_diag_or_dense(A_diag_or_dense: Tensor, b: Tensor, batch_dims: int = 0) -> Tensor:
+    """Dot product for diagonal or dense matrices.
 
     Args:
-        A_diag_or_dense (Tensor): Diagonal matrix.
-        b (Tensor): Dense matrix.
+        A_diag_or_dense: Diagonal or dense matrix.
+        b: Dense matrix/vector.
+        batch_dims: Number of batch dimensions.
 
     Returns:
-        Tensor: Dot product.
+        The result of A * b (or A @ b).
     """
     A_dims = A_diag_or_dense.ndim - batch_dims
     if A_dims == 1:
         return A_diag_or_dense * b
     else:
-        return torch.matmul(A_diag_or_dense, b)
+        return torch.einsum('...ij,...j->...i', A_diag_or_dense, b)
 
 
 def solve_diag_or_dense(
     A_diag_or_dense: Tensor, b: Tensor, batch_dims: int = 0
 ) -> Tensor:
-    """Solve a linear system with a diagonal matrix or a dense matrix.
+    """Solve a linear system with a diagonal or dense matrix.
 
     Args:
-        A_diag_or_dense (Tensor): Diagonal matrix or dense matrix.
-        b (Tensor): Dense matrix.
+        A_diag_or_dense: Diagonal or dense matrix.
+        b: Dense matrix/vector.
 
     Returns:
-        Tensor: Solution to the linear system.
+        The solution to the linear system A x = b.
     """
     A_dim = A_diag_or_dense.ndim - batch_dims
     if A_dim == 1:
@@ -172,15 +175,15 @@ def solve_diag_or_dense(
 def add_diag_or_dense(
     A_diag_or_dense: Tensor, B_diag_or_dense: Tensor, batch_dims: int = 0
 ) -> Tensor:
-    """Add two diagonal matrices or two dense matrices, considering batch dimensions.
+    """Add two diagonal or dense matrices, considering batch dimensions.
 
     Args:
-        A_diag_or_dense (Tensor): Diagonal matrix or dense matrix.
-        B_diag_or_dense (Tensor): Diagonal matrix or dense matrix.
-        batch_dims (int): Number of batch dimensions.
+        A_diag_or_dense: Diagonal or dense matrix.
+        B_diag_or_dense: Diagonal or dense matrix.
+        batch_dims: Number of batch dimensions.
 
     Returns:
-        Tensor: Sum of the matrices.
+        The sum of the two matrices.
     """
     A_ndim = A_diag_or_dense.ndim - batch_dims
     B_ndim = B_diag_or_dense.ndim - batch_dims
