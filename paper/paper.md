@@ -192,7 +192,18 @@ Bayesian inference is a principled approach for determining parameters consisten
 The posterior distribution captures the entire space of parameters that are compatible with the observations and the prior and it quantifies parameter uncertainty.
 When the forward-model is given by a stochastic simulator, Bayesian inference can be challenging: (1) the forward-model can be slow to evaluate, making algorithms that rely on sequential evaluations of the likelihood (such as Markov-Chain Monte-Carlo, MCMC) impractical, (2) the simulator can be non-differentiable, prohibiting the use of gradient-based MCMC or variational inference (VI) methods, and (3) likelihood-evaluations can be intractable, meaning that we can only generate samples from the model, but not evaluate their likelihoods.
 
-Recently, simulation-based inference (SBI) algorithms based on neural networks have been developed to overcome these limitations [@papamakarios2016fast; @papamakarios2019sequential; @hermans2020likelihood]. Unlike classical methods from Approximate Bayesian Computation (ABC, @sisson2018_chapter1), these methods use neural networks to learn the relationship between parameters and simulation outputs. Neural SBI algorithms (1) allow for massive parallelization of simulations (in contrast with sequential evaluations in MCMC methods) (2) do not require gradients through the simulator, and (3) do not require evaluations of the likelihood but only samples from the simulator. Finally, many of these algorithms allow \emph{amortized} inference, that is, after a large upfront cost of simulating data for the training phase, they can return the posterior distribution for any observation without requiring any further simulations or retraining.
+Recently, simulation-based inference (SBI) algorithms based on neural networks have been
+developed to overcome these limitations [@papamakarios2016fast;
+@papamakarios2019sequential; @hermans2020likelihood]. Unlike classical methods from
+Approximate Bayesian Computation (ABC, @sisson2018_chapter1), these methods use neural
+networks to learn the relationship between parameters and simulation outputs. Neural SBI
+algorithms (1) allow for massive parallelization of simulations (in contrast to
+sequential evaluations in MCMC methods), (2) do not require gradients through the
+simulator, and (3) do not require evaluations of the likelihood, but only samples from
+the simulator. Finally, many of these algorithms allow for \emph{amortized} inference,
+that is, after a large upfront cost of simulating data for the training phase, they can
+return the posterior distribution for any observation without requiring further
+simulations or retraining.
 
 To aid in the effective application of these algorithms to a wide range of problems, we developed the `sbi` toolkit. `sbi` implements a variety of state-of-the-art SBI algorithms, offering both high-level interfaces, extensive documentation and tutorials for practitioners, as well as low-level interfaces for experienced users and SBI researchers (giving full control over simulations, the training loop, and the sampling procedure). Since the original release of the `sbi` package [@tejerocantero2020sbi], the community of contributors has expanded significantly, resulting in a large number of improvements that have made `sbi` more flexible, performant, and reliable. `sbi` now supports a wider range of amortized and sequential inference methods, neural network architectures (including normalizing flows, flow- and score-matching, and various embedding network architectures), samplers (including MCMC, variational inference, importance sampling, and rejection sampling), diagnostic tools, visualization tools, and a comprehensive set of tutorials on how to use these features.
 
@@ -244,7 +255,7 @@ conditional density estimators for NPE and NLE, including normalizing flows
 [@lipman2023flow; @dax2023flow] (via `zuko`), as well as ensembles of any of these
 networks. `sbi` also implements a large set of embedding networks that can automatically
 learn summary statistics of (potentially) high-dimensional simulation outputs (including
-multi-layer-perceptrons, convolutional networks, and permutation-invariant networks).
+multilayer perceptrons, convolutional networks, and permutation-invariant networks).
 The neural networks can be trained with a pre-configured training loop with established
 default values, but `sbi` also allows full access over the training loop when desired.
 
@@ -266,7 +277,7 @@ Arviz [@arviz_2019] diagnostic plots.
 With `sbi`, our goal is to advance scientific discovery and computational engineering by
 making Bayesian inference accessible to a broad range of models, including those with
 inaccessible likelihoods, and to a broader range of users, including both machine
-learning researchers and domain-practitioners. We have created an open architecture and
+learning researchers and domain practitioners. We have created an open architecture and
 embraced community-driven development practices to encourage collaboration with other
 machine learning researchers and applied scientists to join us in this long-term vision.
 
