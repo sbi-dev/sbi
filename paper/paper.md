@@ -244,7 +244,7 @@ conditional density estimators for NPE and NLE, including normalizing flows
 [@lipman2023flow; @dax2023flow] (via `zuko`), as well as ensembles of any of these
 networks. `sbi` also implements a large set of embedding networks that can automatically
 learn summary statistics of (potentially) high-dimensional simulation outputs (including
-multi-layer-perceptrons, convolutional networks, and permutation invariant networks).
+multi-layer-perceptrons, convolutional networks, and permutation-invariant networks).
 The neural networks can be trained with a pre-configured training loop with established
 default values, but `sbi` also allows full access over the training loop when desired.
 
@@ -271,6 +271,15 @@ embraced community-driven development practices to encourage collaboration with 
 machine learning researchers and applied scientists to join us in this long-term vision.
 
 # Related software
+
+Simulation-based inference methods implemented in the `sbi` package require only access
+to simulated data, which can also be generated offline in other programming languages or
+frameworks. This sets `sbi` apart from toolboxes for traditional Bayesian inference,
+such as MCMC-based methods [@abril2023pymc; @bingham2019pyro; @gelman2015stan], which
+rely on likelihood evaluations, and from probabilistic programming languages (e.g., Pyro
+[@bingham2019pyro], NumPyro [@phan2019composable], Stan [@gelman2015stan], or Turing.jl
+[@ge2018t]), which typically require the simulator to be differentiable and implemented
+within their respective frameworks [@quera-bofarull2023].
 
 Since the original release of the `sbi` package, several other packages that implement
 neural network-based SBI algorithms have emerged.
