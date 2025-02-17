@@ -513,6 +513,8 @@ class IWElboOptimizer(ElboOptimizer):
         self.loss_name = "iwelbo"
         self.eps = 1e-7
         self.dreg = dreg
+        if not hasattr(self, 'HYPER_PARAMETERS'):
+            self.HYPER_PARAMETERS = []
         self.HYPER_PARAMETERS += ["K", "dreg"]
         if dreg:
             self.stick_the_landing = True
@@ -675,6 +677,8 @@ class RenyiDivergenceOptimizer(ElboOptimizer):
         self.alpha = alpha
         self.unbiased = unbiased
         super().__init__(*args, **kwargs)
+        if not hasattr(self, 'HYPER_PARAMETERS'):
+            self.HYPER_PARAMETERS = []
         self.HYPER_PARAMETERS += ["alpha", "unbiased", "dreg"]
         self.eps = 1e-5
         self.dreg = dreg
