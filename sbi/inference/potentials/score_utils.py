@@ -1,6 +1,6 @@
 import torch
 from torch import Tensor
-from torch.distributions import Distribution, Independent, Normal
+from torch.distributions import Distribution, Independent, Normal, MultivariateNormal
 
 # Automatic denoising -----------------------------------------------------
 
@@ -25,6 +25,8 @@ def denoise(p: Distribution, m: Tensor, s: Tensor, x_t: Tensor) -> Distribution:
         return denoise_independent(p, m, s, x_t)
     elif isinstance(p, Normal):
         return denoise_gaussian(p, m, s, x_t)
+    elif isinstance(p, MultivariateNormal):
+        return denoise_multivariate_gaussian(p, m, s, x_t)
     else:
         raise NotImplementedError(f"Automatic denoising for {type(p)} not implemented")
 
@@ -69,6 +71,26 @@ def denoise_gaussian(p: Normal, m: Tensor, s: Tensor, x_t: Tensor) -> Normal:
     return Normal(posterior_mean, posterior_std)
 
 
+def denoise_multivariate_gaussian(
+    p: MultivariateNormal, m: Tensor, s: Tensor, x_t: Tensor
+) -> MultivariateNormal:
+    mean0 = p.loc
+    cov0 = p.covariance_matrix
+    n = cov0.size(-1)
+    # Support batch dimensions by expanding the identity matrix to match cov0's batch shape
+    batch_shape = cov0.shape[:-2]
+    id_matrix = torch.eye(n, dtype=cov0.dtype, device=cov0.device).expand(*batch_shape, n, n)
+    precision_prior = torch.linalg.inv(cov0)
+    # Reshape m and s so the operation broadcasts correctly over batch dims
+    precision_likelihood = (m**2 / s**2)[..., None, None] * id_matrix
+    posterior_cov = torch.linalg.inv(precision_prior + precision_likelihood)
+    # unsqueeze mean0 and x_t for proper matrix multiplication
+    term1 = torch.matmul(precision_prior, mean0.unsqueeze(-1))
+    term2 = (m / s**2)[..., None] * x_t.unsqueeze(-1)
+    posterior_mean = torch.matmul(posterior_cov, term1 + term2).squeeze(-1)
+    return MultivariateNormal(posterior_mean, covariance_matrix=posterior_cov)
+
+
 # Automatic marginalization -----------------------------------------------
 
 
@@ -91,6 +113,8 @@ def marginalize(p: Distribution, m: Tensor, s: Tensor) -> Distribution:
         return marginalize_independent(p, m, s)
     elif isinstance(p, Normal):
         return marginalize_gaussian(p, m, s)
+    elif isinstance(p, MultivariateNormal):
+        return marginalize_multivariate_gaussian(p, m, s)
     else:
         raise NotImplementedError(
             f"Automatic marginalization for {type(p)} not implemented"
@@ -131,6 +155,33 @@ def marginalize_gaussian(p: Normal, m: Tensor, s: Tensor) -> Normal:
     marginal_std = torch.sqrt(marginal_variance)
 
     return Normal(marginal_mean, marginal_std)
+
+def marginalize_multivariate_gaussian(
+    p: MultivariateNormal, m: Tensor, s: Tensor
+) -> MultivariateNormal:
+    """Marginalize a multivariate Gaussian distribution.
+
+    Given an observation model xₜ = m * x + ε with independent noise ε ~ N(0, s² I),
+    where x ~ p, return the marginal distribution p(xₜ) as a MultivariateNormal.
+
+    Args:
+        p: The prior multivariate Gaussian distribution.
+        m: The scaling factor.
+        s: The standard deviation of the noise.
+        dim: The dimension of the multivariate output (unused in this implementation).
+
+    Returns:
+        The marginal multivariate Gaussian distribution p(xₜ).
+    """
+    mean_0 = p.loc
+    cov_0 = p.covariance_matrix
+
+    marginal_mean = m * mean_0
+    marginal_cov = (m**2) * cov_0 + s**2 * torch.eye(
+        mean_0.shape[-1], dtype=cov_0.dtype, device=cov_0.device
+    )
+
+    return MultivariateNormal(marginal_mean, covariance_matrix=marginal_cov)
 
 
 # Utility functions --------------------------------------------------------

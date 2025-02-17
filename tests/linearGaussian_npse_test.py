@@ -163,19 +163,24 @@ def test_c2st_npse_on_linearGaussian_different_dims():
 #     strict=True,
 #     match="Score accumulation*",
 # )
-@pytest.mark.parametrize(
-    "num_trials",
-    [
-        2,
-    ],
-)
-def test_npse_iid_inference(num_trials):
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("sde_type", ["vp", "ve", "subvp"])
+def test_npse_iid_inference(sde_type):
     """Test whether NPSE infers well a simple example with available ground truth."""
 
     num_dim = 2
-    x_o = zeros(num_trials, num_dim)
-    num_samples = 1000
+    num_samples = 200
     num_simulations = 3000
+    iid_methods = ["fnpe", "gauss", "auto_gauss"]
+    num_good_evals_per_method = {
+        "fnpe": [
+            2,
+        ],
+        "gauss": [4, 6],
+        "auto_gauss": [8, 32],
+    }
 
     # likelihood_mean will be likelihood_shift+theta
     likelihood_shift = -1.0 * ones(num_dim)
@@ -184,27 +189,34 @@ def test_npse_iid_inference(num_trials):
     prior_mean = zeros(num_dim)
     prior_cov = eye(num_dim)
     prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
-    gt_posterior = true_posterior_linear_gaussian_mvn_prior(
-        x_o, likelihood_shift, likelihood_cov, prior_mean, prior_cov
-    )
-    target_samples = gt_posterior.sample((num_samples,))
 
-    inference = NPSE(prior, show_progress_bars=True)
+    inference = NPSE(prior, show_progress_bars=True, sde_type=sde_type)
 
     theta = prior.sample((num_simulations,))
     x = linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     score_estimator = inference.append_simulations(theta, x).train(
-        training_batch_size=100,
+        training_batch_size=500, max_num_epochs=300
     )
-    posterior = inference.build_posterior(score_estimator)
-    posterior.set_default_x(x_o)
-    samples = posterior.sample((num_samples,))
+    for iid_method in iid_methods:
+        for num_trial in num_good_evals_per_method[iid_method]:
+            x_o = zeros(num_trial, num_dim)
+            posterior = inference.build_posterior(score_estimator)
+            posterior.set_default_x(x_o)
+            samples = posterior.sample((num_samples,), iid_method=iid_method)
 
-    # Compute the c2st and assert it is near chance level of 0.5.
-    check_c2st(
-        samples, target_samples, alg=f"npse-vp-gaussian-1D-{num_trials}iid-trials"
-    )
+            gt_posterior = true_posterior_linear_gaussian_mvn_prior(
+                x_o, likelihood_shift, likelihood_cov, prior_mean, prior_cov
+            )
+            target_samples = gt_posterior.sample((num_samples,))
+
+            # Compute the c2st and assert it is near chance level of 0.5.
+            check_c2st(
+                samples,
+                target_samples,
+                alg=f"npse-vp-gaussian-2D-{iid_method}-{num_trial}iid-trials",
+                tol=1.2,
+            )
 
 
 @pytest.mark.slow
