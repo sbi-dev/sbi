@@ -87,7 +87,7 @@ authors:
   - name: Janne K Lappalainen
     affiliation: "1, 2"
 
-  - name: Balint Muscanyi
+  - name: Bálint Mucsányi
     affiliation: "1, 2, 18"
 
   - name: Felix Pei
