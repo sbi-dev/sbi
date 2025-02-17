@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import sys
+
 import pytest
 from pyro.infer.mcmc import MCMC
 from torch import Tensor, eye, zeros
@@ -25,7 +27,14 @@ from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
         "slice_np_vectorized",
         "nuts_pyro",
         "hmc_pyro",
-        "nuts_pymc",
+        pytest.param(
+            "nuts_pymc",
+            marks=pytest.mark.xfail(
+                condition=sys.version_info >= (3, 12),
+                reason="Fails with pymc 5.20.1",
+                raises=TypeError,
+            ),
+        ),
         "hmc_pymc",
         "slice_pymc",
     ),
@@ -57,14 +66,17 @@ def test_api_posterior_sampler_set(
         estimator, prior, x_o
     )
     posterior = MCMCPosterior(
-        potential_fn, theta_transform=transform, method=sampling_method, proposal=prior
+        potential_fn,
+        theta_transform=transform,
+        method=sampling_method,
+        proposal=prior,
+        **mcmc_params_fast,
     )
 
     assert posterior.posterior_sampler is None
     samples = posterior.sample(
         sample_shape=(num_samples, num_chains),
         x=x_o,
-        mcmc_parameters={"init_strategy": "prior", **mcmc_params_fast},
     )
     assert isinstance(samples, Tensor)
     assert samples.shape == (num_samples, num_chains, num_dim)
