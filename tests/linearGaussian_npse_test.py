@@ -173,13 +173,14 @@ def test_npse_iid_inference(sde_type):
     num_dim = 2
     num_samples = 200
     num_simulations = 3000
-    iid_methods = ["fnpe", "gauss", "auto_gauss"]
+    iid_methods = ["fnpe", "gauss", "auto_gauss", "jac_gauss"]
     num_good_evals_per_method = {
         "fnpe": [
             2,
         ],
         "gauss": [4, 6],
         "auto_gauss": [8, 32],
+        "jac_gauss": [4],  # TODO: There might be a bug in the implementation.
     }
 
     # likelihood_mean will be likelihood_shift+theta

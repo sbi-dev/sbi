@@ -1,6 +1,6 @@
 import torch
 from torch import Tensor
-from torch.distributions import Distribution, Independent, Normal, MultivariateNormal
+from torch.distributions import Distribution, Independent, MultivariateNormal, Normal
 
 # Automatic denoising -----------------------------------------------------
 
@@ -77,9 +77,11 @@ def denoise_multivariate_gaussian(
     mean0 = p.loc
     cov0 = p.covariance_matrix
     n = cov0.size(-1)
-    # Support batch dimensions by expanding the identity matrix to match cov0's batch shape
+    # Support batch dimensions by expanding the identity matrix to match cov0's
+    # batch shape
     batch_shape = cov0.shape[:-2]
-    id_matrix = torch.eye(n, dtype=cov0.dtype, device=cov0.device).expand(*batch_shape, n, n)
+    id_matrix = torch.eye(n, dtype=cov0.dtype, device=cov0.device)
+    id_matrix = id_matrix.expand(*batch_shape, n, n)
     precision_prior = torch.linalg.inv(cov0)
     # Reshape m and s so the operation broadcasts correctly over batch dims
     precision_likelihood = (m**2 / s**2)[..., None, None] * id_matrix
@@ -156,6 +158,7 @@ def marginalize_gaussian(p: Normal, m: Tensor, s: Tensor) -> Normal:
 
     return Normal(marginal_mean, marginal_std)
 
+
 def marginalize_multivariate_gaussian(
     p: MultivariateNormal, m: Tensor, s: Tensor
 ) -> MultivariateNormal:
@@ -185,6 +188,7 @@ def marginalize_multivariate_gaussian(
 
 
 # Utility functions --------------------------------------------------------
+
 
 def mv_diag_or_dense(A_diag_or_dense: Tensor, b: Tensor, batch_dims: int = 0) -> Tensor:
     """Dot product for diagonal or dense matrices.
