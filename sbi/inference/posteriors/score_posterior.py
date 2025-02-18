@@ -144,7 +144,7 @@ class ScorePosterior(NeuralPosterior):
 
         if self.sample_with == "ode":
             samples = rejection.accept_reject_sample(
-                proposal=self.sample_via_zuko,
+                proposal=self.sample_via_ode,
                 accept_reject_fn=lambda theta: within_support(self.prior, theta),
                 num_samples=num_samples,
                 show_progress_bars=show_progress_bars,
@@ -241,7 +241,7 @@ class ScorePosterior(NeuralPosterior):
 
         return samples
 
-    def sample_via_zuko(
+    def sample_via_ode(
         self,
         sample_shape: Shape = torch.Size(),
     ) -> Tensor:
@@ -333,7 +333,7 @@ class ScorePosterior(NeuralPosterior):
 
         if self.sample_with == "ode":
             samples = rejection.accept_reject_sample(
-                proposal=self.sample_via_zuko,
+                proposal=self.sample_via_ode,
                 accept_reject_fn=lambda theta: within_support(self.prior, theta),
                 num_samples=num_samples,
                 num_xos=batch_size,

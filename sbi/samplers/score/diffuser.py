@@ -101,9 +101,6 @@ class Diffuser:
         # iid_bridge is not accurate.
         num_batch = self.batch_shape.numel()
         init_shape = (num_samples, num_batch) + self.input_shape
-        # init_shape = (
-        #     num_samples,
-        # ) + self.input_shape  # just use num_samples, not num_batch
         # NOTE: for the IID setting we might need to scale the noise with iid batch
         # size, as in equation (7) in the paper.
         eps = torch.randn(init_shape, device=self.device)
