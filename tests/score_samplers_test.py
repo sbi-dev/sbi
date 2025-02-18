@@ -18,7 +18,7 @@ from sbi.samplers.score import Diffuser
 
 @pytest.mark.parametrize("sde_type", ["vp", "ve", "subvp"])
 @pytest.mark.parametrize("predictor", ("euler_maruyama",))
-@pytest.mark.parametrize("corrector", (None,))
+@pytest.mark.parametrize("corrector", (None, "gibbs", "langevin"))
 @pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
 @pytest.mark.parametrize("mu", (-1.0, 0.0, 1.0))
 @pytest.mark.parametrize("std", (1.0, 0.1))
