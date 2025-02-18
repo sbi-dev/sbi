@@ -1,6 +1,14 @@
 import torch
 from torch import Tensor
-from torch.distributions import Distribution, Independent, MultivariateNormal, Normal
+from torch.distributions import (
+    Distribution,
+    Independent,
+    MultivariateNormal,
+    Normal,
+    MixtureSameFamily,
+    Categorical,
+)
+from sbi.utils.sbiutils import ImproperEmpirical
 
 # Automatic denoising -----------------------------------------------------
 
@@ -28,7 +36,7 @@ def denoise(p: Distribution, m: Tensor, s: Tensor, x_t: Tensor) -> Distribution:
     elif isinstance(p, MultivariateNormal):
         return denoise_multivariate_gaussian(p, m, s, x_t)
     else:
-        raise NotImplementedError(f"Automatic denoising for {type(p)} not implemented")
+        return denoise_empirical(p, m, s, x_t)
 
 
 def denoise_independent(
@@ -92,6 +100,36 @@ def denoise_multivariate_gaussian(
     posterior_mean = torch.matmul(posterior_cov, term1 + term2).squeeze(-1)
     return MultivariateNormal(posterior_mean, covariance_matrix=posterior_cov)
 
+def denoise_empirical(
+    p: Distribution,
+    m: Tensor,
+    s: Tensor,
+    x_t: Tensor,
+    num_particles: int = 5000,
+) -> MixtureSameFamily:
+    particles = p.sample((num_particles,))  # Sample from prior
+    s = torch.clip(s, 1e-1, 1e6)
+
+    # Compute posterior mean and standard deviation
+    posterior_mean = (m * particles + s**2 * x_t) / (m**2 + s**2)
+    posterior_std = torch.sqrt((s**2) / (m**2 + s**2))
+    posterior_std = torch.broadcast_to(posterior_std, posterior_mean.shape)
+
+    # Compute unnormalized log-likelihoods as logits
+    logits = -0.5 * torch.sum(
+        ((x_t - m * particles) / s) ** 2, axis=-1
+    )  # Gaussian likelihood
+    logits = logits - logits.logsumexp(dim=-1, keepdims=True)  # Normalize logits
+
+    # print(posterior_mean.shape, posterior_std.shape, logits.shape)
+    # Define the mixture components
+    components = Independent(Normal(posterior_mean, posterior_std), 1)
+
+    # Create a mixture model
+    posterior = MixtureSameFamily(Categorical(logits=logits), components)
+
+    return posterior
+
 
 # Automatic marginalization -----------------------------------------------
 
@@ -118,9 +156,7 @@ def marginalize(p: Distribution, m: Tensor, s: Tensor) -> Distribution:
     elif isinstance(p, MultivariateNormal):
         return marginalize_multivariate_gaussian(p, m, s)
     else:
-        raise NotImplementedError(
-            f"Automatic marginalization for {type(p)} not implemented"
-        )
+        return marginalize_empirical(p, m, s)
 
 
 def marginalize_independent(p: Independent, m: Tensor, s: Tensor) -> Independent:
@@ -185,6 +221,23 @@ def marginalize_multivariate_gaussian(
     )
 
     return MultivariateNormal(marginal_mean, covariance_matrix=marginal_cov)
+
+def marginalize_empirical(
+    p: Distribution, m: Tensor, s: Tensor, num_particles: int = 5000
+) -> MixtureSameFamily:
+    particles = p.sample((num_particles,))
+    logits = torch.zeros(num_particles)
+    s = torch.clip(s, 1e-1, 1e6)
+    # NOTE: We might want to assume some initial particle variance
+    marginal_mean = m[None, ...] * particles
+    marginal_std = torch.sqrt(s**2)
+
+    # NOTE: This might not have a nice score at low noise levels (diracs...)
+    components = Independent(Normal(marginal_mean, marginal_std), 1)
+    p = MixtureSameFamily(Categorical(logits=logits), components)
+    # Less exact but more well bahaved score
+    # p = Independent(Normal(marginal_mean.mean(0), marginal_std.mean(0)), 1)
+    return p
 
 
 # Utility functions --------------------------------------------------------
