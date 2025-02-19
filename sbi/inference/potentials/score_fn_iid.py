@@ -6,7 +6,7 @@ import torch
 from torch import Tensor
 from torch.distributions import Distribution
 
-from sbi.inference.potentials.score_utils import (
+from sbi.utils.score_utils import (
     add_diag_or_dense,
     denoise,
     marginalize,
@@ -311,8 +311,8 @@ class AbstractGaussCorrectedScoreFn(ScoreFnIID):
         base_score = self.score_estimator(inputs, conditions, time, **kwargs)
         prior_score = self.marginal_prior_score_fn(time, inputs)
 
-        print(f"base_score: {base_score.shape}")
-        print(f"prior_score: {prior_score.shape}")
+        # print(f"base_score: {base_score.shape}")
+        # print(f"prior_score: {prior_score.shape}")
 
         # Marginal prior precision
         prior_precision = self.marginal_denoising_prior_precision_fn(time, inputs)
@@ -321,18 +321,19 @@ class AbstractGaussCorrectedScoreFn(ScoreFnIID):
             time, inputs, conditions, N
         )
 
-        print(f"prior_precision: {prior_precision.shape}")
-        print(f"posterior_precisions: {posterior_precisions.shape}")
+        # print(f"prior_precision: {prior_precision.shape}")
+        # print(f"posterior_precisions: {posterior_precisions.shape}")
 
         prior_precision, posterior_precisions = ensure_lam_positive_definite(
-            prior_precision, posterior_precisions, N
+            prior_precision,
+            posterior_precisions,
+            N,
+            precission_nugget=0.01,
         )
 
         # Total precision
         term1 = (1 - N) * prior_precision
         term2 = torch.sum(posterior_precisions, dim=1, keepdim=True)
-        # print(f"term1: {term1.shape}")
-        # print(f"term2: {term2.shape}")
         Lam = add_diag_or_dense(term1, term2, batch_dims=2)
 
         # print(Lam.shape)
@@ -341,14 +342,11 @@ class AbstractGaussCorrectedScoreFn(ScoreFnIID):
         weighted_prior_score = mv_diag_or_dense(
             prior_precision, prior_score, batch_dims=2
         )
-        # print("weighted_prior_score", weighted_prior_score.shape)
-        # print(f"weighted_prior_score: {weighted_prior_score.shape}")
-        # print(posterior_precisions.shape, base_score.shape)
         weighted_posterior_scores = mv_diag_or_dense(
             posterior_precisions, base_score, batch_dims=2
         )
 
-        # print("weighted_posterior_scores", weighted_posterior_scores.shape)
+
         # Accumulate the scores
         score = (1 - N) * weighted_prior_score.sum(dim=1) + torch.sum(
             weighted_posterior_scores, dim=1

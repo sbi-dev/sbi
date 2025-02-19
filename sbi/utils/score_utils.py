@@ -1,3 +1,4 @@
+from sklearn.mixture import GaussianMixture
 import torch
 from torch import Tensor
 from torch.distributions import (
@@ -12,6 +13,7 @@ from torch.distributions import (
 )
 from sbi.utils.sbiutils import ImproperEmpirical
 from sbi.utils.torchutils import BoxUniform
+from functools import lru_cache
 
 # Automatic denoising -----------------------------------------------------
 
@@ -34,10 +36,14 @@ def denoise(p: Distribution, m: Tensor, s: Tensor, x_t: Tensor) -> Distribution:
     """
     if isinstance(p, Independent):
         return denoise_independent(p, m, s, x_t)
+    elif isinstance(p, MixtureSameFamily):
+        return denoise_mixture(p, m, s, x_t)
     elif isinstance(p, Normal):
         return denoise_gaussian(p, m, s, x_t)
     elif isinstance(p, MultivariateNormal):
         return denoise_multivariate_gaussian(p, m, s, x_t)
+    elif isinstance(p, (Uniform, BoxUniform)):
+        return denoise_uniform(p, m, s, x_t)
     else:
         return denoise_empirical(p, m, s, x_t)
 
@@ -87,11 +93,11 @@ def denoise_multivariate_gaussian(
 ) -> MultivariateNormal:
     mean0 = p.loc
     cov0 = p.covariance_matrix
-    n = cov0.size(-1)
+    n = cov0.size(-1)  # type: ignore
     # Support batch dimensions by expanding the identity matrix to match cov0's
     # batch shape
-    batch_shape = cov0.shape[:-2]
-    id_matrix = torch.eye(n, dtype=cov0.dtype, device=cov0.device)
+    batch_shape = cov0.shape[:-2]  # type: ignore
+    id_matrix = torch.eye(n, dtype=cov0.dtype, device=cov0.device)  # type: ignore
     id_matrix = id_matrix.expand(*batch_shape, n, n)
     precision_prior = torch.linalg.inv(cov0)
     # Reshape m and s so the operation broadcasts correctly over batch dims
@@ -104,7 +110,34 @@ def denoise_multivariate_gaussian(
     return MultivariateNormal(posterior_mean, covariance_matrix=posterior_cov)
 
 
-def denoise_uniform(p: Uniform, m: Tensor, s: Tensor, x_t: Tensor):
+def denoise_mixture(
+    p: MixtureSameFamily, m: Tensor, s: Tensor, x_t: Tensor
+) -> MixtureSameFamily:
+    """Denoise a MixtureSameFamily distribution.
+
+    Args:
+        p: The prior MixtureSameFamily distribution.
+        m: The scaling factor m.
+        s: The standard deviation of the noise.
+        x_t: The observed data.
+
+    Returns:
+        The posterior MixtureSameFamily distribution.
+    """
+    mixture_dist = p.mixture_distribution
+    component_dist = p.component_distribution
+    denoised_components = denoise(component_dist, m, s, x_t)
+    mixture_logits = mixture_dist.logits
+    # Update the logits to reflect the new likelihoods
+    component_loglikelihood = denoised_components.log_prob(x_t)
+    # Update the logits to reflect the new likelihoods
+    denoised_logits = mixture_logits[None, ...] + component_loglikelihood
+    # Normalize the logits
+    denoised_logits = denoised_logits - denoised_logits.logsumexp(dim=-1, keepdims=True)
+    return MixtureSameFamily(Categorical(logits=denoised_logits), denoised_components)
+
+
+def denoise_uniform(p: Uniform | BoxUniform, m: Tensor, s: Tensor, x_t: Tensor):
     return UniformNormalPosterior(p.low, p.high, m, s, x_t)
 
 
@@ -115,6 +148,10 @@ def denoise_empirical(
     x_t: Tensor,
     num_particles: int = 5000,
 ) -> MixtureSameFamily:
+    gmm = fit_gmm(p)
+    return denoise_mixture(gmm, m, s, x_t)
+    raise NotImplementedError("Denoising empirical distributions is not supported.")
+    # NOTE: Thats not that nice
     particles = p.sample((num_particles,))  # Sample from prior
     s = torch.clip(s, 1e-1, 1e6)
 
@@ -124,9 +161,8 @@ def denoise_empirical(
     posterior_std = torch.broadcast_to(posterior_std, posterior_mean.shape)
 
     # Compute unnormalized log-likelihoods as logits
-    logits = -0.5 * torch.sum(
-        ((x_t - m * particles) / s) ** 2, axis=-1
-    )  # Gaussian likelihood
+    # Gaussian likelihood
+    logits = -0.5 * torch.sum(((x_t - m * particles) / s) ** 2, axis=-1)  # type: ignore
     logits = logits - logits.logsumexp(dim=-1, keepdims=True)  # Normalize logits
 
     # print(posterior_mean.shape, posterior_std.shape, logits.shape)
@@ -165,6 +201,8 @@ def marginalize(p: Distribution, m: Tensor, s: Tensor) -> Distribution:
         return marginalize_multivariate_gaussian(p, m, s)
     elif isinstance(p, (Uniform, BoxUniform)):
         return marginalize_uniform(p, m, s)
+    elif isinstance(p, MixtureSameFamily):
+        return marginalize_mixture(p, m, s)
     else:
         return marginalize_empirical(p, m, s)
 
@@ -272,6 +310,10 @@ def marginalize_uniform(
 def marginalize_empirical(
     p: Distribution, m: Tensor, s: Tensor, num_particles: int = 5000
 ) -> MixtureSameFamily:
+    gmm_approx = fit_gmm(p)
+    return marginalize_mixture(gmm_approx, m, s)
+    raise NotImplementedError("Marginalizing empirical distributions is not supported.")
+
     particles = p.sample((num_particles,))
     logits = torch.zeros(num_particles)
     s = torch.clip(s, 1e-1, 1e6)
@@ -298,37 +340,65 @@ class UniformNormalPosterior(Distribution):
     has_rsample: bool = False
 
     def __init__(self, low, high, m, s, x_t, validate_args=None):
-        self.low = low
-        self.high = high
-        self.m = m
-        self.s = s
-        self.x_t = x_t
-        # The posterior density is proportional to N(x_t; m*x, s) on [low, high].
-        # This can be viewed as a truncated normal in x with location x_t/m and scale s/|m|.
-        self.normal = Normal(loc=x_t / m, scale=s / abs(m))
-        self.a = self.normal.cdf(low)
-        self.b = self.normal.cdf(high)
-        self.Z = self.b - self.a  # normalization constant
+        self.low = torch.as_tensor(low)
+        self.high = torch.as_tensor(high)
+        self.m = torch.as_tensor(m)
+        self.s = torch.as_tensor(s)
+        self.x_t = torch.as_tensor(x_t)
+
+        # Posterior is a truncated normal with:
+        self.mu = self.x_t / self.m
+        self.sigma = self.s / torch.abs(self.m)
+
+        # Standard Normal Distribution
+        self.standard_normal = Normal(torch.tensor(0.0, device=self.sigma.device), 1.0)
+
+        # Standardized truncation limits
+        self.alpha = (self.low - self.mu) / self.sigma
+        self.beta = (self.high - self.mu) / self.sigma
+
+        # Compute normalization constant Z
+        self.a = self.standard_normal.cdf(self.alpha)
+        self.b = self.standard_normal.cdf(self.beta)
+        self.Z = torch.clamp(self.b - self.a, min=1e-8)  # Avoid division by zero
+
         batch_shape = torch.broadcast_shapes(
-            low.shape, high.shape, m.shape, s.shape, x_t.shape
+            self.low.shape, self.high.shape, self.m.shape, self.s.shape, self.x_t.shape
         )
         event_shape = torch.Size()
         super().__init__(batch_shape, event_shape, validate_args=validate_args)
 
+    @property
+    def mean(self):
+        # Standard normal pdf values
+        phi_alpha = torch.exp(self.standard_normal.log_prob(self.alpha))
+        phi_beta = torch.exp(self.standard_normal.log_prob(self.beta))
+
+        return self.mu + self.sigma * (phi_alpha - phi_beta) / self.Z
+
+    @property
+    def variance(self):
+        phi_alpha = torch.exp(self.standard_normal.log_prob(self.alpha))
+        phi_beta = torch.exp(self.standard_normal.log_prob(self.beta))
+
+        term = (phi_alpha - phi_beta) / self.Z
+        variance_adjustment = (
+            1 + (self.alpha * phi_alpha - self.beta * phi_beta) / self.Z - term**2
+        )
+
+        return self.sigma**2 * variance_adjustment
+
     def sample(self, sample_shape=torch.Size()):
-        # Inverse transform sampling from the truncated normal.
+        # Inverse CDF sampling for a truncated normal
         u = torch.rand(sample_shape, device=self.low.device) * self.Z + self.a
-        return self.normal.icdf(u)
+        sample = self.mu + self.sigma * self.standard_normal.icdf(
+            u
+        )  # Using icdf for stability
+        return torch.clamp(sample, min=self.low, max=self.high)
 
     def log_prob(self, x):
-        # Compute the log-density of x under the truncated normal.
-        lp = self.normal.log_prob(x) - torch.log(self.Z)
-        # Enforce support: set log-probability to -inf outside [low, high].
-        return torch.where(
-            (x >= self.low) & (x <= self.high),
-            lp,
-            -float("inf") * torch.ones_like(lp),
-        )
+        lp = Normal(self.mu, self.sigma).log_prob(x) - torch.log(self.Z)
+        return torch.where((x >= self.low) & (x <= self.high), lp, -torch.inf)
 
 
 class UniformNormalConvolution(Distribution):
@@ -374,6 +444,43 @@ class UniformNormalConvolution(Distribution):
 
 
 # Utility functions --------------------------------------------------------
+
+@lru_cache()
+def fit_gmm(
+    distribution: Distribution,
+    num_components: int = 10,
+    num_samples: int = 10_000,
+    random_state: int = 0,
+) -> MixtureSameFamily:
+    # Sample particles from the distribution
+    samples = distribution.sample((num_samples,))
+    # Reshape to 2D array: (num_samples, features)
+    samples_np = samples.detach().cpu().numpy().reshape(num_samples, -1)
+
+    # Fit the Gaussian Mixture Model using scikit-learn
+    gmm = GaussianMixture(n_components=num_components, random_state=random_state).fit(
+        samples_np
+    )
+
+    # Convert parameters to torch tensors
+    weights = torch.tensor(gmm.weights_, dtype=samples.dtype, device=samples.device)
+    means = torch.tensor(gmm.means_, dtype=samples.dtype, device=samples.device)
+    covariances = torch.tensor(
+        gmm.covariances_, dtype=samples.dtype, device=samples.device
+    )
+
+    # Decide on univariate or multivariate based on feature dimension
+    d = means.shape[-1]
+    if d == 1:
+        means = means.squeeze(-1)
+        covariances = covariances.squeeze(-1).squeeze(-1)
+        std = torch.sqrt(covariances)
+        components = Normal(means, std)
+    else:
+        components = MultivariateNormal(means, covariance_matrix=covariances)
+
+    # Construct and return the MixtureSameFamily distribution
+    return MixtureSameFamily(Categorical(probs=weights), components)
 
 
 def mv_diag_or_dense(A_diag_or_dense: Tensor, b: Tensor, batch_dims: int = 0) -> Tensor:
