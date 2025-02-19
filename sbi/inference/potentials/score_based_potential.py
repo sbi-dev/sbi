@@ -182,9 +182,10 @@ class PosteriorScoreBasedPotential(BasePotential):
                 assert self.prior is not None, "Prior is required for iid methods."
 
                 method_iid = get_iid_method(self.iid_method)
+                # Always creating a new object every call is not efficient...
                 score_fn_iid = method_iid(self.score_estimator, self.prior)
 
-                score = score_fn_iid(theta, self.x_o, time)
+                score = score_fn_iid(theta, self.x_o, time)  # type: ignore
 
         return score
 

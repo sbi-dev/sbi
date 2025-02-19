@@ -7,8 +7,11 @@ from torch.distributions import (
     Normal,
     MixtureSameFamily,
     Categorical,
+    Uniform,
+    constraints,
 )
 from sbi.utils.sbiutils import ImproperEmpirical
+from sbi.utils.torchutils import BoxUniform
 
 # Automatic denoising -----------------------------------------------------
 
@@ -100,6 +103,11 @@ def denoise_multivariate_gaussian(
     posterior_mean = torch.matmul(posterior_cov, term1 + term2).squeeze(-1)
     return MultivariateNormal(posterior_mean, covariance_matrix=posterior_cov)
 
+
+def denoise_uniform(p: Uniform, m: Tensor, s: Tensor, x_t: Tensor):
+    return UniformNormalPosterior(p.low, p.high, m, s, x_t)
+
+
 def denoise_empirical(
     p: Distribution,
     m: Tensor,
@@ -155,6 +163,8 @@ def marginalize(p: Distribution, m: Tensor, s: Tensor) -> Distribution:
         return marginalize_gaussian(p, m, s)
     elif isinstance(p, MultivariateNormal):
         return marginalize_multivariate_gaussian(p, m, s)
+    elif isinstance(p, (Uniform, BoxUniform)):
+        return marginalize_uniform(p, m, s)
     else:
         return marginalize_empirical(p, m, s)
 
@@ -171,6 +181,23 @@ def marginalize_independent(p: Independent, m: Tensor, s: Tensor) -> Independent
         The marginal independent distribution.
     """
     return Independent(marginalize(p.base_dist, m, s), p.reinterpreted_batch_ndims)
+
+def marginalize_mixture(
+    p: MixtureSameFamily, m: Tensor, s: Tensor
+) -> MixtureSameFamily:
+    """Marginalize a MixtureSameFamily distribution.
+
+    Args:
+        p: The prior MixtureSameFamily distribution.
+        m: The scaling factor m.
+        s: The standard deviation of the noise s.
+
+    Returns:
+        The marginal MixtureSameFamily distribution.
+    """
+    return MixtureSameFamily(
+        p.mixture_distribution, marginalize(p.component_distribution, m, s)
+    )
 
 
 def marginalize_gaussian(p: Normal, m: Tensor, s: Tensor) -> Normal:
@@ -217,10 +244,30 @@ def marginalize_multivariate_gaussian(
 
     marginal_mean = m * mean_0
     marginal_cov = (m**2) * cov_0 + s**2 * torch.eye(
-        mean_0.shape[-1], dtype=cov_0.dtype, device=cov_0.device
+        mean_0.shape[-1],
+        dtype=cov_0.dtype,  # type: ignore
+        device=cov_0.device,  # type: ignore
     )
 
     return MultivariateNormal(marginal_mean, covariance_matrix=marginal_cov)
+
+
+def marginalize_uniform(
+    p: Uniform | BoxUniform, m: Tensor, s: Tensor
+) -> 'UniformNormalConvolution':
+    """Marginalize a uniform distribution.
+
+    Args:
+        p: The prior uniform distribution.
+        m: The scaling factor.
+        s: The standard deviation of the noise.
+
+    Returns:
+        The marginal uniform distribution.
+    """
+
+    return UniformNormalConvolution(p.low, p.high, m, s)  # type: ignore
+
 
 def marginalize_empirical(
     p: Distribution, m: Tensor, s: Tensor, num_particles: int = 5000
@@ -238,6 +285,92 @@ def marginalize_empirical(
     # Less exact but more well bahaved score
     # p = Independent(Normal(marginal_mean.mean(0), marginal_std.mean(0)), 1)
     return p
+
+# Special distributions:
+class UniformNormalPosterior(Distribution):
+    arg_constraints = {
+        "low": constraints.real,
+        "high": constraints.real,
+        "m": constraints.real,
+        "s": constraints.positive,
+        "x_t": constraints.real,
+    }  # type: ignore
+    has_rsample: bool = False
+
+    def __init__(self, low, high, m, s, x_t, validate_args=None):
+        self.low = low
+        self.high = high
+        self.m = m
+        self.s = s
+        self.x_t = x_t
+        # The posterior density is proportional to N(x_t; m*x, s) on [low, high].
+        # This can be viewed as a truncated normal in x with location x_t/m and scale s/|m|.
+        self.normal = Normal(loc=x_t / m, scale=s / abs(m))
+        self.a = self.normal.cdf(low)
+        self.b = self.normal.cdf(high)
+        self.Z = self.b - self.a  # normalization constant
+        batch_shape = torch.broadcast_shapes(
+            low.shape, high.shape, m.shape, s.shape, x_t.shape
+        )
+        event_shape = torch.Size()
+        super().__init__(batch_shape, event_shape, validate_args=validate_args)
+
+    def sample(self, sample_shape=torch.Size()):
+        # Inverse transform sampling from the truncated normal.
+        u = torch.rand(sample_shape, device=self.low.device) * self.Z + self.a
+        return self.normal.icdf(u)
+
+    def log_prob(self, x):
+        # Compute the log-density of x under the truncated normal.
+        lp = self.normal.log_prob(x) - torch.log(self.Z)
+        # Enforce support: set log-probability to -inf outside [low, high].
+        return torch.where(
+            (x >= self.low) & (x <= self.high),
+            lp,
+            -float("inf") * torch.ones_like(lp),
+        )
+
+
+class UniformNormalConvolution(Distribution):
+    arg_constraints = {
+        "low": constraints.real,
+        "high": constraints.real,
+        "scale": constraints.real,
+        "noise": constraints.positive,
+    }  # type: ignore
+    support = constraints.real  # type: ignore
+    has_rsample = False
+
+    def __init__(self, low, high, scale, noise, validate_args=None):
+        self.low = torch.as_tensor(low)
+        self.high = torch.as_tensor(high)
+        self.scale = torch.as_tensor(scale)
+        self.noise = torch.as_tensor(noise)
+
+        # Determine batch_shape from broadcasting low and high (assumes low/high are tensors or scalars)
+        batch_shape = self.low.shape
+
+        event_shape = torch.Size()
+        super().__init__(batch_shape, event_shape, validate_args=validate_args)
+
+    def sample(self, sample_shape=torch.Size()):
+        shape = sample_shape + self.batch_shape  # type: ignore
+        # Sample uniformly over [low, high]
+        x = torch.rand(shape, device=self.low.device)
+        x = x * (self.high - self.low) + self.low
+        noise_sample = torch.randn(shape, device=self.noise.device) * self.noise
+        return self.scale * x + noise_sample
+
+    def log_prob(self, value):
+        # Compute p(value) using the convolution formula:
+        # p(value) = 1/(b-a) * [Phi((value - scale*a)/noise) - Phi((value - scale*b)/noise)]
+        dist0 = Normal(torch.tensor(0.0, device=value.device), 1.0)
+        numerator = dist0.cdf((value - self.scale * self.low) / self.noise) - dist0.cdf(
+            (value - self.scale * self.high) / self.noise
+        )
+        denom = (self.high - self.low).clamp_min(1e-30)
+        pdf = numerator / denom
+        return torch.log(pdf.clamp_min(1e-30))
 
 
 # Utility functions --------------------------------------------------------

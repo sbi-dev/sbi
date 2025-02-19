@@ -1,5 +1,5 @@
-import functools
 from abc import abstractmethod
+import functools
 from typing import Callable, Optional, Type
 
 import torch
@@ -14,7 +14,9 @@ from sbi.inference.potentials.score_utils import (
     solve_diag_or_dense,
 )
 from sbi.neural_nets.estimators.score_estimator import ConditionalScoreEstimator
+from sbi.samplers.score.diffuser import Diffuser
 from sbi.utils.torchutils import ensure_theta_batched
+
 
 IID_METHODS = {}
 
@@ -28,7 +30,7 @@ def get_iid_method(name: str) -> Type["ScoreFnIID"]:
 
 
 def register_iid_method(name: str) -> Callable:
-    def decorator(cls: Type["ScoreFnIID"]) -> Type["ScoreFnIID"]:
+    def decorator(cls):
         IID_METHODS[name] = cls
         return cls
 
@@ -50,12 +52,16 @@ class ScoreFnIID:
             prior: The prior distribution.
             device: The device on which to evaluate the potential. Defaults to "cpu".
         """
+
         self.score_estimator = score_estimator.to(device)
         self.prior = prior
         self.score_estimator.eval()
 
     @abstractmethod
-    def __call__(self, theta: Tensor) -> Tensor:
+    def __call__(
+        self,
+        theta: Tensor,
+    ) -> Tensor:
         r"""
         Abstract method to be implemented by subclasses to compute the score function.
 
@@ -87,7 +93,6 @@ class ScoreFnIID:
             )[0]
         return prior_score
 
-
 @register_iid_method("fnpe")
 class FNPEScoreFn(ScoreFnIID):
     def __init__(
@@ -114,7 +119,7 @@ class FNPEScoreFn(ScoreFnIID):
         if prior_score_weight is None:
             t_max = score_estimator.t_max
 
-            def prior_score_weight_fn(t: Tensor) -> Tensor:
+            def prior_score_weight_fn(t):
                 return (t_max - t) / t_max
 
         self.prior_score_weight_fn = prior_score_weight_fn
@@ -139,6 +144,8 @@ class FNPEScoreFn(ScoreFnIID):
         if time is None:
             time = torch.tensor([self.score_estimator.t_min])
 
+        # NOTE: If this always works needs to be tested
+
         N = inputs.shape[-2]
 
         # Compute the per-sample score
@@ -160,27 +167,21 @@ class AbstractGaussCorrectedScoreFn(ScoreFnIID):
         self,
         score_estimator: "ConditionalScoreEstimator",
         prior: Distribution,
-        ensure_valid_lam: bool = True,
-        precission_nugget: float = 0.05,
     ) -> None:
         r"""Initializes the AbstractGaussCorrectedScoreFn class.
 
         Args:
             score_estimator: The neural network modelling the score.
             prior: The prior distribution.
-            ensure_valid_lam: Flag to ensure the precision matrix is positive definite.
-            precission_nugget: Nugget value to ensure positive definiteness.
         """
         super().__init__(score_estimator, prior)
-        self.ensure_valid_lam = ensure_valid_lam
-        self.precission_nugget = precission_nugget
 
     @abstractmethod
     def posterior_precision_est_fn(self, conditions: Tensor) -> Tensor:
         r"""Abstract method to estimate the posterior precision.
 
         Args:
-            conditions: Observed data.
+            x_o: Observed data.
 
         Returns:
             Estimated posterior precision.
@@ -193,7 +194,7 @@ class AbstractGaussCorrectedScoreFn(ScoreFnIID):
         Args:
             m: Mean tensor.
             std: Standard deviation tensor.
-            inputs: Parameters tensor.
+            theta: Parameters tensor.
 
         Returns:
             Denoised prior distribution.
@@ -204,8 +205,8 @@ class AbstractGaussCorrectedScoreFn(ScoreFnIID):
         r"""Compute the marginal prior distribution.
 
         Args:
-            time: Time tensor.
-            inputs: Parameters tensor.
+            a: Auxiliary variable tensor.
+            theta: Parameters tensor.
 
         Returns:
             Marginal prior distribution.
@@ -220,9 +221,9 @@ class AbstractGaussCorrectedScoreFn(ScoreFnIID):
         r"""Estimates the marginal posterior precision.
 
         Args:
-            time: Time tensor.
-            inputs: Parameters tensor.
-            conditions: Observed data.
+            a: Auxiliary variable tensor.
+            theta: Parameters tensor.
+            x_o: Observed data.
             N: Number of samples.
 
         Returns:
@@ -230,6 +231,7 @@ class AbstractGaussCorrectedScoreFn(ScoreFnIID):
         """
         precisions_posteriors = self.posterior_precision_est_fn(conditions)
 
+        print(f"precisions_posteriors: {precisions_posteriors.shape}")
         # Denoising posterior via Bayes rule
         m = self.score_estimator.mean_t_fn(time)
         std = self.score_estimator.std_fn(time)
@@ -246,8 +248,8 @@ class AbstractGaussCorrectedScoreFn(ScoreFnIID):
         r"""Computes the score of the marginal prior distribution.
 
         Args:
-            time: Time tensor.
-            inputs: Parameters tensor.
+            a: Auxiliary variable tensor.
+            theta: Parameters tensor.
 
         Returns:
             Marginal prior score.
@@ -261,7 +263,7 @@ class AbstractGaussCorrectedScoreFn(ScoreFnIID):
                 inputs,
                 grad_outputs=torch.ones_like(log_p),
                 create_graph=True,
-            )[0].detach()
+            )[0]
 
     def marginal_denoising_prior_precision_fn(
         self, time: Tensor, inputs: Tensor
@@ -269,8 +271,8 @@ class AbstractGaussCorrectedScoreFn(ScoreFnIID):
         r"""Computes the precision of the marginal denoising prior.
 
         Args:
-            time: Time tensor.
-            inputs: Parameters tensor.
+            a: Auxiliary variable tensor.
+            theta: Parameters tensor.
 
         Returns:
             Marginal denoising prior precision.
@@ -279,12 +281,14 @@ class AbstractGaussCorrectedScoreFn(ScoreFnIID):
         std = self.score_estimator.std_fn(time)
 
         p_denoise = self.denoising_prior(m, std, inputs)
+        # TODO: If multivariate prior this will break
         if hasattr(p_denoise, "covariance_matrix"):
             # We currently only support diagonal covariances
             inv_cov = torch.inverse(p_denoise.covariance_matrix)
             return inv_cov.diagonal(dim1=-2, dim2=-1)
         else:
-            return 1 / p_denoise.variance
+            precission = 1 / p_denoise.variance
+            return precission.reshape(inputs.shape)
 
     def __call__(
         self, inputs: Tensor, conditions: Tensor, time: Tensor, **kwargs
@@ -292,18 +296,23 @@ class AbstractGaussCorrectedScoreFn(ScoreFnIID):
         r"""Returns the corrected score function.
 
         Args:
-            inputs: Parameters tensor.
-            conditions: Observed data.
-            time: Time tensor.
+            a: Auxiliary variable tensor.
+            theta: Parameters tensor.
+            x_o: Observed data.
 
         Returns:
             Corrected score function.
         """
+        # TODO We can assume here a fixed 3dim shape of inputs [b,N,d]
+        # TODO We can assume here a fixed format of conditions [N,...]
         batch_input, _, d = inputs.shape
         N, *_ = conditions.shape
 
         base_score = self.score_estimator(inputs, conditions, time, **kwargs)
         prior_score = self.marginal_prior_score_fn(time, inputs)
+
+        print(f"base_score: {base_score.shape}")
+        print(f"prior_score: {prior_score.shape}")
 
         # Marginal prior precision
         prior_precision = self.marginal_denoising_prior_precision_fn(time, inputs)
@@ -312,37 +321,44 @@ class AbstractGaussCorrectedScoreFn(ScoreFnIID):
             time, inputs, conditions, N
         )
 
-        if self.ensure_valid_lam:
-            prior_precision, posterior_precisions = ensure_lam_positive_definite(
-                prior_precision,
-                posterior_precisions,
-                N,
-                precision_nugget=self.precission_nugget,
-            )
+        print(f"prior_precision: {prior_precision.shape}")
+        print(f"posterior_precisions: {posterior_precisions.shape}")
+
+        prior_precision, posterior_precisions = ensure_lam_positive_definite(
+            prior_precision, posterior_precisions, N
+        )
 
         # Total precision
         term1 = (1 - N) * prior_precision
         term2 = torch.sum(posterior_precisions, dim=1, keepdim=True)
+        # print(f"term1: {term1.shape}")
+        # print(f"term2: {term2.shape}")
         Lam = add_diag_or_dense(term1, term2, batch_dims=2)
+
+        # print(Lam.shape)
 
         # Weighted scores
         weighted_prior_score = mv_diag_or_dense(
             prior_precision, prior_score, batch_dims=2
         )
+        # print("weighted_prior_score", weighted_prior_score.shape)
+        # print(f"weighted_prior_score: {weighted_prior_score.shape}")
+        # print(posterior_precisions.shape, base_score.shape)
         weighted_posterior_scores = mv_diag_or_dense(
             posterior_precisions, base_score, batch_dims=2
         )
 
+        # print("weighted_posterior_scores", weighted_posterior_scores.shape)
         # Accumulate the scores
         score = (1 - N) * weighted_prior_score.sum(dim=1) + torch.sum(
             weighted_posterior_scores, dim=1
         )
-
+        # print(f"score: {score.shape}")
         # Solve the linear system
+
         score = solve_diag_or_dense(Lam.squeeze(1), score, batch_dims=1)
 
         return score.reshape(inputs.shape)
-
 
 @register_iid_method("gauss")
 class GaussCorrectedScoreFn(AbstractGaussCorrectedScoreFn):
@@ -351,7 +367,7 @@ class GaussCorrectedScoreFn(AbstractGaussCorrectedScoreFn):
         score_estimator: "ConditionalScoreEstimator",
         prior: Distribution,
         posterior_precision: Optional[Tensor] = None,
-        scale_from_prior_precision: float = 2.0,
+        scale_from_prior_precision: float = 2.0,  # Renamed parameter
     ) -> None:
         r"""
         Initializes the GaussCorrectedScoreFn class.
@@ -360,8 +376,7 @@ class GaussCorrectedScoreFn(AbstractGaussCorrectedScoreFn):
             score_estimator: The neural network modeling the score.
             prior: The prior distribution.
             posterior_precision: Optional preset posterior precision.
-            scale_from_prior_precision: Scaling factor for the posterior precision
-                if not provided.
+            scale_from_prior_precision: Scaling factor for the posterior precision if not provided.
         """
         super().__init__(score_estimator, prior)
 
@@ -381,16 +396,15 @@ class GaussCorrectedScoreFn(AbstractGaussCorrectedScoreFn):
         Returns:
             Estimated posterior precision.
         """
-        precision = self.posterior_precision
-        precision = torch.broadcast_to(precision, (1, x_o.shape[0], *precision.shape))
-        return precision
-
+        precission = self.posterior_precision
+        precission = torch.broadcast_to(
+            precission, (1, x_o.shape[0], *precission.shape)
+        )
+        return precission
 
 @register_iid_method("auto_gauss")
 class AutoGaussCorrectedScoreFn(AbstractGaussCorrectedScoreFn):
-    def __init__(
-        self, score_estimator: "ConditionalScoreEstimator", prior: Distribution
-    ) -> None:
+    def __init__(self, score_estimator, prior):
         super().__init__(score_estimator, prior)
         self._last_conditions = None
         self._cached_posterior_precision = None
@@ -405,29 +419,17 @@ class AutoGaussCorrectedScoreFn(AbstractGaussCorrectedScoreFn):
         Returns:
             Estimated posterior precision.
         """
-        return self.estimate_posterior_precision(
+        return self.estimate_posterior_precission(
             self.score_estimator, self.prior, conditions
         )
 
     @classmethod
     @functools.lru_cache()
-    def estimate_posterior_precision(
-        cls,
-        score_estimator: "ConditionalScoreEstimator",
-        prior: Distribution,
-        conditions: Tensor,
-    ) -> Tensor:
-        r"""
-        Estimates the posterior precision and caches the result.
+    def estimate_posterior_precission(cls, score_estimator, prior, conditions):
+        # NOTE: This assumes that the objects dont change between calls to cache
+        # the results efficiently.
 
-        Args:
-            score_estimator: The neural network modeling the score.
-            prior: The prior distribution.
-            conditions: Observed data.
-
-        Returns:
-            Estimated posterior precision.
-        """
+        # NOTE: To avoid circular imports
         from sbi.inference.posteriors.score_posterior import ScorePosterior
 
         posterior = ScorePosterior(score_estimator, prior)
@@ -458,8 +460,7 @@ class JacCorrectedScoreFn(AbstractGaussCorrectedScoreFn):
         self, time: Tensor, inputs: Tensor, conditions: Tensor, N: int
     ) -> Tensor:
         r"""
-        Estimates the marginal posterior precision using the Jacobian of the score
-        function.
+        Estimates the marginal posterior precision using the Jacobian of the score function.
 
         Args:
             time: Time tensor.
@@ -471,13 +472,13 @@ class JacCorrectedScoreFn(AbstractGaussCorrectedScoreFn):
             Estimated marginal posterior precision.
         """
         d = inputs.shape[-1]
-        # TODO Check if this jacobian actually works
         with torch.enable_grad():
+            # NOTE: torch.func can be realtively unstable...
             jac_fn = torch.func.jacrev(
                 lambda x: self.score_estimator(x, conditions, time)
             )
             jac_fn = torch.func.vmap(torch.func.vmap(jac_fn))
-            jac = jac_fn(inputs).squeeze(1).detach()
+            jac = jac_fn(inputs).squeeze(1)
 
         # Must be symmetrical
         jac = 0.5 * (jac + jac.transpose(-1, -2))
@@ -488,31 +489,38 @@ class JacCorrectedScoreFn(AbstractGaussCorrectedScoreFn):
 
         denoising_posterior_precision = m**2 / std**2 + torch.inverse(cov0)
         # Project to psd
+        eigvals, eigvecs = torch.linalg.eigh(denoising_posterior_precision)
+        eigvals = torch.clamp(eigvals, min=0.1)
+        denoising_posterior_precision = (
+            eigvecs @ torch.diag_embed(eigvals) @ eigvecs.transpose(-1, -2)
+        )
+
         return denoising_posterior_precision
 
 
 def ensure_lam_positive_definite(
-    denoising_prior_precision: Tensor,
-    denoising_posterior_precision: Tensor,
+    denoising_prior_precission: torch.Tensor,
+    denoising_posterior_precission: torch.Tensor,
     N: int,
-    precision_nugget: float = 0.05,
-) -> (Tensor, Tensor):
+    precission_nugget: float = 0.1,
+) -> (torch.Tensor, torch.Tensor):
     r"""Ensure that the matrix is positive definite.
 
     Args:
-        denoising_prior_precision: The prior precision tensor.
-        denoising_posterior_precision: The posterior precision tensor.
+        Lam: The matrix to be corrected.
+        denoising_prior_precission: The prior precision tensor.
+        denoising_posterior_precission: The posterior precision tensor.
         N: The scaling factor used in the correction.
-        precision_nugget: Nugget value to ensure positive definiteness.
 
     Returns:
-        A tuple of (denoising_prior_precision, denoising_posterior_precision) where
-        the posterior precision has been adjusted to be positive definite.
+        A tuple of (denoising_prior_precission, denoising_posterior_precission) where the posterior
+        precision has been adjusted to be positive definite.
     """
-    d = denoising_prior_precision.shape[-1]
+    d = denoising_prior_precission.shape[-1]
 
-    term1 = (1 - N) * denoising_prior_precision
-    term2 = torch.sum(denoising_posterior_precision, axis=1, keepdim=True)
+    term1 = (1 - N) * denoising_prior_precission
+    term2 = torch.sum(denoising_posterior_precission, axis=1, keepdim=True)
+    print(term1.shape, term2.shape)
     Lam = add_diag_or_dense(term1, term2, batch_dims=2)
 
     is_diag = Lam.ndim == 3
@@ -523,22 +531,22 @@ def ensure_lam_positive_definite(
         )
         corrected_eigs = corrected_eigs / (N - 1)
         Lam_corr = (
-            eigenvectors
-            @ torch.diag_embed(corrected_eigs)
-            @ eigenvectors.transpose(-1, -2)
+            eigenvectors @ torch.diag(corrected_eigs) @ eigenvectors.transpose(-1, -2)
         )
-        eye = torch.eye(Lam.shape[-1], device=Lam.device, dtype=Lam.dtype).unsqueeze(0)
-        eye = eye.expand(Lam_corr.shape)
-        Lam_corr = Lam_corr + precision_nugget * eye
-        denoising_posterior_precision = denoising_posterior_precision + Lam_corr
+        Lam_corr += precission_nugget * torch.eye(
+            Lam.shape[-1], device=Lam.device, dtype=Lam.dtype
+        )
+        denoising_posterior_precission = (
+            denoising_posterior_precission + Lam_corr.unsqueeze(0)
+        )
     else:
         # For one-dimensional case, treat Lam as a vector by putting it on the diagonal.
         Lam_diag = Lam
         average_diff = (
             torch.where(Lam_diag > 0, torch.zeros_like(Lam_diag), -Lam_diag) / (N - 1)
-            + precision_nugget
+            + precission_nugget
         )
         Lam_corr = average_diff
-        denoising_posterior_precision = denoising_posterior_precision + Lam_corr
+        denoising_posterior_precission = denoising_posterior_precission + Lam_corr
 
-    return denoising_prior_precision, denoising_posterior_precision
+    return denoising_prior_precission, denoising_posterior_precission
