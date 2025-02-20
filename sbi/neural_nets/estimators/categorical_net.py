@@ -4,13 +4,13 @@
 from typing import Callable, Optional
 
 import torch
-from nflows.nn.nde.made import MADE
 from nflows.utils import torchutils
 from torch import Tensor, nn
 from torch.distributions import Categorical
 from torch.nn import functional as F
 
 from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
+from sbi.utils.nn_utils import MADEWrapper as MADE
 
 
 class CategoricalMADE(MADE):
