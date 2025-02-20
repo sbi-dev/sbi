@@ -15,7 +15,7 @@ from pyknos.nflows.transforms.splines import (
 from torch import Tensor, nn, relu, tanh, tensor, uint8
 
 from sbi.neural_nets.estimators import NFlowsFlow, ZukoFlow
-from sbi.utils.nn_utils import get_numel
+from sbi.utils.nn_utils import MADEMoGWrapper, get_numel
 from sbi.utils.sbiutils import (
     standardizing_net,
     standardizing_transform,
@@ -77,7 +77,7 @@ def build_made(
             standardizing_net(batch_y, structured_y), embedding_net
         )
 
-    distribution = distributions_.MADEMoG(
+    distribution = MADEMoGWrapper(
         features=x_numel,
         hidden_features=hidden_features,
         context_features=y_numel,
