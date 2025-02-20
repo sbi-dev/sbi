@@ -67,8 +67,9 @@ class PosteriorScoreBasedPotential(BasePotential):
             score_estimator: The neural network modelling the score.
             prior: The prior distribution.
             x_o: The observed data at which to evaluate the posterior.
-            iid_method: Which method to use for computing the score. Currently, only
-                `iid_bridge` as proposed in Geffner et al. is implemented.
+            iid_method: Which method to use for computing the score in the iid setting.
+                We currently support "fnpe", "gauss", "auto_gauss", "jac_gauss".
+            iid_params: Parameters for the iid method, for arguments see ScoreFnIID.
             device: The device on which to evaluate the potential.
         """
         self.score_estimator = score_estimator
