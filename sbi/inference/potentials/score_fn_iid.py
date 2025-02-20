@@ -101,14 +101,20 @@ class ScoreFnIID:
         Returns:
             The computed prior score.
         """
-        with torch.enable_grad():
-            theta = theta.detach().clone().requires_grad_(True)
-            prior_log_prob = self.prior.log_prob(theta)
-            prior_score = torch.autograd.grad(
-                prior_log_prob,
-                theta,
-                grad_outputs=torch.ones_like(prior_log_prob),
-            )[0]
+        # NOTE The try except is for unifrom priors which do not have a grad, and
+        # implementations that do not implement the log_prob method.
+        try:
+            with torch.enable_grad():
+                theta = theta.detach().clone().requires_grad_(True)
+                prior_log_prob = self.prior.log_prob(theta)
+                prior_score = torch.autograd.grad(
+                    prior_log_prob,
+                    theta,
+                    grad_outputs=torch.ones_like(prior_log_prob),
+                    create_graph=True,
+                )[0].detach()
+        except Exception:
+            prior_score = torch.zeros_like(theta)
         return prior_score
 
 
@@ -263,7 +269,6 @@ class AbstractGaussCorrectedScoreFn(ScoreFnIID):
         """
         precisions_posteriors = self.posterior_precision_est_fn(conditions)
 
-        print(f"precisions_posteriors: {precisions_posteriors.shape}")
         # Denoising posterior via Bayes rule
         m = self.score_estimator.mean_t_fn(time)
         std = self.score_estimator.std_fn(time)
@@ -286,17 +291,23 @@ class AbstractGaussCorrectedScoreFn(ScoreFnIID):
         Returns:
             Marginal prior score.
         """
-        # NOTE: This is a bit slow, one could add a score function for priors that
-        # explicitly computes it.
-        with torch.enable_grad():
-            inputs = inputs.clone().detach().requires_grad_(True)
-            p = self.marginal_prior(time, inputs)
-            log_p = p.log_prob(inputs)
-            return torch.autograd.grad(
-                log_p,
-                inputs,
-                grad_outputs=torch.ones_like(log_p),
-            )[0]
+        # NOTE: This is for the uniform distribution and distirbutions that do not
+        # implement a log_prob
+        try:
+            with torch.enable_grad():
+                inputs = inputs.clone().detach().requires_grad_(True)
+                p = self.marginal_prior(time, inputs)
+                log_p = p.log_prob(inputs)
+                prior_score = torch.autograd.grad(
+                    log_p,
+                    inputs,
+                    grad_outputs=torch.ones_like(log_p),
+                    create_graph=True,
+                )[0].detach()
+        except Exception:
+            prior_score = torch.zeros_like(inputs)
+
+        return prior_score
 
     def marginal_denoising_prior_precision_fn(
         self, time: Tensor, inputs: Tensor
@@ -461,13 +472,13 @@ class GaussCorrectedScoreFn(AbstractGaussCorrectedScoreFn):
         try:
             prior_precision = 1 / prior.variance
             posterior_precision = scale_from_prior_precision * prior_precision
-        finally:
+        except Exception:
             d = prior.event_shape[0]
             num_samples = int(math.sqrt(d) * 1000)
             prior_samples = prior.sample((num_samples,))
             prior_precision_estimate = 1 / torch.var(prior_samples, dim=0)
             posterior_precision = scale_from_prior_precision * prior_precision_estimate
-        return posterior_precision.squeeze()
+        return posterior_precision
 
 
 @register_iid_method("auto_gauss")
@@ -564,7 +575,7 @@ class AutoGaussCorrectedScoreFn(AbstractGaussCorrectedScoreFn):
             if precision_est_only_diag:
                 precision_est_budget = int(math.sqrt(prior.event_shape[0]) * 1000)
             else:
-                precision_est_budget = int(prior.event_shape[0] * 2000)
+                precision_est_budget = min(int(prior.event_shape[0] * 1000), 5000)
 
         thetas = posterior.sample_batched(
             torch.Size([precision_est_budget]),
@@ -577,8 +588,9 @@ class AutoGaussCorrectedScoreFn(AbstractGaussCorrectedScoreFn):
             variances = torch.var(thetas, dim=0)
             precisions = 1 / variances
         else:
-            cov = torch.einsum("...ij,...kj->...ik", thetas, thetas)
-            cov = cov / (precision_est_budget - 1)
+            cov = torch.einsum("bnd,bne->nde", thetas, thetas) / (
+                precision_est_budget - 1
+            )
             precisions = torch.inverse(cov)
 
         return precisions.unsqueeze(0)
@@ -610,10 +622,10 @@ class JacCorrectedScoreFn(AbstractGaussCorrectedScoreFn):
         d = inputs.shape[-1]
         with torch.enable_grad():
             # NOTE: torch.func can be realtively unstable...
-            jac_fn = torch.func.jacrev(
+            jac_fn = torch.func.jacrev(  # type: ignore
                 lambda x: self.score_estimator(x, conditions, time)
             )
-            jac_fn = torch.func.vmap(torch.func.vmap(jac_fn))
+            jac_fn = torch.func.vmap(torch.func.vmap(jac_fn))  # type: ignore
             jac = jac_fn(inputs).squeeze(1)
 
         # Must be symmetrical

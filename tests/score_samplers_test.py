@@ -15,6 +15,56 @@ from sbi.inference.potentials.score_based_potential import (
 from sbi.neural_nets.net_builders import build_score_estimator
 from sbi.samplers.score import Diffuser
 
+from torch.distributions import Independent, Normal, MultivariateNormal, Uniform, Gamma
+from sbi.utils import BoxUniform, MultipleIndependent
+
+
+@pytest.mark.parametrize("sde_type", ["vp", "ve", "subvp"])
+@pytest.mark.parametrize(
+    "iid_method",
+    [
+        "fnpe",
+        "gauss",
+        "auto_gauss",
+        "jac_gauss",
+    ],
+)
+@pytest.mark.parametrize("d", [1, 2, 3])
+def test_score_fn_iid_on_different_priors(sde_type, iid_method, d):
+    mean0 = torch.zeros(d)
+    std0 = torch.ones(d)
+    score_fn = _build_gaussian_score_estimator(sde_type, (d,), mean0, std0)
+    # Diag normal prior
+    prior1 = Independent(Normal(torch.zeros(d), torch.ones(d)), 1)
+    # Uniform prior
+    prior2 = Independent(Uniform(torch.zeros(d), torch.ones(d)), 1)
+    prior2_2 = BoxUniform(torch.zeros(d), torch.ones(d))
+    # Multivariate normal prior
+    prior3 = MultivariateNormal(torch.zeros(d), torch.eye(d))
+    # Gamma prior - analytical not implemented but should fall back to general case
+    prior4 = Independent(Gamma(torch.ones(d), torch.ones(d)), 1)
+    # Multiple independent prior
+    if d == 1:
+        prior5 = Independent(Normal(torch.zeros(1), torch.ones(1)), 1)
+    else:
+        prior5 = MultipleIndependent([
+            Normal(torch.zeros(1), torch.ones(1)) for _ in range(d)
+        ])
+
+    priors = [prior1, prior2, prior2_2, prior3, prior4, prior5]
+    x_o_iid = torch.ones((5, 1))
+    score_fn.set_x(x_o_iid, x_is_iid=True, iid_method=iid_method)
+    inputs = torch.ones((1, 1, d))
+    for prior in priors:
+        time = torch.ones(1)
+        score_fn.prior = prior
+        output = score_fn.gradient(inputs, time=time)
+
+        assert output.shape == (1, 1, d), (
+            f"Expected shape {(1, 1, d)}, got {output.shape}"
+        )
+        assert torch.isfinite(output).all(), "Output contains non-finite values"
+
 
 @pytest.mark.parametrize("sde_type", ["vp", "ve", "subvp"])
 @pytest.mark.parametrize("predictor", ("euler_maruyama",))

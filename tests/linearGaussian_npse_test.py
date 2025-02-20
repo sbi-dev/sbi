@@ -14,6 +14,7 @@ from sbi.simulators.linear_gaussian import (
     samples_true_posterior_linear_gaussian_uniform_prior,
     true_posterior_linear_gaussian_mvn_prior,
 )
+from sbi.utils import BoxUniform
 
 from .test_utils import check_c2st, get_dkl_gaussian_prior
 
@@ -157,30 +158,21 @@ def test_c2st_npse_on_linearGaussian_different_dims():
     check_c2st(samples, target_samples, alg="npse_different_dims_and_resume_training")
 
 
-# @pytest.mark.xfail(
-#     reason="iid_bridge not working.",
-#     raises=AssertionError,
-#     strict=True,
-#     match="Score accumulation*",
-# )
-
-
 @pytest.mark.slow
 @pytest.mark.parametrize("sde_type", ["vp", "ve", "subvp"])
-def test_npse_iid_inference(sde_type):
+@pytest.mark.parametrize("with_improper_prior", [False, True])
+def test_npse_iid_inference(sde_type, with_improper_prior):
     """Test whether NPSE infers well a simple example with available ground truth."""
 
     num_dim = 2
-    num_samples = 200
+    num_samples = 1000
     num_simulations = 3000
     iid_methods = ["fnpe", "gauss", "auto_gauss", "jac_gauss"]
     num_good_evals_per_method = {
-        "fnpe": [
-            2,
-        ],
-        "gauss": [4, 6],
-        "auto_gauss": [8, 32],
-        "jac_gauss": [4],  # TODO: There might be a bug in the implementation.
+        "fnpe": [3],  # This will fail on to large
+        "gauss": [6],  # This will fail on too large due to hyperparameter not fitted
+        "auto_gauss": [8, 16],  # This will scale
+        "jac_gauss": [8],  # This will scale (bt gets slow, so we only test one)
     }
 
     # likelihood_mean will be likelihood_shift+theta
@@ -191,13 +183,16 @@ def test_npse_iid_inference(sde_type):
     prior_cov = eye(num_dim)
     prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
 
-    inference = NPSE(prior, show_progress_bars=True, sde_type=sde_type)
+    # This check that our method to handle "general" priors works.
+    # i.e. if NPSE does not get a proper passed by the user.
+    prior_npse = prior if not with_improper_prior else None
+    inference = NPSE(prior_npse, show_progress_bars=True, sde_type=sde_type)
 
     theta = prior.sample((num_simulations,))
     x = linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     score_estimator = inference.append_simulations(theta, x).train(
-        training_batch_size=500, max_num_epochs=300
+        training_batch_size=200, max_num_epochs=400
     )
     for iid_method in iid_methods:
         for num_trial in num_good_evals_per_method[iid_method]:
@@ -212,13 +207,69 @@ def test_npse_iid_inference(sde_type):
             target_samples = gt_posterior.sample((num_samples,))
 
             # Compute the c2st and assert it is near chance level of 0.5.
+            # Some degradation is expected, also because posterior get tighter which
+            # usually makes the c2st worse.
             check_c2st(
                 samples,
                 target_samples,
                 alg=f"npse-vp-gaussian-2D-{iid_method}-{num_trial}iid-trials",
-                tol=1.2,
+                tol=0.25 + 0.05 * with_improper_prior,
             )
 
+
+@pytest.mark.slow
+@pytest.mark.parametrize("sde_type", ["vp", "ve", "subvp"])
+def test_npse_iid_inference_on_uniform(sde_type):
+    """Test whether NPSE infers well a simple example with available ground truth."""
+
+    num_dim = 2
+    num_samples = 1000
+    num_simulations = 3000
+    iid_methods = ["fnpe", "gauss", "auto_gauss", "jac_gauss"]
+    num_good_evals_per_method = {
+        "fnpe": [1],  # This will fail on too large
+        "gauss": [6],  # This will fail on too large due to hyperparameter not fitted
+        "auto_gauss": [8, 16],  # This will scale
+        "jac_gauss": [8],  # This will scale (but gets slow, so we only test one)
+    }
+
+    # likelihood_mean will be likelihood_shift+theta
+    likelihood_shift = -1.0 * ones(num_dim)
+    likelihood_cov = 0.3 * eye(num_dim)
+
+    # IID methods do depend on prior, so we also test them with a uniform prior.
+    lower = -2 * ones(num_dim)
+    upper = 2 * ones(num_dim)
+    prior = BoxUniform(lower, upper)
+
+    inference = NPSE(prior, show_progress_bars=True, sde_type=sde_type)
+
+    theta = prior.sample((num_simulations,))
+    x = linear_gaussian(theta, likelihood_shift, likelihood_cov)
+
+    score_estimator = inference.append_simulations(theta, x).train(
+        training_batch_size=500, max_num_epochs=400
+    )
+    for iid_method in iid_methods:
+        for num_trial in num_good_evals_per_method[iid_method]:
+            x_o = zeros(num_trial, num_dim)
+            posterior = inference.build_posterior(score_estimator)
+            posterior.set_default_x(x_o)
+            samples = posterior.sample((num_samples,), iid_method=iid_method)
+
+            target_samples = samples_true_posterior_linear_gaussian_uniform_prior(
+                x_o, likelihood_shift, likelihood_cov, prior
+            )
+
+            # Compute the c2st and assert it is near chance level of 0.5.
+            # Some degradation is expected, also because posterior get tighter which
+            # usually makes the c2st worse.
+            check_c2st(
+                samples,
+                target_samples,
+                alg=f"npse-vp-gaussian-2D-{iid_method}-{num_trial}iid-trials",
+                tol=0.25,
+            )
 
 @pytest.mark.slow
 def test_npse_map():
