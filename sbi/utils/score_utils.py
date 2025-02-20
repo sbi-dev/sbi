@@ -164,7 +164,7 @@ def denoise_uniform(
     Returns:
         The posterior uniform distribution.
     """
-    return UniformNormalPosterior(p.low, p.high, m, s, x_t) # type: ignore
+    return UniformNormalPosterior(p.low, p.high, m, s, x_t)  # type: ignore
 
 
 def denoise_empirical(

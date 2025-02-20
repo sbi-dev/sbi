@@ -271,6 +271,7 @@ def test_npse_iid_inference_on_uniform(sde_type):
                 tol=0.25,
             )
 
+
 @pytest.mark.slow
 def test_npse_map():
     num_dim = 2

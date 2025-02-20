@@ -8,14 +8,13 @@ from typing import Tuple
 import pytest
 import torch
 from torch import Tensor
+from torch.distributions import Gamma, Independent, MultivariateNormal, Normal, Uniform
 
 from sbi.inference.potentials.score_based_potential import (
     score_estimator_based_potential,
 )
 from sbi.neural_nets.net_builders import build_score_estimator
 from sbi.samplers.score import Diffuser
-
-from torch.distributions import Independent, Normal, MultivariateNormal, Uniform, Gamma
 from sbi.utils import BoxUniform, MultipleIndependent
 
 
