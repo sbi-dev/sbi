@@ -7677,11 +7677,11 @@ SNLE or SNRE train neural networks to approximate the likelihood(-ratios).
         <span class="n">num_chains_extended</span> <span class="o">=</span> <span class="n">batch_size</span> <span class="o">*</span> <span class="n">num_chains</span>
         <span class="k">if</span> <span class="n">num_chains_extended</span> <span class="o">&gt;</span> <span class="mi">100</span><span class="p">:</span>
             <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
-                <span class="s2">&quot;Note that for batched sampling, we use num_chains many chains for each&quot;</span>
-                <span class="s2">&quot; x in the batch. With the given settings, this results in a large &quot;</span>
-                <span class="sa">f</span><span class="s2">&quot;number large number of chains (</span><span class="si">{</span><span class="n">num_chains_extended</span><span class="si">}</span><span class="s2">), which can be &quot;</span>
-                <span class="s2">&quot;slow and memory-intensive for vectorized MCMC. Consider reducing the &quot;</span>
-                <span class="s2">&quot;number of chains.&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;Note that for batched sampling, we use num_chains many chains &quot;</span>
+                <span class="s2">&quot;for each x in the batch. With the given settings, this results &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;in a large number of chains (</span><span class="si">{</span><span class="n">num_chains_extended</span><span class="si">}</span><span class="s2">), which can &quot;</span>
+                <span class="s2">&quot;be slow and memory-intensive for vectorized MCMC. Consider &quot;</span>
+                <span class="s2">&quot;reducing the number of chains or batch size.&quot;</span><span class="p">,</span>
                 <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
             <span class="p">)</span>
         <span class="n">init_strategy_parameters</span><span class="p">[</span><span class="s2">&quot;num_return_samples&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">num_chains_extended</span>
@@ -12407,11 +12407,11 @@ parameter generation and mcmc sampling.</p>
     <span class="n">num_chains_extended</span> <span class="o">=</span> <span class="n">batch_size</span> <span class="o">*</span> <span class="n">num_chains</span>
     <span class="k">if</span> <span class="n">num_chains_extended</span> <span class="o">&gt;</span> <span class="mi">100</span><span class="p">:</span>
         <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
-            <span class="s2">&quot;Note that for batched sampling, we use num_chains many chains for each&quot;</span>
-            <span class="s2">&quot; x in the batch. With the given settings, this results in a large &quot;</span>
-            <span class="sa">f</span><span class="s2">&quot;number large number of chains (</span><span class="si">{</span><span class="n">num_chains_extended</span><span class="si">}</span><span class="s2">), which can be &quot;</span>
-            <span class="s2">&quot;slow and memory-intensive for vectorized MCMC. Consider reducing the &quot;</span>
-            <span class="s2">&quot;number of chains.&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;Note that for batched sampling, we use num_chains many chains &quot;</span>
+            <span class="s2">&quot;for each x in the batch. With the given settings, this results &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;in a large number of chains (</span><span class="si">{</span><span class="n">num_chains_extended</span><span class="si">}</span><span class="s2">), which can &quot;</span>
+            <span class="s2">&quot;be slow and memory-intensive for vectorized MCMC. Consider &quot;</span>
+            <span class="s2">&quot;reducing the number of chains or batch size.&quot;</span><span class="p">,</span>
             <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
         <span class="p">)</span>
     <span class="n">init_strategy_parameters</span><span class="p">[</span><span class="s2">&quot;num_return_samples&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">num_chains_extended</span>
