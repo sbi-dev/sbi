@@ -730,15 +730,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#sbi.inference.trainers.npse.npse.NPSE._converged" class="md-nav__link">
-    <span class="md-ellipsis">
-      <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;_converged
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#sbi.inference.trainers.npse.npse.NPSE._loss" class="md-nav__link">
     <span class="md-ellipsis">
       <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;_loss
@@ -9627,7 +9618,9 @@ results.</p>
 <span class="normal">547</span>
 <span class="normal">548</span>
 <span class="normal">549</span>
-<span class="normal">550</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NPSE</span><span class="p">(</span><span class="n">NeuralInference</span><span class="p">):</span>
+<span class="normal">550</span>
+<span class="normal">551</span>
+<span class="normal">552</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NPSE</span><span class="p">(</span><span class="n">NeuralInference</span><span class="p">):</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -9775,11 +9768,12 @@ results.</p>
         <span class="n">training_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">200</span><span class="p">,</span>
         <span class="n">learning_rate</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">5e-4</span><span class="p">,</span>
         <span class="n">validation_fraction</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.1</span><span class="p">,</span>
-        <span class="n">stop_after_epochs</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">200</span><span class="p">,</span>
+        <span class="n">stop_after_epochs</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">50</span><span class="p">,</span>
         <span class="n">max_num_epochs</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">2</span><span class="o">**</span><span class="mi">31</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span>
         <span class="n">clip_max_norm</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="mf">5.0</span><span class="p">,</span>
         <span class="n">calibration_kernel</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">ema_loss_decay</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.1</span><span class="p">,</span>
+        <span class="n">validation_times</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="mi">20</span><span class="p">,</span>
         <span class="n">resume_training</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
         <span class="n">force_first_round_loss</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
         <span class="n">discard_prior_samples</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
@@ -9788,7 +9782,11 @@ results.</p>
         <span class="n">dataloader_kwargs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ConditionalScoreEstimator</span><span class="p">:</span>
 <span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Returns a score estimator that approximates the score</span>
-<span class="sd">        $\nabla_\theta \log p(\theta|x)$.</span>
+<span class="sd">        $\nabla_\theta \log p(\theta|x)$. The denoising score matching loss has a high</span>
+<span class="sd">        variance, which makes it more difficult to detect converegence. To reduce this</span>
+<span class="sd">        variance, we evaluate the validation loss at a fixed set of times. We also use</span>
+<span class="sd">        the exponential moving average of the training and validation losses, as opposed</span>
+<span class="sd">        to the other `trainer` classes, which track the loss directly.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            training_batch_size: Training batch size.</span>
@@ -9804,6 +9802,10 @@ results.</p>
 <span class="sd">            calibration_kernel: A function to calibrate the loss with respect</span>
 <span class="sd">                to the simulations `x` (optional). See Lueckmann, Gonçalves et al.,</span>
 <span class="sd">                NeurIPS 2017. If `None`, no calibration is used.</span>
+<span class="sd">            ema_loss_decay: Loss decay strength for exponential moving average of</span>
+<span class="sd">                training and validation losses.</span>
+<span class="sd">            validation_times: Diffusion times at which to evaluate the validation loss</span>
+<span class="sd">                to reduce variance of validation loss.</span>
 <span class="sd">            resume_training: Can be used in case training time is limited, e.g. on a</span>
 <span class="sd">                cluster. If `True`, the split between train and validation set, the</span>
 <span class="sd">                optimizer, the number of epochs, and the best validation log-prob will</span>
@@ -9890,6 +9892,14 @@ results.</p>
         <span class="c1"># Move entire net to device for training.</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_neural_net</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">)</span>
 
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">validation_times</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
+            <span class="n">validation_times</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_neural_net</span><span class="o">.</span><span class="n">t_min</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_neural_net</span><span class="o">.</span><span class="n">t_max</span><span class="p">,</span> <span class="n">validation_times</span>
+            <span class="p">)</span>
+        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span>
+            <span class="n">validation_times</span><span class="p">,</span> <span class="n">Tensor</span>
+        <span class="p">)</span>  <span class="c1"># let pyright know validation_times is a Tensor.</span>
+
         <span class="k">if</span> <span class="ow">not</span> <span class="n">resume_training</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">optimizer</span> <span class="o">=</span> <span class="n">Adam</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_neural_net</span><span class="o">.</span><span class="n">parameters</span><span class="p">()),</span> <span class="n">lr</span><span class="o">=</span><span class="n">learning_rate</span><span class="p">)</span>
 
@@ -9912,11 +9922,11 @@ results.</p>
                 <span class="p">)</span>
 
                 <span class="n">train_losses</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_loss</span><span class="p">(</span>
-                    <span class="n">theta_batch</span><span class="p">,</span>
-                    <span class="n">x_batch</span><span class="p">,</span>
-                    <span class="n">masks_batch</span><span class="p">,</span>
-                    <span class="n">proposal</span><span class="p">,</span>
-                    <span class="n">calibration_kernel</span><span class="p">,</span>
+                    <span class="n">theta</span><span class="o">=</span><span class="n">theta_batch</span><span class="p">,</span>
+                    <span class="n">x</span><span class="o">=</span><span class="n">x_batch</span><span class="p">,</span>
+                    <span class="n">masks</span><span class="o">=</span><span class="n">masks_batch</span><span class="p">,</span>
+                    <span class="n">proposal</span><span class="o">=</span><span class="n">proposal</span><span class="p">,</span>
+                    <span class="n">calibration_kernel</span><span class="o">=</span><span class="n">calibration_kernel</span><span class="p">,</span>
                     <span class="n">force_first_round_loss</span><span class="o">=</span><span class="n">force_first_round_loss</span><span class="p">,</span>
                 <span class="p">)</span>
 
@@ -9959,24 +9969,43 @@ results.</p>
                         <span class="n">batch</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">),</span>
                         <span class="n">batch</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">),</span>
                     <span class="p">)</span>
+
+                    <span class="c1"># For validation loss, we evaluate at a fixed set of times to reduce</span>
+                    <span class="c1"># the variance in the validation loss, for improved convergence</span>
+                    <span class="c1"># checks. We evaluate the entire validation batch at all times, so</span>
+                    <span class="c1"># we repeat the batches here to match.</span>
+                    <span class="n">val_batch_size</span> <span class="o">=</span> <span class="n">theta_batch</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                    <span class="n">times_batch</span> <span class="o">=</span> <span class="n">validation_times</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                    <span class="n">theta_batch</span> <span class="o">=</span> <span class="n">theta_batch</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span>
+                        <span class="n">times_batch</span><span class="p">,</span> <span class="o">*</span><span class="p">([</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="p">(</span><span class="n">theta_batch</span><span class="o">.</span><span class="n">ndim</span> <span class="o">-</span> <span class="mi">1</span><span class="p">))</span>
+                    <span class="p">)</span>
+                    <span class="n">x_batch</span> <span class="o">=</span> <span class="n">x_batch</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="n">times_batch</span><span class="p">,</span> <span class="o">*</span><span class="p">([</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="p">(</span><span class="n">x_batch</span><span class="o">.</span><span class="n">ndim</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)))</span>
+                    <span class="n">masks_batch</span> <span class="o">=</span> <span class="n">masks_batch</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span>
+                        <span class="n">times_batch</span><span class="p">,</span> <span class="o">*</span><span class="p">([</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="p">(</span><span class="n">masks_batch</span><span class="o">.</span><span class="n">ndim</span> <span class="o">-</span> <span class="mi">1</span><span class="p">))</span>
+                    <span class="p">)</span>
+
+                    <span class="n">validation_times_rep</span> <span class="o">=</span> <span class="n">validation_times</span><span class="o">.</span><span class="n">repeat_interleave</span><span class="p">(</span>
+                        <span class="n">val_batch_size</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">0</span>
+                    <span class="p">)</span>
+
                     <span class="c1"># Take negative loss here to get validation log_prob.</span>
                     <span class="n">val_losses</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_loss</span><span class="p">(</span>
-                        <span class="n">theta_batch</span><span class="p">,</span>
-                        <span class="n">x_batch</span><span class="p">,</span>
-                        <span class="n">masks_batch</span><span class="p">,</span>
-                        <span class="n">proposal</span><span class="p">,</span>
-                        <span class="n">calibration_kernel</span><span class="p">,</span>
+                        <span class="n">theta</span><span class="o">=</span><span class="n">theta_batch</span><span class="p">,</span>
+                        <span class="n">x</span><span class="o">=</span><span class="n">x_batch</span><span class="p">,</span>
+                        <span class="n">masks</span><span class="o">=</span><span class="n">masks_batch</span><span class="p">,</span>
+                        <span class="n">proposal</span><span class="o">=</span><span class="n">proposal</span><span class="p">,</span>
+                        <span class="n">calibration_kernel</span><span class="o">=</span><span class="n">calibration_kernel</span><span class="p">,</span>
+                        <span class="n">times</span><span class="o">=</span><span class="n">validation_times_rep</span><span class="p">,</span>
                         <span class="n">force_first_round_loss</span><span class="o">=</span><span class="n">force_first_round_loss</span><span class="p">,</span>
                     <span class="p">)</span>
+
                     <span class="n">val_loss_sum</span> <span class="o">+=</span> <span class="n">val_losses</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
 
             <span class="c1"># Take mean over all validation samples.</span>
             <span class="n">val_loss</span> <span class="o">=</span> <span class="n">val_loss_sum</span> <span class="o">/</span> <span class="p">(</span>
-                <span class="nb">len</span><span class="p">(</span><span class="n">val_loader</span><span class="p">)</span> <span class="o">*</span> <span class="n">val_loader</span><span class="o">.</span><span class="n">batch_size</span>  <span class="c1"># type: ignore</span>
+                <span class="nb">len</span><span class="p">(</span><span class="n">val_loader</span><span class="p">)</span> <span class="o">*</span> <span class="n">val_loader</span><span class="o">.</span><span class="n">batch_size</span> <span class="o">*</span> <span class="n">times_batch</span>  <span class="c1"># type: ignore</span>
             <span class="p">)</span>
 
-            <span class="c1"># NOTE: Due to the inherently noisy nature we do instead log a exponential</span>
-            <span class="c1"># moving average of the validation loss.</span>
             <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_summary</span><span class="p">[</span><span class="s2">&quot;validation_loss&quot;</span><span class="p">])</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
                 <span class="n">val_loss_ema</span> <span class="o">=</span> <span class="n">val_loss</span>
             <span class="k">else</span><span class="p">:</span>
@@ -10085,6 +10114,7 @@ results.</p>
         <span class="n">masks</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
         <span class="n">proposal</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Any</span><span class="p">],</span>
         <span class="n">calibration_kernel</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span>
+        <span class="n">times</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">force_first_round_loss</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return loss from score estimator. Currently only single-round NPSE</span>
@@ -10101,7 +10131,7 @@ results.</p>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_round</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">force_first_round_loss</span><span class="p">:</span>
             <span class="c1"># First round loss.</span>
-            <span class="n">loss</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_neural_net</span><span class="o">.</span><span class="n">loss</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
+            <span class="n">loss</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_neural_net</span><span class="o">.</span><span class="n">loss</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">times</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
                 <span class="s2">&quot;Multi-round NPSE with arbitrary proposals is not implemented&quot;</span>
@@ -10109,41 +10139,6 @@ results.</p>
 
         <span class="n">assert_all_finite</span><span class="p">(</span><span class="n">loss</span><span class="p">,</span> <span class="s2">&quot;NPSE loss&quot;</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">calibration_kernel</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">*</span> <span class="n">loss</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="nf">_converged</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">epoch</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">stop_after_epochs</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Check if training has converged.</span>
-
-<span class="sd">        Unlike the `._converged` method in base.py, this method does not reset to the</span>
-<span class="sd">        best model. We noticed that this improves performance. Deleting this method</span>
-<span class="sd">        will make C2ST tests fail. This is because the loss is very stochastic, so</span>
-<span class="sd">        resetting might reset to an underfitted model. Ideally, we would write a</span>
-<span class="sd">        custom `._converged()` method which checks whether the loss is still going</span>
-<span class="sd">        down **for all t**.</span>
-
-<span class="sd">        Args:</span>
-<span class="sd">            epoch: Current epoch.</span>
-<span class="sd">            stop_after_epochs: Number of epochs to wait for improvement on the</span>
-<span class="sd">                validation set before terminating training.</span>
-
-<span class="sd">        Returns:</span>
-<span class="sd">            Whether training has converged.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="n">converged</span> <span class="o">=</span> <span class="kc">False</span>
-
-        <span class="c1"># No checkpointing, just check if the validation loss has improved.</span>
-
-        <span class="c1"># (Re)-start the epoch count with the first epoch or any improvement.</span>
-        <span class="k">if</span> <span class="n">epoch</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">_val_loss</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">_best_val_loss</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_best_val_loss</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_val_loss</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_epochs_since_last_improvement</span> <span class="o">=</span> <span class="mi">0</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_epochs_since_last_improvement</span> <span class="o">+=</span> <span class="mi">1</span>
-
-        <span class="c1"># If no validation improvement over many epochs, stop training.</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_epochs_since_last_improvement</span> <span class="o">&gt;</span> <span class="n">stop_after_epochs</span> <span class="o">-</span> <span class="mi">1</span><span class="p">:</span>
-            <span class="n">converged</span> <span class="o">=</span> <span class="kc">True</span>
-
-        <span class="k">return</span> <span class="n">converged</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -10469,173 +10464,8 @@ string.</p>
 <div class="doc doc-object doc-function">
 
 
-<h3 id="sbi.inference.trainers.npse.npse.NPSE._converged" class="doc doc-heading">
-            <code class=" language-python"><span class="n">_converged</span><span class="p">(</span><span class="n">epoch</span><span class="p">,</span> <span class="n">stop_after_epochs</span><span class="p">)</span></code>
-
-<a href="#sbi.inference.trainers.npse.npse.NPSE._converged" class="headerlink" title="Permanent link">&para;</a></h3>
-
-
-    <div class="doc doc-contents ">
-
-        <p>Check if training has converged.</p>
-<p>Unlike the <code>._converged</code> method in base.py, this method does not reset to the
-best model. We noticed that this improves performance. Deleting this method
-will make C2ST tests fail. This is because the loss is very stochastic, so
-resetting might reset to an underfitted model. Ideally, we would write a
-custom <code>._converged()</code> method which checks whether the loss is still going
-down <strong>for all t</strong>.</p>
-
-
-<p><span class="doc-section-title">Parameters:</span></p>
-    <table>
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th>Type</th>
-          <th>Description</th>
-          <th>Default</th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                <code>epoch</code>
-            </td>
-            <td>
-                  <code>int</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Current epoch.</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>stop_after_epochs</code>
-            </td>
-            <td>
-                  <code>int</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Number of epochs to wait for improvement on the
-validation set before terminating training.</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-    <p><span class="doc-section-title">Returns:</span></p>
-    <table>
-      <thead>
-        <tr>
-          <th>Type</th>
-          <th>Description</th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                  <code>bool</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Whether training has converged.</p>
-              </div>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-            <details class="quote">
-              <summary>Source code in <code>sbi/inference/trainers/npse/npse.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">517</span>
-<span class="normal">518</span>
-<span class="normal">519</span>
-<span class="normal">520</span>
-<span class="normal">521</span>
-<span class="normal">522</span>
-<span class="normal">523</span>
-<span class="normal">524</span>
-<span class="normal">525</span>
-<span class="normal">526</span>
-<span class="normal">527</span>
-<span class="normal">528</span>
-<span class="normal">529</span>
-<span class="normal">530</span>
-<span class="normal">531</span>
-<span class="normal">532</span>
-<span class="normal">533</span>
-<span class="normal">534</span>
-<span class="normal">535</span>
-<span class="normal">536</span>
-<span class="normal">537</span>
-<span class="normal">538</span>
-<span class="normal">539</span>
-<span class="normal">540</span>
-<span class="normal">541</span>
-<span class="normal">542</span>
-<span class="normal">543</span>
-<span class="normal">544</span>
-<span class="normal">545</span>
-<span class="normal">546</span>
-<span class="normal">547</span>
-<span class="normal">548</span>
-<span class="normal">549</span>
-<span class="normal">550</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">_converged</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">epoch</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">stop_after_epochs</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Check if training has converged.</span>
-
-<span class="sd">    Unlike the `._converged` method in base.py, this method does not reset to the</span>
-<span class="sd">    best model. We noticed that this improves performance. Deleting this method</span>
-<span class="sd">    will make C2ST tests fail. This is because the loss is very stochastic, so</span>
-<span class="sd">    resetting might reset to an underfitted model. Ideally, we would write a</span>
-<span class="sd">    custom `._converged()` method which checks whether the loss is still going</span>
-<span class="sd">    down **for all t**.</span>
-
-<span class="sd">    Args:</span>
-<span class="sd">        epoch: Current epoch.</span>
-<span class="sd">        stop_after_epochs: Number of epochs to wait for improvement on the</span>
-<span class="sd">            validation set before terminating training.</span>
-
-<span class="sd">    Returns:</span>
-<span class="sd">        Whether training has converged.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">converged</span> <span class="o">=</span> <span class="kc">False</span>
-
-    <span class="c1"># No checkpointing, just check if the validation loss has improved.</span>
-
-    <span class="c1"># (Re)-start the epoch count with the first epoch or any improvement.</span>
-    <span class="k">if</span> <span class="n">epoch</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">_val_loss</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">_best_val_loss</span><span class="p">:</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_best_val_loss</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_val_loss</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_epochs_since_last_improvement</span> <span class="o">=</span> <span class="mi">0</span>
-    <span class="k">else</span><span class="p">:</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_epochs_since_last_improvement</span> <span class="o">+=</span> <span class="mi">1</span>
-
-    <span class="c1"># If no validation improvement over many epochs, stop training.</span>
-    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_epochs_since_last_improvement</span> <span class="o">&gt;</span> <span class="n">stop_after_epochs</span> <span class="o">-</span> <span class="mi">1</span><span class="p">:</span>
-        <span class="n">converged</span> <span class="o">=</span> <span class="kc">True</span>
-
-    <span class="k">return</span> <span class="n">converged</span>
-</code></pre></div></td></tr></table></div>
-            </details>
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
 <h3 id="sbi.inference.trainers.npse.npse.NPSE._loss" class="doc doc-heading">
-            <code class=" language-python"><span class="n">_loss</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">masks</span><span class="p">,</span> <span class="n">proposal</span><span class="p">,</span> <span class="n">calibration_kernel</span><span class="p">,</span> <span class="n">force_first_round_loss</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span></code>
+            <code class=" language-python"><span class="n">_loss</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">masks</span><span class="p">,</span> <span class="n">proposal</span><span class="p">,</span> <span class="n">calibration_kernel</span><span class="p">,</span> <span class="n">times</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">force_first_round_loss</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span></code>
 
 <a href="#sbi.inference.trainers.npse.npse.NPSE._loss" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -10684,43 +10514,45 @@ distribution different from the prior.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/trainers/npse/npse.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">485</span>
-<span class="normal">486</span>
-<span class="normal">487</span>
-<span class="normal">488</span>
-<span class="normal">489</span>
-<span class="normal">490</span>
-<span class="normal">491</span>
-<span class="normal">492</span>
-<span class="normal">493</span>
-<span class="normal">494</span>
-<span class="normal">495</span>
-<span class="normal">496</span>
-<span class="normal">497</span>
-<span class="normal">498</span>
-<span class="normal">499</span>
-<span class="normal">500</span>
-<span class="normal">501</span>
-<span class="normal">502</span>
-<span class="normal">503</span>
-<span class="normal">504</span>
-<span class="normal">505</span>
-<span class="normal">506</span>
-<span class="normal">507</span>
-<span class="normal">508</span>
-<span class="normal">509</span>
-<span class="normal">510</span>
-<span class="normal">511</span>
-<span class="normal">512</span>
-<span class="normal">513</span>
-<span class="normal">514</span>
-<span class="normal">515</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">_loss</span><span class="p">(</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">521</span>
+<span class="normal">522</span>
+<span class="normal">523</span>
+<span class="normal">524</span>
+<span class="normal">525</span>
+<span class="normal">526</span>
+<span class="normal">527</span>
+<span class="normal">528</span>
+<span class="normal">529</span>
+<span class="normal">530</span>
+<span class="normal">531</span>
+<span class="normal">532</span>
+<span class="normal">533</span>
+<span class="normal">534</span>
+<span class="normal">535</span>
+<span class="normal">536</span>
+<span class="normal">537</span>
+<span class="normal">538</span>
+<span class="normal">539</span>
+<span class="normal">540</span>
+<span class="normal">541</span>
+<span class="normal">542</span>
+<span class="normal">543</span>
+<span class="normal">544</span>
+<span class="normal">545</span>
+<span class="normal">546</span>
+<span class="normal">547</span>
+<span class="normal">548</span>
+<span class="normal">549</span>
+<span class="normal">550</span>
+<span class="normal">551</span>
+<span class="normal">552</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">_loss</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">theta</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
     <span class="n">masks</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
     <span class="n">proposal</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Any</span><span class="p">],</span>
     <span class="n">calibration_kernel</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span>
+    <span class="n">times</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">force_first_round_loss</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Return loss from score estimator. Currently only single-round NPSE</span>
@@ -10737,7 +10569,7 @@ distribution different from the prior.</p>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_round</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">force_first_round_loss</span><span class="p">:</span>
         <span class="c1"># First round loss.</span>
-        <span class="n">loss</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_neural_net</span><span class="o">.</span><span class="n">loss</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
+        <span class="n">loss</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_neural_net</span><span class="o">.</span><span class="n">loss</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">times</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
             <span class="s2">&quot;Multi-round NPSE with arbitrary proposals is not implemented&quot;</span>
@@ -11165,43 +10997,7 @@ define a probabilistic ODE and solves it with a numerical ODE solver.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/trainers/npse/npse.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">417</span>
-<span class="normal">418</span>
-<span class="normal">419</span>
-<span class="normal">420</span>
-<span class="normal">421</span>
-<span class="normal">422</span>
-<span class="normal">423</span>
-<span class="normal">424</span>
-<span class="normal">425</span>
-<span class="normal">426</span>
-<span class="normal">427</span>
-<span class="normal">428</span>
-<span class="normal">429</span>
-<span class="normal">430</span>
-<span class="normal">431</span>
-<span class="normal">432</span>
-<span class="normal">433</span>
-<span class="normal">434</span>
-<span class="normal">435</span>
-<span class="normal">436</span>
-<span class="normal">437</span>
-<span class="normal">438</span>
-<span class="normal">439</span>
-<span class="normal">440</span>
-<span class="normal">441</span>
-<span class="normal">442</span>
-<span class="normal">443</span>
-<span class="normal">444</span>
-<span class="normal">445</span>
-<span class="normal">446</span>
-<span class="normal">447</span>
-<span class="normal">448</span>
-<span class="normal">449</span>
-<span class="normal">450</span>
-<span class="normal">451</span>
-<span class="normal">452</span>
-<span class="normal">453</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">453</span>
 <span class="normal">454</span>
 <span class="normal">455</span>
 <span class="normal">456</span>
@@ -11222,7 +11018,43 @@ define a probabilistic ODE and solves it with a numerical ODE solver.</p>
 <span class="normal">471</span>
 <span class="normal">472</span>
 <span class="normal">473</span>
-<span class="normal">474</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_posterior</span><span class="p">(</span>
+<span class="normal">474</span>
+<span class="normal">475</span>
+<span class="normal">476</span>
+<span class="normal">477</span>
+<span class="normal">478</span>
+<span class="normal">479</span>
+<span class="normal">480</span>
+<span class="normal">481</span>
+<span class="normal">482</span>
+<span class="normal">483</span>
+<span class="normal">484</span>
+<span class="normal">485</span>
+<span class="normal">486</span>
+<span class="normal">487</span>
+<span class="normal">488</span>
+<span class="normal">489</span>
+<span class="normal">490</span>
+<span class="normal">491</span>
+<span class="normal">492</span>
+<span class="normal">493</span>
+<span class="normal">494</span>
+<span class="normal">495</span>
+<span class="normal">496</span>
+<span class="normal">497</span>
+<span class="normal">498</span>
+<span class="normal">499</span>
+<span class="normal">500</span>
+<span class="normal">501</span>
+<span class="normal">502</span>
+<span class="normal">503</span>
+<span class="normal">504</span>
+<span class="normal">505</span>
+<span class="normal">506</span>
+<span class="normal">507</span>
+<span class="normal">508</span>
+<span class="normal">509</span>
+<span class="normal">510</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_posterior</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">score_estimator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">ConditionalScoreEstimator</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -11290,7 +11122,7 @@ define a probabilistic ODE and solves it with a numerical ODE solver.</p>
 
 
 <h3 id="sbi.inference.trainers.npse.npse.NPSE.train" class="doc doc-heading">
-            <code class=" language-python"><span class="n">train</span><span class="p">(</span><span class="n">training_batch_size</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">learning_rate</span><span class="o">=</span><span class="mf">0.0005</span><span class="p">,</span> <span class="n">validation_fraction</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">stop_after_epochs</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">max_num_epochs</span><span class="o">=</span><span class="mi">2</span> <span class="o">**</span> <span class="mi">31</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="n">clip_max_norm</span><span class="o">=</span><span class="mf">5.0</span><span class="p">,</span> <span class="n">calibration_kernel</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">ema_loss_decay</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">resume_training</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">force_first_round_loss</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">discard_prior_samples</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">retrain_from_scratch</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">show_train_summary</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">dataloader_kwargs</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+            <code class=" language-python"><span class="n">train</span><span class="p">(</span><span class="n">training_batch_size</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">learning_rate</span><span class="o">=</span><span class="mf">0.0005</span><span class="p">,</span> <span class="n">validation_fraction</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">stop_after_epochs</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">max_num_epochs</span><span class="o">=</span><span class="mi">2</span> <span class="o">**</span> <span class="mi">31</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="n">clip_max_norm</span><span class="o">=</span><span class="mf">5.0</span><span class="p">,</span> <span class="n">calibration_kernel</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">ema_loss_decay</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">validation_times</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">resume_training</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">force_first_round_loss</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">discard_prior_samples</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">retrain_from_scratch</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">show_train_summary</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">dataloader_kwargs</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 <a href="#sbi.inference.trainers.npse.npse.NPSE.train" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -11298,7 +11130,11 @@ define a probabilistic ODE and solves it with a numerical ODE solver.</p>
     <div class="doc doc-contents ">
 
         <p>Returns a score estimator that approximates the score
-<span class="arithmatex">\(\nabla_\theta \log p(\theta|x)\)</span>.</p>
+<span class="arithmatex">\(\nabla_\theta \log p(\theta|x)\)</span>. The denoising score matching loss has a high
+variance, which makes it more difficult to detect converegence. To reduce this
+variance, we evaluate the validation loss at a fixed set of times. We also use
+the exponential moving average of the training and validation losses, as opposed
+to the other <code>trainer</code> classes, which track the loss directly.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -11374,7 +11210,7 @@ validation set before terminating training.</p>
               </div>
             </td>
             <td>
-                  <code>200</code>
+                  <code>50</code>
             </td>
           </tr>
           <tr class="doc-section-item">
@@ -11428,6 +11264,40 @@ NeurIPS 2017. If <code>None</code>, no calibration is used.</p>
             </td>
             <td>
                   <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>ema_loss_decay</code>
+            </td>
+            <td>
+                  <code>float</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Loss decay strength for exponential moving average of
+training and validation losses.</p>
+              </div>
+            </td>
+            <td>
+                  <code>0.1</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>validation_times</code>
+            </td>
+            <td>
+                  <code><span title="typing.Union">Union</span>[<span title="torch.Tensor">Tensor</span>, int]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Diffusion times at which to evaluate the validation loss
+to reduce variance of validation loss.</p>
+              </div>
+            </td>
+            <td>
+                  <code>20</code>
             </td>
           </tr>
           <tr class="doc-section-item">
@@ -11802,16 +11672,53 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 <span class="normal">412</span>
 <span class="normal">413</span>
 <span class="normal">414</span>
-<span class="normal">415</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
+<span class="normal">415</span>
+<span class="normal">416</span>
+<span class="normal">417</span>
+<span class="normal">418</span>
+<span class="normal">419</span>
+<span class="normal">420</span>
+<span class="normal">421</span>
+<span class="normal">422</span>
+<span class="normal">423</span>
+<span class="normal">424</span>
+<span class="normal">425</span>
+<span class="normal">426</span>
+<span class="normal">427</span>
+<span class="normal">428</span>
+<span class="normal">429</span>
+<span class="normal">430</span>
+<span class="normal">431</span>
+<span class="normal">432</span>
+<span class="normal">433</span>
+<span class="normal">434</span>
+<span class="normal">435</span>
+<span class="normal">436</span>
+<span class="normal">437</span>
+<span class="normal">438</span>
+<span class="normal">439</span>
+<span class="normal">440</span>
+<span class="normal">441</span>
+<span class="normal">442</span>
+<span class="normal">443</span>
+<span class="normal">444</span>
+<span class="normal">445</span>
+<span class="normal">446</span>
+<span class="normal">447</span>
+<span class="normal">448</span>
+<span class="normal">449</span>
+<span class="normal">450</span>
+<span class="normal">451</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">training_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">200</span><span class="p">,</span>
     <span class="n">learning_rate</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">5e-4</span><span class="p">,</span>
     <span class="n">validation_fraction</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.1</span><span class="p">,</span>
-    <span class="n">stop_after_epochs</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">200</span><span class="p">,</span>
+    <span class="n">stop_after_epochs</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">50</span><span class="p">,</span>
     <span class="n">max_num_epochs</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">2</span><span class="o">**</span><span class="mi">31</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span>
     <span class="n">clip_max_norm</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="mf">5.0</span><span class="p">,</span>
     <span class="n">calibration_kernel</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">ema_loss_decay</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.1</span><span class="p">,</span>
+    <span class="n">validation_times</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="mi">20</span><span class="p">,</span>
     <span class="n">resume_training</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">force_first_round_loss</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">discard_prior_samples</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
@@ -11820,7 +11727,11 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
     <span class="n">dataloader_kwargs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ConditionalScoreEstimator</span><span class="p">:</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Returns a score estimator that approximates the score</span>
-<span class="sd">    $\nabla_\theta \log p(\theta|x)$.</span>
+<span class="sd">    $\nabla_\theta \log p(\theta|x)$. The denoising score matching loss has a high</span>
+<span class="sd">    variance, which makes it more difficult to detect converegence. To reduce this</span>
+<span class="sd">    variance, we evaluate the validation loss at a fixed set of times. We also use</span>
+<span class="sd">    the exponential moving average of the training and validation losses, as opposed</span>
+<span class="sd">    to the other `trainer` classes, which track the loss directly.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        training_batch_size: Training batch size.</span>
@@ -11836,6 +11747,10 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 <span class="sd">        calibration_kernel: A function to calibrate the loss with respect</span>
 <span class="sd">            to the simulations `x` (optional). See Lueckmann, Gonçalves et al.,</span>
 <span class="sd">            NeurIPS 2017. If `None`, no calibration is used.</span>
+<span class="sd">        ema_loss_decay: Loss decay strength for exponential moving average of</span>
+<span class="sd">            training and validation losses.</span>
+<span class="sd">        validation_times: Diffusion times at which to evaluate the validation loss</span>
+<span class="sd">            to reduce variance of validation loss.</span>
 <span class="sd">        resume_training: Can be used in case training time is limited, e.g. on a</span>
 <span class="sd">            cluster. If `True`, the split between train and validation set, the</span>
 <span class="sd">            optimizer, the number of epochs, and the best validation log-prob will</span>
@@ -11922,6 +11837,14 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
     <span class="c1"># Move entire net to device for training.</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_neural_net</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">)</span>
 
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">validation_times</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
+        <span class="n">validation_times</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_neural_net</span><span class="o">.</span><span class="n">t_min</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_neural_net</span><span class="o">.</span><span class="n">t_max</span><span class="p">,</span> <span class="n">validation_times</span>
+        <span class="p">)</span>
+    <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span>
+        <span class="n">validation_times</span><span class="p">,</span> <span class="n">Tensor</span>
+    <span class="p">)</span>  <span class="c1"># let pyright know validation_times is a Tensor.</span>
+
     <span class="k">if</span> <span class="ow">not</span> <span class="n">resume_training</span><span class="p">:</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">optimizer</span> <span class="o">=</span> <span class="n">Adam</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_neural_net</span><span class="o">.</span><span class="n">parameters</span><span class="p">()),</span> <span class="n">lr</span><span class="o">=</span><span class="n">learning_rate</span><span class="p">)</span>
 
@@ -11944,11 +11867,11 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
             <span class="p">)</span>
 
             <span class="n">train_losses</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_loss</span><span class="p">(</span>
-                <span class="n">theta_batch</span><span class="p">,</span>
-                <span class="n">x_batch</span><span class="p">,</span>
-                <span class="n">masks_batch</span><span class="p">,</span>
-                <span class="n">proposal</span><span class="p">,</span>
-                <span class="n">calibration_kernel</span><span class="p">,</span>
+                <span class="n">theta</span><span class="o">=</span><span class="n">theta_batch</span><span class="p">,</span>
+                <span class="n">x</span><span class="o">=</span><span class="n">x_batch</span><span class="p">,</span>
+                <span class="n">masks</span><span class="o">=</span><span class="n">masks_batch</span><span class="p">,</span>
+                <span class="n">proposal</span><span class="o">=</span><span class="n">proposal</span><span class="p">,</span>
+                <span class="n">calibration_kernel</span><span class="o">=</span><span class="n">calibration_kernel</span><span class="p">,</span>
                 <span class="n">force_first_round_loss</span><span class="o">=</span><span class="n">force_first_round_loss</span><span class="p">,</span>
             <span class="p">)</span>
 
@@ -11991,24 +11914,43 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
                     <span class="n">batch</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">),</span>
                     <span class="n">batch</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">),</span>
                 <span class="p">)</span>
+
+                <span class="c1"># For validation loss, we evaluate at a fixed set of times to reduce</span>
+                <span class="c1"># the variance in the validation loss, for improved convergence</span>
+                <span class="c1"># checks. We evaluate the entire validation batch at all times, so</span>
+                <span class="c1"># we repeat the batches here to match.</span>
+                <span class="n">val_batch_size</span> <span class="o">=</span> <span class="n">theta_batch</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                <span class="n">times_batch</span> <span class="o">=</span> <span class="n">validation_times</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                <span class="n">theta_batch</span> <span class="o">=</span> <span class="n">theta_batch</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span>
+                    <span class="n">times_batch</span><span class="p">,</span> <span class="o">*</span><span class="p">([</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="p">(</span><span class="n">theta_batch</span><span class="o">.</span><span class="n">ndim</span> <span class="o">-</span> <span class="mi">1</span><span class="p">))</span>
+                <span class="p">)</span>
+                <span class="n">x_batch</span> <span class="o">=</span> <span class="n">x_batch</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="n">times_batch</span><span class="p">,</span> <span class="o">*</span><span class="p">([</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="p">(</span><span class="n">x_batch</span><span class="o">.</span><span class="n">ndim</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)))</span>
+                <span class="n">masks_batch</span> <span class="o">=</span> <span class="n">masks_batch</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span>
+                    <span class="n">times_batch</span><span class="p">,</span> <span class="o">*</span><span class="p">([</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="p">(</span><span class="n">masks_batch</span><span class="o">.</span><span class="n">ndim</span> <span class="o">-</span> <span class="mi">1</span><span class="p">))</span>
+                <span class="p">)</span>
+
+                <span class="n">validation_times_rep</span> <span class="o">=</span> <span class="n">validation_times</span><span class="o">.</span><span class="n">repeat_interleave</span><span class="p">(</span>
+                    <span class="n">val_batch_size</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">0</span>
+                <span class="p">)</span>
+
                 <span class="c1"># Take negative loss here to get validation log_prob.</span>
                 <span class="n">val_losses</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_loss</span><span class="p">(</span>
-                    <span class="n">theta_batch</span><span class="p">,</span>
-                    <span class="n">x_batch</span><span class="p">,</span>
-                    <span class="n">masks_batch</span><span class="p">,</span>
-                    <span class="n">proposal</span><span class="p">,</span>
-                    <span class="n">calibration_kernel</span><span class="p">,</span>
+                    <span class="n">theta</span><span class="o">=</span><span class="n">theta_batch</span><span class="p">,</span>
+                    <span class="n">x</span><span class="o">=</span><span class="n">x_batch</span><span class="p">,</span>
+                    <span class="n">masks</span><span class="o">=</span><span class="n">masks_batch</span><span class="p">,</span>
+                    <span class="n">proposal</span><span class="o">=</span><span class="n">proposal</span><span class="p">,</span>
+                    <span class="n">calibration_kernel</span><span class="o">=</span><span class="n">calibration_kernel</span><span class="p">,</span>
+                    <span class="n">times</span><span class="o">=</span><span class="n">validation_times_rep</span><span class="p">,</span>
                     <span class="n">force_first_round_loss</span><span class="o">=</span><span class="n">force_first_round_loss</span><span class="p">,</span>
                 <span class="p">)</span>
+
                 <span class="n">val_loss_sum</span> <span class="o">+=</span> <span class="n">val_losses</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
 
         <span class="c1"># Take mean over all validation samples.</span>
         <span class="n">val_loss</span> <span class="o">=</span> <span class="n">val_loss_sum</span> <span class="o">/</span> <span class="p">(</span>
-            <span class="nb">len</span><span class="p">(</span><span class="n">val_loader</span><span class="p">)</span> <span class="o">*</span> <span class="n">val_loader</span><span class="o">.</span><span class="n">batch_size</span>  <span class="c1"># type: ignore</span>
+            <span class="nb">len</span><span class="p">(</span><span class="n">val_loader</span><span class="p">)</span> <span class="o">*</span> <span class="n">val_loader</span><span class="o">.</span><span class="n">batch_size</span> <span class="o">*</span> <span class="n">times_batch</span>  <span class="c1"># type: ignore</span>
         <span class="p">)</span>
 
-        <span class="c1"># NOTE: Due to the inherently noisy nature we do instead log a exponential</span>
-        <span class="c1"># moving average of the validation loss.</span>
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_summary</span><span class="p">[</span><span class="s2">&quot;validation_loss&quot;</span><span class="p">])</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
             <span class="n">val_loss_ema</span> <span class="o">=</span> <span class="n">val_loss</span>
         <span class="k">else</span><span class="p">:</span>

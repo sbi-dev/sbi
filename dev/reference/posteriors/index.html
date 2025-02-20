@@ -898,9 +898,9 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#sbi.inference.posteriors.score_posterior.ScorePosterior.sample_via_zuko" class="md-nav__link">
+  <a href="#sbi.inference.posteriors.score_posterior.ScorePosterior.sample_via_ode" class="md-nav__link">
     <span class="md-ellipsis">
-      <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;sample_via_zuko
+      <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;sample_via_ode
     </span>
   </a>
   
@@ -1652,7 +1652,7 @@ This class can not be used in combination with SNLE or SNRE.</p>
             <span class="p">)</span>
 
         <span class="n">samples</span> <span class="o">=</span> <span class="n">rejection</span><span class="o">.</span><span class="n">accept_reject_sample</span><span class="p">(</span>
-            <span class="n">proposal</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">posterior_estimator</span><span class="p">,</span>
+            <span class="n">proposal</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">posterior_estimator</span><span class="o">.</span><span class="n">sample</span><span class="p">,</span>
             <span class="n">accept_reject_fn</span><span class="o">=</span><span class="k">lambda</span> <span class="n">theta</span><span class="p">:</span> <span class="n">within_support</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">prior</span><span class="p">,</span> <span class="n">theta</span><span class="p">),</span>
             <span class="n">num_samples</span><span class="o">=</span><span class="n">num_samples</span><span class="p">,</span>
             <span class="n">show_progress_bars</span><span class="o">=</span><span class="n">show_progress_bars</span><span class="p">,</span>
@@ -1696,7 +1696,7 @@ This class can not be used in combination with SNLE or SNRE.</p>
         <span class="p">)</span>
 
         <span class="n">samples</span> <span class="o">=</span> <span class="n">rejection</span><span class="o">.</span><span class="n">accept_reject_sample</span><span class="p">(</span>
-            <span class="n">proposal</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">posterior_estimator</span><span class="p">,</span>
+            <span class="n">proposal</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">posterior_estimator</span><span class="o">.</span><span class="n">sample</span><span class="p">,</span>
             <span class="n">accept_reject_fn</span><span class="o">=</span><span class="k">lambda</span> <span class="n">theta</span><span class="p">:</span> <span class="n">within_support</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">prior</span><span class="p">,</span> <span class="n">theta</span><span class="p">),</span>
             <span class="n">num_samples</span><span class="o">=</span><span class="n">num_samples</span><span class="p">,</span>
             <span class="n">show_progress_bars</span><span class="o">=</span><span class="n">show_progress_bars</span><span class="p">,</span>
@@ -1893,7 +1893,7 @@ This class can not be used in combination with SNLE or SNRE.</p>
         <span class="k">def</span><span class="w"> </span><span class="nf">acceptance_at</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
             <span class="c1"># [1:] to remove batch-dimension for `reshape_to_batch_event`.</span>
             <span class="k">return</span> <span class="n">rejection</span><span class="o">.</span><span class="n">accept_reject_sample</span><span class="p">(</span>
-                <span class="n">proposal</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">posterior_estimator</span><span class="p">,</span>
+                <span class="n">proposal</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">posterior_estimator</span><span class="o">.</span><span class="n">sample</span><span class="p">,</span>
                 <span class="n">accept_reject_fn</span><span class="o">=</span><span class="k">lambda</span> <span class="n">theta</span><span class="p">:</span> <span class="n">within_support</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">prior</span><span class="p">,</span> <span class="n">theta</span><span class="p">),</span>
                 <span class="n">num_samples</span><span class="o">=</span><span class="n">num_rejection_samples</span><span class="p">,</span>
                 <span class="n">show_progress_bars</span><span class="o">=</span><span class="n">show_progress_bars</span><span class="p">,</span>
@@ -2427,7 +2427,7 @@ re-evaluate only whenever a new <code>x</code> is passed.</p>
     <span class="k">def</span><span class="w"> </span><span class="nf">acceptance_at</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
         <span class="c1"># [1:] to remove batch-dimension for `reshape_to_batch_event`.</span>
         <span class="k">return</span> <span class="n">rejection</span><span class="o">.</span><span class="n">accept_reject_sample</span><span class="p">(</span>
-            <span class="n">proposal</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">posterior_estimator</span><span class="p">,</span>
+            <span class="n">proposal</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">posterior_estimator</span><span class="o">.</span><span class="n">sample</span><span class="p">,</span>
             <span class="n">accept_reject_fn</span><span class="o">=</span><span class="k">lambda</span> <span class="n">theta</span><span class="p">:</span> <span class="n">within_support</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">prior</span><span class="p">,</span> <span class="n">theta</span><span class="p">),</span>
             <span class="n">num_samples</span><span class="o">=</span><span class="n">num_rejection_samples</span><span class="p">,</span>
             <span class="n">show_progress_bars</span><span class="o">=</span><span class="n">show_progress_bars</span><span class="p">,</span>
@@ -3614,7 +3614,7 @@ samples and then reshape into the desired shape.</p>
         <span class="p">)</span>
 
     <span class="n">samples</span> <span class="o">=</span> <span class="n">rejection</span><span class="o">.</span><span class="n">accept_reject_sample</span><span class="p">(</span>
-        <span class="n">proposal</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">posterior_estimator</span><span class="p">,</span>
+        <span class="n">proposal</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">posterior_estimator</span><span class="o">.</span><span class="n">sample</span><span class="p">,</span>
         <span class="n">accept_reject_fn</span><span class="o">=</span><span class="k">lambda</span> <span class="n">theta</span><span class="p">:</span> <span class="n">within_support</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">prior</span><span class="p">,</span> <span class="n">theta</span><span class="p">),</span>
         <span class="n">num_samples</span><span class="o">=</span><span class="n">num_samples</span><span class="p">,</span>
         <span class="n">show_progress_bars</span><span class="o">=</span><span class="n">show_progress_bars</span><span class="p">,</span>
@@ -3826,7 +3826,7 @@ given every observation.</p>
     <span class="p">)</span>
 
     <span class="n">samples</span> <span class="o">=</span> <span class="n">rejection</span><span class="o">.</span><span class="n">accept_reject_sample</span><span class="p">(</span>
-        <span class="n">proposal</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">posterior_estimator</span><span class="p">,</span>
+        <span class="n">proposal</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">posterior_estimator</span><span class="o">.</span><span class="n">sample</span><span class="p">,</span>
         <span class="n">accept_reject_fn</span><span class="o">=</span><span class="k">lambda</span> <span class="n">theta</span><span class="p">:</span> <span class="n">within_support</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">prior</span><span class="p">,</span> <span class="n">theta</span><span class="p">),</span>
         <span class="n">num_samples</span><span class="o">=</span><span class="n">num_samples</span><span class="p">,</span>
         <span class="n">show_progress_bars</span><span class="o">=</span><span class="n">show_progress_bars</span><span class="p">,</span>
@@ -14151,10 +14151,7 @@ zuko probabilistic ODEs to compute the log-probability.</p>
 
               <details class="quote">
                 <summary>Source code in <code>sbi/inference/posteriors/score_posterior.py</code></summary>
-                <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 27</span>
-<span class="normal"> 28</span>
-<span class="normal"> 29</span>
-<span class="normal"> 30</span>
+                <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 30</span>
 <span class="normal"> 31</span>
 <span class="normal"> 32</span>
 <span class="normal"> 33</span>
@@ -14491,7 +14488,103 @@ zuko probabilistic ODEs to compute the log-probability.</p>
 <span class="normal">364</span>
 <span class="normal">365</span>
 <span class="normal">366</span>
-<span class="normal">367</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">ScorePosterior</span><span class="p">(</span><span class="n">NeuralPosterior</span><span class="p">):</span>
+<span class="normal">367</span>
+<span class="normal">368</span>
+<span class="normal">369</span>
+<span class="normal">370</span>
+<span class="normal">371</span>
+<span class="normal">372</span>
+<span class="normal">373</span>
+<span class="normal">374</span>
+<span class="normal">375</span>
+<span class="normal">376</span>
+<span class="normal">377</span>
+<span class="normal">378</span>
+<span class="normal">379</span>
+<span class="normal">380</span>
+<span class="normal">381</span>
+<span class="normal">382</span>
+<span class="normal">383</span>
+<span class="normal">384</span>
+<span class="normal">385</span>
+<span class="normal">386</span>
+<span class="normal">387</span>
+<span class="normal">388</span>
+<span class="normal">389</span>
+<span class="normal">390</span>
+<span class="normal">391</span>
+<span class="normal">392</span>
+<span class="normal">393</span>
+<span class="normal">394</span>
+<span class="normal">395</span>
+<span class="normal">396</span>
+<span class="normal">397</span>
+<span class="normal">398</span>
+<span class="normal">399</span>
+<span class="normal">400</span>
+<span class="normal">401</span>
+<span class="normal">402</span>
+<span class="normal">403</span>
+<span class="normal">404</span>
+<span class="normal">405</span>
+<span class="normal">406</span>
+<span class="normal">407</span>
+<span class="normal">408</span>
+<span class="normal">409</span>
+<span class="normal">410</span>
+<span class="normal">411</span>
+<span class="normal">412</span>
+<span class="normal">413</span>
+<span class="normal">414</span>
+<span class="normal">415</span>
+<span class="normal">416</span>
+<span class="normal">417</span>
+<span class="normal">418</span>
+<span class="normal">419</span>
+<span class="normal">420</span>
+<span class="normal">421</span>
+<span class="normal">422</span>
+<span class="normal">423</span>
+<span class="normal">424</span>
+<span class="normal">425</span>
+<span class="normal">426</span>
+<span class="normal">427</span>
+<span class="normal">428</span>
+<span class="normal">429</span>
+<span class="normal">430</span>
+<span class="normal">431</span>
+<span class="normal">432</span>
+<span class="normal">433</span>
+<span class="normal">434</span>
+<span class="normal">435</span>
+<span class="normal">436</span>
+<span class="normal">437</span>
+<span class="normal">438</span>
+<span class="normal">439</span>
+<span class="normal">440</span>
+<span class="normal">441</span>
+<span class="normal">442</span>
+<span class="normal">443</span>
+<span class="normal">444</span>
+<span class="normal">445</span>
+<span class="normal">446</span>
+<span class="normal">447</span>
+<span class="normal">448</span>
+<span class="normal">449</span>
+<span class="normal">450</span>
+<span class="normal">451</span>
+<span class="normal">452</span>
+<span class="normal">453</span>
+<span class="normal">454</span>
+<span class="normal">455</span>
+<span class="normal">456</span>
+<span class="normal">457</span>
+<span class="normal">458</span>
+<span class="normal">459</span>
+<span class="normal">460</span>
+<span class="normal">461</span>
+<span class="normal">462</span>
+<span class="normal">463</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">ScorePosterior</span><span class="p">(</span><span class="n">NeuralPosterior</span><span class="p">):</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Posterior $p(\theta|x_o)$ with `log_prob()` and `sample()` methods. It samples</span>
 <span class="sd">    from the diffusion model given the score_estimator and rejects samples that lie</span>
 <span class="sd">    outside of the prior bounds.</span>
@@ -14513,7 +14606,7 @@ zuko probabilistic ODEs to compute the log-probability.</p>
         <span class="n">prior</span><span class="p">:</span> <span class="n">Distribution</span><span class="p">,</span>
         <span class="n">max_sampling_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10_000</span><span class="p">,</span>
         <span class="n">device</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">enable_transform</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">enable_transform</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
         <span class="n">sample_with</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;sde&quot;</span><span class="p">,</span>
     <span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
@@ -14577,7 +14670,6 @@ zuko probabilistic ODEs to compute the log-probability.</p>
 
 <span class="sd">        Args:</span>
 <span class="sd">            sample_shape: Shape of the samples to be drawn.</span>
-<span class="sd">            x: Deprecated - use `.set_default_x()` prior to `.sample()`.</span>
 <span class="sd">            predictor: The predictor for the diffusion-based sampler. Can be a string or</span>
 <span class="sd">                a custom predictor following the API in `sbi.samplers.score.predictors`.</span>
 <span class="sd">                Currently, only `euler_maruyama` is implemented.</span>
@@ -14603,23 +14695,39 @@ zuko probabilistic ODEs to compute the log-probability.</p>
 
         <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_x_else_default_x</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
         <span class="n">x</span> <span class="o">=</span> <span class="n">reshape_to_batch_event</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">score_estimator</span><span class="o">.</span><span class="n">condition_shape</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">potential_fn</span><span class="o">.</span><span class="n">set_x</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">potential_fn</span><span class="o">.</span><span class="n">set_x</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">x_is_iid</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="n">num_samples</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">(</span><span class="n">sample_shape</span><span class="p">)</span><span class="o">.</span><span class="n">numel</span><span class="p">()</span>
 
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">sample_with</span> <span class="o">==</span> <span class="s2">&quot;ode&quot;</span><span class="p">:</span>
-            <span class="n">samples</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sample_via_zuko</span><span class="p">(</span><span class="n">sample_shape</span><span class="o">=</span><span class="n">sample_shape</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="n">x</span><span class="p">)</span>
-        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">sample_with</span> <span class="o">==</span> <span class="s2">&quot;sde&quot;</span><span class="p">:</span>
-            <span class="n">samples</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sample_via_diffusion</span><span class="p">(</span>
-                <span class="n">sample_shape</span><span class="o">=</span><span class="n">sample_shape</span><span class="p">,</span>
-                <span class="n">predictor</span><span class="o">=</span><span class="n">predictor</span><span class="p">,</span>
-                <span class="n">corrector</span><span class="o">=</span><span class="n">corrector</span><span class="p">,</span>
-                <span class="n">predictor_params</span><span class="o">=</span><span class="n">predictor_params</span><span class="p">,</span>
-                <span class="n">corrector_params</span><span class="o">=</span><span class="n">corrector_params</span><span class="p">,</span>
-                <span class="n">steps</span><span class="o">=</span><span class="n">steps</span><span class="p">,</span>
-                <span class="n">ts</span><span class="o">=</span><span class="n">ts</span><span class="p">,</span>
-                <span class="n">max_sampling_batch_size</span><span class="o">=</span><span class="n">max_sampling_batch_size</span><span class="p">,</span>
+            <span class="n">samples</span> <span class="o">=</span> <span class="n">rejection</span><span class="o">.</span><span class="n">accept_reject_sample</span><span class="p">(</span>
+                <span class="n">proposal</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">sample_via_ode</span><span class="p">,</span>
+                <span class="n">accept_reject_fn</span><span class="o">=</span><span class="k">lambda</span> <span class="n">theta</span><span class="p">:</span> <span class="n">within_support</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">prior</span><span class="p">,</span> <span class="n">theta</span><span class="p">),</span>
+                <span class="n">num_samples</span><span class="o">=</span><span class="n">num_samples</span><span class="p">,</span>
                 <span class="n">show_progress_bars</span><span class="o">=</span><span class="n">show_progress_bars</span><span class="p">,</span>
-            <span class="p">)</span>
+                <span class="n">max_sampling_batch_size</span><span class="o">=</span><span class="n">max_sampling_batch_size</span><span class="p">,</span>
+            <span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">sample_with</span> <span class="o">==</span> <span class="s2">&quot;sde&quot;</span><span class="p">:</span>
+            <span class="n">proposal_sampling_kwargs</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s2">&quot;predictor&quot;</span><span class="p">:</span> <span class="n">predictor</span><span class="p">,</span>
+                <span class="s2">&quot;corrector&quot;</span><span class="p">:</span> <span class="n">corrector</span><span class="p">,</span>
+                <span class="s2">&quot;predictor_params&quot;</span><span class="p">:</span> <span class="n">predictor_params</span><span class="p">,</span>
+                <span class="s2">&quot;corrector_params&quot;</span><span class="p">:</span> <span class="n">corrector_params</span><span class="p">,</span>
+                <span class="s2">&quot;steps&quot;</span><span class="p">:</span> <span class="n">steps</span><span class="p">,</span>
+                <span class="s2">&quot;ts&quot;</span><span class="p">:</span> <span class="n">ts</span><span class="p">,</span>
+                <span class="s2">&quot;max_sampling_batch_size&quot;</span><span class="p">:</span> <span class="n">max_sampling_batch_size</span><span class="p">,</span>
+                <span class="s2">&quot;show_progress_bars&quot;</span><span class="p">:</span> <span class="n">show_progress_bars</span><span class="p">,</span>
+            <span class="p">}</span>
+            <span class="n">samples</span> <span class="o">=</span> <span class="n">rejection</span><span class="o">.</span><span class="n">accept_reject_sample</span><span class="p">(</span>
+                <span class="n">proposal</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_sample_via_diffusion</span><span class="p">,</span>
+                <span class="n">accept_reject_fn</span><span class="o">=</span><span class="k">lambda</span> <span class="n">theta</span><span class="p">:</span> <span class="n">within_support</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">prior</span><span class="p">,</span> <span class="n">theta</span><span class="p">),</span>
+                <span class="n">num_samples</span><span class="o">=</span><span class="n">num_samples</span><span class="p">,</span>
+                <span class="n">show_progress_bars</span><span class="o">=</span><span class="n">show_progress_bars</span><span class="p">,</span>
+                <span class="n">max_sampling_batch_size</span><span class="o">=</span><span class="n">max_sampling_batch_size</span><span class="p">,</span>
+                <span class="n">proposal_sampling_kwargs</span><span class="o">=</span><span class="n">proposal_sampling_kwargs</span><span class="p">,</span>
+            <span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
 
+        <span class="n">samples</span> <span class="o">=</span> <span class="n">samples</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">sample_shape</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">score_estimator</span><span class="o">.</span><span class="n">input_shape</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">samples</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_sample_via_diffusion</span><span class="p">(</span>
@@ -14638,7 +14746,6 @@ zuko probabilistic ODEs to compute the log-probability.</p>
 
 <span class="sd">        Args:</span>
 <span class="sd">            sample_shape: Shape of the samples to be drawn.</span>
-<span class="sd">            x: Deprecated - use `.set_default_x()` prior to `.sample()`.</span>
 <span class="sd">            predictor: The predictor for the diffusion-based sampler. Can be a string or</span>
 <span class="sd">                a custom predictor following the API in `sbi.samplers.score.predictors`.</span>
 <span class="sd">                Currently, only `euler_maruyama` is implemented.</span>
@@ -14689,11 +14796,10 @@ zuko probabilistic ODEs to compute the log-probability.</p>
             <span class="p">)</span>
         <span class="n">samples</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">(</span><span class="n">samples</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">)[:</span><span class="n">num_samples</span><span class="p">]</span>
 
-        <span class="k">return</span> <span class="n">samples</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">sample_shape</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">score_estimator</span><span class="o">.</span><span class="n">input_shape</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">samples</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">sample_via_zuko</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">sample_via_ode</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
-        <span class="n">x</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
         <span class="n">sample_shape</span><span class="p">:</span> <span class="n">Shape</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">(),</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
 <span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Return samples from posterior distribution with probability flow ODE.</span>
@@ -14710,10 +14816,12 @@ zuko probabilistic ODEs to compute the log-probability.</p>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">num_samples</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">(</span><span class="n">sample_shape</span><span class="p">)</span><span class="o">.</span><span class="n">numel</span><span class="p">()</span>
 
-        <span class="n">flow</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">potential_fn</span><span class="o">.</span><span class="n">get_continuous_normalizing_flow</span><span class="p">(</span><span class="n">condition</span><span class="o">=</span><span class="n">x</span><span class="p">)</span>
+        <span class="n">flow</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">potential_fn</span><span class="o">.</span><span class="n">get_continuous_normalizing_flow</span><span class="p">(</span>
+            <span class="n">condition</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">potential_fn</span><span class="o">.</span><span class="n">x_o</span>
+        <span class="p">)</span>
         <span class="n">samples</span> <span class="o">=</span> <span class="n">flow</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">((</span><span class="n">num_samples</span><span class="p">,)))</span>
 
-        <span class="k">return</span> <span class="n">samples</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">sample_shape</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">score_estimator</span><span class="o">.</span><span class="n">input_shape</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">samples</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">log_prob</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -14758,19 +14866,73 @@ zuko probabilistic ODEs to compute the log-probability.</p>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">sample_shape</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">,</span>
         <span class="n">x</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
+        <span class="n">predictor</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Predictor</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;euler_maruyama&quot;</span><span class="p">,</span>
+        <span class="n">corrector</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Corrector</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">predictor_params</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">corrector_params</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">steps</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">500</span><span class="p">,</span>
+        <span class="n">ts</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">max_sampling_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10000</span><span class="p">,</span>
         <span class="n">show_progress_bars</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
-            <span class="s2">&quot;Batched sampling is not implemented for ScorePosterior.&quot;</span>
+        <span class="n">num_samples</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">(</span><span class="n">sample_shape</span><span class="p">)</span><span class="o">.</span><span class="n">numel</span><span class="p">()</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">reshape_to_batch_event</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">score_estimator</span><span class="o">.</span><span class="n">condition_shape</span><span class="p">)</span>
+        <span class="n">condition_dim</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">score_estimator</span><span class="o">.</span><span class="n">condition_shape</span><span class="p">)</span>
+        <span class="n">batch_shape</span> <span class="o">=</span> <span class="n">x</span><span class="o">.</span><span class="n">shape</span><span class="p">[:</span><span class="o">-</span><span class="n">condition_dim</span><span class="p">]</span>
+        <span class="n">batch_size</span> <span class="o">=</span> <span class="n">batch_shape</span><span class="o">.</span><span class="n">numel</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">potential_fn</span><span class="o">.</span><span class="n">set_x</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+
+        <span class="n">max_sampling_batch_size</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">max_sampling_batch_size</span>
+            <span class="k">if</span> <span class="n">max_sampling_batch_size</span> <span class="ow">is</span> <span class="kc">None</span>
+            <span class="k">else</span> <span class="n">max_sampling_batch_size</span>
         <span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">sample_with</span> <span class="o">==</span> <span class="s2">&quot;ode&quot;</span><span class="p">:</span>
+            <span class="n">samples</span> <span class="o">=</span> <span class="n">rejection</span><span class="o">.</span><span class="n">accept_reject_sample</span><span class="p">(</span>
+                <span class="n">proposal</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">sample_via_ode</span><span class="p">,</span>
+                <span class="n">accept_reject_fn</span><span class="o">=</span><span class="k">lambda</span> <span class="n">theta</span><span class="p">:</span> <span class="n">within_support</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">prior</span><span class="p">,</span> <span class="n">theta</span><span class="p">),</span>
+                <span class="n">num_samples</span><span class="o">=</span><span class="n">num_samples</span><span class="p">,</span>
+                <span class="n">num_xos</span><span class="o">=</span><span class="n">batch_size</span><span class="p">,</span>
+                <span class="n">show_progress_bars</span><span class="o">=</span><span class="n">show_progress_bars</span><span class="p">,</span>
+                <span class="n">max_sampling_batch_size</span><span class="o">=</span><span class="n">max_sampling_batch_size</span><span class="p">,</span>
+                <span class="n">proposal_sampling_kwargs</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;x&quot;</span><span class="p">:</span> <span class="n">x</span><span class="p">},</span>
+            <span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">samples</span> <span class="o">=</span> <span class="n">samples</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span>
+                <span class="n">sample_shape</span> <span class="o">+</span> <span class="n">batch_shape</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">score_estimator</span><span class="o">.</span><span class="n">input_shape</span>
+            <span class="p">)</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">sample_with</span> <span class="o">==</span> <span class="s2">&quot;sde&quot;</span><span class="p">:</span>
+            <span class="n">proposal_sampling_kwargs</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s2">&quot;predictor&quot;</span><span class="p">:</span> <span class="n">predictor</span><span class="p">,</span>
+                <span class="s2">&quot;corrector&quot;</span><span class="p">:</span> <span class="n">corrector</span><span class="p">,</span>
+                <span class="s2">&quot;predictor_params&quot;</span><span class="p">:</span> <span class="n">predictor_params</span><span class="p">,</span>
+                <span class="s2">&quot;corrector_params&quot;</span><span class="p">:</span> <span class="n">corrector_params</span><span class="p">,</span>
+                <span class="s2">&quot;steps&quot;</span><span class="p">:</span> <span class="n">steps</span><span class="p">,</span>
+                <span class="s2">&quot;ts&quot;</span><span class="p">:</span> <span class="n">ts</span><span class="p">,</span>
+                <span class="s2">&quot;max_sampling_batch_size&quot;</span><span class="p">:</span> <span class="n">max_sampling_batch_size</span><span class="p">,</span>
+                <span class="s2">&quot;show_progress_bars&quot;</span><span class="p">:</span> <span class="n">show_progress_bars</span><span class="p">,</span>
+            <span class="p">}</span>
+            <span class="n">samples</span> <span class="o">=</span> <span class="n">rejection</span><span class="o">.</span><span class="n">accept_reject_sample</span><span class="p">(</span>
+                <span class="n">proposal</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_sample_via_diffusion</span><span class="p">,</span>
+                <span class="n">accept_reject_fn</span><span class="o">=</span><span class="k">lambda</span> <span class="n">theta</span><span class="p">:</span> <span class="n">within_support</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">prior</span><span class="p">,</span> <span class="n">theta</span><span class="p">),</span>
+                <span class="n">num_samples</span><span class="o">=</span><span class="n">num_samples</span><span class="p">,</span>
+                <span class="n">num_xos</span><span class="o">=</span><span class="n">batch_size</span><span class="p">,</span>
+                <span class="n">show_progress_bars</span><span class="o">=</span><span class="n">show_progress_bars</span><span class="p">,</span>
+                <span class="n">max_sampling_batch_size</span><span class="o">=</span><span class="n">max_sampling_batch_size</span><span class="p">,</span>
+                <span class="n">proposal_sampling_kwargs</span><span class="o">=</span><span class="n">proposal_sampling_kwargs</span><span class="p">,</span>
+            <span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">samples</span> <span class="o">=</span> <span class="n">samples</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span>
+                <span class="n">sample_shape</span> <span class="o">+</span> <span class="n">batch_shape</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">score_estimator</span><span class="o">.</span><span class="n">input_shape</span>
+            <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">samples</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">map</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">num_iter</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">,</span>
         <span class="n">num_to_optimize</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">,</span>
-        <span class="n">learning_rate</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-5</span><span class="p">,</span>
+        <span class="n">learning_rate</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.01</span><span class="p">,</span>
         <span class="n">init_method</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;posterior&quot;</span><span class="p">,</span>
         <span class="n">num_init_samples</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">,</span>
         <span class="n">save_best_every</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">,</span>
@@ -14818,20 +14980,44 @@ zuko probabilistic ODEs to compute the log-probability.</p>
 <span class="sd">        Returns:</span>
 <span class="sd">            The MAP estimate.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
-            <span class="s2">&quot;MAP estimation is currently not working accurately for ScorePosterior.&quot;</span>
-        <span class="p">)</span>
-        <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">map</span><span class="p">(</span>
-            <span class="n">x</span><span class="o">=</span><span class="n">x</span><span class="p">,</span>
-            <span class="n">num_iter</span><span class="o">=</span><span class="n">num_iter</span><span class="p">,</span>
-            <span class="n">num_to_optimize</span><span class="o">=</span><span class="n">num_to_optimize</span><span class="p">,</span>
-            <span class="n">learning_rate</span><span class="o">=</span><span class="n">learning_rate</span><span class="p">,</span>
-            <span class="n">init_method</span><span class="o">=</span><span class="n">init_method</span><span class="p">,</span>
-            <span class="n">num_init_samples</span><span class="o">=</span><span class="n">num_init_samples</span><span class="p">,</span>
-            <span class="n">save_best_every</span><span class="o">=</span><span class="n">save_best_every</span><span class="p">,</span>
-            <span class="n">show_progress_bars</span><span class="o">=</span><span class="n">show_progress_bars</span><span class="p">,</span>
-            <span class="n">force_update</span><span class="o">=</span><span class="n">force_update</span><span class="p">,</span>
-        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">x</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;Passing `x` directly to `.map()` has been deprecated.&quot;</span>
+                <span class="s2">&quot;Use `.self_default_x()` to set `x`, and then run `.map()` &quot;</span>
+            <span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">default_x</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;Default `x` has not been set.&quot;</span>
+                <span class="s2">&quot;To set the default, use the `.set_default_x()` method.&quot;</span>
+            <span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_map</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">force_update</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">potential_fn</span><span class="o">.</span><span class="n">set_x</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">default_x</span><span class="p">)</span>
+            <span class="n">callable_potential_fn</span> <span class="o">=</span> <span class="n">CallableDifferentiablePotentialFunction</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">potential_fn</span>
+            <span class="p">)</span>
+            <span class="k">if</span> <span class="n">init_method</span> <span class="o">==</span> <span class="s2">&quot;posterior&quot;</span><span class="p">:</span>
+                <span class="n">inits</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_init_samples</span><span class="p">,))</span>
+            <span class="k">elif</span> <span class="n">init_method</span> <span class="o">==</span> <span class="s2">&quot;proposal&quot;</span><span class="p">:</span>
+                <span class="n">inits</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">proposal</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_init_samples</span><span class="p">,))</span>  <span class="c1"># type: ignore</span>
+            <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">init_method</span><span class="p">,</span> <span class="n">Tensor</span><span class="p">):</span>
+                <span class="n">inits</span> <span class="o">=</span> <span class="n">init_method</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">_map</span> <span class="o">=</span> <span class="n">gradient_ascent</span><span class="p">(</span>
+                <span class="n">potential_fn</span><span class="o">=</span><span class="n">callable_potential_fn</span><span class="p">,</span>
+                <span class="n">inits</span><span class="o">=</span><span class="n">inits</span><span class="p">,</span>
+                <span class="n">theta_transform</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">theta_transform</span><span class="p">,</span>
+                <span class="n">num_iter</span><span class="o">=</span><span class="n">num_iter</span><span class="p">,</span>
+                <span class="n">num_to_optimize</span><span class="o">=</span><span class="n">num_to_optimize</span><span class="p">,</span>
+                <span class="n">learning_rate</span><span class="o">=</span><span class="n">learning_rate</span><span class="p">,</span>
+                <span class="n">save_best_every</span><span class="o">=</span><span class="n">save_best_every</span><span class="p">,</span>
+                <span class="n">show_progress_bars</span><span class="o">=</span><span class="n">show_progress_bars</span><span class="p">,</span>
+            <span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_map</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -14851,7 +15037,7 @@ zuko probabilistic ODEs to compute the log-probability.</p>
 
 
 <h3 id="sbi.inference.posteriors.score_posterior.ScorePosterior.__init__" class="doc doc-heading">
-            <code class=" language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">score_estimator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">max_sampling_batch_size</span><span class="o">=</span><span class="mi">10000</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">enable_transform</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">sample_with</span><span class="o">=</span><span class="s1">&#39;sde&#39;</span><span class="p">)</span></code>
+            <code class=" language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">score_estimator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">max_sampling_batch_size</span><span class="o">=</span><span class="mi">10000</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">enable_transform</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">sample_with</span><span class="o">=</span><span class="s1">&#39;sde&#39;</span><span class="p">)</span></code>
 
 <a href="#sbi.inference.posteriors.score_posterior.ScorePosterior.__init__" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -14952,7 +15138,7 @@ returned for <code>theta_transform</code>. True is not supported yet.</p>
               </div>
             </td>
             <td>
-                  <code>False</code>
+                  <code>True</code>
             </td>
           </tr>
           <tr class="doc-section-item">
@@ -14977,10 +15163,7 @@ sampler or the SDE-based sampler.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/score_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">43</span>
-<span class="normal">44</span>
-<span class="normal">45</span>
-<span class="normal">46</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">46</span>
 <span class="normal">47</span>
 <span class="normal">48</span>
 <span class="normal">49</span>
@@ -15027,13 +15210,16 @@ sampler or the SDE-based sampler.</p>
 <span class="normal">90</span>
 <span class="normal">91</span>
 <span class="normal">92</span>
-<span class="normal">93</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">93</span>
+<span class="normal">94</span>
+<span class="normal">95</span>
+<span class="normal">96</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">score_estimator</span><span class="p">:</span> <span class="n">ConditionalScoreEstimator</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Distribution</span><span class="p">,</span>
     <span class="n">max_sampling_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10_000</span><span class="p">,</span>
     <span class="n">device</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">enable_transform</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">enable_transform</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
     <span class="n">sample_with</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;sde&quot;</span><span class="p">,</span>
 <span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
@@ -15123,21 +15309,6 @@ sampler or the SDE-based sampler.</p>
             </td>
             <td>
                   <code><span title="torch.Size">Size</span>()</code>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>x</code>
-            </td>
-            <td>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Deprecated - use <code>.set_default_x()</code> prior to <code>.sample()</code>.</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
             </td>
           </tr>
           <tr class="doc-section-item">
@@ -15261,25 +15432,7 @@ linear grid between t_max and t_min is used.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/score_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">158</span>
-<span class="normal">159</span>
-<span class="normal">160</span>
-<span class="normal">161</span>
-<span class="normal">162</span>
-<span class="normal">163</span>
-<span class="normal">164</span>
-<span class="normal">165</span>
-<span class="normal">166</span>
-<span class="normal">167</span>
-<span class="normal">168</span>
-<span class="normal">169</span>
-<span class="normal">170</span>
-<span class="normal">171</span>
-<span class="normal">172</span>
-<span class="normal">173</span>
-<span class="normal">174</span>
-<span class="normal">175</span>
-<span class="normal">176</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">176</span>
 <span class="normal">177</span>
 <span class="normal">178</span>
 <span class="normal">179</span>
@@ -15328,7 +15481,24 @@ linear grid between t_max and t_min is used.</p>
 <span class="normal">222</span>
 <span class="normal">223</span>
 <span class="normal">224</span>
-<span class="normal">225</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">_sample_via_diffusion</span><span class="p">(</span>
+<span class="normal">225</span>
+<span class="normal">226</span>
+<span class="normal">227</span>
+<span class="normal">228</span>
+<span class="normal">229</span>
+<span class="normal">230</span>
+<span class="normal">231</span>
+<span class="normal">232</span>
+<span class="normal">233</span>
+<span class="normal">234</span>
+<span class="normal">235</span>
+<span class="normal">236</span>
+<span class="normal">237</span>
+<span class="normal">238</span>
+<span class="normal">239</span>
+<span class="normal">240</span>
+<span class="normal">241</span>
+<span class="normal">242</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">_sample_via_diffusion</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">sample_shape</span><span class="p">:</span> <span class="n">Shape</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">(),</span>
     <span class="n">predictor</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Predictor</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;euler_maruyama&quot;</span><span class="p">,</span>
@@ -15344,7 +15514,6 @@ linear grid between t_max and t_min is used.</p>
 
 <span class="sd">    Args:</span>
 <span class="sd">        sample_shape: Shape of the samples to be drawn.</span>
-<span class="sd">        x: Deprecated - use `.set_default_x()` prior to `.sample()`.</span>
 <span class="sd">        predictor: The predictor for the diffusion-based sampler. Can be a string or</span>
 <span class="sd">            a custom predictor following the API in `sbi.samplers.score.predictors`.</span>
 <span class="sd">            Currently, only `euler_maruyama` is implemented.</span>
@@ -15395,7 +15564,7 @@ linear grid between t_max and t_min is used.</p>
         <span class="p">)</span>
     <span class="n">samples</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">(</span><span class="n">samples</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">)[:</span><span class="n">num_samples</span><span class="p">]</span>
 
-    <span class="k">return</span> <span class="n">samples</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">sample_shape</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">score_estimator</span><span class="o">.</span><span class="n">input_shape</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">samples</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -15565,25 +15734,7 @@ stochastic approximation, which is faster but less accurate.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/score_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">251</span>
-<span class="normal">252</span>
-<span class="normal">253</span>
-<span class="normal">254</span>
-<span class="normal">255</span>
-<span class="normal">256</span>
-<span class="normal">257</span>
-<span class="normal">258</span>
-<span class="normal">259</span>
-<span class="normal">260</span>
-<span class="normal">261</span>
-<span class="normal">262</span>
-<span class="normal">263</span>
-<span class="normal">264</span>
-<span class="normal">265</span>
-<span class="normal">266</span>
-<span class="normal">267</span>
-<span class="normal">268</span>
-<span class="normal">269</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">269</span>
 <span class="normal">270</span>
 <span class="normal">271</span>
 <span class="normal">272</span>
@@ -15602,7 +15753,25 @@ stochastic approximation, which is faster but less accurate.</p>
 <span class="normal">285</span>
 <span class="normal">286</span>
 <span class="normal">287</span>
-<span class="normal">288</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">log_prob</span><span class="p">(</span>
+<span class="normal">288</span>
+<span class="normal">289</span>
+<span class="normal">290</span>
+<span class="normal">291</span>
+<span class="normal">292</span>
+<span class="normal">293</span>
+<span class="normal">294</span>
+<span class="normal">295</span>
+<span class="normal">296</span>
+<span class="normal">297</span>
+<span class="normal">298</span>
+<span class="normal">299</span>
+<span class="normal">300</span>
+<span class="normal">301</span>
+<span class="normal">302</span>
+<span class="normal">303</span>
+<span class="normal">304</span>
+<span class="normal">305</span>
+<span class="normal">306</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">log_prob</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">theta</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -15650,7 +15819,7 @@ stochastic approximation, which is faster but less accurate.</p>
 
 
 <h3 id="sbi.inference.posteriors.score_posterior.ScorePosterior.map" class="doc doc-heading">
-            <code class=" language-python"><span class="nb">map</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_iter</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">num_to_optimize</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">learning_rate</span><span class="o">=</span><span class="mf">1e-05</span><span class="p">,</span> <span class="n">init_method</span><span class="o">=</span><span class="s1">&#39;posterior&#39;</span><span class="p">,</span> <span class="n">num_init_samples</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">save_best_every</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">force_update</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span></code>
+            <code class=" language-python"><span class="nb">map</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_iter</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">num_to_optimize</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">learning_rate</span><span class="o">=</span><span class="mf">0.01</span><span class="p">,</span> <span class="n">init_method</span><span class="o">=</span><span class="s1">&#39;posterior&#39;</span><span class="p">,</span> <span class="n">num_init_samples</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">save_best_every</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">force_update</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span></code>
 
 <a href="#sbi.inference.posteriors.score_posterior.ScorePosterior.map" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -15745,7 +15914,7 @@ for the optimization.</p>
               </div>
             </td>
             <td>
-                  <code>1e-05</code>
+                  <code>0.01</code>
             </td>
           </tr>
           <tr class="doc-section-item">
@@ -15865,78 +16034,102 @@ have a cached value.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/score_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">301</span>
-<span class="normal">302</span>
-<span class="normal">303</span>
-<span class="normal">304</span>
-<span class="normal">305</span>
-<span class="normal">306</span>
-<span class="normal">307</span>
-<span class="normal">308</span>
-<span class="normal">309</span>
-<span class="normal">310</span>
-<span class="normal">311</span>
-<span class="normal">312</span>
-<span class="normal">313</span>
-<span class="normal">314</span>
-<span class="normal">315</span>
-<span class="normal">316</span>
-<span class="normal">317</span>
-<span class="normal">318</span>
-<span class="normal">319</span>
-<span class="normal">320</span>
-<span class="normal">321</span>
-<span class="normal">322</span>
-<span class="normal">323</span>
-<span class="normal">324</span>
-<span class="normal">325</span>
-<span class="normal">326</span>
-<span class="normal">327</span>
-<span class="normal">328</span>
-<span class="normal">329</span>
-<span class="normal">330</span>
-<span class="normal">331</span>
-<span class="normal">332</span>
-<span class="normal">333</span>
-<span class="normal">334</span>
-<span class="normal">335</span>
-<span class="normal">336</span>
-<span class="normal">337</span>
-<span class="normal">338</span>
-<span class="normal">339</span>
-<span class="normal">340</span>
-<span class="normal">341</span>
-<span class="normal">342</span>
-<span class="normal">343</span>
-<span class="normal">344</span>
-<span class="normal">345</span>
-<span class="normal">346</span>
-<span class="normal">347</span>
-<span class="normal">348</span>
-<span class="normal">349</span>
-<span class="normal">350</span>
-<span class="normal">351</span>
-<span class="normal">352</span>
-<span class="normal">353</span>
-<span class="normal">354</span>
-<span class="normal">355</span>
-<span class="normal">356</span>
-<span class="normal">357</span>
-<span class="normal">358</span>
-<span class="normal">359</span>
-<span class="normal">360</span>
-<span class="normal">361</span>
-<span class="normal">362</span>
-<span class="normal">363</span>
-<span class="normal">364</span>
-<span class="normal">365</span>
-<span class="normal">366</span>
-<span class="normal">367</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">map</span><span class="p">(</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">373</span>
+<span class="normal">374</span>
+<span class="normal">375</span>
+<span class="normal">376</span>
+<span class="normal">377</span>
+<span class="normal">378</span>
+<span class="normal">379</span>
+<span class="normal">380</span>
+<span class="normal">381</span>
+<span class="normal">382</span>
+<span class="normal">383</span>
+<span class="normal">384</span>
+<span class="normal">385</span>
+<span class="normal">386</span>
+<span class="normal">387</span>
+<span class="normal">388</span>
+<span class="normal">389</span>
+<span class="normal">390</span>
+<span class="normal">391</span>
+<span class="normal">392</span>
+<span class="normal">393</span>
+<span class="normal">394</span>
+<span class="normal">395</span>
+<span class="normal">396</span>
+<span class="normal">397</span>
+<span class="normal">398</span>
+<span class="normal">399</span>
+<span class="normal">400</span>
+<span class="normal">401</span>
+<span class="normal">402</span>
+<span class="normal">403</span>
+<span class="normal">404</span>
+<span class="normal">405</span>
+<span class="normal">406</span>
+<span class="normal">407</span>
+<span class="normal">408</span>
+<span class="normal">409</span>
+<span class="normal">410</span>
+<span class="normal">411</span>
+<span class="normal">412</span>
+<span class="normal">413</span>
+<span class="normal">414</span>
+<span class="normal">415</span>
+<span class="normal">416</span>
+<span class="normal">417</span>
+<span class="normal">418</span>
+<span class="normal">419</span>
+<span class="normal">420</span>
+<span class="normal">421</span>
+<span class="normal">422</span>
+<span class="normal">423</span>
+<span class="normal">424</span>
+<span class="normal">425</span>
+<span class="normal">426</span>
+<span class="normal">427</span>
+<span class="normal">428</span>
+<span class="normal">429</span>
+<span class="normal">430</span>
+<span class="normal">431</span>
+<span class="normal">432</span>
+<span class="normal">433</span>
+<span class="normal">434</span>
+<span class="normal">435</span>
+<span class="normal">436</span>
+<span class="normal">437</span>
+<span class="normal">438</span>
+<span class="normal">439</span>
+<span class="normal">440</span>
+<span class="normal">441</span>
+<span class="normal">442</span>
+<span class="normal">443</span>
+<span class="normal">444</span>
+<span class="normal">445</span>
+<span class="normal">446</span>
+<span class="normal">447</span>
+<span class="normal">448</span>
+<span class="normal">449</span>
+<span class="normal">450</span>
+<span class="normal">451</span>
+<span class="normal">452</span>
+<span class="normal">453</span>
+<span class="normal">454</span>
+<span class="normal">455</span>
+<span class="normal">456</span>
+<span class="normal">457</span>
+<span class="normal">458</span>
+<span class="normal">459</span>
+<span class="normal">460</span>
+<span class="normal">461</span>
+<span class="normal">462</span>
+<span class="normal">463</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">map</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">num_iter</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">,</span>
     <span class="n">num_to_optimize</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">,</span>
-    <span class="n">learning_rate</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-5</span><span class="p">,</span>
+    <span class="n">learning_rate</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.01</span><span class="p">,</span>
     <span class="n">init_method</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;posterior&quot;</span><span class="p">,</span>
     <span class="n">num_init_samples</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">,</span>
     <span class="n">save_best_every</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">,</span>
@@ -15984,20 +16177,44 @@ have a cached value.</p>
 <span class="sd">    Returns:</span>
 <span class="sd">        The MAP estimate.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
-        <span class="s2">&quot;MAP estimation is currently not working accurately for ScorePosterior.&quot;</span>
-    <span class="p">)</span>
-    <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">map</span><span class="p">(</span>
-        <span class="n">x</span><span class="o">=</span><span class="n">x</span><span class="p">,</span>
-        <span class="n">num_iter</span><span class="o">=</span><span class="n">num_iter</span><span class="p">,</span>
-        <span class="n">num_to_optimize</span><span class="o">=</span><span class="n">num_to_optimize</span><span class="p">,</span>
-        <span class="n">learning_rate</span><span class="o">=</span><span class="n">learning_rate</span><span class="p">,</span>
-        <span class="n">init_method</span><span class="o">=</span><span class="n">init_method</span><span class="p">,</span>
-        <span class="n">num_init_samples</span><span class="o">=</span><span class="n">num_init_samples</span><span class="p">,</span>
-        <span class="n">save_best_every</span><span class="o">=</span><span class="n">save_best_every</span><span class="p">,</span>
-        <span class="n">show_progress_bars</span><span class="o">=</span><span class="n">show_progress_bars</span><span class="p">,</span>
-        <span class="n">force_update</span><span class="o">=</span><span class="n">force_update</span><span class="p">,</span>
-    <span class="p">)</span>
+    <span class="k">if</span> <span class="n">x</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">&quot;Passing `x` directly to `.map()` has been deprecated.&quot;</span>
+            <span class="s2">&quot;Use `.self_default_x()` to set `x`, and then run `.map()` &quot;</span>
+        <span class="p">)</span>
+
+    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">default_x</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">&quot;Default `x` has not been set.&quot;</span>
+            <span class="s2">&quot;To set the default, use the `.set_default_x()` method.&quot;</span>
+        <span class="p">)</span>
+
+    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_map</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">force_update</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">potential_fn</span><span class="o">.</span><span class="n">set_x</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">default_x</span><span class="p">)</span>
+        <span class="n">callable_potential_fn</span> <span class="o">=</span> <span class="n">CallableDifferentiablePotentialFunction</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">potential_fn</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">init_method</span> <span class="o">==</span> <span class="s2">&quot;posterior&quot;</span><span class="p">:</span>
+            <span class="n">inits</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_init_samples</span><span class="p">,))</span>
+        <span class="k">elif</span> <span class="n">init_method</span> <span class="o">==</span> <span class="s2">&quot;proposal&quot;</span><span class="p">:</span>
+            <span class="n">inits</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">proposal</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_init_samples</span><span class="p">,))</span>  <span class="c1"># type: ignore</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">init_method</span><span class="p">,</span> <span class="n">Tensor</span><span class="p">):</span>
+            <span class="n">inits</span> <span class="o">=</span> <span class="n">init_method</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_map</span> <span class="o">=</span> <span class="n">gradient_ascent</span><span class="p">(</span>
+            <span class="n">potential_fn</span><span class="o">=</span><span class="n">callable_potential_fn</span><span class="p">,</span>
+            <span class="n">inits</span><span class="o">=</span><span class="n">inits</span><span class="p">,</span>
+            <span class="n">theta_transform</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">theta_transform</span><span class="p">,</span>
+            <span class="n">num_iter</span><span class="o">=</span><span class="n">num_iter</span><span class="p">,</span>
+            <span class="n">num_to_optimize</span><span class="o">=</span><span class="n">num_to_optimize</span><span class="p">,</span>
+            <span class="n">learning_rate</span><span class="o">=</span><span class="n">learning_rate</span><span class="p">,</span>
+            <span class="n">save_best_every</span><span class="o">=</span><span class="n">save_best_every</span><span class="p">,</span>
+            <span class="n">show_progress_bars</span><span class="o">=</span><span class="n">show_progress_bars</span><span class="p">,</span>
+        <span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+
+    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_map</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -16043,22 +16260,6 @@ have a cached value.</p>
             </td>
             <td>
                   <code><span title="torch.Size">Size</span>()</code>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>x</code>
-            </td>
-            <td>
-                  <code><span title="typing.Optional">Optional</span>[<span title="torch.Tensor">Tensor</span>]</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Deprecated - use <code>.set_default_x()</code> prior to <code>.sample()</code>.</p>
-              </div>
-            </td>
-            <td>
-                  <code>None</code>
             </td>
           </tr>
           <tr class="doc-section-item">
@@ -16215,10 +16416,7 @@ linear grid between t_max and t_min is used.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/score_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 95</span>
-<span class="normal"> 96</span>
-<span class="normal"> 97</span>
-<span class="normal"> 98</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 98</span>
 <span class="normal"> 99</span>
 <span class="normal">100</span>
 <span class="normal">101</span>
@@ -16276,7 +16474,25 @@ linear grid between t_max and t_min is used.</p>
 <span class="normal">153</span>
 <span class="normal">154</span>
 <span class="normal">155</span>
-<span class="normal">156</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">sample</span><span class="p">(</span>
+<span class="normal">156</span>
+<span class="normal">157</span>
+<span class="normal">158</span>
+<span class="normal">159</span>
+<span class="normal">160</span>
+<span class="normal">161</span>
+<span class="normal">162</span>
+<span class="normal">163</span>
+<span class="normal">164</span>
+<span class="normal">165</span>
+<span class="normal">166</span>
+<span class="normal">167</span>
+<span class="normal">168</span>
+<span class="normal">169</span>
+<span class="normal">170</span>
+<span class="normal">171</span>
+<span class="normal">172</span>
+<span class="normal">173</span>
+<span class="normal">174</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">sample</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">sample_shape</span><span class="p">:</span> <span class="n">Shape</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">(),</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -16294,7 +16510,6 @@ linear grid between t_max and t_min is used.</p>
 
 <span class="sd">    Args:</span>
 <span class="sd">        sample_shape: Shape of the samples to be drawn.</span>
-<span class="sd">        x: Deprecated - use `.set_default_x()` prior to `.sample()`.</span>
 <span class="sd">        predictor: The predictor for the diffusion-based sampler. Can be a string or</span>
 <span class="sd">            a custom predictor following the API in `sbi.samplers.score.predictors`.</span>
 <span class="sd">            Currently, only `euler_maruyama` is implemented.</span>
@@ -16320,23 +16535,39 @@ linear grid between t_max and t_min is used.</p>
 
     <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_x_else_default_x</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
     <span class="n">x</span> <span class="o">=</span> <span class="n">reshape_to_batch_event</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">score_estimator</span><span class="o">.</span><span class="n">condition_shape</span><span class="p">)</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">potential_fn</span><span class="o">.</span><span class="n">set_x</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">potential_fn</span><span class="o">.</span><span class="n">set_x</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">x_is_iid</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="n">num_samples</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">(</span><span class="n">sample_shape</span><span class="p">)</span><span class="o">.</span><span class="n">numel</span><span class="p">()</span>
 
     <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">sample_with</span> <span class="o">==</span> <span class="s2">&quot;ode&quot;</span><span class="p">:</span>
-        <span class="n">samples</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sample_via_zuko</span><span class="p">(</span><span class="n">sample_shape</span><span class="o">=</span><span class="n">sample_shape</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="n">x</span><span class="p">)</span>
-    <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">sample_with</span> <span class="o">==</span> <span class="s2">&quot;sde&quot;</span><span class="p">:</span>
-        <span class="n">samples</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sample_via_diffusion</span><span class="p">(</span>
-            <span class="n">sample_shape</span><span class="o">=</span><span class="n">sample_shape</span><span class="p">,</span>
-            <span class="n">predictor</span><span class="o">=</span><span class="n">predictor</span><span class="p">,</span>
-            <span class="n">corrector</span><span class="o">=</span><span class="n">corrector</span><span class="p">,</span>
-            <span class="n">predictor_params</span><span class="o">=</span><span class="n">predictor_params</span><span class="p">,</span>
-            <span class="n">corrector_params</span><span class="o">=</span><span class="n">corrector_params</span><span class="p">,</span>
-            <span class="n">steps</span><span class="o">=</span><span class="n">steps</span><span class="p">,</span>
-            <span class="n">ts</span><span class="o">=</span><span class="n">ts</span><span class="p">,</span>
-            <span class="n">max_sampling_batch_size</span><span class="o">=</span><span class="n">max_sampling_batch_size</span><span class="p">,</span>
+        <span class="n">samples</span> <span class="o">=</span> <span class="n">rejection</span><span class="o">.</span><span class="n">accept_reject_sample</span><span class="p">(</span>
+            <span class="n">proposal</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">sample_via_ode</span><span class="p">,</span>
+            <span class="n">accept_reject_fn</span><span class="o">=</span><span class="k">lambda</span> <span class="n">theta</span><span class="p">:</span> <span class="n">within_support</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">prior</span><span class="p">,</span> <span class="n">theta</span><span class="p">),</span>
+            <span class="n">num_samples</span><span class="o">=</span><span class="n">num_samples</span><span class="p">,</span>
             <span class="n">show_progress_bars</span><span class="o">=</span><span class="n">show_progress_bars</span><span class="p">,</span>
-        <span class="p">)</span>
+            <span class="n">max_sampling_batch_size</span><span class="o">=</span><span class="n">max_sampling_batch_size</span><span class="p">,</span>
+        <span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">sample_with</span> <span class="o">==</span> <span class="s2">&quot;sde&quot;</span><span class="p">:</span>
+        <span class="n">proposal_sampling_kwargs</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;predictor&quot;</span><span class="p">:</span> <span class="n">predictor</span><span class="p">,</span>
+            <span class="s2">&quot;corrector&quot;</span><span class="p">:</span> <span class="n">corrector</span><span class="p">,</span>
+            <span class="s2">&quot;predictor_params&quot;</span><span class="p">:</span> <span class="n">predictor_params</span><span class="p">,</span>
+            <span class="s2">&quot;corrector_params&quot;</span><span class="p">:</span> <span class="n">corrector_params</span><span class="p">,</span>
+            <span class="s2">&quot;steps&quot;</span><span class="p">:</span> <span class="n">steps</span><span class="p">,</span>
+            <span class="s2">&quot;ts&quot;</span><span class="p">:</span> <span class="n">ts</span><span class="p">,</span>
+            <span class="s2">&quot;max_sampling_batch_size&quot;</span><span class="p">:</span> <span class="n">max_sampling_batch_size</span><span class="p">,</span>
+            <span class="s2">&quot;show_progress_bars&quot;</span><span class="p">:</span> <span class="n">show_progress_bars</span><span class="p">,</span>
+        <span class="p">}</span>
+        <span class="n">samples</span> <span class="o">=</span> <span class="n">rejection</span><span class="o">.</span><span class="n">accept_reject_sample</span><span class="p">(</span>
+            <span class="n">proposal</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_sample_via_diffusion</span><span class="p">,</span>
+            <span class="n">accept_reject_fn</span><span class="o">=</span><span class="k">lambda</span> <span class="n">theta</span><span class="p">:</span> <span class="n">within_support</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">prior</span><span class="p">,</span> <span class="n">theta</span><span class="p">),</span>
+            <span class="n">num_samples</span><span class="o">=</span><span class="n">num_samples</span><span class="p">,</span>
+            <span class="n">show_progress_bars</span><span class="o">=</span><span class="n">show_progress_bars</span><span class="p">,</span>
+            <span class="n">max_sampling_batch_size</span><span class="o">=</span><span class="n">max_sampling_batch_size</span><span class="p">,</span>
+            <span class="n">proposal_sampling_kwargs</span><span class="o">=</span><span class="n">proposal_sampling_kwargs</span><span class="p">,</span>
+        <span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
 
+    <span class="n">samples</span> <span class="o">=</span> <span class="n">samples</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">sample_shape</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">score_estimator</span><span class="o">.</span><span class="n">input_shape</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">samples</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -16347,10 +16578,10 @@ linear grid between t_max and t_min is used.</p>
 <div class="doc doc-object doc-function">
 
 
-<h3 id="sbi.inference.posteriors.score_posterior.ScorePosterior.sample_via_zuko" class="doc doc-heading">
-            <code class=" language-python"><span class="n">sample_via_zuko</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">sample_shape</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">())</span></code>
+<h3 id="sbi.inference.posteriors.score_posterior.ScorePosterior.sample_via_ode" class="doc doc-heading">
+            <code class=" language-python"><span class="n">sample_via_ode</span><span class="p">(</span><span class="n">sample_shape</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">())</span></code>
 
-<a href="#sbi.inference.posteriors.score_posterior.ScorePosterior.sample_via_zuko" class="headerlink" title="Permanent link">&para;</a></h3>
+<a href="#sbi.inference.posteriors.score_posterior.ScorePosterior.sample_via_ode" class="headerlink" title="Permanent link">&para;</a></h3>
 
 
     <div class="doc doc-contents ">
@@ -16376,7 +16607,6 @@ flow. This is implemented via the zuko library.</p>
                 <code>x</code>
             </td>
             <td>
-                  <code><span title="torch.Tensor">Tensor</span></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -16431,31 +16661,31 @@ flow. This is implemented via the zuko library.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/score_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">227</span>
-<span class="normal">228</span>
-<span class="normal">229</span>
-<span class="normal">230</span>
-<span class="normal">231</span>
-<span class="normal">232</span>
-<span class="normal">233</span>
-<span class="normal">234</span>
-<span class="normal">235</span>
-<span class="normal">236</span>
-<span class="normal">237</span>
-<span class="normal">238</span>
-<span class="normal">239</span>
-<span class="normal">240</span>
-<span class="normal">241</span>
-<span class="normal">242</span>
-<span class="normal">243</span>
-<span class="normal">244</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">244</span>
 <span class="normal">245</span>
 <span class="normal">246</span>
 <span class="normal">247</span>
 <span class="normal">248</span>
-<span class="normal">249</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">sample_via_zuko</span><span class="p">(</span>
+<span class="normal">249</span>
+<span class="normal">250</span>
+<span class="normal">251</span>
+<span class="normal">252</span>
+<span class="normal">253</span>
+<span class="normal">254</span>
+<span class="normal">255</span>
+<span class="normal">256</span>
+<span class="normal">257</span>
+<span class="normal">258</span>
+<span class="normal">259</span>
+<span class="normal">260</span>
+<span class="normal">261</span>
+<span class="normal">262</span>
+<span class="normal">263</span>
+<span class="normal">264</span>
+<span class="normal">265</span>
+<span class="normal">266</span>
+<span class="normal">267</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">sample_via_ode</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
-    <span class="n">x</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
     <span class="n">sample_shape</span><span class="p">:</span> <span class="n">Shape</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">(),</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Return samples from posterior distribution with probability flow ODE.</span>
@@ -16472,10 +16702,12 @@ flow. This is implemented via the zuko library.</p>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">num_samples</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">(</span><span class="n">sample_shape</span><span class="p">)</span><span class="o">.</span><span class="n">numel</span><span class="p">()</span>
 
-    <span class="n">flow</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">potential_fn</span><span class="o">.</span><span class="n">get_continuous_normalizing_flow</span><span class="p">(</span><span class="n">condition</span><span class="o">=</span><span class="n">x</span><span class="p">)</span>
+    <span class="n">flow</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">potential_fn</span><span class="o">.</span><span class="n">get_continuous_normalizing_flow</span><span class="p">(</span>
+        <span class="n">condition</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">potential_fn</span><span class="o">.</span><span class="n">x_o</span>
+    <span class="p">)</span>
     <span class="n">samples</span> <span class="o">=</span> <span class="n">flow</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">((</span><span class="n">num_samples</span><span class="p">,)))</span>
 
-    <span class="k">return</span> <span class="n">samples</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">sample_shape</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">score_estimator</span><span class="o">.</span><span class="n">input_shape</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">samples</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
