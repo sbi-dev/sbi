@@ -14,7 +14,6 @@ from sbi.utils.metrics import c2st
 from .mini_sbibm import get_task
 from .mini_sbibm.base_task import Task
 
-# NOTE: This might can be improved...
 # Global settings
 SEED = 0
 TASKS = ["two_moons", "linear_mvg_2d", "gaussian_linear", "slcp"]
