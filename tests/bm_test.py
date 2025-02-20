@@ -21,7 +21,7 @@ TASKS = ["two_moons", "linear_mvg_2d", "gaussian_linear", "slcp"]
 NUM_SIMULATIONS = 2000
 NUM_EVALUATION_OBS = 3  # Currently only 3 observation tested for speed
 NUM_ROUNDS_SEQUENTIAL = 2
-EVALUATION_POINT_SEQUENTIAL = 1
+NUM_EVALUATION_OBS_SEQ = 1
 TRAIN_KWARGS = {}
 
 # Density estimators to test
@@ -102,11 +102,11 @@ def pytest_generate_tests(metafunc):
     Args:
         metafunc: The metafunc object from pytest.
     """
-    if "inference_method" in metafunc.fixturenames:
+    if "inference_class" in metafunc.fixturenames:
         method_list = metafunc.config.getoption("--bm-mode")
         name = str(method_list).lower()
         method_group = METHOD_GROUPS.get(name, [])
-        metafunc.parametrize("inference_method", method_group)
+        metafunc.parametrize("inference_class", method_group)
     if "extra_kwargs" in metafunc.fixturenames:
         kwargs_list = metafunc.config.getoption("--bm-mode")
         name = str(kwargs_list).lower()
@@ -163,8 +163,8 @@ def eval_c2st(
     return float(c2st_val)
 
 
-def amortized_inference_eval(
-    inference_method, task_name: str, extra_kwargs: dict, results_bag: ResultsBag
+def train_and_eval_amortized_inference(
+    inference_class, task_name: str, extra_kwargs: dict, results_bag: ResultsBag
 ) -> None:
     """
     Performs amortized inference evaluation.
@@ -181,7 +181,7 @@ def amortized_inference_eval(
     thetas, xs = task.get_data(NUM_SIMULATIONS)
     prior = task.get_prior()
 
-    inference = inference_method(prior, **extra_kwargs)
+    inference = inference_class(prior, **extra_kwargs)
     _ = inference.append_simulations(thetas, xs).train(**TRAIN_KWARGS)
 
     posterior = inference.build_posterior()
@@ -192,11 +192,11 @@ def amortized_inference_eval(
     results_bag.metric = mean_c2st
     results_bag.num_simulations = NUM_SIMULATIONS
     results_bag.task_name = task_name
-    results_bag.method = inference_method.__name__ + str(extra_kwargs)
+    results_bag.method = inference_class.__name__ + str(extra_kwargs)
 
 
-def sequential_inference_eval(
-    method, task_name: str, extra_kwargs: dict, results_bag: ResultsBag
+def train_and_eval_sequential_inference(
+    inference_class, task_name: str, extra_kwargs: dict, results_bag: ResultsBag
 ) -> None:
     """
     Performs sequential inference evaluation.
@@ -212,19 +212,19 @@ def sequential_inference_eval(
     num_simulations = NUM_SIMULATIONS // NUM_ROUNDS_SEQUENTIAL
     thetas, xs = task.get_data(num_simulations)
     prior = task.get_prior()
-    idx_eval = EVALUATION_POINT_SEQUENTIAL
+    idx_eval = NUM_EVALUATION_OBS_SEQ
     x_o = task.get_observation(idx_eval)
     simulator = task.get_simulator()
 
     # Round 1
-    inference = method(prior, **extra_kwargs)
+    inference = inference_class(prior, **extra_kwargs)
     _ = inference.append_simulations(thetas, xs).train(**TRAIN_KWARGS)
 
     for _ in range(NUM_ROUNDS_SEQUENTIAL - 1):
         proposal = inference.build_posterior().set_default_x(x_o)
         thetas_i = proposal.sample((num_simulations,))
         xs_i = simulator(thetas_i)
-        if "npe" in method.__name__.lower():
+        if "npe" in inference_class.__name__.lower():
             # NPE_C requires a Gaussian prior
             _ = inference.append_simulations(thetas_i, xs_i, proposal=proposal).train(
                 **TRAIN_KWARGS
@@ -240,13 +240,13 @@ def sequential_inference_eval(
     results_bag.metric = c2st_val
     results_bag.num_simulations = NUM_SIMULATIONS
     results_bag.task_name = task_name
-    results_bag.method = method.__name__ + str(extra_kwargs)
+    results_bag.method = inference_class.__name__ + str(extra_kwargs)
 
 
 @pytest.mark.benchmark
 @pytest.mark.parametrize("task_name", TASKS, ids=str)
-def test_benchmark(
-    inference_method,
+def test_run_benchmark(
+    inference_class,
     task_name: str,
     results_bag,
     extra_kwargs: dict,
@@ -256,15 +256,18 @@ def test_benchmark(
     Benchmark test for amortized and sequential inference methods.
 
     Args:
-        inference_method: The inference method to test.
+        inference_class: The inference class to test i.e. NPE, NLE, NRE ...
         task_name: The name of the task.
         results_bag: The results bag to store evaluation results.
         extra_kwargs: Additional keyword arguments for the method.
-        benchmark_mode: The benchmark mode.
+        benchmark_mode: The benchmark mode. This is a fixture which based on user
+            input, determines which type of methods should be run.
     """
     if benchmark_mode in ["snpe", "snle", "snre"]:
-        sequential_inference_eval(
-            inference_method, task_name, extra_kwargs, results_bag
+        train_and_eval_sequential_inference(
+            inference_class, task_name, extra_kwargs, results_bag
         )
     else:
-        amortized_inference_eval(inference_method, task_name, extra_kwargs, results_bag)
+        train_and_eval_amortized_inference(
+            inference_class, task_name, extra_kwargs, results_bag
+        )
