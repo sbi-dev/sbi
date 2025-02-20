@@ -253,7 +253,7 @@ def test_benchmark(
     benchmark_mode: str,
 ) -> None:
     """
-    Benchmark test for standard and sequential inference methods.
+    Benchmark test for amortized and sequential inference methods.
 
     Args:
         inference_method: The inference method to test.
