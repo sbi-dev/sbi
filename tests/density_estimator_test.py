@@ -16,6 +16,7 @@ from sbi.neural_nets.estimators.shape_handling import (
 )
 from sbi.neural_nets.net_builders import (
     build_categoricalmassestimator,
+    build_made,
     build_maf,
     build_maf_rqs,
     build_mdn,
@@ -36,6 +37,7 @@ from sbi.neural_nets.net_builders import (
 
 # List of all density estimator builders for testing.
 model_builders = [
+    build_made,
     build_mdn,
     build_maf,
     build_maf_rqs,

@@ -114,7 +114,10 @@ class MADEWrapper(made.MADE):
         dummy_input = torch.zeros((inputs.shape[:-1] + (1,)))
         concat_input = torch.cat((dummy_input, inputs), dim=-1)
         outputs = super().forward(concat_input, context)
-        return outputs[..., self.output_multiplier :]  # remove dummy input
+        # the final layer of MADE produces self.output_multiplier outputs for each
+        # input dimension, in order. We only want the outputs corresponding to the
+        # real inputs, so we discard the first self.output_multiplier outputs.
+        return outputs[..., self.output_multiplier :]
 
 
 """
