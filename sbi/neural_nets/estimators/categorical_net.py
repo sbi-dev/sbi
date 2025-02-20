@@ -97,11 +97,13 @@ class CategoricalMADE(MADE):
             condition: Conditioning variable. `(batch_size, *condition_shape)`.
 
         Returns:
-            Log-probabilities of shape `(batch_size, num_variables, num_categories)`.
+            Log-probabilities of shape `(batch_size,)`.
         """
         outputs = self.forward(input, condition=condition)
+
         outputs = outputs.reshape(*input.shape, self.num_categories)
         log_prob = Categorical(logits=outputs).log_prob(input).sum(dim=-1)
+
         return log_prob
 
     def sample(self, sample_shape, context=None):
@@ -138,10 +140,7 @@ class CategoricalMADE(MADE):
 
 
 class CategoricalMassEstimator(ConditionalDensityEstimator):
-    """Conditional density (mass) estimation for a categorical random variable.
-
-    The event_shape of this class is `()`.
-    """
+    """Conditional density (mass) estimation for a categorical random variable."""
 
     def __init__(
         self, net: CategoricalMADE, input_shape: torch.Size, condition_shape: torch.Size
