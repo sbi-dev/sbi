@@ -105,7 +105,8 @@ class ScorePosterior(NeuralPosterior):
         corrector_params: Optional[Dict] = None,
         steps: int = 500,
         ts: Optional[Tensor] = None,
-        iid_method: Optional[str] = "fnpe",
+        iid_method: str = "auto_gauss",
+        iid_params: Optional[Dict] = None,
         max_sampling_batch_size: int = 10_000,
         sample_with: Optional[str] = None,
         show_progress_bars: bool = True,
@@ -141,7 +142,9 @@ class ScorePosterior(NeuralPosterior):
         x = self._x_else_default_x(x)
         x = reshape_to_batch_event(x, self.score_estimator.condition_shape)
         is_iid = x.ndim > 1 and x.shape[0] > 1
-        self.potential_fn.set_x(x, x_is_iid=is_iid, iid_method=iid_method)
+        self.potential_fn.set_x(
+            x, x_is_iid=is_iid, iid_method=iid_method, iid_params=iid_params
+        )
 
         num_samples = torch.Size(sample_shape).numel()
 

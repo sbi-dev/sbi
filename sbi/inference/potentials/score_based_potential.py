@@ -57,7 +57,8 @@ class PosteriorScoreBasedPotential(BasePotential):
         score_estimator: ConditionalScoreEstimator,
         prior: Optional[Distribution],
         x_o: Optional[Tensor] = None,
-        iid_method: str = "fnpe",
+        iid_method: str = "auto_gauss",
+        iid_params: Optional[dict] = None,
         device: str = "cpu",
     ):
         r"""Returns the score function for score-based methods.
@@ -73,17 +74,20 @@ class PosteriorScoreBasedPotential(BasePotential):
         self.score_estimator = score_estimator
         self.score_estimator.eval()
         self.iid_method = iid_method
+        self.iid_params = iid_params
         super().__init__(prior, x_o, device=device)
 
     def set_x(
         self,
         x_o: Optional[Tensor],
         x_is_iid: Optional[bool] = False,
-        iid_method: str = "fnpe",
+        iid_method: str = "auto_gauss",
+        iid_params: Optional[dict] = None,
         rebuild_flow: Optional[bool] = True,
     ):
         super().set_x(x_o, x_is_iid)
         self.iid_method = iid_method
+        self.iid_params = iid_params
         if rebuild_flow and self._x_o is not None:
             x_density_estimator = reshape_to_batch_event(
                 self.x_o, event_shape=self.score_estimator.condition_shape
@@ -183,7 +187,9 @@ class PosteriorScoreBasedPotential(BasePotential):
 
                 method_iid = get_iid_method(self.iid_method)
                 # Always creating a new object every call is not efficient...
-                score_fn_iid = method_iid(self.score_estimator, self.prior)
+                score_fn_iid = method_iid(
+                    self.score_estimator, self.prior, **(self.iid_params or {})
+                )
 
                 score = score_fn_iid(theta, self.x_o, time)  # type: ignore
 

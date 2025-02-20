@@ -1,19 +1,21 @@
-from sklearn.mixture import GaussianMixture
+from functools import lru_cache
+from typing import Optional
+
 import torch
+from sklearn.mixture import GaussianMixture
 from torch import Tensor
 from torch.distributions import (
+    Categorical,
     Distribution,
     Independent,
+    MixtureSameFamily,
     MultivariateNormal,
     Normal,
-    MixtureSameFamily,
-    Categorical,
     Uniform,
     constraints,
 )
-from sbi.utils.sbiutils import ImproperEmpirical
+
 from sbi.utils.torchutils import BoxUniform
-from functools import lru_cache
 
 # Automatic denoising -----------------------------------------------------
 
@@ -91,6 +93,17 @@ def denoise_gaussian(p: Normal, m: Tensor, s: Tensor, x_t: Tensor) -> Normal:
 def denoise_multivariate_gaussian(
     p: MultivariateNormal, m: Tensor, s: Tensor, x_t: Tensor
 ) -> MultivariateNormal:
+    """Denoise a multivariate Gaussian distribution.
+
+    Args:
+        p: The prior multivariate Gaussian distribution.
+        m: The scaling factor.
+        s: The standard deviation of the noise.
+        x_t: The observed data.
+
+    Returns:
+        The posterior multivariate Gaussian distribution.
+    """
     mean0 = p.loc
     cov0 = p.covariance_matrix
     n = cov0.size(-1)  # type: ignore
@@ -137,7 +150,20 @@ def denoise_mixture(
     return MixtureSameFamily(Categorical(logits=denoised_logits), denoised_components)
 
 
-def denoise_uniform(p: Uniform | BoxUniform, m: Tensor, s: Tensor, x_t: Tensor):
+def denoise_uniform(
+    p: Uniform | BoxUniform, m: Tensor, s: Tensor, x_t: Tensor
+) -> 'UniformNormalPosterior':
+    """Denoise a uniform distribution.
+
+    Args:
+        p: The prior uniform distribution.
+        m: The scaling factor m.
+        s: The standard deviation of the noise s.
+        x_t: The observed data.
+
+    Returns:
+        The posterior uniform distribution.
+    """
     return UniformNormalPosterior(p.low, p.high, m, s, x_t)
 
 
@@ -146,33 +172,21 @@ def denoise_empirical(
     m: Tensor,
     s: Tensor,
     x_t: Tensor,
-    num_particles: int = 5000,
 ) -> MixtureSameFamily:
+    """Denoise an empirical distribution.
+
+    Args:
+        p: The prior empirical distribution.
+        m: The scaling factor m.
+        s: The standard deviation of the noise s.
+        x_t: The observed data.
+        num_particles: Number of particles to sample. Defaults to 5000.
+
+    Returns:
+        The posterior empirical distribution.
+    """
     gmm = fit_gmm(p)
     return denoise_mixture(gmm, m, s, x_t)
-    raise NotImplementedError("Denoising empirical distributions is not supported.")
-    # NOTE: Thats not that nice
-    particles = p.sample((num_particles,))  # Sample from prior
-    s = torch.clip(s, 1e-1, 1e6)
-
-    # Compute posterior mean and standard deviation
-    posterior_mean = (m * particles + s**2 * x_t) / (m**2 + s**2)
-    posterior_std = torch.sqrt((s**2) / (m**2 + s**2))
-    posterior_std = torch.broadcast_to(posterior_std, posterior_mean.shape)
-
-    # Compute unnormalized log-likelihoods as logits
-    # Gaussian likelihood
-    logits = -0.5 * torch.sum(((x_t - m * particles) / s) ** 2, axis=-1)  # type: ignore
-    logits = logits - logits.logsumexp(dim=-1, keepdims=True)  # Normalize logits
-
-    # print(posterior_mean.shape, posterior_std.shape, logits.shape)
-    # Define the mixture components
-    components = Independent(Normal(posterior_mean, posterior_std), 1)
-
-    # Create a mixture model
-    posterior = MixtureSameFamily(Categorical(logits=logits), components)
-
-    return posterior
 
 
 # Automatic marginalization -----------------------------------------------
@@ -219,6 +233,7 @@ def marginalize_independent(p: Independent, m: Tensor, s: Tensor) -> Independent
         The marginal independent distribution.
     """
     return Independent(marginalize(p.base_dist, m, s), p.reinterpreted_batch_ndims)
+
 
 def marginalize_mixture(
     p: MixtureSameFamily, m: Tensor, s: Tensor
@@ -272,7 +287,6 @@ def marginalize_multivariate_gaussian(
         p: The prior multivariate Gaussian distribution.
         m: The scaling factor.
         s: The standard deviation of the noise.
-        dim: The dimension of the multivariate output (unused in this implementation).
 
     Returns:
         The marginal multivariate Gaussian distribution p(xₜ).
@@ -310,26 +324,34 @@ def marginalize_uniform(
 def marginalize_empirical(
     p: Distribution, m: Tensor, s: Tensor, num_particles: int = 5000
 ) -> MixtureSameFamily:
+    """Marginalize an empirical distribution.
+
+    Args:
+        p: The prior empirical distribution.
+        m: The scaling factor m.
+        s: The standard deviation of the noise s.
+        num_particles: Number of particles to sample. Defaults to 5000.
+
+    Returns:
+        The marginal empirical distribution.
+    """
     gmm_approx = fit_gmm(p)
     return marginalize_mixture(gmm_approx, m, s)
-    raise NotImplementedError("Marginalizing empirical distributions is not supported.")
 
-    particles = p.sample((num_particles,))
-    logits = torch.zeros(num_particles)
-    s = torch.clip(s, 1e-1, 1e6)
-    # NOTE: We might want to assume some initial particle variance
-    marginal_mean = m[None, ...] * particles
-    marginal_std = torch.sqrt(s**2)
-
-    # NOTE: This might not have a nice score at low noise levels (diracs...)
-    components = Independent(Normal(marginal_mean, marginal_std), 1)
-    p = MixtureSameFamily(Categorical(logits=logits), components)
-    # Less exact but more well bahaved score
-    # p = Independent(Normal(marginal_mean.mean(0), marginal_std.mean(0)), 1)
-    return p
 
 # Special distributions:
 class UniformNormalPosterior(Distribution):
+    """Posterior distribution for a uniform prior and normal likelihood.
+
+    Args:
+        low: Lower bound of the uniform distribution.
+        high: Upper bound of the uniform distribution.
+        m: Scaling factor.
+        s: Standard deviation of the noise.
+        x_t: Observed data.
+        validate_args: Whether to validate arguments. Defaults to None.
+    """
+
     arg_constraints = {
         "low": constraints.real,
         "high": constraints.real,
@@ -402,6 +424,16 @@ class UniformNormalPosterior(Distribution):
 
 
 class UniformNormalConvolution(Distribution):
+    """Convolution of a uniform distribution with a normal distribution.
+
+    Args:
+        low: Lower bound of the uniform distribution.
+        high: Upper bound of the uniform distribution.
+        scale: Scaling factor.
+        noise: Standard deviation of the noise.
+        validate_args: Whether to validate arguments. Defaults to None.
+    """
+
     arg_constraints = {
         "low": constraints.real,
         "high": constraints.real,
@@ -417,7 +449,8 @@ class UniformNormalConvolution(Distribution):
         self.scale = torch.as_tensor(scale)
         self.noise = torch.as_tensor(noise)
 
-        # Determine batch_shape from broadcasting low and high (assumes low/high are tensors or scalars)
+        # Determine batch_shape from broadcasting low and high (assumes low/high
+        # are tensors or scalars)
         batch_shape = self.low.shape
 
         event_shape = torch.Size()
@@ -433,7 +466,8 @@ class UniformNormalConvolution(Distribution):
 
     def log_prob(self, value):
         # Compute p(value) using the convolution formula:
-        # p(value) = 1/(b-a) * [Phi((value - scale*a)/noise) - Phi((value - scale*b)/noise)]
+        # p(value) = 1/(b-a) * [Phi((value - scale*a)/noise)
+        # - Phi((value - scale*b)/noise)]
         dist0 = Normal(torch.tensor(0.0, device=value.device), 1.0)
         numerator = dist0.cdf((value - self.scale * self.low) / self.noise) - dist0.cdf(
             (value - self.scale * self.high) / self.noise
@@ -445,14 +479,30 @@ class UniformNormalConvolution(Distribution):
 
 # Utility functions --------------------------------------------------------
 
+
 @lru_cache()
 def fit_gmm(
     distribution: Distribution,
     num_components: int = 10,
-    num_samples: int = 10_000,
+    num_samples: Optional[int] = None,
     random_state: int = 0,
 ) -> MixtureSameFamily:
+    """Fit a Gaussian Mixture Model (GMM) to a distribution.
+
+    Args:
+        distribution: The distribution to fit the GMM to.
+        num_components: Number of GMM components. Defaults to 10.
+        num_samples: Number of samples to draw from the distribution.
+            Defaults to 10_000.
+        random_state: Random state for reproducibility. Defaults to 0.
+
+    Returns:
+        The fitted GMM as a MixtureSameFamily distribution.
+    """
     # Sample particles from the distribution
+    if num_samples is None:
+        d = distribution.event_shape.numel()
+        num_samples = 1000 * d * num_components
     samples = distribution.sample((num_samples,))
     # Reshape to 2D array: (num_samples, features)
     samples_np = samples.detach().cpu().numpy().reshape(num_samples, -1)
@@ -489,7 +539,7 @@ def mv_diag_or_dense(A_diag_or_dense: Tensor, b: Tensor, batch_dims: int = 0) ->
     Args:
         A_diag_or_dense: Diagonal or dense matrix.
         b: Dense matrix/vector.
-        batch_dims: Number of batch dimensions.
+        batch_dims: Number of batch dimensions. Defaults to 0.
 
     Returns:
         The result of A * b (or A @ b).
@@ -509,6 +559,7 @@ def solve_diag_or_dense(
     Args:
         A_diag_or_dense: Diagonal or dense matrix.
         b: Dense matrix/vector.
+        batch_dims: Number of batch dimensions. Defaults to 0.
 
     Returns:
         The solution to the linear system A x = b.
@@ -528,7 +579,7 @@ def add_diag_or_dense(
     Args:
         A_diag_or_dense: Diagonal or dense matrix.
         B_diag_or_dense: Diagonal or dense matrix.
-        batch_dims: Number of batch dimensions.
+        batch_dims: Number of batch dimensions. Defaults to 0.
 
     Returns:
         The sum of the two matrices.
