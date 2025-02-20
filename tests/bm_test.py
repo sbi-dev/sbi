@@ -19,7 +19,7 @@ from .mini_sbibm.base_task import Task
 SEED = 0
 TASKS = ["two_moons", "linear_mvg_2d", "gaussian_linear", "slcp"]
 NUM_SIMULATIONS = 2000
-EVALUATION_POINTS = 4  # Currently only 3 observation tested for speed
+NUM_EVALUATION_OBS = 3  # Currently only 3 observation tested for speed
 NUM_ROUNDS_SEQUENTIAL = 2
 EVALUATION_POINT_SEQUENTIAL = 1
 TRAIN_KWARGS = {}
@@ -126,7 +126,7 @@ def standard_eval_c2st_loop(posterior: NeuralPosterior, task: Task) -> float:
         float: The mean C2ST value.
     """
     c2st_scores = []
-    for i in range(1, EVALUATION_POINTS):
+    for i in range(1, NUM_EVALUATION_OBS + 1):
         c2st_val = eval_c2st(posterior, task, i)
         c2st_scores.append(c2st_val)
 

@@ -214,7 +214,7 @@ def mcmc_params_fast() -> dict:
     return dict(num_chains=1, thin=1, warmup_steps=1)
 
 
-# Pytest harvest xdist support - not sure if we need it (for me xdist is always slower).
+# Pytest harvest xdist support.
 
 
 # Define the folder in which temporary worker's results will be stored
