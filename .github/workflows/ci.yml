@@ -10,9 +10,6 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
 
-env:
-  UV_SYSTEM_PYTHON: 1
-
 jobs:
   ci:
     name: CI
@@ -41,8 +38,8 @@ jobs:
 
     - name: Install dependencies with uv
       run: |
-        # uv pip install torch --extra-index-url https://download.pytorch.org/whl/cpu
-        uv pip install -e .[dev]
+        uv --system pip install torch --extra-index-url https://download.pytorch.org/whl/cpu
+        uv --system pip install -e .[dev]
 
     - name: Cache testmon data
       uses: actions/cache@v4
@@ -54,7 +51,7 @@ jobs:
 
     - name: Run the fast CPU tests with coverage
       run: |
-        uv run pytest --testmon-forceselect -v -n auto -m "not slow and not gpu" --cov=sbi --cov-report=xml tests/
+        uv --system run pytest --testmon-forceselect -v -n auto -m "not slow and not gpu" --cov=sbi --cov-report=xml tests/
 
 
     - name: Upload coverage to Codecov
