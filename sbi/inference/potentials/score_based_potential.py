@@ -79,21 +79,22 @@ class PosteriorScoreBasedPotential(BasePotential):
         self,
         x_o: Optional[Tensor],
         x_is_iid: Optional[bool] = False,
-        rebuild_flow: Optional[bool] = True,
+        rebuild_flow: Optional[bool] = False,
     ):
         """
         Set the observed data and whether it is IID.
         Args:
         x_o: The observed data.
         x_is_iid: Whether the observed data is IID (if batch_dim>1).
-        rebuild_flow: Whether to save (overwrrite) a low-tolerance flow model, useful if
-        the flow needs to be evaluated many times (e.g. for MAP calculation).
+        rebuild_flow: Whether to rebuild (overwrite) a higher-tolerance (faster) flow
+            model. Useful if the flow needs to be evaluated many times (e.g. for
+            MAP calculation).
         """
         super().set_x(x_o, x_is_iid)
         if rebuild_flow and self._x_o is not None:
-            # By default, we want a high-tolerance flow.
-            # This flow will be used mainly for MAP calculations, hence we want to save
-            # it instead of rebuilding it every time.
+            # By default, we want a high-tolerance flow (see below).
+            # Here, we create a faster high-tolerance flow, eg., for MAP calculations
+            # that will be built only once.
             self.flow = self.rebuild_flow(atol=1e-2, rtol=1e-3, exact=True)
 
     def __call__(
@@ -217,7 +218,7 @@ class PosteriorScoreBasedPotential(BasePotential):
         x_density_estimator = reshape_to_batch_event(
             self.x_o, event_shape=self.score_estimator.condition_shape
         )
-        assert x_density_estimator.shape[0] == 1, (
+        assert x_density_estimator.shape[0] == 1 or not self.x_is_iid, (
             "PosteriorScoreBasedPotential supports only x batchsize of 1`."
         )
 

@@ -339,7 +339,6 @@ class ScorePosterior(NeuralPosterior):
                 num_xos=batch_size,
                 show_progress_bars=show_progress_bars,
                 max_sampling_batch_size=max_sampling_batch_size,
-                proposal_sampling_kwargs={"x": x},
             )[0]
             samples = samples.reshape(
                 sample_shape + batch_shape + self.score_estimator.input_shape
@@ -436,7 +435,8 @@ class ScorePosterior(NeuralPosterior):
             )
 
         if self._map is None or force_update:
-            self.potential_fn.set_x(self.default_x)
+            # build fixed potential with fixed (fast / low-precision) flow.
+            self.potential_fn.set_x(self.default_x, rebuild_flow=True)
             callable_potential_fn = CallableDifferentiablePotentialFunction(
                 self.potential_fn
             )
