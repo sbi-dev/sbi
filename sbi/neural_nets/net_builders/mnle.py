@@ -72,8 +72,8 @@ def build_mnle(
 ):
     """Returns a density estimator for mixed data types.
 
-    Uses a categorical net to model the discrete part and a conditional density
-    estimator to model the continuous part of the data.
+    Uses an autoregressive categorical density estimator to model the discrete part
+    and a conditional density estimator to model the continuous part of the data.
 
     Note: If the condition y is > 1D, an embedding net must be provided. Then,
     during inference, we need to combine the embedded condition with the

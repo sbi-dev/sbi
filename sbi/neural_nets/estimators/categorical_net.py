@@ -41,7 +41,8 @@ class CategoricalMADE(MADE):
             num_categories: number of categories for each variable. len(categories)
                 defines the number of input units, i.e., dimensionality of the features.
                 max(categories) defines the number of output units, i.e., the largest
-                number of categories.
+                number of categories. Can handle mutliple variables with differing
+                numbers of choices.
             num_hidden: number of hidden units per layer.
             num_layers: number of hidden layers.
             embedding_net: emebedding net for input.
@@ -87,6 +88,7 @@ class CategoricalMADE(MADE):
         """
         embedded_condition = self.embedding_net.forward(condition)
         out = super().forward(input, context=embedded_condition)
+        # masks out logits i.e. for variables with num_categories < max(num_categories)
         return out.masked_fill(~self.mask.bool().flatten(), float("-inf"))
 
     def log_prob(self, input: Tensor, condition: Optional[Tensor] = None) -> Tensor:
