@@ -51,7 +51,7 @@ jobs:
 
     - name: Run the fast CPU tests with coverage
       run: |
-        uv run --system pytest --testmon-forceselect -v -n auto -m "not slow and not gpu" --cov=sbi --cov-report=xml tests/
+        uv run pytest --testmon-forceselect -v -n auto -m "not slow and not gpu" --cov=sbi --cov-report=xml tests/
 
 
     - name: Upload coverage to Codecov
