@@ -318,6 +318,31 @@ class ScorePosterior(NeuralPosterior):
         max_sampling_batch_size: int = 10000,
         show_progress_bars: bool = True,
     ) -> Tensor:
+        r"""Given a batch of observations [x_1, ..., x_B] this function samples from
+        posteriors $p(\theta|x_1)$, ... ,$p(\theta|x_B)$, in a batched (i.e. vectorized)
+        manner.
+
+        Args:
+            sample_shape: Desired shape of samples that are drawn from the posterior
+                given every observation.
+            x: A batch of observations, of shape `(batch_dim, event_shape_x)`.
+                `batch_dim` corresponds to the number of observations to be
+                drawn.
+            predictor: The predictor for the diffusion-based sampler. Can be a string or
+                a custom predictor following the API in `sbi.samplers.score.predictors`.
+                Currently, only `euler_maruyama` is implemented.
+            corrector: The corrector for the diffusion-based sampler.
+            predictor_params: Additional parameters passed to predictor.
+            corrector_params: Additional parameters passed to corrector.
+            steps: Number of steps to take for the Euler-Maruyama method.
+            ts: Time points at which to evaluate the diffusion process. If None, a
+                linear grid between t_max and t_min is used.
+            max_sampling_batch_size: Maximum batch size for sampling.
+            show_progress_bars: Whether to show sampling progress monitor.
+
+        Returns:
+            Samples from the posteriors of shape (*sample_shape, B, *input_shape)
+        """
         num_samples = torch.Size(sample_shape).numel()
         x = reshape_to_batch_event(x, self.score_estimator.condition_shape)
         condition_dim = len(self.score_estimator.condition_shape)
@@ -435,8 +460,8 @@ class ScorePosterior(NeuralPosterior):
             )
 
         if self._map is None or force_update:
-            # build fixed potential with fixed (fast / low-precision) flow.
-            self.potential_fn.set_x(self.default_x, rebuild_flow=True)
+            # rebuild coarse flow fast for MAP optimization.
+            self.potential_fn.set_x(self.default_x, atol=1e-2, rtol=1e-3, exact=True)
             callable_potential_fn = CallableDifferentiablePotentialFunction(
                 self.potential_fn
             )
