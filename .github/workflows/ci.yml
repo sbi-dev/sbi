@@ -29,21 +29,27 @@ jobs:
         fetch-depth: 0
         lfs: false
 
-    - name: Cache testmon data
-      uses: actions/cache@v4
-      with:
-        path: .testmondata
-        key: testmon-${{ runner.os }}-${{ matrix.python-version }}-${{ github.sha }}
-        restore-keys: |
-          testmon-${{ runner.os }}-${{ matrix.python-version }}-
-
-
     - name: Install uv and set the python version
       uses: astral-sh/setup-uv@v5
       with:
         python-version: ${{ matrix.python-version }}
         enable-cache: true
-        cache-dependency-glob: "pyproject.toml"
+
+    - name: Cache uv dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/uv
+        key: uv-${{ runner.os }}-${{ matrix.python-version }}-${{ hashFiles('pyproject.toml') }}
+        restore-keys: |
+          uv-${{ runner.os }}-${{ matrix.python-version }}-
+
+    - name: Cache testmon data
+      uses: actions/cache@v4
+      with:
+        path: .testmondata
+        key: testmon-${{ runner.os }}-${{ matrix.python-version }}-${{ github.ref }}
+        restore-keys: |
+          testmon-${{ runner.os }}-${{ matrix.python-version }}-
 
     - name: Install dependencies with uv
       run: uv sync --all-extras --dev  # installs dependencies from the `pyproject.toml` file
