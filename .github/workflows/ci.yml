@@ -36,7 +36,9 @@ jobs:
         enable-cache: true
 
     - name: Install dependencies with uv
-      run: uv sync --all-extras --dev  # installs dependencies from the `pyproject.toml` file
+      run: |
+        uv pip install torch --extra-index-url https://download.pytorch.org/whl/cpu
+        uv pip install -e .[dev]
 
     - name: Cache uv dependencies
       uses: actions/cache@v4
