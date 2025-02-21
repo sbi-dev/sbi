@@ -38,8 +38,8 @@ jobs:
 
     - name: Install dependencies with uv
       run: |
-        # uv pip --system  install torch --extra-index-url https://download.pytorch.org/whl/cpu
-        uv pip --system install -e .[dev]
+        # uv pip install --system torch --extra-index-url https://download.pytorch.org/whl/cpu
+        uv pip install --system -e .[dev]
 
     - name: Cache testmon data
       uses: actions/cache@v4
