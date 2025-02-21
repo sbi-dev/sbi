@@ -105,6 +105,8 @@ class ScorePosterior(NeuralPosterior):
         corrector_params: Optional[Dict] = None,
         steps: int = 500,
         ts: Optional[Tensor] = None,
+        iid_method: str = "auto_gauss",
+        iid_params: Optional[Dict] = None,
         max_sampling_batch_size: int = 10_000,
         sample_with: Optional[str] = None,
         show_progress_bars: bool = True,
@@ -123,6 +125,9 @@ class ScorePosterior(NeuralPosterior):
             steps: Number of steps to take for the Euler-Maruyama method.
             ts: Time points at which to evaluate the diffusion process. If None, a
                 linear grid between t_max and t_min is used.
+            iid_method: Which method to use for computing the score in the iid setting.
+                We currently support "fnpe", "gauss", "auto_gauss", "jac_gauss".
+            iid_params: Additional parameters passed to the iid method.
             max_sampling_batch_size: Maximum batch size for sampling.
             sample_with: Deprecated - use `.build_posterior(sample_with=...)` prior to
                 `.sample()`.
@@ -138,7 +143,10 @@ class ScorePosterior(NeuralPosterior):
 
         x = self._x_else_default_x(x)
         x = reshape_to_batch_event(x, self.score_estimator.condition_shape)
-        self.potential_fn.set_x(x, x_is_iid=True)
+        is_iid = x.ndim > 1 and x.shape[0] > 1
+        self.potential_fn.set_x(
+            x, x_is_iid=is_iid, iid_method=iid_method, iid_params=iid_params
+        )
 
         num_samples = torch.Size(sample_shape).numel()
 
@@ -176,6 +184,7 @@ class ScorePosterior(NeuralPosterior):
     def _sample_via_diffusion(
         self,
         sample_shape: Shape = torch.Size(),
+        x: Optional[Tensor] = None,
         predictor: Union[str, Predictor] = "euler_maruyama",
         corrector: Optional[Union[str, Corrector]] = None,
         predictor_params: Optional[Dict] = None,
@@ -244,6 +253,7 @@ class ScorePosterior(NeuralPosterior):
     def sample_via_ode(
         self,
         sample_shape: Shape = torch.Size(),
+        x: Optional[Tensor] = None,
     ) -> Tensor:
         r"""Return samples from posterior distribution with probability flow ODE.
 

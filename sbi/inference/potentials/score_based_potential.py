@@ -11,6 +11,7 @@ from zuko.distributions import NormalizingFlow
 from zuko.transforms import FreeFormJacobianTransform
 
 from sbi.inference.potentials.base_potential import BasePotential
+from sbi.inference.potentials.score_fn_iid import get_iid_method
 from sbi.neural_nets.estimators.score_estimator import ConditionalScoreEstimator
 from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
@@ -57,7 +58,8 @@ class PosteriorScoreBasedPotential(BasePotential):
         score_estimator: ConditionalScoreEstimator,
         prior: Optional[Distribution],
         x_o: Optional[Tensor] = None,
-        iid_method: str = "iid_bridge",
+        iid_method: str = "auto_gauss",
+        iid_params: Optional[dict] = None,
         device: str = "cpu",
     ):
         r"""Returns the score function for score-based methods.
@@ -66,30 +68,37 @@ class PosteriorScoreBasedPotential(BasePotential):
             score_estimator: The neural network modelling the score.
             prior: The prior distribution.
             x_o: The observed data at which to evaluate the posterior.
-            iid_method: Which method to use for computing the score. Currently, only
-                `iid_bridge` as proposed in Geffner et al. is implemented.
+            iid_method: Which method to use for computing the score in the iid setting.
+                We currently support "fnpe", "gauss", "auto_gauss", "jac_gauss".
+            iid_params: Parameters for the iid method, for arguments see ScoreFnIID.
             device: The device on which to evaluate the potential.
         """
         self.score_estimator = score_estimator
         self.score_estimator.eval()
         self.iid_method = iid_method
+        self.iid_params = iid_params
         super().__init__(prior, x_o, device=device)
 
     def set_x(
         self,
         x_o: Optional[Tensor],
         x_is_iid: Optional[bool] = False,
+        iid_method: str = "auto_gauss",
+        iid_params: Optional[dict] = None,
         rebuild_flow: Optional[bool] = True,
     ):
         """
         Set the observed data and whether it is IID.
         Args:
-        x_o: The observed data.
-        x_is_iid: Whether the observed data is IID (if batch_dim>1).
-        rebuild_flow: Whether to save (overwrrite) a low-tolerance flow model, useful if
-        the flow needs to be evaluated many times (e.g. for MAP calculation).
+            x_o: The observed data.
+            x_is_iid: Whether the observed data is IID (if batch_dim>1).
+            rebuild_flow: Whether to save (overwrrite) a low-tolerance flow model,
+                useful if the flow needs to be evaluated many times
+                (e.g. for MAP calculation).
         """
         super().set_x(x_o, x_is_iid)
+        self.iid_method = iid_method
+        self.iid_params = iid_params
         if rebuild_flow and self._x_o is not None:
             # By default, we want a high-tolerance flow.
             # This flow will be used mainly for MAP calculations, hence we want to save
@@ -172,9 +181,15 @@ class PosteriorScoreBasedPotential(BasePotential):
                     input=theta, condition=self.x_o, time=time
                 )
             else:
-                raise NotImplementedError(
-                    "Score accumulation for IID data is not yet implemented."
+                assert self.prior is not None, "Prior is required for iid methods."
+
+                method_iid = get_iid_method(self.iid_method)
+                # Always creating a new object every call is not efficient...
+                score_fn_iid = method_iid(
+                    self.score_estimator, self.prior, **(self.iid_params or {})
                 )
+
+                score = score_fn_iid(theta, self.x_o, time)  # type: ignore
 
         return score
 
@@ -216,9 +231,6 @@ class PosteriorScoreBasedPotential(BasePotential):
             )
         x_density_estimator = reshape_to_batch_event(
             self.x_o, event_shape=self.score_estimator.condition_shape
-        )
-        assert x_density_estimator.shape[0] == 1, (
-            "PosteriorScoreBasedPotential supports only x batchsize of 1`."
         )
 
         flow = self.get_continuous_normalizing_flow(
