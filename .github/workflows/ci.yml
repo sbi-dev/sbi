@@ -10,6 +10,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
 
+env:
+  UV_SYSTEM_PYTHON: 1
+
 jobs:
   ci:
     name: CI
@@ -34,20 +37,12 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
         enable-cache: true
+        cache-dependency-glob: "pyproject.toml"
 
     - name: Install dependencies with uv
       run: |
-        uv pip install torch --extra-index-url https://download.pytorch.org/whl/cpu
+        # uv pip install torch --extra-index-url https://download.pytorch.org/whl/cpu
         uv pip install -e .[dev]
-        uv sync --generate-lockfile  # <-- Generate uv.lock
-
-    - name: Cache uv dependencies
-      uses: actions/cache@v4
-      with:
-        path: ~/.cache/uv
-        key: uv-${{ runner.os }}-${{ matrix.python-version }}-${{ hashFiles('uv.lock') }}
-        restore-keys: |
-          uv-${{ runner.os }}-${{ matrix.python-version }}-
 
     - name: Cache testmon data
       uses: actions/cache@v4
