@@ -108,6 +108,7 @@ class MADEWrapper(made.MADE):
             dropout_probability,
             use_batch_norm,
         )
+        self.output_multiplier = output_multiplier
 
     def forward(self, inputs, context=None):
         # add dummy input to ensure all dims conditioned on context.
