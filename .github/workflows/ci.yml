@@ -35,6 +35,9 @@ jobs:
         python-version: ${{ matrix.python-version }}
         enable-cache: true
 
+    - name: Install dependencies with uv
+      run: uv sync --all-extras --dev  # installs dependencies from the `pyproject.toml` file
+
     - name: Cache uv dependencies
       uses: actions/cache@v4
       with:
@@ -51,13 +54,8 @@ jobs:
         restore-keys: |
           testmon-${{ runner.os }}-${{ matrix.python-version }}-
 
-    - name: Install dependencies with uv
-      run: uv sync --all-extras --dev  # installs dependencies from the `pyproject.toml` file
-
     - name: Run the fast CPU tests with coverage
-      run: |
-        uv run pytest --testmon-forceselect -v -n auto -m "not slow and not gpu" --cov=sbi --cov-report=xml tests/
-
+      run: uv run pytest --testmon-forceselect -v -n auto -m "not slow and not gpu" --cov=sbi --cov-report=xml tests/
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4
