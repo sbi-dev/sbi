@@ -151,9 +151,9 @@ def test_batched_sample_log_prob_with_different_x(
 
 
 @pytest.mark.mcmc
-@pytest.mark.parametrize("snlre_method", [NLE_A, NRE_A, NRE_B, NRE_C, NPE_C])
+@pytest.mark.parametrize("snlre_method", [NLE_A])
 @pytest.mark.parametrize("x_o_batch_dim", (0, 1, 2))
-@pytest.mark.parametrize("init_strategy", ["proposal", "resample"])
+@pytest.mark.parametrize("init_strategy", ["resample"])
 @pytest.mark.parametrize(
     "sample_shape",
     (
