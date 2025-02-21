@@ -961,7 +961,8 @@ def gradient_ascent(
                         f"Optimizing MAP estimate. Iterations: {iter_ + 1} / "
                         f"{num_iter}. Performance in iteration "
                         f"{divmod(iter_ + 1, save_best_every)[0] * save_best_every}: "
-                        f"{best_log_prob_iter.item():.2f} (= unnormalized log-prob)",
+                        f"{best_log_prob_iter.item():.2f} (= unnormalized log-prob). "
+                        "Press Ctrl-C to interrupt.",
                         end="",
                     )
                 argmax_ = theta_transform.inv(best_theta_overall)
