@@ -1,38 +1,37 @@
-## What does this implement/fix? Explain your changes
+## What does this PR do?
+
+Describe your changes in a few sentences. What problem does this solve or what feature does it add?
 
 ...
 
-## Does this close any currently open issues?
+## Does this close any issues?
 
-Fixes # (issue)
-
-## Any relevant code examples, logs, error output, etc?
-
-...
-
-## Any other comments?
+If this fixes a bug or adds a feature related to an open issue, link it here. Example:
+`Fixes #123`
 
 ...
 
-## Checklist
+## Any relevant code examples, logs, or error messages?
 
-Put an `x` in the boxes that apply. You can also fill these out after creating
-the PR. If you're unsure about any of them, don't hesitate to ask. We're here to
-help! This is simply a reminder of what we are going to look for before merging
-your code.
+If applicable, add relevant snippets, screenshots, or logs to help us understand the changes.
 
-- [ ] I have read and understood the [contribution
-  guidelines](https://github.com/sbi-dev/sbi/blob/main/CONTRIBUTING.md)
-- [ ] I have commented my code, particularly in hard-to-understand areas
-- [ ] I have added tests that prove my fix is effective or that my feature works
-- [ ] I have reported how long the new tests run and potentially marked them
-  with `pytest.mark.slow`.
-- [ ] New and existing unit tests pass locally with my changes
-- [ ] I performed linting and formatting as described in the [contribution
-  guidelines](https://github.com/sbi-dev/sbi/blob/main/CONTRIBUTING.md)
-- [ ] There are no conflicts with the `main` branch
+...
 
-For the reviewer:
+## Anything else we should know?
 
+Any additional comments, questions, or things you'd like feedback on?
+
+...
+
+## ✅ Checklist
+
+Put an `x` in the boxes that apply. If you're unsure about any of them, no worries—just ask!
+
+- [ ] I have read and followed the [contribution guidelines](https://github.com/sbi-dev/sbi/blob/main/CONTRIBUTING.md)
+- [ ] I have added helpful comments to my code where needed
+- [ ] I have added tests for new functionality
+- [ ] (If applicable) I have reported how long new tests run and marked them with `pytest.mark.slow`
+
+**For reviewers:**
 - [ ] I have reviewed every file
-- [ ] All comments have been addressed.
+- [ ] All comments have been addressed

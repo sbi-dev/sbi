@@ -98,9 +98,6 @@ class Diffuser:
             1 if self.predictor.potential_fn.x_is_iid else self.batch_shape.numel()
         )
         init_shape = (num_samples, num_batch) + self.input_shape
-        # init_shape = (
-        #     num_samples,
-        # ) + self.input_shape  # just use num_samples, not num_batch
         # NOTE: for the IID setting we might need to scale the noise with iid batch
         # size, as in equation (7) in the paper.
         # NOTE: TODO we need some interface for that

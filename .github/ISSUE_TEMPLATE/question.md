@@ -7,8 +7,14 @@ assignees: ''
 
 ---
 
-Describe your question or problem here. Please provide reproducible code
-examples if applicable.
+## ❓ Question or Problem
 
-If this is a general question about SBI, please consider [opening a Discussion
-instead](https://github.com/sbi-dev/sbi/discussions).
+Clearly describe your question or issue. If applicable, provide a **minimal reproducible code example**.
+
+...
+
+## 🔎 Is this a general SBI question?
+
+If your question is **not** related to a bug or specific toolbox behavior, please consider [opening a Discussion instead](https://github.com/sbi-dev/sbi/discussions).
+
+...

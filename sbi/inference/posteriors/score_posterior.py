@@ -10,6 +10,7 @@ from torch.distributions import Distribution
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials.score_based_potential import (
+    CallableDifferentiablePotentialFunction,
     PosteriorScoreBasedPotential,
     score_estimator_based_potential,
 )
@@ -115,7 +116,6 @@ class ScorePosterior(NeuralPosterior):
 
         Args:
             sample_shape: Shape of the samples to be drawn.
-            x: Deprecated - use `.set_default_x()` prior to `.sample()`.
             predictor: The predictor for the diffusion-based sampler. Can be a string or
                 a custom predictor following the API in `sbi.samplers.score.predictors`.
                 Currently, only `euler_maruyama` is implemented.
@@ -153,14 +153,12 @@ class ScorePosterior(NeuralPosterior):
 
         if self.sample_with == "ode":
             samples = rejection.accept_reject_sample(
-                proposal=self.sample_via_zuko,
+                proposal=self.sample_via_ode,
                 accept_reject_fn=lambda theta: within_support(self.prior, theta),
                 num_samples=num_samples,
                 show_progress_bars=show_progress_bars,
                 max_sampling_batch_size=max_sampling_batch_size,
-                proposal_sampling_kwargs={"x": x},
             )[0]
-            samples = samples.reshape(sample_shape + self.score_estimator.input_shape)
         elif self.sample_with == "sde":
             proposal_sampling_kwargs = {
                 "predictor": predictor,
@@ -180,8 +178,8 @@ class ScorePosterior(NeuralPosterior):
                 max_sampling_batch_size=max_sampling_batch_size,
                 proposal_sampling_kwargs=proposal_sampling_kwargs,
             )[0]
-            samples = samples.reshape(sample_shape + self.score_estimator.input_shape)
 
+        samples = samples.reshape(sample_shape + self.score_estimator.input_shape)
         return samples
 
     def _sample_via_diffusion(
@@ -201,7 +199,6 @@ class ScorePosterior(NeuralPosterior):
 
         Args:
             sample_shape: Shape of the samples to be drawn.
-            x: Deprecated - use `.set_default_x()` prior to `.sample()`.
             predictor: The predictor for the diffusion-based sampler. Can be a string or
                 a custom predictor following the API in `sbi.samplers.score.predictors`.
                 Currently, only `euler_maruyama` is implemented.
@@ -254,7 +251,7 @@ class ScorePosterior(NeuralPosterior):
 
         return samples
 
-    def sample_via_zuko(
+    def sample_via_ode(
         self,
         sample_shape: Shape = torch.Size(),
         x: Optional[Tensor] = None,
@@ -273,10 +270,9 @@ class ScorePosterior(NeuralPosterior):
         """
         num_samples = torch.Size(sample_shape).numel()
 
-        x = self._x_else_default_x(x)
-        x = reshape_to_batch_event(x, self.score_estimator.condition_shape)
-
-        flow = self.potential_fn.get_continuous_normalizing_flow(condition=x)
+        flow = self.potential_fn.get_continuous_normalizing_flow(
+            condition=self.potential_fn.x_o
+        )
         samples = flow.sample(torch.Size((num_samples,)))
 
         return samples
@@ -348,7 +344,7 @@ class ScorePosterior(NeuralPosterior):
 
         if self.sample_with == "ode":
             samples = rejection.accept_reject_sample(
-                proposal=self.sample_via_zuko,
+                proposal=self.sample_via_ode,
                 accept_reject_fn=lambda theta: within_support(self.prior, theta),
                 num_samples=num_samples,
                 num_xos=batch_size,
@@ -476,39 +472,3 @@ class ScorePosterior(NeuralPosterior):
             )[0]
 
         return self._map
-
-
-class DifferentiablePotentialFunction(torch.autograd.Function):
-    @staticmethod
-    def forward(ctx, input, call_function, gradient_function):
-        # Save the methods as callables
-        ctx.call_function = call_function
-        ctx.gradient_function = gradient_function
-        ctx.save_for_backward(input)
-
-        # Perform the forward computation
-        output = call_function(input)
-        return output
-
-    @staticmethod
-    def backward(ctx, grad_output):
-        (input,) = ctx.saved_tensors
-        grad = ctx.gradient_function(input)
-        while len(grad_output.shape) < len(grad.shape):
-            grad_output = grad_output.unsqueeze(-1)
-        grad_input = grad_output * grad
-        return grad_input, None, None
-
-
-# Wrapper class to manage state
-class CallableDifferentiablePotentialFunction:
-    def __init__(self, posterior_score_based_potential):
-        self.posterior_score_based_potential = posterior_score_based_potential
-
-    def __call__(self, input):
-        prepared_potential = partial(
-            self.posterior_score_based_potential.__call__, rebuild_flow=False
-        )
-        return DifferentiablePotentialFunction.apply(
-            input, prepared_potential, self.posterior_score_based_potential.gradient
-        )
