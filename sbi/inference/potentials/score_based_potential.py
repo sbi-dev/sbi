@@ -232,9 +232,6 @@ class PosteriorScoreBasedPotential(BasePotential):
         x_density_estimator = reshape_to_batch_event(
             self.x_o, event_shape=self.score_estimator.condition_shape
         )
-        assert x_density_estimator.shape[0] == 1, (
-            "PosteriorScoreBasedPotential supports only x batchsize of 1`."
-        )
 
         flow = self.get_continuous_normalizing_flow(
             condition=x_density_estimator, atol=atol, rtol=rtol, exact=exact
