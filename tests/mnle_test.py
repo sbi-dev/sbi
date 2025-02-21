@@ -405,24 +405,25 @@ def test_log_likelihood_over_local_iid_theta(
     )
 
     num_simulations = 100
+    idx_of_cond = 3
     theta = proposal.sample((num_simulations,))
-    x = mixed_simulator_with_conditions(theta)
+    x = mixed_simulator_with_conditions(theta, idx_of_cond)
     estimator = trainer.append_simulations(theta, x).train(max_num_epochs=1)
 
     # condition on multiple conditions
-    theta_o = proposal.sample((num_xs,))[:, :3]
+    theta_o = proposal.sample((num_xs,))[:, :idx_of_cond]
 
-    x_o = torch.zeros(num_trials, num_xs, 3)
+    x_o = torch.zeros(num_trials, num_xs, idx_of_cond)
     condition_o = proposal.sample((
         num_conditions,
         num_trials,
-    ))[:, 3:].reshape(num_conditions, num_trials, 1)
+    ))[:, idx_of_cond:].reshape(num_trials, 1)
     for i in range(num_xs):
         # simulate with same iid theta but different conditions
         x_o[:, i, :] = mixed_simulator(theta_o[i].repeat(num_trials, 1), condition_o)
 
     # batched conditioning
-    theta = proposal.sample((num_thetas,))[:, :3]
+    theta = proposal.sample((num_thetas,))[:, :idx_of_cond]
     # x_o has shape (iid, batch, *event)
     # condition_o has shape (iid, num_conditions)
     ll_batched = _log_likelihood_over_iid_trials_and_local_theta(
