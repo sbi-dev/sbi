@@ -404,7 +404,8 @@ class MCMCPosterior(NeuralPosterior):
             Samples from the posteriors of shape (*sample_shape, B, *input_shape)
         """
 
-        # TODO: test comment for testmon.
+        print("sample_batched")
+        print(x.shape)
         # Replace arguments that were not passed with their default.
         method = self.method if method is None else method
         thin = self.thin if thin is None else thin
