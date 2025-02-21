@@ -29,6 +29,15 @@ jobs:
         fetch-depth: 0
         lfs: false
 
+    - name: Cache testmon data
+      uses: actions/cache@v4
+      with:
+        path: .testmondata
+        key: testmon-${{ runner.os }}-${{ matrix.python-version }}-${{ github.sha }}
+        restore-keys: |
+          testmon-${{ runner.os }}-${{ matrix.python-version }}-
+
+
     - name: Install uv and set the python version
       uses: astral-sh/setup-uv@v5
       with:
@@ -38,14 +47,6 @@ jobs:
 
     - name: Install dependencies with uv
       run: uv sync --all-extras --dev  # installs dependencies from the `pyproject.toml` file
-
-    - name: Cache testmon data
-      uses: actions/cache@v4
-      with:
-        path: .testmondata
-        key: testmon-${{ runner.os }}-${{ matrix.python-version }}-${{ github.ref }}
-        restore-keys: |
-          testmon-${{ runner.os }}-${{ matrix.python-version }}-
 
     - name: Run the fast CPU tests with coverage
       run: |
