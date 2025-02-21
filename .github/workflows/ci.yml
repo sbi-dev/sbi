@@ -38,8 +38,8 @@ jobs:
 
     - name: Install dependencies with uv
       run: |
-        uv --system pip install torch --extra-index-url https://download.pytorch.org/whl/cpu
-        uv --system pip install -e .[dev]
+        # uv pip --system  install torch --extra-index-url https://download.pytorch.org/whl/cpu
+        uv pip --system install -e .[dev]
 
     - name: Cache testmon data
       uses: actions/cache@v4
@@ -51,7 +51,7 @@ jobs:
 
     - name: Run the fast CPU tests with coverage
       run: |
-        uv --system run pytest --testmon-forceselect -v -n auto -m "not slow and not gpu" --cov=sbi --cov-report=xml tests/
+        uv run --system pytest --testmon-forceselect -v -n auto -m "not slow and not gpu" --cov=sbi --cov-report=xml tests/
 
 
     - name: Upload coverage to Codecov
