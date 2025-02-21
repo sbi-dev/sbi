@@ -271,9 +271,6 @@ class ScorePosterior(NeuralPosterior):
         theta: Tensor,
         x: Optional[Tensor] = None,
         track_gradients: bool = False,
-        atol: float = 1e-5,
-        rtol: float = 1e-6,
-        exact: bool = True,
     ) -> Tensor:
         r"""Returns the log-probability of the posterior $p(\theta|x)$.
 
@@ -300,9 +297,6 @@ class ScorePosterior(NeuralPosterior):
         return self.potential_fn(
             theta.to(self._device),
             track_gradients=track_gradients,
-            atol=atol,
-            rtol=rtol,
-            exact=exact,
         )
 
     def sample_batched(
