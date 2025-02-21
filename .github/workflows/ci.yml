@@ -37,9 +37,7 @@ jobs:
         cache-dependency-glob: "pyproject.toml"
 
     - name: Install dependencies with uv
-      run: |
-        # uv pip install --system torch --extra-index-url https://download.pytorch.org/whl/cpu
-        uv pip install --system -e .[dev]
+      run: uv sync --all-extras --dev  # installs dependencies from the `pyproject.toml` file
 
     - name: Cache testmon data
       uses: actions/cache@v4
