@@ -2,7 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from abc import abstractmethod
-from typing import Any, Callable, Dict, Optional, Union
+from typing import Any, Dict, Optional, Union
 from warnings import warn
 
 import torch
@@ -11,7 +11,8 @@ from torch import Tensor
 
 from sbi.inference.potentials.base_potential import (
     BasePotential,
-    CallablePotentialWrapper,
+    CustomPotential,
+    CustomPotentialWrapper,
 )
 from sbi.sbi_types import Array, Shape, TorchTransform
 from sbi.utils.sbiutils import gradient_ascent
@@ -29,7 +30,7 @@ class NeuralPosterior:
 
     def __init__(
         self,
-        potential_fn: Union[Callable, BasePotential],
+        potential_fn: Union[BasePotential, CustomPotential],
         theta_transform: Optional[TorchTransform] = None,
         device: Optional[str] = None,
         x_shape: Optional[torch.Size] = None,
@@ -51,16 +52,13 @@ class NeuralPosterior:
                 stacklevel=2,
             )
 
-        # Wrap as `CallablePotentialWrapper` if `potential_fn` is a Callable.
+        # Wrap custom potential functions to adhere to the `BasePotential` interface.
         if not isinstance(potential_fn, BasePotential):
-            # If the `potential_fn` is a Callable then we wrap it as a
-            # `CallablePotentialWrapper` which inherits from `BasePotential`.
             potential_device = "cpu" if device is None else device
-            potential_fn = CallablePotentialWrapper(
+            potential_fn = CustomPotentialWrapper(
                 potential_fn, prior=None, x_o=None, device=potential_device
             )
 
-        # Ensure device string.
         self._device = process_device(potential_fn.device if device is None else device)
 
         self.potential_fn = potential_fn
