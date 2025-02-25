@@ -71,6 +71,7 @@ dev = [
     # Test
     "pytest",
     "pytest-cov",
+    "pytest-testmon",
     "pytest-xdist",
     "torchtestcase",
 ]

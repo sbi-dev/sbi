@@ -166,7 +166,6 @@ def build_mnle(
 
     # Set up a flow for modelling the continuous data, conditioned on the discrete data.
     continuous_net = model_builders[flow_model](
-        # TODO: add support for optional log-transform in flow builders.
         batch_x=(
             torch.log(cont_x) if log_transform_x else cont_x
         ),  # log transform manually.
