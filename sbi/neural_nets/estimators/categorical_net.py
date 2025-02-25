@@ -23,7 +23,7 @@ class CategoricalMADE(MADE):
 
     def __init__(
         self,
-        num_categories: Tensor[int],
+        num_categories: Tensor,
         num_hidden_features: int,
         num_context_features: Optional[int] = None,
         num_blocks: int = 2,

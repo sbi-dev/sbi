@@ -66,8 +66,8 @@ def build_categoricalmassestimator(
 
     categorical_net = CategoricalMADE(
         num_categories=num_categories,
-        hidden_features=num_hidden,
-        context_features=y_numel,
+        num_hidden_features=num_hidden,
+        num_context_features=y_numel,
         num_blocks=num_layers,
         embedding_net=embedding_net,
     )
