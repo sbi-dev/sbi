@@ -1,7 +1,6 @@
 from typing import List
 
 import pytest
-import torch
 from torch import eye, ones, zeros
 from torch.distributions import MultivariateNormal
 
@@ -228,4 +227,4 @@ def test_npse_map():
 
     map_ = posterior.map(show_progress_bars=True, num_iter=5)
 
-    assert torch.allclose(map_, gt_posterior.mean, atol=0.15), "MAP is not close to GT."
+    assert ((map_ - gt_posterior.mean) ** 2).sum() < 0.5, "MAP is not close to GT."

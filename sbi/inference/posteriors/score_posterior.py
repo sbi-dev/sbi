@@ -271,6 +271,9 @@ class ScorePosterior(NeuralPosterior):
         theta: Tensor,
         x: Optional[Tensor] = None,
         track_gradients: bool = False,
+        atol: float = 1e-5,
+        rtol: float = 1e-5,
+        exact: bool = False,
     ) -> Tensor:
         r"""Returns the log-probability of the posterior $p(\theta|x)$.
 
@@ -291,7 +294,9 @@ class ScorePosterior(NeuralPosterior):
             `(len(θ),)`-shaped log posterior probability $\log p(\theta|x)$ for θ in the
             support of the prior, -∞ (corresponding to 0 probability) outside.
         """
-        self.potential_fn.set_x(self._x_else_default_x(x))
+        self.potential_fn.set_x(
+            self._x_else_default_x(x), atol=atol, rtol=rtol, exact=exact
+        )
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
         return self.potential_fn(
