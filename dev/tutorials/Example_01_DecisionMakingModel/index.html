@@ -623,6 +623,7 @@ p(\beta) = \text{Gamma}(1, 0.5) \\
 p(\text{probs}) = \text{Beta}(2, 2)
 \]</div>
 <p>Because the <code>InverseGamma</code> and the <code>Binomial</code> likelihoods are well-defined we can perform MCMC on this problem and obtain reference-posterior samples.</p>
+<p><em>Note: While the simulator we use in this tutorial only has a single continous and discrete dimension, MNLE also works with multi-dimensional continuous and discrete variables.</em></p>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">example_01_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">BinomialGammaPotential</span>
@@ -642,7 +643,7 @@ p(\text{probs}) = \text{Beta}(2, 2)
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Returns a sample from a mixed distribution given parameters theta.</span>
 
 <span class="sd">    Args:</span>
-<span class="sd">        theta: batch of parameters, shape (batch_size, 2) concentration_scaling:</span>
+<span class="sd">        theta: batch of parameters, shape (batch_size, 1 + num_categories) concentration_scaling:</span>
 <span class="sd">        scaling factor for the concentration parameter of the InverseGamma</span>
 <span class="sd">        distribution, mimics an experimental condition.</span>
 
