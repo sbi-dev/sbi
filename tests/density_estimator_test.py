@@ -414,7 +414,4 @@ def test_mixed_density_estimator(
 
     # Test samples
     samples = density_estimator.sample(sample_shape, condition=conditions)
-    if density_estimator_build_fn == build_categoricalmassestimator:
-        # Our categorical is always 1D and does not return `input_event_shape`.
-        input_event_shape = ()
     assert samples.shape == (*sample_shape, batch_dim, *input_event_shape)
