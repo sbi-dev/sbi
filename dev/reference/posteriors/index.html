@@ -898,6 +898,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#sbi.inference.posteriors.score_posterior.ScorePosterior.sample_batched" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;sample_batched
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#sbi.inference.posteriors.score_posterior.ScorePosterior.sample_via_ode" class="md-nav__link">
     <span class="md-ellipsis">
       <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;sample_via_ode
@@ -14584,7 +14593,31 @@ zuko probabilistic ODEs to compute the log-probability.</p>
 <span class="normal">460</span>
 <span class="normal">461</span>
 <span class="normal">462</span>
-<span class="normal">463</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">ScorePosterior</span><span class="p">(</span><span class="n">NeuralPosterior</span><span class="p">):</span>
+<span class="normal">463</span>
+<span class="normal">464</span>
+<span class="normal">465</span>
+<span class="normal">466</span>
+<span class="normal">467</span>
+<span class="normal">468</span>
+<span class="normal">469</span>
+<span class="normal">470</span>
+<span class="normal">471</span>
+<span class="normal">472</span>
+<span class="normal">473</span>
+<span class="normal">474</span>
+<span class="normal">475</span>
+<span class="normal">476</span>
+<span class="normal">477</span>
+<span class="normal">478</span>
+<span class="normal">479</span>
+<span class="normal">480</span>
+<span class="normal">481</span>
+<span class="normal">482</span>
+<span class="normal">483</span>
+<span class="normal">484</span>
+<span class="normal">485</span>
+<span class="normal">486</span>
+<span class="normal">487</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">ScorePosterior</span><span class="p">(</span><span class="n">NeuralPosterior</span><span class="p">):</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Posterior $p(\theta|x_o)$ with `log_prob()` and `sample()` methods. It samples</span>
 <span class="sd">    from the diffusion model given the score_estimator and rejects samples that lie</span>
 <span class="sd">    outside of the prior bounds.</span>
@@ -14829,8 +14862,8 @@ zuko probabilistic ODEs to compute the log-probability.</p>
         <span class="n">x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">track_gradients</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
         <span class="n">atol</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-5</span><span class="p">,</span>
-        <span class="n">rtol</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-6</span><span class="p">,</span>
-        <span class="n">exact</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="n">rtol</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-5</span><span class="p">,</span>
+        <span class="n">exact</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
 <span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Returns the log-probability of the posterior $p(\theta|x)$.</span>
 
@@ -14851,15 +14884,14 @@ zuko probabilistic ODEs to compute the log-probability.</p>
 <span class="sd">            `(len(θ),)`-shaped log posterior probability $\log p(\theta|x)$ for θ in the</span>
 <span class="sd">            support of the prior, -∞ (corresponding to 0 probability) outside.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">potential_fn</span><span class="o">.</span><span class="n">set_x</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_x_else_default_x</span><span class="p">(</span><span class="n">x</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">potential_fn</span><span class="o">.</span><span class="n">set_x</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_x_else_default_x</span><span class="p">(</span><span class="n">x</span><span class="p">),</span> <span class="n">atol</span><span class="o">=</span><span class="n">atol</span><span class="p">,</span> <span class="n">rtol</span><span class="o">=</span><span class="n">rtol</span><span class="p">,</span> <span class="n">exact</span><span class="o">=</span><span class="n">exact</span>
+        <span class="p">)</span>
 
         <span class="n">theta</span> <span class="o">=</span> <span class="n">ensure_theta_batched</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">as_tensor</span><span class="p">(</span><span class="n">theta</span><span class="p">))</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">potential_fn</span><span class="p">(</span>
             <span class="n">theta</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">),</span>
             <span class="n">track_gradients</span><span class="o">=</span><span class="n">track_gradients</span><span class="p">,</span>
-            <span class="n">atol</span><span class="o">=</span><span class="n">atol</span><span class="p">,</span>
-            <span class="n">rtol</span><span class="o">=</span><span class="n">rtol</span><span class="p">,</span>
-            <span class="n">exact</span><span class="o">=</span><span class="n">exact</span><span class="p">,</span>
         <span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">sample_batched</span><span class="p">(</span>
@@ -14875,6 +14907,31 @@ zuko probabilistic ODEs to compute the log-probability.</p>
         <span class="n">max_sampling_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10000</span><span class="p">,</span>
         <span class="n">show_progress_bars</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Given a batch of observations [x_1, ..., x_B] this function samples from</span>
+<span class="sd">        posteriors $p(\theta|x_1)$, ... ,$p(\theta|x_B)$, in a batched (i.e. vectorized)</span>
+<span class="sd">        manner.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            sample_shape: Desired shape of samples that are drawn from the posterior</span>
+<span class="sd">                given every observation.</span>
+<span class="sd">            x: A batch of observations, of shape `(batch_dim, event_shape_x)`.</span>
+<span class="sd">                `batch_dim` corresponds to the number of observations to be</span>
+<span class="sd">                drawn.</span>
+<span class="sd">            predictor: The predictor for the diffusion-based sampler. Can be a string or</span>
+<span class="sd">                a custom predictor following the API in `sbi.samplers.score.predictors`.</span>
+<span class="sd">                Currently, only `euler_maruyama` is implemented.</span>
+<span class="sd">            corrector: The corrector for the diffusion-based sampler.</span>
+<span class="sd">            predictor_params: Additional parameters passed to predictor.</span>
+<span class="sd">            corrector_params: Additional parameters passed to corrector.</span>
+<span class="sd">            steps: Number of steps to take for the Euler-Maruyama method.</span>
+<span class="sd">            ts: Time points at which to evaluate the diffusion process. If None, a</span>
+<span class="sd">                linear grid between t_max and t_min is used.</span>
+<span class="sd">            max_sampling_batch_size: Maximum batch size for sampling.</span>
+<span class="sd">            show_progress_bars: Whether to show sampling progress monitor.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Samples from the posteriors of shape (*sample_shape, B, *input_shape)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">num_samples</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">(</span><span class="n">sample_shape</span><span class="p">)</span><span class="o">.</span><span class="n">numel</span><span class="p">()</span>
         <span class="n">x</span> <span class="o">=</span> <span class="n">reshape_to_batch_event</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">score_estimator</span><span class="o">.</span><span class="n">condition_shape</span><span class="p">)</span>
         <span class="n">condition_dim</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">score_estimator</span><span class="o">.</span><span class="n">condition_shape</span><span class="p">)</span>
@@ -14896,7 +14953,6 @@ zuko probabilistic ODEs to compute the log-probability.</p>
                 <span class="n">num_xos</span><span class="o">=</span><span class="n">batch_size</span><span class="p">,</span>
                 <span class="n">show_progress_bars</span><span class="o">=</span><span class="n">show_progress_bars</span><span class="p">,</span>
                 <span class="n">max_sampling_batch_size</span><span class="o">=</span><span class="n">max_sampling_batch_size</span><span class="p">,</span>
-                <span class="n">proposal_sampling_kwargs</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;x&quot;</span><span class="p">:</span> <span class="n">x</span><span class="p">},</span>
             <span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
             <span class="n">samples</span> <span class="o">=</span> <span class="n">samples</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span>
                 <span class="n">sample_shape</span> <span class="o">+</span> <span class="n">batch_shape</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">score_estimator</span><span class="o">.</span><span class="n">input_shape</span>
@@ -14993,7 +15049,8 @@ zuko probabilistic ODEs to compute the log-probability.</p>
             <span class="p">)</span>
 
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_map</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">force_update</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">potential_fn</span><span class="o">.</span><span class="n">set_x</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">default_x</span><span class="p">)</span>
+            <span class="c1"># rebuild coarse flow fast for MAP optimization.</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">potential_fn</span><span class="o">.</span><span class="n">set_x</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">default_x</span><span class="p">,</span> <span class="n">atol</span><span class="o">=</span><span class="mf">1e-2</span><span class="p">,</span> <span class="n">rtol</span><span class="o">=</span><span class="mf">1e-3</span><span class="p">,</span> <span class="n">exact</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
             <span class="n">callable_potential_fn</span> <span class="o">=</span> <span class="n">CallableDifferentiablePotentialFunction</span><span class="p">(</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">potential_fn</span>
             <span class="p">)</span>
@@ -15575,7 +15632,7 @@ linear grid between t_max and t_min is used.</p>
 
 
 <h3 id="sbi.inference.posteriors.score_posterior.ScorePosterior.log_prob" class="doc doc-heading">
-            <code class=" language-python"><span class="n">log_prob</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">track_gradients</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">atol</span><span class="o">=</span><span class="mf">1e-05</span><span class="p">,</span> <span class="n">rtol</span><span class="o">=</span><span class="mf">1e-06</span><span class="p">,</span> <span class="n">exact</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></code>
+            <code class=" language-python"><span class="n">log_prob</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">track_gradients</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">atol</span><span class="o">=</span><span class="mf">1e-05</span><span class="p">,</span> <span class="n">rtol</span><span class="o">=</span><span class="mf">1e-05</span><span class="p">,</span> <span class="n">exact</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span></code>
 
 <a href="#sbi.inference.posteriors.score_posterior.ScorePosterior.log_prob" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -15676,7 +15733,7 @@ consumption.</p>
               </div>
             </td>
             <td>
-                  <code>1e-06</code>
+                  <code>1e-05</code>
             </td>
           </tr>
           <tr class="doc-section-item">
@@ -15693,7 +15750,7 @@ stochastic approximation, which is faster but less accurate.</p>
               </div>
             </td>
             <td>
-                  <code>True</code>
+                  <code>False</code>
             </td>
           </tr>
       </tbody>
@@ -15770,15 +15827,14 @@ stochastic approximation, which is faster but less accurate.</p>
 <span class="normal">302</span>
 <span class="normal">303</span>
 <span class="normal">304</span>
-<span class="normal">305</span>
-<span class="normal">306</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">log_prob</span><span class="p">(</span>
+<span class="normal">305</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">log_prob</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">theta</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">track_gradients</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">atol</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-5</span><span class="p">,</span>
-    <span class="n">rtol</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-6</span><span class="p">,</span>
-    <span class="n">exact</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">rtol</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-5</span><span class="p">,</span>
+    <span class="n">exact</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Returns the log-probability of the posterior $p(\theta|x)$.</span>
 
@@ -15799,15 +15855,14 @@ stochastic approximation, which is faster but less accurate.</p>
 <span class="sd">        `(len(θ),)`-shaped log posterior probability $\log p(\theta|x)$ for θ in the</span>
 <span class="sd">        support of the prior, -∞ (corresponding to 0 probability) outside.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">potential_fn</span><span class="o">.</span><span class="n">set_x</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_x_else_default_x</span><span class="p">(</span><span class="n">x</span><span class="p">))</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">potential_fn</span><span class="o">.</span><span class="n">set_x</span><span class="p">(</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_x_else_default_x</span><span class="p">(</span><span class="n">x</span><span class="p">),</span> <span class="n">atol</span><span class="o">=</span><span class="n">atol</span><span class="p">,</span> <span class="n">rtol</span><span class="o">=</span><span class="n">rtol</span><span class="p">,</span> <span class="n">exact</span><span class="o">=</span><span class="n">exact</span>
+    <span class="p">)</span>
 
     <span class="n">theta</span> <span class="o">=</span> <span class="n">ensure_theta_batched</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">as_tensor</span><span class="p">(</span><span class="n">theta</span><span class="p">))</span>
     <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">potential_fn</span><span class="p">(</span>
         <span class="n">theta</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">),</span>
         <span class="n">track_gradients</span><span class="o">=</span><span class="n">track_gradients</span><span class="p">,</span>
-        <span class="n">atol</span><span class="o">=</span><span class="n">atol</span><span class="p">,</span>
-        <span class="n">rtol</span><span class="o">=</span><span class="n">rtol</span><span class="p">,</span>
-        <span class="n">exact</span><span class="o">=</span><span class="n">exact</span><span class="p">,</span>
     <span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -16034,30 +16089,7 @@ have a cached value.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/score_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">373</span>
-<span class="normal">374</span>
-<span class="normal">375</span>
-<span class="normal">376</span>
-<span class="normal">377</span>
-<span class="normal">378</span>
-<span class="normal">379</span>
-<span class="normal">380</span>
-<span class="normal">381</span>
-<span class="normal">382</span>
-<span class="normal">383</span>
-<span class="normal">384</span>
-<span class="normal">385</span>
-<span class="normal">386</span>
-<span class="normal">387</span>
-<span class="normal">388</span>
-<span class="normal">389</span>
-<span class="normal">390</span>
-<span class="normal">391</span>
-<span class="normal">392</span>
-<span class="normal">393</span>
-<span class="normal">394</span>
-<span class="normal">395</span>
-<span class="normal">396</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">396</span>
 <span class="normal">397</span>
 <span class="normal">398</span>
 <span class="normal">399</span>
@@ -16124,7 +16156,31 @@ have a cached value.</p>
 <span class="normal">460</span>
 <span class="normal">461</span>
 <span class="normal">462</span>
-<span class="normal">463</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">map</span><span class="p">(</span>
+<span class="normal">463</span>
+<span class="normal">464</span>
+<span class="normal">465</span>
+<span class="normal">466</span>
+<span class="normal">467</span>
+<span class="normal">468</span>
+<span class="normal">469</span>
+<span class="normal">470</span>
+<span class="normal">471</span>
+<span class="normal">472</span>
+<span class="normal">473</span>
+<span class="normal">474</span>
+<span class="normal">475</span>
+<span class="normal">476</span>
+<span class="normal">477</span>
+<span class="normal">478</span>
+<span class="normal">479</span>
+<span class="normal">480</span>
+<span class="normal">481</span>
+<span class="normal">482</span>
+<span class="normal">483</span>
+<span class="normal">484</span>
+<span class="normal">485</span>
+<span class="normal">486</span>
+<span class="normal">487</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">map</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">num_iter</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">,</span>
@@ -16190,7 +16246,8 @@ have a cached value.</p>
         <span class="p">)</span>
 
     <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_map</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">force_update</span><span class="p">:</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">potential_fn</span><span class="o">.</span><span class="n">set_x</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">default_x</span><span class="p">)</span>
+        <span class="c1"># rebuild coarse flow fast for MAP optimization.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">potential_fn</span><span class="o">.</span><span class="n">set_x</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">default_x</span><span class="p">,</span> <span class="n">atol</span><span class="o">=</span><span class="mf">1e-2</span><span class="p">,</span> <span class="n">rtol</span><span class="o">=</span><span class="mf">1e-3</span><span class="p">,</span> <span class="n">exact</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
         <span class="n">callable_potential_fn</span> <span class="o">=</span> <span class="n">CallableDifferentiablePotentialFunction</span><span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">potential_fn</span>
         <span class="p">)</span>
@@ -16568,6 +16625,408 @@ linear grid between t_max and t_min is used.</p>
         <span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
 
     <span class="n">samples</span> <span class="o">=</span> <span class="n">samples</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">sample_shape</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">score_estimator</span><span class="o">.</span><span class="n">input_shape</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">samples</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="sbi.inference.posteriors.score_posterior.ScorePosterior.sample_batched" class="doc doc-heading">
+            <code class=" language-python"><span class="n">sample_batched</span><span class="p">(</span><span class="n">sample_shape</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">predictor</span><span class="o">=</span><span class="s1">&#39;euler_maruyama&#39;</span><span class="p">,</span> <span class="n">corrector</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">predictor_params</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">corrector_params</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">steps</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">ts</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">max_sampling_batch_size</span><span class="o">=</span><span class="mi">10000</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></code>
+
+<a href="#sbi.inference.posteriors.score_posterior.ScorePosterior.sample_batched" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Given a batch of observations [x_1, &hellip;, x_B] this function samples from
+posteriors <span class="arithmatex">\(p(\theta|x_1)\)</span>, &hellip; ,<span class="arithmatex">\(p(\theta|x_B)\)</span>, in a batched (i.e. vectorized)
+manner.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>sample_shape</code>
+            </td>
+            <td>
+                  <code><span title="torch.Size">Size</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Desired shape of samples that are drawn from the posterior
+given every observation.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>x</code>
+            </td>
+            <td>
+                  <code><span title="torch.Tensor">Tensor</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A batch of observations, of shape <code>(batch_dim, event_shape_x)</code>.
+<code>batch_dim</code> corresponds to the number of observations to be
+drawn.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>predictor</code>
+            </td>
+            <td>
+                  <code><span title="typing.Union">Union</span>[<span title="str">str</span>, <span title="sbi.samplers.score.predictors.Predictor">Predictor</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The predictor for the diffusion-based sampler. Can be a string or
+a custom predictor following the API in <code>sbi.samplers.score.predictors</code>.
+Currently, only <code>euler_maruyama</code> is implemented.</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#39;euler_maruyama&#39;</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>corrector</code>
+            </td>
+            <td>
+                  <code><span title="typing.Optional">Optional</span>[<span title="typing.Union">Union</span>[<span title="str">str</span>, <span title="sbi.samplers.score.correctors.Corrector">Corrector</span>]]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The corrector for the diffusion-based sampler.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>predictor_params</code>
+            </td>
+            <td>
+                  <code><span title="typing.Optional">Optional</span>[<span title="typing.Dict">Dict</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Additional parameters passed to predictor.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>corrector_params</code>
+            </td>
+            <td>
+                  <code><span title="typing.Optional">Optional</span>[<span title="typing.Dict">Dict</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Additional parameters passed to corrector.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>steps</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of steps to take for the Euler-Maruyama method.</p>
+              </div>
+            </td>
+            <td>
+                  <code>500</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>ts</code>
+            </td>
+            <td>
+                  <code><span title="typing.Optional">Optional</span>[<span title="torch.Tensor">Tensor</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Time points at which to evaluate the diffusion process. If None, a
+linear grid between t_max and t_min is used.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>max_sampling_batch_size</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Maximum batch size for sampling.</p>
+              </div>
+            </td>
+            <td>
+                  <code>10000</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>show_progress_bars</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Whether to show sampling progress monitor.</p>
+              </div>
+            </td>
+            <td>
+                  <code>True</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="torch.Tensor">Tensor</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Samples from the posteriors of shape (*sample_shape, B, *input_shape)</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+            <details class="quote">
+              <summary>Source code in <code>sbi/inference/posteriors/score_posterior.py</code></summary>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">307</span>
+<span class="normal">308</span>
+<span class="normal">309</span>
+<span class="normal">310</span>
+<span class="normal">311</span>
+<span class="normal">312</span>
+<span class="normal">313</span>
+<span class="normal">314</span>
+<span class="normal">315</span>
+<span class="normal">316</span>
+<span class="normal">317</span>
+<span class="normal">318</span>
+<span class="normal">319</span>
+<span class="normal">320</span>
+<span class="normal">321</span>
+<span class="normal">322</span>
+<span class="normal">323</span>
+<span class="normal">324</span>
+<span class="normal">325</span>
+<span class="normal">326</span>
+<span class="normal">327</span>
+<span class="normal">328</span>
+<span class="normal">329</span>
+<span class="normal">330</span>
+<span class="normal">331</span>
+<span class="normal">332</span>
+<span class="normal">333</span>
+<span class="normal">334</span>
+<span class="normal">335</span>
+<span class="normal">336</span>
+<span class="normal">337</span>
+<span class="normal">338</span>
+<span class="normal">339</span>
+<span class="normal">340</span>
+<span class="normal">341</span>
+<span class="normal">342</span>
+<span class="normal">343</span>
+<span class="normal">344</span>
+<span class="normal">345</span>
+<span class="normal">346</span>
+<span class="normal">347</span>
+<span class="normal">348</span>
+<span class="normal">349</span>
+<span class="normal">350</span>
+<span class="normal">351</span>
+<span class="normal">352</span>
+<span class="normal">353</span>
+<span class="normal">354</span>
+<span class="normal">355</span>
+<span class="normal">356</span>
+<span class="normal">357</span>
+<span class="normal">358</span>
+<span class="normal">359</span>
+<span class="normal">360</span>
+<span class="normal">361</span>
+<span class="normal">362</span>
+<span class="normal">363</span>
+<span class="normal">364</span>
+<span class="normal">365</span>
+<span class="normal">366</span>
+<span class="normal">367</span>
+<span class="normal">368</span>
+<span class="normal">369</span>
+<span class="normal">370</span>
+<span class="normal">371</span>
+<span class="normal">372</span>
+<span class="normal">373</span>
+<span class="normal">374</span>
+<span class="normal">375</span>
+<span class="normal">376</span>
+<span class="normal">377</span>
+<span class="normal">378</span>
+<span class="normal">379</span>
+<span class="normal">380</span>
+<span class="normal">381</span>
+<span class="normal">382</span>
+<span class="normal">383</span>
+<span class="normal">384</span>
+<span class="normal">385</span>
+<span class="normal">386</span>
+<span class="normal">387</span>
+<span class="normal">388</span>
+<span class="normal">389</span>
+<span class="normal">390</span>
+<span class="normal">391</span>
+<span class="normal">392</span>
+<span class="normal">393</span>
+<span class="normal">394</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">sample_batched</span><span class="p">(</span>
+    <span class="bp">self</span><span class="p">,</span>
+    <span class="n">sample_shape</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">,</span>
+    <span class="n">x</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
+    <span class="n">predictor</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Predictor</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;euler_maruyama&quot;</span><span class="p">,</span>
+    <span class="n">corrector</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Corrector</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">predictor_params</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">corrector_params</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">steps</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">500</span><span class="p">,</span>
+    <span class="n">ts</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">max_sampling_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10000</span><span class="p">,</span>
+    <span class="n">show_progress_bars</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Given a batch of observations [x_1, ..., x_B] this function samples from</span>
+<span class="sd">    posteriors $p(\theta|x_1)$, ... ,$p(\theta|x_B)$, in a batched (i.e. vectorized)</span>
+<span class="sd">    manner.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        sample_shape: Desired shape of samples that are drawn from the posterior</span>
+<span class="sd">            given every observation.</span>
+<span class="sd">        x: A batch of observations, of shape `(batch_dim, event_shape_x)`.</span>
+<span class="sd">            `batch_dim` corresponds to the number of observations to be</span>
+<span class="sd">            drawn.</span>
+<span class="sd">        predictor: The predictor for the diffusion-based sampler. Can be a string or</span>
+<span class="sd">            a custom predictor following the API in `sbi.samplers.score.predictors`.</span>
+<span class="sd">            Currently, only `euler_maruyama` is implemented.</span>
+<span class="sd">        corrector: The corrector for the diffusion-based sampler.</span>
+<span class="sd">        predictor_params: Additional parameters passed to predictor.</span>
+<span class="sd">        corrector_params: Additional parameters passed to corrector.</span>
+<span class="sd">        steps: Number of steps to take for the Euler-Maruyama method.</span>
+<span class="sd">        ts: Time points at which to evaluate the diffusion process. If None, a</span>
+<span class="sd">            linear grid between t_max and t_min is used.</span>
+<span class="sd">        max_sampling_batch_size: Maximum batch size for sampling.</span>
+<span class="sd">        show_progress_bars: Whether to show sampling progress monitor.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Samples from the posteriors of shape (*sample_shape, B, *input_shape)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">num_samples</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">(</span><span class="n">sample_shape</span><span class="p">)</span><span class="o">.</span><span class="n">numel</span><span class="p">()</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="n">reshape_to_batch_event</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">score_estimator</span><span class="o">.</span><span class="n">condition_shape</span><span class="p">)</span>
+    <span class="n">condition_dim</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">score_estimator</span><span class="o">.</span><span class="n">condition_shape</span><span class="p">)</span>
+    <span class="n">batch_shape</span> <span class="o">=</span> <span class="n">x</span><span class="o">.</span><span class="n">shape</span><span class="p">[:</span><span class="o">-</span><span class="n">condition_dim</span><span class="p">]</span>
+    <span class="n">batch_size</span> <span class="o">=</span> <span class="n">batch_shape</span><span class="o">.</span><span class="n">numel</span><span class="p">()</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">potential_fn</span><span class="o">.</span><span class="n">set_x</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+
+    <span class="n">max_sampling_batch_size</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">max_sampling_batch_size</span>
+        <span class="k">if</span> <span class="n">max_sampling_batch_size</span> <span class="ow">is</span> <span class="kc">None</span>
+        <span class="k">else</span> <span class="n">max_sampling_batch_size</span>
+    <span class="p">)</span>
+
+    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">sample_with</span> <span class="o">==</span> <span class="s2">&quot;ode&quot;</span><span class="p">:</span>
+        <span class="n">samples</span> <span class="o">=</span> <span class="n">rejection</span><span class="o">.</span><span class="n">accept_reject_sample</span><span class="p">(</span>
+            <span class="n">proposal</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">sample_via_ode</span><span class="p">,</span>
+            <span class="n">accept_reject_fn</span><span class="o">=</span><span class="k">lambda</span> <span class="n">theta</span><span class="p">:</span> <span class="n">within_support</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">prior</span><span class="p">,</span> <span class="n">theta</span><span class="p">),</span>
+            <span class="n">num_samples</span><span class="o">=</span><span class="n">num_samples</span><span class="p">,</span>
+            <span class="n">num_xos</span><span class="o">=</span><span class="n">batch_size</span><span class="p">,</span>
+            <span class="n">show_progress_bars</span><span class="o">=</span><span class="n">show_progress_bars</span><span class="p">,</span>
+            <span class="n">max_sampling_batch_size</span><span class="o">=</span><span class="n">max_sampling_batch_size</span><span class="p">,</span>
+        <span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">samples</span> <span class="o">=</span> <span class="n">samples</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span>
+            <span class="n">sample_shape</span> <span class="o">+</span> <span class="n">batch_shape</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">score_estimator</span><span class="o">.</span><span class="n">input_shape</span>
+        <span class="p">)</span>
+    <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">sample_with</span> <span class="o">==</span> <span class="s2">&quot;sde&quot;</span><span class="p">:</span>
+        <span class="n">proposal_sampling_kwargs</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;predictor&quot;</span><span class="p">:</span> <span class="n">predictor</span><span class="p">,</span>
+            <span class="s2">&quot;corrector&quot;</span><span class="p">:</span> <span class="n">corrector</span><span class="p">,</span>
+            <span class="s2">&quot;predictor_params&quot;</span><span class="p">:</span> <span class="n">predictor_params</span><span class="p">,</span>
+            <span class="s2">&quot;corrector_params&quot;</span><span class="p">:</span> <span class="n">corrector_params</span><span class="p">,</span>
+            <span class="s2">&quot;steps&quot;</span><span class="p">:</span> <span class="n">steps</span><span class="p">,</span>
+            <span class="s2">&quot;ts&quot;</span><span class="p">:</span> <span class="n">ts</span><span class="p">,</span>
+            <span class="s2">&quot;max_sampling_batch_size&quot;</span><span class="p">:</span> <span class="n">max_sampling_batch_size</span><span class="p">,</span>
+            <span class="s2">&quot;show_progress_bars&quot;</span><span class="p">:</span> <span class="n">show_progress_bars</span><span class="p">,</span>
+        <span class="p">}</span>
+        <span class="n">samples</span> <span class="o">=</span> <span class="n">rejection</span><span class="o">.</span><span class="n">accept_reject_sample</span><span class="p">(</span>
+            <span class="n">proposal</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_sample_via_diffusion</span><span class="p">,</span>
+            <span class="n">accept_reject_fn</span><span class="o">=</span><span class="k">lambda</span> <span class="n">theta</span><span class="p">:</span> <span class="n">within_support</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">prior</span><span class="p">,</span> <span class="n">theta</span><span class="p">),</span>
+            <span class="n">num_samples</span><span class="o">=</span><span class="n">num_samples</span><span class="p">,</span>
+            <span class="n">num_xos</span><span class="o">=</span><span class="n">batch_size</span><span class="p">,</span>
+            <span class="n">show_progress_bars</span><span class="o">=</span><span class="n">show_progress_bars</span><span class="p">,</span>
+            <span class="n">max_sampling_batch_size</span><span class="o">=</span><span class="n">max_sampling_batch_size</span><span class="p">,</span>
+            <span class="n">proposal_sampling_kwargs</span><span class="o">=</span><span class="n">proposal_sampling_kwargs</span><span class="p">,</span>
+        <span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">samples</span> <span class="o">=</span> <span class="n">samples</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span>
+            <span class="n">sample_shape</span> <span class="o">+</span> <span class="n">batch_shape</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">score_estimator</span><span class="o">.</span><span class="n">input_shape</span>
+        <span class="p">)</span>
+
     <span class="k">return</span> <span class="n">samples</span>
 </code></pre></div></td></tr></table></div>
             </details>
