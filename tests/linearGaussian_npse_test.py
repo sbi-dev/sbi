@@ -1,7 +1,6 @@
 from typing import List
 
 import pytest
-import torch
 from torch import eye, ones, zeros
 from torch.distributions import MultivariateNormal
 
@@ -223,11 +222,9 @@ def test_npse_map():
     theta = prior.sample((num_simulations,))
     x = linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    inference.append_simulations(theta, x).train(
-        training_batch_size=100, max_num_epochs=10
-    )
+    inference.append_simulations(theta, x).train()
     posterior = inference.build_posterior().set_default_x(x_o)
 
-    map_ = posterior.map(show_progress_bars=True)
+    map_ = posterior.map(show_progress_bars=True, num_iter=5)
 
-    assert torch.allclose(map_, gt_posterior.mean, atol=0.4), "MAP is not close to GT."
+    assert ((map_ - gt_posterior.mean) ** 2).sum() < 0.5, "MAP is not close to GT."

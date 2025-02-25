@@ -272,8 +272,8 @@ class ScorePosterior(NeuralPosterior):
         x: Optional[Tensor] = None,
         track_gradients: bool = False,
         atol: float = 1e-5,
-        rtol: float = 1e-6,
-        exact: bool = True,
+        rtol: float = 1e-5,
+        exact: bool = False,
     ) -> Tensor:
         r"""Returns the log-probability of the posterior $p(\theta|x)$.
 
@@ -294,15 +294,14 @@ class ScorePosterior(NeuralPosterior):
             `(len(θ),)`-shaped log posterior probability $\log p(\theta|x)$ for θ in the
             support of the prior, -∞ (corresponding to 0 probability) outside.
         """
-        self.potential_fn.set_x(self._x_else_default_x(x))
+        self.potential_fn.set_x(
+            self._x_else_default_x(x), atol=atol, rtol=rtol, exact=exact
+        )
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
         return self.potential_fn(
             theta.to(self._device),
             track_gradients=track_gradients,
-            atol=atol,
-            rtol=rtol,
-            exact=exact,
         )
 
     def sample_batched(
@@ -318,6 +317,31 @@ class ScorePosterior(NeuralPosterior):
         max_sampling_batch_size: int = 10000,
         show_progress_bars: bool = True,
     ) -> Tensor:
+        r"""Given a batch of observations [x_1, ..., x_B] this function samples from
+        posteriors $p(\theta|x_1)$, ... ,$p(\theta|x_B)$, in a batched (i.e. vectorized)
+        manner.
+
+        Args:
+            sample_shape: Desired shape of samples that are drawn from the posterior
+                given every observation.
+            x: A batch of observations, of shape `(batch_dim, event_shape_x)`.
+                `batch_dim` corresponds to the number of observations to be
+                drawn.
+            predictor: The predictor for the diffusion-based sampler. Can be a string or
+                a custom predictor following the API in `sbi.samplers.score.predictors`.
+                Currently, only `euler_maruyama` is implemented.
+            corrector: The corrector for the diffusion-based sampler.
+            predictor_params: Additional parameters passed to predictor.
+            corrector_params: Additional parameters passed to corrector.
+            steps: Number of steps to take for the Euler-Maruyama method.
+            ts: Time points at which to evaluate the diffusion process. If None, a
+                linear grid between t_max and t_min is used.
+            max_sampling_batch_size: Maximum batch size for sampling.
+            show_progress_bars: Whether to show sampling progress monitor.
+
+        Returns:
+            Samples from the posteriors of shape (*sample_shape, B, *input_shape)
+        """
         num_samples = torch.Size(sample_shape).numel()
         x = reshape_to_batch_event(x, self.score_estimator.condition_shape)
         condition_dim = len(self.score_estimator.condition_shape)
@@ -339,7 +363,6 @@ class ScorePosterior(NeuralPosterior):
                 num_xos=batch_size,
                 show_progress_bars=show_progress_bars,
                 max_sampling_batch_size=max_sampling_batch_size,
-                proposal_sampling_kwargs={"x": x},
             )[0]
             samples = samples.reshape(
                 sample_shape + batch_shape + self.score_estimator.input_shape
@@ -436,7 +459,8 @@ class ScorePosterior(NeuralPosterior):
             )
 
         if self._map is None or force_update:
-            self.potential_fn.set_x(self.default_x)
+            # rebuild coarse flow fast for MAP optimization.
+            self.potential_fn.set_x(self.default_x, atol=1e-2, rtol=1e-3, exact=True)
             callable_potential_fn = CallableDifferentiablePotentialFunction(
                 self.potential_fn
             )
