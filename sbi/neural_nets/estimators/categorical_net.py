@@ -23,9 +23,9 @@ class CategoricalMADE(MADE):
 
     def __init__(
         self,
-        num_categories: Tensor,  # Tensor[int]
-        hidden_features: int,
-        context_features: Optional[int] = None,
+        num_categories: Tensor[int],
+        num_hidden_features: int,
+        num_context_features: Optional[int] = None,
         num_blocks: int = 2,
         use_residual_blocks: bool = True,
         random_mask: bool = False,
@@ -43,8 +43,14 @@ class CategoricalMADE(MADE):
                 max(categories) defines the number of output units, i.e., the largest
                 number of categories. Can handle mutliple variables with differing
                 numbers of choices.
-            num_hidden: number of hidden units per layer.
-            num_layers: number of hidden layers.
+            num_hidden_features: number of hidden units per layer.
+            num_context_features: number of context features.
+            num_blocks: number of masked blocks.
+            use_residual_blocks: whether to use residual blocks.
+            random_mask: whether to use a random mask.
+            activation: activation function. default is ReLU.
+            dropout_probability: dropout probability. default is 0.0.
+            use_batch_norm: whether to use batch normalization.
             embedding_net: emebedding net for input.
         """
         if use_residual_blocks and random_mask:
@@ -57,9 +63,9 @@ class CategoricalMADE(MADE):
             self.mask[i, :c] = 1
 
         super().__init__(
-            self.num_variables,
-            hidden_features,
-            context_features=context_features,
+            features=self.num_variables,
+            hidden_features=num_hidden_features,
+            context_features=num_context_features,
             num_blocks=num_blocks,
             output_multiplier=self.num_categories,
             use_residual_blocks=use_residual_blocks,
@@ -70,9 +76,9 @@ class CategoricalMADE(MADE):
         )
 
         self.embedding_net = embedding_net
-        self.hidden_features = hidden_features
+        self.hidden_features = num_hidden_features
         self.epsilon = epsilon
-        self.context_features = context_features
+        self.context_features = num_context_features
 
     def forward(self, input: Tensor, condition: Optional[Tensor] = None) -> Tensor:
         r"""Forward pass of the categorical density estimator network to compute the
@@ -94,6 +100,8 @@ class CategoricalMADE(MADE):
     def log_prob(self, input: Tensor, condition: Optional[Tensor] = None) -> Tensor:
         r"""Return log-probability of samples.
 
+        Evaluates `Categorical.log_prob`. The logits are given by the MADE.
+
         Args:
             input: Input datapoints of shape `(batch_size, *input_shape)`.
             condition: Conditioning variable. `(batch_size, *condition_shape)`.
@@ -108,13 +116,21 @@ class CategoricalMADE(MADE):
 
         return log_prob
 
-    def sample(self, sample_shape, context=None):
-        # Ensure sample_shape is a tuple
-        if isinstance(sample_shape, int):
-            sample_shape = (sample_shape,)
-        sample_shape = torch.Size(sample_shape)
+    def sample(
+        self, sample_shape: torch.Size, context: Optional[Tensor] = None
+    ) -> Tensor:
+        """Sample from the conditional categorical distribution.
 
-        # Calculate total number of samples
+        Autoregressively samples from the conditional categorical distribution.
+        Calls `Categorical.sample`. The logits are given by the MADE.
+
+        Args:
+            sample_shape: Shape of samples.
+            context: Conditioning variable. `(batch_dim, *condition_shape)`.
+
+        Returns:
+            Samples of shape `(*sample_shape, batch_dim)`.
+        """
         num_samples = int(torch.prod(torch.tensor(sample_shape)))
 
         # Prepare context
@@ -129,6 +145,9 @@ class CategoricalMADE(MADE):
             context = torch.zeros(num_samples, context_dim)
             batch_dim = 1
 
+        # Autoregressively sample from the conditional categorical distribution.
+        # for i = 1, ..., num_variables:
+        #   x_i ~ Categorical(logits=f_i(x_1, ..., x_{i-1}, c))
         with torch.no_grad():
             samples = torch.randn(num_samples, batch_dim, self.num_variables)
             for i in range(self.num_variables):
@@ -161,7 +180,7 @@ class CategoricalMassEstimator(ConditionalDensityEstimator):
         self.num_categories = net.num_categories
 
     def log_prob(self, input: Tensor, condition: Tensor, **kwargs) -> Tensor:
-        """Return log-probability of samples.
+        """Return log-probability of samples under the categorical distribution.
 
         Args:
             input: Input datapoints of shape
