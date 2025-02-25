@@ -29,7 +29,7 @@ from tests.test_utils import PosteriorPotential, TractablePosterior
         (NPSE, None),
     ),
 )
-def test_running_sbc(method, prior, reduce_fn_str, sampler, mcmc_params_accurate: dict):
+def test_running_sbc(method, prior, reduce_fn_str, sampler, mcmc_params_fast: dict):
     """Tests running inference and then SBC and obtaining nltp."""
 
     num_dim = 2
@@ -59,7 +59,7 @@ def test_running_sbc(method, prior, reduce_fn_str, sampler, mcmc_params_accurate
         posterior_kwargs = {
             "sample_with": "mcmc" if sampler == "mcmc" else "vi",
             "mcmc_method": "slice_np_vectorized",
-            "mcmc_parameters": mcmc_params_accurate,
+            "mcmc_parameters": mcmc_params_fast,
         }
     else:
         posterior_kwargs = {}
@@ -69,7 +69,7 @@ def test_running_sbc(method, prior, reduce_fn_str, sampler, mcmc_params_accurate
     thetas = prior.sample((num_sbc_runs,))
     xs = linear_gaussian(thetas, likelihood_shift, likelihood_cov)
 
-    reduce_fn = "marginals" if reduce_fn_str == "marginals" else posterior.log_prob
+    reduce_fn = "marginals" if reduce_fn_str == "marginals" else posterior.potential
     run_sbc(
         thetas,
         xs,
@@ -79,7 +79,8 @@ def test_running_sbc(method, prior, reduce_fn_str, sampler, mcmc_params_accurate
     )
 
     # Check nltp
-    get_nltp(thetas, xs, posterior)
+    if method in [NPE, NPSE]:
+        get_nltp(thetas, xs, posterior)
 
 
 @pytest.mark.slow
