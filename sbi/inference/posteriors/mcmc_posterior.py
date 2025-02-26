@@ -625,6 +625,7 @@ class MCMCPosterior(NeuralPosterior):
                     )
                 ]  # type: ignore
             )
+        assert initial_params.shape[0] == num_chains, "Initial params shape mismatch."
         return initial_params
 
     def _get_initial_params_batched(
