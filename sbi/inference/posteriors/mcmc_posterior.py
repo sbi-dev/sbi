@@ -607,15 +607,23 @@ class MCMCPosterior(NeuralPosterior):
                         delayed(seeded_init_fn)(seed) for seed in seeds
                     ),
                     total=len(seeds),
-                    desc=f"""Generating {num_chains} MCMC inits with
-                            {num_workers} workers.""",
+                    desc=f"Generating {num_chains} MCMC inits via {init_strategy} "
+                    "strategy",
                     disable=not show_progress_bars,
                 )
             )
             initial_params = torch.cat(initial_params)  # type: ignore
         else:
             initial_params = torch.cat(
-                [init_fn() for _ in range(num_chains)]  # type: ignore
+                [
+                    init_fn()
+                    for _ in tqdm(
+                        range(num_chains),
+                        desc=f"Generating {num_chains} MCMC inits via {init_strategy} "
+                        "strategy",
+                        disable=not show_progress_bars,
+                    )
+                ]  # type: ignore
             )
         return initial_params
 
