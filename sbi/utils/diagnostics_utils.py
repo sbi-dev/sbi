@@ -75,7 +75,7 @@ def get_posterior_samples_on_batch(
             tqdm(
                 Parallel(return_as="generator", n_jobs=num_workers)(
                     delayed(sample_fun)(posterior, sample_shape, x=x, seed=s)
-                    for x, s in zip(xs, seeds)
+                    for x, s in zip(xs, seeds, strict=False)
                 ),
                 disable=not show_progress_bar,
                 total=len(xs),
