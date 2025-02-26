@@ -59,14 +59,14 @@ posterior = inference.build_posterior()
 
 ### Installation
 
-`sbi` requires Python 3.9 or higher. While a GPU isn't necessary, it can improve
+`sbi` requires Python 3.10 or higher. While a GPU isn't necessary, it can improve
 performance in some cases. We recommend using a virtual environment with
 [`conda`](https://docs.conda.io/en/latest/miniconda.html) for an easy setup.
 
 If `conda` is installed on the system, an environment for installing `sbi` can be created as follows:
 
 ```
-conda create -n sbi_env python=3.9 && conda activate sbi_env
+conda create -n sbi_env python=3.10 && conda activate sbi_env
 ```
 
 ### From PyPI

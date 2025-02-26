@@ -24,7 +24,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Development Status :: 3 - Alpha",
 ]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dynamic = ["version"]
 readme = "README.md"
 keywords = ["Bayesian inference", "simulation-based inference", "PyTorch"]
@@ -42,7 +42,7 @@ dependencies = [
     "tensorboard",
     "torch>=1.13.0, <2.6.0",
     "tqdm",
-    "pymc>=5.0.0",
+    "pymc>=5.21.0",
     "zuko>=1.2.0",
 ]
 
@@ -140,7 +140,7 @@ xfail_strict = true
 [tool.pyright]
 include = ["sbi"]
 exclude = ["**/__pycache__", "**/__node_modules__", ".git", "docs", "tutorials", "tests"]
-python_version = "3.9"
+python_version = "3.10"
 reportUnsupportedDunderAll = false
 reportGeneralTypeIssues = false
 reportInvalidTypeForm = false
