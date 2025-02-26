@@ -42,6 +42,7 @@ jobs:
         with:
           python-version: '3.10'
           enable-cache: true
+          cache-dependency-glob: "pyproject.toml"
 
       - name: Install dependencies with uv
         run: uv sync --all-extras --dev
