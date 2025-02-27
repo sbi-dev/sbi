@@ -210,6 +210,40 @@ fails (xfailed).
 - Commit and push again until CI tests pass. Don't hesitate to ask for help by
   commenting on the PR.
 
+#### mini-sbibm tests
+
+As SBI is a fundamentally data-driven approach, we are not only interested in whether
+the modifications to the codebase "pass the tests" but also in whether they improve or
+at least do not deteriorate the performance of the package for inference. To this end,
+we have a set of *mini-sbibm* tests that are intended for developers to run locally.
+
+These tests differ from the regular tests in that they always pass (provided there
+are no errors) but output performance metrics that can be compared, e.g., to the
+performance metrics of the main branch or relative to each other. The user-facing API
+is available via `pytest` through custom flags. To run the mini-sbibm tests, you can use
+the following command:
+```bash
+    pytest --bm
+```
+This will run all the mini-sbibm tests on all methods with default parameters and output
+the performance metrics nicely formatted to the console. If you have multiple CPU cores
+available, you can run the tests in parallel using the `-n auto` flag:
+```bash
+    pytest --bm -n auto
+```
+What if you are currently working on a specific method and you want to run the
+mini-sbibm tests only for this class of methods? You can use the `--bm-mode` flag:
+```bash
+    pytest --bm --bm-mode nspe
+```
+This will run the mini-sbibm tests only for methods of the `nspe` class, but with a
+few major hyperparameter choices, such as different base network architectures and
+different diffusion processes.
+
+The currently available modes are: `"npe"`, `"nle"`, `"nre"`, `"fmpe"`, `"npse"`,
+`"snpe"`, `"snle"`, and `"snre"`. If you require another mode, you can add it to the
+test suite in `tests/test_bm.py`.
+
 ## Contributing to the documentation
 
 Most of the documentation for `sbi` is written in markdown and the website is generated
