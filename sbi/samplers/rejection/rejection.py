@@ -1,11 +1,10 @@
 import logging
 import warnings
-from typing import Any, Callable, Dict, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Optional, Tuple
 
 import torch
 import torch.distributions.transforms as torch_tf
-from torch import Tensor, as_tensor, nn
-from torch.distributions import Distribution
+from torch import Tensor, as_tensor
 from tqdm.auto import tqdm
 
 from sbi.utils.sbiutils import gradient_ascent
@@ -179,18 +178,19 @@ def rejection_sample(
 
         # When in case of leakage a batch size was used there could be too many samples.
         samples = torch.cat(accepted)[:num_samples]
-        assert (
-            samples.shape[0] == num_samples
-        ), "Number of accepted samples must match required samples."
+        assert samples.shape[0] == num_samples, (
+            "Number of accepted samples must match required samples."
+        )
 
     return samples, as_tensor(acceptance_rate)
 
 
 @torch.no_grad()
 def accept_reject_sample(
-    proposal: Union[nn.Module, Distribution],
+    proposal: Callable,
     accept_reject_fn: Callable,
     num_samples: int,
+    num_xos: int = 1,
     show_progress_bars: bool = False,
     warn_acceptance: float = 0.01,
     sample_for_correction_factor: bool = False,
@@ -214,11 +214,15 @@ def accept_reject_sample(
            density during evaluation of the posterior.
 
     Args:
-        posterior_nn: Neural net representing the posterior.
-        accept_reject_fn: Function that evaluatuates which samples are accepted or
+        proposal: A callable that takes `sample_shape` as arguments (and kwargs as
+        needed). Returns samples from the proposal distribution with shape
+        (*sample_shape, event_dim).
+        accept_reject_fn: Function that evaluates which samples are accepted or
             rejected. Must take a batch of parameters and return a boolean tensor which
             indicates which parameters get accepted.
         num_samples: Desired number of samples.
+        num_xos: Number of conditions for batched_sampling (currently only accepting
+            one batch dimension for the condition).
         show_progress_bars: Whether to show a progressbar during sampling.
         warn_acceptance: A minimum acceptance rate under which to warn about slowness.
         sample_for_correction_factor: True if this function was called by
@@ -264,8 +268,6 @@ def accept_reject_sample(
     # But this would require giving the method the condition_shape explicitly...
     if "condition" in proposal_sampling_kwargs:
         num_xos = proposal_sampling_kwargs["condition"].shape[0]
-    else:
-        num_xos = 1
 
     accepted = [[] for _ in range(num_xos)]
     acceptance_rate = torch.full((num_xos,), float("Nan"))
@@ -278,7 +280,7 @@ def accept_reject_sample(
     num_samples_possible = 0
     while num_remaining > 0:
         # Sample and reject.
-        candidates = proposal.sample(
+        candidates = proposal(
             (sampling_batch_size,),  # type: ignore
             **proposal_sampling_kwargs,
         )
@@ -358,10 +360,8 @@ def accept_reject_sample(
     samples = [torch.cat(accepted[i], dim=0)[:num_samples] for i in range(num_xos)]
     samples = torch.stack(samples, dim=1)
     samples = samples.reshape(num_samples, *candidates.shape[1:])
-    assert (
-        samples.shape[0] == num_samples
-    ), "Number of accepted samples must match required samples."
+    assert samples.shape[0] == num_samples, (
+        "Number of accepted samples must match required samples."
+    )
 
-    # NOTE: Restriction prior does currently require a float as return for the
-    # acceptance rate, which is why we for now also return the minimum acceptance rate.
-    return samples, as_tensor(min_acceptance_rate)
+    return samples, as_tensor(acceptance_rate)

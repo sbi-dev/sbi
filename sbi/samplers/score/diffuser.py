@@ -7,10 +7,8 @@ import torch
 from torch import Tensor
 from tqdm.auto import tqdm
 
-from sbi.inference.potentials.score_based_potential import (
-    PosteriorScoreBasedPotential,
-)
-from sbi.samplers.score import Corrector, Predictor, get_corrector, get_predictor
+from sbi.samplers.score.correctors import Corrector, get_corrector
+from sbi.samplers.score.predictors import Predictor, get_predictor
 
 
 class Diffuser:
@@ -19,7 +17,7 @@ class Diffuser:
 
     def __init__(
         self,
-        score_based_potential: PosteriorScoreBasedPotential,
+        score_based_potential: 'PosteriorScoreBasedPotential',  # noqa: F821 # type: ignore
         predictor: Union[str, Predictor],
         corrector: Optional[Union[str, Corrector]] = None,
         predictor_params: Optional[dict] = None,
@@ -64,7 +62,7 @@ class Diffuser:
     def set_predictor(
         self,
         predictor: Union[str, Predictor],
-        score_based_potential: PosteriorScoreBasedPotential,
+        score_based_potential: 'PosteriorScoreBasedPotential',  # noqa: F821 # type: ignore
         **kwargs,
     ):
         """Set the predictor for the diffusion-based sampler."""
@@ -101,11 +99,8 @@ class Diffuser:
         # batched sampling setting with a flag.
         # TODO: this fixes the iid setting shape problems, but iid inference via
         # iid_bridge is not accurate.
-        # num_batch = self.batch_shape.numel()
-        # init_shape = (num_batch, num_samples) + self.input_shape
-        init_shape = (
-            num_samples,
-        ) + self.input_shape  # just use num_samples, not num_batch
+        num_batch = self.batch_shape.numel()
+        init_shape = (num_samples, num_batch) + self.input_shape
         # NOTE: for the IID setting we might need to scale the noise with iid batch
         # size, as in equation (7) in the paper.
         eps = torch.randn(init_shape, device=self.device)

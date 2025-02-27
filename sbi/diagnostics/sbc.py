@@ -10,10 +10,13 @@ from torch import Tensor, ones, zeros
 from torch.distributions import Uniform
 from tqdm.auto import tqdm
 
-from sbi.inference import DirectPosterior
+from sbi.inference import DirectPosterior, ScorePosterior
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.posteriors.vi_posterior import VIPosterior
-from sbi.utils.diagnostics_utils import get_posterior_samples_on_batch
+from sbi.utils.diagnostics_utils import (
+    get_posterior_samples_on_batch,
+    remove_nans_and_infs_in_x,
+)
 from sbi.utils.metrics import c2st
 
 
@@ -54,6 +57,9 @@ def run_sbc(
         ranks: ranks of the ground truth parameters under the inferred
         dap_samples: samples from the data averaged posterior.
     """
+
+    thetas, xs = remove_nans_and_infs_in_x(thetas, xs)
+
     num_sbc_samples = thetas.shape[0]
 
     if num_sbc_samples < 100:
@@ -69,9 +75,9 @@ def run_sbc(
             stacklevel=2,
         )
 
-    assert (
-        thetas.shape[0] == xs.shape[0]
-    ), "Unequal number of parameters and observations."
+    assert thetas.shape[0] == xs.shape[0], (
+        "Unequal number of parameters and observations."
+    )
 
     if "sbc_batch_size" in kwargs:
         warnings.warn(
@@ -180,7 +186,7 @@ def get_nltp(thetas: Tensor, xs: Tensor, posterior: NeuralPosterior) -> Tensor:
         nltp: negative log probs of true parameters under approximate posteriors.
     """
     nltp = torch.zeros(thetas.shape[0])
-    unnormalized_log_prob = not isinstance(posterior, DirectPosterior)
+    unnormalized_log_prob = not isinstance(posterior, (DirectPosterior, ScorePosterior))
 
     for idx, (tho, xo) in enumerate(zip(thetas, xs)):
         # Log prob of true params under posterior.

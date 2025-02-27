@@ -110,18 +110,18 @@ def test_c2st_npe_on_linearGaussian(npe_method, num_dim: int, prior_str: str):
 
         max_dkl = 0.15
 
-        assert (
-            dkl < max_dkl
-        ), f"D-KL={dkl} is more than 2 stds above the average performance."
+        assert dkl < max_dkl, (
+            f"D-KL={dkl} is more than 2 stds above the average performance."
+        )
 
         assert ((map_ - gt_posterior.mean) ** 2).sum() < 0.5
 
     elif prior_str == "uniform":
         # Check whether the returned probability outside of the support is zero.
         posterior_prob = get_prob_outside_uniform_prior(posterior, prior, num_dim)
-        assert (
-            posterior_prob == 0.0
-        ), "The posterior probability outside of the prior support is not zero"
+        assert posterior_prob == 0.0, (
+            "The posterior probability outside of the prior support is not zero"
+        )
 
         # Check whether normalization (i.e. scaling up the density due
         # to leakage into regions without prior support) scales up the density by the
@@ -147,7 +147,7 @@ def test_c2st_npe_on_linearGaussian(npe_method, num_dim: int, prior_str: str):
 @pytest.mark.slow
 @pytest.mark.parametrize(
     "density_estimator",
-    ["mdn", "maf", "maf_rqs", "nsf", "zuko_maf", "zuko_nsf"],
+    ["made", "mdn", "maf", "maf_rqs", "nsf", "zuko_maf", "zuko_nsf"],
 )
 def test_density_estimators_on_linearGaussian(density_estimator):
     """Test NPE with different density estimators on linear Gaussian example."""
@@ -625,9 +625,9 @@ def test_mdn_conditional_density(num_dim: int = 3, cond_dim: int = 1):
         cond_dim: Dimensionality of the condition.
     """
 
-    assert (
-        num_dim > cond_dim
-    ), "The number of dimensions needs to be greater than that of the condition!"
+    assert num_dim > cond_dim, (
+        "The number of dimensions needs to be greater than that of the condition!"
+    )
 
     x_o = zeros(1, num_dim)
     num_samples = 1000

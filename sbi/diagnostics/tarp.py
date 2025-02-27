@@ -13,7 +13,10 @@ from scipy.stats import kstest
 from torch import Tensor
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
-from sbi.utils.diagnostics_utils import get_posterior_samples_on_batch
+from sbi.utils.diagnostics_utils import (
+    get_posterior_samples_on_batch,
+    remove_nans_and_infs_in_x,
+)
 from sbi.utils.metrics import l2
 
 
@@ -61,6 +64,9 @@ def run_tarp(
         ecp: Expected coverage probability (``ecp``), see equation 4 of the paper
         alpha: credibility values, see equation 2 of the paper
     """
+
+    thetas, xs = remove_nans_and_infs_in_x(thetas, xs)
+
     num_tarp_samples, dim_theta = thetas.shape
 
     posterior_samples = get_posterior_samples_on_batch(
@@ -133,9 +139,9 @@ def _run_tarp(
     """
     num_posterior_samples, num_tarp_samples, _ = posterior_samples.shape
 
-    assert (
-        references.shape == thetas.shape
-    ), "references must have the same shape as thetas"
+    assert references.shape == thetas.shape, (
+        "references must have the same shape as thetas"
+    )
 
     if num_bins is None:
         num_bins = num_tarp_samples // 10

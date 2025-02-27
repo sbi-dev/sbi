@@ -6,12 +6,13 @@ from __future__ import annotations
 import pytest
 import torch
 from torch import eye, ones, zeros
-from torch.distributions import MultivariateNormal
+from torch.distributions import Independent, MultivariateNormal, Uniform
 
 from sbi.inference import (
     NLE_A,
     NPE_A,
     NPE_C,
+    NPSE,
     NRE_A,
     NRE_B,
     NRE_C,
@@ -98,13 +99,20 @@ def test_importance_posterior_sample_log_prob(snplre_method: type):
 
 @pytest.mark.parametrize("snpe_method", [NPE_A, NPE_C])
 @pytest.mark.parametrize("x_o_batch_dim", (0, 1, 2))
+@pytest.mark.parametrize("prior", ("mvn", "uniform"))
 def test_batched_sample_log_prob_with_different_x(
-    snpe_method: type, x_o_batch_dim: bool
+    snpe_method: type,
+    x_o_batch_dim: bool,
+    prior: str,
 ):
     num_dim = 2
     num_simulations = 1000
 
-    prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
+    # We also want to test on bounded support! Which will invoke leakage correction.
+    if prior == "mvn":
+        prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
+    elif prior == "uniform":
+        prior = Independent(Uniform(-1.0 * ones(num_dim), 1.0 * ones(num_dim)), 1)
     simulator = diagonal_linear_gaussian
 
     inference = snpe_method(prior=prior)
@@ -116,6 +124,7 @@ def test_batched_sample_log_prob_with_different_x(
 
     posterior = DirectPosterior(posterior_estimator=posterior_estimator, prior=prior)
 
+    torch.manual_seed(0)
     samples = posterior.sample_batched((10,), x_o)
     batched_log_probs = posterior.log_prob_batched(samples, x_o)
 
@@ -125,6 +134,20 @@ def test_batched_sample_log_prob_with_different_x(
         else (10, num_dim)
     ), "Sample shape wrong"
     assert batched_log_probs.shape == (10, max(x_o_batch_dim, 1)), "logprob shape wrong"
+
+    # Test consistency with non-batched log_prob
+    # NOTE: Leakage factor is a MC estimate, so we need to relax the tolerance here.
+    if x_o_batch_dim == 0:
+        log_probs = posterior.log_prob(samples, x=x_o)
+        assert torch.allclose(
+            log_probs, batched_log_probs[:, 0], atol=1e-1, rtol=1e-1
+        ), "Batched log probs different from non-batched log probs"
+    else:
+        for idx in range(x_o_batch_dim):
+            log_probs = posterior.log_prob(samples[:, idx], x=x_o[idx])
+            assert torch.allclose(
+                log_probs, batched_log_probs[:, idx], atol=1e-1, rtol=1e-1
+            ), "Batched log probs different from non-batched log probs"
 
 
 @pytest.mark.mcmc
@@ -211,9 +234,79 @@ def test_batched_mcmc_sample_log_prob_with_different_x(
         samples_separate2_m = torch.mean(samples_separate2, dim=0, dtype=torch.float32)
         samples_sep_m = torch.stack([samples_separate1_m, samples_separate2_m], dim=0)
 
-        assert torch.allclose(
-            samples_m, samples_sep_m, atol=0.2, rtol=0.2
-        ), "Batched sampling is not consistent with separate sampling."
+        assert torch.allclose(samples_m, samples_sep_m, atol=0.2, rtol=0.2), (
+            "Batched sampling is not consistent with separate sampling."
+        )
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("npse_method", [NPSE])
+@pytest.mark.parametrize("x_o_batch_dim", (0, 1, 2))
+@pytest.mark.parametrize("sampling_method", ["sde", "ode"])
+@pytest.mark.parametrize(
+    "sample_shape",
+    (
+        (5,),  # less than num_chains
+        (4, 2),  # 2D batch
+    ),
+)
+def test_batched_score_sample_with_different_x(
+    npse_method: type,
+    x_o_batch_dim: bool,
+    sampling_method: str,
+    sample_shape: torch.Size,
+):
+    num_dim = 2
+    num_simulations = 100
+
+    prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
+    simulator = diagonal_linear_gaussian
+
+    inference = npse_method(prior=prior)
+    theta = prior.sample((num_simulations,))
+    x = simulator(theta)
+    inference.append_simulations(theta, x).train(max_num_epochs=2)
+
+    x_o = ones(num_dim) if x_o_batch_dim == 0 else ones(x_o_batch_dim, num_dim)
+
+    posterior = inference.build_posterior(sample_with=sampling_method)
+
+    samples = posterior.sample_batched(
+        sample_shape,
+        x_o,
+    )
+
+    assert (
+        samples.shape == (*sample_shape, x_o_batch_dim, num_dim)
+        if x_o_batch_dim > 0
+        else (*sample_shape, num_dim)
+    ), "Sample shape wrong"
+
+    # test only for 1 sample_shape case to avoid repeating this test.
+    if x_o_batch_dim > 1 and sample_shape == (5,):
+        assert samples.shape[1] == x_o_batch_dim, "Batch dimension wrong"
+        inference = npse_method(prior=prior)
+        _ = inference.append_simulations(theta, x).train()
+        posterior = inference.build_posterior(sample_with=sampling_method)
+
+        x_o = torch.stack([0.5 * ones(num_dim), -0.5 * ones(num_dim)], dim=0)
+        # test with multiple chains to test whether correct chains are
+        # concatenated.
+        sample_shape = (1000,)  # use enough samples for accuracy comparison
+        samples = posterior.sample_batched(sample_shape, x_o)
+
+        samples_separate1 = posterior.sample(sample_shape, x_o[0])
+        samples_separate2 = posterior.sample(sample_shape, x_o[1])
+
+        # Check if means are approx. same
+        samples_m = torch.mean(samples, dim=0, dtype=torch.float32)
+        samples_separate1_m = torch.mean(samples_separate1, dim=0, dtype=torch.float32)
+        samples_separate2_m = torch.mean(samples_separate2, dim=0, dtype=torch.float32)
+        samples_sep_m = torch.stack([samples_separate1_m, samples_separate2_m], dim=0)
+
+        assert torch.allclose(samples_m, samples_sep_m, atol=0.2, rtol=0.2), (
+            "Batched sampling is not consistent with separate sampling."
+        )
 
 
 @pytest.mark.slow

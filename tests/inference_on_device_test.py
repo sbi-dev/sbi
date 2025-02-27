@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import Tuple
+from typing import Tuple, Union
 
 import pytest
 import torch
@@ -24,6 +24,7 @@ from sbi.inference import (
     ratio_estimator_based_potential,
 )
 from sbi.inference.posteriors.importance_posterior import ImportanceSamplingPosterior
+from sbi.inference.posteriors.mcmc_posterior import MCMCPosterior
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.neural_nets.embedding_nets import FCEmbedding
 from sbi.neural_nets.factory import (
@@ -33,7 +34,11 @@ from sbi.neural_nets.factory import (
     posterior_nn,
 )
 from sbi.simulators import diagonal_linear_gaussian, linear_gaussian
-from sbi.utils.torchutils import BoxUniform, gpu_available, process_device
+from sbi.utils.torchutils import (
+    BoxUniform,
+    gpu_available,
+    process_device,
+)
 from sbi.utils.user_input_checks import (
     validate_theta_and_x,
 )
@@ -127,7 +132,7 @@ def test_training_and_mcmc_on_device(
                 model=model, num_transforms=2, dtype=torch.float32
             )
         )
-        train_kwargs = dict(force_first_round_loss=True)
+        train_kwargs = dict()
     elif method == NLE:
         kwargs = dict(
             density_estimator=likelihood_nn(
@@ -152,9 +157,12 @@ def test_training_and_mcmc_on_device(
         x = simulator(theta).to(data_device)
         theta = theta.to(data_device)
 
-        estimator = inferer.append_simulations(theta, x, data_device=data_device).train(
-            training_batch_size=100, max_num_epochs=max_num_epochs, **train_kwargs
+        data_kwargs = (
+            dict(proposal=proposals[-1]) if method in [NPE_A, NPE_C] else dict()
         )
+        estimator = inferer.append_simulations(
+            theta, x, data_device=data_device, **data_kwargs
+        ).train(max_num_epochs=max_num_epochs, **train_kwargs)
 
         # mcmc cases
         if sampling_method in ["slice_np", "slice_np_vectorized", "nuts_pymc"]:
@@ -315,9 +323,9 @@ def test_train_with_different_data_and_training_device(
         density_estimator=estimator if data_device == "cpu" else None,
         prior=prior,
     ).set_default_x(x_o)
-    assert posterior._device == str(
-        weights_device
-    ), "inferred posterior device not correct."
+    assert posterior._device == str(weights_device), (
+        "inferred posterior device not correct."
+    )
 
 
 @pytest.mark.parametrize("inference_method", [NPE_A, NPE_C, NRE_A, NRE_B, NRE_C, NLE])
@@ -406,12 +414,12 @@ def test_vi_on_gpu(num_dim: int, q: str, vi_method: str, sampling_method: str):
     samples = posterior.sample((1,), method=sampling_method)
     logprobs = posterior.log_prob(samples)
 
-    assert (
-        str(samples.device) == device
-    ), f"The devices after training do not match: {samples.device} vs {device}"
-    assert (
-        str(logprobs.device) == device
-    ), f"The devices after training do not match: {logprobs.device} vs {device}"
+    assert str(samples.device) == device, (
+        f"The devices after training do not match: {samples.device} vs {device}"
+    )
+    assert str(logprobs.device) == device, (
+        f"The devices after training do not match: {logprobs.device} vs {device}"
+    )
 
 
 @pytest.mark.gpu
@@ -436,3 +444,75 @@ def test_boxuniform_device_handling(arg_device, device):
         low=zeros(1).to(arg_device), high=ones(1).to(arg_device), device=device
     )
     NPE_C(prior=prior, device=arg_device)
+
+
+@pytest.mark.gpu
+@pytest.mark.parametrize("method", [NPE_A, NPE_C])
+@pytest.mark.parametrize("device", ["cpu", "gpu"])
+def test_multiround_mdn_training_on_device(method: Union[NPE_A, NPE_C], device: str):
+    num_dim = 2
+    num_rounds = 2
+    num_simulations = 100
+    device = process_device("gpu")
+    prior = BoxUniform(-torch.ones(num_dim), torch.ones(num_dim), device=device)
+    simulator = diagonal_linear_gaussian
+
+    estimator = "mdn_snpe_a" if method == NPE_A else "mdn"
+
+    trainer = method(prior, density_estimator=estimator, device=device)
+
+    theta = prior.sample((num_simulations,))
+    x = simulator(theta)
+
+    proposal = prior
+    for _ in range(num_rounds):
+        trainer.append_simulations(theta, x, proposal=proposal).train(max_num_epochs=2)
+        proposal = trainer.build_posterior().set_default_x(torch.zeros(num_dim))
+        theta = proposal.sample((num_simulations,))
+        x = simulator(theta)
+
+
+@pytest.mark.gpu
+@pytest.mark.parametrize("device", ["cpu", "gpu"])
+def test_conditioned_posterior_on_gpu(device: str, mcmc_params_fast: dict):
+    device = process_device(device)
+    num_dims = 3
+
+    proposal = BoxUniform(
+        low=-torch.ones(num_dims, device=device),
+        high=torch.ones(num_dims, device=device),
+    )
+
+    inference = NPE_C(device=device, show_progress_bars=False)
+
+    num_simulations = 100
+    theta = proposal.sample((num_simulations,))
+    x = torch.randn_like(theta)
+    x_o = torch.zeros(1, num_dims).to(device)
+    inference = inference.append_simulations(theta, x)
+
+    estimator = inference.train(max_num_epochs=2)
+
+    # condition on one dim of theta
+    condition_o = torch.ones(1, 1).to(device)
+    prior = BoxUniform(
+        low=-torch.ones(num_dims - 1, device=device),
+        high=torch.ones(num_dims - 1, device=device),
+    )
+    prior_transform = utils.mcmc_transform(prior, device=device)
+
+    potential_fn, _ = likelihood_estimator_based_potential(estimator, proposal, x_o)
+    conditioned_potential_fn = potential_fn.condition_on_theta(
+        condition_o, dims_global_theta=[0, 1]
+    )
+
+    conditional_posterior = MCMCPosterior(
+        potential_fn=conditioned_potential_fn,
+        theta_transform=prior_transform,
+        proposal=prior,
+        device=device,
+        **mcmc_params_fast,
+    ).set_default_x(x_o)
+    samples = conditional_posterior.sample((1,), x=x_o)
+    conditional_posterior.potential_fn(samples)
+    conditional_posterior.map()

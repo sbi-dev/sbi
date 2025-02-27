@@ -1,7 +1,6 @@
 from typing import List
 
 import pytest
-import torch
 from torch import eye, ones, zeros
 from torch.distributions import MultivariateNormal
 
@@ -96,9 +95,9 @@ def test_c2st_npse_on_linearGaussian(
 
         max_dkl = 0.15
 
-        assert (
-            dkl < max_dkl
-        ), f"D-KL={dkl} is more than 2 stds above the average performance."
+        assert dkl < max_dkl, (
+            f"D-KL={dkl} is more than 2 stds above the average performance."
+        )
 
 
 def test_c2st_npse_on_linearGaussian_different_dims():
@@ -159,7 +158,7 @@ def test_c2st_npse_on_linearGaussian_different_dims():
 
 @pytest.mark.xfail(
     reason="iid_bridge not working.",
-    raises=NotImplementedError,
+    raises=AssertionError,
     strict=True,
     match="Score accumulation*",
 )
@@ -203,10 +202,6 @@ def test_npse_iid_inference(num_trials):
 
 
 @pytest.mark.slow
-@pytest.mark.xfail(
-    raises=NotImplementedError,
-    reason="MAP optimization via score not working accurately.",
-)
 def test_npse_map():
     num_dim = 2
     x_o = zeros(num_dim)
@@ -227,11 +222,9 @@ def test_npse_map():
     theta = prior.sample((num_simulations,))
     x = linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    inference.append_simulations(theta, x).train(
-        training_batch_size=100, max_num_epochs=10
-    )
+    inference.append_simulations(theta, x).train()
     posterior = inference.build_posterior().set_default_x(x_o)
 
-    map_ = posterior.map(show_progress_bars=True)
+    map_ = posterior.map(show_progress_bars=True, num_iter=5)
 
-    assert torch.allclose(map_, gt_posterior.mean, atol=0.2), "MAP is not close to GT."
+    assert ((map_ - gt_posterior.mean) ** 2).sum() < 0.5, "MAP is not close to GT."

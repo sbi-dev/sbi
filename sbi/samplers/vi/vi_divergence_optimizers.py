@@ -25,7 +25,6 @@ from torch.optim.lr_scheduler import (
 from torch.optim.rmsprop import RMSprop
 from torch.optim.sgd import SGD
 
-from sbi.inference.potentials.base_potential import BasePotential
 from sbi.samplers.vi.vi_utils import (
     filter_kwrags_for_func,
     make_object_deepcopy_compatible,
@@ -47,7 +46,7 @@ class DivergenceOptimizer(ABC):
 
     def __init__(
         self,
-        potential_fn: BasePotential,
+        potential_fn: 'BasePotential',  # noqa: F821 # type: ignore
         q: PyroTransformedDistribution,
         prior: Optional[Distribution] = None,
         n_particles: int = 256,
@@ -514,6 +513,8 @@ class IWElboOptimizer(ElboOptimizer):
         self.loss_name = "iwelbo"
         self.eps = 1e-7
         self.dreg = dreg
+        if not hasattr(self, 'HYPER_PARAMETERS'):
+            self.HYPER_PARAMETERS = []
         self.HYPER_PARAMETERS += ["K", "dreg"]
         if dreg:
             self.stick_the_landing = True
@@ -676,6 +677,8 @@ class RenyiDivergenceOptimizer(ElboOptimizer):
         self.alpha = alpha
         self.unbiased = unbiased
         super().__init__(*args, **kwargs)
+        if not hasattr(self, 'HYPER_PARAMETERS'):
+            self.HYPER_PARAMETERS = []
         self.HYPER_PARAMETERS += ["alpha", "unbiased", "dreg"]
         self.eps = 1e-5
         self.dreg = dreg

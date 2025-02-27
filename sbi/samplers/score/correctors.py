@@ -32,9 +32,9 @@ def register_corrector(name: str) -> Callable:
     """
 
     def decorator(corrector: Type[Corrector]) -> Callable:
-        assert issubclass(
-            corrector, Corrector
-        ), "Corrector must be a subclass of Corrector."
+        assert issubclass(corrector, Corrector), (
+            "Corrector must be a subclass of Corrector."
+        )
         CORRECTORS[name] = corrector
         return corrector
 

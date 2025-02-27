@@ -33,9 +33,9 @@ def reshape_to_sample_batch_event(
 
     trailing_theta_or_x_shape = theta_or_x.shape[-event_shape_dim:]
     leading_theta_or_x_shape = theta_or_x.shape[:-event_shape_dim]
-    assert (
-        trailing_theta_or_x_shape == event_shape
-    ), "The trailing dimensions of `theta_or_x` do not match the `event_shape`."
+    assert trailing_theta_or_x_shape == event_shape, (
+        "The trailing dimensions of `theta_or_x` do not match the `event_shape`."
+    )
 
     if len(leading_theta_or_x_shape) == 0:
         # A single datapoint is passed. Add batch and sample dim artificially.
@@ -71,9 +71,9 @@ def reshape_to_batch_event(theta_or_x: Tensor, event_shape: torch.Size) -> Tenso
 
     trailing_theta_or_x_shape = theta_or_x.shape[-event_shape_dim:]
     leading_theta_or_x_shape = theta_or_x.shape[:-event_shape_dim]
-    assert (
-        trailing_theta_or_x_shape == event_shape
-    ), "The trailing dimensions of `theta_or_x` do not match the `event_shape`."
+    assert trailing_theta_or_x_shape == event_shape, (
+        "The trailing dimensions of `theta_or_x` do not match the `event_shape`."
+    )
 
     if len(leading_theta_or_x_shape) == 0:
         # A single datapoint is passed. Add batch artificially.

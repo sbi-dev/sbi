@@ -133,9 +133,9 @@ def test_c2st_posterior_ensemble_on_linearGaussian(
             num_samples=num_samples,
         )
         max_dkl = 0.15
-        assert (
-            dkl < max_dkl
-        ), f"D-KL={dkl} is more than 2 stds above the average performance."
+        assert dkl < max_dkl, (
+            f"D-KL={dkl} is more than 2 stds above the average performance."
+        )
 
     # test individual log_prob and map
     posterior.log_prob(samples, individually=True)

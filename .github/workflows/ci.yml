@@ -29,30 +29,35 @@ jobs:
         fetch-depth: 0
         lfs: false
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
+    - name: Install uv and set the python version
+      uses: astral-sh/setup-uv@v5
       with:
         python-version: ${{ matrix.python-version }}
+        enable-cache: true
 
-    - name: Cache dependency
-      id: cache-dependencies
+    - name: Install dependencies with uv
+      run: |
+        uv pip install torch --extra-index-url https://download.pytorch.org/whl/cpu
+        uv pip install -e .[dev]
+
+    - name: Cache uv dependencies
       uses: actions/cache@v4
       with:
-        path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ matrix.python-version }}
+        path: ~/.cache/uv
+        key: uv-${{ runner.os }}-${{ matrix.python-version }}-${{ hashFiles('pyproject.toml') }}
         restore-keys: |
-          ${{ runner.os }}-pip-${{ matrix.python-version }}-
-          ${{ runner.os }}-pip-
+          uv-${{ runner.os }}-${{ matrix.python-version }}-
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install torch --extra-index-url https://download.pytorch.org/whl/cpu
-        pip install -e .[dev]
+    - name: Cache testmon data
+      uses: actions/cache@v4
+      with:
+        path: .testmondata
+        key: testmon-${{ runner.os }}-${{ matrix.python-version }}-${{ github.ref }}
+        restore-keys: |
+          testmon-${{ runner.os }}-${{ matrix.python-version }}-
 
     - name: Run the fast CPU tests with coverage
-      run: |
-        pytest -v -x -n auto -m "not slow and not gpu" --cov=sbi --cov-report=xml tests/
+      run: uv run pytest --testmon-forceselect -v -n auto -m "not slow and not gpu" --cov=sbi --cov-report=xml tests/
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4

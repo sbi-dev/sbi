@@ -10,6 +10,7 @@ from torch.distributions import Distribution
 from sbi.inference.trainers.nre.nre_base import RatioEstimator
 from sbi.sbi_types import TensorboardSummaryWriter
 from sbi.utils.sbiutils import del_entries
+from sbi.utils.torchutils import assert_all_finite
 
 
 class NRE_B(RatioEstimator):
@@ -122,4 +123,6 @@ class NRE_B(RatioEstimator):
         # "correct" one for the 1-out-of-N classification.
         log_prob = logits[:, 0] - torch.logsumexp(logits, dim=-1)
 
-        return -torch.mean(log_prob)
+        loss = -torch.mean(log_prob)
+        assert_all_finite(loss, "NRE-B loss")
+        return loss

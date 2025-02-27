@@ -10,6 +10,7 @@ from torch.distributions import Distribution
 from sbi.inference.trainers.nre.nre_base import RatioEstimator
 from sbi.sbi_types import TensorboardSummaryWriter
 from sbi.utils.sbiutils import del_entries
+from sbi.utils.torchutils import assert_all_finite
 
 
 class NRE_C(RatioEstimator):
@@ -190,7 +191,10 @@ class NRE_C(RatioEstimator):
 
         # relative weights. p_marginal := p_0, and p_joint := p_K * K from the notation.
         p_marginal, p_joint = self._get_prior_probs_marginal_and_joint(gamma)
-        return -torch.mean(p_marginal * log_prob_marginal + p_joint * log_prob_joint)
+
+        loss = -torch.mean(p_marginal * log_prob_marginal + p_joint * log_prob_joint)
+        assert_all_finite(loss, "NRE-C loss")
+        return loss
 
     @staticmethod
     def _get_prior_probs_marginal_and_joint(gamma: float) -> Tuple[float, float]:

@@ -31,8 +31,8 @@ keywords = ["Bayesian inference", "simulation-based inference", "PyTorch"]
 dependencies = [
     "arviz",
     "joblib>=1.0.0",
-    "jupyter",
     "matplotlib",
+    "notebook <= 6.4.12",
     "numpy<2.0.0",
     "pillow",
     "pyknos>=0.16.0",
@@ -40,7 +40,7 @@ dependencies = [
     "scikit-learn",
     "scipy<1.13",
     "tensorboard",
-    "torch>=1.13.0",
+    "torch>=1.13.0, <2.6.0",
     "tqdm",
     "pymc>=5.0.0",
     "zuko>=1.2.0",
@@ -59,19 +59,19 @@ doc = [
     "mkdocstrings[python] >= 0.18",
     "nbconvert",
     "nbformat",
-    "notebook <= 6.4.12",
     "traitlets <= 5.9.0",
 ]
 dev = [
     "ffmpeg",
     # Lint
-    "pre-commit == 3.5.0",
+    "pre-commit == 4.0.1",
     "pyyaml",
     "pyright",
-    "ruff>=0.3.3",
+    "ruff==0.9.0",
     # Test
     "pytest",
     "pytest-cov",
+    "pytest-testmon",
     "pytest-xdist",
     "pytest-harvest",
     "torchtestcase",
@@ -108,6 +108,7 @@ ignore = [
 [tool.ruff.lint.extend-per-file-ignores]
 "__init__.py" = ["E402", "F401", "F403"]  # allow unused imports and undefined names
 "test_*.py" = ["F403", "F405"]
+"tutorials/*.ipynb" = ["E501"]  # allow long lines in notebooks
 
 [tool.ruff.lint.isort]
 case-sensitive = true

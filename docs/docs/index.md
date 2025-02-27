@@ -39,7 +39,7 @@ samples = posterior.sample((1000,), x=x_o)
 **To get started, install the `sbi` package with:**
 
 ```commandline
-pip install sbi
+python -m pip install sbi
 ```
 
 for more advanced install options, see our [Install Guide](install.md).

@@ -60,8 +60,8 @@ def warn_if_zscoring_changes_data(x: Tensor, duplicate_tolerance: float = 0.1) -
 
         if num_unique_z < num_unique * (1 - duplicate_tolerance):
             warnings.warn(
-                "Z-scoring these simulation outputs resulted in {num_unique_z} unique "
-                "datapoints. Before z-scoring, it had been {num_unique}. This can "
+                f"Z-scoring these simulation outputs resulted in {num_unique_z} unique "
+                f"datapoints. Before z-scoring, it had been {num_unique}. This can "
                 "occur due to numerical inaccuracies when the data covers a large "
                 "range of values. Consider either setting `z_score_x=False` (but "
                 "beware that this can be problematic for training the NN) or exclude "
@@ -387,7 +387,7 @@ def nle_nre_apt_msg_on_invalid_x(
 
     if num_nans + num_infs > 0:
         if exclude_invalid_x:
-            logging.warn(
+            logging.warning(
                 f"Found {num_nans} NaN simulations and {num_infs} Inf simulations."
                 f"These will be discarded from training due to "
                 f"`exclude_invalid_x=True`. Please be aware that this gives "
@@ -841,7 +841,9 @@ def mog_log_prob(
 
     # Split up evaluation into parts.
     weights = logits_pp - torch.logsumexp(logits_pp, dim=-1, keepdim=True)
-    constant = -(output_dim / 2.0) * torch.log(torch.tensor([2 * pi]))
+    constant = -(output_dim / 2.0) * torch.log(
+        torch.tensor([2 * pi], device=theta.device)
+    )
     log_det = 0.5 * torch.log(torch.det(precisions_pp))
     theta_minus_mean = theta.expand_as(means_pp) - means_pp
     exponent = -0.5 * batched_mixture_vmv(precisions_pp, theta_minus_mean)
@@ -945,7 +947,7 @@ def gradient_ascent(
                     )
                     best_theta_iter = optimize_inits[  # type: ignore
                         torch.argmax(log_probs_of_optimized)
-                    ].view(1, -1)
+                    ].unsqueeze(0)  # add batch dim
                     best_log_prob_iter = potential_fn(
                         theta_transform.inv(best_theta_iter)
                     )
@@ -959,7 +961,8 @@ def gradient_ascent(
                         f"Optimizing MAP estimate. Iterations: {iter_ + 1} / "
                         f"{num_iter}. Performance in iteration "
                         f"{divmod(iter_ + 1, save_best_every)[0] * save_best_every}: "
-                        f"{best_log_prob_iter.item():.2f} (= unnormalized log-prob)",
+                        f"{best_log_prob_iter.item():.2f} (= unnormalized log-prob). "
+                        "Press Ctrl-C to interrupt.",
                         end="",
                     )
                 argmax_ = theta_transform.inv(best_theta_overall)

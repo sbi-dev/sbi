@@ -101,9 +101,9 @@ def get_prob_outside_uniform_prior(
     # Test whether likelihood outside prior support is zero.
     assert isinstance(prior, BoxUniform)
     sample_outside_support = 1.1 * prior.base_dist.low
-    assert not within_support(
-        prior, sample_outside_support
-    ).all(), "Samples must be outside of support."
+    assert not within_support(prior, sample_outside_support).all(), (
+        "Samples must be outside of support."
+    )
 
     return torch.exp(posterior.log_prob(sample_outside_support))
 
@@ -148,9 +148,9 @@ def check_c2st(x: Tensor, y: Tensor, alg: str, tol: float = 0.1) -> None:
     score = c2st(x, y).item()
     print(f"c2st for {alg} is {score:.2f}.")
 
-    assert (
-        (0.5 - tol) <= score <= (0.5 + tol)
-    ), f"{alg}'s c2st={score:.2f} is too far from the desired near-chance performance."
+    assert (0.5 - tol) <= score <= (0.5 + tol), (
+        f"{alg}'s c2st={score:.2f} is too far from the desired near-chance performance."
+    )
 
 
 class PosteriorPotential(BasePotential):
@@ -178,9 +178,9 @@ class PosteriorPotential(BasePotential):
         """
         super().__init__(prior, x_o, device)
 
-        assert (
-            x_o is None
-        ), "No need to pass x_o, passed Posterior must be fixed to x_o."
+        assert x_o is None, (
+            "No need to pass x_o, passed Posterior must be fixed to x_o."
+        )
         self.posterior = posterior
 
     def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:

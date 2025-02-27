@@ -418,9 +418,9 @@ class MCMCPosterior(NeuralPosterior):
             else init_strategy_parameters
         )
 
-        assert (
-            method == "slice_np_vectorized"
-        ), "Batched sampling only supported for vectorized samplers!"
+        assert method == "slice_np_vectorized", (
+            "Batched sampling only supported for vectorized samplers!"
+        )
 
         # warn if num_chains is larger than num requested samples
         if num_chains > torch.Size(sample_shape).numel():
@@ -452,11 +452,11 @@ class MCMCPosterior(NeuralPosterior):
         num_chains_extended = batch_size * num_chains
         if num_chains_extended > 100:
             warnings.warn(
-                "Note that for batched sampling, we use num_chains many chains for each"
-                " x in the batch. With the given settings, this results in a large "
-                f"number large number of chains ({num_chains_extended}), which can be "
-                "slow and memory-intensive for vectorized MCMC. Consider reducing the "
-                "number of chains.",
+                "Note that for batched sampling, we use num_chains many chains "
+                "for each x in the batch. With the given settings, this results "
+                f"in a large number of chains ({num_chains_extended}), which can "
+                "be slow and memory-intensive for vectorized MCMC. Consider "
+                "reducing the number of chains or batch size.",
                 stacklevel=2,
             )
         init_strategy_parameters["num_return_samples"] = num_chains_extended
@@ -1003,9 +1003,9 @@ class MCMCPosterior(NeuralPosterior):
         Returns:
             inference_data: Arviz InferenceData object.
         """
-        assert (
-            self._posterior_sampler is not None
-        ), """No samples have been generated, call .sample() first."""
+        assert self._posterior_sampler is not None, (
+            """No samples have been generated, call .sample() first."""
+        )
 
         sampler: Union[
             MCMC, SliceSamplerSerial, SliceSamplerVectorized, PyMCSampler

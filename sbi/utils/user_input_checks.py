@@ -386,9 +386,9 @@ def check_prior_return_type(
     """Check whether prior.sample() returns float32 Tensor."""
 
     prior_dtype = prior.sample().dtype
-    assert (
-        prior_dtype == return_type
-    ), f"Prior return type must be {return_type}, but is {prior_dtype}."
+    assert prior_dtype == return_type, (
+        f"Prior return type must be {return_type}, but is {prior_dtype}."
+    )
 
 
 def check_prior_batch_behavior(prior) -> None:
@@ -408,13 +408,13 @@ def check_prior_batch_behavior(prior) -> None:
     # Using len here because `log_prob` could be `ndarray` or `torch.Tensor`.
     num_log_probs = len(log_probs)
 
-    assert (
-        num_sampled == num_samples
-    ), "prior.sample((batch_size, )) must return batch_size parameters."
+    assert num_sampled == num_samples, (
+        "prior.sample((batch_size, )) must return batch_size parameters."
+    )
 
-    assert (
-        num_log_probs == num_samples
-    ), "prior.log_prob must return as many log probs as samples."
+    assert num_log_probs == num_samples, (
+        "prior.log_prob must return as many log probs as samples."
+    )
 
 
 def check_prior_support(prior):
@@ -503,9 +503,9 @@ def wrap_as_pytorch_simulator(
         # Get data to check input type is consistent with data.
         theta = prior.sample().numpy()  # Cast to numpy because is in PyTorch already.
         x = simulator(theta)
-        assert isinstance(
-            x, ndarray
-        ), f"Simulator output type {type(x)} must match its input type {type(theta)}"
+        assert isinstance(x, ndarray), (
+            f"Simulator output type {type(x)} must match its input type {type(theta)}"
+        )
 
         # Define a wrapper function to PyTorch
         def pytorch_simulator(theta: Tensor) -> Tensor:

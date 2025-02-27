@@ -16,8 +16,7 @@ from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_sample_batch_event,
 )
 from sbi.sbi_types import TorchTransform
-from sbi.utils import mcmc_transform
-from sbi.utils.sbiutils import within_support
+from sbi.utils.sbiutils import mcmc_transform, within_support
 from sbi.utils.torchutils import ensure_theta_batched
 
 
@@ -25,7 +24,7 @@ def score_estimator_based_potential(
     score_estimator: ConditionalScoreEstimator,
     prior: Optional[Distribution],
     x_o: Optional[Tensor],
-    enable_transform: bool = False,
+    enable_transform: bool = True,
 ) -> Tuple["PosteriorScoreBasedPotential", TorchTransform]:
     r"""Returns the potential function gradient for score estimators.
 
@@ -40,10 +39,6 @@ def score_estimator_based_potential(
     potential_fn = PosteriorScoreBasedPotential(
         score_estimator, prior, x_o, device=device
     )
-
-    assert (
-        enable_transform is False
-    ), "Transforms are not yet supported for score estimators."
 
     if prior is not None:
         theta_transform = mcmc_transform(
@@ -74,28 +69,45 @@ class PosteriorScoreBasedPotential(BasePotential):
                 `iid_bridge` as proposed in Geffner et al. is implemented.
             device: The device on which to evaluate the potential.
         """
-
-        super().__init__(prior, x_o, device=device)
         self.score_estimator = score_estimator
         self.score_estimator.eval()
         self.iid_method = iid_method
+        super().__init__(prior, x_o, device=device)
+
+    def set_x(
+        self,
+        x_o: Optional[Tensor],
+        x_is_iid: Optional[bool] = False,
+        atol: float = 1e-5,
+        rtol: float = 1e-6,
+        exact: bool = True,
+    ):
+        """
+        Set the observed data and whether it is IID.
+
+        Rebuids the continuous normalizing flow if the observed data is set.
+
+        Args:
+            x_o: The observed data.
+            x_is_iid: Whether the observed data is IID (if batch_dim>1).
+            atol: Absolute tolerance for the ODE solver.
+            rtol: Relative tolerance for the ODE solver.
+            exact: Whether to use the exact ODE solver.
+        """
+        super().set_x(x_o, x_is_iid)
+        if self._x_o is not None:
+            self.flow = self.rebuild_flow(atol=atol, rtol=rtol, exact=exact)
 
     def __call__(
         self,
         theta: Tensor,
         track_gradients: bool = True,
-        atol: float = 1e-5,
-        rtol: float = 1e-6,
-        exact: bool = True,
     ) -> Tensor:
         """Return the potential (posterior log prob) via probability flow ODE.
 
         Args:
             theta: The parameters at which to evaluate the potential.
             track_gradients: Whether to track gradients.
-            atol: Absolute tolerance for the ODE solver.
-            rtol: Relative tolerance for the ODE solver.
-            exact: Whether to use the exact ODE solver.
 
         Returns:
             The potential function, i.e., the log probability of the posterior.
@@ -104,21 +116,10 @@ class PosteriorScoreBasedPotential(BasePotential):
         theta_density_estimator = reshape_to_sample_batch_event(
             theta, theta.shape[1:], leading_is_sample=True
         )
-        x_density_estimator = reshape_to_batch_event(
-            self.x_o, event_shape=self.score_estimator.condition_shape
-        )
-        assert (
-            x_density_estimator.shape[0] == 1
-        ), "PosteriorScoreBasedPotential supports only x batchsize of 1`."
-
         self.score_estimator.eval()
 
-        flow = self.get_continuous_normalizing_flow(
-            condition=x_density_estimator, atol=atol, rtol=rtol, exact=exact
-        )
-
         with torch.set_grad_enabled(track_gradients):
-            log_probs = flow.log_prob(theta_density_estimator).squeeze(-1)
+            log_probs = self.flow.log_prob(theta_density_estimator).squeeze(-1)
             # Force probability to be zero outside prior support.
             in_prior_support = within_support(self.prior, theta)
 
@@ -135,7 +136,7 @@ class PosteriorScoreBasedPotential(BasePotential):
         r"""Returns the potential function gradient for score-based methods.
 
         Args:
-            theta: The parameters at which to evaluate the potential.
+            theta: The parameters at which to evaluate the potential gradient.
             time: The diffusion time. If None, then `t_min` of the
                 self.score_estimator is used (i.e. we evaluate the gradient of the
                 actual data distribution).
@@ -189,12 +190,36 @@ class PosteriorScoreBasedPotential(BasePotential):
         # Use zuko to build the normalizing flow.
         return NormalizingFlow(transform, base=base_density)
 
+    def rebuild_flow(
+        self, atol: float = 1e-5, rtol: float = 1e-6, exact: bool = True
+    ) -> NormalizingFlow:
+        """
+        Rebuilds the continuous normalizing flow. This is used when
+        a new default x is set, or to evaluate the log probs at higher precision.
+        """
+        if self._x_o is None:
+            raise ValueError(
+                "No observed data x_o is available. Please reinitialize \
+                the potential or manually set self._x_o."
+            )
+        x_density_estimator = reshape_to_batch_event(
+            self.x_o, event_shape=self.score_estimator.condition_shape
+        )
+        assert x_density_estimator.shape[0] == 1 or not self.x_is_iid, (
+            "PosteriorScoreBasedPotential supports only x batchsize of 1`."
+        )
+
+        flow = self.get_continuous_normalizing_flow(
+            condition=x_density_estimator, atol=atol, rtol=rtol, exact=exact
+        )
+        return flow
+
 
 def build_freeform_jacobian_transform(
     score_estimator: ConditionalScoreEstimator,
     x_o: Tensor,
-    atol: float = 1e-5,
-    rtol: float = 1e-6,
+    atol: float = 1e-6,
+    rtol: float = 1e-5,
     exact: bool = True,
 ) -> FreeFormJacobianTransform:
     """Builds the free-form Jacobian for the probability flow ODE, used for log-prob.
@@ -229,3 +254,54 @@ def build_freeform_jacobian_transform(
         exact=exact,
     )
     return transform
+
+
+class DifferentiablePotentialFunction(torch.autograd.Function):
+    """
+    A wrapper of PosteriorScoreBasedPotential with a custom autograd function to compute
+    the gradient of log_prob with respect to theta. Instead of backpropagating through
+    the continuous normalizing flow, we use the gradient of the score estimator.
+
+    """
+
+    @staticmethod
+    def forward(ctx, input, call_function, gradient_function):
+        """
+        Computes the potential normally.
+        """
+        # Save the methods as callables
+        ctx.call_function = call_function
+        ctx.gradient_function = gradient_function
+        ctx.save_for_backward(input)
+
+        # Perform the forward computation
+        output = call_function(input)
+        return output
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        (input,) = ctx.saved_tensors
+        grad = ctx.gradient_function(input)
+        # Match dims
+        while len(grad_output.shape) < len(grad.shape):
+            grad_output = grad_output.unsqueeze(-1)
+        grad_input = grad_output * grad
+        return grad_input, None, None
+
+
+class CallableDifferentiablePotentialFunction:
+    """
+    This class handles the forward and backward functions from the potential function
+    that can be passed to DifferentiablePotentialFunction, as torch.autograd.Function
+    only supports static methods, and so it can't be given the potential class directly.
+    """
+
+    def __init__(self, posterior_score_based_potential):
+        self.posterior_score_based_potential = posterior_score_based_potential
+
+    def __call__(self, input):
+        return DifferentiablePotentialFunction.apply(
+            input,
+            self.posterior_score_based_potential.__call__,
+            self.posterior_score_based_potential.gradient,
+        )

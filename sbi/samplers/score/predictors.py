@@ -7,15 +7,13 @@ from typing import Callable, Type
 import torch
 from torch import Tensor
 
-from sbi.inference.potentials.score_based_potential import (
-    PosteriorScoreBasedPotential,
-)
-
 PREDICTORS = {}
 
 
 def get_predictor(
-    name: str, score_based_potential: PosteriorScoreBasedPotential, **kwargs
+    name: str,
+    score_based_potential: 'PosteriorScoreBasedPotential',  # noqa: F821 # type: ignore
+    **kwargs,
 ) -> "Predictor":
     """Helper function to get predictor by name.
 
@@ -37,9 +35,9 @@ def register_predictor(name: str) -> Callable:
     """
 
     def decorator(predictor: Type[Predictor]) -> Callable:
-        assert issubclass(
-            predictor, Predictor
-        ), "Predictor must be a subclass of Predictor."
+        assert issubclass(predictor, Predictor), (
+            "Predictor must be a subclass of Predictor."
+        )
         PREDICTORS[name] = predictor
         return predictor
 
@@ -54,7 +52,7 @@ class Predictor(ABC):
 
     def __init__(
         self,
-        potential_fn: PosteriorScoreBasedPotential,
+        potential_fn: 'PosteriorScoreBasedPotential',  # noqa: F821 # type: ignore
     ):
         """Initialize predictor.
 
@@ -94,7 +92,7 @@ class Predictor(ABC):
 class EulerMaruyama(Predictor):
     def __init__(
         self,
-        potential_fn: PosteriorScoreBasedPotential,
+        potential_fn: 'PosteriorScoreBasedPotential',  # noqa: F821 # type: ignore
         eta: float = 1.0,
     ):
         """Simple Euler-Maruyama discretization of the associated family of reverse

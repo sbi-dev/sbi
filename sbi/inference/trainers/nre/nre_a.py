@@ -10,6 +10,7 @@ from torch.distributions import Distribution
 from sbi.inference.trainers.nre.nre_base import RatioEstimator
 from sbi.sbi_types import TensorboardSummaryWriter
 from sbi.utils.sbiutils import del_entries
+from sbi.utils.torchutils import assert_all_finite
 
 
 class NRE_A(RatioEstimator):
@@ -124,4 +125,6 @@ class NRE_A(RatioEstimator):
         labels[1::2] = 0.0
 
         # Binary cross entropy to learn the likelihood (AALR-specific)
-        return nn.BCELoss()(likelihood, labels)
+        loss = nn.BCELoss()(likelihood, labels)
+        assert_all_finite(loss, "NRE-A loss")
+        return loss

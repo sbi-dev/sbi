@@ -301,9 +301,9 @@ class BoxUniform(Independent):
         """
 
         # Type checks.
-        assert isinstance(low, Tensor) and isinstance(
-            high, Tensor
-        ), f"low and high must be tensors but are {type(low)} and {type(high)}."
+        assert isinstance(low, Tensor) and isinstance(high, Tensor), (
+            f"low and high must be tensors but are {type(low)} and {type(high)}."
+        )
         if not low.device == high.device:
             raise RuntimeError(
                 "Expected all tensors to be on the same device, but found at least"

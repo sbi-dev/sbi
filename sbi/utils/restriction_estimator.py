@@ -15,8 +15,8 @@ from torch.optim.adam import Adam
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler, WeightedRandomSampler
 
+from sbi.samplers import rejection
 from sbi.samplers.importance.sir import sampling_importance_resampling
-from sbi.samplers.rejection.rejection import accept_reject_sample
 from sbi.sbi_types import Shape
 from sbi.utils.sbiutils import (
     get_simulations_since_round,
@@ -560,9 +560,9 @@ class AcceptRejectFunction:
             else:
                 raise NameError(f"`safety_margin` {safety_margin} not supported.")
         else:
-            assert (
-                allowed_false_negatives is not None
-            ), "`allowed_false_negatives` must be set."
+            assert allowed_false_negatives is not None, (
+                "`allowed_false_negatives` must be set."
+            )
             quantile_index = floor(num_valid * allowed_false_negatives)
             self._classifier_thr, _ = torch.kthvalue(clf_probs, quantile_index + 1)
 
@@ -684,14 +684,19 @@ class RestrictedPrior(Distribution):
         sample_with = self._sample_with if sample_with is None else sample_with
 
         if sample_with == "rejection":
-            samples, acceptance_rate = accept_reject_sample(
-                proposal=self._prior,
+            samples, acceptance_rate = rejection.accept_reject_sample(
+                proposal=self._prior.sample,
                 accept_reject_fn=self._accept_reject_fn,
                 num_samples=num_samples,
                 show_progress_bars=show_progress_bars,
                 max_sampling_batch_size=max_sampling_batch_size,
                 alternative_method="sample_with='sir'",
             )
+            # NOTE: This currently requires a float acceptance rate. A previous version
+            # of accept_reject_sample returned a float. In favour to batched sampling
+            # it now returns a tensor.
+            acceptance_rate = acceptance_rate.min().item()
+
             if save_acceptance_rate:
                 self.acceptance_rate = torch.as_tensor(acceptance_rate)
             if print_rejected_frac:

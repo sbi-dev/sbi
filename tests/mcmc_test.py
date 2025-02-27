@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import sys
+
 import numpy as np
 import pytest
 import torch
@@ -183,7 +185,15 @@ def test_c2st_pymc_sampler_on_Gaussian(
     (
         "nuts_pyro",
         "hmc_pyro",
-        "nuts_pymc",
+        pytest.param(
+            "nuts_pymc",
+            marks=pytest.mark.xfail(
+                condition=sys.version_info >= (3, 12),
+                reason="Fails with pymc 5.20.1",
+                strict=True,
+                raises=TypeError,
+            ),
+        ),
         "hmc_pymc",
         "slice_pymc",
         "slice_np",

@@ -7,7 +7,7 @@ from typing import Any, Callable, Dict, Optional, Union
 from torch.distributions import Distribution
 
 from sbi.inference.posteriors import MCMCPosterior, RejectionPosterior, VIPosterior
-from sbi.inference.potentials import mixed_likelihood_estimator_based_potential
+from sbi.inference.potentials import likelihood_estimator_based_potential
 from sbi.inference.trainers.nle.nle_base import LikelihoodEstimator
 from sbi.neural_nets.estimators import MixedDensityEstimator
 from sbi.sbi_types import TensorboardSummaryWriter, TorchModule
@@ -155,9 +155,7 @@ class MNLE(LikelihoodEstimator):
         (
             potential_fn,
             theta_transform,
-        ) = mixed_likelihood_estimator_based_potential(
-            likelihood_estimator=likelihood_estimator, prior=prior, x_o=None
-        )
+        ) = likelihood_estimator_based_potential(likelihood_estimator, prior, x_o=None)
 
         if sample_with == "mcmc":
             self._posterior = MCMCPosterior(
