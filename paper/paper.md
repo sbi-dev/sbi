@@ -9,31 +9,35 @@ tags:
   - Conditional Density Estimation
 
 authors:
-  - name: Jan Boelts^[Maintainer]
-    affiliation: "1, 2, 3"
+  - name: Jan Boelts
+    affiliation: "1, 2, 3, 26"
+    corresponding: true
+    equal-contrib: true
     role: "Maintainer, core contributor"
 
-  - name: Michael Deistler^[Maintainer]
-    affiliation: "1, 2"
+  - name: Michael Deistler
+    affiliation: "1, 2, 26"
+    corresponding: true
+    equal-contrib: true
     role: "Maintainer, core contributor"
 
-  - name: Manuel Gloeckler^[Core Contributor]
+  - name: Manuel Gloeckler
     affiliation: "1, 2"
     role: "Core contributor"
 
-  - name: Álvaro Tejero-Cantero^[Core Contributor]
+  - name: Álvaro Tejero-Cantero
     affiliation: "3, 4"
     role: "Core contributor"
 
-  - name: Jan-Matthis Lueckmann^[Core Contributor]
+  - name: Jan-Matthis Lueckmann
     affiliation: "5"
     role: "Core contributor"
 
-  - name: Guy Moss^[Core Contributor]
+  - name: Guy Moss
     affiliation: "1, 2"
     role: "Core contributor"
 
-  - name: Peter Steinbach^[Major Contributor]
+  - name: Peter Steinbach
     affiliation: "6"
     role: "Major contributor"
 
@@ -118,6 +122,7 @@ authors:
 
   - name: Jakob H. Macke
     affiliation: "1, 2, 25"
+    corresponding: true
 
 affiliations:
   - index: 1
@@ -170,6 +175,8 @@ affiliations:
     name: Departments of Computer Science Electrical Engineering, KU Leuven, Belgium
   - index: 25
     name: Department Empirical Inference, Max Planck Institute for Intelligent Systems, Tübingen
+  - index: 26
+    name: Maintainer
 
 date: 16 October 2024
 bibliography: paper.bib
