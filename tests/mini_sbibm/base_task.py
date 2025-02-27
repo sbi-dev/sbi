@@ -118,6 +118,7 @@ class Task(ABC):
             torch.Tensor: The loaded posterior samples.
         """
         posterior_samples = torch.load(
-            PATH + os.sep + "files" + os.sep + f"{self.name}{os.sep}samples_{idx}.pt"
+            PATH + os.sep + "files" + os.sep + f"{self.name}{os.sep}samples_{idx}.pt",
+            weights_only=False,
         )
         return posterior_samples
