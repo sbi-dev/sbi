@@ -11,14 +11,10 @@ tags:
 authors:
   - name: Jan Boelts^[Maintainer]
     affiliation: "1, 2, 3"
-    corresponding: true
-    equal-contrib: true
     role: "Maintainer, core contributor"
 
-  - name: Michael Deistler
+  - name: Michael Deistler^[Maintainer]
     affiliation: "1, 2"
-    corresponding: true
-    equal-contrib: true
     role: "Maintainer, core contributor"
 
   - name: Manuel Gloeckler
@@ -122,7 +118,6 @@ authors:
 
   - name: Jakob H. Macke
     affiliation: "1, 2, 25"
-    corresponding: true
 
 affiliations:
   - index: 1
