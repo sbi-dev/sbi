@@ -17,23 +17,23 @@ authors:
     affiliation: "1, 2"
     role: "Maintainer, core contributor"
 
-  - name: Manuel Gloeckler
+  - name: Manuel Gloeckler^[Core Contributor]
     affiliation: "1, 2"
     role: "Core contributor"
 
-  - name: Álvaro Tejero-Cantero
+  - name: Álvaro Tejero-Cantero^[Core Contributor]
     affiliation: "3, 4"
     role: "Core contributor"
 
-  - name: Jan-Matthis Lueckmann
+  - name: Jan-Matthis Lueckmann^[Core Contributor]
     affiliation: "5"
     role: "Core contributor"
 
-  - name: Guy Moss
+  - name: Guy Moss^[Core Contributor]
     affiliation: "1, 2"
     role: "Core contributor"
 
-  - name: Peter Steinbach
+  - name: Peter Steinbach^[Major Contributor]
     affiliation: "6"
     role: "Major contributor"
 
