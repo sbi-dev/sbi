@@ -88,7 +88,8 @@ class Task(ABC):
             torch.Tensor: The loaded observation.
         """
         x_o = torch.load(
-            PATH + os.sep + "files" + os.sep + f"{self.name}{os.sep}x_o_{idx}.pt"
+            PATH + os.sep + "files" + os.sep + f"{self.name}{os.sep}x_o_{idx}.pt",
+            weights_only=False,
         )
         return x_o
 
