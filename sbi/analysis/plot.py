@@ -124,12 +124,18 @@ def plt_hist_2d(
     ax: Axes,
     samples_col: np.ndarray,
     samples_row: np.ndarray,
-    limits_col: torch.Tensor,
-    limits_row: torch.Tensor,
+    limits_col: Union[torch.Tensor, List],
+    limits_row: Union[torch.Tensor, List],
     offdiag_kwargs: Dict,
 ):
-    hist_kwargs = copy.deepcopy(offdiag_kwargs)
     """Plot 2D histogram."""
+    hist_kwargs = copy.deepcopy(offdiag_kwargs)
+
+    if isinstance(limits_col, torch.Tensor):
+        limits_col = limits_col.tolist()
+    if isinstance(limits_row, torch.Tensor):
+        limits_row = limits_row.tolist()
+
     if (
         "bins" not in hist_kwargs["np_hist_kwargs"]
         or hist_kwargs["np_hist_kwargs"]["bins"] is None
