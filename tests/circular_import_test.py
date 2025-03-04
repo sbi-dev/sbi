@@ -96,7 +96,7 @@ def test_for_circular_imports():
             import_first_function(module.__name__)
 
             del module
-        except ImportError as e:
+        except (ImportError, NameError) as e:
             # NOTE: There might be other errors which are intended
             if "circular import" in str(e):
                 # This is a circular import detected
