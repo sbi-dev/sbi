@@ -106,8 +106,9 @@ class CustomPotentialWrapper(BasePotential):
             potential_fn: Custom potential function following the CustomPotential
                 protocol, i.e., the function must have exactly two positional arguments
                 where the first is theta and the second is the x_o.
-            prior: Prior distribution. x_o: Observed data. device: Device on which to
-            evaluate the potential function.
+            prior: Prior distribution, optional at init, but needed at inference time.
+            x_o: Observed data, optional at init, but needed at inference time.
+            device: Device on which to evaluate the potential function.
 
         """
         super().__init__(prior, x_o, device)
