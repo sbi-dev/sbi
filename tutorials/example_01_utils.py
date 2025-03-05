@@ -42,19 +42,33 @@ class BinomialGammaPotential(BasePotential):
         batch_size = theta.shape[0]
         num_trials = self.x_o.shape[0]
         theta = theta.reshape(batch_size, 1, -1)
+        # We assume the InverseGamma to be in the first position of theta.
+        # And potentially multiple Binomials in the rest.
         beta, rhos = theta[:, :, :1], theta[:, :, 1:]
 
-        # vectorized
-        logprob_choices = torch.stack(
-            [Binomial(probs=rho).log_prob(self.x_o[:, 1:]) for rho in rhos],
+        # evaluate vectorized across batch of thetas.
+        logprob_choices = (
+            torch.stack(
+                [
+                    Binomial(probs=rhos[:, :, rho_idx]).log_prob(
+                        self.x_o[:, 1 + rho_idx]
+                    )
+                    for rho_idx in range(rhos.shape[-1])
+                ],
+            )
+            .transpose(0, 1)
+            .transpose(1, 2)
         )
 
         logprob_rts = InverseGamma(
-            concentration=self.concentration_scaling * torch.ones_like(beta),
-            rate=beta,
+            concentration=self.concentration_scaling * torch.ones_like(beta), rate=beta
         ).log_prob(self.x_o[:, :1].reshape(1, num_trials, -1))
 
+        # sum across parameter dimensions.
         joint_likelihood = torch.sum(logprob_choices, dim=-1) + logprob_rts.squeeze()
 
         assert joint_likelihood.shape == torch.Size([theta.shape[0], self.x_o.shape[0]])
+        assert joint_likelihood.isfinite().all(), (
+            "Joint likelihood contains infs or nans"
+        )
         return joint_likelihood.sum(1)
