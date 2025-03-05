@@ -14,7 +14,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.5">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.7">
     
     
       
@@ -675,11 +675,11 @@ p(\text{probs}) = \text{Beta}(2, 2)
 <span class="n">x_o</span> <span class="o">=</span> <span class="n">mixed_simulator</span><span class="p">(</span><span class="n">theta_o</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="n">num_trials</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
 </code></pre></div>
 <div class="highlight"><pre><span></span><code><span class="n">mcmc_kwargs</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
-    <span class="n">num_chains</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span>
-    <span class="n">warmup_steps</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>
-    <span class="n">method</span><span class="o">=</span><span class="s2">&quot;slice_np_vectorized&quot;</span><span class="p">,</span>
-    <span class="n">init_strategy</span><span class="o">=</span><span class="s2">&quot;proposal&quot;</span><span class="p">,</span>
+    <span class="n">num_chains</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span>
+    <span class="n">warmup_steps</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span>
+    <span class="n">init_strategy</span><span class="o">=</span><span class="s2">&quot;resample&quot;</span><span class="p">,</span>
     <span class="n">thin</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+    <span class="n">num_workers</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
 <span class="p">)</span>
 
 <span class="n">true_posterior</span> <span class="o">=</span> <span class="n">MCMCPosterior</span><span class="p">(</span>
@@ -704,13 +704,13 @@ p(\text{probs}) = \text{Beta}(2, 2)
 <span class="n">trainer</span> <span class="o">=</span> <span class="n">MNLE</span><span class="p">(</span><span class="n">proposal</span><span class="p">,</span> <span class="n">estimator_builder</span><span class="p">)</span>
 <span class="n">estimator</span> <span class="o">=</span> <span class="n">trainer</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 75 epochs.
+<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 58 epochs.
 </code></pre></div>
 
 <div class="highlight"><pre><span></span><code><span class="c1"># Build posterior from the trained estimator and prior.</span>
-<span class="n">mnle_posterior</span> <span class="o">=</span> <span class="n">trainer</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">)</span>
+<span class="n">mnle_posterior</span> <span class="o">=</span> <span class="n">trainer</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span> <span class="n">mcmc_parameters</span><span class="o">=</span><span class="n">mcmc_kwargs</span><span class="p">)</span>
 
-<span class="n">mnle_samples</span> <span class="o">=</span> <span class="n">mnle_posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_samples</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_o</span><span class="p">,</span> <span class="o">**</span><span class="n">mcmc_kwargs</span><span class="p">)</span>
+<span class="n">mnle_samples</span> <span class="o">=</span> <span class="n">mnle_posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_samples</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_o</span><span class="p">)</span>
 </code></pre></div>
 <h3 id="compare-mnle-and-reference-posterior">Compare MNLE and reference posterior<a class="headerlink" href="#compare-mnle-and-reference-posterior" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code><span class="c1"># Plot them in one pairplot as contours (obtained via KDE on the samples).</span>
@@ -777,9 +777,9 @@ p(\text{probs}) = \text{Beta}(2, 2)
 <span class="p">);</span>
 </code></pre></div>
 <p><img alt="png" src="../Example_01_DecisionMakingModel_files/Example_01_DecisionMakingModel_18_0.png" /></p>
-<div class="highlight"><pre><span></span><code><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;c2st between true and MNLE posterior:&quot;</span><span class="p">,</span> <span class="n">c2st</span><span class="p">(</span><span class="n">true_samples</span><span class="p">,</span> <span class="n">mnle_samples</span><span class="p">)</span><span class="o">.</span><span class="n">item</span><span class="p">())</span>
+<div class="highlight"><pre><span></span><code><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;c2st between true and MNLE posterior: </span><span class="si">{</span><span class="n">c2st</span><span class="p">(</span><span class="n">true_samples</span><span class="p">,</span><span class="w"> </span><span class="n">mnle_samples</span><span class="p">)</span><span class="o">.</span><span class="n">item</span><span class="p">()</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>c2st between true and MNLE posterior: 0.5155000000000001
+<div class="codehilite"><pre><span></span><code>c2st between true and MNLE posterior: 0.57
 </code></pre></div>
 
 <p>Again we can see that the posteriors match nicely. In addition, we observe that the posterior&rsquo;s (epistemic) uncertainty reduces as we increase the number of trials.</p>
@@ -858,7 +858,7 @@ experimental conditions).</p>
     <span class="n">theta_transform</span><span class="o">=</span><span class="n">prior_transform</span><span class="p">,</span>
     <span class="n">proposal</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span>
     <span class="o">**</span><span class="n">mcmc_kwargs</span><span class="p">,</span>
-<span class="p">)</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_samples</span><span class="p">,),</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="p">)</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_samples</span><span class="p">,))</span>
 </code></pre></div>
 <h3 id="train-mnle-including-experimental-conditions">Train MNLE including experimental conditions<a class="headerlink" href="#train-mnle-including-experimental-conditions" title="Permanent link">&para;</a></h3>
 <p>Next, we use the combined parameters and conditions (<code>theta</code>) and the corresponding
@@ -867,7 +867,7 @@ simulated data to train <code>MNLE</code>.</p>
 <span class="n">trainer</span> <span class="o">=</span> <span class="n">MNLE</span><span class="p">(</span><span class="n">proposal</span><span class="p">,</span> <span class="n">estimator_builder</span><span class="p">)</span>
 <span class="n">estimator</span> <span class="o">=</span> <span class="n">trainer</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 75 epochs.
+<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 77 epochs.
 </code></pre></div>
 
 <h3 id="construct-conditional-potential-function">Construct conditional potential function<a class="headerlink" href="#construct-conditional-potential-function" title="Permanent link">&para;</a></h3>
@@ -922,9 +922,9 @@ model parameters, but conditioned on the experimental condition.</p>
     <span class="n">frameon</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
     <span class="n">fontsize</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span>
 <span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;c2st between true and MNLE posterior:&quot;</span><span class="p">,</span> <span class="n">c2st</span><span class="p">(</span><span class="n">true_posterior_samples</span><span class="p">,</span> <span class="n">conditional_samples</span><span class="p">)</span><span class="o">.</span><span class="n">item</span><span class="p">())</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;c2st between true and MNLE posterior: </span><span class="si">{</span><span class="n">c2st</span><span class="p">(</span><span class="n">true_posterior_samples</span><span class="p">,</span><span class="w"> </span><span class="n">conditional_samples</span><span class="p">)</span><span class="o">.</span><span class="n">item</span><span class="p">()</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>c2st between true and MNLE posterior: 0.551
+<div class="codehilite"><pre><span></span><code>c2st between true and MNLE posterior: 0.59
 </code></pre></div>
 
 <p><img alt="png" src="../Example_01_DecisionMakingModel_files/Example_01_DecisionMakingModel_30_1.png" /></p>
@@ -1057,7 +1057,7 @@ numbers of trails and experimental conditions - all without retraining the MNLE.
     <script id="__config" type="application/json">{"base": "../..", "features": ["content.code.copy"], "search": "../../assets/javascripts/workers/search.f8cc74c7.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.f1b6f286.min.js"></script>
+      <script src="../../assets/javascripts/bundle.c8b220af.min.js"></script>
       
         <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-MML-AM_CHTML"></script>
       
