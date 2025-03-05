@@ -85,7 +85,9 @@ class BasePotential(metaclass=ABCMeta):
 class CustomPotential(Protocol):
     """Protocol for custom potential functions."""
 
-    def __call__(self, theta: Tensor, x_o: Tensor) -> Tensor: ...
+    def __call__(self, theta: Tensor, x_o: Tensor) -> Tensor:
+        """Call the potential function on given theta and observed data."""
+        ...
 
 
 class CustomPotentialWrapper(BasePotential):
@@ -101,10 +103,11 @@ class CustomPotentialWrapper(BasePotential):
         """Wraps a callable potential function.
 
         Args:
-            potential_fn: Custom callable potential function.
-            prior: Prior distribution.
-            x_o: Observed data.
-            device: Device on which to evaluate the potential function.
+            potential_fn: Custom potential function following the CustomPotential
+                protocol, i.e., the function must have exactly two positional arguments
+                where the first is theta and the second is the x_o.
+            prior: Prior distribution. x_o: Observed data. device: Device on which to
+            evaluate the potential function.
 
         """
         super().__init__(prior, x_o, device)
@@ -112,7 +115,7 @@ class CustomPotentialWrapper(BasePotential):
         self.potential_fn = potential_fn
 
     def __call__(self, theta, track_gradients: bool = True):
-        """Call the callable potential function on given theta.
+        """Calls the custom potential function on given theta.
 
         Note, x_o is re-used from the initialization of the potential function.
         """
