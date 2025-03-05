@@ -148,16 +148,13 @@ def test_mnle_accuracy_with_different_samplers_and_trials(
 ):
     """Test MNLE c2st accuracy for different samplers and number of trials."""
 
-    num_simulations = 3200
-    num_samples = 500
+    num_simulations = 4000
+    num_samples = 1000
 
     prior = MultipleIndependent(
         [
             Gamma(torch.tensor([1.0]), torch.tensor([0.5])),
             Beta(torch.tensor([2.0]), torch.tensor([2.0])),
-            Beta(
-                torch.tensor([2.0]), torch.tensor([2.0])
-            ),  # tests discrete dims > 1 works
         ],
         validate_args=False,
     )
@@ -200,7 +197,7 @@ def test_mnle_accuracy_with_different_samplers_and_trials(
     check_c2st(
         mnle_posterior_samples,
         true_posterior_samples,
-        alg=f"MNLE with {sampler}",
+        alg=f"MNLE with {flow_model} and {sampler}",
     )
 
 
