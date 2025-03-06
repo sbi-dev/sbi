@@ -28,7 +28,7 @@ jobs:
           extra_args: --all-files --show-diff-on-failure
 
   pyright:
-    name: Check types
+    name: type checking.
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

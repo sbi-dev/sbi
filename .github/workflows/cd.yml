@@ -17,6 +17,9 @@ jobs:
   cd:
     name: Continuous Deployment
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.10', '3.11', '3.12', '3.13']
 
     steps:
     - name: Checkout
@@ -28,7 +31,7 @@ jobs:
     - name: Install uv and set the python version
       uses: astral-sh/setup-uv@v5
       with:
-        python-version: '3.10'
+        python-version: ${{ matrix.python-version }}
         enable-cache: true
         cache-dependency-glob: "pyproject.toml"
 
