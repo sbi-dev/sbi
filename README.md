@@ -5,6 +5,7 @@
 [![codecov](https://codecov.io/gh/sbi-dev/sbi/branch/main/graph/badge.svg)](https://codecov.io/gh/sbi-dev/sbi)
 [![GitHub license](https://img.shields.io/github/license/sbi-dev/sbi)](https://github.com/sbi-dev/sbi/blob/master/LICENSE.txt)
 [![DOI](https://joss.theoj.org/papers/10.21105/joss.02505/status.svg)](https://doi.org/10.21105/joss.02505)
+[![NumFOCUS affiliated](https://camo.githubusercontent.com/a0f197cee66ccd8ed498cf64e9f3f384c78a072fe1e65bada8d3015356ac7599/68747470733a2f2f696d672e736869656c64732e696f2f62616467652f4e756d464f4355532d616666696c696174656425323070726f6a6563742d6f72616e67652e7376673f7374796c653d666c617426636f6c6f72413d45313532334426636f6c6f72423d303037443841)]
 
 ## `sbi`: Simulation-Based Inference
 
@@ -205,7 +206,7 @@ Durkan's `lfi`. `sbi` runs as a community project. See also
 `sbi` has been supported by the German Federal Ministry of Education and Research (BMBF)
 through project ADIMEM (FKZ 01IS18052 A-D), project SiMaLeSAM (FKZ 01IS21055A) and the
 Tübingen AI Center (FKZ 01IS18039A). Since 2024, `sbi` is supported by the appliedAI
-Institute for Europe.
+Institute for Europe, and by NumFOCUS.
 
 ## License
 
