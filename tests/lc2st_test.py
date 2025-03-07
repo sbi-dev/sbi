@@ -197,7 +197,7 @@ def test_lc2st_false_positiv_rate(method, set_seed):
 
     # use big num_train and num_epochs to obtain "good" estimator
     # (convergence of the estimator)
-    num_train = 5_000
+    num_train = 10_000
 
     num_cal = 1_000
     num_eval = 10_000
