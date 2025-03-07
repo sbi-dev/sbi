@@ -453,7 +453,9 @@ def get_simulations_since_round(
             counting from 0.
     """
     return torch.cat([
-        t for t, r in zip(data, data_round_indices) if r >= starting_round_index
+        t
+        for t, r in zip(data, data_round_indices, strict=False)
+        if r >= starting_round_index
     ])
 
 

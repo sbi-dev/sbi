@@ -188,8 +188,8 @@ def test_c2st_pymc_sampler_on_Gaussian(
         pytest.param(
             "nuts_pymc",
             marks=pytest.mark.xfail(
-                condition=sys.version_info >= (3, 12),
-                reason="Fails with pymc 5.20.1",
+                condition=sys.version_info >= (3, 10),
+                reason="Fails with pymc>=5.20.1 and python>=3.10",
                 strict=True,
                 raises=TypeError,
             ),

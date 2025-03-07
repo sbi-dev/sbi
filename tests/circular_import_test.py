@@ -22,9 +22,8 @@ def import_first_function(module_name: str):
     if functions:
         first_function_name, first_function = functions[0]
         cmd = f"from {module_name} import {first_function_name}"
+        cmd += f"; del {first_function_name}"
         exec(cmd)
-        cmd_del = f"del {first_function_name}"
-        exec(cmd_del)
     else:
         pass
 
@@ -102,5 +101,9 @@ def test_for_circular_imports():
                 # This is a circular import detected
                 errors.append(f"Circular import detected in {module_name}. Error: {e}")
                 print(f"Circular import detected in {module_name}")
+        except Exception as e:
+            # NOTE: There might be other errors which we catch here and report
+            print(f"Error in {module_name}: {e}")
+            errors.append(f"Error in {module_name}: {e}")
 
     assert len(errors) == 0, "\n".join(errors)

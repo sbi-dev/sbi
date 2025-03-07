@@ -93,7 +93,7 @@ def simulate_for_sbi(
                     for xx in tqdm(
                         Parallel(return_as="generator", n_jobs=num_workers)(
                             delayed(simulator_seeded)(batch, seed)
-                            for batch, seed in zip(batches, batch_seeds)
+                            for batch, seed in zip(batches, batch_seeds, strict=False)
                         ),
                         total=num_simulations,
                         disable=not show_progress_bar,

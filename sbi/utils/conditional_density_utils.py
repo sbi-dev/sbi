@@ -73,7 +73,7 @@ def _compute_covariance(
     # Compute E[X] * E[Y].
     expected_values_of_marginals = [
         _expected_value_f_of_x(prob.unsqueeze(0), lim.unsqueeze(0))
-        for prob, lim in zip(_calc_marginals(probs, limits), limits)
+        for prob, lim in zip(_calc_marginals(probs, limits), limits, strict=False)
     ]
 
     return expected_value_of_joint - f(*expected_values_of_marginals)
@@ -104,7 +104,7 @@ def _expected_value_f_of_x(
 
     x_values_over_which_we_integrate = [
         torch.linspace(lim[0].item(), lim[1].item(), prob.shape[0], device=probs.device)
-        for lim, prob in zip(torch.flip(limits, [0]), probs)
+        for lim, prob in zip(torch.flip(limits, [0]), probs, strict=False)
     ]  # See #403 and #404 for flip().
     grids = list(torch.meshgrid(x_values_over_which_we_integrate))
     expected_val = torch.sum(f(*grids) * probs)

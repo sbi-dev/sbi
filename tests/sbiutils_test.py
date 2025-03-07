@@ -231,7 +231,9 @@ def test_gaussian_transforms(snpe_method: str, plot_results: bool = False):
 
         def log_prob(self, theta):
             probs = zeros(theta.shape[0])
-            for m, p, logit in zip(self._means, self._preds, self._logits):
+            for m, p, logit in zip(
+                self._means, self._preds, self._logits, strict=False
+            ):
                 mvn = MultivariateNormal(m, p)
                 weighted_prob = torch.exp(mvn.log_prob(theta)) * logit
                 probs += weighted_prob
