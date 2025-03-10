@@ -856,13 +856,7 @@ see the source code in <code>_get_default_fig_kwargs()</code></p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/analysis/plot.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">683</span>
-<span class="normal">684</span>
-<span class="normal">685</span>
-<span class="normal">686</span>
-<span class="normal">687</span>
-<span class="normal">688</span>
-<span class="normal">689</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">689</span>
 <span class="normal">690</span>
 <span class="normal">691</span>
 <span class="normal">692</span>
@@ -1008,7 +1002,19 @@ see the source code in <code>_get_default_fig_kwargs()</code></p>
 <span class="normal">832</span>
 <span class="normal">833</span>
 <span class="normal">834</span>
-<span class="normal">835</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">pairplot</span><span class="p">(</span>
+<span class="normal">835</span>
+<span class="normal">836</span>
+<span class="normal">837</span>
+<span class="normal">838</span>
+<span class="normal">839</span>
+<span class="normal">840</span>
+<span class="normal">841</span>
+<span class="normal">842</span>
+<span class="normal">843</span>
+<span class="normal">844</span>
+<span class="normal">845</span>
+<span class="normal">846</span>
+<span class="normal">847</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">pairplot</span><span class="p">(</span>
     <span class="n">samples</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">],</span> <span class="n">List</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">],</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">],</span>
     <span class="n">points</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span>
         <span class="n">Union</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">],</span> <span class="n">List</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">],</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span>
@@ -1115,7 +1121,9 @@ see the source code in <code>_get_default_fig_kwargs()</code></p>
     <span class="n">diag_kwargs_list</span> <span class="o">=</span> <span class="n">to_list_kwargs</span><span class="p">(</span><span class="n">diag_kwargs</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">samples</span><span class="p">))</span>
     <span class="n">diag_func</span> <span class="o">=</span> <span class="n">get_diag_funcs</span><span class="p">(</span><span class="n">diag_list</span><span class="p">)</span>
     <span class="n">diag_kwargs_filled</span> <span class="o">=</span> <span class="p">[]</span>
-    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="p">(</span><span class="n">diag_i</span><span class="p">,</span> <span class="n">diag_kwargs_i</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">diag_list</span><span class="p">,</span> <span class="n">diag_kwargs_list</span><span class="p">)):</span>
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="p">(</span><span class="n">diag_i</span><span class="p">,</span> <span class="n">diag_kwargs_i</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span>
+        <span class="nb">zip</span><span class="p">(</span><span class="n">diag_list</span><span class="p">,</span> <span class="n">diag_kwargs_list</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="p">):</span>
         <span class="n">diag_kwarg_filled_i</span> <span class="o">=</span> <span class="n">_get_default_diag_kwargs</span><span class="p">(</span><span class="n">diag_i</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span>
         <span class="c1"># update the defaults dictionary with user provided values</span>
         <span class="n">diag_kwarg_filled_i</span> <span class="o">=</span> <span class="n">_update</span><span class="p">(</span><span class="n">diag_kwarg_filled_i</span><span class="p">,</span> <span class="n">diag_kwargs_i</span><span class="p">)</span>
@@ -1126,7 +1134,9 @@ see the source code in <code>_get_default_fig_kwargs()</code></p>
     <span class="n">upper_kwargs_list</span> <span class="o">=</span> <span class="n">to_list_kwargs</span><span class="p">(</span><span class="n">upper_kwargs</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">samples</span><span class="p">))</span>
     <span class="n">upper_func</span> <span class="o">=</span> <span class="n">get_offdiag_funcs</span><span class="p">(</span><span class="n">upper_list</span><span class="p">)</span>
     <span class="n">upper_kwargs_filled</span> <span class="o">=</span> <span class="p">[]</span>
-    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="p">(</span><span class="n">upper_i</span><span class="p">,</span> <span class="n">upper_kwargs_i</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">upper_list</span><span class="p">,</span> <span class="n">upper_kwargs_list</span><span class="p">)):</span>
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="p">(</span><span class="n">upper_i</span><span class="p">,</span> <span class="n">upper_kwargs_i</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span>
+        <span class="nb">zip</span><span class="p">(</span><span class="n">upper_list</span><span class="p">,</span> <span class="n">upper_kwargs_list</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="p">):</span>
         <span class="n">upper_kwarg_filled_i</span> <span class="o">=</span> <span class="n">_get_default_offdiag_kwargs</span><span class="p">(</span><span class="n">upper_i</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span>
         <span class="c1"># update the defaults dictionary with user provided values</span>
         <span class="n">upper_kwarg_filled_i</span> <span class="o">=</span> <span class="n">_update</span><span class="p">(</span><span class="n">upper_kwarg_filled_i</span><span class="p">,</span> <span class="n">upper_kwargs_i</span><span class="p">)</span>
@@ -1137,7 +1147,9 @@ see the source code in <code>_get_default_fig_kwargs()</code></p>
     <span class="n">lower_kwargs_list</span> <span class="o">=</span> <span class="n">to_list_kwargs</span><span class="p">(</span><span class="n">lower_kwargs</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">samples</span><span class="p">))</span>
     <span class="n">lower_func</span> <span class="o">=</span> <span class="n">get_offdiag_funcs</span><span class="p">(</span><span class="n">lower_list</span><span class="p">)</span>
     <span class="n">lower_kwargs_filled</span> <span class="o">=</span> <span class="p">[]</span>
-    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="p">(</span><span class="n">lower_i</span><span class="p">,</span> <span class="n">lower_kwargs_i</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">lower_list</span><span class="p">,</span> <span class="n">lower_kwargs_list</span><span class="p">)):</span>
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="p">(</span><span class="n">lower_i</span><span class="p">,</span> <span class="n">lower_kwargs_i</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span>
+        <span class="nb">zip</span><span class="p">(</span><span class="n">lower_list</span><span class="p">,</span> <span class="n">lower_kwargs_list</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="p">):</span>
         <span class="n">lower_kwarg_filled_i</span> <span class="o">=</span> <span class="n">_get_default_offdiag_kwargs</span><span class="p">(</span><span class="n">lower_i</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span>
         <span class="c1"># update the defaults dictionary with user provided values</span>
         <span class="n">lower_kwarg_filled_i</span> <span class="o">=</span> <span class="n">_update</span><span class="p">(</span><span class="n">lower_kwarg_filled_i</span><span class="p">,</span> <span class="n">lower_kwargs_i</span><span class="p">)</span>
@@ -1413,19 +1425,7 @@ see the source code in <code>_get_default_fig_kwargs()</code></p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/analysis/plot.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">838</span>
-<span class="normal">839</span>
-<span class="normal">840</span>
-<span class="normal">841</span>
-<span class="normal">842</span>
-<span class="normal">843</span>
-<span class="normal">844</span>
-<span class="normal">845</span>
-<span class="normal">846</span>
-<span class="normal">847</span>
-<span class="normal">848</span>
-<span class="normal">849</span>
-<span class="normal">850</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">850</span>
 <span class="normal">851</span>
 <span class="normal">852</span>
 <span class="normal">853</span>
@@ -1515,7 +1515,21 @@ see the source code in <code>_get_default_fig_kwargs()</code></p>
 <span class="normal">937</span>
 <span class="normal">938</span>
 <span class="normal">939</span>
-<span class="normal">940</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">marginal_plot</span><span class="p">(</span>
+<span class="normal">940</span>
+<span class="normal">941</span>
+<span class="normal">942</span>
+<span class="normal">943</span>
+<span class="normal">944</span>
+<span class="normal">945</span>
+<span class="normal">946</span>
+<span class="normal">947</span>
+<span class="normal">948</span>
+<span class="normal">949</span>
+<span class="normal">950</span>
+<span class="normal">951</span>
+<span class="normal">952</span>
+<span class="normal">953</span>
+<span class="normal">954</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">marginal_plot</span><span class="p">(</span>
     <span class="n">samples</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">],</span> <span class="n">List</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">],</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">],</span>
     <span class="n">points</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span>
         <span class="n">Union</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">],</span> <span class="n">List</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">],</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span>
@@ -1590,7 +1604,9 @@ see the source code in <code>_get_default_fig_kwargs()</code></p>
     <span class="n">diag_kwargs_list</span> <span class="o">=</span> <span class="n">to_list_kwargs</span><span class="p">(</span><span class="n">diag_kwargs</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">samples</span><span class="p">))</span>
     <span class="n">diag_func</span> <span class="o">=</span> <span class="n">get_diag_funcs</span><span class="p">(</span><span class="n">diag_list</span><span class="p">)</span>
     <span class="n">diag_kwargs_filled</span> <span class="o">=</span> <span class="p">[]</span>
-    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="p">(</span><span class="n">diag_i</span><span class="p">,</span> <span class="n">diag_kwargs_i</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">diag_list</span><span class="p">,</span> <span class="n">diag_kwargs_list</span><span class="p">)):</span>
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="p">(</span><span class="n">diag_i</span><span class="p">,</span> <span class="n">diag_kwargs_i</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span>
+        <span class="nb">zip</span><span class="p">(</span><span class="n">diag_list</span><span class="p">,</span> <span class="n">diag_kwargs_list</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="p">):</span>
         <span class="n">diag_kwarg_filled_i</span> <span class="o">=</span> <span class="n">_get_default_diag_kwargs</span><span class="p">(</span><span class="n">diag_i</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span>
         <span class="n">diag_kwarg_filled_i</span> <span class="o">=</span> <span class="n">_update</span><span class="p">(</span><span class="n">diag_kwarg_filled_i</span><span class="p">,</span> <span class="n">diag_kwargs_i</span><span class="p">)</span>
         <span class="n">diag_kwargs_filled</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">diag_kwarg_filled_i</span><span class="p">)</span>
@@ -1875,21 +1891,7 @@ in <code>sbi.analysis.plot</code> for details.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/analysis/plot.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1131</span>
-<span class="normal">1132</span>
-<span class="normal">1133</span>
-<span class="normal">1134</span>
-<span class="normal">1135</span>
-<span class="normal">1136</span>
-<span class="normal">1137</span>
-<span class="normal">1138</span>
-<span class="normal">1139</span>
-<span class="normal">1140</span>
-<span class="normal">1141</span>
-<span class="normal">1142</span>
-<span class="normal">1143</span>
-<span class="normal">1144</span>
-<span class="normal">1145</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1145</span>
 <span class="normal">1146</span>
 <span class="normal">1147</span>
 <span class="normal">1148</span>
@@ -1976,7 +1978,21 @@ in <code>sbi.analysis.plot</code> for details.</p>
 <span class="normal">1229</span>
 <span class="normal">1230</span>
 <span class="normal">1231</span>
-<span class="normal">1232</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">conditional_pairplot</span><span class="p">(</span>
+<span class="normal">1232</span>
+<span class="normal">1233</span>
+<span class="normal">1234</span>
+<span class="normal">1235</span>
+<span class="normal">1236</span>
+<span class="normal">1237</span>
+<span class="normal">1238</span>
+<span class="normal">1239</span>
+<span class="normal">1240</span>
+<span class="normal">1241</span>
+<span class="normal">1242</span>
+<span class="normal">1243</span>
+<span class="normal">1244</span>
+<span class="normal">1245</span>
+<span class="normal">1246</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">conditional_pairplot</span><span class="p">(</span>
     <span class="n">density</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
     <span class="n">condition</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
     <span class="n">limits</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">List</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">],</span>
