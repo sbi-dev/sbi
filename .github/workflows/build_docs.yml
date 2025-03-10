@@ -26,7 +26,7 @@ jobs:
         cache-dependency-glob: "pyproject.toml"
 
     - name: Install dependencies with uv
-      run: uv sync --all-extras --doc
+      run: uv sync --extra doc
 
     - name: strip output except plots and prints from tutorial notebooks
       run: |

@@ -45,7 +45,7 @@ jobs:
           cache-dependency-glob: "pyproject.toml"
 
       - name: Install dependencies with uv
-        run: uv sync --all-extras --dev
+        run: uv sync --extra dev
 
       - name: Check types with pyright
         run: uv run pyright sbi

@@ -29,8 +29,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.8']
-        torch-version: ['1.11', '2.2']
+        python-version: ['3.10']
+        torch-version: ['1.13', '2.5']
 
     steps:
     - name: Checkout
@@ -39,27 +39,18 @@ jobs:
         fetch-depth: 0
         lfs: false
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
+    - name: Install uv and set the python version
+      uses: astral-sh/setup-uv@v5
       with:
         python-version: ${{ matrix.python-version }}
+        enable-cache: true
+        cache-dependency-glob: "pyproject.toml"
 
-    - name: Cache dependency
-      id: cache-dependencies
-      uses: actions/cache@v4
-      with:
-        path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ matrix.torch-version }}$
-        restore-keys: |
-          ${{ runner.os }}-pip-${{ matrix.python-version }}-
-          ${{ runner.os }}-pip-
-
-    - name: Install dependencies
+    - name: Install dependencies with uv
       run: |
-        python -m pip install --upgrade pip
-        pip install torch==${{ matrix.torch-version }} --extra-index-url https://download.pytorch.org/whl/cpu
-        pip install -e .[dev]
+        uv pip install torch==${{ matrix.torch-version }} --extra-index-url https://download.pytorch.org/whl/cpu
+        uv pip install -e .[dev]
 
     - name: Run the selected tests without coverage
       run: |
-        pytest -v -x -m ${{ inputs.pytest-marker }} tests/
+        uv run pytest -v -x -m ${{ inputs.pytest-marker }} tests/

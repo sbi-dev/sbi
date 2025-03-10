@@ -37,7 +37,7 @@ jobs:
         cache-dependency-glob: "pyproject.toml"
 
     - name: Install dependencies with uv
-      run: uv sync --all-extras --dev
+      run: uv sync --extra dev
 
     - name: Run the fast and the slow CPU tests with coverage
       run: uv run pytest -v -x -n auto -m "not gpu" --cov=sbi --cov-report=xml tests/
