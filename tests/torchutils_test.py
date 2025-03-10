@@ -188,7 +188,7 @@ def test_dkl_gauss():
         distributions.MultivariateNormal(ones(2), 0.5 * eye(2)),
     )
 
-    for d1, d2 in zip(dist1, dist2):
+    for d1, d2 in zip(dist1, dist2, strict=False):
         torch_dkl = distributions.kl.kl_divergence(d1, d2)
         monte_carlo_dkl = kl_d_via_monte_carlo(d1, d2, num_samples=5000)
 

@@ -73,7 +73,7 @@ def simulate_in_batches(
             ) as _:
                 simulation_outputs: List[Tensor] = Parallel(n_jobs=num_workers)(  # pyright: ignore[reportAssignmentType]
                     delayed(simulator_seeded)(batch, batch_seed)
-                    for batch, batch_seed in zip(batches, batch_seeds)
+                    for batch, batch_seed in zip(batches, batch_seeds, strict=False)
                 )
         else:
             pbar = tqdm(

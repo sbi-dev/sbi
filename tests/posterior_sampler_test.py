@@ -30,8 +30,8 @@ from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
         pytest.param(
             "nuts_pymc",
             marks=pytest.mark.xfail(
-                condition=sys.version_info >= (3, 12),
-                reason="Fails with pymc 5.20.1",
+                condition=sys.version_info >= (3, 10),
+                reason="Fails with pymc>=5.20.1 and python>=3.10",
                 raises=TypeError,
             ),
         ),

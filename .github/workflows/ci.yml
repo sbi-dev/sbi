@@ -1,4 +1,4 @@
-name: Tests
+name: Continuous Integration
 
 on: [pull_request, workflow_dispatch]
 
@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   ci:
-    name: CI
+    name: Continuous Integration
     runs-on: ubuntu-latest
     if: |
       github.event_name == 'push' ||
@@ -20,7 +20,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.9', '3.12']
+        python-version: ['3.10']
 
     steps:
     - name: Checkout
@@ -34,6 +34,7 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
         enable-cache: true
+        cache-dependency-glob: "pyproject.toml"
 
     - name: Install dependencies with uv
       run: |
@@ -56,7 +57,7 @@ jobs:
         restore-keys: |
           testmon-${{ runner.os }}-${{ matrix.python-version }}-
 
-    - name: Run the fast CPU tests with coverage
+    - name: Run fast CPU tests with coverage
       run: uv run pytest --testmon-forceselect -v -n auto -m "not slow and not gpu" --cov=sbi --cov-report=xml tests/
 
     - name: Upload coverage to Codecov
