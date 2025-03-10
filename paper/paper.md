@@ -10,13 +10,13 @@ tags:
 
 authors:
   - name: Jan Boelts
-    affiliation: "1, 2, 3, 26"
+    affiliation: "1, 2, 3"
     corresponding: true
     equal-contrib: true
     role: "Maintainer, core contributor"
 
   - name: Michael Deistler
-    affiliation: "1, 2, 26"
+    affiliation: "1, 2"
     corresponding: true
     equal-contrib: true
     role: "Maintainer, core contributor"
@@ -175,8 +175,6 @@ affiliations:
     name: Departments of Computer Science Electrical Engineering, KU Leuven, Belgium
   - index: 25
     name: Department Empirical Inference, Max Planck Institute for Intelligent Systems, Tübingen
-  - index: 26
-    name: Maintainer
 
 date: 16 October 2024
 bibliography: paper.bib
