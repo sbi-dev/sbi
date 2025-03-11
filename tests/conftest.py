@@ -1,19 +1,16 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
-import pickle
 import re
 import shutil
-from logging import warning
 from pathlib import Path
 from shutil import rmtree
 
 import pandas as pd
 import pytest
 import torch
+from pytest_harvest import get_session_results_df, get_xdist_worker_id, is_main_process
 
 from sbi.utils.sbiutils import seed_all_backends
-from pytest_harvest import is_main_process, get_xdist_worker_id, get_session_results_df
-
 
 # Seed for `set_seed` fixture. Change to random state of all seeded tests.
 seed = 1
@@ -224,6 +221,7 @@ def mcmc_params_fast() -> dict:
 # Pytest harvest xdist support.
 # Saves results now as human-readable .csv! Which can be inspected by the user in
 # the .bm_results folder.
+
 
 def pytest_sessionfinish(session):
     """Gather all results and save them to a csv.
