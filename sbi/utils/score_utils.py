@@ -21,17 +21,17 @@ from sbi.utils.torchutils import BoxUniform
 
 
 def denoise(p: Distribution, m: Tensor, s: Tensor, x_t: Tensor) -> Distribution:
-    """Given the prior distribution p(X), scaling factor m, standard deviation of the
-    noise s, and observation X_t, return the posterior distribution p(X | X_t = x_t).
+    """Returns the denoised distribution p(X | X_t = x_t).
+
+    This return the posterior distribution p(X | X_t = x_t) given the prior
+    distribution p(X) and the following generative process X_t = m * X + s*ε, where
+    ε ~ N(0, 1).
 
     Args:
         p: The prior distribution p(X).
         m: The scaling factor m.
         s: The standard deviation of the noise s.
         x_t: The observation X_t.
-
-    Raises:
-        NotImplementedError: If the distribution is not supported.
 
     Returns:
         The posterior distribution p(X | X_t = x_t).
@@ -47,7 +47,7 @@ def denoise(p: Distribution, m: Tensor, s: Tensor, x_t: Tensor) -> Distribution:
     elif isinstance(p, (Uniform, BoxUniform)):
         return denoise_uniform(p, m, s, x_t)
     else:
-        return denoise_empirical(p, m, s, x_t)
+        return denoise_general(p, m, s, x_t)
 
 
 def denoise_independent(
@@ -167,13 +167,21 @@ def denoise_uniform(
     return UniformNormalPosterior(p.low, p.high, m, s, x_t)  # type: ignore
 
 
-def denoise_empirical(
+def denoise_general(
     p: Distribution,
     m: Tensor,
     s: Tensor,
     x_t: Tensor,
 ) -> MixtureSameFamily:
-    """Denoise an empirical distribution.
+    """Denoise a general distribution.
+
+    This is an approximate method intended for general distributions. It fits a
+    Gaussian Mixture Model (GMM) to the empirical distribution, which can then be
+    denoised analytically using the denoise_mixture function.
+
+    NOTE: Why GMM not KDE or MC methods? This is because in one intended use case we
+    require access to the score function (i.e. the gradient of the log density), and
+    this gradient is rather ill-behave for particle-based approximations.
 
     Args:
         p: The prior empirical distribution.
@@ -361,7 +369,15 @@ class UniformNormalPosterior(Distribution):
     }  # type: ignore
     has_rsample: bool = False
 
-    def __init__(self, low, high, m, s, x_t, validate_args=None):
+    def __init__(
+        self,
+        low: Tensor | float,
+        high: Tensor | float,
+        m: Tensor | float,
+        s: Tensor | float,
+        x_t: Tensor | float,
+        validate_args: Optional[bool] = None,
+    ) -> None:
         self.low = torch.as_tensor(low)
         self.high = torch.as_tensor(high)
         self.m = torch.as_tensor(m)
@@ -391,7 +407,7 @@ class UniformNormalPosterior(Distribution):
         super().__init__(batch_shape, event_shape, validate_args=validate_args)
 
     @property
-    def mean(self):
+    def mean(self) -> Tensor:
         # Standard normal pdf values
         phi_alpha = torch.exp(self.standard_normal.log_prob(self.alpha))
         phi_beta = torch.exp(self.standard_normal.log_prob(self.beta))
@@ -399,7 +415,7 @@ class UniformNormalPosterior(Distribution):
         return self.mu + self.sigma * (phi_alpha - phi_beta) / self.Z
 
     @property
-    def variance(self):
+    def variance(self) -> Tensor:
         phi_alpha = torch.exp(self.standard_normal.log_prob(self.alpha))
         phi_beta = torch.exp(self.standard_normal.log_prob(self.beta))
 
@@ -410,7 +426,7 @@ class UniformNormalPosterior(Distribution):
 
         return self.sigma**2 * variance_adjustment
 
-    def sample(self, sample_shape=torch.Size()):
+    def sample(self, sample_shape: torch.Size = torch.Size()) -> Tensor:
         # Inverse CDF sampling for a truncated normal
         u = torch.rand(sample_shape, device=self.low.device) * self.Z + self.a
         sample = self.mu + self.sigma * self.standard_normal.icdf(
@@ -418,7 +434,7 @@ class UniformNormalPosterior(Distribution):
         )  # Using icdf for stability
         return torch.clamp(sample, min=self.low, max=self.high)
 
-    def log_prob(self, x):
+    def log_prob(self, x: Tensor) -> Tensor:
         lp = Normal(self.mu, self.sigma).log_prob(x) - torch.log(self.Z)
         return torch.where((x >= self.low) & (x <= self.high), lp, -torch.inf)
 
@@ -441,9 +457,16 @@ class UniformNormalConvolution(Distribution):
         "noise": constraints.positive,
     }  # type: ignore
     support = constraints.real  # type: ignore
-    has_rsample = False
+    has_rsample: bool = False
 
-    def __init__(self, low, high, scale, noise, validate_args=None):
+    def __init__(
+        self,
+        low: Tensor | float,
+        high: Tensor | float,
+        scale: Tensor | float,
+        noise: Tensor | float,
+        validate_args=None,
+    ) -> None:
         self.low = torch.as_tensor(low)
         self.high = torch.as_tensor(high)
         self.scale = torch.as_tensor(scale)
@@ -456,7 +479,7 @@ class UniformNormalConvolution(Distribution):
         event_shape = torch.Size()
         super().__init__(batch_shape, event_shape, validate_args=validate_args)
 
-    def sample(self, sample_shape=torch.Size()):
+    def sample(self, sample_shape: torch.Size = torch.Size()) -> Tensor:
         shape = sample_shape + self.batch_shape  # type: ignore
         # Sample uniformly over [low, high]
         x = torch.rand(shape, device=self.low.device)
@@ -464,7 +487,7 @@ class UniformNormalConvolution(Distribution):
         noise_sample = torch.randn(shape, device=self.noise.device) * self.noise
         return self.scale * x + noise_sample
 
-    def log_prob(self, value):
+    def log_prob(self, value: Tensor) -> Tensor:
         # Compute p(value) using the convolution formula:
         # p(value) = 1/(b-a) * [Phi((value - scale*a)/noise)
         # - Phi((value - scale*b)/noise)]
