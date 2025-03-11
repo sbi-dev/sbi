@@ -1107,6 +1107,7 @@ This class can not be used in combination with SNLE or SNRE.</p>
 
 
 
+
               <details class="quote">
                 <summary>Source code in <code>sbi/inference/posteriors/direct_posterior.py</code></summary>
                 <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 26</span>
@@ -2138,6 +2139,7 @@ returned for <code>theta_transform</code>.</p>
       </tbody>
     </table>
 
+
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/direct_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">40</span>
@@ -2345,6 +2347,7 @@ re-evaluate only whenever a new <code>x</code> is passed.</p>
           </tr>
       </tbody>
     </table>
+
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/direct_posterior.py</code></summary>
@@ -2605,6 +2608,7 @@ These parameters only have an effect if <code>norm_posterior=True</code>.</p>
           </tr>
       </tbody>
     </table>
+
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/direct_posterior.py</code></summary>
@@ -2913,6 +2917,7 @@ These parameters only have an effect if <code>norm_posterior=True</code>.</p>
           </tr>
       </tbody>
     </table>
+
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/direct_posterior.py</code></summary>
@@ -3302,6 +3307,7 @@ have a cached value.</p>
       </tbody>
     </table>
 
+
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/direct_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">404</span>
@@ -3519,6 +3525,7 @@ samples and then reshape into the desired shape.</p>
           </tr>
       </tbody>
     </table>
+
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/direct_posterior.py</code></summary>
@@ -3758,6 +3765,7 @@ given every observation.</p>
       </tbody>
     </table>
 
+
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/direct_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">146</span>
@@ -3881,6 +3889,7 @@ SNLE or SNRE train neural networks to approximate the likelihood(-ratios).
 estimating the normlalization constant with importance sampling. It also allows to
 perform importance sampling (with <code>.sample()</code>) and to draw approximate samples with
 sampling-importance-resampling (SIR) (with <code>.sir_sample()</code>)</p>
+
 
 
 
@@ -4755,6 +4764,7 @@ None, <code>potential_fn.device</code> is used.</p>
       </tbody>
     </table>
 
+
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/importance_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">26</span>
@@ -4960,6 +4970,7 @@ None, <code>potential_fn.device</code> is used.</p>
           </tr>
       </tbody>
     </table>
+
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/importance_posterior.py</code></summary>
@@ -5169,6 +5180,7 @@ the proposal at every iteration. Used only in <code>sir_sample()</code>.</p>
       </tbody>
     </table>
 
+
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/importance_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">245</span>
@@ -5334,6 +5346,7 @@ unchanged and have a cached value.</p>
           </tr>
       </tbody>
     </table>
+
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/importance_posterior.py</code></summary>
@@ -5514,6 +5527,7 @@ consumption.</p>
           </tr>
       </tbody>
     </table>
+
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/importance_posterior.py</code></summary>
@@ -5837,6 +5851,7 @@ have a cached value.</p>
       </tbody>
     </table>
 
+
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/importance_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">295</span>
@@ -6106,6 +6121,7 @@ proposal at every iteration.</p>
       </tbody>
     </table>
 
+
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/importance_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">155</span>
@@ -6238,6 +6254,7 @@ proposal at every iteration.</p>
         <p>Provides MCMC to sample from the posterior.<br/><br/>
 SNLE or SNRE train neural networks to approximate the likelihood(-ratios).
 <code>MCMCPosterior</code> allows to sample from the posterior with MCMC.</p>
+
 
 
 
@@ -8344,6 +8361,7 @@ SNLE or SNRE train neural networks to approximate the likelihood(-ratios).
     <div class="doc doc-contents ">
 
         <p>Returns MCMC method.</p>
+
     </div>
 
 </div>
@@ -8365,6 +8383,7 @@ SNLE or SNRE train neural networks to approximate the likelihood(-ratios).
     <div class="doc doc-contents ">
 
         <p>Returns sampler created by <code>sample</code>.</p>
+
     </div>
 
 </div>
@@ -8407,6 +8426,7 @@ SNLE or SNRE train neural networks to approximate the likelihood(-ratios).
           </tr>
       </tbody>
     </table>
+
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/mcmc_posterior.py</code></summary>
@@ -8715,6 +8735,7 @@ faster than <code>"spawn"</code> but is only supported on POSIX-based systems
           </tr>
       </tbody>
     </table>
+
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/mcmc_posterior.py</code></summary>
@@ -9037,6 +9058,7 @@ the intitialization method.</p>
     </table>
         <p>Returns: Initialization function.</p>
 
+
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/mcmc_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">511</span>
@@ -9275,6 +9297,7 @@ the intitialization method.</p>
           </tr>
       </tbody>
     </table>
+
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/mcmc_posterior.py</code></summary>
@@ -9569,6 +9592,7 @@ for each x</p>
       </tbody>
     </table>
 
+
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/mcmc_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">631</span>
@@ -9786,6 +9810,7 @@ for each x</p>
           </tr>
       </tbody>
     </table>
+
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/mcmc_posterior.py</code></summary>
@@ -10057,6 +10082,7 @@ even when the potential function requires evaluating a neural network.</p>
           </tr>
       </tbody>
     </table>
+
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/mcmc_posterior.py</code></summary>
@@ -10358,6 +10384,7 @@ even when the potential function requires evaluating a neural network.</p>
           </tr>
       </tbody>
     </table>
+
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/mcmc_posterior.py</code></summary>
@@ -10691,6 +10718,7 @@ can only be turned off for vectorized sampler.</p>
       </tbody>
     </table>
 
+
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/mcmc_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">704</span>
@@ -10887,6 +10915,7 @@ sbi slice samplers, only the samples are added.</p>
           </tr>
       </tbody>
     </table>
+
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/mcmc_posterior.py</code></summary>
@@ -11093,6 +11122,7 @@ consumption.</p>
           </tr>
       </tbody>
     </table>
+
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/mcmc_posterior.py</code></summary>
@@ -11388,6 +11418,7 @@ have a cached value.</p>
       </tbody>
     </table>
 
+
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/mcmc_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 936</span>
@@ -11664,6 +11695,7 @@ samples and then reshape into the desired shape.</p>
           </tr>
       </tbody>
     </table>
+
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/mcmc_posterior.py</code></summary>
@@ -12214,6 +12246,7 @@ parameter generation and mcmc sampling.</p>
       </tbody>
     </table>
 
+
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/mcmc_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">364</span>
@@ -12580,6 +12613,7 @@ parameter generation and mcmc sampling.</p>
       </tbody>
     </table>
 
+
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/mcmc_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">170</span>
@@ -12636,6 +12670,7 @@ parameter generation and mcmc sampling.</p>
         <p>Provides rejection sampling to sample from the posterior.<br/><br/>
 SNLE or SNRE train neural networks to approximate the likelihood(-ratios).
 <code>RejectionPosterior</code> allows to sample from the posterior with rejection sampling.</p>
+
 
 
 
@@ -13293,6 +13328,7 @@ maximum of the <code>potential_fn / proposal</code> ratio.</p>
       </tbody>
     </table>
 
+
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/rejection_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">24</span>
@@ -13478,6 +13514,7 @@ consumption.</p>
           </tr>
       </tbody>
     </table>
+
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/rejection_posterior.py</code></summary>
@@ -13773,6 +13810,7 @@ have a cached value.</p>
       </tbody>
     </table>
 
+
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/rejection_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">181</span>
@@ -14013,6 +14051,7 @@ samples and then reshape into the desired shape.</p>
       </tbody>
     </table>
 
+
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/rejection_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">100</span>
@@ -14188,6 +14227,7 @@ is used to reject samples that lie outside of the prior bounds.</p>
 corrector.</p>
 <p>Log probabilities are obtained by calling the potential function, which in turn uses
 zuko probabilistic ODEs to compute the log-probability.</p>
+
 
 
 
@@ -15254,6 +15294,7 @@ sampler or the SDE-based sampler.</p>
       </tbody>
     </table>
 
+
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/score_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">46</span>
@@ -15522,6 +15563,7 @@ linear grid between t_max and t_min is used.</p>
           </tr>
       </tbody>
     </table>
+
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/score_posterior.py</code></summary>
@@ -15825,6 +15867,7 @@ stochastic approximation, which is faster but less accurate.</p>
       </tbody>
     </table>
 
+
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/score_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">269</span>
@@ -16122,6 +16165,7 @@ have a cached value.</p>
           </tr>
       </tbody>
     </table>
+
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/score_posterior.py</code></summary>
@@ -16507,6 +16551,7 @@ linear grid between t_max and t_min is used.</p>
       </tbody>
     </table>
 
+
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/score_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 98</span>
@@ -16887,6 +16932,7 @@ linear grid between t_max and t_min is used.</p>
       </tbody>
     </table>
 
+
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/score_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">307</span>
@@ -17154,6 +17200,7 @@ flow. This is implemented via the zuko library.</p>
       </tbody>
     </table>
 
+
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/score_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">244</span>
@@ -17244,6 +17291,7 @@ References:<br/>
 Deistler, Jakob Macke, 2022, <a href="https://openreview.net/forum?id=kZ0UYdhqkNY">https://openreview.net/forum?id=kZ0UYdhqkNY</a><br/>
 [2] Sequential Neural Posterior and Likelihood Approximation, Samuel Wiqvist, Jes
 Frellsen, Umberto Picchini, 2021, <a href="https://arxiv.org/abs/2102.06522">https://arxiv.org/abs/2102.06522</a></p>
+
 
 
 
@@ -18488,6 +18536,7 @@ Frellsen, Umberto Picchini, 2021, <a href="https://arxiv.org/abs/2102.06522">htt
     <div class="doc doc-contents ">
 
         <p>Returns the variational posterior.</p>
+
     </div>
 
 </div>
@@ -18510,6 +18559,7 @@ Frellsen, Umberto Picchini, 2021, <a href="https://arxiv.org/abs/2102.06522">htt
     <div class="doc doc-contents ">
 
         <p>Variational inference method e.g. one of [rKL, fKL, IW, alpha].</p>
+
     </div>
 
 </div>
@@ -18586,6 +18636,7 @@ incompatible deep copying).</p>
           </tr>
       </tbody>
     </table>
+
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/vi_posterior.py</code></summary>
@@ -18681,6 +18732,7 @@ due not support pickle protocols (e.g. due to local functions, etc.).</p>
           </tr>
       </tbody>
     </table>
+
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/vi_posterior.py</code></summary>
@@ -18916,6 +18968,7 @@ attribute.</p>
       </tbody>
     </table>
 
+
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/vi_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 50</span>
@@ -19149,6 +19202,7 @@ e.g. remains deep copy compatible.</p>
       </tbody>
     </table>
 
+
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/vi_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">623</span>
@@ -19254,6 +19308,7 @@ prop, prop_prior].</p>
           </tr>
       </tbody>
     </table>
+
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/vi_posterior.py</code></summary>
@@ -19386,6 +19441,7 @@ consumption.</p>
           </tr>
       </tbody>
     </table>
+
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/vi_posterior.py</code></summary>
@@ -19679,6 +19735,7 @@ have a cached value.</p>
       </tbody>
     </table>
 
+
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/vi_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">514</span>
@@ -19887,6 +19944,7 @@ have a cached value.</p>
       </tbody>
     </table>
 
+
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/vi_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">276</span>
@@ -20031,6 +20089,7 @@ is already a <code>VIPosterior</code>, then the arguments will be copied from it
           </tr>
       </tbody>
     </table>
+
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/vi_posterior.py</code></summary>
@@ -20257,6 +20316,7 @@ is already a <code>VIPosterior</code>, then the arguments will be copied from it
           </tr>
       </tbody>
     </table>
+
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/vi_posterior.py</code></summary>
@@ -20559,6 +20619,7 @@ weight_transform: Callable applied to importance weights (only for fKL)</p>
     </table>
         <p>Returns:
     VIPosterior: <code>VIPosterior</code> (can be used to chain calls).</p>
+
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/vi_posterior.py</code></summary>
