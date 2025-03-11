@@ -39,9 +39,6 @@ def sampling_importance_resampling(
 
     selected_samples = []
 
-    max_sampling_batch_size = max(
-        1, int(max_sampling_batch_size / num_candidate_samples)
-    )
     sampling_batch_size = min(num_samples, max_sampling_batch_size)
 
     num_remaining = num_samples
@@ -66,7 +63,7 @@ def sampling_importance_resampling(
             samples = thetas.reshape(batch_size, num_candidate_samples, -1)[mask]
             selected_samples.append(samples)
 
-        num_remaining -= batch_size
+        num_remaining -= samples.shape[0]
         pbar.update(samples.shape[0])
     pbar.close()
 

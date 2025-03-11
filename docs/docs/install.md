@@ -1,6 +1,6 @@
 # Installation
 
-`sbi` requires Python 3.9 or higher. A GPU is not required, but can lead to
+`sbi` requires Python 3.10 or higher. A GPU is not required, but can lead to
 speed-up in some cases. We recommend using a
 [`conda`](https://docs.conda.io/en/latest/miniconda.html) virtual environment
 ([Miniconda installation

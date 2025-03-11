@@ -80,8 +80,10 @@ class MixedDensityEstimator(ConditionalDensityEstimator):
                 sample_shape=sample_shape,
                 condition=condition,
             )
-            # Trailing `1` because `Categorical` has event_shape `()`.
-            discrete_samples = discrete_samples.reshape(num_samples * batch_dim, 1)
+            num_variables = self.discrete_net.net.num_variables
+            discrete_samples = discrete_samples.reshape(
+                num_samples * batch_dim, num_variables
+            )
 
             # repeat the batch of embedded condition to match number of choices.
             condition_event_dim = embedded_condition.dim() - 1
@@ -145,7 +147,8 @@ class MixedDensityEstimator(ConditionalDensityEstimator):
             f"{input_batch_dim} do not match."
         )
 
-        cont_input, disc_input = _separate_input(input)
+        num_discrete_variables = self.discrete_net.net.num_variables
+        cont_input, disc_input = _separate_input(input, num_discrete_variables)
         # Embed continuous condition
         embedded_condition = self.condition_embedding(condition)
         # expand and repeat to match batch of inputs.
@@ -204,3 +207,8 @@ def _separate_input(
     Assumes the discrete data to live in the last columns of input.
     """
     return input[..., :-num_discrete_columns], input[..., -num_discrete_columns:]
+
+
+def _is_discrete(input: Tensor) -> Tensor:
+    """Infer discrete columns in input data."""
+    return torch.tensor([torch.allclose(col, col.round()) for col in input.T])

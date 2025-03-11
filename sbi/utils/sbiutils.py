@@ -453,7 +453,9 @@ def get_simulations_since_round(
             counting from 0.
     """
     return torch.cat([
-        t for t, r in zip(data, data_round_indices) if r >= starting_round_index
+        t
+        for t, r in zip(data, data_round_indices, strict=False)
+        if r >= starting_round_index
     ])
 
 
@@ -961,7 +963,8 @@ def gradient_ascent(
                         f"Optimizing MAP estimate. Iterations: {iter_ + 1} / "
                         f"{num_iter}. Performance in iteration "
                         f"{divmod(iter_ + 1, save_best_every)[0] * save_best_every}: "
-                        f"{best_log_prob_iter.item():.2f} (= unnormalized log-prob)",
+                        f"{best_log_prob_iter.item():.2f} (= unnormalized log-prob). "
+                        "Press Ctrl-C to interrupt.",
                         end="",
                     )
                 argmax_ = theta_transform.inv(best_theta_overall)

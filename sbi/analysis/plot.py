@@ -124,12 +124,18 @@ def plt_hist_2d(
     ax: Axes,
     samples_col: np.ndarray,
     samples_row: np.ndarray,
-    limits_col: torch.Tensor,
-    limits_row: torch.Tensor,
+    limits_col: Union[torch.Tensor, List],
+    limits_row: Union[torch.Tensor, List],
     offdiag_kwargs: Dict,
 ):
-    hist_kwargs = copy.deepcopy(offdiag_kwargs)
     """Plot 2D histogram."""
+    hist_kwargs = copy.deepcopy(offdiag_kwargs)
+
+    if isinstance(limits_col, torch.Tensor):
+        limits_col = limits_col.tolist()
+    if isinstance(limits_row, torch.Tensor):
+        limits_row = limits_row.tolist()
+
     if (
         "bins" not in hist_kwargs["np_hist_kwargs"]
         or hist_kwargs["np_hist_kwargs"]["bins"] is None
@@ -787,7 +793,9 @@ def pairplot(
     diag_kwargs_list = to_list_kwargs(diag_kwargs, len(samples))
     diag_func = get_diag_funcs(diag_list)
     diag_kwargs_filled = []
-    for i, (diag_i, diag_kwargs_i) in enumerate(zip(diag_list, diag_kwargs_list)):
+    for i, (diag_i, diag_kwargs_i) in enumerate(
+        zip(diag_list, diag_kwargs_list, strict=False)
+    ):
         diag_kwarg_filled_i = _get_default_diag_kwargs(diag_i, i)
         # update the defaults dictionary with user provided values
         diag_kwarg_filled_i = _update(diag_kwarg_filled_i, diag_kwargs_i)
@@ -798,7 +806,9 @@ def pairplot(
     upper_kwargs_list = to_list_kwargs(upper_kwargs, len(samples))
     upper_func = get_offdiag_funcs(upper_list)
     upper_kwargs_filled = []
-    for i, (upper_i, upper_kwargs_i) in enumerate(zip(upper_list, upper_kwargs_list)):
+    for i, (upper_i, upper_kwargs_i) in enumerate(
+        zip(upper_list, upper_kwargs_list, strict=False)
+    ):
         upper_kwarg_filled_i = _get_default_offdiag_kwargs(upper_i, i)
         # update the defaults dictionary with user provided values
         upper_kwarg_filled_i = _update(upper_kwarg_filled_i, upper_kwargs_i)
@@ -809,7 +819,9 @@ def pairplot(
     lower_kwargs_list = to_list_kwargs(lower_kwargs, len(samples))
     lower_func = get_offdiag_funcs(lower_list)
     lower_kwargs_filled = []
-    for i, (lower_i, lower_kwargs_i) in enumerate(zip(lower_list, lower_kwargs_list)):
+    for i, (lower_i, lower_kwargs_i) in enumerate(
+        zip(lower_list, lower_kwargs_list, strict=False)
+    ):
         lower_kwarg_filled_i = _get_default_offdiag_kwargs(lower_i, i)
         # update the defaults dictionary with user provided values
         lower_kwarg_filled_i = _update(lower_kwarg_filled_i, lower_kwargs_i)
@@ -910,7 +922,9 @@ def marginal_plot(
     diag_kwargs_list = to_list_kwargs(diag_kwargs, len(samples))
     diag_func = get_diag_funcs(diag_list)
     diag_kwargs_filled = []
-    for i, (diag_i, diag_kwargs_i) in enumerate(zip(diag_list, diag_kwargs_list)):
+    for i, (diag_i, diag_kwargs_i) in enumerate(
+        zip(diag_list, diag_kwargs_list, strict=False)
+    ):
         diag_kwarg_filled_i = _get_default_diag_kwargs(diag_i, i)
         diag_kwarg_filled_i = _update(diag_kwarg_filled_i, diag_kwargs_i)
         diag_kwargs_filled.append(diag_kwarg_filled_i)
@@ -2031,7 +2045,7 @@ def marginal_plot_with_probs_intensity(
         # normalize color intensity
         norm = Normalize(vmin=vmin, vmax=vmax)
         # set color intensity
-        for w, p in zip(weights, patches):
+        for w, p in zip(weights, patches, strict=False):
             p.set_facecolor(cmap(w))
         if show_colorbar:
             plt.colorbar(cm.ScalarMappable(norm=norm, cmap=cmap), ax=ax_, label=label)

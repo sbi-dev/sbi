@@ -5,6 +5,7 @@ on:
       - main
   release:
     types: [ published ]
+  workflow_dispatch:
 
 jobs:
   docs:
@@ -17,31 +18,24 @@ jobs:
         fetch-depth: 0
         lfs: false
 
-    - name: Set up Python
-      uses: actions/setup-python@v2
+    - name: Install uv and set the python version
+      uses: astral-sh/setup-uv@v5
       with:
         python-version: '3.10'
+        enable-cache: true
+        cache-dependency-glob: "pyproject.toml"
 
-    - name: Cache dependency
-      id: cache-dependencies
-      uses: actions/cache@v4
-      with:
-        path: ~/.cache/pip
-        key: ${{ runner.os }}-pip
-
-    - name: Install sbi and dependencies
-      run: |
-        python -m pip install --upgrade pip
-        python -m pip install .[doc]
+    - name: Install dependencies with uv
+      run: uv sync --extra doc
 
     - name: strip output except plots and prints from tutorial notebooks
       run: |
-        python tests/strip_notebook_outputs.py tutorials/
+        uv run python tests/strip_notebook_outputs.py tutorials/
 
     - name: convert notebooks to markdown
       run: |
         cd docs
-        jupyter nbconvert --to markdown ../tutorials/*.ipynb --output-dir docs/tutorials/
+        uv run jupyter nbconvert --to markdown ../tutorials/*.ipynb --output-dir docs/tutorials/
 
     - name: Configure Git user for bot
       run: |
@@ -52,10 +46,10 @@ jobs:
       if: ${{ github.event_name == 'push' }}
       run: |
         cd docs
-        mike deploy dev --push
+        uv run mike deploy dev --push
 
     - name: Build and deploy the lastest documentation upon new release
       if: ${{ github.event_name == 'release' }}
       run: |
         cd docs
-        mike deploy ${{ github.event.release.name }} latest -u --push
+        uv run mike deploy ${{ github.event.release.name }} latest -u --push

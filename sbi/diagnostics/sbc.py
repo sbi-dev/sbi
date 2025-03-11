@@ -10,7 +10,7 @@ from torch import Tensor, ones, zeros
 from torch.distributions import Uniform
 from tqdm.auto import tqdm
 
-from sbi.inference import DirectPosterior
+from sbi.inference import DirectPosterior, ScorePosterior
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.posteriors.vi_posterior import VIPosterior
 from sbi.utils.diagnostics_utils import (
@@ -138,7 +138,7 @@ def _run_sbc(
     ranks = torch.zeros((num_sbc_samples, len(reduce_fns)))
     # Iterate over all sbc samples and calculate ranks.
     for sbc_idx, (true_theta, x_i) in tqdm(
-        enumerate(zip(thetas, xs)),
+        enumerate(zip(thetas, xs, strict=False)),
         total=num_sbc_samples,
         disable=not show_progress_bar,
         desc=f"Calculating ranks for {num_sbc_samples} sbc samples.",
@@ -186,9 +186,9 @@ def get_nltp(thetas: Tensor, xs: Tensor, posterior: NeuralPosterior) -> Tensor:
         nltp: negative log probs of true parameters under approximate posteriors.
     """
     nltp = torch.zeros(thetas.shape[0])
-    unnormalized_log_prob = not isinstance(posterior, DirectPosterior)
+    unnormalized_log_prob = not isinstance(posterior, (DirectPosterior, ScorePosterior))
 
-    for idx, (tho, xo) in enumerate(zip(thetas, xs)):
+    for idx, (tho, xo) in enumerate(zip(thetas, xs, strict=False)):
         # Log prob of true params under posterior.
         if unnormalized_log_prob:
             nltp[idx] = -posterior.potential(tho, x=xo)
@@ -266,7 +266,7 @@ def check_prior_vs_dap(prior_samples: Tensor, dap_samples: Tensor) -> Tensor:
 
     return torch.tensor([
         c2st(s1.unsqueeze(1), s2.unsqueeze(1))
-        for s1, s2 in zip(prior_samples.T, dap_samples.T)
+        for s1, s2 in zip(prior_samples.T, dap_samples.T, strict=False)
     ])
 
 

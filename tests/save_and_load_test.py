@@ -21,7 +21,9 @@ from sbi.inference.posteriors.vi_posterior import VIPosterior
         (NRE, "rejection"),
     ),
 )
-def test_picklability(inference_method, sampling_method: str, tmp_path):
+def test_picklability(
+    inference_method, sampling_method: str, tmp_path, mcmc_params_fast
+):
     num_dim = 2
     prior = utils.BoxUniform(low=-2 * torch.ones(num_dim), high=2 * torch.ones(num_dim))
     x_o = torch.zeros(1, num_dim)
@@ -31,15 +33,15 @@ def test_picklability(inference_method, sampling_method: str, tmp_path):
 
     inference = inference_method(prior=prior)
     _ = inference.append_simulations(theta, x).train(max_num_epochs=1)
-    posterior = inference.build_posterior(sample_with=sampling_method).set_default_x(
-        x_o
-    )
+    posterior = inference.build_posterior(
+        sample_with=sampling_method, mcmc_parameters=mcmc_params_fast
+    ).set_default_x(x_o)
 
     # After sample and log_prob, the posterior should still be picklable
     if isinstance(posterior, VIPosterior):
         posterior.train(max_num_iters=10)
     _ = posterior.sample((1,))
-    _ = posterior.log_prob(torch.zeros(1, num_dim))
+    _ = posterior.potential(torch.zeros(1, num_dim))
 
     with open(f"{tmp_path}/saved_posterior.pickle", "wb") as handle:
         pickle.dump(posterior, handle)

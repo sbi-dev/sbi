@@ -8,8 +8,13 @@ import torch
 from torch import Tensor, nn
 
 from sbi.neural_nets.estimators import MixedDensityEstimator
-from sbi.neural_nets.estimators.mixed_density_estimator import _separate_input
-from sbi.neural_nets.net_builders.categorial import build_categoricalmassestimator
+from sbi.neural_nets.estimators.mixed_density_estimator import (
+    _is_discrete,
+    _separate_input,
+)
+from sbi.neural_nets.net_builders.categorial import (
+    build_categoricalmassestimator,
+)
 from sbi.neural_nets.net_builders.flow import (
     build_made,
     build_maf,
@@ -26,10 +31,7 @@ from sbi.neural_nets.net_builders.flow import (
     build_zuko_unaf,
 )
 from sbi.neural_nets.net_builders.mdn import build_mdn
-from sbi.utils.sbiutils import (
-    standardizing_net,
-    z_score_parser,
-)
+from sbi.utils.sbiutils import standardizing_net, z_score_parser
 from sbi.utils.user_input_checks import check_data_device
 
 model_builders = {
@@ -56,6 +58,7 @@ def build_mnle(
     z_score_x: Optional[str] = "independent",
     z_score_y: Optional[str] = "independent",
     flow_model: str = "nsf",
+    num_categorical_columns: Optional[Tensor] = None,
     embedding_net: nn.Module = nn.Identity(),
     combined_embedding_net: Optional[nn.Module] = None,
     num_transforms: int = 2,
@@ -69,8 +72,8 @@ def build_mnle(
 ):
     """Returns a density estimator for mixed data types.
 
-    Uses a categorical net to model the discrete part and a conditional density
-    estimator to model the continuous part of the data.
+    Uses an autoregressive categorical density estimator to model the discrete part
+    and a conditional density estimator to model the continuous part of the data.
 
     Note: If the condition y is > 1D, an embedding net must be provided. Then,
     during inference, we need to combine the embedded condition with the
@@ -102,6 +105,8 @@ def build_mnle(
             as z_score_x.
         flow_model: type of flow model to use for the continuous part of the
             data.
+        num_categorical_columns: Number of categorical columns of each variable in the
+            input data. If None, the function will infer this from the data.
         embedding_net: Optional embedding network for y, required if y is > 1D.
         combined_embedding_net: Optional embedding for combining the discrete
             part of the input and the embedded condition into a joined
@@ -125,13 +130,17 @@ def build_mnle(
 
     warnings.warn(
         "The mixed neural likelihood estimator assumes that x contains "
-        "continuous data in the first n-1 columns (e.g., reaction times) and "
-        "categorical data in the last column (e.g., corresponding choices). If "
+        "continuous data in the first n-k columns (e.g., reaction times) and "
+        "categorical data in the last k columns (e.g., corresponding choices). If "
         "this is not the case for the passed `x` do not use this function.",
         stacklevel=2,
     )
     # Separate continuous and discrete data.
-    cont_x, disc_x = _separate_input(batch_x)
+    if num_categorical_columns is None:
+        num_disc = int(torch.sum(_is_discrete(batch_x)))
+    else:
+        num_disc = len(num_categorical_columns)
+    cont_x, disc_x = _separate_input(batch_x, num_discrete_columns=num_disc)
 
     # Set up y-embedding net with z-scoring.
     z_score_y_bool, structured_y = z_score_parser(z_score_y)
@@ -152,6 +161,7 @@ def build_mnle(
         num_hidden=hidden_features,
         num_layers=hidden_layers,
         embedding_net=embedding_net,
+        num_categories=num_categorical_columns,
     )
 
     if combined_embedding_net is None:
@@ -166,7 +176,6 @@ def build_mnle(
 
     # Set up a flow for modelling the continuous data, conditioned on the discrete data.
     continuous_net = model_builders[flow_model](
-        # TODO: add support for optional log-transform in flow builders.
         batch_x=(
             torch.log(cont_x) if log_transform_x else cont_x
         ),  # log transform manually.

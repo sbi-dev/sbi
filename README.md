@@ -5,6 +5,7 @@
 [![codecov](https://codecov.io/gh/sbi-dev/sbi/branch/main/graph/badge.svg)](https://codecov.io/gh/sbi-dev/sbi)
 [![GitHub license](https://img.shields.io/github/license/sbi-dev/sbi)](https://github.com/sbi-dev/sbi/blob/master/LICENSE.txt)
 [![DOI](https://joss.theoj.org/papers/10.21105/joss.02505/status.svg)](https://doi.org/10.21105/joss.02505)
+[![NumFOCUS affiliated](https://camo.githubusercontent.com/a0f197cee66ccd8ed498cf64e9f3f384c78a072fe1e65bada8d3015356ac7599/68747470733a2f2f696d672e736869656c64732e696f2f62616467652f4e756d464f4355532d616666696c696174656425323070726f6a6563742d6f72616e67652e7376673f7374796c653d666c617426636f6c6f72413d45313532334426636f6c6f72423d303037443841)](https://numfocus.org/sponsored-projects/affiliated-projects)
 
 ## `sbi`: Simulation-Based Inference
 
@@ -59,14 +60,14 @@ posterior = inference.build_posterior()
 
 ### Installation
 
-`sbi` requires Python 3.9 or higher. While a GPU isn't necessary, it can improve
+`sbi` requires Python 3.10 or higher. While a GPU isn't necessary, it can improve
 performance in some cases. We recommend using a virtual environment with
 [`conda`](https://docs.conda.io/en/latest/miniconda.html) for an easy setup.
 
 If `conda` is installed on the system, an environment for installing `sbi` can be created as follows:
 
 ```
-conda create -n sbi_env python=3.9 && conda activate sbi_env
+conda create -n sbi_env python=3.10 && conda activate sbi_env
 ```
 
 ### From PyPI
@@ -205,7 +206,7 @@ Durkan's `lfi`. `sbi` runs as a community project. See also
 `sbi` has been supported by the German Federal Ministry of Education and Research (BMBF)
 through project ADIMEM (FKZ 01IS18052 A-D), project SiMaLeSAM (FKZ 01IS21055A) and the
 Tübingen AI Center (FKZ 01IS18039A). Since 2024, `sbi` is supported by the appliedAI
-Institute for Europe.
+Institute for Europe, and by NumFOCUS.
 
 ## License
 

@@ -261,7 +261,7 @@ def test_pickle_support(q: str):
 
     with tempfile.NamedTemporaryFile(suffix=".pt") as f:
         torch.save(posterior, f.name)
-        posterior_loaded = torch.load(f.name)
+        posterior_loaded = torch.load(f.name, weights_only=False)
         assert (posterior._x == posterior_loaded._x).all(), (
             "Mhh, something with the pickled is strange"
         )

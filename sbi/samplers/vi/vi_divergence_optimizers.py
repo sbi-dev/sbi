@@ -200,7 +200,7 @@ class DivergenceOptimizer(ABC):
 
     def update_state(self) -> None:
         """This updates the current state."""
-        for state_para, para in zip(self.state_dict, self.q.parameters()):
+        for state_para, para in zip(self.state_dict, self.q.parameters(), strict=False):
             if torch.isfinite(para).all():
                 state_para.data = para.data.clone()
             else:
@@ -213,7 +213,7 @@ class DivergenceOptimizer(ABC):
         Args:
             warm_up_rounds: Number of warm_up_round one should do after failure.
         """
-        for state_para, para in zip(self.state_dict, self.q.parameters()):
+        for state_para, para in zip(self.state_dict, self.q.parameters(), strict=False):
             para.data = state_para.data.clone().to(para.device)
         self._optimizer.__init__(self.q.parameters(), self.learning_rate)
         self.warm_up(warm_up_rounds)
@@ -464,7 +464,7 @@ class ElboOptimizer(DivergenceOptimizer):
     def update_surrogate_q(self) -> None:
         """Updates the surrogate with new parameters."""
         for param, param_surro in zip(
-            self.q.parameters(), self._surrogate_q.parameters()
+            self.q.parameters(), self._surrogate_q.parameters(), strict=False
         ):
             param_surro.data = param.data
             param_surro.requires_grad = False
