@@ -215,7 +215,7 @@ fails (xfailed).
 As SBI is a fundamentally data-driven approach, we are not only interested in whether
 the modifications to the codebase "pass the tests" but also in whether they improve or
 at least do not deteriorate the performance of the package for inference. To this end,
-we have a set of *mini-sbibm* tests that are intended for developers to run locally.
+we have a set of *mini-sbibm* tests (a minimal version of the sbi benchmarking package [`sbibm`](https://github.com/sbi-benchmark/sbibm)) that are intended for developers to run locally.
 
 These tests differ from the regular tests in that they always pass (provided there
 are no errors) but output performance metrics that can be compared, e.g., to the
