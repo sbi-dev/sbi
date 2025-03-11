@@ -7,10 +7,13 @@ from logging import warning
 from pathlib import Path
 from shutil import rmtree
 
+import pandas as pd
 import pytest
 import torch
 
 from sbi.utils.sbiutils import seed_all_backends
+from pytest_harvest import is_main_process, get_xdist_worker_id, get_session_results_df
+
 
 # Seed for `set_seed` fixture. Change to random state of all seeded tests.
 seed = 1
@@ -118,25 +121,22 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
         colored_line = f"\033[96m{centered_line}\033[0m"
         terminalreporter.write_line(colored_line)
 
-        if harvested_fixture_data is not None:
-            terminalreporter.write_line("Amortized inference:")
+        terminalreporter.write_line("Amortized inference:")
 
-            results = harvested_fixture_data["results_bag"]
+        try:
+            # Load results from CSV
+            results = pd.read_csv('./.bm_results/results_all.csv')
 
             # Extract relevant data (method, task, metric)
-            methods = set()
-            tasks = set()
+            methods = set(results['method'])
+            tasks = set(results['task_name'])
             data = {}  # (method, task) -> metric
 
-            for _, info in results.items():
-                method = info.get('method')
-                task = info.get('task_name')
-                metric = info.get('metric')
-
-                if method is not None and task is not None:
-                    methods.add(method)
-                    tasks.add(task)
-                    data[(method, task)] = metric
+            for _, row in results.iterrows():
+                method = row['method']
+                task = row['task_name']
+                metric = row['metric']
+                data[(method, task)] = metric
 
             methods = sorted(methods)
             tasks = sorted(tasks)
@@ -146,13 +146,13 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
                 return
 
             # Determine column widths
-            method_col_width = max(len(m) for m in methods)
-            task_col_widths = {t: max(len(t), 10) for t in tasks}
+            method_col_width = max(len(str(m)) for m in methods)
+            task_col_widths = {t: max(len(str(t)), 10) for t in tasks}
 
             # Print the header row
             header = " " * (method_col_width + 2)
             for t in tasks:
-                header += t.center(task_col_widths[t] + 2)
+                header += str(t).center(task_col_widths[t] + 2)
             terminalreporter.write_line(header)
 
             # Print separator line
@@ -163,11 +163,15 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
             min_max_per_task = {}
             for t in tasks:
                 task_metrics = [data.get((m, t), float('inf')) for m in methods]
-                min_max_per_task[t] = (min(task_metrics), max(task_metrics))
+                task_metrics = [m for m in task_metrics if m != float('inf')]
+                if task_metrics:
+                    min_max_per_task[t] = (min(task_metrics), max(task_metrics))
+                else:
+                    min_max_per_task[t] = (0, 1)  # Default if no metrics
 
             # Print each row with colored values
             for m in methods:
-                row = m.ljust(method_col_width + 2)
+                row = str(m).ljust(method_col_width + 2)
                 for t in tasks:
                     val = data.get((m, t), "N/A")
                     if val == "N/A":
@@ -198,8 +202,11 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
                         )
 
                 terminalreporter.write_line(row)
-        else:
-            terminalreporter.write_line("No harvested fixture data found yet.")
+
+        except Exception as e:
+            terminalreporter.write_line(f"Error processing results: {e}")
+    else:
+        terminalreporter.write_line("Run with --bm flag to see benchmark results.")
 
 
 @pytest.fixture(scope="function")
@@ -215,45 +222,20 @@ def mcmc_params_fast() -> dict:
 
 
 # Pytest harvest xdist support.
+# Saves results now as human-readable .csv! Which can be inspected by the user in
+# the .bm_results folder.
 
-
-# Define the folder in which temporary worker's results will be stored
-RESULTS_PATH = Path('./.xdist_results/')
-RESULTS_PATH.mkdir(exist_ok=True)
-
-
-def pytest_harvest_xdist_init():
-    # reset the recipient folder
+def pytest_sessionfinish(session):
+    """Gather all results and save them to a csv.
+    Works both on worker and master nodes, and also with xdist disabled"""
+    session_results_df = get_session_results_df(session)
+    suffix = 'all' if is_main_process(session) else get_xdist_worker_id(session)
+    RESULTS_PATH = Path('./.bm_results/')
     if RESULTS_PATH.exists():
         rmtree(RESULTS_PATH)
     RESULTS_PATH.mkdir(exist_ok=False)
-    return True
 
-
-def pytest_harvest_xdist_worker_dump(worker_id, session_items, fixture_store):
-    # persist session_items and fixture_store in the file system
-    with open(RESULTS_PATH / ('%s.pkl' % worker_id), 'wb') as f:
-        try:
-            pickle.dump((session_items, fixture_store), f)
-        except Exception as e:
-            warning(
-                "Error while pickling worker %s's harvested results: [%s] %s",
-                (worker_id, e.__class__, e),
-            )
-    return True
-
-
-def pytest_harvest_xdist_load():
-    # restore the saved objects from file system
-    workers_saved_material = dict()
-    for pkl_file in RESULTS_PATH.glob('*.pkl'):
-        wid = pkl_file.stem
-        with pkl_file.open('rb') as f:
-            workers_saved_material[wid] = pickle.load(f)
-    return workers_saved_material
-
-
-def pytest_harvest_xdist_cleanup():
-    # delete all temporary pickle files
-    rmtree(RESULTS_PATH)
-    return True
+    if suffix == 'all':
+        session_results_df.to_csv('./.bm_results/results_all.csv')
+    else:
+        session_results_df.to_csv('./.bm_results/results_%s.csv' % suffix)

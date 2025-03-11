@@ -63,6 +63,7 @@ coverage.xml
 tests/.mypy_cache
 .xdist_results/
 .xdist_harvested/
+.bm_results/
 
 # Translations
 *.mo
