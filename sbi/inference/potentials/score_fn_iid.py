@@ -1,6 +1,6 @@
 import functools
 import math
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from typing import Callable, Optional, Type
 
 import torch
@@ -20,7 +20,7 @@ from sbi.utils.torchutils import ensure_theta_batched
 IID_METHODS = {}
 
 
-def get_iid_method(name: str) -> Type["ScoreFnIID"]:
+def get_iid_method(name: str) -> Type["IIDScoreFunction"]:
     r"""
     Retrieves the IID method by name.
 
@@ -48,14 +48,14 @@ def register_iid_method(name: str) -> Callable:
         A decorator function to register the IID method class.
     """
 
-    def decorator(cls: Type["ScoreFnIID"]) -> Type["ScoreFnIID"]:
+    def decorator(cls: Type["IIDScoreFunction"]) -> Type["IIDScoreFunction"]:
         IID_METHODS[name] = cls
         return cls
 
     return decorator
 
 
-class ScoreFnIID:
+class IIDScoreFunction(ABC):
     def __init__(
         self,
         score_estimator: "ConditionalScoreEstimator",
@@ -63,7 +63,17 @@ class ScoreFnIID:
         device: str = "cpu",
     ) -> None:
         r"""
-        Initializes the ScoreFnIID class.
+        This is a abstract base class wrapper for score estimators. Subclasses are used
+        to implement different methods for factorized distributions. For example, in
+        the IID setting the posterior for N observations can be represented as a product
+        of N "local" posteriors, divided by N-1 prior terms.
+
+        This allows to efficiently extend "single" observation score estimators to a
+        sequence of IID observtions. Unfortunatly, this is not as simple as just summing
+        the scores minus the prior score, as in diffusion models the we also need to
+        represent the "marginal" posterior scores at time $t$. Even if the true
+        posterior factorizes, the marginal true posterior at time $t>0$ does not and
+        this requires some adjustments.
 
         Args:
             score_estimator: The neural network modeling the score.
@@ -71,25 +81,107 @@ class ScoreFnIID:
             device: The device on which to evaluate the potential. Defaults to "cpu".
         """
 
-        self.score_estimator = score_estimator.to(device)
+        self.score_estimator = score_estimator.to(device).eval()
         self.prior = prior
-        self.score_estimator.eval()
 
     @abstractmethod
     def __call__(
         self,
-        theta: Tensor,
+        inputs: Tensor,
+        conditions: Tensor,
+        time: Optional[Tensor] = None,
     ) -> Tensor:
         r"""
         Abstract method to be implemented by subclasses to compute the score function.
 
         Args:
-            theta: The parameters at which to evaluate the potential.
+            inputs: The parameters at which to evaluate the potential of size [b,iid,d]
+            conditions: The sequence of observations of size [iid,...]
+            time: The time in the diffusion process to specify the target marginal.
+
+        Returns:
+            The score of the inputs given N observations of shape (batch,d).
+        """
+        pass
+
+
+@register_iid_method("fnpe")
+class FNPEScoreFunction(IIDScoreFunction):
+    def __init__(
+        self,
+        score_estimator: "ConditionalScoreEstimator",
+        prior: Distribution,
+        device: str = "cpu",
+        prior_score_weight: Optional[Callable[[Tensor], Tensor]] = None,
+    ) -> None:
+        r"""
+        The FNPEScoreFunction implments the "Factorized Neural Posterior Estimation"
+        method for score-based models [1]. This method does not apply the necessary
+        corrections for the score function, but instead uses a simple weighting of the
+        prior score. This is generally applicable and simple but does in general not
+        return the correct marginal score for any $t > 0$.
+
+        For a moderate number of factors, this hence does require post-hoc adjustment
+        through e.g. predictor-corrector samplers to ensure stable convergence to the
+        correct terminal distiribution at $t=0$.
+
+        Literature:
+        - [1] Compositional Score Modeling for Simulation-Based Inference
+            (https://arxiv.org/abs/2209.14249)
+
+        Args:
+            score_estimator: The neural network modeling the score.
+            prior: The prior distribution.
+            device: The device on which to evaluate the potential. Defaults to "cpu".
+            prior_score_weight: A function to weight the prior score. Defaults to the
+                linear interpolation between zero (at t=0) and one (at t=t_max).
+        """
+        super().__init__(score_estimator, prior, device)
+        if prior_score_weight is None:
+            t_max = score_estimator.t_max
+
+            def prior_score_weight_fn(t):
+                return (t_max - t) / t_max
+
+        self.prior_score_weight_fn = prior_score_weight_fn
+
+    def __call__(
+        self,
+        inputs: Tensor,
+        conditions: Tensor,
+        time: Optional[Tensor] = None,
+    ) -> Tensor:
+        r"""
+        Computes the score function for score-based methods on multiple observations.
+
+        Args:
+            inputs: The input parameters at which to evaluate the potential.
+            conditions: The observed data at which to evaluate the posterior.
+            time: The time at which to evaluate the score. Defaults to None.
 
         Returns:
             The computed score function.
         """
-        pass
+
+        assert inputs.ndim == 3, "Inputs must have shape [b,iid,d]"
+        assert conditions.ndim == 2, "Conditions must have shape [iid,...]"
+
+        if time is None:
+            time = torch.tensor([self.score_estimator.t_min])
+
+        N = conditions.shape[0]
+
+        # Compute the per-sample score
+        inputs = ensure_theta_batched(inputs)
+        base_score = self.score_estimator(inputs, conditions, time)
+
+        # Compute the prior score
+        prior_score = self.prior_score_weight_fn(time) * self.prior_score_fn(inputs)
+
+        # Accumulate
+        score = (1 - N) * prior_score + base_score.sum(-2, keepdim=True)
+
+        return score
 
     def prior_score_fn(self, theta: Tensor) -> Tensor:
         r"""
@@ -118,74 +210,7 @@ class ScoreFnIID:
         return prior_score
 
 
-@register_iid_method("fnpe")
-class FNPEScoreFn(ScoreFnIID):
-    def __init__(
-        self,
-        score_estimator: "ConditionalScoreEstimator",
-        prior: Distribution,
-        device: str = "cpu",
-        prior_score_weight: Optional[Callable[[Tensor], Tensor]] = None,
-    ) -> None:
-        r"""
-        Initializes the FNPEScoreFn class.
-
-        Paper: Compositional Score Modeling for Simulation-Based Inference
-        - https://arxiv.org/abs/2209.14249
-
-        Args:
-            score_estimator: The neural network modeling the score.
-            prior: The prior distribution.
-            device: The device on which to evaluate the potential. Defaults to "cpu".
-            prior_score_weight: A function to weight the prior score. Defaults to None.
-        """
-        super().__init__(score_estimator, prior, device)
-
-        if prior_score_weight is None:
-            t_max = score_estimator.t_max
-
-            def prior_score_weight_fn(t):
-                return (t_max - t) / t_max
-
-        self.prior_score_weight_fn = prior_score_weight_fn
-
-    def __call__(
-        self,
-        inputs: Tensor,
-        conditions: Tensor,
-        time: Optional[Tensor] = None,
-    ) -> Tensor:
-        r"""
-        Computes the score function for score-based methods.
-
-        Args:
-            inputs: The input parameters at which to evaluate the potential.
-            conditions: The observed data at which to evaluate the posterior.
-            time: The time at which to evaluate the score. Defaults to None.
-
-        Returns:
-            The computed score function.
-        """
-        if time is None:
-            time = torch.tensor([self.score_estimator.t_min])
-
-        N = conditions.shape[0]
-
-        # Compute the per-sample score
-        inputs = ensure_theta_batched(inputs)
-        base_score = self.score_estimator(inputs, conditions, time)
-
-        # Compute the prior score
-        prior_score = self.prior_score_fn(inputs)
-        prior_score = self.prior_score_weight_fn(time) * prior_score
-
-        # Accumulate
-        score = (1 - N) * prior_score + base_score.sum(-2, keepdim=True)
-
-        return score
-
-
-class AbstractGaussCorrectedScoreFn(ScoreFnIID):
+class BaseGaussCorrectedScoreFunction(IIDScoreFunction):
     def __init__(
         self,
         score_estimator: "ConditionalScoreEstimator",
@@ -194,14 +219,27 @@ class AbstractGaussCorrectedScoreFn(ScoreFnIID):
         lam_psd_nugget: float = 0.01,
         device: str = "cpu",
     ) -> None:
-        r"""Initializes the AbstractGaussCorrectedScoreFn class.
+        r"""Corrected score function estimators have been originally proposed in [1].
+        Specificially a simple analytic correction for the marginal scores is derived
+        using Gaussian assumptions. This is a simple and efficient method to correct
+        the score function for the marginal posterior, which was also shown to scale
+        well to large sequence settings [1,2].
 
-        Method for appropriately correcting the score function using Gaussian
-        approximations.
+        A limitation of the method is that it requires following inputs:
+        - The marginal prior distribution (which might be non-trivial to compute)
+        - The marginal posterior precision (which is generally not available, and needs
+            to be estimated).
 
-        Papers:
-        - https://arxiv.org/abs/2106.05399
-        - https://arxiv.org/abs/2411.02728
+        Within this library we have an extensive set of tools to obtain analytic (or
+        good approximations) for the most common prior distributions. The marginal
+        posterior precision can be treated as a "hyperparameter" different estimation
+        methods are available, which will be subclased from this class.
+
+        Literature:
+        - [1] Diffusion posterior sampling for simulation-based inference in tall data
+            settings (https://arxiv.org/abs/2404.07593)
+        - [2] Compositional simulation-based inference for time series
+            (https://arxiv.org/abs/2411.02728)
 
         Args:
             score_estimator: The neural network modelling the score.
@@ -214,7 +252,6 @@ class AbstractGaussCorrectedScoreFn(ScoreFnIID):
         self.ensure_lam_psd = ensure_lam_psd
         self.lam_psd_nugget = lam_psd_nugget
 
-    @abstractmethod
     def posterior_precision_est_fn(self, conditions: Tensor) -> Tensor:
         r"""Abstract method to estimate the posterior precision.
 
@@ -224,20 +261,7 @@ class AbstractGaussCorrectedScoreFn(ScoreFnIID):
         Returns:
             Estimated posterior precision.
         """
-        pass
-
-    def denoising_prior(self, m: Tensor, std: Tensor, inputs: Tensor) -> Distribution:
-        r"""Denoise the prior distribution.
-
-        Args:
-            m: Mean tensor.
-            std: Standard deviation tensor.
-            inputs: Parameters tensor.
-
-        Returns:
-            Denoised prior distribution.
-        """
-        return denoise(self.prior, m, std, inputs)
+        return torch.ones((1,))
 
     def marginal_prior(self, time: Tensor, inputs: Tensor) -> Distribution:
         r"""Compute the marginal prior distribution.
@@ -324,7 +348,7 @@ class AbstractGaussCorrectedScoreFn(ScoreFnIID):
         m = self.score_estimator.mean_t_fn(time)
         std = self.score_estimator.std_fn(time)
 
-        p_denoise = self.denoising_prior(m, std, inputs)
+        p_denoise = denoise(self.prior, m, std, inputs)
 
         if hasattr(p_denoise, "covariance_matrix"):
             # We currently only support diagonal covariances
@@ -354,8 +378,7 @@ class AbstractGaussCorrectedScoreFn(ScoreFnIID):
         """
         assert inputs.ndim == 3, "Inputs must have shape [b,iid,d]"
         assert conditions.ndim == 2, "Conditions must have shape [iid,...]"
-        # NOTE We can assume here a fixed 3dim shape of inputs [b,N,d]
-        # NOTE We can assume here a fixed format of conditions [N,...]
+
         N, *_ = conditions.shape
 
         if time is None:
@@ -404,7 +427,7 @@ class AbstractGaussCorrectedScoreFn(ScoreFnIID):
 
 
 @register_iid_method("gauss")
-class GaussCorrectedScoreFn(AbstractGaussCorrectedScoreFn):
+class GaussCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
     def __init__(
         self,
         score_estimator: "ConditionalScoreEstimator",
@@ -416,7 +439,10 @@ class GaussCorrectedScoreFn(AbstractGaussCorrectedScoreFn):
         device: str = "cpu",
     ) -> None:
         r"""
-        Initializes the GaussCorrectedScoreFn class.
+        This extends the BaseGaussCorrectedScoreFunction to provide a simple method to
+        heuristically estimate the posterior precision. Assuming that data is
+        informative enough, the posterior precision should be higher than the prior
+        precision. This method simply scales the prior precision by a factor.
 
         Args:
             score_estimator: The neural network modeling the score.
@@ -482,7 +508,7 @@ class GaussCorrectedScoreFn(AbstractGaussCorrectedScoreFn):
 
 
 @register_iid_method("auto_gauss")
-class AutoGaussCorrectedScoreFn(AbstractGaussCorrectedScoreFn):
+class AutoGaussCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
     def __init__(
         self,
         score_estimator: "ConditionalScoreEstimator",
@@ -495,7 +521,10 @@ class AutoGaussCorrectedScoreFn(AbstractGaussCorrectedScoreFn):
         device: str = "cpu",
     ) -> None:
         r"""
-        Initializes the AutoGaussCorrectedScoreFn class.
+        This method extends the by estimating the posterior precision using
+        approximate posterior samples obtained from a diffusion model (using the
+        score_estimator) [1]. This method has a slight initialization overhead, but
+        generally provides more accurate results than simple heuristics.
 
         Args:
             score_estimator: The neural network modeling the score.
@@ -566,7 +595,7 @@ class AutoGaussCorrectedScoreFn(AbstractGaussCorrectedScoreFn):
         # NOTE: This assumes that the objects dont change between calls to cache
         # the results efficiently.
 
-        # NOTE: To avoid circular imports
+        # NOTE: To avoid circular imports :(
         from sbi.inference.posteriors.score_posterior import ScorePosterior
 
         posterior = ScorePosterior(score_estimator, prior)
@@ -597,9 +626,16 @@ class AutoGaussCorrectedScoreFn(AbstractGaussCorrectedScoreFn):
 
 
 @register_iid_method("jac_gauss")
-class JacCorrectedScoreFn(AbstractGaussCorrectedScoreFn):
-    def posterior_precision_est_fn(self, conditions: Tensor) -> Tensor:
-        raise ValueError("This method is not used for JacCorrectedScoreFn.")
+class JacCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
+    """
+    This method extends the BaseGaussCorrectedScoreFunction by using Tweedie's moment
+    projection to estimate the marginal posterior covariance at each time step.
+
+    This method theoretically provides the most accurate estimates for the marginal,
+    however, it requires the computation of the Jacobian of the score function at each
+    iteration which can be computationally expensive and lead to numerical instabilities
+    in some cases.
+    """
 
     def marginal_denoising_posterior_precision_est_fn(
         self, time: Tensor, inputs: Tensor, conditions: Tensor, N: int

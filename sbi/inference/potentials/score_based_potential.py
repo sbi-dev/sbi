@@ -1,7 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 import torch
 from torch import Tensor
@@ -58,7 +58,7 @@ class PosteriorScoreBasedPotential(BasePotential):
         prior: Optional[Distribution],
         x_o: Optional[Tensor] = None,
         iid_method: str = "auto_gauss",
-        iid_params: Optional[dict] = None,
+        iid_params: Optional[Dict[str, Any]] = None,
         device: str = "cpu",
     ):
         r"""Returns the score function for score-based methods.
@@ -83,7 +83,7 @@ class PosteriorScoreBasedPotential(BasePotential):
         x_o: Optional[Tensor],
         x_is_iid: Optional[bool] = False,
         iid_method: str = "auto_gauss",
-        iid_params: Optional[dict] = None,
+        iid_params: Optional[Dict[str, Any]] = None,
         atol: float = 1e-5,
         rtol: float = 1e-6,
         exact: bool = True,
@@ -103,7 +103,7 @@ class PosteriorScoreBasedPotential(BasePotential):
         super().set_x(x_o, x_is_iid)
         self.iid_method = iid_method
         self.iid_params = iid_params
-        if self._x_o is not None:
+        if not x_is_iid and (self._x_o is not None):
             self.flow = self.rebuild_flow(atol=atol, rtol=rtol, exact=exact)
 
     def __call__(
@@ -170,13 +170,13 @@ class PosteriorScoreBasedPotential(BasePotential):
             else:
                 assert self.prior is not None, "Prior is required for iid methods."
 
-                method_iid = get_iid_method(self.iid_method)
+                iid_method = get_iid_method(self.iid_method)
                 # Always creating a new object every call is not efficient...
-                score_fn_iid = method_iid(
+                score_fn_iid = iid_method(
                     self.score_estimator, self.prior, **(self.iid_params or {})
                 )
 
-                score = score_fn_iid(theta, self.x_o, time)  # type: ignore
+                score = score_fn_iid(theta, self.x_o, time)
 
         return score
 
@@ -218,9 +218,6 @@ class PosteriorScoreBasedPotential(BasePotential):
             )
         x_density_estimator = reshape_to_batch_event(
             self.x_o, event_shape=self.score_estimator.condition_shape
-        )
-        assert x_density_estimator.shape[0] == 1 or not self.x_is_iid, (
-            "PosteriorScoreBasedPotential supports only x batchsize of 1`."
         )
 
         flow = self.get_continuous_normalizing_flow(
