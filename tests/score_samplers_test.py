@@ -28,39 +28,47 @@ from sbi.utils import BoxUniform, MultipleIndependent
         "jac_gauss",
     ],
 )
-@pytest.mark.parametrize("d", [1, 2, 3])
-def test_score_fn_iid_on_different_priors(sde_type, iid_method, d):
-    mean0 = torch.zeros(d)
-    std0 = torch.ones(d)
-    score_fn = _build_gaussian_score_estimator(sde_type, (d,), mean0, std0)
+@pytest.mark.parametrize("num_dim", [1, 2, 3])
+def test_score_fn_iid_on_different_priors(sde_type, iid_method, num_dim):
+    """Test the the iid methods work with the most common priors that are used in
+    practice (or are implemented in this library).
+
+    This is mostly becuase "gauss" based methods do need to perform analytical
+    integration over the prior (which is automatically done in this library). It ensures
+    that it doesn't lead to any errors, but does not test the correctness of the
+    integration!
+    """
+    mean0 = torch.zeros(num_dim)
+    std0 = torch.ones(num_dim)
+    score_fn = _build_gaussian_score_estimator(sde_type, (num_dim,), mean0, std0)
     # Diag normal prior
-    prior1 = Independent(Normal(torch.zeros(d), torch.ones(d)), 1)
+    prior1 = Independent(Normal(torch.zeros(num_dim), torch.ones(num_dim)), 1)
     # Uniform prior
-    prior2 = Independent(Uniform(torch.zeros(d), torch.ones(d)), 1)
-    prior2_2 = BoxUniform(torch.zeros(d), torch.ones(d))
+    prior2 = Independent(Uniform(torch.zeros(num_dim), torch.ones(num_dim)), 1)
+    prior2_2 = BoxUniform(torch.zeros(num_dim), torch.ones(num_dim))
     # Multivariate normal prior
-    prior3 = MultivariateNormal(torch.zeros(d), torch.eye(d))
+    prior3 = MultivariateNormal(torch.zeros(num_dim), torch.eye(num_dim))
     # Gamma prior - analytical not implemented but should fall back to general case
-    prior4 = Independent(Gamma(torch.ones(d), torch.ones(d)), 1)
+    prior4 = Independent(Gamma(torch.ones(num_dim), torch.ones(num_dim)), 1)
     # Multiple independent prior
-    if d == 1:
+    if num_dim == 1:
         prior5 = Independent(Normal(torch.zeros(1), torch.ones(1)), 1)
     else:
         prior5 = MultipleIndependent([
-            Normal(torch.zeros(1), torch.ones(1)) for _ in range(d)
+            Normal(torch.zeros(1), torch.ones(1)) for _ in range(num_dim)
         ])
 
     priors = [prior1, prior2, prior2_2, prior3, prior4, prior5]
     x_o_iid = torch.ones((5, 1))
     score_fn.set_x(x_o_iid, x_is_iid=True, iid_method=iid_method)
-    inputs = torch.ones((1, 1, d))
+    inputs = torch.ones((1, 1, num_dim))
     for prior in priors:
         time = torch.ones(1)
         score_fn.prior = prior
         output = score_fn.gradient(inputs, time=time)
 
-        assert output.shape == (1, 1, d), (
-            f"Expected shape {(1, 1, d)}, got {output.shape}"
+        assert output.shape == (1, 1, num_dim), (
+            f"Expected shape {(1, 1, num_dim)}, got {output.shape}"
         )
         assert torch.isfinite(output).all(), "Output contains non-finite values"
 
