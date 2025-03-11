@@ -63,11 +63,11 @@ class IIDScoreFunction(ABC):
         device: str = "cpu",
     ) -> None:
         r"""
-        This is a abstract base class wrapper for score estimators. Subclasses are used
-        to implement different methods for factorized distributions. For example, in
-        the IID setting the posterior for N observations can be represented as a product
-        of N "local" posteriors, divided by N-1 prior terms.
+        This is a abstract base class wrapper for score estimators. S
 
+        Subclasses are used to implement different methods for factorized distributions.
+        For example, in the IID setting the posterior for N observations can be
+        represented as a product of N "local" posteriors, divided by N-1 prior terms.
         This allows to efficiently extend "single" observation score estimators to a
         sequence of IID observtions. Unfortunatly, this is not as simple as just summing
         the scores minus the prior score, as in diffusion models the we also need to
@@ -116,11 +116,12 @@ class FNPEScoreFunction(IIDScoreFunction):
     ) -> None:
         r"""
         The FNPEScoreFunction implments the "Factorized Neural Posterior Estimation"
-        method for score-based models [1]. This method does not apply the necessary
-        corrections for the score function, but instead uses a simple weighting of the
-        prior score. This is generally applicable and simple but does in general not
-        return the correct marginal score for any $t > 0$.
+        method for score-based models [1].
 
+        This method does not apply the necessary corrections for the score function, but
+        instead uses a simple weighting of the prior score. This is generally applicable
+        and simple but does in general not return the correct marginal score for any
+        $t > 0$.
         For a moderate number of factors, this hence does require post-hoc adjustment
         through e.g. predictor-corrector samplers to ensure stable convergence to the
         correct terminal distiribution at $t=0$.
@@ -220,6 +221,7 @@ class BaseGaussCorrectedScoreFunction(IIDScoreFunction):
         device: str = "cpu",
     ) -> None:
         r"""Corrected score function estimators have been originally proposed in [1].
+
         Specificially a simple analytic correction for the marginal scores is derived
         using Gaussian assumptions. This is a simple and efficient method to correct
         the score function for the marginal posterior, which was also shown to scale
