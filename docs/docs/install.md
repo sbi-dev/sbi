@@ -9,8 +9,8 @@ installed on the system, an environment for installing `sbi` can be created as
 follows:
 
 ```console
-# Create an environment for sbi (indicate Python 3.8 or higher); activate it
-$ conda create -n sbi_env python=3.12 && conda activate sbi_env
+# Create an environment for sbi (indicate Python 3.10 or higher); activate it
+$ conda create -n sbi_env python=3.10 && conda activate sbi_env
 ```
 
 Independent of whether you are using `conda` or not, `sbi` can be installed
