@@ -14,7 +14,7 @@ from sbi.inference import (
     RejectionPosterior,
     VIPosterior,
 )
-from sbi.inference.potentials.base_potential import CallablePotentialWrapper
+from sbi.inference.potentials.base_potential import CustomPotentialWrapper
 from sbi.utils import BoxUniform
 from sbi.utils.conditional_density_utils import ConditionedPotential
 
@@ -83,7 +83,7 @@ def test_callable_potential(sampling_method, mcmc_params_accurate: dict):
     ],
 )
 def test_conditioned_potential(condition: Tensor):
-    potential_fn = CallablePotentialWrapper(
+    potential_fn = CustomPotentialWrapper(
         potential_fn=lambda theta, x_o: theta,
         prior=BoxUniform(low=zeros(2), high=ones(2)),
     )

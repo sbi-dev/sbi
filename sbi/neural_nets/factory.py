@@ -112,6 +112,7 @@ def classifier_nn(
                 check_net_device(embedding_net_theta, "cpu", embedding_net_warn_msg),
                 check_net_device(embedding_net_x, "cpu", embedding_net_warn_msg),
             ),
+            strict=False,
         ),
         **kwargs,
     )
@@ -194,6 +195,7 @@ def likelihood_nn(
                 check_net_device(embedding_net, "cpu", embedding_net_warn_msg),
                 num_components,
             ),
+            strict=False,
         ),
         **kwargs,
     )
@@ -332,6 +334,7 @@ def posterior_nn(
                 check_net_device(embedding_net, "cpu", embedding_net_warn_msg),
                 num_components,
             ),
+            strict=False,
         ),
         **kwargs,
     )
@@ -434,6 +437,7 @@ def posterior_score_nn(
                 hidden_features,
                 embedding_net,
             ),
+            strict=False,
         ),
         **kwargs,
     )

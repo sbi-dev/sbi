@@ -17,6 +17,10 @@ jobs:
   cd:
     name: Continuous Deployment
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.10', '3.11', '3.12', '3.13']
 
     steps:
     - name: Checkout
@@ -28,16 +32,15 @@ jobs:
     - name: Install uv and set the python version
       uses: astral-sh/setup-uv@v5
       with:
-        python-version: '3.9'
+        python-version: ${{ matrix.python-version }}
         enable-cache: true
+        cache-dependency-glob: "pyproject.toml"
 
     - name: Install dependencies with uv
-      run: |
-        uv pip install -e .[dev]
+      run: uv sync --extra dev
 
     - name: Run the fast and the slow CPU tests with coverage
-      run: |
-        uv run pytest -v -x -n auto -m "not gpu" --cov=sbi --cov-report=xml tests/
+      run: uv run pytest -v -x -n auto -m "not gpu" --cov=sbi --cov-report=xml tests/
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4-beta
