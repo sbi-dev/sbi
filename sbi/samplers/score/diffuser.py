@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import math
 from typing import Optional, Union
 
 import torch
@@ -90,19 +91,25 @@ class Diffuser:
             num_samples (int): Number of samples to draw.
 
         Returns:
-            Tensor: _description_
+            Tensor: Initial noise samples.
         """
-        # TODO: this fixes the iid setting shape problems, but iid inference via
-        # iid_bridge is not accurate.
-        num_batch = (
+        num_batches = (
             1 if self.predictor.potential_fn.x_is_iid else self.batch_shape.numel()
         )
-        init_shape = (num_samples, num_batch) + self.input_shape
-        # NOTE: for the IID setting we might need to scale the noise with iid batch
-        # size, as in equation (7) in the paper.
-        # NOTE: TODO we need some interface for that
+        init_shape = (num_samples, num_batches) + self.input_shape
+        # NOTE: This interface is not ideal, but for one method we need to adjust the
+        # initial distirbution
+        init_std = self.init_std
+        if (
+            hasattr(self.predictor.potential_fn, "iid_method")
+            and self.predictor.potential_fn.iid_method == "fnpe"
+        ):
+            x_o = self.predictor.potential_fn.x_o
+            N_iid = x_o.shape[0]
+            init_std = math.sqrt(1 / N_iid) * init_std
+
         eps = torch.randn(init_shape, device=self.device)
-        mean, std, eps = torch.broadcast_tensors(self.init_mean, self.init_std, eps)
+        mean, std, eps = torch.broadcast_tensors(self.init_mean, init_std, eps)
         return mean + std * eps
 
     @torch.no_grad()
