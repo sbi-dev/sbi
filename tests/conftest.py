@@ -226,6 +226,11 @@ def mcmc_params_fast() -> dict:
 def pytest_sessionfinish(session):
     """Gather all results and save them to a csv.
     Works both on worker and master nodes, and also with xdist disabled"""
+
+    # Only run this if the --bm flag is provided
+    if not session.config.getoption("--bm"):
+        return
+
     session_results_df = get_session_results_df(session)
     suffix = 'all' if is_main_process(session) else get_xdist_worker_id(session)
     RESULTS_PATH = Path('./.bm_results/')
