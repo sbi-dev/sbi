@@ -50,6 +50,14 @@ class Corrector(ABC):
     ):
         """Base class for correctors.
 
+        Predictor-corrector diffusion-based samplers for score-based sampling where
+        originally introduced in [1]. The corrector is used to refine the samples at the
+        current time, to match the target marginal distribution.
+
+        Literature:
+        - [1] Score-Based Generative Modeling through Stochastic Differential Equations
+            (https://arxiv.org/abs/2011.13456)
+
         Args:
             predictor (Predictor): The associated predictor.
         """
@@ -77,7 +85,13 @@ class LangevinCorrector(Corrector):
     ):
         """Basic Langevin corrector.
 
-        Ref: https://en.wikipedia.org/wiki/Langevin_dynamics
+        See [1] for more details on unadjusted Langevin dynamics for sampling. This was
+        one of the samplers introduced in [2].
+
+        Literature:
+        - [1] https://en.wikipedia.org/wiki/Langevin_dynamics
+        - [2] Score-Based Generative Modeling through Stochastic Differential Equations
+            (https://arxiv.org/abs/2011.13456)
 
         Args:
             predictor: Associated predictor.
@@ -91,7 +105,6 @@ class LangevinCorrector(Corrector):
         self.num_steps = num_steps
 
     def correct(self, theta: Tensor, t0: Tensor, t1: Optional[Tensor] = None) -> Tensor:
-        # TODO: Why is this impacting performance
         for _ in range(self.num_steps):
             score = self.predictor.potential_fn.gradient(theta, t1)
             eps = self.std * torch.randn_like(theta, device=self.device)
@@ -103,7 +116,9 @@ class LangevinCorrector(Corrector):
 @register_corrector("gibbs")
 class GibbsCorrector(Corrector):
     def __init__(self, predictor: Predictor, num_steps: int = 5):
-        """(Pseudo) Gibbs sampling corrector. Iteratively adds back noise according to
+        """(Pseudo) Gibbs sampling corrector.
+
+        Iteratively adds back noise according to
         the correct forward SDE, then removes noise using the predictor. Hence,
         approximatly sampling form the joint distribution using Gibbs sampling (if the
         two conditional distributions are compatible).
@@ -116,6 +131,7 @@ class GibbsCorrector(Corrector):
         self.num_steps = num_steps
 
     def noise(self, theta: Tensor, t0: Tensor, t1: Tensor) -> Tensor:
+        # Forward sde
         f = self.predictor.drift(theta, t0)
         g = self.predictor.diffusion(theta, t0)
         eps = torch.randn_like(theta, device=self.device)
