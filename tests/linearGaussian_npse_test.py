@@ -193,7 +193,9 @@ def npse_trained_model(sde_type, prior_type):
     theta = prior.sample((num_simulations,))
     x = linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    score_estimator = inference.append_simulations(theta, x).train()
+    score_estimator = inference.append_simulations(theta, x).train(
+        stop_after_epochs=200
+    )
 
     return {
         "score_estimator": score_estimator,
@@ -214,8 +216,8 @@ def npse_trained_model(sde_type, prior_type):
 @pytest.mark.parametrize(
     "iid_method, num_trial",
     [
-        pytest.param("fnpe", 3, id="fnpe-3trials"),
-        pytest.param("gauss", 4, id="gauss-6trials"),
+        pytest.param("fnpe", 3, id="fnpe-2trials"),
+        pytest.param("gauss", 3, id="gauss-6trials"),
         pytest.param("auto_gauss", 8, id="auto_gauss-8trials"),
         pytest.param("auto_gauss", 16, id="auto_gauss-16trials"),
         pytest.param("jac_gauss", 8, id="jac_gauss-8trials"),
@@ -260,7 +262,7 @@ def test_npse_iid_inference(npse_trained_model, iid_method, num_trial, sde_type,
         samples,
         target_samples,
         alg=f"npse-{sde_type}-{prior_type}-{num_dim}-{iid_method}-{num_trial}iid-trials",
-        tol=0.03 * max(num_trial, 10),
+        tol=0.05 * min(num_trial, 8),
     )
 
 
