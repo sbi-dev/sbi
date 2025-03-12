@@ -814,6 +814,33 @@ fails (xfailed).</li>
 <li>Commit and push again until CI tests pass. Don&rsquo;t hesitate to ask for help by
   commenting on the PR.</li>
 </ul>
+<h4 id="mini-sbibm-tests">mini-sbibm tests<a class="headerlink" href="#mini-sbibm-tests" title="Permanent link">&para;</a></h4>
+<p>As SBI is a fundamentally data-driven approach, we are not only interested in whether
+the modifications to the codebase &ldquo;pass the tests&rdquo; but also in whether they improve or
+at least do not deteriorate the performance of the package for inference. To this end,
+we have a set of <em>mini-sbibm</em> tests (a minimal version of the sbi benchmarking package <a href="https://github.com/sbi-benchmark/sbibm"><code>sbibm</code></a>) that are intended for developers to run locally.</p>
+<p>These tests differ from the regular tests in that they always pass (provided there
+are no errors) but output performance metrics that can be compared, e.g., to the
+performance metrics of the main branch or relative to each other. The user-facing API
+is available via <code>pytest</code> through custom flags. To run the mini-sbibm tests, you can use
+the following command:
+<div class="highlight"><pre><span></span><code><span class="w">    </span>pytest<span class="w"> </span>--bm
+</code></pre></div>
+This will run all the mini-sbibm tests on all methods with default parameters and output
+the performance metrics nicely formatted to the console. If you have multiple CPU cores
+available, you can run the tests in parallel using the <code>-n auto</code> flag:
+<div class="highlight"><pre><span></span><code><span class="w">    </span>pytest<span class="w"> </span>--bm<span class="w"> </span>-n<span class="w"> </span>auto
+</code></pre></div>
+What if you are currently working on a specific method and you want to run the
+mini-sbibm tests only for this class of methods? You can use the <code>--bm-mode</code> flag:
+<div class="highlight"><pre><span></span><code><span class="w">    </span>pytest<span class="w"> </span>--bm<span class="w"> </span>--bm-mode<span class="w"> </span>nspe
+</code></pre></div>
+This will run the mini-sbibm tests only for methods of the <code>nspe</code> class, but with a
+few major hyperparameter choices, such as different base network architectures and
+different diffusion processes.</p>
+<p>The currently available modes are: <code>"npe"</code>, <code>"nle"</code>, <code>"nre"</code>, <code>"fmpe"</code>, <code>"npse"</code>,
+<code>"snpe"</code>, <code>"snle"</code>, and <code>"snre"</code>. If you require another mode, you can add it to the
+test suite in <code>tests/test_bm.py</code>.</p>
 <h2 id="contributing-to-the-documentation">Contributing to the documentation<a class="headerlink" href="#contributing-to-the-documentation" title="Permanent link">&para;</a></h2>
 <p>Most of the documentation for <code>sbi</code> is written in markdown and the website is generated
 using <code>mkdocs</code> with <code>mkdocstrings</code> and <code>mike</code>. The tutorials and examples are converted
