@@ -162,10 +162,12 @@ def sde_type(request):
     """Module-scoped fixture for SDE type."""
     return request.param
 
+
 @pytest.fixture(scope="module", params=["gaussian", "uniform", None])
 def prior_type(request):
     """Module-scoped fixture for prior type."""
     return request.param
+
 
 @pytest.fixture(scope="module")
 def npse_trained_model(sde_type, prior_type):
@@ -212,6 +214,7 @@ def npse_trained_model(sde_type, prior_type):
         "num_dim": num_dim,
     }
 
+
 @pytest.mark.slow
 @pytest.mark.parametrize(
     "iid_method, num_trial",
@@ -223,7 +226,9 @@ def npse_trained_model(sde_type, prior_type):
         pytest.param("jac_gauss", 8, id="jac_gauss-8trials"),
     ],
 )
-def test_npse_iid_inference(npse_trained_model, iid_method, num_trial, sde_type, prior_type):
+def test_npse_iid_inference(
+    npse_trained_model, iid_method, num_trial, sde_type, prior_type
+):
     """Test whether NPSE infers well a simple example with available ground truth."""
     num_samples = 1000
 
