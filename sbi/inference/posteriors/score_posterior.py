@@ -126,8 +126,18 @@ class ScorePosterior(NeuralPosterior):
             ts: Time points at which to evaluate the diffusion process. If None, a
                 linear grid between t_max and t_min is used.
             iid_method: Which method to use for computing the score in the iid setting.
-                We currently support "fnpe", "gauss", "auto_gauss", "jac_gauss".
-            iid_params: Additional parameters passed to the iid method.
+                We currently support "fnpe", "gauss", "auto_gauss", "jac_gauss". The
+                fnpe method is simple and generally applicable. However, it can become
+                inaccurate already for quite a few iid samples (as it based on heuristic
+                approximations), and should be used at best only with a `corrector`. The
+                "gauss" methods are more accurate, by aiming for an efficient
+                approximation of the correct marginal score in the iid case. This
+                however requires estimating some hyperparamters, which is done in a
+                systematic way in the "auto_gauss" (initial overhead) and "jac_gauss"
+                (iterative jacobian computations are expensive). We default to
+                "auto_gauss" for these reasons.
+            iid_params: Additional parameters passed to the iid method. See the specific
+                `IIDScoreFunction` child class for details.
             max_sampling_batch_size: Maximum batch size for sampling.
             sample_with: Deprecated - use `.build_posterior(sample_with=...)` prior to
                 `.sample()`.
@@ -143,7 +153,7 @@ class ScorePosterior(NeuralPosterior):
 
         x = self._x_else_default_x(x)
         x = reshape_to_batch_event(x, self.score_estimator.condition_shape)
-        is_iid = x.ndim > 1 and x.shape[0] > 1
+        is_iid = x.shape[0] > 1
         self.potential_fn.set_x(
             x, x_is_iid=is_iid, iid_method=iid_method, iid_params=iid_params
         )
