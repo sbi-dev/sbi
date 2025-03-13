@@ -172,7 +172,6 @@ how to run each of these methods
   Simulation-Based Inference with Balanced Neural Ratio
   Estimation_](https://arxiv.org/abs/2208.13624) (NeurIPS 2022).
 
-
 ### Neural Variational Inference, amortized (NVI) and sequential (SNVI)
 
 - [`SNVI`](https://sbi-dev.github.io/sbi/latest/reference/#sbi.inference.posteriors.vi_posterior)
