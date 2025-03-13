@@ -145,8 +145,8 @@
 - split linting process from the CI/CD workflow (#1164) (@tomMoral)
 - Switch to the newest `pyright` and fix all typing errors (#1045, #1108) (@Baschdl)
 - introduce two docs versions: `latest` pointing to latest release at
-  https://sbi-dev.github.io/sbi/latest/ and `dev` pointing to the latest version on
-  `main` https://sbi-dev.github.io/sbi/dev/
+  <https://sbi-dev.github.io/sbi/latest/> and `dev` pointing to the latest version on
+  `main` <https://sbi-dev.github.io/sbi/dev/>
 
 # v0.22.0
 
