@@ -21,13 +21,13 @@
 
 ## New Contributors 🎉
 
-* @emmanuel-ferdman made their first contribution in https://github.com/sbi-dev/sbi/pull/1297
-* @CompiledAtBirth made their first contribution in https://github.com/sbi-dev/sbi/pull/1299
-* @tvwenger made their first contribution in https://github.com/sbi-dev/sbi/pull/1302
-* @matthewfeickert made their first contribution in https://github.com/sbi-dev/sbi/pull/1340
-* @manuel-morales-a made their first contribution in https://github.com/sbi-dev/sbi/pull/1336
+* @emmanuel-ferdman made their first contribution in <https://github.com/sbi-dev/sbi/pull/1297>
+* @CompiledAtBirth made their first contribution in <https://github.com/sbi-dev/sbi/pull/1299>
+* @tvwenger made their first contribution in <https://github.com/sbi-dev/sbi/pull/1302>
+* @matthewfeickert made their first contribution in <https://github.com/sbi-dev/sbi/pull/1340>
+* @manuel-morales-a made their first contribution in <https://github.com/sbi-dev/sbi/pull/1336>
 
-**Full Changelog**: https://github.com/sbi-dev/sbi/compare/v0.23.2...v0.23.3
+**Full Changelog**: <https://github.com/sbi-dev/sbi/compare/v0.23.2...v0.23.3>
 
 # v0.23.2
 
