@@ -66,7 +66,7 @@ performance in some cases. We recommend using a virtual environment with
 
 If `conda` is installed on the system, an environment for installing `sbi` can be created as follows:
 
-```
+```bash
 conda create -n sbi_env python=3.10 && conda activate sbi_env
 ```
 
@@ -74,7 +74,7 @@ conda create -n sbi_env python=3.10 && conda activate sbi_env
 
 To install `sbi` from PyPI run
 
-```
+```bash
 python -m pip install sbi
 ```
 
@@ -82,13 +82,13 @@ python -m pip install sbi
 
 To install and add `sbi` to a project with [`pixi`](https://pixi.sh/), from the project directory run
 
-```
+```bash
 pixi add sbi
 ```
 
 and to install into a particular conda environment with [`conda`](https://docs.conda.io/projects/conda/), in the activated environment run
 
-```
+```bash
 conda install --channel conda-forge sbi
 ```
 
