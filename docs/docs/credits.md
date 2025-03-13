@@ -13,9 +13,9 @@ direct contributions to the codebase have been instrumental in the development o
 
 > Copyright (C) 2020 Álvaro Tejero-Cantero, Jakob H. Macke, Jan-Matthis Lückmann,
 > Michael Deistler, Jan F. Bölts.
-
+>
 > Copyright (C) 2020 Conor M. Durkan.
-
+>
 > All contributors hold the copyright of their specific contributions.
 
 ## Support
