@@ -2,30 +2,30 @@
 
 ## Highlights 🤩
 
-* docs: Add conda-forge install instructions by @matthewfeickert in <https://github.com/sbi-dev/sbi/pull/1340>
-* feat: `NLE` with multiple iid conditions by @janfb in <https://github.com/sbi-dev/sbi/pull/1331>
+- docs: Add conda-forge install instructions by @matthewfeickert in <https://github.com/sbi-dev/sbi/pull/1340>
+- feat: `NLE` with multiple iid conditions by @janfb in <https://github.com/sbi-dev/sbi/pull/1331>
 
 ## What's Changed 🚧
 
-* fix: Correted typo in y-axis label by @turnmanh in <https://github.com/sbi-dev/sbi/pull/1296>
-* docs: update embedding networks notebook by @emmanuel-ferdman in <https://github.com/sbi-dev/sbi/pull/1297>
-* fix pickle issues in MCMC posterior + test by @manuelgloeckler in <https://github.com/sbi-dev/sbi/pull/1291>
-* Minor fix for EnsemblePosterior weights.setter by @CompiledAtBirth in <https://github.com/sbi-dev/sbi/pull/1299>
-* Remove deprecated neural_net access from `utils` by @tvwenger in <https://github.com/sbi-dev/sbi/pull/1302>
-* [test] add tests for ensemble posterior weights by @samadpls in <https://github.com/sbi-dev/sbi/pull/1307>
-* Clarify last round behavior of SNPE-A by @michaeldeistler in <https://github.com/sbi-dev/sbi/pull/1323>
-* expose batched sampling option; error handling by @janfb in <https://github.com/sbi-dev/sbi/pull/1321>
-* Fix #1316: remove sample_dim docstring for condition. by @janfb in <https://github.com/sbi-dev/sbi/pull/1338>
-* docs: fix tutorial typos by @janfb in <https://github.com/sbi-dev/sbi/pull/1341>
-* docs: run and seed SBC tutorial by @manuel-morales-a in <https://github.com/sbi-dev/sbi/pull/1336>
+- fix: Correted typo in y-axis label by @turnmanh in <https://github.com/sbi-dev/sbi/pull/1296>
+- docs: update embedding networks notebook by @emmanuel-ferdman in <https://github.com/sbi-dev/sbi/pull/1297>
+- fix pickle issues in MCMC posterior + test by @manuelgloeckler in <https://github.com/sbi-dev/sbi/pull/1291>
+- Minor fix for EnsemblePosterior weights.setter by @CompiledAtBirth in <https://github.com/sbi-dev/sbi/pull/1299>
+- Remove deprecated neural_net access from `utils` by @tvwenger in <https://github.com/sbi-dev/sbi/pull/1302>
+- [test] add tests for ensemble posterior weights by @samadpls in <https://github.com/sbi-dev/sbi/pull/1307>
+- Clarify last round behavior of SNPE-A by @michaeldeistler in <https://github.com/sbi-dev/sbi/pull/1323>
+- expose batched sampling option; error handling by @janfb in <https://github.com/sbi-dev/sbi/pull/1321>
+- Fix #1316: remove sample_dim docstring for condition. by @janfb in <https://github.com/sbi-dev/sbi/pull/1338>
+- docs: fix tutorial typos by @janfb in <https://github.com/sbi-dev/sbi/pull/1341>
+- docs: run and seed SBC tutorial by @manuel-morales-a in <https://github.com/sbi-dev/sbi/pull/1336>
 
 ## New Contributors 🎉
 
-* @emmanuel-ferdman made their first contribution in <https://github.com/sbi-dev/sbi/pull/1297>
-* @CompiledAtBirth made their first contribution in <https://github.com/sbi-dev/sbi/pull/1299>
-* @tvwenger made their first contribution in <https://github.com/sbi-dev/sbi/pull/1302>
-* @matthewfeickert made their first contribution in <https://github.com/sbi-dev/sbi/pull/1340>
-* @manuel-morales-a made their first contribution in <https://github.com/sbi-dev/sbi/pull/1336>
+- @emmanuel-ferdman made their first contribution in <https://github.com/sbi-dev/sbi/pull/1297>
+- @CompiledAtBirth made their first contribution in <https://github.com/sbi-dev/sbi/pull/1299>
+- @tvwenger made their first contribution in <https://github.com/sbi-dev/sbi/pull/1302>
+- @matthewfeickert made their first contribution in <https://github.com/sbi-dev/sbi/pull/1340>
+- @manuel-morales-a made their first contribution in <https://github.com/sbi-dev/sbi/pull/1336>
 
 **Full Changelog**: <https://github.com/sbi-dev/sbi/compare/v0.23.2...v0.23.3>
 
