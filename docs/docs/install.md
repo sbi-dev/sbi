@@ -16,19 +16,19 @@ $ conda create -n sbi_env python=3.10 && conda activate sbi_env
 Independent of whether you are using `conda` or not, `sbi` can be installed
 using `pip`:
 
-```
+```bash
 python -m pip install sbi
 ```
 
 To install and add `sbi` to a project with [`pixi`](https://pixi.sh/), from the project directory run
 
-```
+```bash
 pixi add sbi
 ```
 
 and to install into a particular conda environment with [`conda`](https://docs.conda.io/projects/conda/), in the activated environment run
 
-```
+```bash
 conda install --channel conda-forge sbi
 ```
 
