@@ -63,7 +63,7 @@ class IIDScoreFunction(ABC):
         device: str = "cpu",
     ) -> None:
         r"""
-        This is a abstract base class wrapper for score estimators. S
+        This is a abstract base class wrapper for score estimators.
 
         Subclasses are used to implement different methods for factorized distributions.
         For example, in the IID setting the posterior for N observations can be
@@ -220,7 +220,7 @@ class BaseGaussCorrectedScoreFunction(IIDScoreFunction):
         lam_psd_nugget: float = 0.01,
         device: str = "cpu",
     ) -> None:
-        r"""Corrected score function estimators have been originally proposed in [1].
+        r"""Base class for Gauss-corrected score function as proposed in [1].
 
         Specificially a simple analytic correction for the marginal scores is derived
         using Gaussian assumptions. This is a simple and efficient method to correct
@@ -255,7 +255,7 @@ class BaseGaussCorrectedScoreFunction(IIDScoreFunction):
         self.lam_psd_nugget = lam_psd_nugget
 
     def posterior_precision_est_fn(self, conditions: Tensor) -> Tensor:
-        r"""Abstract method to estimate the posterior precision.
+        r"""Dummy method to estimate the posterior precision.
 
         Args:
             conditions: Observed data.
@@ -467,18 +467,20 @@ class GaussCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
 
         self.posterior_precision = posterior_precision
 
-    def posterior_precision_est_fn(self, x_o: Tensor) -> Tensor:
+    def posterior_precision_est_fn(self, conditions: Tensor) -> Tensor:
         r"""
         Estimates the posterior precision.
 
         Args:
-            x_o: Observed data.
+            conditions: Observed data.
 
         Returns:
             Estimated posterior precision.
         """
         precision = self.posterior_precision
-        precision = torch.broadcast_to(precision, (1, x_o.shape[0], *precision.shape))
+        precision = torch.broadcast_to(
+            precision, (1, conditions.shape[0], *precision.shape)
+        )
         return precision
 
     @classmethod

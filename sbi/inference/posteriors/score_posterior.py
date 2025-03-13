@@ -194,7 +194,6 @@ class ScorePosterior(NeuralPosterior):
     def _sample_via_diffusion(
         self,
         sample_shape: Shape = torch.Size(),
-        x: Optional[Tensor] = None,
         predictor: Union[str, Predictor] = "euler_maruyama",
         corrector: Optional[Union[str, Corrector]] = None,
         predictor_params: Optional[Dict] = None,
@@ -263,7 +262,6 @@ class ScorePosterior(NeuralPosterior):
     def sample_via_ode(
         self,
         sample_shape: Shape = torch.Size(),
-        x: Optional[Tensor] = None,
     ) -> Tensor:
         r"""Return samples from posterior distribution with probability flow ODE.
 

@@ -17,7 +17,7 @@ from torch.distributions import (
 
 from sbi.utils.torchutils import BoxUniform
 
-# Automatic denoising -----------------------------------------------------
+# Automatic denoising ------------------------------------------------------
 
 
 def denoise(p: Distribution, m: Tensor, s: Tensor, x_t: Tensor) -> Distribution:

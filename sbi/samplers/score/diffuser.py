@@ -13,6 +13,14 @@ from sbi.samplers.score.predictors import Predictor, get_predictor
 
 
 class Diffuser:
+    """Diffusion-based sampler for score-based sampling.
+
+    Requires the gradient of a family of distributions (for different times)
+    characterized by the gradient of a potential function (i.e. the score function). The
+    sampler uses a predictor to propagate samples forward in time. Optionally, a
+    corrector can be used to refine the samples at the current time.
+    """
+
     predictor: Predictor
     corrector: Optional[Corrector]
 
@@ -24,11 +32,7 @@ class Diffuser:
         predictor_params: Optional[dict] = None,
         corrector_params: Optional[dict] = None,
     ):
-        """Diffusion-based sampler for score-based sampling i.e it requires the
-        gradient of a family of distributions (for different times) characterized by the
-        gradient of a potential function (i.e. the score function). The sampler uses a
-        predictor to propagate samples forward in time. Optionally, a corrector can be
-        used to refine the samples at the current time.
+        """Init method for the Diffuser class.
 
         Args:
             score_based_potential_gradient: A time-dependent score-based potential.
@@ -120,15 +124,16 @@ class Diffuser:
         show_progress_bars: bool = True,
         save_intermediate: bool = False,
     ) -> Tensor:
-        """Samples from the distribution at the final time point by propagating samples
-        forward in time using the predictor and optionally refining them using the a
-        corrector.
+        """Samples from the distribution at the final time point.
+
+        Propagates samples forward in time using the predictor and optionally refines
+        them using the a corrector.
 
         Args:
             num_samples: Number of samples to draw.
             ts: Time grid to propagate samples forward, or "solve" the SDE.
-            show_progress_bars (optional): Shows a progressbar or not. Defaults to True.
-            save_intermediate (optional): Returns samples at all time point, instead of
+            show_progress_bars: Whehter to show progressbar. Defaults to True.
+            save_intermediate: Whether to return samples at all time point, instead of
                 only returning samples at the end. Defaults to False.
 
         Returns:
