@@ -2,8 +2,8 @@
 
 ## Highlights 🤩
 
-* docs: Add conda-forge install instructions by @matthewfeickert in https://github.com/sbi-dev/sbi/pull/1340
-* feat: `NLE` with multiple iid conditions by @janfb in https://github.com/sbi-dev/sbi/pull/1331
+* docs: Add conda-forge install instructions by @matthewfeickert in <https://github.com/sbi-dev/sbi/pull/1340>
+* feat: `NLE` with multiple iid conditions by @janfb in <https://github.com/sbi-dev/sbi/pull/1331>
 
 ## What's Changed 🚧
 
