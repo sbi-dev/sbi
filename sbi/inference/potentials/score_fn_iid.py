@@ -647,6 +647,9 @@ class JacCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
     in some cases.
     """
 
+    def posterior_precision_est_fn(self, conditions: Tensor) -> Tensor:
+        raise ValueError("This method does not use the posterior precision estimation.")
+
     def marginal_denoising_posterior_precision_est_fn(
         self,
         time: Tensor,
