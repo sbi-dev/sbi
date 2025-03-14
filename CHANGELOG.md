@@ -4,8 +4,9 @@
 
 ### ✨ Highlights
 
-- Add `CategoricalMADE` by @jnsbck in https://github.com/sbi-dev/sbi/pull/1269  **(Major New Feature)**
+- feat: add `CategoricalMADE` by @jnsbck in https://github.com/sbi-dev/sbi/pull/1269  **(Major New Feature)**
 - tests: `mini-sbibm` by @manuelgloeckler in https://github.com/sbi-dev/sbi/pull/1335 **(Major New Feature)**
+- feat: Score-based iid sampling by @manuelgloeckler in https://github.com/sbi-dev/sbi/pull/1381 **(Major New Feature)**
 - Drop python3.9 support, fix ci by @janfb in https://github.com/sbi-dev/sbi/pull/1412 **(Python Version Support Change)**
 - additional features for NPSE by @gmoss13 in https://github.com/sbi-dev/sbi/pull/1370 **(Enhancement)**
 
@@ -21,6 +22,7 @@
 - fix mnle tests by @janfb in https://github.com/sbi-dev/sbi/pull/1415
 - fix: protocol and refactor for custom potential by @janfb in https://github.com/sbi-dev/sbi/pull/1409
 - fix docs workflow by @janfb in https://github.com/sbi-dev/sbi/pull/1419
+- fix: gpu-handling for CategoricalMADE by @janfb in https://github.com/sbi-dev/sbi/pull/1448
 
 ### 🛠️ Maintenance & Improvements
 
