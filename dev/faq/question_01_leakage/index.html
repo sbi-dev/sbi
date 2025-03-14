@@ -14,7 +14,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.7">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.8">
     
     
       
@@ -490,8 +490,8 @@ following warning:</p>
 <a href="https://arxiv.org/abs/2002.03712">here</a>, and
 <a href="https://arxiv.org/abs/1905.07488">here</a>. The following fixes are possible:</p>
 <ul>
-<li>
-<p>use truncated proposals for SNPE (TSNPE)
+<li>use truncated proposals for SNPE (TSNPE)</li>
+</ul>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference</span><span class="w"> </span><span class="kn">import</span> <span class="n">NPE</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">sbi.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">RestrictedPrior</span><span class="p">,</span> <span class="n">get_density_thresholder</span>
 
@@ -505,8 +505,8 @@ following warning:</p>
 
     <span class="n">accept_reject_fn</span> <span class="o">=</span> <span class="n">get_density_thresholder</span><span class="p">(</span><span class="n">posterior</span><span class="p">,</span> <span class="n">quantile</span><span class="o">=</span><span class="mf">1e-4</span><span class="p">)</span>
     <span class="n">proposal</span> <span class="o">=</span> <span class="n">RestrictedPrior</span><span class="p">(</span><span class="n">prior</span><span class="p">,</span> <span class="n">accept_reject_fn</span><span class="p">,</span> <span class="n">sample_with</span><span class="o">=</span><span class="s2">&quot;rejection&quot;</span><span class="p">)</span>
-</code></pre></div></p>
-</li>
+</code></pre></div>
+<ul>
 <li>
 <p>sample with MCMC: <code>samples = posterior((num_samples,), x=x_o, sample_with_mcmc=True)</code>.
 This approach will make sampling slower, but samples will not &ldquo;leak&rdquo;.</p>

@@ -18,7 +18,7 @@
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.7">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.8">
     
     
       
@@ -684,21 +684,21 @@ on the ‘Fork’ button near the top of the page. This will create a copy of th
 <code>sbi</code> codebase under your GitHub user account. See more details on how to fork
 a repository <a href="https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/fork-a-repo">here</a>.</p>
 <p><strong>Step 3</strong>: Clone your fork of the <code>sbi</code> repo from your GitHub account to your
-local disk:
-<div class="highlight"><pre><span></span><code>git clone git@github.com:$USERNAME/sbi.git
-cd sbi
-</code></pre></div></p>
+local disk:</p>
+<div class="highlight"><pre><span></span><code>git<span class="w"> </span>clone<span class="w"> </span>git@github.com:<span class="nv">$USERNAME</span>/sbi.git
+<span class="nb">cd</span><span class="w"> </span>sbi
+</code></pre></div>
 <p><strong>Step 4</strong>: Install a recent version of Python (we currently recommend 3.10)
 for instance using <a href="https://github.com/conda-forge/miniforge"><code>miniforge</code></a>. We
 strongly recommend you create a specific <code>conda</code> environment for doing
-development on <code>sbi</code> as per:
-<div class="highlight"><pre><span></span><code>conda create -n sbi_dev python=3.10
-conda activate sbi_dev
-</code></pre></div></p>
-<p><strong>Step 5</strong>: Install <code>sbi</code> in editable mode with
-<div class="highlight"><pre><span></span><code>pip install -e &quot;.[dev]&quot;
+development on <code>sbi</code> as per:</p>
+<div class="highlight"><pre><span></span><code>conda<span class="w"> </span>create<span class="w"> </span>-n<span class="w"> </span>sbi_dev<span class="w"> </span><span class="nv">python</span><span class="o">=</span><span class="m">3</span>.10
+conda<span class="w"> </span>activate<span class="w"> </span>sbi_dev
 </code></pre></div>
-This installs the <code>sbi</code> package into the current environment by creating a
+<p><strong>Step 5</strong>: Install <code>sbi</code> in editable mode with</p>
+<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[dev]&quot;</span>
+</code></pre></div>
+<p>This installs the <code>sbi</code> package into the current environment by creating a
 link to the source code directory (instead of copying the code to pip’s <code>site_packages</code>
 directory, which is what normally happens). This means that any edits you make
 to the <code>sbi</code> source code will be reflected the next time you open a Python interpreter
@@ -707,33 +707,33 @@ and the <code>dev</code> flag installs development and testing dependencies). Th
 at least Python 3.8.</p>
 <p><strong>Step 6</strong>: Add the upstream remote. This saves a reference to the main <code>sbi</code>
 repository, which you can use to keep your repository synchronized with the latest
-changes:
-<div class="highlight"><pre><span></span><code>git remote add upstream git@github.com:sbi-dev/sbi.git
+changes:</p>
+<div class="highlight"><pre><span></span><code>git<span class="w"> </span>remote<span class="w"> </span>add<span class="w"> </span>upstream<span class="w"> </span>git@github.com:sbi-dev/sbi.git
 </code></pre></div>
-Check that the upstream and origin remote aliases are configured correctly by
-running <code>git remote -v</code> which should display:
-<div class="highlight"><pre><span></span><code>origin  git@github.com:$USERNAME/sbi.git (fetch)
-origin  git@github.com:$USERNAME/sbi.git (push)
-upstream        git@github.com:sbi-dev/sbi.git (fetch)
-upstream        git@github.com:sbi-dev/sbi.git (push)
-</code></pre></div></p>
-<p><strong>Step 7</strong>: Install <code>pre-commit</code> to run code style checks before each commit:
-<div class="highlight"><pre><span></span><code>pip install pre-commit
-pre-commit install
-</code></pre></div></p>
+<p>Check that the upstream and origin remote aliases are configured correctly by
+running <code>git remote -v</code> which should display:</p>
+<div class="highlight"><pre><span></span><code>origin<span class="w">  </span>git@github.com:<span class="nv">$USERNAME</span>/sbi.git<span class="w"> </span><span class="o">(</span>fetch<span class="o">)</span>
+origin<span class="w">  </span>git@github.com:<span class="nv">$USERNAME</span>/sbi.git<span class="w"> </span><span class="o">(</span>push<span class="o">)</span>
+upstream<span class="w">        </span>git@github.com:sbi-dev/sbi.git<span class="w"> </span><span class="o">(</span>fetch<span class="o">)</span>
+upstream<span class="w">        </span>git@github.com:sbi-dev/sbi.git<span class="w"> </span><span class="o">(</span>push<span class="o">)</span>
+</code></pre></div>
+<p><strong>Step 7</strong>: Install <code>pre-commit</code> to run code style checks before each commit:</p>
+<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>pre-commit
+pre-commit<span class="w"> </span>install
+</code></pre></div>
 <p>You should now have a working installation of <code>sbi</code> and a git repository
 properly configured for making contributions. The following steps describe the
 process of modifying code and submitting a pull request:</p>
 <p><strong>Step 8</strong>: Synchronize your main branch with the upstream/main branch. See more
-details on <a href="https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/syncing-a-fork">GitHub Docs</a>:
-<div class="highlight"><pre><span></span><code>git checkout main
-git fetch upstream
-git merge upstream/main
-</code></pre></div></p>
-<p><strong>Step 9</strong>: Create a feature branch to hold your development changes:
-<div class="highlight"><pre><span></span><code>git checkout -b my_feature
+details on <a href="https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/syncing-a-fork">GitHub Docs</a>:</p>
+<div class="highlight"><pre><span></span><code>git<span class="w"> </span>checkout<span class="w"> </span>main
+git<span class="w"> </span>fetch<span class="w"> </span>upstream
+git<span class="w"> </span>merge<span class="w"> </span>upstream/main
 </code></pre></div>
-and start making changes. Always use a feature branch! It’s good practice
+<p><strong>Step 9</strong>: Create a feature branch to hold your development changes:</p>
+<div class="highlight"><pre><span></span><code>git<span class="w"> </span>checkout<span class="w"> </span>-b<span class="w"> </span>my_feature
+</code></pre></div>
+<p>and start making changes. Always use a feature branch! It’s good practice
 to never work on the main branch, as this allows you to easily get back to a
 working state of the code if needed (e.g., if you’re working on multiple
 changes at once, or need to pull in recent changes from someone else to get
@@ -741,14 +741,14 @@ your new feature to work properly). In most cases you should make PRs into the
 upstream’s main branch.</p>
 <p><strong>Step 10</strong>: Develop your code on your feature branch on the computer, using
 Git to do the version control. When you’re done editing, add changed files
-using <code>git add</code> and then <code>git commit</code> to record your changes:
-<div class="highlight"><pre><span></span><code>git add modified_files
-git commit -m &quot;description of your commit&quot;
+using <code>git add</code> and then <code>git commit</code> to record your changes:</p>
+<div class="highlight"><pre><span></span><code>git<span class="w"> </span>add<span class="w"> </span>modified_files
+git<span class="w"> </span>commit<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;description of your commit&quot;</span>
 </code></pre></div>
-Then push the changes to your GitHub account with:
-<div class="highlight"><pre><span></span><code>git push -u origin my_feature
+<p>Then push the changes to your GitHub account with:</p>
+<div class="highlight"><pre><span></span><code>git<span class="w"> </span>push<span class="w"> </span>-u<span class="w"> </span>origin<span class="w"> </span>my_feature
 </code></pre></div>
-The <code>-u</code> flag ensures that your local branch will be automatically linked with
+<p>The <code>-u</code> flag ensures that your local branch will be automatically linked with
 the remote branch, so you can later use <code>git push</code> and <code>git pull</code> without any
 extra arguments.</p>
 <p><strong>Step 11</strong>: Follow <a href="https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request-from-a-fork">these</a>
@@ -768,13 +768,13 @@ git merge upstream/main
 Style</a>.</p>
 <p>For code linting and formating, we use <a href="https://docs.astral.sh/ruff/"><code>ruff</code></a>,
 which is installed alongside <code>sbi</code>.</p>
-<p>You can exclude slow tests and those which require a GPU with
-<div class="highlight"><pre><span></span><code>pytest -m &quot;not slow and not gpu&quot;
+<p>You can exclude slow tests and those which require a GPU with</p>
+<div class="highlight"><pre><span></span><code>pytest<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;not slow and not gpu&quot;</span>
 </code></pre></div>
-Additionally, we recommend to run tests with
-<div class="highlight"><pre><span></span><code>pytest -n auto -m &quot;not slow and not gpu&quot;
+<p>Additionally, we recommend to run tests with</p>
+<div class="highlight"><pre><span></span><code>pytest<span class="w"> </span>-n<span class="w"> </span>auto<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;not slow and not gpu&quot;</span>
 </code></pre></div>
-in parallel. GPU tests should probably not be run this way. If you see unexpected
+<p>in parallel. GPU tests should probably not be run this way. If you see unexpected
 behavior (tests fail if they shouldn&rsquo;t), try to run them without <code>-n auto</code> and
 see if it persists. When writing new tests and debugging things, it may make sense
 to also run them without <code>-n auto</code>.</p>
@@ -823,19 +823,19 @@ we have a set of <em>mini-sbibm</em> tests (a minimal version of the sbi benchma
 are no errors) but output performance metrics that can be compared, e.g., to the
 performance metrics of the main branch or relative to each other. The user-facing API
 is available via <code>pytest</code> through custom flags. To run the mini-sbibm tests, you can use
-the following command:
+the following command:</p>
 <div class="highlight"><pre><span></span><code><span class="w">    </span>pytest<span class="w"> </span>--bm
 </code></pre></div>
-This will run all the mini-sbibm tests on all methods with default parameters and output
+<p>This will run all the mini-sbibm tests on all methods with default parameters and output
 the performance metrics nicely formatted to the console. If you have multiple CPU cores
-available, you can run the tests in parallel using the <code>-n auto</code> flag:
+available, you can run the tests in parallel using the <code>-n auto</code> flag:</p>
 <div class="highlight"><pre><span></span><code><span class="w">    </span>pytest<span class="w"> </span>--bm<span class="w"> </span>-n<span class="w"> </span>auto
 </code></pre></div>
-What if you are currently working on a specific method and you want to run the
-mini-sbibm tests only for this class of methods? You can use the <code>--bm-mode</code> flag:
+<p>What if you are currently working on a specific method and you want to run the
+mini-sbibm tests only for this class of methods? You can use the <code>--bm-mode</code> flag:</p>
 <div class="highlight"><pre><span></span><code><span class="w">    </span>pytest<span class="w"> </span>--bm<span class="w"> </span>--bm-mode<span class="w"> </span>nspe
 </code></pre></div>
-This will run the mini-sbibm tests only for methods of the <code>nspe</code> class, but with a
+<p>This will run the mini-sbibm tests only for methods of the <code>nspe</code> class, but with a
 few major hyperparameter choices, such as different base network architectures and
 different diffusion processes.</p>
 <p>The currently available modes are: <code>"npe"</code>, <code>"nle"</code>, <code>"nre"</code>, <code>"fmpe"</code>, <code>"npse"</code>,
