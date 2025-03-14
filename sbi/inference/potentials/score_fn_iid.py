@@ -256,10 +256,10 @@ class BaseGaussCorrectedScoreFunction(IIDScoreFunction):
 
     @abstractmethod
     def posterior_precision_est_fn(self, conditions: Tensor) -> Tensor:
-        r"""Dummy method to estimate the posterior precision.
+        r"""Abstract method for estimating the posterior precision.
 
-        This can be seens as an important hyperparameter which can be estimated in
-        different way leading to different methods.
+        This can be seen as an important hyperparameter which can be estimated in
+        different ways leading to different methods (see child classes).
 
         Args:
             conditions: Observed data.
@@ -355,7 +355,7 @@ class BaseGaussCorrectedScoreFunction(IIDScoreFunction):
                 precision = 1 / p_denoise.variance
                 return precision.reshape(inputs.shape)
             except Exception as e:
-                msg = """This iid_method try's to denoise the prior distribution
+                msg = """This iid_method tries to denoise the prior distribution
                 analytically. For custom prior distributions (i.e. which do not
                 implemented the variance/covariance_matrix method) but inherit from
                 standard prior distributions i.e. Normal or Uniform, this might lead to
