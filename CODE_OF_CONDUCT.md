@@ -61,7 +61,7 @@ at an online or offline event.
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
 reported by contacting `sbi` developer Jan Boelts via email
-(jan.boelts@mailbox.org) or anonymously via
+(<jan.boelts@mailbox.org>) or anonymously via
 [https://forms.gle/AEmwEznWAKdvrBQbA](https://forms.gle/AEmwEznWAKdvrBQbA). All
 complaints will be reviewed and investigated promptly and fairly.
 

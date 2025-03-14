@@ -1,4 +1,4 @@
-# API Reference:
+# API Reference
 
 <div class="grid cards" markdown>
 

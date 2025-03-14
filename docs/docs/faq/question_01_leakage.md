@@ -15,6 +15,7 @@ The reason for this issue is described in more detail
 [here](https://arxiv.org/abs/1905.07488). The following fixes are possible:
 
 - use truncated proposals for SNPE (TSNPE)
+
 ```python
 from sbi.inference import NPE
 from sbi.utils import RestrictedPrior, get_density_thresholder
