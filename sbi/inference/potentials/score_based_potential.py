@@ -103,6 +103,8 @@ class PosteriorScoreBasedPotential(BasePotential):
         super().set_x(x_o, x_is_iid)
         self.iid_method = iid_method
         self.iid_params = iid_params
+        # NOTE: Once IID potential evaluation is supported. This might needs to be
+        # adapted. See #1450.
         if not x_is_iid and (self._x_o is not None):
             self.flow = self.rebuild_flow(atol=atol, rtol=rtol, exact=exact)
 
@@ -120,6 +122,14 @@ class PosteriorScoreBasedPotential(BasePotential):
         Returns:
             The potential function, i.e., the log probability of the posterior.
         """
+
+        if self.x_is_iid:
+            raise NotImplementedError(
+                "Potential function evaluation in the IID setting not yet supported for\
+                score-based methods. Sampling does however work `.sample`. If you  \
+                insetad like to evaluate multiple posteriors use `log_prob_batched`."
+            )
+
         theta = ensure_theta_batched(torch.as_tensor(theta))
         theta_density_estimator = reshape_to_sample_batch_event(
             theta, theta.shape[1:], leading_is_sample=True

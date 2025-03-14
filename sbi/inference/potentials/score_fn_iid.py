@@ -254,8 +254,12 @@ class BaseGaussCorrectedScoreFunction(IIDScoreFunction):
         self.ensure_lam_psd = ensure_lam_psd
         self.lam_psd_nugget = lam_psd_nugget
 
+    @abstractmethod
     def posterior_precision_est_fn(self, conditions: Tensor) -> Tensor:
         r"""Abstract method to estimate the posterior precision.
+
+        This can be seens as an important hyperparameter which can be estimated in
+        different way leading to different methods.
 
         Args:
             conditions: Observed data.
@@ -263,24 +267,13 @@ class BaseGaussCorrectedScoreFunction(IIDScoreFunction):
         Returns:
             Estimated posterior precision.
         """
-        return torch.ones((1,))
-
-    def marginal_prior(self, time: Tensor, inputs: Tensor) -> Distribution:
-        r"""Compute the marginal prior distribution.
-
-        Args:
-            time: Time tensor.
-            inputs: Parameters tensor.
-
-        Returns:
-            Marginal prior distribution.
-        """
-        m = self.score_estimator.mean_t_fn(time)
-        std = self.score_estimator.std_fn(time)
-        return marginalize(self.prior, m, std)
+        pass
 
     def marginal_denoising_posterior_precision_est_fn(
-        self, time: Tensor, inputs: Tensor, conditions: Tensor, N: int
+        self,
+        time: Tensor,
+        inputs: Optional[Tensor],
+        conditions: Tensor,
     ) -> Tensor:
         r"""Estimates the marginal posterior precision.
 
@@ -288,11 +281,11 @@ class BaseGaussCorrectedScoreFunction(IIDScoreFunction):
             time: Time tensor.
             inputs: Parameters tensor.
             conditions: Observed data.
-            N: Number of samples.
 
         Returns:
             Estimated marginal posterior precision.
         """
+        del inputs
         precisions_posteriors = self.posterior_precision_est_fn(conditions)
 
         # Denoising posterior via Bayes rule
@@ -318,11 +311,13 @@ class BaseGaussCorrectedScoreFunction(IIDScoreFunction):
             Marginal prior score.
         """
         # NOTE: This is for the uniform distribution and distirbutions that do not
-        # implement a log_prob
+        # implement a log_prob.
         try:
             with torch.enable_grad():
                 inputs = inputs.clone().detach().requires_grad_(True)
-                p = self.marginal_prior(time, inputs)
+                m = self.score_estimator.mean_t_fn(time)
+                std = self.score_estimator.std_fn(time)
+                p = marginalize(self.prior, m, std)
                 log_p = p.log_prob(inputs)
                 prior_score = torch.autograd.grad(
                     log_p,
@@ -353,12 +348,21 @@ class BaseGaussCorrectedScoreFunction(IIDScoreFunction):
         p_denoise = denoise(self.prior, m, std, inputs)
 
         if hasattr(p_denoise, "covariance_matrix"):
-            # We currently only support diagonal covariances
             inv_cov = torch.inverse(p_denoise.covariance_matrix)  # type: ignore
             return inv_cov.reshape(inputs.shape + inputs.shape[-1:])
         else:
-            precision = 1 / p_denoise.variance
-            return precision.reshape(inputs.shape)
+            try:
+                precision = 1 / p_denoise.variance
+                return precision.reshape(inputs.shape)
+            except Exception as e:
+                msg = """This iid_method try's to denoise the prior distribution
+                analytically. For custom prior distributions (i.e. which do not
+                implemented the variance/covariance_matrix method) but inherit from
+                standard prior distributions i.e. Normal or Uniform, this might lead to
+                errors. If you encounter this error, please raise an issue on the sbi
+                repository.
+                """
+                raise NotImplementedError(msg) from e
 
     def __call__(
         self,
@@ -393,7 +397,9 @@ class BaseGaussCorrectedScoreFunction(IIDScoreFunction):
         prior_precision = self.marginal_denoising_prior_precision_fn(time, inputs)
         # Marginal posterior variance estimates
         posterior_precisions = self.marginal_denoising_posterior_precision_est_fn(
-            time, inputs, conditions, N
+            time,
+            inputs,
+            conditions,
         )
 
         if self.ensure_lam_psd:
@@ -640,7 +646,10 @@ class JacCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
     """
 
     def marginal_denoising_posterior_precision_est_fn(
-        self, time: Tensor, inputs: Tensor, conditions: Tensor, N: int
+        self,
+        time: Tensor,
+        inputs: Tensor,
+        conditions: Tensor,
     ) -> Tensor:
         r"""
         Estimates the marginal posterior precision using the Jacobian of the score
@@ -652,7 +661,6 @@ class JacCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
             time: Time tensor.
             inputs: Parameter tensor.
             conditions: Observed data.
-            N: Number of samples.
 
         Returns:
             Estimated marginal posterior precision.
