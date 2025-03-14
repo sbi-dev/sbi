@@ -13,6 +13,7 @@ from sbi.simulators.linear_gaussian import (
     samples_true_posterior_linear_gaussian_uniform_prior,
     true_posterior_linear_gaussian_mvn_prior,
 )
+from sbi.utils import BoxUniform
 
 from .test_utils import check_c2st, get_dkl_gaussian_prior
 
@@ -156,48 +157,117 @@ def test_c2st_npse_on_linearGaussian_different_dims():
     check_c2st(samples, target_samples, alg="npse_different_dims_and_resume_training")
 
 
-@pytest.mark.xfail(
-    reason="iid_bridge not working.",
-    raises=AssertionError,
-    strict=True,
-    match="Score accumulation*",
-)
-@pytest.mark.parametrize("num_trials", [2, 10])
-def test_npse_iid_inference(num_trials):
-    """Test whether NPSE infers well a simple example with available ground truth."""
+@pytest.fixture(scope="module", params=["vp", "ve", "subvp"])
+def sde_type(request):
+    """Module-scoped fixture for SDE type."""
+    return request.param
 
+
+@pytest.fixture(scope="module", params=["gaussian", "uniform", None])
+def prior_type(request):
+    """Module-scoped fixture for prior type."""
+    return request.param
+
+
+@pytest.fixture(scope="module")
+def npse_trained_model(sde_type, prior_type):
+    """Module-scoped fixture that trains a score estimator for NPSE tests."""
     num_dim = 2
-    x_o = zeros(num_trials, num_dim)
-    num_samples = 1000
-    num_simulations = 3000
+    num_simulations = 5000
 
     # likelihood_mean will be likelihood_shift+theta
     likelihood_shift = -1.0 * ones(num_dim)
     likelihood_cov = 0.3 * eye(num_dim)
 
-    prior_mean = zeros(num_dim)
-    prior_cov = eye(num_dim)
-    prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
-    gt_posterior = true_posterior_linear_gaussian_mvn_prior(
-        x_o, likelihood_shift, likelihood_cov, prior_mean, prior_cov
-    )
-    target_samples = gt_posterior.sample((num_samples,))
+    if prior_type == "gaussian" or (prior_type is None):
+        prior_mean = zeros(num_dim)
+        prior_cov = eye(num_dim)
+        prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
+        prior_npse = prior if prior_type is None else None
+    elif prior_type == "uniform":
+        prior = BoxUniform(-2 * ones(num_dim), 2 * ones(num_dim))
+        prior_npse = prior
 
-    inference = NPSE(prior, show_progress_bars=True)
+    # This check that our method to handle "general" priors works.
+    # i.e. if NPSE does not get a proper passed by the user.
+    inference = NPSE(prior_npse, show_progress_bars=True, sde_type=sde_type)
 
     theta = prior.sample((num_simulations,))
     x = linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     score_estimator = inference.append_simulations(theta, x).train(
-        training_batch_size=100,
+        stop_after_epochs=200
     )
+
+    return {
+        "score_estimator": score_estimator,
+        "inference": inference,
+        "prior": prior,
+        "likelihood_shift": likelihood_shift,
+        "likelihood_cov": likelihood_cov,
+        "prior_mean": prior_mean
+        if prior_type == "gaussian" or prior_type is None
+        else None,
+        "prior_cov": prior_cov
+        if prior_type == "gaussian" or prior_type is None
+        else None,
+        "num_dim": num_dim,
+    }
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize(
+    "iid_method, num_trial",
+    [
+        pytest.param("fnpe", 3, id="fnpe-2trials"),
+        pytest.param("gauss", 3, id="gauss-6trials"),
+        pytest.param("auto_gauss", 8, id="auto_gauss-8trials"),
+        pytest.param("auto_gauss", 16, id="auto_gauss-16trials"),
+        pytest.param("jac_gauss", 8, id="jac_gauss-8trials"),
+    ],
+)
+def test_npse_iid_inference(
+    npse_trained_model, iid_method, num_trial, sde_type, prior_type
+):
+    """Test whether NPSE infers well a simple example with available ground truth."""
+    num_samples = 1000
+
+    # Extract data from fixture
+    score_estimator = npse_trained_model["score_estimator"]
+    inference = npse_trained_model["inference"]
+    prior = npse_trained_model["prior"]
+    likelihood_shift = npse_trained_model["likelihood_shift"]
+    likelihood_cov = npse_trained_model["likelihood_cov"]
+    prior_mean = npse_trained_model["prior_mean"]
+    prior_cov = npse_trained_model["prior_cov"]
+    num_dim = npse_trained_model["num_dim"]
+
+    x_o = zeros(num_trial, num_dim)
     posterior = inference.build_posterior(score_estimator)
     posterior.set_default_x(x_o)
-    samples = posterior.sample((num_samples,))
+    samples = posterior.sample((num_samples,), iid_method=iid_method)
+
+    if prior_type == "gaussian" or (prior_type is None):
+        gt_posterior = true_posterior_linear_gaussian_mvn_prior(
+            x_o, likelihood_shift, likelihood_cov, prior_mean, prior_cov
+        )
+        target_samples = gt_posterior.sample((num_samples,))
+    elif prior_type == "uniform":
+        target_samples = samples_true_posterior_linear_gaussian_uniform_prior(
+            x_o,
+            likelihood_shift,
+            likelihood_cov,
+            prior,  # type: ignore
+        )
 
     # Compute the c2st and assert it is near chance level of 0.5.
+    # Some degradation is expected, also because posterior get tighter which
+    # usually makes the c2st worse.
     check_c2st(
-        samples, target_samples, alg=f"npse-vp-gaussian-1D-{num_trials}iid-trials"
+        samples,
+        target_samples,
+        alg=f"npse-{sde_type}-{prior_type}-{num_dim}-{iid_method}-{num_trial}iid-trials",
+        tol=0.05 * min(num_trial, 8),
     )
 
 

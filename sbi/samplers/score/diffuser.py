@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import math
 from typing import Optional, Union
 
 import torch
@@ -12,6 +13,14 @@ from sbi.samplers.score.predictors import Predictor, get_predictor
 
 
 class Diffuser:
+    """Diffusion-based sampler for score-based sampling.
+
+    Requires the gradient of a family of distributions (for different times)
+    characterized by the gradient of a potential function (i.e. the score function). The
+    sampler uses a predictor to propagate samples forward in time. Optionally, a
+    corrector can be used to refine the samples at the current time.
+    """
+
     predictor: Predictor
     corrector: Optional[Corrector]
 
@@ -23,11 +32,7 @@ class Diffuser:
         predictor_params: Optional[dict] = None,
         corrector_params: Optional[dict] = None,
     ):
-        """Diffusion-based sampler for score-based sampling i.e it requires the
-        gradient of a family of distributions (for different times) characterized by the
-        gradient of a potential function (i.e. the score function). The sampler uses a
-        predictor to propagate samples forward in time. Optionally, a corrector can be
-        used to refine the samples at the current time.
+        """Init method for the Diffuser class.
 
         Args:
             score_based_potential_gradient: A time-dependent score-based potential.
@@ -90,21 +95,25 @@ class Diffuser:
             num_samples (int): Number of samples to draw.
 
         Returns:
-            Tensor: _description_
+            Tensor: Initial noise samples.
         """
-        # TODO: for iid setting, self.batch_shape.numel() will be the iid-batch. But we
-        # don't want to generate num_obs samples, but only one sample given the the iid
-        # batch.
-        # TODO: the solution will probably be to distinguish between the iid setting and
-        # batched sampling setting with a flag.
-        # TODO: this fixes the iid setting shape problems, but iid inference via
-        # iid_bridge is not accurate.
-        num_batch = self.batch_shape.numel()
-        init_shape = (num_samples, num_batch) + self.input_shape
-        # NOTE: for the IID setting we might need to scale the noise with iid batch
-        # size, as in equation (7) in the paper.
+        num_batches = (
+            1 if self.predictor.potential_fn.x_is_iid else self.batch_shape.numel()
+        )
+        init_shape = (num_samples, num_batches) + self.input_shape
+        # NOTE: This interface is not ideal, but for one method we need to adjust the
+        # initial distirbution
+        init_std = self.init_std
+        if (
+            hasattr(self.predictor.potential_fn, "iid_method")
+            and self.predictor.potential_fn.iid_method == "fnpe"
+        ):
+            x_o = self.predictor.potential_fn.x_o
+            N_iid = x_o.shape[0]
+            init_std = math.sqrt(1 / N_iid) * init_std
+
         eps = torch.randn(init_shape, device=self.device)
-        mean, std, eps = torch.broadcast_tensors(self.init_mean, self.init_std, eps)
+        mean, std, eps = torch.broadcast_tensors(self.init_mean, init_std, eps)
         return mean + std * eps
 
     @torch.no_grad()
@@ -115,15 +124,16 @@ class Diffuser:
         show_progress_bars: bool = True,
         save_intermediate: bool = False,
     ) -> Tensor:
-        """Samples from the distribution at the final time point by propagating samples
-        forward in time using the predictor and optionally refining them using the a
-        corrector.
+        """Samples from the distribution at the final time point.
+
+        Propagates samples forward in time using the predictor and optionally refines
+        them using the a corrector.
 
         Args:
             num_samples: Number of samples to draw.
             ts: Time grid to propagate samples forward, or "solve" the SDE.
-            show_progress_bars (optional): Shows a progressbar or not. Defaults to True.
-            save_intermediate (optional): Returns samples at all time point, instead of
+            show_progress_bars: Whehter to show progressbar. Defaults to True.
+            save_intermediate: Whether to return samples at all time point, instead of
                 only returning samples at the end. Defaults to False.
 
         Returns:

@@ -1,7 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 import torch
 from torch import Tensor
@@ -10,6 +10,7 @@ from zuko.distributions import NormalizingFlow
 from zuko.transforms import FreeFormJacobianTransform
 
 from sbi.inference.potentials.base_potential import BasePotential
+from sbi.inference.potentials.score_fn_iid import get_iid_method
 from sbi.neural_nets.estimators.score_estimator import ConditionalScoreEstimator
 from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
@@ -56,7 +57,8 @@ class PosteriorScoreBasedPotential(BasePotential):
         score_estimator: ConditionalScoreEstimator,
         prior: Optional[Distribution],
         x_o: Optional[Tensor] = None,
-        iid_method: str = "iid_bridge",
+        iid_method: str = "auto_gauss",
+        iid_params: Optional[Dict[str, Any]] = None,
         device: str = "cpu",
     ):
         r"""Returns the score function for score-based methods.
@@ -65,19 +67,24 @@ class PosteriorScoreBasedPotential(BasePotential):
             score_estimator: The neural network modelling the score.
             prior: The prior distribution.
             x_o: The observed data at which to evaluate the posterior.
-            iid_method: Which method to use for computing the score. Currently, only
-                `iid_bridge` as proposed in Geffner et al. is implemented.
+            iid_method: Which method to use for computing the score in the iid setting.
+                We currently support "fnpe", "gauss", "auto_gauss", "jac_gauss".
+            iid_params: Parameters for the iid method, for arguments see
+                `IIDScoreFunction`.
             device: The device on which to evaluate the potential.
         """
         self.score_estimator = score_estimator
         self.score_estimator.eval()
         self.iid_method = iid_method
+        self.iid_params = iid_params
         super().__init__(prior, x_o, device=device)
 
     def set_x(
         self,
         x_o: Optional[Tensor],
         x_is_iid: Optional[bool] = False,
+        iid_method: str = "auto_gauss",
+        iid_params: Optional[Dict[str, Any]] = None,
         atol: float = 1e-5,
         rtol: float = 1e-6,
         exact: bool = True,
@@ -90,12 +97,20 @@ class PosteriorScoreBasedPotential(BasePotential):
         Args:
             x_o: The observed data.
             x_is_iid: Whether the observed data is IID (if batch_dim>1).
+            iid_method: Which method to use for computing the score in the iid setting.
+                We currently support "fnpe", "gauss", "auto_gauss", "jac_gauss".
+            iid_params: Parameters for the iid method, for arguments see
+                `IIDScoreFunction`.
             atol: Absolute tolerance for the ODE solver.
             rtol: Relative tolerance for the ODE solver.
             exact: Whether to use the exact ODE solver.
         """
         super().set_x(x_o, x_is_iid)
-        if self._x_o is not None:
+        self.iid_method = iid_method
+        self.iid_params = iid_params
+        # NOTE: Once IID potential evaluation is supported. This needs to be adapted.
+        # See #1450.
+        if not x_is_iid and (self._x_o is not None):
             self.flow = self.rebuild_flow(atol=atol, rtol=rtol, exact=exact)
 
     def __call__(
@@ -112,6 +127,15 @@ class PosteriorScoreBasedPotential(BasePotential):
         Returns:
             The potential function, i.e., the log probability of the posterior.
         """
+
+        if self.x_is_iid:
+            raise NotImplementedError(
+                "Potential function evaluation in the IID setting is not yet supported"
+                " for score-based methods. Sampling does however work via `.sample`. "
+                "If you intended to evaluate the posterior given a batch of (non-iid) "
+                "x use `log_prob_batched`."
+            )
+
         theta = ensure_theta_batched(torch.as_tensor(theta))
         theta_density_estimator = reshape_to_sample_batch_event(
             theta, theta.shape[1:], leading_is_sample=True
@@ -160,9 +184,14 @@ class PosteriorScoreBasedPotential(BasePotential):
                     input=theta, condition=self.x_o, time=time
                 )
             else:
-                raise NotImplementedError(
-                    "Score accumulation for IID data is not yet implemented."
+                assert self.prior is not None, "Prior is required for iid methods."
+
+                iid_method = get_iid_method(self.iid_method)
+                score_fn_iid = iid_method(
+                    self.score_estimator, self.prior, **(self.iid_params or {})
                 )
+
+                score = score_fn_iid(theta, self.x_o, time)
 
         return score
 
@@ -204,9 +233,6 @@ class PosteriorScoreBasedPotential(BasePotential):
             )
         x_density_estimator = reshape_to_batch_event(
             self.x_o, event_shape=self.score_estimator.condition_shape
-        )
-        assert x_density_estimator.shape[0] == 1 or not self.x_is_iid, (
-            "PosteriorScoreBasedPotential supports only x batchsize of 1`."
         )
 
         flow = self.get_continuous_normalizing_flow(
