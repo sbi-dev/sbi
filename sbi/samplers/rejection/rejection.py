@@ -364,4 +364,4 @@ def accept_reject_sample(
         "Number of accepted samples must match required samples."
     )
 
-    return samples, as_tensor(acceptance_rate)
+    return samples, as_tensor(acceptance_rate, device=samples.device)

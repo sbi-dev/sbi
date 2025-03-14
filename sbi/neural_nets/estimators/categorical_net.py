@@ -61,6 +61,7 @@ class CategoricalMADE(MADE):
         self.mask = torch.zeros(self.num_variables, self.num_categories)
         for i, c in enumerate(num_categories):
             self.mask[i, :c] = 1
+        self.register_buffer("mask", self.mask)
 
         super().__init__(
             features=self.num_variables,
