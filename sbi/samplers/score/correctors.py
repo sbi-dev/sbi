@@ -59,7 +59,7 @@ class Corrector(ABC):
             (https://arxiv.org/abs/2011.13456)
 
         Args:
-            predictor (Predictor): The associated predictor.
+            predictor: The associated predictor.
         """
         self.predictor = predictor
         self.potential_fn = predictor.potential_fn
@@ -68,10 +68,21 @@ class Corrector(ABC):
     def __call__(
         self, theta: Tensor, t0: Tensor, t1: Optional[Tensor] = None
     ) -> Tensor:
+        """Correct the samples.
+
+        Args:
+            theta: The samples to correct.
+            t0: The current time.
+            t1: The next time. Defaults to None.
+
+        Returns:
+            Tensor: The corrected samples.
+        """
         return self.correct(theta, t0, t1)
 
     @abstractmethod
     def correct(self, theta: Tensor, t0: Tensor, t1: Optional[Tensor] = None) -> Tensor:
+        """Correct the samples."""
         pass
 
 
@@ -95,9 +106,9 @@ class LangevinCorrector(Corrector):
 
         Args:
             predictor: Associated predictor.
-            step_size (optional): Unadjusted Langevin dynamics are only valid for small
+            step_size: Unadjusted Langevin dynamics are only valid for small
                 step sizes. Defaults to 1e-4.
-            num_steps (optional): Number of steps to correct. Defaults to 5.
+            num_steps: Number of steps to correct. Defaults to 5.
         """
         super().__init__(predictor)
         self.step_size = step_size
@@ -105,6 +116,10 @@ class LangevinCorrector(Corrector):
         self.num_steps = num_steps
 
     def correct(self, theta: Tensor, t0: Tensor, t1: Optional[Tensor] = None) -> Tensor:
+        """Correct the samples using unadjusted Langevin dynamics.
+
+        Does not explicitly depend on the current time.
+        """
         for _ in range(self.num_steps):
             score = self.predictor.potential_fn.gradient(theta, t1)
             eps = self.std * torch.randn_like(theta, device=self.device)
@@ -118,19 +133,20 @@ class GibbsCorrector(Corrector):
     def __init__(self, predictor: Predictor, num_steps: int = 5):
         """(Pseudo) Gibbs sampling corrector.
 
-        Iteratively adds back noise according to
-        the correct forward SDE, then removes noise using the predictor. Hence,
-        approximatly sampling form the joint distribution using Gibbs sampling (if the
-        two conditional distributions are compatible).
+        Iteratively adds back noise according to the correct forward SDE, then removes
+        noise using the predictor. Hence, approximatly sampling form the joint
+        distribution using Gibbs sampling (if the two conditional distributions are
+        compatible).
 
         Args:
-            predictor (Predictor): Associated predictor.
-            num_steps (int, optional): Number of steps. Defaults to 5.
+            predictor: Associated predictor.
+            num_steps: Number of steps. Defaults to 5.
         """
         super().__init__(predictor)
         self.num_steps = num_steps
 
     def noise(self, theta: Tensor, t0: Tensor, t1: Tensor) -> Tensor:
+        """Add noise according to the correct forward SDE"""
         # Forward sde
         f = self.predictor.drift(theta, t0)
         g = self.predictor.diffusion(theta, t0)
@@ -140,6 +156,7 @@ class GibbsCorrector(Corrector):
         return theta + f * dt + g * eps * dt_sqrt
 
     def correct(self, theta: Tensor, t0: Tensor, t1: Tensor) -> Tensor:
+        """Correct the samples using Gibbs sampling."""
         for _ in range(self.num_steps):
             theta = self.noise(theta, t0, t1)
             theta = self.predictor(theta, t1, t0)

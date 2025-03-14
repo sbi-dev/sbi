@@ -69,7 +69,8 @@ class PosteriorScoreBasedPotential(BasePotential):
             x_o: The observed data at which to evaluate the posterior.
             iid_method: Which method to use for computing the score in the iid setting.
                 We currently support "fnpe", "gauss", "auto_gauss", "jac_gauss".
-            iid_params: Parameters for the iid method, for arguments see ScoreFnIID.
+            iid_params: Parameters for the iid method, for arguments see
+                `IIDScoreFunction`.
             device: The device on which to evaluate the potential.
         """
         self.score_estimator = score_estimator
@@ -96,6 +97,10 @@ class PosteriorScoreBasedPotential(BasePotential):
         Args:
             x_o: The observed data.
             x_is_iid: Whether the observed data is IID (if batch_dim>1).
+            iid_method: Which method to use for computing the score in the iid setting.
+                We currently support "fnpe", "gauss", "auto_gauss", "jac_gauss".
+            iid_params: Parameters for the iid method, for arguments see
+                `IIDScoreFunction`.
             atol: Absolute tolerance for the ODE solver.
             rtol: Relative tolerance for the ODE solver.
             exact: Whether to use the exact ODE solver.
