@@ -58,9 +58,6 @@ class CategoricalMADE(MADE):
 
         self.num_variables = len(num_categories)
         self.num_categories = int(torch.max(num_categories))
-        self.mask = torch.zeros(self.num_variables, self.num_categories)
-        for i, c in enumerate(num_categories):
-            self.mask[i, :c] = 1
 
         super().__init__(
             features=self.num_variables,
@@ -74,6 +71,10 @@ class CategoricalMADE(MADE):
             dropout_probability=dropout_probability,
             use_batch_norm=use_batch_norm,
         )
+        mask = torch.zeros(self.num_variables, self.num_categories)
+        for i, c in enumerate(num_categories):
+            mask[i, :c] = 1
+        self.register_buffer("mask", mask)
 
         self.embedding_net = embedding_net
         self.hidden_features = num_hidden_features

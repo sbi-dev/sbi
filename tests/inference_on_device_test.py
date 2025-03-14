@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import sys
 from typing import Tuple, Union
 
 import pytest
@@ -69,7 +70,19 @@ pytestmark = pytest.mark.skipif(
         pytest.param(NRE_B, "resnet", "slice_np", marks=pytest.mark.mcmc),
         (NRE_C, "resnet", "rejection"),
         (NRE_C, "resnet", "importance"),
-        pytest.param(NRE_C, "resnet", "nuts_pymc", marks=pytest.mark.mcmc),
+        pytest.param(
+            NRE_C,
+            "resnet",
+            "nuts_pymc",
+            marks=(
+                pytest.mark.mcmc,
+                pytest.mark.xfail(
+                    condition=sys.version_info >= (3, 10),
+                    reason="Fails with pymc>=5.20.1 and python>=3.10",
+                    raises=TypeError,
+                ),
+            ),
+        ),
     ],
 )
 @pytest.mark.parametrize(

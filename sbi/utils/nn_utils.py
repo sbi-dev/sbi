@@ -112,7 +112,7 @@ class MADEWrapper(made.MADE):
 
     def forward(self, inputs, context=None):
         # add dummy input to ensure all dims conditioned on context.
-        dummy_input = torch.zeros((inputs.shape[:-1] + (1,)))
+        dummy_input = torch.zeros((inputs.shape[:-1] + (1,)), device=inputs.device)
         concat_input = torch.cat((dummy_input, inputs), dim=-1)
         outputs = super().forward(concat_input, context)
         # the final layer of MADE produces self.output_multiplier outputs for each
