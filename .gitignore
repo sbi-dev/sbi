@@ -96,3 +96,7 @@ target/
 
 # Class diagram
 *.pyns
+
+# uv
+uv.lock
+.python-version
