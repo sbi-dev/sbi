@@ -13,9 +13,9 @@ direct contributions to the codebase have been instrumental in the development o
 
 > Copyright (C) 2020 Álvaro Tejero-Cantero, Jakob H. Macke, Jan-Matthis Lückmann,
 > Michael Deistler, Jan F. Bölts.
-
+>
 > Copyright (C) 2020 Conor M. Durkan.
-
+>
 > All contributors hold the copyright of their specific contributions.
 
 ## Support
@@ -25,7 +25,7 @@ through project ADIMEM (FKZ 01IS18052 A-D), project SiMaLeSAM (FKZ 01IS21055A) a
 Tübingen AI Center (FKZ 01IS18039A). Since 2024, `sbi` has been supported by the
 appliedAI Institute for Europe gGmbH.
 
-![](static/logo_bmbf.svg)
+![German Federal Ministry of Education and Research Logo](static/logo_bmbf.svg)
 
 ## Important dependencies and prior art
 

@@ -93,7 +93,8 @@ these algorithms can be categorized as:
 Depending on the characteristics of the problem, e.g. the dimensionalities of the
 parameter space and the observation space, one of the methods will be more suitable.
 
-![](./static/goal.png)
+![Conceptual diagram for simulation-based inference. It depicts a model, prior distribution, simulated data, neural density estimator, and posterior distribution. The process includes a feedback loop using the estimated posterior distribution to adaptively generate additional informative simulations. The diagram also illustrates consistent and inconsistent samples.
+](./static/goal.png)
 
 **Goal: Algorithmically identify mechanistic models that are consistent with data.**
 

@@ -57,7 +57,8 @@ a repository [here](https://docs.github.com/en/pull-requests/collaborating-with-
 
 **Step 3**: Clone your fork of the `sbi` repo from your GitHub account to your
 local disk:
-```
+
+```bash
 git clone git@github.com:$USERNAME/sbi.git
 cd sbi
 ```
@@ -66,15 +67,18 @@ cd sbi
 for instance using [`miniforge`](https://github.com/conda-forge/miniforge). We
 strongly recommend you create a specific `conda` environment for doing
 development on `sbi` as per:
-```
+
+```bash
 conda create -n sbi_dev python=3.10
 conda activate sbi_dev
 ```
 
 **Step 5**: Install `sbi` in editable mode with
-```
+
+```bash
 pip install -e ".[dev]"
 ```
+
 This installs the `sbi` package into the current environment by creating a
 link to the source code directory (instead of copying the code to pip’s `site_packages`
 directory, which is what normally happens). This means that any edits you make
@@ -86,12 +90,15 @@ at least Python 3.8.
 **Step 6**: Add the upstream remote. This saves a reference to the main `sbi`
 repository, which you can use to keep your repository synchronized with the latest
 changes:
-```
+
+```bash
 git remote add upstream git@github.com:sbi-dev/sbi.git
 ```
+
 Check that the upstream and origin remote aliases are configured correctly by
 running `git remote -v` which should display:
-```
+
+```bash
 origin  git@github.com:$USERNAME/sbi.git (fetch)
 origin  git@github.com:$USERNAME/sbi.git (push)
 upstream        git@github.com:sbi-dev/sbi.git (fetch)
@@ -99,7 +106,8 @@ upstream        git@github.com:sbi-dev/sbi.git (push)
 ```
 
 **Step 7**: Install `pre-commit` to run code style checks before each commit:
-```
+
+```bash
 pip install pre-commit
 pre-commit install
 ```
@@ -110,16 +118,19 @@ process of modifying code and submitting a pull request:
 
 **Step 8**: Synchronize your main branch with the upstream/main branch. See more
 details on [GitHub Docs](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/syncing-a-fork):
-```
+
+```bash
 git checkout main
 git fetch upstream
 git merge upstream/main
 ```
 
 **Step 9**: Create a feature branch to hold your development changes:
-```
+
+```bash
 git checkout -b my_feature
 ```
+
 and start making changes. Always use a feature branch! It’s good practice
 to never work on the main branch, as this allows you to easily get back to a
 working state of the code if needed (e.g., if you’re working on multiple
@@ -130,14 +141,18 @@ upstream’s main branch.
 **Step 10**: Develop your code on your feature branch on the computer, using
 Git to do the version control. When you’re done editing, add changed files
 using `git add` and then `git commit` to record your changes:
-```
+
+```bash
 git add modified_files
 git commit -m "description of your commit"
 ```
+
 Then push the changes to your GitHub account with:
-```
+
+```bash
 git push -u origin my_feature
 ```
+
 The `-u` flag ensures that your local branch will be automatically linked with
 the remote branch, so you can later use `git push` and `git pull` without any
 extra arguments.
@@ -164,13 +179,17 @@ For code linting and formating, we use [`ruff`](https://docs.astral.sh/ruff/),
 which is installed alongside `sbi`.
 
 You can exclude slow tests and those which require a GPU with
-```
+
+```bash
 pytest -m "not slow and not gpu"
 ```
+
 Additionally, we recommend to run tests with
-```
+
+```bash
 pytest -n auto -m "not slow and not gpu"
 ```
+
 in parallel. GPU tests should probably not be run this way. If you see unexpected
 behavior (tests fail if they shouldn't), try to run them without `-n auto` and
 see if it persists. When writing new tests and debugging things, it may make sense
@@ -222,20 +241,26 @@ are no errors) but output performance metrics that can be compared, e.g., to the
 performance metrics of the main branch or relative to each other. The user-facing API
 is available via `pytest` through custom flags. To run the mini-sbibm tests, you can use
 the following command:
+
 ```bash
     pytest --bm
 ```
+
 This will run all the mini-sbibm tests on all methods with default parameters and output
 the performance metrics nicely formatted to the console. If you have multiple CPU cores
 available, you can run the tests in parallel using the `-n auto` flag:
+
 ```bash
     pytest --bm -n auto
 ```
+
 What if you are currently working on a specific method and you want to run the
 mini-sbibm tests only for this class of methods? You can use the `--bm-mode` flag:
+
 ```bash
     pytest --bm --bm-mode nspe
 ```
+
 This will run the mini-sbibm tests only for methods of the `nspe` class, but with a
 few major hyperparameter choices, such as different base network architectures and
 different diffusion processes.
