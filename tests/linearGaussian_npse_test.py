@@ -219,8 +219,8 @@ def npse_trained_model(sde_type, prior_type):
 @pytest.mark.parametrize(
     "iid_method, num_trial",
     [
-        pytest.param("fnpe", 2, id="fnpe-2trials"),
-        pytest.param("gauss", 3, id="gauss-3trials"),
+        pytest.param("fnpe", 3, id="fnpe-2trials"),
+        pytest.param("gauss", 3, id="gauss-6trials"),
         pytest.param("auto_gauss", 8, id="auto_gauss-8trials"),
         pytest.param("auto_gauss", 16, id="auto_gauss-16trials"),
         pytest.param("jac_gauss", 8, id="jac_gauss-8trials"),
