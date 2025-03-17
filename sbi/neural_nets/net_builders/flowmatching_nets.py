@@ -14,10 +14,7 @@ from torch import Tensor
 from torch.nn import functional as F
 from zuko.nn import MLP as ZukoMLP
 
-from sbi.neural_nets.estimators.flowmatching_estimator import (
-    FlowMatchingEstimator,
-    VectorFieldNet,
-)
+from sbi.neural_nets.estimators.flowmatching_estimator import FlowMatchingEstimator
 from sbi.utils.nn_utils import get_numel
 from sbi.utils.sbiutils import (
     standardizing_net,
@@ -25,6 +22,7 @@ from sbi.utils.sbiutils import (
     z_standardization,
 )
 from sbi.utils.user_input_checks import check_data_device
+from sbi.utils.vector_field_utils import VectorFieldNet
 
 
 def build_mlp_flowmatcher(
