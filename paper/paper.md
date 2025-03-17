@@ -304,6 +304,18 @@ The `swyft` package [@swyft] specializes in algorithms based on neural ratio est
 The `sbijax` package [@dirmeier2024simulationbasedinferencepythonpackage] implements a set
 of inference methods in JAX.
 
+# Author contributions
+
+This work represents a collaborative effort with contributions from a large and diverse
+team.  Author contributions are categorized as follows: Jan Boelts and Michael Deistler
+are the current maintainers and lead developers of the sbi package and contributed
+equally to this work.  Manuel Gloeckler, Álvaro Tejero-Cantero, Jan-Matthis Lueckmann,
+and Guy Moss have made substantial and sustained core contributions to the codebase and
+project direction. Peter Steinbach, Thomas Moreau, Fabio Muratore, Julia Linhart, and
+Conor Durkan have made major contributions to specific features or aspects of the
+package.  All other authors listed have contributed to the sbi package through code,
+documentation, or discussions.
+
 # Acknowledgements
 
 This work has been supported by the German Federal Ministry of Education and Research
