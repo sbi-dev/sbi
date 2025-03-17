@@ -27,12 +27,12 @@ from sbi.utils import (
 )
 from sbi.utils.sbiutils import get_simulations_since_round
 from sbi.utils.simulation_utils import simulate_for_sbi
-from sbi.utils.torchutils import check_if_prior_on_device, process_device
 from sbi.utils.user_input_checks import (
     check_sbi_inputs,
     process_prior,
     process_simulator,
 )
+from sbi.utils.torchutils import check_if_prior_on_device, process_device
 
 
 def infer(
@@ -87,8 +87,7 @@ def infer(
             "Method not available. `method` must be one of 'SNPE', 'SNLE', 'SNRE'."
         ) from err
 
-    if (
-        init_kwargs is not None
+    if (init_kwargs is not None
         or build_posterior_kwargs is not None
         or train_kwargs is not None
     ):
