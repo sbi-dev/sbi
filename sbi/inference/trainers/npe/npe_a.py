@@ -87,7 +87,8 @@ class NPE_A(PosteriorEstimator):
 
     def train(
         self,
-        final_round: bool = False, training_batch_size: int = 200,
+        final_round: bool = False,
+        training_batch_size: int = 200,
         learning_rate: float = 5e-4,
         validation_fraction: float = 0.1,
         stop_after_epochs: int = 20,
