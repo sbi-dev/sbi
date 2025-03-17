@@ -1,4 +1,3 @@
-from abc import ABC, abstractmethod
 from typing import Optional
 
 import torch
@@ -6,12 +5,7 @@ import torch.nn as nn
 from torch import Tensor
 
 from sbi.neural_nets.estimators.base import ConditionalVectorFieldEstimator
-
-
-# abstract class to ensure forward signature for flow matching networks
-class VectorFieldNet(nn.Module, ABC):
-    @abstractmethod
-    def forward(self, theta: Tensor, x: Tensor, t: Tensor) -> Tensor: ...
+from sbi.utils.vector_field_utils import VectorFieldNet
 
 
 class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
