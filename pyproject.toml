@@ -60,6 +60,13 @@ doc = [
     "nbconvert",
     "nbformat",
     "traitlets <= 5.9.0",
+    "sphinx",
+    "sphinx-autobuild",
+    "sphinx_autodoc_typehints",
+    "sphinx-math-dollar",
+    "myst-nb",
+    "jupytext",
+    "sphinx-book-theme",
 ]
 dev = [
     "ffmpeg",
@@ -141,7 +148,7 @@ xfail_strict = true
 # Pyright configuration
 [tool.pyright]
 include = ["sbi"]
-exclude = ["**/__pycache__", "**/__node_modules__", ".git", "docs", "tutorials", "tests"]
+exclude = ["**/__pycache__", "**/__node_modules__", ".git", "docs", "tutorials", "mkdocs", "tests"]
 python_version = "3.10"
 reportUnsupportedDunderAll = false
 reportGeneralTypeIssues = false
