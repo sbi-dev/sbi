@@ -162,18 +162,6 @@ def test_c2st_npse_on_linearGaussian_different_dims():
     check_c2st(samples, target_samples, alg="npse_different_dims_and_resume_training")
 
 
-@pytest.fixture(scope="module", params=SDE_TYPES)
-def sde_type(request):
-    """Module-scoped fixture for SDE type."""
-    return request.param
-
-
-@pytest.fixture(scope="module", params=PRIOR_TYPES)
-def prior_type(request):
-    """Module-scoped fixture for prior type."""
-    return request.param
-
-
 @pytest.fixture(scope="module")
 def npse_trained_model(request):
     """Module-scoped fixture that trains a score estimator for NPSE tests."""
@@ -219,6 +207,8 @@ def npse_trained_model(request):
         else None,
         "num_dim": num_dim,
         "x_o": zeros(num_dim),
+        "sde_type": sde_type,
+        "prior_type": prior_type,
     }
 
 
@@ -238,9 +228,7 @@ def npse_trained_model(request):
         pytest.param("jac_gauss", 8, id="jac_gauss-8trials"),
     ],
 )
-def test_npse_iid_inference(
-    npse_trained_model, iid_method, num_trial, sde_type, prior_type
-):
+def test_npse_iid_inference(npse_trained_model, iid_method, num_trial):
     """Test whether NPSE infers well a simple example with available ground truth."""
     num_samples = 1000
 
@@ -253,6 +241,8 @@ def test_npse_iid_inference(
     prior_mean = npse_trained_model["prior_mean"]
     prior_cov = npse_trained_model["prior_cov"]
     num_dim = npse_trained_model["num_dim"]
+    sde_type = npse_trained_model["sde_type"]
+    prior_type = npse_trained_model["prior_type"]
 
     x_o = zeros(num_trial, num_dim)
     posterior = inference.build_posterior(score_estimator)
