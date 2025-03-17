@@ -19,6 +19,7 @@ from torch.distributions import (
     AffineTransform,
     Distribution,
     Independent,
+    Transform,
     biject_to,
     constraints,
 )
@@ -193,6 +194,83 @@ def standardizing_transform_zuko(
         AffineTransform,
         loc=-t_mean / t_std,
         scale=1 / t_std,
+        buffer=True,
+    )
+
+
+class BoundedLogitTransform(Transform):
+    """
+    Implements a logit transformation for data bounded within a given interval
+    (min_val, max_val), mapping it to the real line (-inf, inf). This transformation
+    is useful for normalizing bounded data while ensuring numerical stability.
+
+    The transformation follows:
+        x' = log((x - min_val) / (max_val - min_val))
+        - log(1 - (x - min_val) / (max_val - min_val))
+
+    The inverse transformation applies the sigmoid function
+    to map back to (min_val, max_val).
+
+    Attributes:
+        min_val (float): The lower bound of the input domain.
+        max_val (float): The upper bound of the input domain.
+        eps (float): A small value to prevent numerical issues at the boundaries.
+        domain (Constraint): Defines the valid input range as (min_val, max_val).
+        codomain (Constraint): Defines the output range as the real line (-inf, inf).
+    """
+
+    def __init__(self, min_val: float, max_val: float, eps: float = 1e-5):
+        super().__init__()
+        self.min_val = min_val
+        self.max_val = max_val
+        self.eps = eps  # Avoids numerical instability at boundaries
+
+        # Define domain and codomain
+        self.domain = constraints.interval(min_val, max_val)  # Input is in (min, max)
+        self.codomain = constraints.real  # Output is unbounded
+
+    def __call__(self, x: Tensor) -> Tensor:
+        # Normalize to (0,1)
+        x = (x - self.min_val) / (self.max_val - self.min_val)
+        x = torch.clamp(x, self.eps, 1 - self.eps)  # Prevents log(0) or log(∞)
+        return torch.log(x) - torch.log(1 - x)  # Logit function
+
+    def inv(self, y: Tensor) -> Tensor:
+        # Sigmoid and scale back to (min, max)
+        return self.min_val + (self.max_val - self.min_val) * torch.sigmoid(y)
+
+    def log_abs_det_jacobian(self, x: Tensor, y: Tensor) -> Tensor:
+        """
+        Computes the log absolute determinant of the Jacobian of the transformation.
+        Needed for proper transformation in Zuko flows.
+        """
+        x = (x - self.min_val) / (self.max_val - self.min_val)
+        x = torch.clamp(x, self.eps, 1 - self.eps)
+        log_det = (
+            -torch.log(x) - torch.log(1 - x) - torch.log(self.max_val - self.min_val)
+        )
+        return log_det
+
+
+def logit_transform_zuko(
+    min_val: float, max_val: float, eps: float = 1e-6
+) -> zuko.flows.UnconditionalTransform:
+    """
+    Builds logit-transforming transform for Zuko flows on a bounded interval.
+
+    Args:
+        min_val: Lower bound of the prior interval.
+        max_val: Upper bound of the prior interval.
+        eps: Small constant to avoid numerical issues at 0 and 1.
+
+    Returns:
+        Logit transformation for the given range.
+    """
+    return zuko.flows.UnconditionalTransform(
+        BoundedLogitTransform,
+        min_val=min_val,
+        max_val=max_val,
+        eps=eps,
         buffer=True,
     )
 
