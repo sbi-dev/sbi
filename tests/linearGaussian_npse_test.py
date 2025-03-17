@@ -1,3 +1,4 @@
+from itertools import product
 from typing import List
 
 import pytest
@@ -17,8 +18,12 @@ from sbi.utils import BoxUniform
 
 from .test_utils import check_c2st, get_dkl_gaussian_prior
 
+SDE_TYPES = ["vp", "ve", "subvp"]
+PRIOR_TYPES = ["gaussian", "uniform", None]
+
 
 # We always test num_dim and sample_with with defaults and mark the rests as slow.
+@pytest.mark.slow
 @pytest.mark.parametrize(
     "sde_type, num_dim, prior_str, sample_with",
     [
@@ -157,21 +162,22 @@ def test_c2st_npse_on_linearGaussian_different_dims():
     check_c2st(samples, target_samples, alg="npse_different_dims_and_resume_training")
 
 
-@pytest.fixture(scope="module", params=["vp", "ve", "subvp"])
+@pytest.fixture(scope="module", params=SDE_TYPES)
 def sde_type(request):
     """Module-scoped fixture for SDE type."""
     return request.param
 
 
-@pytest.fixture(scope="module", params=["gaussian", "uniform", None])
+@pytest.fixture(scope="module", params=PRIOR_TYPES)
 def prior_type(request):
     """Module-scoped fixture for prior type."""
     return request.param
 
 
 @pytest.fixture(scope="module")
-def npse_trained_model(sde_type, prior_type):
+def npse_trained_model(request):
     """Module-scoped fixture that trains a score estimator for NPSE tests."""
+    sde_type, prior_type = request.param
     num_dim = 2
     num_simulations = 5000
 
@@ -212,10 +218,16 @@ def npse_trained_model(sde_type, prior_type):
         if prior_type == "gaussian" or prior_type is None
         else None,
         "num_dim": num_dim,
+        "x_o": zeros(num_dim),
     }
 
 
 @pytest.mark.slow
+@pytest.mark.parametrize(
+    "npse_trained_model",
+    list(product(SDE_TYPES, PRIOR_TYPES)),
+    indirect=True,  # So pytest knows to pass to the fixture
+)
 @pytest.mark.parametrize(
     "iid_method, num_trial",
     [
@@ -272,27 +284,25 @@ def test_npse_iid_inference(
 
 
 @pytest.mark.slow
-def test_npse_map():
-    num_dim = 2
-    x_o = zeros(num_dim)
-    num_simulations = 3000
+@pytest.mark.parametrize(
+    "npse_trained_model",
+    [
+        ("vp", "gaussian"),
+    ],
+    indirect=True,
+)
+def test_npse_map(npse_trained_model):
+    x_o = npse_trained_model["x_o"]
+    inference = npse_trained_model["inference"]
+    prior_mean = npse_trained_model["prior_mean"]
+    prior_cov = npse_trained_model["prior_cov"]
+    likelihood_shift = npse_trained_model["likelihood_shift"]
+    likelihood_cov = npse_trained_model["likelihood_cov"]
 
-    # likelihood_mean will be likelihood_shift+theta
-    likelihood_shift = -1.0 * ones(num_dim)
-    likelihood_cov = 0.3 * eye(num_dim)
-
-    prior_mean = zeros(num_dim)
-    prior_cov = eye(num_dim)
-    prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
     gt_posterior = true_posterior_linear_gaussian_mvn_prior(
         x_o, likelihood_shift, likelihood_cov, prior_mean, prior_cov
     )
-    inference = NPSE(prior, show_progress_bars=True)
 
-    theta = prior.sample((num_simulations,))
-    x = linear_gaussian(theta, likelihood_shift, likelihood_cov)
-
-    inference.append_simulations(theta, x).train()
     posterior = inference.build_posterior().set_default_x(x_o)
 
     map_ = posterior.map(show_progress_bars=True, num_iter=5)
