@@ -83,31 +83,11 @@ class NPE_A(PosteriorEstimator):
             show_progress_bars: Whether to show a progressbar during training.
         """
 
-        # Catch invalid inputs.
-        if not ((density_estimator == "mdn_snpe_a") or callable(density_estimator)):
-            raise TypeError(
-                "The `density_estimator` passed to SNPE_A needs to be a "
-                "callable or the string 'mdn_snpe_a'!"
-            )
-
-        # `num_components` will be used to replicate the Gaussian in the last round.
-        self._num_components = num_components
-        self._ran_final_round = False
-
-        # WARNING: sneaky trick ahead. We proxy the parent's `train` here,
-        # requiring the signature to have `num_atoms`, save it for use below, and
-        # continue. It's sneaky because we are using the object (self) as a namespace
-        # to pass arguments between functions, and that's implicit state management.
-        kwargs = del_entries(
-            locals(),
-            entries=("self", "__class__", "num_components"),
-        )
-        super().__init__(**kwargs)
+        raise NotImplementedError
 
     def train(
         self,
-        final_round: bool = False,
-        training_batch_size: int = 200,
+        final_round: bool = False, training_batch_size: int = 200,
         learning_rate: float = 5e-4,
         validation_fraction: float = 0.1,
         stop_after_epochs: int = 20,
