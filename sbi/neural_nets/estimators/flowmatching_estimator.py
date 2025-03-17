@@ -1,50 +1,15 @@
-from typing import Optional
+import math
+from typing import Optional, Tuple
 
 import torch
 import torch.nn as nn
 from torch import Tensor
 
-from sbi.neural_nets.estimators.base import ConditionalVectorFieldEstimator
+from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
 from sbi.utils.vector_field_utils import VectorFieldNet
 
 
-class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
-    r"""
-    Rectified flow matching estimator class that estimates the conditional vector field,
-    :math:`v(\theta_t, t; x_o) = \mathbb{E}[\theta_1 - \theta_0 | \theta_t, x_o = x_o]`
-
-    This estimator implements the flow matching approach where the vector field is
-    learned by matching the flow between the base and target distributions. The vector
-    field represents the instantaneous change in the distribution at time t.
-
-    References
-    ----------
-    .. [1] Liu, X., Gong, C., & Liu, Q. (2023).
-           "Flow Straight and Fast: Learning to Generate and Transfer Data with
-           Rectified Flow"
-           *International Conference on Learning Representations (ICLR)*
-           https://arxiv.org/abs/2209.03003
-
-    .. [2] Lipman, Y., Chen, R. T. Q., Ben-Hamu, H., Nickel, M., & Le, M. (2023).
-           "Flow Matching for Generative Modeling"
-           *International Conference on Learning Representations (ICLR)*
-           https://arxiv.org/abs/2210.02747
-
-    .. [3] Singh, S., & Fischer, I. (2024).
-           "Stochastic Sampling from Deterministic Flow Models"
-           https://arxiv.org/abs/2410.02217
-    """
-
-    # Whether the score is defined for this estimator.
-    # Required for gradient-based methods.
-    SCORE_DEFINED: bool = True
-    # Whether the SDE functions - score, drift and diffusion -
-    # are defined for this estimator.
-    SDE_DEFINED: bool = True
-    # Whether the marginals are defined for this estimator.
-    # Required for iid methods.
-    MARGINALS_DEFINED: bool = True
-
+class FlowMatchingEstimator(ConditionalDensityEstimator):
     def __init__(
         self,
         net: VectorFieldNet,
