@@ -79,7 +79,7 @@ class FullAttention(nn.Module):
 
     def __init__(self, config, layer_idx: Optional[int] = None):
         super().__init__()
-        self.config = config  # TODO implement config?
+        self.config = config
         self.layer_idx = layer_idx
         self.hidden_size = config["hidden_size"]
         self.head_dim = config.get(
@@ -92,7 +92,6 @@ class FullAttention(nn.Module):
         self.num_key_value_heads = config["num_key_value_heads"]
         self.scaling = self.head_dim**-0.5
         self.attention_dropout = config["attention_dropout"]
-        self.is_causal = True
 
         op_size = config["num_attention_heads"] * self.head_dim + 2 * (
             config["num_key_value_heads"] * self.head_dim
