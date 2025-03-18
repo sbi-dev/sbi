@@ -2,6 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import torch
+import torch.nn as nn
 
 # code for MMD from:
 # https://github.com/mackelab/labproject/blob/main/labproject/metrics/MMD_torch.py
@@ -78,4 +79,44 @@ def calculate_p_misspecification(
     )
     mmd = compute_rbf_mmd_median_heuristic(x_obs, x[:max_samples], mode=mode)
     p_val = 1 - (mmds_baseline < mmd).sum().item() / n_shuffle
+    return p_val, (mmds_baseline, mmd)
+
+
+def calc_misspecification_mmd(
+    inference,
+    x_obs,
+    x,
+    mode="x_space",
+    n_shuffle=1_000,
+    max_samples=1_000,
+    mmd_mode="biased",
+):
+    """calculate the p-value of the misspecification test.
+    inference: inference object
+    x_obs: observed data
+    x: synthetic data
+    mode: mode of MMD calculation ("x_space" or "embedding")
+    n_shuffle: number of shuffles for computing mmds und H_0
+    max_samples: maximum number of samples to use
+    mmd_mode: mode of MMD calculation ("biased" or "unbiased")
+    """
+    if mode == "x_space":
+        z_obs = x_obs
+        z = x
+    elif mode == "embedding":
+        if isinstance(inference._neural_net, type(None)):
+            raise ValueError("no neural net provieded, neural_net should not be None")
+        if isinstance(inference._neural_net.embedding_net, nn.modules.linear.Identity):
+            raise Warning(
+                "The embedding net is might be the identity function,"
+                "in which case the MMD is computed in the x-space."
+            )
+        z_obs = inference._neural_net.embedding_net(x_obs).detach()
+        z = inference._neural_net.embedding_net(x_obs).detach()
+    else:
+        raise ValueError("mode should be either x_space or embedding")
+
+    p_val, (mmds_baseline, mmd) = calculate_p_misspecification(
+        z_obs, z, n_shuffle=n_shuffle, max_samples=max_samples, mode=mmd_mode
+    )
     return p_val, (mmds_baseline, mmd)
