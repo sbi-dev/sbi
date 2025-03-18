@@ -361,36 +361,20 @@ class UnconditionalDensityEstimator(UnconditionalEstimator):
         super().__init__(input_shape)
         self.net = net
 
-    @abstractmethod
-    def log_prob(self, input: Tensor, **kwargs) -> Tensor:
+    def log_prob(self, x: Tensor) -> Tensor:
         r"""Return the log probabilities of the inputs
 
         Args:
-            input: Inputs to evaluate the log probability on of shape
-                    `(sample_dim_input, batch_dim_input, *event_shape_input)`.
+            x: Inputs to evaluate the log probability on of shape
+                `(sample_dim_input, batch_dim_input, *event_shape_input)`.
 
         Returns:
             Sample-wise log probabilities.
         """
 
-        pass
+        return self._neural_net.log_prob(x)
 
-    @abstractmethod
-    def loss(self, input: Tensor, **kwargs) -> Tensor:
-        r"""Return the loss for training the density estimator.
-
-        Args:
-            input: Inputs to evaluate the loss on of shape
-                `(batch_dim, *input_event_shape)`.
-
-        Returns:
-            Loss of shape (batch_dim,)
-        """
-
-        pass
-
-    @abstractmethod
-    def sample(self, sample_shape: torch.Size, **kwargs) -> Tensor:
+    def sample(self, sample_shape: torch.Size()) -> Tensor:
         r"""Return samples from the density estimator.
 
         Args:
@@ -400,11 +384,9 @@ class UnconditionalDensityEstimator(UnconditionalEstimator):
             Samples of shape (*sample_shape, batch_dim, *event_shape_input).
         """
 
-        pass
+        return self._neural_net.sample(sample_shape)
 
-    def sample_and_log_prob(
-        self, sample_shape: torch.Size, **kwargs
-    ) -> Tuple[Tensor, Tensor]:
+    def sample_and_log_prob(self, sample_shape: torch.Size) -> Tuple[Tensor, Tensor]:
         r"""Return samples and their density from the density estimator.
 
         Args:
@@ -419,6 +401,6 @@ class UnconditionalDensityEstimator(UnconditionalEstimator):
             then be overwritten to provide a more efficient implementation.
         """
 
-        samples = self.sample(sample_shape, **kwargs)
-        log_probs = self.log_prob(samples, **kwargs)
+        samples = self.sample(sample_shape)
+        log_probs = self.log_prob(samples)
         return samples, log_probs

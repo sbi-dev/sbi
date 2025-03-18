@@ -4,7 +4,7 @@
 import time
 from abc import ABC
 from copy import deepcopy
-from typing import Any, Callable, Optional, Tuple, Union
+from typing import Callable, Optional, Tuple, Union
 
 import torch
 from torch import Tensor
@@ -19,73 +19,12 @@ from sbi.neural_nets.estimators import UnconditionalDensityEstimator
 from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
 )
-from sbi.neural_nets.net_builders.flow import build_zuko_unconditional_flow
-from sbi.sbi_types import Shape
+from sbi.neural_nets.factory import marginal_nn
 from sbi.utils import check_estimator_arg
 from sbi.utils.torchutils import assert_all_finite
 
 
-def marginal_nn(
-    model: str,
-    z_score_x: Optional[str] = "independent",
-    hidden_features: int = 50,
-    num_transforms: int = 5,
-    num_bins: int = 10,
-    num_components: int = 10,
-    **kwargs: Any,
-) -> Callable:
-    r"""
-    Returns a function that builds a density estimator for learning the marginal.
-
-    Args:
-        model: The type of density estimator that will be created. One of [`mdn`,
-            `made`, `maf`, `maf_rqs`, `nsf`].
-        z_score_x: Whether to z-score samples $x$ before passing them into
-            the network, can take one of the following:
-            - `none`, or None: do not z-score.
-            - `independent`: z-score each dimension independently.
-            - `structured`: treat dimensions as related, therefore compute mean and std
-            over the entire batch, instead of per-dimension. Should be used when each
-            sample is, for example, a time series or an image.
-        hidden_features: Number of hidden features.
-        num_transforms: Number of transforms when a flow is used. Only relevant if
-            density estimator is a normalizing flow (i.e. currently either a `maf` or a
-            `nsf`). Ignored if density estimator is a `mdn` or `made`.
-        num_bins: Number of bins used for the splines in `nsf`. Ignored if density
-            estimator not `nsf`.
-        num_components: Number of mixture components for a mixture of Gaussians.
-            Ignored if density estimator is not an mdn.
-        kwargs: additional custom arguments passed to downstream build functions.
-    """
-
-    kwargs = dict(
-        zip(
-            (
-                "z_score_x",
-                "hidden_features",
-                "num_transforms",
-                "num_bins",
-                "num_components",
-            ),
-            (
-                z_score_x,
-                hidden_features,
-                num_transforms,
-                num_bins,
-                num_components,
-            ),
-            strict=False,
-        ),
-        **kwargs,
-    )
-
-    def build_fn(batch_x):
-        return build_zuko_unconditional_flow(which_nf=model, batch_x=batch_x)
-
-    return build_fn
-
-
-class MarginalEstimator(NeuralInference, ABC):
+class MarginalTrainer(NeuralInference, ABC):
     def __init__(
         self,
         density_estimator: Union[str, Callable] = "MAF",
@@ -152,12 +91,25 @@ class MarginalEstimator(NeuralInference, ABC):
 
         return train_loader, val_loader
 
-    def append_simulations(self, x) -> "MarginalEstimator":
+    def append_simulations(self, x) -> "MarginalTrainer":
         self._x = x
         return self
 
     def get_simulations(self) -> Tensor:
         return self._x
+
+    def loss(self, x: Tensor) -> Tensor:
+        """Return loss.
+
+        The loss is the negative log prob
+
+        Returns:
+            Negative log prob.
+        """
+        x = reshape_to_batch_event(x, event_shape=self._neural_net.input_shape)
+        loss = self._neural_net.loss(x)
+        assert_all_finite(loss, "loss")
+        return loss
 
     def train(
         self,
@@ -226,7 +178,7 @@ class MarginalEstimator(NeuralInference, ABC):
                 # Get batches on current device.
                 x_batch = batch[0].to(self._device)
 
-                train_losses = self._loss(x_batch)
+                train_losses = self.loss(x_batch)
                 train_loss = torch.mean(train_losses)
                 train_loss_sum += train_losses.sum().item()
 
@@ -252,7 +204,7 @@ class MarginalEstimator(NeuralInference, ABC):
                 for batch in val_loader:
                     x_batch = batch[0].to(self._device)
                     # Take negative loss here to get validation log_prob.
-                    val_losses = self._loss(x_batch)
+                    val_losses = self.loss(x_batch)
                     val_loss_sum += val_losses.sum().item()
 
             # Take mean over all validation samples.
@@ -283,25 +235,3 @@ class MarginalEstimator(NeuralInference, ABC):
         self._neural_net.zero_grad(set_to_none=True)
 
         return deepcopy(self._neural_net)
-
-    def _loss(
-        self,
-        x: Tensor,
-    ) -> Tensor:
-        """Return loss.
-
-        The loss is the negative log prob
-
-        Returns:
-            Negative log prob.
-        """
-        x = reshape_to_batch_event(x, event_shape=self._neural_net.input_shape)
-        loss = self._neural_net.loss(x)
-        assert_all_finite(loss, "loss")
-        return loss
-
-    def sample(
-        self,
-        sample_shape: Shape = torch.Size(),
-    ):
-        return self._neural_net.sample(sample_shape)
