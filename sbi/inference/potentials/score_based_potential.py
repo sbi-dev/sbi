@@ -331,3 +331,66 @@ class CallableDifferentiablePotentialFunction:
             self.posterior_score_based_potential.__call__,
             self.posterior_score_based_potential.gradient,
         )
+
+
+class ScoreAdaptation(ABC):
+    def __init__(
+        self,
+        score_estimator: ConditionalScoreEstimator,
+        prior: Optional[Distribution],
+        device: str = "cpu",
+    ):
+        """ This class manages manipulating the score estimator to impose additional
+        constraints on the posterior via guidance.
+
+        Args:
+            score_estimator: The score estimator.
+            prior: The prior distribution.
+            device: The device on which to evaluate the potential.
+        """
+        self.score_estimator = score_estimator
+        self.prior = prior
+        self.device = device
+
+    @abstractmethod
+    def __call__(self, theta: Tensor, x_o: Tensor, time: Optional[Tensor] = None):
+        pass
+
+
+class ClassifierFreeGuidance(ScoreAdaptation):
+    def __init__(
+        self,
+        score_estimator: ConditionalScoreEstimator,
+        prior: Optional[Distribution],
+        prior_scale: float | Tensor,
+        prior_shift: float | Tensor,
+        likelihood_scale: float | Tensor,
+        likelihood_shift: float | Tensor,
+        device: str = "cpu",
+    ):
+        """ This class manages manipulating the score estimator to temper of shift the
+        prior and likelihood.
+
+        This is usually known as classifier-free guidance. And works by decomposing the
+        posterior score into a prior and likelihood component. These can then be scaled
+        and shifted to impose additional constraints on the posterior.
+
+        Args:
+            score_estimator: The score estimator.
+            prior: The prior distribution.
+            device: The device on which to evaluate the potential.
+        """
+
+        if prior is None:
+            raise ValueError("Prior is required for classifier-free guidance, please"
+                            " provide as least an improper empirical prior.")
+
+        self.prior_scale = prior_scale
+        self.prior_shift = prior_shift
+        self.likelihood_scale = likelihood_scale
+        self.likelihood_shift = likelihood_shift
+
+        super().__init__(score_estimator, prior, device)
+
+
+    def __call__(self, theta: Tensor, x_o: Tensor, time: Optional[Tensor] = None):
