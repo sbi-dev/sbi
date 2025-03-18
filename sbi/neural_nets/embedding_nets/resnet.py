@@ -174,7 +174,7 @@ class ResidualBLockConv(nn.Module):
         return y
 
 
-class ResNet(nn.Module):
+class ResNetEmbedding(nn.Module):
     def __init__(
         self,
         c_in: int,
@@ -287,6 +287,11 @@ class ResNet(nn.Module):
         """
 
         # Check if image like data is used
+
+        # Only three dimensions, interprete as one channel and add it
+        if len(x.shape) == 3:
+            x = x.unsqueeze(1)
+
         assert len(x.shape) == 4
 
         # Apply the initial transformation
