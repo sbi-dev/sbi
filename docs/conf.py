@@ -59,7 +59,7 @@ myst_enable_extensions = [
     "colon_fence",
 ]
 nb_execution_timeout = 600
-nb_execution_mode = "cache"
+nb_execution_mode = "off"
 
 # -- Options for HTML output -------------------------------------------------
 
