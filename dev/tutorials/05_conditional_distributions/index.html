@@ -256,7 +256,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../" class="md-nav__link">
+      <a href="../index.md" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -541,8 +541,6 @@
 <div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">IPython.display</span><span class="w"> </span><span class="kn">import</span> <span class="n">HTML</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">matplotlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">animation</span><span class="p">,</span> <span class="n">rc</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">sbi.analysis</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">conditional_corrcoeff</span><span class="p">,</span>
@@ -553,6 +551,9 @@
 
 <span class="n">_</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
 </code></pre></div>
+<div class="codehilite"><pre><span></span><code>WARNING (pytensor.tensor.blas): Using NumPy C-API based implementation for BLAS functions.
+</code></pre></div>
+
 <p>Let&rsquo;s say we have used SNPE to obtain a posterior distribution over three parameters. In this tutorial, we just load the posterior from a file:</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">toy_posterior_for_07_cc</span><span class="w"> </span><span class="kn">import</span> <span class="n">ExamplePosterior</span>
 
@@ -582,48 +583,7 @@
 </code></pre></div>
 <p><img alt="png" src="../05_conditional_distributions_files/05_conditional_distributions_13_0.png" /></p>
 <p>It might be tempting to conclude that the experimental data barely constrains our parameters and that almost all parameter combinations can reproduce the experimental data. As we will show below, this is not the case.</p>
-<p>Because our toy posterior has only three parameters, we can plot posterior samples in a 3D plot:</p>
-<div class="highlight"><pre><span></span><code><span class="n">rc</span><span class="p">(</span><span class="s2">&quot;animation&quot;</span><span class="p">,</span> <span class="n">html</span><span class="o">=</span><span class="s2">&quot;html5&quot;</span><span class="p">)</span>
-
-<span class="c1"># First set up the figure, the axis, and the plot element we want to animate</span>
-<span class="n">fig</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span> <span class="mi">6</span><span class="p">))</span>
-<span class="n">ax</span> <span class="o">=</span> <span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">111</span><span class="p">,</span> <span class="n">projection</span><span class="o">=</span><span class="s2">&quot;3d&quot;</span><span class="p">)</span>
-
-<span class="n">ax</span><span class="o">.</span><span class="n">set_xlim</span><span class="p">((</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>
-<span class="n">ax</span><span class="o">.</span><span class="n">set_ylim</span><span class="p">((</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>
-
-
-<span class="k">def</span><span class="w"> </span><span class="nf">init</span><span class="p">():</span>
-    <span class="p">(</span><span class="n">line</span><span class="p">,)</span> <span class="o">=</span> <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">([],</span> <span class="p">[],</span> <span class="n">lw</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
-    <span class="n">line</span><span class="o">.</span><span class="n">set_data</span><span class="p">([],</span> <span class="p">[])</span>
-    <span class="k">return</span> <span class="p">(</span><span class="n">line</span><span class="p">,)</span>
-
-
-<span class="k">def</span><span class="w"> </span><span class="nf">animate</span><span class="p">(</span><span class="n">angle</span><span class="p">):</span>
-    <span class="n">num_samples_vis</span> <span class="o">=</span> <span class="mi">1000</span>
-    <span class="n">line</span> <span class="o">=</span> <span class="n">ax</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span>
-        <span class="n">posterior_samples</span><span class="p">[:</span><span class="n">num_samples_vis</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span>
-        <span class="n">posterior_samples</span><span class="p">[:</span><span class="n">num_samples_vis</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span>
-        <span class="n">posterior_samples</span><span class="p">[:</span><span class="n">num_samples_vis</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span>
-        <span class="n">zdir</span><span class="o">=</span><span class="s2">&quot;z&quot;</span><span class="p">,</span>
-        <span class="n">s</span><span class="o">=</span><span class="mi">15</span><span class="p">,</span>
-        <span class="n">c</span><span class="o">=</span><span class="s2">&quot;#2171b5&quot;</span><span class="p">,</span>
-        <span class="n">depthshade</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-    <span class="p">)</span>
-    <span class="n">ax</span><span class="o">.</span><span class="n">view_init</span><span class="p">(</span><span class="mi">20</span><span class="p">,</span> <span class="n">angle</span><span class="p">)</span>
-    <span class="k">return</span> <span class="p">(</span><span class="n">line</span><span class="p">,)</span>
-
-
-<span class="n">anim</span> <span class="o">=</span> <span class="n">animation</span><span class="o">.</span><span class="n">FuncAnimation</span><span class="p">(</span>
-    <span class="n">fig</span><span class="p">,</span> <span class="n">animate</span><span class="p">,</span> <span class="n">init_func</span><span class="o">=</span><span class="n">init</span><span class="p">,</span> <span class="n">frames</span><span class="o">=</span><span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">360</span><span class="p">,</span> <span class="mi">5</span><span class="p">),</span> <span class="n">interval</span><span class="o">=</span><span class="mi">150</span><span class="p">,</span> <span class="n">blit</span><span class="o">=</span><span class="kc">True</span>
-<span class="p">)</span>
-
-<span class="n">plt</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
-</code></pre></div>
-<div class="highlight"><pre><span></span><code><span class="n">HTML</span><span class="p">(</span><span class="n">anim</span><span class="o">.</span><span class="n">to_html5_video</span><span class="p">())</span>
-</code></pre></div>
-<p>Clearly, the range of admissible parameters is constrained to a narrow region in parameter space, which had not been evident from the marginals.</p>
-<p>If the posterior has more than three dimensions, inspecting all dimensions at once will not be possible anymore. One way to still reveal structures in high-dimensional posteriors is to inspect 2D-slices through the posterior. In <code>sbi</code>, this can be done with the <code>conditional_pairplot()</code> function, which computes the conditional distributions within the posterior. We can slice (i.e. condition) the posterior at any location, given by the <code>condition</code>. In the plot below, for all upper diagonal plots, we keep all but two parameters constant at values sampled from the posterior, and inspect what combinations of the remaining two parameters can reproduce experimental data. For the plots on the diagonal (the 1D conditionals), we keep all but one parameter constant.</p>
+<p>Unfortunately, if the posterior has more than three dimensions, inspecting all dimensions at once will not be possible anymore. One way to still reveal structures in high-dimensional posteriors is to inspect 2D-slices through the posterior. In <code>sbi</code>, this can be done with the <code>conditional_pairplot()</code> function, which computes the conditional distributions within the posterior. We can slice (i.e. condition) the posterior at any location, given by the <code>condition</code>. In the plot below, for all upper diagonal plots, we keep all but two parameters constant at values sampled from the posterior, and inspect what combinations of the remaining two parameters can reproduce experimental data. For the plots on the diagonal (the 1D conditionals), we keep all but one parameter constant.</p>
 <div class="highlight"><pre><span></span><code><span class="n">condition</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">1</span><span class="p">,))</span>
 
 <span class="n">_</span> <span class="o">=</span> <span class="n">conditional_pairplot</span><span class="p">(</span>
@@ -633,7 +593,7 @@
     <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mi">5</span><span class="p">),</span>
 <span class="p">)</span>
 </code></pre></div>
-<p><img alt="png" src="../05_conditional_distributions_files/05_conditional_distributions_20_0.png" /></p>
+<p><img alt="png" src="../05_conditional_distributions_files/05_conditional_distributions_16_0.png" /></p>
 <p>This plot looks completely different from the marginals obtained with <code>pairplot()</code>. As it can be seen on the diagonal plots, if all parameters but one are kept constant, the remaining parameter has to be tuned to a narrow region in parameter space. In addition, the upper diagonal plots show strong correlations: deviations in one parameter can be compensated through changes in another parameter.</p>
 <p>We can summarize these correlations in a conditional correlation matrix, which computes the Pearson correlation coefficient of each of these pairwise plots. This matrix (below) shows strong correlations between many parameters, which can be interpreted as potential compensation mechansims:</p>
 <div class="highlight"><pre><span></span><code><span class="n">cond_coeff_mat</span> <span class="o">=</span> <span class="n">conditional_corrcoeff</span><span class="p">(</span>
@@ -645,6 +605,11 @@
 <span class="n">im</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">cond_coeff_mat</span><span class="p">,</span> <span class="n">clim</span><span class="o">=</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">cmap</span><span class="o">=</span><span class="s2">&quot;PiYG&quot;</span><span class="p">)</span>
 <span class="n">_</span> <span class="o">=</span> <span class="n">fig</span><span class="o">.</span><span class="n">colorbar</span><span class="p">(</span><span class="n">im</span><span class="p">)</span>
 </code></pre></div>
+<div class="codehilite"><pre><span></span><code>/Users/michaeldeistler/anaconda3/envs/sbi/lib/python3.12/site-packages/torch/functional.py:513: UserWarning: torch.meshgrid: in an upcoming release, it will be required to pass the indexing argument. (Triggered internally at /Users/runner/work/pytorch/pytorch/pytorch/aten/src/ATen/native/TensorShape.cpp:3610.)
+  return _VF.meshgrid(tensors, **kwargs)  # type: ignore[attr-defined]
+</code></pre></div>
+
+<p><img alt="png" src="../05_conditional_distributions_files/05_conditional_distributions_19_1.png" /></p>
 <p>So far, we have investigated the conditional distribution only at a specific <code>condition</code> sampled from the posterior. In many applications, it makes sense to repeat the above analyses with a different <code>condition</code> (another sample from the posterior), which can be interpreted as slicing the posterior at a different location. Note that <code>conditional_corrcoeff()</code> can directly compute the matrix for several <code>conditions</code> and then outputs the average over them. This can be done by passing a batch of <span class="arithmatex">\(N\)</span> conditions as the <code>condition</code> argument.</p>
 <h2 id="sampling-conditional-distributions">Sampling conditional distributions<a class="headerlink" href="#sampling-conditional-distributions" title="Permanent link">&para;</a></h2>
 <p>So far, we have demonstrated how one can plot 2D conditional distributions with <code>conditional_pairplot()</code> and how one can compute the pairwise conditional correlation coefficient with <code>conditional_corrcoeff()</code>. In some cases, it can be useful to keep a subset of parameters fixed and to vary <strong>more than two</strong> parameters. This can be done by sampling the conditonal posterior <span class="arithmatex">\(p(\theta_i | \theta_{j \neq i}, x_o)\)</span>. As of <code>sbi</code> <code>v0.18.0</code>, this functionality requires using the <a href="https://sbi-dev.github.io/sbi/latest/tutorials/09_sampler_interface/">sampler interface</a>. In this tutorial, we demonstrate this functionality on a linear gaussian simulator with four parameters. We would like to fix the forth parameter to <span class="arithmatex">\(\theta_4=0.2\)</span> and sample the first three parameters given that value, i.e. we want to sample <span class="arithmatex">\(p(\theta_1, \theta_2, \theta_3 | \theta_4 = 0.2, x_o)\)</span>. For an application in neuroscience, see <a href="https://www.biorxiv.org/content/10.1101/2021.07.30.454484v4.abstract">Deistler, Gonçalves, Macke, 2021</a>.</p>
@@ -702,6 +667,14 @@
 <span class="p">)</span><span class="o">.</span><span class="n">set_default_x</span><span class="p">(</span><span class="n">x_o</span><span class="p">)</span>
 <span class="n">cond_samples</span> <span class="o">=</span> <span class="n">mcmc_posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">100</span><span class="p">,))</span>
 </code></pre></div>
+<div class="codehilite"><pre><span></span><code>/Users/michaeldeistler/Documents/phd/sbi/sbi/inference/posteriors/mcmc_posterior.py:115: UserWarning: The default value for thinning in MCMC sampling has been changed from 10 to 1. This might cause the results differ from the last benchmark.
+  thin = _process_thin_default(thin)
+
+
+
+Generating 20 MCMC inits via resample strategy:   0%|          | 0/20 [00:00&lt;?, ?it/s]
+</code></pre></div>
+
 <p>The resulting samples are 3-dimensional, corresponding to <span class="arithmatex">\([\theta_1, \theta_2, \theta_3]\)</span>, sampled from <span class="arithmatex">\(p(\theta_1, \theta_2, \theta_3 | \theta_4=0.2, x_o)\)</span>.</p>
 <div class="highlight"><pre><span></span><code><span class="nb">print</span><span class="p">(</span><span class="n">cond_samples</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
 </code></pre></div>
@@ -712,7 +685,7 @@
 <div class="highlight"><pre><span></span><code><span class="n">pairplot</span><span class="p">(</span><span class="n">cond_samples</span><span class="p">,</span> <span class="n">limits</span><span class="o">=</span><span class="p">[[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">]],</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">8</span><span class="p">),</span>
          <span class="n">diag_kwargs</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">bins</span><span class="o">=</span><span class="s2">&quot;auto&quot;</span><span class="p">));</span>
 </code></pre></div>
-<p><img alt="png" src="../05_conditional_distributions_files/05_conditional_distributions_37_0.png" /></p>
+<p><img alt="png" src="../05_conditional_distributions_files/05_conditional_distributions_33_0.png" /></p>
 
 
 
