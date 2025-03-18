@@ -1,0 +1,21 @@
+# .readthedocs.yml
+# Read the Docs configuration file
+# See https://docs.readthedocs.io/en/stable/config-file/v2.html for details
+
+# RTD configuration file version
+version: 2
+
+sphinx:
+  configuration: docs/conf.py
+
+build:
+  os: ubuntu-22.04
+  tools:
+    python: "3.10"
+
+python:
+  install:
+    - method: pip
+      path: .
+      extra_requirements:
+        - doc
