@@ -34,8 +34,8 @@ jobs:
 
     - name: convert notebooks to markdown
       run: |
-        cd docs
-        uv run jupyter nbconvert --to markdown ../tutorials/*.ipynb --output-dir docs/tutorials/
+        cd mkdocs
+        uv run jupyter nbconvert --to markdown ../docs/tutorials/*.ipynb --output-dir docs/tutorials/
 
     - name: Configure Git user for bot
       run: |
@@ -45,11 +45,11 @@ jobs:
     - name: Build and deploy dev documentation upon push to main
       if: ${{ github.event_name == 'push' }}
       run: |
-        cd docs
+        cd mkdocs
         uv run mike deploy dev --push
 
     - name: Build and deploy the lastest documentation upon new release
       if: ${{ github.event_name == 'release' }}
       run: |
-        cd docs
+        cd mkdocs
         uv run mike deploy ${{ github.event.release.name }} latest -u --push
