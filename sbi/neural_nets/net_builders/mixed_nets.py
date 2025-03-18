@@ -1,8 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-import warnings
-from typing import Optional
+from typing import Literal, Optional
 
 import torch
 from torch import Tensor, nn
@@ -68,7 +67,7 @@ def _build_mixed_density_estimator(
     hidden_layers: int = 2,
     tail_bound: float = 10.0,
     log_transform_x: bool = True,
-    is_mnpe: bool = False,
+    mode: Literal["mnle", "mnpe"] = "mnle",
     **kwargs,
 ) -> MixedDensityEstimator:
     """Base function for building mixed neural density estimators.
@@ -149,7 +148,7 @@ def _build_mixed_density_estimator(
 
     # The embedding net is applied to the continuous part of the parameters
     # MNPE: parameters are in batch_x, MNLE: parameters are in batch_y
-    if is_mnpe:
+    if mode.lower() == "mnpe":
         z_score_x_bool, structured_x = z_score_parser(z_score_x)
         if z_score_x_bool:
             embedding_net_x = nn.Sequential(
@@ -157,8 +156,8 @@ def _build_mixed_density_estimator(
             )
         else:
             embedding_net_x = embedding_net
-        embedding_net_y = nn.Identity()
-    else:
+        embedding_net_y = standardizing_net(batch_y)
+    elif mode.lower() == "mnle":
         z_score_y_bool, structured_y = z_score_parser(z_score_y)
         if z_score_y_bool:
             embedding_net_y = nn.Sequential(
@@ -167,6 +166,8 @@ def _build_mixed_density_estimator(
         else:
             embedding_net_y = embedding_net
         embedding_net_x = nn.Identity()
+    else:
+        raise ValueError(f"Invalid mode: {mode}, must be one of 'mnle' or 'mnpe'.")
 
     # embed
     embedded_batch_x = embedding_net_x(cont_x)
@@ -202,8 +203,8 @@ def _build_mixed_density_estimator(
             torch.log(embedded_batch_x + 1e-10) if log_transform_x else embedded_batch_x
         ),  # log transform manually.
         batch_y=combined_condition,
-        z_score_x=z_score_x,
-        z_score_y="none",  # combined condition is already z-scored.
+        z_score_x="none" if mode.lower() == "mnpe" else z_score_x,
+        z_score_y="none",  # combined condition is already z-scored for mnle
         # combined embedding net for discrete and continuous data.
         embedding_net=combined_embedding_net,
         num_bins=num_bins,
@@ -242,7 +243,7 @@ def build_mnle(
         MixedDensityEstimator for MNLE.
     """
     return _build_mixed_density_estimator(
-        batch_x=batch_x, batch_y=batch_y, is_mnpe=False, **kwargs
+        batch_x=batch_x, batch_y=batch_y, mode="mnle", **kwargs
     )
 
 
@@ -264,5 +265,5 @@ def build_mnpe(
         MixedDensityEstimator for MNPE.
     """
     return _build_mixed_density_estimator(
-        batch_x=batch_x, batch_y=batch_y, is_mnpe=True, **kwargs
+        batch_x=batch_x, batch_y=batch_y, mode="mnpe", **kwargs
     )
