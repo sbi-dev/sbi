@@ -53,19 +53,13 @@ class RotaryEncoder(nn.Module):
             Rotary Position Embedding.
         """
         seq_length = x.shape[-2]
-        rotary_dim = self.embedding_dim // 2
 
         if position_ids is None:
             position_ids = torch.arange(0, seq_length, 1).to(x)
 
         freqs = position_ids.view(-1, 1) / self.div_term.to(x)
 
-        x_rot, x_pass = x[..., :rotary_dim], x[..., rotary_dim:]
-
-        x_embed = torch.cat(
-            [(x_rot * freqs.cos()) + (self.rotate_half(x_rot) * freqs.sin()), x_pass],
-            dim=-1,
-        )
+        x_embed = x * freqs.cos() + self.rotate_half(x) * freqs.sin()
 
         return x_embed
 
