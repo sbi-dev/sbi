@@ -18,6 +18,7 @@ from sbi.utils.score_utils import (
 from sbi.utils.torchutils import ensure_theta_batched
 
 IID_METHODS = {}
+GUIDANCE_METHODS = {}
 
 
 def get_iid_method(name: str) -> Type["IIDScoreFunction"]:
@@ -36,6 +37,39 @@ def get_iid_method(name: str) -> Type["IIDScoreFunction"]:
         )
     return IID_METHODS[name]
 
+def get_guidance_method(name: str) -> Type["ScoreAdaptation"]:
+    r"""
+    Retrieves the guidance method by name.
+
+    Args:
+        name: The name of the guidance method.
+
+    Returns:
+        The guidance method class.
+    """
+    if name not in GUIDANCE_METHODS:
+        raise NotImplementedError(
+            f"Method {name} for guidance not implemented."
+        )
+    return GUIDANCE_METHODS[name]
+
+def register_guidance_method(name: str) -> Callable:
+    r"""
+    Registers a guidance method.
+
+    Args:
+        name: The name of the guidance method.
+
+    Returns:
+        A decorator function to register the guidance method class.
+    """
+
+    def decorator(cls: Type["ScoreAdaptation"]) -> Type["ScoreAdaptation"]:
+        GUIDANCE_METHODS[name] = cls
+        return cls
+
+    return decorator
+
 
 def register_iid_method(name: str) -> Callable:
     r"""
@@ -53,6 +87,90 @@ def register_iid_method(name: str) -> Callable:
         return cls
 
     return decorator
+
+
+class ScoreAdaptation(ABC):
+    def __init__(
+        self,
+        score_estimator: ConditionalScoreEstimator,
+        prior: Optional[Distribution],
+        device: str = "cpu",
+    ):
+        """ This class manages manipulating the score estimator to impose additional
+        constraints on the posterior via guidance.
+
+        Args:
+            score_estimator: The score estimator.
+            prior: The prior distribution.
+            device: The device on which to evaluate the potential.
+        """
+        self.score_estimator = score_estimator
+        self.prior = prior
+        self.device = device
+
+    @abstractmethod
+    def __call__(self, theta: Tensor, x_o: Tensor, time: Optional[Tensor] = None):
+        pass
+
+@register_guidance_method("classifier_free")
+class ClassifierFreeGuidance(ScoreAdaptation):
+    def __init__(
+        self,
+        score_estimator: ConditionalScoreEstimator,
+        prior: Optional[Distribution],
+        prior_scale: float | Tensor,
+        prior_shift: float | Tensor,
+        likelihood_scale: float | Tensor,
+        likelihood_shift: float | Tensor,
+        device: str = "cpu",
+    ):
+        """ This class manages manipulating the score estimator to temper of shift the
+        prior and likelihood.
+
+        This is usually known as classifier-free guidance. And works by decomposing the
+        posterior score into a prior and likelihood component. These can then be scaled
+        and shifted to impose additional constraints on the posterior.
+
+        Args:
+            score_estimator: The score estimator.
+            prior: The prior distribution.
+            device: The device on which to evaluate the potential.
+        """
+
+        if prior is None:
+            raise ValueError("Prior is required for classifier-free guidance, please"
+                            " provide as least an improper empirical prior.")
+
+        self.prior_scale = prior_scale
+        self.prior_shift = prior_shift
+        self.likelihood_scale = likelihood_scale
+        self.likelihood_shift = likelihood_shift
+
+        super().__init__(score_estimator, prior, device)
+
+    def marginal_prior_score(self, theta: Tensor,  time: Tensor):
+        """ Computes the marginal prior score analyticaly (or approximatly)
+        """
+        m = self.score_estimator.mean_t_fn(time)
+        std = self.score_estimator.std_fn(time)
+        marginal_prior = marginalize(self.prior, m, std)
+        marginal_prior_score = compute_score(marginal_prior, theta)
+        return marginal_prior_score
+
+
+    def __call__(self, theta: Tensor, x_o: Tensor, time: Optional[Tensor] = None):
+        if time is None:
+            time = torch.tensor([self.score_estimator.t_min])
+
+        posterior_score = self.score_estimator(input=theta, condition=x_o, time=time)
+        prior_score = self.marginal_prior_score(theta, time)
+
+        ll_score = posterior_score - prior_score
+        ll_score_mod = ll_score * self.likelihood_scale + self.likelihood_shift
+        prior_score_mod = prior_score * self.prior_scale + self.prior_shift
+
+        return ll_score_mod + prior_score_mod
+
 
 
 class IIDScoreFunction(ABC):
@@ -177,38 +295,13 @@ class FNPEScoreFunction(IIDScoreFunction):
         base_score = self.score_estimator(inputs, conditions, time)
 
         # Compute the prior score
-        prior_score = self.prior_score_weight_fn(time) * self.prior_score_fn(inputs)
+
+        prior_score = self.prior_score_weight_fn(time) * compute_score(self.prior, inputs)
 
         # Accumulate
         score = (1 - N) * prior_score + base_score.sum(-2, keepdim=True)
 
         return score
-
-    def prior_score_fn(self, theta: Tensor) -> Tensor:
-        r"""
-        Computes the score of the prior distribution.
-
-        Args:
-            theta: The parameters at which to evaluate the prior score.
-
-        Returns:
-            The computed prior score.
-        """
-        # NOTE The try except is for unifrom priors which do not have a grad, and
-        # implementations that do not implement the log_prob method.
-        try:
-            with torch.enable_grad():
-                theta = theta.detach().clone().requires_grad_(True)
-                prior_log_prob = self.prior.log_prob(theta)
-                prior_score = torch.autograd.grad(
-                    prior_log_prob,
-                    theta,
-                    grad_outputs=torch.ones_like(prior_log_prob),
-                    create_graph=True,
-                )[0].detach()
-        except Exception:
-            prior_score = torch.zeros_like(theta)
-        return prior_score
 
 
 class BaseGaussCorrectedScoreFunction(IIDScoreFunction):
@@ -310,24 +403,10 @@ class BaseGaussCorrectedScoreFunction(IIDScoreFunction):
         Returns:
             Marginal prior score.
         """
-        # NOTE: This is for the uniform distribution and distirbutions that do not
-        # implement a log_prob.
-        try:
-            with torch.enable_grad():
-                inputs = inputs.clone().detach().requires_grad_(True)
-                m = self.score_estimator.mean_t_fn(time)
-                std = self.score_estimator.std_fn(time)
-                p = marginalize(self.prior, m, std)
-                log_p = p.log_prob(inputs)
-                prior_score = torch.autograd.grad(
-                    log_p,
-                    inputs,
-                    grad_outputs=torch.ones_like(log_p),
-                    create_graph=True,
-                )[0].detach()
-        except Exception:
-            prior_score = torch.zeros_like(inputs)
-
+        m = self.score_estimator.mean_t_fn(time)
+        std = self.score_estimator.std_fn(time)
+        p = marginalize(self.prior, m, std)
+        prior_score = compute_score(p, inputs)
         return prior_score
 
     def marginal_denoising_prior_precision_fn(
@@ -690,6 +769,24 @@ class JacCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
 
         return denoising_posterior_precision
 
+
+
+def compute_score(p: Distribution, inputs: Tensor):
+    # NOTE The try except is for unifrom priors which do not have a grad, and
+    # implementations that do not implement the log_prob method.
+    try:
+        with torch.enable_grad():
+            inputs = inputs.detach().clone().requires_grad_(True)
+            log_prob = p.log_prob(inputs)
+            score = torch.autograd.grad(
+                log_prob,
+                inputs,
+                grad_outputs=torch.ones_like(log_prob),
+                create_graph=True,
+            )[0].detach()
+    except Exception:
+        score = torch.zeros_like(inputs)
+    return score
 
 def ensure_lam_positive_definite(
     denoising_prior_precision: torch.Tensor,
