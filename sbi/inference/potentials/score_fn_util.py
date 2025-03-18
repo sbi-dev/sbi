@@ -784,7 +784,7 @@ def compute_score(p: Distribution, inputs: Tensor):
                 grad_outputs=torch.ones_like(log_prob),
                 create_graph=True,
             )[0].detach()
-    except Exception:
+    except Exception:   
         score = torch.zeros_like(inputs)
     return score
 
