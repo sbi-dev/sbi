@@ -5,7 +5,18 @@ import logging
 import random
 import warnings
 from math import pi
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Type, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Literal,
+    Optional,
+    Sequence,
+    Tuple,
+    Type,
+    Union,
+)
 
 import numpy as np
 import pyknos.nflows.transforms as nflows_tf
@@ -102,46 +113,63 @@ def clamp_and_warn(name: str, value: float, min_val: float, max_val: float) -> f
     return clamped_val
 
 
-def z_score_parser(z_score_flag: Optional["str"]) -> Tuple[bool, bool]:
-    """Parses string z-score flag into booleans.
+ZScoreType = Literal[
+    "affine-independent",
+    "affine-structured",
+    "logit-independent",
+    "logit-structured",
+    "none",
+]
 
-    Converts string flag into booleans denoting whether to z-score or not, and whether
-    data dimensions are structured or independent.
+
+def z_score_parser(z_score_flag: Optional[ZScoreType]) -> Tuple[Union[str, None], bool]:
+    """Parses string z-score flag into booleans.This function interprets a z-scoring
+    flag string to determine the type of transformation (affine, logit, or none)
+    and whether the data dimensions are structured or independent.
 
     Args:
-        z_score_flag: str flag for z-scoring method stating whether the data
-            dimensions are "structured" or "independent", or does not require z-scoring
-            ("none" or None).
+        z_score_flag (Optional[str]): A string specifying the z-scoring method.
+        - `none` or `None`: No transformation is applied.
+        - `affine-independent`: Applies standard z-scoring with independent dimensions.
+        - `affine-structured`: Applies standard z-scoring with structured dimensions.
+        - `logit-independent`: Applies logit transformation with independent dimensions.
+        - `logit-structured`: Applies logit transformation with structured dimensions.
 
     Returns:
-        Flag for whether or not to z-score, and whether data is structured
+        tuple:
+        - transform_type (Optional[str]): The type of transformation,
+          either `"affine"`, `"logit"`, or `None` if no transformation is applied.
+        - structured_data (bool): A boolean indicating whether
+          the data dimensions are structured (`True`) or independent (`False`).
     """
     if isinstance(z_score_flag, bool):
         # Raise warning if boolean was passed.
         warnings.warn(
-            "Boolean flag for z-scoring is deprecated as of sbi v0.18.0. It will be "
-            "removed in a future release. Use 'none', 'independent', or 'structured' "
-            "to indicate z-scoring option.",
+            "Boolean flag for z-scoring is deprecated as of sbi v0.23.3. It will be "
+            "removed in a future release. Use `affine-independent`,`affine-structured`,"
+            "`logit-independent`, `logit-structured`, `none`."
+            "to indicate z-scoring option. Now defaulting to 'affine-independent'.",
             stacklevel=2,
         )
-        z_score_bool, structured_data = z_score_flag, False
+        transform_type, structured_data = "affine", False
 
-    elif (z_score_flag is None) or (z_score_flag == "none"):
-        # Return Falses if "none" or None was passed.
-        z_score_bool, structured_data = False, False
-
-    elif (z_score_flag == "independent") or (z_score_flag == "structured"):
-        # Got one of two valid z-scoring methods.
-        z_score_bool = True
-        structured_data = z_score_flag == "structured"
-
+    if z_score_flag in [None, "none"]:
+        transform_type, structured_data = None, False
+    elif z_score_flag in [
+        "affine-independent",
+        "affine-structured",
+        "logit-independent",
+        "logit-structured",
+    ]:
+        transform_type, structured_data = z_score_flag.split("-")
+        structured_data = structured_data == "structured"
     else:
-        # Return warning due to invalid option, defaults to not z-scoring.
         raise ValueError(
-            "Invalid z-scoring option. Use 'none', 'independent', or 'structured'."
+            "Invalid z-scoring option. Use 'affine-independent', 'affine-structured'",
+            "'logit-independent', 'logit-structured', 'identity'.",
         )
 
-    return z_score_bool, structured_data
+    return transform_type, structured_data
 
 
 def standardizing_transform(
@@ -253,19 +281,20 @@ class BoundedLogitTransform(Transform):
 
 
 def logit_transform_zuko(
-    min_val: float, max_val: float, eps: float = 1e-6
+    batch_t: Tensor, structured_dims: bool = False, eps: float = 1e-5
 ) -> zuko.flows.UnconditionalTransform:
     """
     Builds logit-transforming transform for Zuko flows on a bounded interval.
 
     Args:
-        min_val: Lower bound of the prior interval.
-        max_val: Upper bound of the prior interval.
+        batch_t: Batched tensor from which min and max values are computed.
         eps: Small constant to avoid numerical issues at 0 and 1.
 
     Returns:
         Logit transformation for the given range.
     """
+    min_val, max_val = min_max_estimation(batch_t, structured_dims)
+
     return zuko.flows.UnconditionalTransform(
         BoundedLogitTransform,
         min_val=min_val,
@@ -273,6 +302,34 @@ def logit_transform_zuko(
         eps=eps,
         buffer=True,
     )
+
+
+def min_max_estimation(
+    batch_t: Tensor, structured_dims: bool = False
+) -> Tuple[float, float]:
+    """
+    Estimates the minimum and maximum values of a batched tensor.
+
+    Args:
+        batch_t: Batched tensor from which min and max values are computed.
+        structured_dims: Whether data dimensions are structured (e.g., time-series,
+            images), which requires computing min and max per sample first before
+            aggregating over samples for a single min and max for the batch, or
+            independent (default), which computes min and max values independently.
+
+    Returns:
+        Tuple of min and max values for the given tensor.
+    """
+    is_valid_t, *_ = handle_invalid_x(batch_t, True)
+
+    if structured_dims:
+        min_val = torch.min(batch_t[is_valid_t], dim=1).values
+        max_val = torch.max(batch_t[is_valid_t], dim=1).values
+    else:
+        min_val = torch.min(batch_t[is_valid_t], dim=0).values
+        max_val = torch.max(batch_t[is_valid_t], dim=0).values
+
+    return min_val, max_val
 
 
 def z_standardization(
