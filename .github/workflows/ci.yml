@@ -49,16 +49,20 @@ jobs:
         restore-keys: |
           uv-${{ runner.os }}-${{ matrix.python-version }}-
 
-    - name: Cache testmon data
-      uses: actions/cache@v4
-      with:
-        path: .testmondata
-        key: testmon-${{ runner.os }}-${{ matrix.python-version }}-${{ github.ref }}
-        restore-keys: |
-          testmon-${{ runner.os }}-${{ matrix.python-version }}-
+    # - name: Cache testmon data
+    #   uses: actions/cache@v4
+    #   with:
+    #     path: .testmondata
+    #     key: testmon-${{ runner.os }}-${{ matrix.python-version }}-${{ github.ref }}
+    #     restore-keys: |
+    #       testmon-${{ runner.os }}-${{ matrix.python-version }}-
+
+    # - name: Fix file permissions for testmondata
+    #   run: |
+    #     [ -f .testmondata ] && chmod u+w .testmondata || true
 
     - name: Run fast CPU tests with coverage
-      run: uv run pytest --testmon-forceselect -v -n auto -m "not slow and not gpu" --cov=sbi --cov-report=xml tests/
+      run: uv run pytest -v -n auto -m "not slow and not gpu" --cov=sbi --cov-report=xml tests/ #--testmon-forceselect
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4
