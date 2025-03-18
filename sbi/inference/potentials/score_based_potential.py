@@ -79,8 +79,8 @@ class PosteriorScoreBasedPotential(BasePotential):
         self.score_estimator.eval()
         self.iid_method = iid_method
         self.iid_params = iid_params
-        self.guidance_method = None
-        self.guidance_params = None
+        self.guidance_method = guidance_method
+        self.guidance_params = guidance_params
         super().__init__(prior, x_o, device=device)
 
     def set_x(
@@ -192,9 +192,9 @@ class PosteriorScoreBasedPotential(BasePotential):
             )
 
         if self.guidance_method is not None:
-            score_fn = get_guidance_method(self.guidance_method)(
-                self.score_estimator, self.prior, **(self.guidance_params or {})
-            )
+            score_wrapper, cfg = get_guidance_method(self.guidance_method)
+            cfg_params = cfg(**(self.guidance_params or {}))
+            score_fn = score_wrapper(self.score_estimator, self.prior, cfg_params)
         else:
             score_fn = self.score_estimator
 

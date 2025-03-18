@@ -17,6 +17,8 @@ from sbi.utils.score_utils import (
 )
 from sbi.utils.torchutils import ensure_theta_batched
 
+from dataclasses import dataclass
+
 IID_METHODS = {}
 GUIDANCE_METHODS = {}
 
@@ -46,26 +48,27 @@ def get_guidance_method(name: str) -> Type["ScoreAdaptation"]:
         name: The name of the guidance method.
 
     Returns:
-        The guidance method class.
+        The guidance method class and its default configuration.
     """
     if name not in GUIDANCE_METHODS:
         raise NotImplementedError(f"Method {name} for guidance not implemented.")
     return GUIDANCE_METHODS[name]
 
 
-def register_guidance_method(name: str) -> Callable:
+def register_guidance_method(name: str, default_cfg: Optional[Type] = None) -> Callable:
     r"""
-    Registers a guidance method.
+    Registers a guidance method and its default configuration.
 
     Args:
         name: The name of the guidance method.
+        default_cfg: The default configuration class for the guidance method.
 
     Returns:
         A decorator function to register the guidance method class.
     """
 
     def decorator(cls: Type["ScoreAdaptation"]) -> Type["ScoreAdaptation"]:
-        GUIDANCE_METHODS[name] = cls
+        GUIDANCE_METHODS[name] = (cls, default_cfg)
         return cls
 
     return decorator
@@ -112,17 +115,20 @@ class ScoreAdaptation(ABC):
     def __call__(self, theta: Tensor, x_o: Tensor, time: Optional[Tensor] = None):
         pass
 
+@dataclass
+class AffineClassifierFreeGuidanceCfg:
+    prior_scale: float | Tensor = 1.0
+    prior_shift: float | Tensor = 0.0
+    likelihood_scale: float | Tensor = 1.0
+    likelihood_shift: float | Tensor = 0.0
 
-@register_guidance_method("classifier_free")
-class ClassifierFreeGuidance(ScoreAdaptation):
+@register_guidance_method("affine_classifier_free", AffineClassifierFreeGuidanceCfg)
+class AffineClassifierFreeGuidance(ScoreAdaptation):
     def __init__(
         self,
         score_estimator: ConditionalScoreEstimator,
         prior: Optional[Distribution],
-        prior_scale: float | Tensor,
-        prior_shift: float | Tensor,
-        likelihood_scale: float | Tensor,
-        likelihood_shift: float | Tensor,
+        cfg: AffineClassifierFreeGuidanceCfg,
         device: str = "cpu",
     ):
         """This class manages manipulating the score estimator to temper of shift the
@@ -144,11 +150,10 @@ class ClassifierFreeGuidance(ScoreAdaptation):
                 " provide as least an improper empirical prior."
             )
 
-        self.prior_scale = prior_scale
-        self.prior_shift = prior_shift
-        self.likelihood_scale = likelihood_scale
-        self.likelihood_shift = likelihood_shift
-
+        self.prior_scale = torch.tensor(cfg.prior_scale, device=device)
+        self.prior_shift = torch.tensor(cfg.prior_shift, device=device)
+        self.likelihood_scale = torch.tensor(cfg.likelihood_scale, device=device)
+        self.likelihood_shift = torch.tensor(cfg.likelihood_shift, device=device)
         super().__init__(score_estimator, prior, device)
 
     def marginal_prior_score(self, theta: Tensor, time: Tensor):
