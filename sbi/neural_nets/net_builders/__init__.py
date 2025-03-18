@@ -19,9 +19,12 @@ from sbi.neural_nets.net_builders.flow import (
     build_zuko_sospf,
     build_zuko_unaf,
 )
-from sbi.neural_nets.net_builders.flowmatching_nets import (
+from sbi.neural_nets.net_builders.mdn import build_mdn
+from sbi.neural_nets.net_builders.mnle import build_mnle
+from sbi.neural_nets.net_builders.vector_field_nets import (
     build_mlp_flowmatcher,
     build_resnet_flowmatcher,
+    build_score_estimator,
 )
 from sbi.neural_nets.net_builders.mdn import build_mdn
 from sbi.neural_nets.net_builders.mixed_nets import build_mnle, build_mnpe
