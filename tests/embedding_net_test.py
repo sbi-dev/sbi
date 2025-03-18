@@ -15,6 +15,7 @@ from sbi.neural_nets.embedding_nets import (
     CNNEmbedding,
     FCEmbedding,
     PermutationInvariantEmbedding,
+    ResNetEmbedding,
 )
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
@@ -154,6 +155,49 @@ def test_1d_and_2d_cnn_embedding_net(input_shape, num_channels):
     else:
         simulator = simulator2d
         xo = torch.ones(1, num_channels, *input_shape).squeeze(1)
+
+    prior = MultivariateNormal(torch.zeros(num_dim), torch.eye(num_dim))
+
+    num_simulations = 1000
+    theta = prior.sample(torch.Size((num_simulations,)))
+    x = simulator(theta)
+    if num_channels > 1:
+        x = x.unsqueeze(1).repeat(
+            1, num_channels, *[1 for _ in range(len(input_shape))]
+        )
+
+    trainer = NPE(prior=prior, density_estimator=estimator_provider)
+    trainer.append_simulations(theta, x).train(max_num_epochs=2)
+    posterior = trainer.build_posterior().set_default_x(xo)
+
+    s = posterior.sample((10,))
+    posterior.potential(s)
+
+
+@pytest.mark.parametrize("input_shape", [(32, 32), (32, 64), (111, 111)])
+@pytest.mark.parametrize("num_channels", (1, 2, 3))
+@pytest.mark.parametrize("change_c_mode", ["conv", "zeros"])
+@pytest.mark.parametrize("n_stages", [1, 3, 4])
+def test_2d_ResNet_cnn_embedding_net(
+    input_shape, num_channels, change_c_mode, n_stages
+):
+    estimator_provider = posterior_nn(
+        "mdn",
+        embedding_net=ResNetEmbedding(
+            c_in=num_channels, n_stages=n_stages, change_c_mode=change_c_mode, c_out=20
+        ),
+    )
+
+    num_dim = input_shape[0]
+
+    def simulator2d(theta):
+        x = MultivariateNormal(
+            loc=theta, covariance_matrix=0.5 * torch.eye(num_dim)
+        ).sample()
+        return x.unsqueeze(2).repeat(1, 1, input_shape[1])
+
+    simulator = simulator2d
+    xo = torch.ones(1, num_channels, *input_shape).squeeze(1)
 
     prior = MultivariateNormal(torch.zeros(num_dim), torch.eye(num_dim))
 
