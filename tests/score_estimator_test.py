@@ -11,6 +11,7 @@ from sbi.neural_nets.embedding_nets import CNNEmbedding
 from sbi.neural_nets.estimators.score_estimator import (
     ConditionalScoreEstimator, VPScoreEstimator)
 from sbi.neural_nets.net_builders import build_score_estimator
+from scipy import stats
 
 
 @pytest.mark.parametrize("sde_type", ["vp", "ve", "subvp"])
@@ -161,10 +162,17 @@ def test_times_schedule():
     times = vpse.times_schedule(10)
     obs = times.device
 
+    delta = vpse.t_max - vpse.t_min
+    t_mu = vpse.t_min + delta/2
+    t_std = delta/8.
+
+    ndist = stats.norm(t_mu, t_std)
+    lo,hi = ndist.ppf(.01), ndist.ppf(.99)
+
     assert exp == obs
     assert times.shape == torch.Size((10,))
-    assert times.max().item() < vpse.t_max
-    assert times.min().item() >= vpse.t_min
+    assert times.max().item() <= hi
+    assert times.min().item() >= lo
 
 
 def test_noise_schedule():

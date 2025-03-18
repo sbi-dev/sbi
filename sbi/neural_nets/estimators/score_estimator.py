@@ -2,11 +2,12 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import math
-from math import pi
+from math import exp, pi
 from typing import Callable, Optional, Union
 
 import torch
 from sbi.neural_nets.estimators.base import ConditionalVectorFieldEstimator
+from scipy import stats
 from torch import Tensor, nn
 
 
@@ -337,7 +338,8 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
 
         Args:
             times (Tensor):
-                SDE times in [0, 1]. This tensor will be regenerated from self.times_schedule
+                SDE times in [0, 1]. This tensor will be regenerated from
+                self.times_schedule
 
         Returns:
             Tensor: Generated beta schedule at a given time.
@@ -351,6 +353,7 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
                        t_max: float = None) -> Tensor:
         """
         Perform uniform sampling of time variables within the range [t_min, t_max].
+        The `times` tensor will be put on the same device as the stored network.
 
         Args:
             num_samples (int): Number of samples to generate.
@@ -360,7 +363,6 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         Returns:
             Tensor: A tensor of sampled time variables scaled and shifted to the range [0,1].
 
-        TODO: is the tensor on device?
         """
         t_min = self.t_min if isinstance(t_min, type(None)) else t_min
         t_max = self.t_max if isinstance(t_max, type(None)) else t_max
@@ -394,6 +396,9 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
             raise ValueError(f"Weight function {weight_fn} not recognized.")
 
 
+#TODO: experiment with time schedule with more samples around .5 (check edm paper)
+#TODO: impacts on training and evaluate
+#TODO: check effect in mini sbibm -> converges faster (focus on more important)
 class VPScoreEstimator(ConditionalScoreEstimator):
     """Class for score estimators with variance preserving SDEs (i.e., DDPM)."""
 
@@ -409,7 +414,15 @@ class VPScoreEstimator(ConditionalScoreEstimator):
         std_0: Union[Tensor, float] = 1.0,
         t_min: float = 1e-5,
         t_max: float = 1.0,
+            pmean: float = 1.2,
+            pstd: float = -1.2
     ) -> None:
+
+        self.pmean, self.pstd = pmean, pstd
+        noise_dist = stats.norm(pmean, pstd**2)
+        self.beta_min = exp(noise_dist.ppf(0.01))
+        self.beta_max = exp(noise_dist.ppf(0.99))
+
         super().__init__(
             net,
             input_shape,
@@ -484,9 +497,53 @@ class VPScoreEstimator(ConditionalScoreEstimator):
             g = g.unsqueeze(-1)
         return g
 
-#TODO: experiment with time schedule with more samples around .5 (check edm paper)
-#TODO: impacts on training and evaluate
-#TODO: check effect in mini sbibm -> converges faster (focus on more important)
+    def noise_schedule(self, times: Tensor) -> Tensor:
+        """
+        Generate a beta schedule similar to suggestions in the EDM [1] paper.
+
+        This method acts as a fallback in case derivative classes do not
+        implement it on their own. It calculates a linear beta schedule defined
+        by the input `times`, which represent the normalized time steps t ∈ [0, 1].
+
+        Args:
+            times (Tensor):
+                SDE times in [0, 1]. This tensor will be regenerated from
+                self.times_schedule
+
+        Returns:
+            Tensor: Generated beta schedule at a given time.
+
+        [1] Karras et al "Elucidating the Design Space of Diffusion-Based
+        Generative Models", https://arxiv.org/abs/2206.00364
+        """
+
+        samples = torch.randn_like(times)*(self.pstd**2) + self.pmean
+        return torch.exp(samples)
+
+    def times_schedule(self,
+                       num_samples: int,
+                       t_min: float = None,
+                       t_max: float = None) -> Tensor:
+        """
+        Perform normal sampling around the middle of the interval [t_min, t_max]
+
+        Args:
+            num_samples (int): Number of samples to generate.
+            t_min (float, optional): The minimum time value. Defaults to self.t_min.
+            t_max (float, optional): The maximum time value. Defaults to self.t_max.
+
+        Returns:
+            Tensor: A tensor of sampled time variables scaled and shifted to the range [0,1].
+
+        """
+        t_min = self.t_min if isinstance(t_min, type(None)) else t_min
+        t_max = self.t_max if isinstance(t_max, type(None)) else t_max
+        t_mu = t_min + (t_max - t_min)/2.
+        t_std = (t_max - t_min)/8.
+
+        # apply scale and loc to normal distribution
+        return torch.randn(num_samples, device=self.device) * t_std + t_mu
+
 class SubVPScoreEstimator(ConditionalScoreEstimator):
     """Class for score estimators with sub-variance preserving SDEs."""
 
