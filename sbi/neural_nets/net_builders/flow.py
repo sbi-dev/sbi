@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import warnings
 from functools import partial
 from typing import List, Optional, Sequence, Union
 
@@ -17,6 +18,8 @@ from torch import Tensor, nn, relu, tanh, tensor, uint8
 from sbi.neural_nets.estimators import NFlowsFlow, ZukoFlow
 from sbi.utils.nn_utils import MADEMoGWrapper, get_numel
 from sbi.utils.sbiutils import (
+    ZScoreType,
+    logit_transform_zuko,
     standardizing_net,
     standardizing_transform,
     standardizing_transform_zuko,
@@ -31,8 +34,8 @@ nflow_specific_kwargs = ["num_bins", "num_components", "tail_bound"]
 def build_made(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Optional[str] = "independent",
-    z_score_y: Optional[str] = "independent",
+    z_score_x: Optional[ZScoreType] = "affine-independent",
+    z_score_y: Optional[ZScoreType] = "affine-independent",
     hidden_features: int = 50,
     num_mixture_components: int = 10,
     embedding_net: nn.Module = nn.Identity(),
@@ -102,8 +105,8 @@ def build_made(
 def build_maf(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Optional[str] = "independent",
-    z_score_y: Optional[str] = "independent",
+    z_score_x: Optional[ZScoreType] = "affine-independent",
+    z_score_y: Optional[ZScoreType] = "affine-independent",
     hidden_features: int = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
@@ -190,8 +193,8 @@ def build_maf(
 def build_maf_rqs(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Optional[str] = "independent",
-    z_score_y: Optional[str] = "independent",
+    z_score_x: Optional[ZScoreType] = "affine-independent",
+    z_score_y: Optional[ZScoreType] = "affine-independent",
     hidden_features: int = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
@@ -302,8 +305,8 @@ def build_maf_rqs(
 def build_nsf(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Optional[str] = "independent",
-    z_score_y: Optional[str] = "independent",
+    z_score_x: Optional[ZScoreType] = "affine-independent",
+    z_score_y: Optional[ZScoreType] = "affine-independent",
     hidden_features: int = 50,
     num_transforms: int = 5,
     num_bins: int = 10,
@@ -424,8 +427,8 @@ def build_nsf(
 def build_zuko_nice(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Optional[str] = "independent",
-    z_score_y: Optional[str] = "independent",
+    z_score_x: Optional[ZScoreType] = "affine-independent",
+    z_score_y: Optional[ZScoreType] = "affine-independent",
     hidden_features: Union[Sequence[int], int] = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
@@ -479,8 +482,8 @@ def build_zuko_nice(
 def build_zuko_maf(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Optional[str] = "independent",
-    z_score_y: Optional[str] = "independent",
+    z_score_x: Optional[ZScoreType] = "affine-independent",
+    z_score_y: Optional[ZScoreType] = "affine-independent",
     hidden_features: Union[Sequence[int], int] = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
@@ -531,8 +534,8 @@ def build_zuko_maf(
 def build_zuko_nsf(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Optional[str] = "independent",
-    z_score_y: Optional[str] = "independent",
+    z_score_x: Optional[ZScoreType] = "affine-independent",
+    z_score_y: Optional[ZScoreType] = "affine-independent",
     hidden_features: Union[Sequence[int], int] = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
@@ -592,8 +595,8 @@ def build_zuko_nsf(
 def build_zuko_ncsf(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Optional[str] = "independent",
-    z_score_y: Optional[str] = "independent",
+    z_score_x: Optional[ZScoreType] = "affine-independent",
+    z_score_y: Optional[ZScoreType] = "affine-independent",
     hidden_features: Union[Sequence[int], int] = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
@@ -648,8 +651,8 @@ def build_zuko_ncsf(
 def build_zuko_sospf(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Optional[str] = "independent",
-    z_score_y: Optional[str] = "independent",
+    z_score_x: Optional[ZScoreType] = "affine-independent",
+    z_score_y: Optional[ZScoreType] = "affine-independent",
     hidden_features: Union[Sequence[int], int] = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
@@ -702,8 +705,8 @@ def build_zuko_sospf(
 def build_zuko_naf(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Optional[str] = "independent",
-    z_score_y: Optional[str] = "independent",
+    z_score_x: Optional[ZScoreType] = "affine-independent",
+    z_score_y: Optional[ZScoreType] = "affine-independent",
     hidden_features: Union[Sequence[int], int] = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
@@ -768,8 +771,8 @@ def build_zuko_naf(
 def build_zuko_unaf(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Optional[str] = "independent",
-    z_score_y: Optional[str] = "independent",
+    z_score_x: Optional[ZScoreType] = "affine-independent",
+    z_score_y: Optional[ZScoreType] = "affine-independent",
     hidden_features: Union[Sequence[int], int] = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
@@ -834,8 +837,8 @@ def build_zuko_unaf(
 def build_zuko_cnf(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Optional[str] = "independent",
-    z_score_y: Optional[str] = "independent",
+    z_score_x: Optional[ZScoreType] = "affine-independent",
+    z_score_y: Optional[ZScoreType] = "affine-independent",
     hidden_features: Union[Sequence[int], int] = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
@@ -888,8 +891,8 @@ def build_zuko_cnf(
 def build_zuko_gf(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Optional[str] = "independent",
-    z_score_y: Optional[str] = "independent",
+    z_score_x: Optional[ZScoreType] = "affine-independent",
+    z_score_y: Optional[ZScoreType] = "affine-independent",
     hidden_features: Union[Sequence[int], int] = 50,
     num_transforms: int = 3,
     embedding_net: nn.Module = nn.Identity(),
@@ -945,8 +948,8 @@ def build_zuko_gf(
 def build_zuko_bpf(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Optional[str] = "independent",
-    z_score_y: Optional[str] = "independent",
+    z_score_x: Optional[ZScoreType] = "affine-independent",
+    z_score_y: Optional[ZScoreType] = "affine-independent",
     hidden_features: Union[Sequence[int], int] = 50,
     num_transforms: int = 3,
     embedding_net: nn.Module = nn.Identity(),
@@ -1004,8 +1007,8 @@ def build_zuko_flow(
     which_nf: str,
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Optional[str] = "independent",
-    z_score_y: Optional[str] = "independent",
+    z_score_x: Optional[ZScoreType],
+    z_score_y: Optional[ZScoreType],
     hidden_features: Union[Sequence[int], int] = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
@@ -1019,13 +1022,20 @@ def build_zuko_flow(
         batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring.
         batch_y: Batch of ys, used to infer dimensionality and (optional) z-scoring.
         z_score_x: Whether to z-score xs passing into the network, can be one of:
-            - `none`, or None: do not z-score.
-            - `independent`: z-score each dimension independently.
-            - `structured`: treat dimensions as related, therefore compute mean and std
-            over the entire batch, instead of per-dimension. Should be used when each
-            sample is, for example, a time series or an image.
-        z_score_y: Whether to z-score ys passing into the network, same options as
-            z_score_x.
+            - `none` or `None`: No transformation is applied.
+            - `affine-independent`: Applies standard z-scoring with independent dims.
+            - `affine-structured`: Applies standard z-scoring with structured dims.
+            - `logit-independent`: Applies logit transformation with independent dims.
+            - `logit-structured`: Applies logit transformation with structured dims.
+            Affine is the default standardization method. Logit is used for numerical
+            stability during training, mapping prior bounds estimated from
+            batch size to [-inf, inf]).
+            Independent z-scores each dimension independenlty. Structured treats dims
+            as related, therefore compute mean and std over the entire batch, instead of
+            per-dimension. Should be used when each sample is, for example,
+            a time series or an image.
+        z_score_y: Whether to z-score ys passing into the network,
+                   same options as z_score_x.
         hidden_features: The number of hidden features in the flow. Defaults to 50.
         num_transforms: The number of transformations in the flow. Defaults to 5.
         embedding_net: The embedding network to use. Defaults to nn.Identity().
@@ -1060,46 +1070,50 @@ def build_zuko_flow(
             **kwargs,
         )
 
+    transform_type_x, structured_x = z_score_parser(z_score_x)
+    transform_type_y, structured_y = z_score_parser(z_score_y)
+
     # Continuous normalizing flows (CNF) only have one transform,
     # so we need to handle them slightly differently.
     if which_nf == "CNF":
         transform = flow_built.transform
-
-        z_score_x_bool, structured_x = z_score_parser(z_score_x)
-        if z_score_x_bool:
+        if transform_type_x == "affine":
             transform = (
                 transform,
                 standardizing_transform_zuko(batch_x, structured_x),
             )
-
-        z_score_y_bool, structured_y = z_score_parser(z_score_y)
-        if z_score_y_bool:
-            # Prepend standardizing transform to y-embedding.
-            embedding_net = nn.Sequential(
-                standardizing_transform_zuko(batch_y, structured_y), embedding_net
+        elif transform_type_x == "logit":
+            transform = (
+                transform,
+                logit_transform_zuko(batch_x, structured_x),
             )
-
-        # Combine transforms.
-        neural_net = zuko.flows.Flow(transform, flow_built.base)
     else:
-        transforms = flow_built.transform.transforms
-
-        z_score_x_bool, structured_x = z_score_parser(z_score_x)
-        if z_score_x_bool:
-            transforms = (
-                *transforms,
+        transform = flow_built.transform.transforms
+        if transform_type_x == "affine":
+            transform = (
+                *transform,
                 standardizing_transform_zuko(batch_x, structured_x),
             )
-
-        z_score_y_bool, structured_y = z_score_parser(z_score_y)
-        if z_score_y_bool:
-            # Prepend standardizing transform to y-embedding.
-            embedding_net = nn.Sequential(
-                standardizing_net(batch_y, structured_y), embedding_net
+        elif transform_type_x == "logit":
+            transform = (
+                *transform,
+                logit_transform_zuko(batch_x, structured_x),
             )
 
-        # Combine transforms.
-        neural_net = zuko.flows.Flow(transforms, flow_built.base)
+    if transform_type_y == "affine" or transform_type_y == "logit":
+        # Prepend standardizing transform to y-embedding.
+        embedding_net = nn.Sequential(
+            standardizing_net(batch_y, structured_y), embedding_net
+        )
+        if transform_type_y == "logit":
+            # Print a warning that the logit transformation is not applied to y.
+            warnings.warn(
+                "Logit transformation can only be applied on the conditioned variable.",
+                stacklevel=2,
+            )
+
+    # Combine transforms.
+    neural_net = zuko.flows.Flow(transform, flow_built.base)
 
     flow = ZukoFlow(
         neural_net,
@@ -1114,7 +1128,6 @@ def build_zuko_flow(
 class ContextSplineMap(nn.Module):
     """
     Neural network from `context` to the spline parameters.
-
     We cannot use the resnet as conditioner to learn each dimension conditioned
     on the other dimensions (because there is only one). Instead, we learn the
     spline parameters directly. In the case of conditinal density estimation,
