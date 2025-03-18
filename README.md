@@ -126,7 +126,7 @@ how to run each of these methods
   Estimation_](https://proceedings.neurips.cc/paper/2016/hash/6aca97005c68f1206823815f66102863-Abstract.html)
   (NeurIPS 2016).
 
-  [`(S)NPE_B`](https://sbi-dev.github.io/sbi/latest/reference/#sbi.inference.trainers.npe.npe_b.NPE_B)
+- [`(S)NPE_B`](https://sbi-dev.github.io/sbi/latest/reference/#sbi.inference.trainers.npe.npe_b.NPE_B)
   from Lueckmann JM, Goncalves P, Bassetto G, Öcal K, Nonnenmacher M, and Macke J [_Flexible
   statistical inference for mechanistic models of neural dynamics_](https://arxiv.org/abs/1711.01861)
   (NeurIPS 2017).
