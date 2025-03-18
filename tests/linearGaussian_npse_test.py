@@ -1,4 +1,3 @@
-from itertools import product
 from typing import List
 
 import pytest
@@ -18,8 +17,70 @@ from sbi.utils import BoxUniform
 
 from .test_utils import check_c2st, get_dkl_gaussian_prior
 
-SDE_TYPES = ["vp", "ve", "subvp"]
-PRIOR_TYPES = ["gaussian", "uniform", None]
+DEFAULT_USE = [
+    pytest.param(("ve", None), id="ve-None"),
+    pytest.param(("vp", "gaussian"), id="vp-gaussian"),
+]
+
+SLOW_COMBINATIONS = [
+    pytest.param(("vp", "uniform"), id="vp-uniform", marks=pytest.mark.slow),
+    pytest.param(("vp", None), id="vp-None", marks=pytest.mark.slow),
+    pytest.param(("ve", "gaussian"), id="ve-gaussian", marks=pytest.mark.slow),
+    pytest.param(("ve", "uniform"), id="ve-uniform", marks=pytest.mark.slow),
+    pytest.param(("subvp", "gaussian"), id="subvp-gaussian", marks=pytest.mark.slow),
+    pytest.param(("subvp", "uniform"), id="subvp-uniform", marks=pytest.mark.slow),
+    pytest.param(("subvp", None), id="subvp-None", marks=pytest.mark.slow),
+]
+
+
+@pytest.fixture(scope="module")
+def npse_trained_model(request):
+    """Module-scoped fixture that trains a score estimator for NPSE tests."""
+    sde_type, prior_type = request.param
+    num_dim = 2
+    num_simulations = 5000
+
+    # likelihood_mean will be likelihood_shift+theta
+    likelihood_shift = -1.0 * ones(num_dim)
+    likelihood_cov = 0.3 * eye(num_dim)
+
+    if prior_type == "gaussian" or (prior_type is None):
+        prior_mean = zeros(num_dim)
+        prior_cov = eye(num_dim)
+        prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
+        prior_npse = prior if prior_type is None else None
+    elif prior_type == "uniform":
+        prior = BoxUniform(-2 * ones(num_dim), 2 * ones(num_dim))
+        prior_npse = prior
+
+    # This check that our method to handle "general" priors works.
+    # i.e. if NPSE does not get a proper passed by the user.
+    inference = NPSE(prior_npse, show_progress_bars=True, sde_type=sde_type)
+
+    theta = prior.sample((num_simulations,))
+    x = linear_gaussian(theta, likelihood_shift, likelihood_cov)
+
+    score_estimator = inference.append_simulations(theta, x).train(
+        stop_after_epochs=200
+    )
+
+    return {
+        "score_estimator": score_estimator,
+        "inference": inference,
+        "prior": prior,
+        "likelihood_shift": likelihood_shift,
+        "likelihood_cov": likelihood_cov,
+        "prior_mean": prior_mean
+        if prior_type == "gaussian" or prior_type is None
+        else None,
+        "prior_cov": prior_cov
+        if prior_type == "gaussian" or prior_type is None
+        else None,
+        "num_dim": num_dim,
+        "x_o": zeros(num_dim),
+        "sde_type": sde_type,
+        "prior_type": prior_type,
+    }
 
 
 # We always test num_dim and sample_with with defaults and mark the rests as slow.
@@ -162,70 +223,21 @@ def test_c2st_npse_on_linearGaussian_different_dims():
     check_c2st(samples, target_samples, alg="npse_different_dims_and_resume_training")
 
 
-@pytest.fixture(scope="module")
-def npse_trained_model(request):
-    """Module-scoped fixture that trains a score estimator for NPSE tests."""
-    sde_type, prior_type = request.param
-    num_dim = 2
-    num_simulations = 5000
-
-    # likelihood_mean will be likelihood_shift+theta
-    likelihood_shift = -1.0 * ones(num_dim)
-    likelihood_cov = 0.3 * eye(num_dim)
-
-    if prior_type == "gaussian" or (prior_type is None):
-        prior_mean = zeros(num_dim)
-        prior_cov = eye(num_dim)
-        prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
-        prior_npse = prior if prior_type is None else None
-    elif prior_type == "uniform":
-        prior = BoxUniform(-2 * ones(num_dim), 2 * ones(num_dim))
-        prior_npse = prior
-
-    # This check that our method to handle "general" priors works.
-    # i.e. if NPSE does not get a proper passed by the user.
-    inference = NPSE(prior_npse, show_progress_bars=True, sde_type=sde_type)
-
-    theta = prior.sample((num_simulations,))
-    x = linear_gaussian(theta, likelihood_shift, likelihood_cov)
-
-    score_estimator = inference.append_simulations(theta, x).train(
-        stop_after_epochs=200
-    )
-
-    return {
-        "score_estimator": score_estimator,
-        "inference": inference,
-        "prior": prior,
-        "likelihood_shift": likelihood_shift,
-        "likelihood_cov": likelihood_cov,
-        "prior_mean": prior_mean
-        if prior_type == "gaussian" or prior_type is None
-        else None,
-        "prior_cov": prior_cov
-        if prior_type == "gaussian" or prior_type is None
-        else None,
-        "num_dim": num_dim,
-        "x_o": zeros(num_dim),
-        "sde_type": sde_type,
-        "prior_type": prior_type,
-    }
-
-
-@pytest.mark.slow
 @pytest.mark.parametrize(
     "npse_trained_model",
-    list(product(SDE_TYPES, PRIOR_TYPES)),
+    DEFAULT_USE + SLOW_COMBINATIONS,
     indirect=True,  # So pytest knows to pass to the fixture
 )
 @pytest.mark.parametrize(
     "iid_method, num_trial",
     [
-        pytest.param("fnpe", 3, id="fnpe-2trials"),
-        pytest.param("gauss", 3, id="gauss-6trials"),
+        pytest.param("fnpe", 3, id="fnpe-2trials", marks=pytest.mark.slow),
+        pytest.param("gauss", 3, id="gauss-6trials", marks=pytest.mark.slow),
         pytest.param("auto_gauss", 8, id="auto_gauss-8trials"),
-        pytest.param("auto_gauss", 16, id="auto_gauss-16trials"),
-        pytest.param("jac_gauss", 8, id="jac_gauss-8trials"),
+        pytest.param(
+            "auto_gauss", 16, id="auto_gauss-16trials", marks=pytest.mark.slow
+        ),
+        pytest.param("jac_gauss", 8, id="jac_gauss-8trials", marks=pytest.mark.slow),
     ],
 )
 def test_npse_iid_inference(npse_trained_model, iid_method, num_trial):
