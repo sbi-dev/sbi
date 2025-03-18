@@ -73,7 +73,8 @@ class NPE_B(PosteriorEstimator):
         Args:
             theta: Batch of parameters θ.
             x: Batch of data.
-            masks: Whether to retrain with prior loss (for each prior sample).
+            masks: Mask that is True for prior samples in the batch in order to train
+            them with prior loss.
             proposal: Proposal distribution.
 
         Returns:
