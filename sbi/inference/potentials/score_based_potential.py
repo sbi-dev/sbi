@@ -10,7 +10,7 @@ from zuko.distributions import NormalizingFlow
 from zuko.transforms import FreeFormJacobianTransform
 
 from sbi.inference.potentials.base_potential import BasePotential
-from sbi.inference.potentials.score_fn_util import get_iid_method, get_guidance_method
+from sbi.inference.potentials.score_fn_util import get_guidance_method, get_iid_method
 from sbi.neural_nets.estimators.score_estimator import ConditionalScoreEstimator
 from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
@@ -58,7 +58,7 @@ class PosteriorScoreBasedPotential(BasePotential):
         prior: Optional[Distribution],
         x_o: Optional[Tensor] = None,
         iid_method: str = "auto_gauss",
-        iid_params: Optional[Dict[str, Any]] = None, # NOTE: dataclasses!
+        iid_params: Optional[Dict[str, Any]] = None,  # NOTE: dataclasses!
         guidance_method: Optional[str] = None,
         guidance_params: Optional[Dict[str, Any]] = None,
         device: str = "cpu",
@@ -198,12 +198,9 @@ class PosteriorScoreBasedPotential(BasePotential):
         else:
             score_fn = self.score_estimator
 
-
         with torch.set_grad_enabled(track_gradients):
             if not self.x_is_iid or self._x_o.shape[0] == 1:
-                score = score_fn(
-                    input=theta, condition=self.x_o, time=time
-                )
+                score = score_fn(input=theta, condition=self.x_o, time=time)
             else:
                 assert self.prior is not None, "Prior is required for iid methods."
 
