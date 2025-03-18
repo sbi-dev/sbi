@@ -165,3 +165,21 @@ def test_times_schedule():
     assert times.shape == torch.Size((10,))
     assert times.max().item() < vpse.t_max
     assert times.min().item() >= vpse.t_min
+
+
+def test_noise_schedule():
+
+    id_net = torch.nn.Identity()
+    inpt_shape = (4,)
+    cond_shape = (4,)
+
+    vpse = VPScoreEstimator(id_net, inpt_shape, cond_shape)
+    exp = vpse.device
+    times = vpse.times_schedule(10)
+    noise = vpse.noise_schedule(times)
+    obs = noise.device
+
+    assert exp == obs
+    assert noise.shape == torch.Size((10,))
+    assert noise.max().item() < vpse.beta_max
+    assert noise.min().item() >= vpse.beta_min
