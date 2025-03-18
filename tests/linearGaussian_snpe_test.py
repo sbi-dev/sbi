@@ -41,12 +41,12 @@ from .test_utils import (
 )
 
 
-@pytest.mark.parametrize("npe_method", [NPE_A, NPE_C])
+@pytest.mark.parametrize("npe_method_str", ["npe_a", "npe_b", "npe_c"])
 @pytest.mark.parametrize(
     "num_dim, prior_str",
     ((2, "gaussian"), (2, "uniform"), (1, "gaussian")),
 )
-def test_c2st_npe_on_linearGaussian(npe_method, num_dim: int, prior_str: str):
+def test_c2st_npe_on_linearGaussian(npe_method_str, num_dim: int, prior_str: str):
     """Test whether NPE infers well a simple example with available ground truth."""
 
     x_o = zeros(1, num_dim)
@@ -78,7 +78,12 @@ def test_c2st_npe_on_linearGaussian(npe_method, num_dim: int, prior_str: str):
     def simulator(theta):
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    inference = npe_method(prior, show_progress_bars=False)
+    if npe_method_str == "npe_a":
+        inference = NPE_A(prior, show_progress_bars=False)
+    elif npe_method_str == "npe_b":
+        inference = NPE_B(prior, show_progress_bars=False)
+    else:
+        inference = NPE_C(prior, show_progress_bars=False)
 
     theta = prior.sample((num_simulations,))
     x = simulator(theta)
@@ -92,7 +97,7 @@ def test_c2st_npe_on_linearGaussian(npe_method, num_dim: int, prior_str: str):
     samples = posterior.sample((num_samples,))
 
     # Compute the c2st and assert it is near chance level of 0.5.
-    check_c2st(samples, target_samples, alg="npe_c")
+    check_c2st(samples, target_samples, alg=npe_method_str)
 
     map_ = posterior.map(num_init_samples=1_000, show_progress_bars=False)
 
@@ -145,11 +150,12 @@ def test_c2st_npe_on_linearGaussian(npe_method, num_dim: int, prior_str: str):
 
 
 @pytest.mark.slow
+@pytest.mark.parametrize("npe_method_str", ["npe_b", "npe_c"])
 @pytest.mark.parametrize(
     "density_estimator",
     ["made", "mdn", "maf", "maf_rqs", "nsf", "zuko_maf", "zuko_nsf"],
 )
-def test_density_estimators_on_linearGaussian(density_estimator):
+def test_density_estimators_on_linearGaussian(npe_method_str, density_estimator):
     """Test NPE with different density estimators on linear Gaussian example."""
 
     theta_dim = 4
@@ -175,7 +181,10 @@ def test_density_estimators_on_linearGaussian(density_estimator):
     def simulator(theta):
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    inference = NPE_C(prior, density_estimator=density_estimator)
+    if npe_method_str == "npe_b":
+        inference = NPE_B(prior, density_estimator=density_estimator)
+    else:
+        inference = NPE_C(prior, density_estimator=density_estimator)
 
     theta = prior.sample((num_simulations,))
     x = simulator(theta)
@@ -188,10 +197,12 @@ def test_density_estimators_on_linearGaussian(density_estimator):
     samples = posterior.sample((num_samples,))
 
     # Compute the c2st and assert it is near chance level of 0.5.
-    check_c2st(samples, target_samples, alg=f"npe_{density_estimator}")
+    check_c2st(samples, target_samples, alg=f"{npe_method_str}_{density_estimator}")
 
 
-def test_c2st_npe_on_linearGaussian_different_dims(density_estimator="maf"):
+def test_c2st_npe_on_linearGaussian_different_dims(
+    npe_method_str, density_estimator="maf"
+):
     """Test NPE on linear Gaussian with different theta and x dimensionality."""
 
     theta_dim = 3
@@ -228,11 +239,18 @@ def test_c2st_npe_on_linearGaussian_different_dims(density_estimator="maf"):
         )
 
     # Test whether prior can be `None`.
-    inference = NPE_C(
-        prior=None,
-        density_estimator=density_estimator,
-        show_progress_bars=False,
-    )
+    if npe_method_str == "npe_b":
+        inference = NPE_B(
+            prior=None,
+            density_estimator=density_estimator,
+            show_progress_bars=False,
+        )
+    else:
+        inference = NPE_C(
+            prior=None,
+            density_estimator=density_estimator,
+            show_progress_bars=False,
+        )
 
     theta = prior.sample((num_simulations,))
     x = simulator(theta)
@@ -250,7 +268,7 @@ def test_c2st_npe_on_linearGaussian_different_dims(density_estimator="maf"):
     samples = posterior.sample((num_samples,))
 
     # Compute the c2st and assert it is near chance level of 0.5.
-    check_c2st(samples, target_samples, alg="snpe_c_different_dims")
+    check_c2st(samples, target_samples, alg=f"s{npe_method_str}_different_dims")
 
 
 # Test multi-round NPE.
@@ -259,12 +277,7 @@ def test_c2st_npe_on_linearGaussian_different_dims(density_estimator="maf"):
     "method_str",
     (
         "snpe_a",
-        pytest.param(
-            "snpe_b",
-            marks=pytest.mark.xfail(
-                raises=NotImplementedError, reason="""NPE-B not implemented"""
-            ),
-        ),
+        "snpe_b",
         "snpe_c",
         "snpe_c_non_atomic",
         "tsnpe_rejection",
@@ -317,10 +330,14 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str):
         inference = NPE_B(**creation_args)
         theta = prior.sample((500,))
         x = simulator(theta)
-        posterior_estimator = inference.append_simulations(theta, x).train()
+
+        posterior_estimator = inference.append_simulations(
+            theta, x, proposal=prior
+        ).train()
         posterior1 = DirectPosterior(
             prior=prior, posterior_estimator=posterior_estimator
         ).set_default_x(x_o)
+
         theta = posterior1.sample((1000,))
         x = simulator(theta)
         posterior_estimator = inference.append_simulations(
@@ -680,7 +697,7 @@ def test_mdn_conditional_density(num_dim: int = 3, cond_dim: int = 1):
     )
 
 
-@pytest.mark.parametrize("npe_method", [NPE_A, NPE_C])
+@pytest.mark.parametrize("npe_method", [NPE_A, NPE_B, NPE_C])
 def test_example_posterior(npe_method: type):
     """Return an inferred `NeuralPosterior` for interactive examination."""
     num_dim = 2
