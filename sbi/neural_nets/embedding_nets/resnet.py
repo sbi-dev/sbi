@@ -192,6 +192,10 @@ class ResNet(nn.Module):
         """
         Residual neural network mapping image like data to a fixed sized vector.
 
+        References:
+
+        He et al. (2015): "Deep Residual Learning for Image Recognition"
+
         Args:
             c_in: Number of input channels.
             c_out: Dimensionality of the embedding vector.
