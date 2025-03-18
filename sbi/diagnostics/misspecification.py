@@ -112,7 +112,7 @@ def calc_misspecification_mmd(
                 "in which case the MMD is computed in the x-space."
             )
         z_obs = inference._neural_net.embedding_net(x_obs).detach()
-        z = inference._neural_net.embedding_net(x_obs).detach()
+        z = inference._neural_net.embedding_net(x).detach()
     else:
         raise ValueError("mode should be either x_space or embedding")
 
