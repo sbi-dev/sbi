@@ -532,7 +532,7 @@
 
 
 <h1 id="getting-started-with-sbi">Getting started with <code>sbi</code><a class="headerlink" href="#getting-started-with-sbi" title="Permanent link">&para;</a></h1>
-<p>Note, you can find the original version of this notebook at <a href="https://github.com/sbi-dev/sbi/blob/main/tutorials/00_getting_started.ipynb">/tutorials/00_getting_started.ipynb</a> in the <code>sbi</code> repository.</p>
+<p>Note, you can find the original version of this notebook at <a href="https://github.com/sbi-dev/sbi/blob/main/docs/tutorials/00_getting_started.ipynb">/docs/tutorials/00_getting_started.ipynb</a> in the <code>sbi</code> repository.</p>
 <p><code>sbi</code> provides a simple interface to run state-of-the-art algorithms for simulation-based inference.</p>
 <p><strong>The overall goal of simulation-based inference is to algorithmically identify model parameters which are consistent with data.</strong></p>
 <p>In this tutorial we demonstrate how to get started with the <code>sbi</code> toolbox and how to perform parameter inference on a simple model.</p>
@@ -552,7 +552,7 @@
 1. observational data (or summary statistics thereof) - <em>the observations</em><br />
 2. a candidate (mechanistic) model - <em>the simulator</em><br />
 3. prior knowledge or constraints on model parameters - <em>the prior</em></p>
-<p>If you are new to simulation-based inference, please first read the information on the <a href="https://sbi-dev.github.io/sbi/">homepage of the website</a> to familiarise with the motivation and relevant terms.</p>
+<p>If you are new to simulation-based inference, please first read the information on the <a href="https://sbi.readthedocs.io/en/latest/index.html">homepage of the website</a> to familiarise with the motivation and relevant terms.</p>
 <p>For this illustrative example we consider a model <em>simulator</em> that takes in 3 parameters (<span class="arithmatex">\(\theta\)</span>). For simplicity, the <em>simulator</em> outputs simulations of the same dimensionality and adds 1.0 and some Gaussian noise to the parameter set. </p>
 <blockquote>
 <p>Note: This is where you instead would use your specific  <em>simulator</em> with its parameters.</p>
@@ -592,8 +592,8 @@ are consistent which each other.</p>
 </code></pre></div>
 <p>Next, we instantiate the inference object. In this example, we will use neural perform posterior estimation (NPE):</p>
 <blockquote>
-<p>Note: In <code>sbi</code> version 0.23.0, we renamed all inference classes from, e.g., <code>SNPE</code>, to <code>NPE</code> (i.e., we removed the <code>S</code> prefix). The functionality of the classes remains the same. The <code>NPE</code> class handles both the amortized (as shown in this tutorial) and sequential (as shown <a href="https://sbi-dev.github.io/sbi/tutorial/02_multiround_inference/">here</a>) versions of neural posterior estimation. An alias for <code>SNPE</code> still exists for backwards compatibility.</p>
-<p>Note: This is where you could specify an alternative inference object such as NRE for ratio estimation or NLE for likelihood estimation. Here, you can see <a href="https://sbi-dev.github.io/sbi/latest/tutorials/16_implemented_methods/">all implemented methods</a>.</p>
+<p>Note: In <code>sbi</code> version 0.23.0, we renamed all inference classes from, e.g., <code>SNPE</code>, to <code>NPE</code> (i.e., we removed the <code>S</code> prefix). The functionality of the classes remains the same. The <code>NPE</code> class handles both the amortized (as shown in this tutorial) and sequential (as shown <a href="https://sbi.readthedocs.io/en/latest/tutorials/02_multiround_inference.html">here</a>) versions of neural posterior estimation. An alias for <code>SNPE</code> still exists for backwards compatibility.</p>
+<p>Note: This is where you could specify an alternative inference object such as NRE for ratio estimation or NLE for likelihood estimation. Here, you can see <a href="https://sbi.readthedocs.io/en/latest/tutorials/16_implemented_methods.html">all implemented methods</a>.</p>
 </blockquote>
 <div class="highlight"><pre><span></span><code><span class="n">inference</span> <span class="o">=</span> <span class="n">NPE</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">)</span>
 </code></pre></div>
@@ -706,10 +706,10 @@ range of posterior samples: min: tensor(-8.8757)  max : tensor(3.9791)
 
 <h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <p>To learn more about the capabilities of <code>sbi</code>, you can head over to the tutorial
-<a href="../01_gaussian_amortized/">01_gaussian_amortized</a>, for inferring parameters for multiple
+<a href="https://sbi.readthedocs.io/en/latest/tutorials/01_gaussian_amortized.html">01_gaussian_amortized</a>, for inferring parameters for multiple
 observations without retraining.</p>
 <p>Alternatively, for an example with an <strong>actual</strong> simulator, you can read our example
-for a scientific simulator from neuroscience under <a href="../Example_00_HodgkinHuxleyModel/">Example_00_HodgkinHuxleyModel</a>.</p>
+for a scientific simulator from neuroscience under <a href="https://sbi.readthedocs.io/en/latest/tutorials/Example_00_HodgkinHuxleyModel.html">Example_00_HodgkinHuxleyModel</a>.</p>
 
 
 

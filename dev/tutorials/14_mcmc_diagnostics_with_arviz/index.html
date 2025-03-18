@@ -577,7 +577,7 @@
 </code></pre></div>
 <h2 id="train-mnle-to-approximate-the-likelihood">Train MNLE to approximate the likelihood<a class="headerlink" href="#train-mnle-to-approximate-the-likelihood" title="Permanent link">&para;</a></h2>
 <p>For this tutorial, we will use a simple simulator with two parameters. For details see
-the <a href="../Example_01_DecisionMakingModel/">example on the decision making model</a>.</p>
+the <a href="https://sbi.readthedocs.io/en/latest/tutorials/Example_01_DecisionMakingModel.html">example on the decision making model</a>.</p>
 <p>Here, we pass <code>mcmc_method="nuts"</code> in order to use the underlying <a href="https://docs.pyro.ai/en/1.8.1/mcmc.html#nuts"><code>pyro</code> No-U-turn sampler</a>, but it would work as well with other samplers (e.g. &ldquo;slice_np_vectorized&rdquo;, &ldquo;hmc&rdquo;).</p>
 <p>Additionally, when calling <code>posterior.sample(...)</code> we pass <code>return_arviz=True</code> so that the <a href="https://arviz-devs.github.io/arviz/api/generated/arviz.InferenceData.html#arviz.InferenceData"><code>Arviz InferenceData</code></a> object is returned. This object gives us access to the wealth of MCMC diagnostics tool provided by <code>arviz</code>.</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># Generate training data and train MNLE.</span>

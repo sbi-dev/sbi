@@ -485,6 +485,15 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#next-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      Next steps
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -505,9 +514,9 @@
 
 
 <h1 id="amortized-posterior-inference-on-gaussian-example">Amortized posterior inference on Gaussian example<a class="headerlink" href="#amortized-posterior-inference-on-gaussian-example" title="Permanent link">&para;</a></h1>
-<p>Note, you can find the original version of this notebook at <a href="https://github.com/sbi-dev/sbi/blob/main/tutorials/01_gaussian_amortized.ipynb">tutorials/01_gaussian_amortized.ipynb</a> in the <code>sbi</code> repository.</p>
+<p>Note, you can find the original version of this notebook at <a href="https://github.com/sbi-dev/sbi/blob/main/docs/tutorials/01_gaussian_amortized.ipynb">docs/tutorials/01_gaussian_amortized.ipynb</a> in the <code>sbi</code> repository.</p>
 <p>In this tutorial, we introduce <strong>amortization</strong> that is the capability to evaluate the posterior for different observations without having to re-run inference.</p>
-<p>We will demonstrate how <code>sbi</code> can infer an amortized posterior for the illustrative linear Gaussian example introduced in <a href="https://sbi-dev.github.io/sbi/latest/tutorials/00_getting_started/">Getting Started</a>, that takes in 3 parameters (<span class="arithmatex">\(\theta\)</span>). </p>
+<p>We will demonstrate how <code>sbi</code> can infer an amortized posterior for the illustrative linear Gaussian example introduced in <a href="https://sbi.readthedocs.io/en/latest/tutorials/00_getting_started.html">Getting Started</a>, that takes in 3 parameters (<span class="arithmatex">\(\theta\)</span>). </p>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">sbi</span><span class="w"> </span><span class="kn">import</span> <span class="n">analysis</span> <span class="k">as</span> <span class="n">analysis</span>
@@ -585,9 +594,9 @@
 <p><img alt="png" src="../01_gaussian_amortized_files/01_gaussian_amortized_14_0.png" /></p>
 <p>The inferred distirbutions over the parameters given the <strong>second</strong> observation  <span class="arithmatex">\(x_{obs~2}\)</span> also match the ground truth parameters <span class="arithmatex">\(\theta_{2}\)</span> we used to generate our second test observation  <span class="arithmatex">\(x_{obs~2}\)</span>.</p>
 <p>This in a nutshell demonstrates the benefit of amortized methods. </p>
-<h1 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h1>
+<h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <p>Now that you got familiar with amortization and are probably good to go and have a first shot at applying <code>sbi</code> to your own inference problem. If you want to learn more, we recommend checking out our tutorial
-<a href="../02_multiround_inference/">02_multiround_inference</a> which aims to make inference for a single observation more sampling efficient.</p>
+<a href="https://sbi.readthedocs.io/en/latest/tutorials/02_multiround_inference.html">02_multiround_inference</a> which aims to make inference for a single observation more sampling efficient.</p>
 
 
 
