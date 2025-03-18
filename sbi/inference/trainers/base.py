@@ -341,7 +341,7 @@ class NeuralInference(ABC):
         num_validation_examples = num_examples - num_training_examples
 
         if not resume_training:
-            # Seperate indicies for training and validation
+            # Separate indices for training and validation
             permuted_indices = torch.randperm(num_examples)
             self.train_indices, self.val_indices = (
                 permuted_indices[:num_training_examples],

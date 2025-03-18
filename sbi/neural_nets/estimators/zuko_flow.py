@@ -7,12 +7,15 @@ import torch
 from torch import Tensor, nn
 from zuko.flows.core import Flow
 
-from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
+from sbi.neural_nets.estimators.base import (
+    ConditionalDensityEstimator,
+    UnconditionalDensityEstimator,
+)
 from sbi.sbi_types import Shape
 
 
 class ZukoFlow(ConditionalDensityEstimator):
-    r"""`zuko`- based normalizing flow density estimator.
+    r"""`zuko`- based conditional normalizing flow density estimator.
 
     Flow type objects already have a .log_prob() and .sample() method, so here we just
     wrap them and add the .loss() method.
@@ -25,12 +28,13 @@ class ZukoFlow(ConditionalDensityEstimator):
         input_shape: torch.Size,
         condition_shape: torch.Size,
     ):
-        r"""Initialize the density estimator.
+        r"""Initialize the conditional density estimator.
 
         Args:
             flow: Flow object.
-            input_shape: Event shape of the input at which the density is being
-                evaluated (and which is also the event_shape of samples).
+            input_shape: Event shape of the input at which the coniditional
+                density is being evaluated (and which is also the event_shape
+                of samples).
             condition_shape: Event shape of the condition.
         """
 
@@ -118,13 +122,14 @@ class ZukoFlow(ConditionalDensityEstimator):
         )
 
         emb_cond = self._embedding_net(condition)
-        distributions = self.net(emb_cond)
-        log_probs = distributions.log_prob(input)
+        dists = self.net(emb_cond)
+        log_probs = dists.log_prob(input)
 
         return log_probs
 
     def loss(self, input: Tensor, condition: Tensor) -> Tensor:
-        r"""Return the negative log-probability for training the density estimator.
+        r"""Return the negative log-probability for training the conditional
+        density estimator.
 
         Args:
             input: Inputs of shape `(batch_dim, *input_event_shape)`.
@@ -137,7 +142,7 @@ class ZukoFlow(ConditionalDensityEstimator):
         return -self.log_prob(input.unsqueeze(0), condition)[0]
 
     def sample(self, sample_shape: Shape, condition: Tensor) -> Tensor:
-        r"""Return samples from the density estimator.
+        r"""Return samples from the conditional density estimator.
 
         Args:
             sample_shape: Shape of the samples to return.
@@ -156,7 +161,7 @@ class ZukoFlow(ConditionalDensityEstimator):
     def sample_and_log_prob(
         self, sample_shape: torch.Size, condition: Tensor, **kwargs
     ) -> Tuple[Tensor, Tensor]:
-        r"""Return samples and their density from the density estimator.
+        r"""Return samples and their density from the conditional density estimator.
 
         Args:
             sample_shape: Shape of the samples to return.
@@ -168,6 +173,125 @@ class ZukoFlow(ConditionalDensityEstimator):
         """
         emb_cond = self._embedding_net(condition)
         dists = self.net(emb_cond)
+
+        samples, log_probs = dists.rsample_and_log_prob(sample_shape)
+        return samples, log_probs
+
+
+class ZukoUnconditionalFlow(UnconditionalDensityEstimator):
+    r"""`zuko`- based normalizing flow density estimator.
+
+    Flow type objects already have a .log_prob() and .sample() method, so here we just
+    wrap them and add the .loss() method.
+    """
+
+    def __init__(
+        self,
+        net: Flow,
+        input_shape: torch.Size,
+    ):
+        r"""Initialize the density estimator.
+
+        Args:
+            flow: Flow object.
+            input_shape: Event shape of the input at which the density is being
+                evaluated (and which is also the event_shape of samples).
+        """
+
+        super().__init__(net=net, input_shape=input_shape)
+
+    def inverse_transform(self, input: Tensor) -> Tensor:
+        r"""Return the inverse flow-transform of the inputs.
+
+        The inverse transform is the transformation that maps the inputs back to the
+        base distribution (noise) space.
+
+        Args:
+            input: Inputs to evaluate the inverse transform on of shape
+                    (*batch_shape1, input_size).
+
+        Returns:
+            noise: Transformed inputs.
+
+        Note:
+            This function should support PyTorch's automatic broadcasting. This means
+            the function should behave as follows for different input shapes:
+            - (input_size,) + (batch_size,*condition_shape) -> (batch_size,)
+            - (batch_size, input_size) + (*condition_shape) -> (batch_size,)
+            - (batch_size, input_size) + (batch_size, *condition_shape) -> (batch_size,)
+            - (batch_size1, input_size) + (batch_size2, *condition_shape)
+                                                  -> RuntimeError i.e. not broadcastable
+            - (batch_size1,1, input_size) + (batch_size2, *condition_shape)
+                                                  -> (batch_size1,batch_size2)
+            - (batch_size1, input_size) + (batch_size2,1, *condition_shape)
+                                                  -> (batch_size2,batch_size1)
+        """
+
+        # PyTorch's automatic broadcasting
+        batch_shape_in = input.shape[:-1]
+        batch_shape = torch.broadcast_shapes(batch_shape_in)
+        # Expand the input to the same batch shape
+        input = input.expand(batch_shape + (input.shape[-1],))
+
+        dists = self.net
+        noise = dists.transform(input)
+
+        return noise
+
+    def log_prob(self, input: Tensor) -> Tensor:
+        r"""Return the log probabilities of the inputs
+
+        Args:
+            input: Inputs to evaluate the log probability on. Of shape
+                `(sample_dim, batch_dim, *event_shape)`.
+
+        Returns:
+            Sample-wise log probabilities, shape `(input_sample_dim, input_batch_dim)`.
+        """
+        dist = self.net()
+        log_probs = dist.log_prob(input)
+
+        return log_probs
+
+    def loss(self, input: Tensor) -> Tensor:
+        r"""Return the negative log-probability for training the density estimator.
+
+        Args:
+            input: Inputs of shape `(batch_dim, *input_event_shape)`.
+
+        Returns:
+            Negative log-probability of shape `(batch_dim,)`.
+        """
+
+        return -self.log_prob(input.unsqueeze(0))[0]
+
+    def sample(self, sample_shape: Shape) -> Tensor:
+        r"""Return samples from the density estimator.
+
+        Args:
+            sample_shape: Shape of the samples to return.
+
+        Returns:
+            Samples of shape `(*sample_shape,)`.
+        """
+        dists = self.net()
+        samples = dists.sample(sample_shape)
+
+        return samples
+
+    def sample_and_log_prob(
+        self, sample_shape: torch.Size, **kwargs
+    ) -> Tuple[Tensor, Tensor]:
+        r"""Return samples and their density from the density estimator.
+
+        Args:
+            sample_shape: Shape of the samples to return.
+
+        Returns:
+            Samples of shape `(*sample_shape, *input_event_shape)`
+            and associated log probs of shape `(*sample_shape)`.
+        """
+        dists = self.net()
 
         samples, log_probs = dists.rsample_and_log_prob(sample_shape)
         return samples, log_probs
