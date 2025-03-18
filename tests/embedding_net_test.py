@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import pytest
 import torch
-from torch import eye, ones, zeros
+from torch import Tensor, eye, ones, zeros
 from torch.distributions import MultivariateNormal
 
 from sbi import utils
@@ -14,6 +14,7 @@ from sbi.neural_nets import classifier_nn, flowmatching_nn, likelihood_nn, poste
 from sbi.neural_nets.embedding_nets import (
     CNNEmbedding,
     FCEmbedding,
+    LRUEmbedding,
     PermutationInvariantEmbedding,
 )
 from sbi.simulators.linear_gaussian import (
@@ -250,3 +251,17 @@ def test_npe_with_with_iid_embedding_varying_num_trials(trial_factor=50):
             check_c2st(
                 samples, reference_samples, alg=f"iid-NPE with {num_trials} trials"
             )
+
+
+def test_lru_embedding_isolated(
+    dim_observation: int = 7, output_dim: int = 5, batch_size: int = 16
+):
+    """Run some random data trough an LRUEmbedding network."""
+    embedding_net = LRUEmbedding(
+        input_dim=dim_observation, output_dim=output_dim, hidden_dim=9, num_layers=3
+    )
+    x = torch.randn(batch_size, 100, dim_observation)
+
+    x_embed = embedding_net(x)
+    assert isinstance(x_embed, Tensor)
+    assert x_embed.shape == (batch_size, output_dim)
