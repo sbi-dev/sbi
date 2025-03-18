@@ -37,6 +37,7 @@ def get_iid_method(name: str) -> Type["IIDScoreFunction"]:
         )
     return IID_METHODS[name]
 
+
 def get_guidance_method(name: str) -> Type["ScoreAdaptation"]:
     r"""
     Retrieves the guidance method by name.
@@ -48,10 +49,9 @@ def get_guidance_method(name: str) -> Type["ScoreAdaptation"]:
         The guidance method class.
     """
     if name not in GUIDANCE_METHODS:
-        raise NotImplementedError(
-            f"Method {name} for guidance not implemented."
-        )
+        raise NotImplementedError(f"Method {name} for guidance not implemented.")
     return GUIDANCE_METHODS[name]
+
 
 def register_guidance_method(name: str) -> Callable:
     r"""
@@ -96,7 +96,7 @@ class ScoreAdaptation(ABC):
         prior: Optional[Distribution],
         device: str = "cpu",
     ):
-        """ This class manages manipulating the score estimator to impose additional
+        """This class manages manipulating the score estimator to impose additional
         constraints on the posterior via guidance.
 
         Args:
@@ -112,6 +112,7 @@ class ScoreAdaptation(ABC):
     def __call__(self, theta: Tensor, x_o: Tensor, time: Optional[Tensor] = None):
         pass
 
+
 @register_guidance_method("classifier_free")
 class ClassifierFreeGuidance(ScoreAdaptation):
     def __init__(
@@ -124,7 +125,7 @@ class ClassifierFreeGuidance(ScoreAdaptation):
         likelihood_shift: float | Tensor,
         device: str = "cpu",
     ):
-        """ This class manages manipulating the score estimator to temper of shift the
+        """This class manages manipulating the score estimator to temper of shift the
         prior and likelihood.
 
         This is usually known as classifier-free guidance. And works by decomposing the
@@ -138,8 +139,10 @@ class ClassifierFreeGuidance(ScoreAdaptation):
         """
 
         if prior is None:
-            raise ValueError("Prior is required for classifier-free guidance, please"
-                            " provide as least an improper empirical prior.")
+            raise ValueError(
+                "Prior is required for classifier-free guidance, please"
+                " provide as least an improper empirical prior."
+            )
 
         self.prior_scale = prior_scale
         self.prior_shift = prior_shift
@@ -148,29 +151,28 @@ class ClassifierFreeGuidance(ScoreAdaptation):
 
         super().__init__(score_estimator, prior, device)
 
-    def marginal_prior_score(self, theta: Tensor,  time: Tensor):
-        """ Computes the marginal prior score analyticaly (or approximatly)
-        """
+    def marginal_prior_score(self, theta: Tensor, time: Tensor):
+        """Computes the marginal prior score analyticaly (or approximatly)"""
         m = self.score_estimator.mean_t_fn(time)
         std = self.score_estimator.std_fn(time)
-        marginal_prior = marginalize(self.prior, m, std)
+        marginal_prior = marginalize(self.prior, m, std)  # type: ignore
         marginal_prior_score = compute_score(marginal_prior, theta)
         return marginal_prior_score
 
-
-    def __call__(self, theta: Tensor, x_o: Tensor, time: Optional[Tensor] = None):
+    def __call__(self, input: Tensor, condition: Tensor, time: Optional[Tensor] = None):
         if time is None:
             time = torch.tensor([self.score_estimator.t_min])
 
-        posterior_score = self.score_estimator(input=theta, condition=x_o, time=time)
-        prior_score = self.marginal_prior_score(theta, time)
+        posterior_score = self.score_estimator(
+            input=input, condition=condition, time=time
+        )
+        prior_score = self.marginal_prior_score(input, time)
 
         ll_score = posterior_score - prior_score
         ll_score_mod = ll_score * self.likelihood_scale + self.likelihood_shift
         prior_score_mod = prior_score * self.prior_scale + self.prior_shift
 
         return ll_score_mod + prior_score_mod
-
 
 
 class IIDScoreFunction(ABC):
@@ -296,7 +298,9 @@ class FNPEScoreFunction(IIDScoreFunction):
 
         # Compute the prior score
 
-        prior_score = self.prior_score_weight_fn(time) * compute_score(self.prior, inputs)
+        prior_score = self.prior_score_weight_fn(time) * compute_score(
+            self.prior, inputs
+        )
 
         # Accumulate
         score = (1 - N) * prior_score + base_score.sum(-2, keepdim=True)
@@ -770,7 +774,6 @@ class JacCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
         return denoising_posterior_precision
 
 
-
 def compute_score(p: Distribution, inputs: Tensor):
     # NOTE The try except is for unifrom priors which do not have a grad, and
     # implementations that do not implement the log_prob method.
@@ -784,9 +787,10 @@ def compute_score(p: Distribution, inputs: Tensor):
                 grad_outputs=torch.ones_like(log_prob),
                 create_graph=True,
             )[0].detach()
-    except Exception:   
+    except Exception:
         score = torch.zeros_like(inputs)
     return score
+
 
 def ensure_lam_positive_definite(
     denoising_prior_precision: torch.Tensor,
