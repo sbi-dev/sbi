@@ -52,13 +52,13 @@ To get started, install the `sbi` package with:
 
    python -m pip install sbi
 
-for more advanced install options, see our `Install Guide <https://sbi.readthedocs.io/en/latest/installation.html>`.
+for more advanced install options, see our `Install Guide <https://sbi.readthedocs.io/en/latest/installation.html>`_.
 
 Then, check out our material:
 
 -  `Tutorials and Examples <https://sbi.readthedocs.io/en/latest/tutorials.html>`_
 
--  `Reference API <https://sbi.readthedocs.io/en/latest/reference.html>`_
+-  `Reference API <https://sbi.readthedocs.io/en/latest/sbi.html>`_
 
 
 Motivation and approach
@@ -130,7 +130,7 @@ the inference on one particular observation to be more simulation-efficient
 (e.g., SNPE).
 
 Below, we list all implemented methods and their corresponding publications.
-For usage in ``sbi``, see the `Inference API reference <https://sbi.readthedocs.io/en/latest/reference.html>`_
+For usage in ``sbi``, see the `Inference API reference <https://sbi.readthedocs.io/en/latest/sbi.html>`_
 and the `tutorial on implemented methods <https://sbi.readthedocs.io/en/latest/tutorials/16_implemented_methods.html>`_.
 
 
@@ -140,17 +140,14 @@ Posterior estimation (``(S)NPE``)
 - **Fast ε-free Inference of Simulation Models with Bayesian Conditional Density Estimation**
   by Papamakarios & Murray (NeurIPS 2016)
   `PDF <https://papers.nips.cc/paper/6084-fast-free-inference-of-simulation-models-with-bayesian-conditional-density-estimation.pdf>`__
-  `BibTeX <https://papers.nips.cc/paper/6084-fast-free-inference-of-simulation-models-with-bayesian-conditional-density-estimation/bibtex>`__
 
 - **Flexible statistical inference for mechanistic models of neural dynamics**
   by Lueckmann, Goncalves, Bassetto, Öcal, Nonnenmacher & Macke (NeurIPS 2017)
   `PDF <https://papers.nips.cc/paper/6728-flexible-statistical-inference-for-mechanistic-models-of-neural-dynamics.pdf>`__
-  `BibTeX <https://papers.nips.cc/paper/6728-flexible-statistical-inference-for-mechanistic-models-of-neural-dynamics/bibtex>`__
 
 - **Automatic posterior transformation for likelihood-free inference**
   by Greenberg, Nonnenmacher & Macke (ICML 2019)
   `PDF <http://proceedings.mlr.press/v97/greenberg19a/greenberg19a.pdf>`__
-  `BibTeX`__
 
 - **BayesFlow: Learning complex stochastic models with invertible neural networks**
   by Radev, S. T., Mertens, U. K., Voss, A., Ardizzone, L., & Köthe, U. (IEEE transactions on neural networks and learning systems 2020)
@@ -174,7 +171,6 @@ Likelihood-estimation (``(S)NLE``)
 - **Sequential neural likelihood: Fast likelihood-free inference with autoregressive flows**
   by Papamakarios, Sterratt & Murray (AISTATS 2019)
   `PDF <http://proceedings.mlr.press/v89/papamakarios19a/papamakarios19a.pdf>`__
-  `BibTeX <https://gpapamak.github.io/bibtex/snl.bib>`__
 
 - **Variational methods for simulation-based inference**
   by Glöckler, Deistler, Macke (ICLR 2022)
