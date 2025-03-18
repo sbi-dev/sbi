@@ -6,9 +6,10 @@ from math import exp, pi
 from typing import Callable, Optional, Union
 
 import torch
-from sbi.neural_nets.estimators.base import ConditionalVectorFieldEstimator
 from scipy import stats
 from torch import Tensor, nn
+
+from sbi.neural_nets.estimators.base import ConditionalVectorFieldEstimator
 
 
 class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
@@ -361,7 +362,8 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
             t_max (float, optional): The maximum time value. Defaults to self.t_max.
 
         Returns:
-            Tensor: A tensor of sampled time variables scaled and shifted to the range [0,1].
+            Tensor: A tensor of sampled time variables scaled and shifted to the
+                    range [0,1].
 
         """
         t_min = self.t_min if isinstance(t_min, type(None)) else t_min
@@ -533,7 +535,8 @@ class VPScoreEstimator(ConditionalScoreEstimator):
             t_max (float, optional): The maximum time value. Defaults to self.t_max.
 
         Returns:
-            Tensor: A tensor of sampled time variables scaled and shifted to the range [0,1].
+            Tensor: A tensor of sampled time variables scaled and shifted to
+                    the range [0,1].
 
         """
         t_min = self.t_min if isinstance(t_min, type(None)) else t_min

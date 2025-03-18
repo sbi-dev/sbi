@@ -7,11 +7,14 @@ from typing import Tuple
 
 import pytest
 import torch
+from scipy import stats
+
 from sbi.neural_nets.embedding_nets import CNNEmbedding
 from sbi.neural_nets.estimators.score_estimator import (
-    ConditionalScoreEstimator, VPScoreEstimator)
+    ConditionalScoreEstimator,
+    VPScoreEstimator,
+)
 from sbi.neural_nets.net_builders import build_score_estimator
-from scipy import stats
 
 
 @pytest.mark.parametrize("sde_type", ["vp", "ve", "subvp"])
@@ -155,7 +158,7 @@ def test_times_schedule():
     cond_shape = (4,)
 
     with pytest.raises(NotImplementedError):
-        cse = ConditionalScoreEstimator(id_net, inpt_shape, cond_shape)
+        ConditionalScoreEstimator(id_net, inpt_shape, cond_shape)
 
     vpse = VPScoreEstimator(id_net, inpt_shape, cond_shape)
     exp = vpse.device
