@@ -43,7 +43,7 @@ class LRUEmbedding(nn.Module):
             LRUBlock(
                 input_dim=hidden_dim,
                 output_dim=hidden_dim,
-                state_dim=hidden_dim,
+                state_dim=state_dim,
                 mlp_dim=mlp_dim,
                 r_min=r_min,
                 r_max=r_max,
