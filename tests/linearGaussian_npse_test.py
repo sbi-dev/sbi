@@ -274,13 +274,7 @@ def test_npse_iid_inference(npse_trained_model, iid_method, num_trial):
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize(
-    "npse_trained_model",
-    [
-        ("vp", "gaussian"),
-    ],
-    indirect=True,
-)
+@pytest.mark.parametrize("npse_trained_model", [("vp", "gaussian")], indirect=True)
 def test_npse_map(npse_trained_model):
     x_o = npse_trained_model["x_o"]
     inference = npse_trained_model["inference"]
