@@ -81,7 +81,7 @@ class ResidualBLockConv(nn.Module):
         Single residual block for image like data.
 
         Args:
-            c_in: Number of input channels
+            c_in: Number of input channels.
             c_out: Number of output channels. If None, use c_in.
             change_c_mode: Mode to change the number of channels.
                            Options are "conv" and "zeros". If "conv" is selected,
@@ -111,7 +111,7 @@ class ResidualBLockConv(nn.Module):
         if c_out is None:
             c_out = c_in
 
-        # Preserv the dimensionality of the input and the output
+        # Preserve the dimensionality of the input and the output
         if c_in == c_out:
             self.residual = nn.Identity()
 
@@ -194,11 +194,11 @@ class ResNet(nn.Module):
 
         Args:
             c_in: Number of input channels.
-            c_out: Dimensionality of the embedding vector
-            c_hidden_fc: Number of hidden units in the fully connected layers
-            n_stages: Number of stages in the network
-            blocks_per_stage: Number of residual blocks per stage
-            c_stages: Number of channels per stage
+            c_out: Dimensionality of the embedding vector.
+            c_hidden_fc: Number of hidden units in the fully connected layers.
+            n_stages: Number of stages in the network.
+            blocks_per_stage: Number of residual blocks per stage.
+            c_stages: Number of channels per stage.
             activation: Constructor for the activation function
             change_c_mode: Mode to change the number of channels. Options are
                            "conv" and "zeros". If "conv" is selected, 1x1 convolutions
@@ -210,7 +210,7 @@ class ResNet(nn.Module):
                                residual connection is added.
             construct_mapping_kwargs: Additional keyword arguments for the mapping
                                       functions.
-            coupling_block_kwargs: Additional keyword arguments for the coupling blocks
+            coupling_block_kwargs: Additional keyword arguments for the coupling blocks.
         """
         super().__init__()
 
