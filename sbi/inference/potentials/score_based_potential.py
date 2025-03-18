@@ -10,7 +10,7 @@ from zuko.distributions import NormalizingFlow
 from zuko.transforms import FreeFormJacobianTransform
 
 from sbi.inference.potentials.base_potential import BasePotential
-from sbi.inference.potentials.score_fn_iid import get_iid_method
+from sbi.inference.potentials.score_fn_util import get_iid_method, get_guidance_method
 from sbi.neural_nets.estimators.score_estimator import ConditionalScoreEstimator
 from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
@@ -58,7 +58,9 @@ class PosteriorScoreBasedPotential(BasePotential):
         prior: Optional[Distribution],
         x_o: Optional[Tensor] = None,
         iid_method: str = "auto_gauss",
-        iid_params: Optional[Dict[str, Any]] = None,
+        iid_params: Optional[Dict[str, Any]] = None, # NOTE: dataclasses!
+        guidance_method: Optional[str] = None,
+        guidance_params: Optional[Dict[str, Any]] = None,
         device: str = "cpu",
     ):
         r"""Returns the score function for score-based methods.
@@ -77,6 +79,8 @@ class PosteriorScoreBasedPotential(BasePotential):
         self.score_estimator.eval()
         self.iid_method = iid_method
         self.iid_params = iid_params
+        self.guidance_method = None
+        self.guidance_params = None
         super().__init__(prior, x_o, device=device)
 
     def set_x(
@@ -85,6 +89,8 @@ class PosteriorScoreBasedPotential(BasePotential):
         x_is_iid: Optional[bool] = False,
         iid_method: str = "auto_gauss",
         iid_params: Optional[Dict[str, Any]] = None,
+        guidance_method: Optional[str] = None,
+        guidance_params: Optional[Dict[str, Any]] = None,
         atol: float = 1e-5,
         rtol: float = 1e-6,
         exact: bool = True,
@@ -108,6 +114,8 @@ class PosteriorScoreBasedPotential(BasePotential):
         super().set_x(x_o, x_is_iid)
         self.iid_method = iid_method
         self.iid_params = iid_params
+        self.guidance_method = guidance_method
+        self.guidance_params = guidance_params
         # NOTE: Once IID potential evaluation is supported. This needs to be adapted.
         # See #1450.
         if not x_is_iid and (self._x_o is not None):
@@ -141,6 +149,11 @@ class PosteriorScoreBasedPotential(BasePotential):
             theta, theta.shape[1:], leading_is_sample=True
         )
         self.score_estimator.eval()
+
+        if self.guidance_method is not None:
+            raise NotImplementedError(
+                "Guidance does not yet supported for potential evaluation."
+            )
 
         with torch.set_grad_enabled(track_gradients):
             log_probs = self.flow.log_prob(theta_density_estimator).squeeze(-1)
@@ -178,9 +191,17 @@ class PosteriorScoreBasedPotential(BasePotential):
                 the potential or manually set self._x_o."
             )
 
+        if self.guidance_method is not None:
+            score_fn = get_guidance_method(self.guidance_method)(
+                self.score_estimator, self.prior, **(self.guidance_params or {})
+            )
+        else:
+            score_fn = self.score_estimator
+
+
         with torch.set_grad_enabled(track_gradients):
             if not self.x_is_iid or self._x_o.shape[0] == 1:
-                score = self.score_estimator.forward(
+                score = score_fn(
                     input=theta, condition=self.x_o, time=time
                 )
             else:
