@@ -5,6 +5,8 @@ import torch
 from torch import Tensor, nn
 import numpy as np
 
+from torch.utils._pytree import tree_flatten, tree_unflatten
+
 
 class LRUEmbedding(nn.Module):
     """Embedding network backed by a Linear Recurrent Unit (LRU).
@@ -18,13 +20,14 @@ class LRUEmbedding(nn.Module):
         output_dim: int = 10,
         state_dim: int = 20,
         hidden_dim: int = 20,
-        mlp_dim: int = 80,
         num_layers: int = 2,
         r_min=0.0,
         r_max=1.0,
         max_phase=2 * np.pi,
         bidirectional: bool = False,
         dropout: float = 0.0,
+        norm: bool = False,
+        #aggretate_func : Callable,
     ):
         """Fully-connected multi-layer neural network to be used as embedding network.
 
@@ -41,10 +44,8 @@ class LRUEmbedding(nn.Module):
 
         layers = [
             LRUBlock(
-                input_dim=hidden_dim,
-                output_dim=hidden_dim,
+                hidden_dim=hidden_dim,
                 state_dim=state_dim,
-                mlp_dim=mlp_dim,
                 r_min=r_min,
                 r_max=r_max,
                 max_phase=max_phase,
@@ -73,42 +74,54 @@ class LRUEmbedding(nn.Module):
         x = self.embedding(x)
         x_scan = self.net(x)  # (batch_size, len_sequence, output_dim)
 
-        # Aggregate the features of the time dimension.
-        x_embed = self.output(x_scan)
 
+
+        # Pooling
+        # TODO: implement pooling
+
+        # output embedding
+        x_embed = self.output(x_scan)
         return x_embed
 
 
 class LRUBlock(nn.Module):
     def __init__(
         self,
-        input_dim: int,
-        output_dim: int = 10,
+        hidden_dim: int,
         state_dim: int = 20,
-        mlp_dim: int = 20,
         r_min=0.0,
         r_max=1.0,
         max_phase=2 * np.pi,
         bidirectional: bool = False,
         dropout: float = 0.0,
+        norm: Bool=False,
     ):
         super().__init__()
-        self.lru = LRU(input_dim, state_dim, r_min, r_max, max_phase)
-        self.hidden_projection = nn.Linear(state_dim, mlp_dim)
-        self.hidden_nonlinearity = nn.GELU()
-        self.output_projection = nn.Linear(mlp_dim, output_dim)
+        #https://github.com/NicolasZucchet/minimal-LRU/blob/main/lru/model.py
+        self.lru = LRU(hidden_dim, state_dim, r_min, r_max, max_phase)
+        self.out1 = nn.Linear(hidden_dim,hidden_dim)
+        self.out2 = nn.Linear(hidden_dim, hidden_dim)
+        self.GELU = nn.GELU()
+        self.sigmoid = nn.Sigmoid()
         self.dropout = nn.Dropout(dropout) if dropout > 0 else nn.Identity()
+        self.norm = nn.LayerNorm(hidden_dim) if norm else nn.Identity()
 
     def forward(self, x: Tensor) -> Tensor:
-        # TO DO: GLU mixing Layers?
+        # Batch, len_sequence, hidden_dim
+        # normalization
+        y = self.norm(x)
 
         # run LRU
-        x = self.lru(x)
+        y=self.lru(y)
 
         # state mixing
-        y = self.hidden_nonlinearity(self.hidden_projection(x))
+        y = self.GELU(y)
         y = self.dropout(y)
-        y = self.output_projection(y) + x
+        y = self.out1(y)*self.sigmoid(self.out2(y))
+        y = self.dropout(y) 
+
+        # skip connection
+        y = y + x
         return y
 
 
@@ -120,10 +133,14 @@ class LRU(nn.Module):
         r_min=0.1,
         r_max=1.0,
         max_phase=2 * np.pi,
+        bidirectional: bool = False,
     ):
         super().__init__()
 
         # between r_min and r_max, with phase in [0, max_phase].
+        if bidirectional:
+            state_dim = state_dim *2
+
         u1 = torch.rand(size=(state_dim,))
         u2 = torch.rand(size=(state_dim,))
         self.nu_log = nn.Parameter(
@@ -148,10 +165,13 @@ class LRU(nn.Module):
         self.gamma_log = nn.Parameter(gamma_log)
 
     def forward(self, input_sequence):
-        """Forward pass of the LRU layer. Output y and input_sequence are of shape (L, H)."""
+        """Forward pass of the LRU layer. Output y and input_sequence are of shape (batchsize, length, hidden_dim)."""
 
-        # Materializing the diagonal of Lambda and projections
+
+        # Diagonal of the dynamics matrix (A)
         Lambda = torch.exp(-torch.exp(self.nu_log) + 1j * torch.exp(self.theta_log))
+
+        # Input and output projections
         B_norm = (self.B_re + 1j * self.B_im) * torch.unsqueeze(
             torch.exp(self.gamma_log), dim=-1
         )
@@ -159,15 +179,28 @@ class LRU(nn.Module):
 
         # Running the LRU + output projection
         # For details on parallel scan, check discussion in Smith et al (2022).
-        Lambda_elements = torch.tile(Lambda[None, ...], input_sequence.shape[0], dim=0)
-        Bu_elements = torch.vmap(lambda u: B_norm @ u)(input_sequence)
+        #Lambda_elements = torch.tile(Lambda[None, ...], input_sequence.shape[0], dim=0)
+        Lambda_elements = Lambda.tile(input_sequence.shape[1], 1) # TODO: check if we need repeat
+        Bu_elements = input_sequence@B_norm.T
         elements = (Lambda_elements, Bu_elements)
         _, inner_states = parallel_scan(binary_operator_diag, elements)  # all x_k
-        y = torch.vmap(lambda x: u)
 
+        if self.bidirectional:
+            _, inner_states2 = parallel_scan(binary_operator_diag, elements, reverse=True)
+            inner_states = torch.cat([inner_states, inner_states2], dim=-1)
+            
+        y=(inner_states@C.T).real + input_sequence@self.D.T
+        return y
+    
 
+#https://github.com/i404788/s5-pytorch/blob/master/s5/s5_model.py
+#https://github.com/state-spaces/mamba/tree/main
+#https://github.com/pytorch/pytorch/issues/95408
+
+@torch.jit.script
 def binary_operator_diag(element_i, element_j):
     # Binary operator for parallel scan of linear recurrence.
     a_i, bu_i = element_i
     a_j, bu_j = element_j
     return a_j * a_i, a_j * bu_i + bu_j
+
