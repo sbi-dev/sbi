@@ -216,8 +216,8 @@ def likelihood_nn(
 
 def flowmatching_nn(
     model: str,
-    z_score_theta: Optional[str] = "independent",
-    z_score_x: Optional[str] = "independent",
+    z_score_theta: Optional[str] = None,
+    z_score_x: Optional[str] = None,
     hidden_features: int = 64,
     num_layers: int = 5,
     num_blocks: int = 5,
@@ -383,8 +383,8 @@ def posterior_nn(
 def posterior_score_nn(
     sde_type: str,
     score_net_type: Union[str, nn.Module] = "mlp",
-    z_score_theta: Optional[str] = "independent",
-    z_score_x: Optional[str] = "independent",
+    z_score_theta: Optional[str] = None,
+    z_score_x: Optional[str] = None,
     t_embedding_dim: int = 16,
     hidden_features: int = 50,
     embedding_net: nn.Module = nn.Identity(),
