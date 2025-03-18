@@ -213,10 +213,10 @@ def likelihood_nn(
 
 
 def flowmatching_nn(
-    model: Union[str, nn.Module] = "mlp",
+    model: str,
     z_score_theta: Optional[str] = None,
     z_score_x: Optional[str] = None,
-    hidden_features: Union[Sequence[int], int] = 64,
+    hidden_features: int = 64,
     num_layers: int = 5,
     num_blocks: int = 5,
     num_freqs: int = 16,
