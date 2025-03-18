@@ -12,7 +12,7 @@ def __getattr__(name):
         "CNNEmbedding",
         "FCEmbedding",
         "PermutationInvariantEmbedding",
-        "ResNet",
+        "ResNetEmbedding",
     ]:
         raise ImportError(
             "As of sbi v0.23.0, you have to import embedding networks from "
