@@ -2,13 +2,13 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import math
-from math import pi
 from typing import Callable, Optional, Union
 
 import torch
 from torch import Tensor, nn
 
 from sbi.neural_nets.estimators.base import ConditionalVectorFieldEstimator
+from sbi.utils.vector_field_utils import VectorFieldNet
 
 
 class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
@@ -61,9 +61,10 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
 
     def __init__(
         self,
-        net: nn.Module,
+        net: VectorFieldNet,
         input_shape: torch.Size,
         condition_shape: torch.Size,
+        embedding_net: nn.Module = nn.Identity(),
         weight_fn: Union[str, Callable] = "max_likelihood",
         mean_0: Union[Tensor, float] = 0.0,
         std_0: Union[Tensor, float] = 1.0,
@@ -78,6 +79,8 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
             net: Score estimator neural network with call signature:
                 input, condition, and time (in [0,1]).
             condition_shape: Shape of the conditioning variable.
+            embedding_net: Network to embed the conditioning variable before passing it
+                to the score network.
             weight_fn: Function to compute the weights over time. Can be one of the
                 following:
                 - "identity": constant weights (1.),
@@ -90,6 +93,9 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
 
         """
         super().__init__(net, input_shape, condition_shape, t_min, t_max)
+
+        # store embedding network
+        self._embedding_net = embedding_net
 
         # Set lambdas (variance weights) function.
         self._set_weight_fn(weight_fn)
@@ -109,6 +115,11 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         std_base = self.approx_marginal_std(torch.tensor([t_max])).flatten()[0]
         self._mean_base.fill_(mean_base)
         self._std_base.fill_(std_base)
+
+    @property
+    def embedding_net(self):
+        """Return the embedding network."""
+        return self._embedding_net
 
     def forward(self, input: Tensor, condition: Tensor, time: Tensor) -> Tensor:
         r"""Forward pass of the score estimator
@@ -132,6 +143,9 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         condition = torch.broadcast_to(condition, batch_shape + self.condition_shape)
         time = torch.broadcast_to(time, batch_shape)
 
+        # embed the conditioning variable
+        condition_emb = self._embedding_net(condition)
+
         # Time dependent mean and std of the target distribution to z-score the input
         # and to approximate the score at the end of the diffusion.
         mean = self.approx_marginal_mean(time)
@@ -148,7 +162,7 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         score_gaussian = (input - mean) / std**2
 
         # Score prediction by the network
-        score_pred = self.net(input_enc, condition, time_enc)
+        score_pred = self.net(input_enc, condition_emb, time_enc)
 
         # Output pre-conditioned score
         # The learnable part will be largly scaled at the beginning of the diffusion
@@ -207,6 +221,9 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
                 + self.t_min
             )
 
+        # Embed conditioning variable
+        condition_emb = self._embedding_net(condition)
+
         # Sample noise.
         eps = torch.randn_like(input)
 
@@ -221,7 +238,7 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         score_target = -eps / std
 
         # Predict score from noised input and diffusion time.
-        score_pred = self.forward(input_noised, condition, times)
+        score_pred = self.forward(input_noised, condition_emb, times)
 
         # Compute weights over time.
         weights = self.weight_fn(times)
@@ -238,7 +255,7 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
 
         if control_variate:
             D = input.shape[-1]
-            score_mean_pred = self.forward(mean, condition, times)
+            score_mean_pred = self.forward(mean, condition_emb, times)
             s = torch.squeeze(std, -1)
 
             # Loss terms that depend on eps
@@ -401,9 +418,10 @@ class VPScoreEstimator(ConditionalScoreEstimator):
 
     def __init__(
         self,
-        net: nn.Module,
+        net: VectorFieldNet,
         input_shape: torch.Size,
         condition_shape: torch.Size,
+        embedding_net: nn.Module = nn.Identity(),
         weight_fn: Union[str, Callable] = "max_likelihood",
         beta_min: float = 0.01,
         beta_max: float = 10.0,
@@ -418,9 +436,10 @@ class VPScoreEstimator(ConditionalScoreEstimator):
             net,
             input_shape,
             condition_shape,
+            embedding_net=embedding_net,
+            weight_fn=weight_fn,
             mean_0=mean_0,
             std_0=std_0,
-            weight_fn=weight_fn,
             t_min=t_min,
             t_max=t_max,
         )
@@ -503,9 +522,10 @@ class SubVPScoreEstimator(ConditionalScoreEstimator):
 
     def __init__(
         self,
-        net: nn.Module,
+        net: VectorFieldNet,
         input_shape: torch.Size,
         condition_shape: torch.Size,
+        embedding_net: nn.Module = nn.Identity(),
         weight_fn: Union[str, Callable] = "max_likelihood",
         beta_min: float = 0.01,
         beta_max: float = 10.0,
@@ -520,6 +540,7 @@ class SubVPScoreEstimator(ConditionalScoreEstimator):
             net,
             input_shape,
             condition_shape,
+            embedding_net=embedding_net,
             weight_fn=weight_fn,
             mean_0=mean_0,
             std_0=std_0,
@@ -621,9 +642,10 @@ class VEScoreEstimator(ConditionalScoreEstimator):
 
     def __init__(
         self,
-        net: nn.Module,
+        net: VectorFieldNet,
         input_shape: torch.Size,
         condition_shape: torch.Size,
+        embedding_net: nn.Module = nn.Identity(),
         weight_fn: Union[str, Callable] = "max_likelihood",
         sigma_min: float = 1e-5,
         sigma_max: float = 5.0,
@@ -636,6 +658,7 @@ class VEScoreEstimator(ConditionalScoreEstimator):
             net,
             input_shape,
             condition_shape,
+            embedding_net=embedding_net,
             weight_fn=weight_fn,
             mean_0=mean_0,
             std_0=std_0,
@@ -710,20 +733,3 @@ class VEScoreEstimator(ConditionalScoreEstimator):
             g = g.unsqueeze(-1)
 
         return g
-
-
-class GaussianFourierTimeEmbedding(nn.Module):
-    """Gaussian random features for encoding time steps.
-
-    This is to be used as a utility for score-matching."""
-
-    def __init__(self, embed_dim=256, scale=30.0):
-        super().__init__()
-        # Randomly sample weights during initialization. These weights are fixed
-        # during optimization and are not trainable.
-        self.W = nn.Parameter(torch.randn(embed_dim // 2) * scale, requires_grad=False)
-
-    def forward(self, times: Tensor):
-        times_proj = times[:, None] * self.W[None, :] * 2 * pi
-        embedding = torch.cat([torch.sin(times_proj), torch.cos(times_proj)], dim=-1)
-        return torch.squeeze(embedding, dim=1)
