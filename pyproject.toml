@@ -81,6 +81,7 @@ dev = [
     "pytest-testmon",
     "pytest-xdist",
     "pytest-harvest",
+    "pytest-split",
     "torchtestcase",
 ]
 
