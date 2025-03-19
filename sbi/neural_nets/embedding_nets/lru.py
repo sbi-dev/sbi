@@ -26,7 +26,7 @@ class LRUEmbedding(nn.Module):
         bidirectional: bool = False,
         dropout: float = 0.0,
         norm: bool = False,
-        # aggretate_func : Callable,
+        aggretate_func : callable | str = "last_ts"
     ):
         """Fully-connected multi-layer neural network to be used as embedding network.
 
@@ -53,9 +53,19 @@ class LRUEmbedding(nn.Module):
             )
             for _ in range(num_layers)
         ]
+        
+        if aggretate_func == "last_ts":
+            def aggretate_func(x):
+                return x[:,-1,:]
+        elif aggretate_func == "mean":
+            def aggretate_func(x):
+                return x.mean(dim=1)
+        elif aggretate_func == "sum":
+            def aggretate_func(x):
+                return x.sum(dim=1)
+        elif isinstance(aggretate_func, str):
+            raise ValueError(f"aggretate_func {aggretate_func} not implemented")
 
-        # Output layer.
-        # TODO: only readout one timestep
         self.output = nn.Linear(hidden_dim, output_dim)
 
         self.layers = nn.Sequential(*layers)
@@ -71,14 +81,14 @@ class LRUEmbedding(nn.Module):
             Network output (batch_size, output_dim).
         """
         x = self.embedding(x)
-        x_scan = self.net(x)  # (batch_size, len_sequence, output_dim)
+        x = self.net(x)  # (batch_size, len_sequence, output_dim)
 
         # Pooling
-        # TODO: implement pooling
+        x = self.aggretate_func(x)
 
         # output embedding
-        x_embed = self.output(x_scan)
-        return x_embed
+        x = self.output(x)
+        return x
 
 
 class LRUBlock(nn.Module):
