@@ -116,11 +116,7 @@ class EstimatorDistribution(pyro.distributions.TorchDistribution):
         # and sample shape of (sample_dim,)
         sample_shape = x.shape[: -len(self.event_shape) - len(self.batch_shape)]
         x = x.reshape(-1, self.batch_shape.numel(), *self.event_shape)
-        print(
-            x.shape, self.batch_shape, self.event_shape, self._condition_reshaped.shape
-        )
         lp = self._estimator_log_prob(x, self._condition_reshaped)
-        print(lp.shape)
         # reshape (sample_dim, batch_dim,) -> (*sample_shape, *batch_shape)
         return lp.reshape(*sample_shape, *self.batch_shape)
 
