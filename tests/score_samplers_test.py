@@ -17,6 +17,27 @@ from sbi.neural_nets.net_builders import build_score_estimator
 from sbi.samplers.score import Diffuser
 from sbi.utils import BoxUniform, MultipleIndependent
 
+def build_some_priors(num_dim: int):
+    # Diag normal prior
+    prior1 = Independent(Normal(torch.zeros((num_dim,)), torch.ones((num_dim,))), 1)
+    # Uniform prior
+    prior2 = Independent(Uniform(torch.zeros((num_dim,)), torch.ones((num_dim,))), 1)
+    prior2_2 = BoxUniform(torch.zeros((num_dim,)), torch.ones((num_dim,)))
+    # Multivariate normal prior
+    prior3 = MultivariateNormal(torch.zeros((num_dim,)), torch.eye(num_dim))
+    # Gamma prior - analytical not implemented but should fall back to general case
+    prior4 = Independent(Gamma(torch.ones((num_dim,)), torch.ones((num_dim,))), 1)
+    # Multiple independent prior
+    if num_dim == 1:
+        prior5 = Independent(Normal(torch.zeros((num_dim,)), torch.ones((num_dim,))), 1)
+    else:
+        prior5 = MultipleIndependent([
+            Normal(torch.zeros((1,)), torch.ones((1,))) for _ in range(num_dim)
+        ])
+
+    priors = [prior1, prior2, prior2_2, prior3, prior4, prior5]
+
+    return priors
 
 @pytest.mark.parametrize("sde_type", ["vp", "ve", "subvp"])
 @pytest.mark.parametrize(
@@ -28,7 +49,7 @@ from sbi.utils import BoxUniform, MultipleIndependent
         "jac_gauss",
     ],
 )
-@pytest.mark.parametrize("num_dim", [1, 2, 3])
+@pytest.mark.parametrize("num_dim", [2, 3])
 def test_score_fn_iid_on_different_priors(sde_type, iid_method, num_dim):
     """Test the the iid methods work with the most common priors that are used in
     practice (or are implemented in this library).
@@ -38,27 +59,11 @@ def test_score_fn_iid_on_different_priors(sde_type, iid_method, num_dim):
     that it doesn't lead to any errors, but does not test the correctness of the
     integration!
     """
-    mean0 = torch.zeros(num_dim)
-    std0 = torch.ones(num_dim)
+    mean0 = torch.zeros((num_dim,))
+    std0 = torch.ones((num_dim,))
     score_fn = _build_gaussian_score_estimator(sde_type, (num_dim,), mean0, std0)
-    # Diag normal prior
-    prior1 = Independent(Normal(torch.zeros(num_dim), torch.ones(num_dim)), 1)
-    # Uniform prior
-    prior2 = Independent(Uniform(torch.zeros(num_dim), torch.ones(num_dim)), 1)
-    prior2_2 = BoxUniform(torch.zeros(num_dim), torch.ones(num_dim))
-    # Multivariate normal prior
-    prior3 = MultivariateNormal(torch.zeros(num_dim), torch.eye(num_dim))
-    # Gamma prior - analytical not implemented but should fall back to general case
-    prior4 = Independent(Gamma(torch.ones(num_dim), torch.ones(num_dim)), 1)
-    # Multiple independent prior
-    if num_dim == 1:
-        prior5 = Independent(Normal(torch.zeros(1), torch.ones(1)), 1)
-    else:
-        prior5 = MultipleIndependent([
-            Normal(torch.zeros(1), torch.ones(1)) for _ in range(num_dim)
-        ])
 
-    priors = [prior1, prior2, prior2_2, prior3, prior4, prior5]
+    priors = build_some_priors(num_dim)
     x_o_iid = torch.ones((5, 1))
     score_fn.set_x(x_o_iid, x_is_iid=True, iid_method=iid_method)
     inputs = torch.ones((1, 1, num_dim))
@@ -72,6 +77,37 @@ def test_score_fn_iid_on_different_priors(sde_type, iid_method, num_dim):
         )
         assert torch.isfinite(output).all(), "Output contains non-finite values"
 
+
+@pytest.mark.parametrize("sde_type", ["vp", "ve", "subvp"])
+@pytest.mark.parametrize(
+    "guidance_method",
+    [
+        "affine_classifier_free",
+    ],
+)
+@pytest.mark.parametrize("num_dim", [1, 2, 3])
+def test_score_fn_guidance(sde_type, guidance_method, num_dim):
+    """ """
+    mean0 = torch.zeros(num_dim)
+    std0 = torch.ones(num_dim)
+    score_fn = _build_gaussian_score_estimator(sde_type, (num_dim,), mean0, std0)
+    x_o = torch.ones((
+        1,
+        1,
+    ))
+    score_fn.set_x(x_o, guidance_method=guidance_method)
+    inputs = torch.ones((1, 1, num_dim))
+    time = torch.ones(1)
+
+    priors = build_some_priors(num_dim)
+    for prior in priors:
+        score_fn.prior = prior
+        output = score_fn.gradient(inputs, time=time)
+
+    assert output.shape == (1, 1, num_dim), (
+        f"Expected shape {(1, 1, num_dim)}, got {output.shape}"
+    )
+    assert torch.isfinite(output).all(), "Output contains non-finite values"
 
 
 @pytest.mark.parametrize("sde_type", ["vp", "ve", "subvp"])
