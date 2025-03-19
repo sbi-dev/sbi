@@ -9,7 +9,10 @@ import pytest
 import torch
 from sbi.neural_nets.embedding_nets import CNNEmbedding
 from sbi.neural_nets.estimators.score_estimator import (
-    ConditionalScoreEstimator, ImprovedVPScoreEstimator, VPScoreEstimator)
+    ConditionalScoreEstimator,
+    ImprovedVPScoreEstimator,
+    VPScoreEstimator,
+)
 from sbi.neural_nets.net_builders import build_score_estimator
 from scipy import stats
 
@@ -149,7 +152,6 @@ def _build_score_estimator_and_tensors(
 
 
 def test_times_schedule():
-
     id_net = torch.nn.Identity()
     inpt_shape = (4,)
     cond_shape = (4,)
@@ -163,14 +165,14 @@ def test_times_schedule():
     obs = times.device
 
     delta = ivpse.t_max - ivpse.t_min
-    t_mu = ivpse.t_min + delta/2.
-    t_std = delta/8.
+    t_mu = ivpse.t_min + delta / 2.0
+    t_std = delta / 8.0
 
     assert exp == obs
     assert times.shape == torch.Size((10,))
 
     ndist = stats.norm(t_mu, t_std)
-    lo,hi = ndist.ppf(.01), ndist.ppf(.99)
+    lo, hi = ndist.ppf(0.01), ndist.ppf(0.99)
 
     assert times.max().item() <= hi
     assert times.min().item() >= lo
@@ -179,7 +181,6 @@ def test_times_schedule():
 
 
 def test_noise_schedule():
-
     id_net = torch.nn.Identity()
     inpt_shape = (4,)
     cond_shape = (4,)
@@ -194,7 +195,7 @@ def test_noise_schedule():
     assert noise.shape == torch.Size((10,))
 
     ndist = stats.norm(ivpse.pmean, ivpse.pstd)
-    lo,hi = ndist.ppf(.01), ndist.ppf(.99)
+    lo, hi = ndist.ppf(0.01), ndist.ppf(0.99)
 
     assert noise.max().item() < hi
     assert noise.min().item() > lo

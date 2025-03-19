@@ -47,7 +47,7 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         mean_0: Union[Tensor, float] = 0.0,
         std_0: Union[Tensor, float] = 1.0,
         t_min: float = 1e-3,
-        t_max: float = 1.0
+        t_max: float = 1.0,
     ) -> None:
         r"""Score estimator class that estimates the conditional score function, i.e.,
         gradient of the density p(xt|x0).
@@ -347,10 +347,9 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         """
         return self.beta_min + (self.beta_max - self.beta_min) * times
 
-    def times_schedule(self,
-                       num_samples: int,
-                       t_min: float = None,
-                       t_max: float = None) -> Tensor:
+    def times_schedule(
+        self, num_samples: int, t_min: float = None, t_max: float = None
+    ) -> Tensor:
         """
         Perform uniform sampling of time variables within the range [t_min, t_max].
         The `times` tensor will be put on the same device as the stored network.
@@ -396,9 +395,10 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         else:
             raise ValueError(f"Weight function {weight_fn} not recognized.")
 
-#TODO: experiment with time schedule with more samples around .5 (check edm paper)
-#TODO: impacts on training and evaluate
-#TODO: check effect in mini sbibm -> converges faster (focus on more important)
+
+# TODO: experiment with time schedule with more samples around .5 (check edm paper)
+# TODO: impacts on training and evaluate
+# TODO: check effect in mini sbibm -> converges faster (focus on more important)
 class VPScoreEstimator(ConditionalScoreEstimator):
     """Class for score estimators with variance preserving SDEs (i.e., DDPM)."""
 
@@ -414,10 +414,9 @@ class VPScoreEstimator(ConditionalScoreEstimator):
         std_0: Union[Tensor, float] = 1.0,
         t_min: float = 1e-5,
         t_max: float = 1.0,
-            pmean: float = 1.2,
-            pstd: float = -1.2
+        pmean: float = 1.2,
+        pstd: float = -1.2,
     ) -> None:
-
         self.pmean, self.pstd = pmean, pstd
         noise_dist = stats.norm(pmean, pstd**2)
         self.beta_min = exp(noise_dist.ppf(0.01))
@@ -498,9 +497,9 @@ class VPScoreEstimator(ConditionalScoreEstimator):
         return g
 
 
-#TODO: experiment with time schedule with more samples around .5 (check edm paper)
-#TODO: impacts on training and evaluate
-#TODO: check effect in mini sbibm -> converges faster (focus on more important)
+# TODO: experiment with time schedule with more samples around .5 (check edm paper)
+# TODO: impacts on training and evaluate
+# TODO: check effect in mini sbibm -> converges faster (focus on more important)
 class ImprovedVPScoreEstimator(ConditionalScoreEstimator):
     """Class for score estimators with variance preserving SDEs (i.e., DDPM)."""
 
@@ -516,10 +515,9 @@ class ImprovedVPScoreEstimator(ConditionalScoreEstimator):
         std_0: Union[Tensor, float] = 1.0,
         t_min: float = 1e-5,
         t_max: float = 1.0,
-            pmean: float = -1.2,
-            pstd: float = 1.2
+        pmean: float = -1.2,
+        pstd: float = 1.2,
     ) -> None:
-
         self.pmean, self.pstd = pmean, pstd
         noise_dist = stats.norm(pmean, pstd**2)
         self.beta_min = exp(noise_dist.ppf(0.01))
@@ -619,13 +617,12 @@ class ImprovedVPScoreEstimator(ConditionalScoreEstimator):
         Generative Models", https://arxiv.org/abs/2206.00364
         """
 
-        samples = torch.randn_like(times)*(self.pstd) + self.pmean
+        samples = torch.randn_like(times) * (self.pstd) + self.pmean
         return torch.exp(samples)
 
-    def times_schedule(self,
-                       num_samples: int,
-                       t_min: float = None,
-                       t_max: float = None) -> Tensor:
+    def times_schedule(
+        self, num_samples: int, t_min: float = None, t_max: float = None
+    ) -> Tensor:
         """
         Perform normal sampling around the middle of the interval [t_min, t_max]
 
@@ -641,11 +638,12 @@ class ImprovedVPScoreEstimator(ConditionalScoreEstimator):
         """
         t_min = self.t_min if isinstance(t_min, type(None)) else t_min
         t_max = self.t_max if isinstance(t_max, type(None)) else t_max
-        t_mu = t_min + (t_max - t_min)/2.
-        t_std = (t_max - t_min)/8.
+        t_mu = t_min + (t_max - t_min) / 2.0
+        t_std = (t_max - t_min) / 8.0
 
         # apply scale and loc to normal distribution
         return torch.randn(num_samples, device=self.device) * t_std + t_mu
+
 
 class SubVPScoreEstimator(ConditionalScoreEstimator):
     """Class for score estimators with sub-variance preserving SDEs."""
@@ -668,8 +666,8 @@ class SubVPScoreEstimator(ConditionalScoreEstimator):
             input_shape,
             condition_shape,
             weight_fn=weight_fn,
-            beta_min = beta_min,
-            beta_max = beta_max,
+            beta_min=beta_min,
+            beta_max=beta_max,
             mean_0=mean_0,
             std_0=std_0,
             t_min=t_min,
@@ -830,9 +828,7 @@ class VEScoreEstimator(ConditionalScoreEstimator):
         """
         sigma_scale = self.sigma_max / self.sigma_min
         sigmas = self.sigma_min * (sigma_scale) ** times
-        g = sigmas * math.sqrt(
-            (2 * math.log(sigma_scale))
-        )
+        g = sigmas * math.sqrt((2 * math.log(sigma_scale)))
 
         while len(g.shape) < len(input.shape):
             g = g.unsqueeze(-1)
