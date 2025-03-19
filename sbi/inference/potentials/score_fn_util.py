@@ -6,6 +6,7 @@ from typing import Callable, Optional, Type
 import torch
 from torch import Tensor
 from torch.distributions import Distribution
+import torch.nn.functional as F
 
 from sbi.neural_nets.estimators.score_estimator import ConditionalScoreEstimator
 from sbi.utils.score_utils import (
@@ -184,7 +185,6 @@ class ImpaintGuidanceCfg:
     conditioned_indices: list[int]
     imputed_value: float | Tensor
 
-
 @register_guidance_method("impaint", ImpaintGuidanceCfg)
 class ImpaintGuidance(ScoreAdaptation):
     def __init__(
@@ -285,6 +285,44 @@ class UniversalGuidance(ScoreAdaptation):
         guidance_score = self.guidance_fn_score(denoised_input, condition, m, std)
 
         return score + guidance_score
+
+@dataclass
+class IntervalGuidanceCfg:
+    lower_bound: float | Tensor
+    upper_bound: float | Tensor
+    scale_factor: float = 0.1
+
+
+@register_guidance_method("interval", IntervalGuidanceCfg)
+class IntervalGuidance(UniversalGuidance):
+    def __init__(
+        self,
+        score_estimator: ConditionalScoreEstimator,
+        prior: Optional[Distribution],
+        cfg: IntervalGuidanceCfg,
+        device: str = "cpu",
+    ):
+        """Implements interval guidance to constrain parameters within bounds.
+
+        Args:
+            score_estimator: The score estimator.
+            prior: The prior distribution.
+            cfg: Configuration specifying the interval bounds.
+            device: The device on which to evaluate the potential.
+        """
+
+        def interval_fn(input, condition, m, std):
+            scale = cfg.scale_factor / (m**2 * std**2)
+            return F.logsigmoid(scale * (input - cfg.upper_bound)) + F.logsigmoid(
+                -scale * (input - cfg.lower_bound)
+            )
+
+        super().__init__(
+            score_estimator,
+            prior,
+            UniversalGuidanceCfg(guidance_fn=interval_fn),
+            device=device,
+        )
 
 
 class IIDScoreFunction(ABC):
