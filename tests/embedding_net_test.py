@@ -292,3 +292,48 @@ def test_lru_embedding_net_isolated(
     x_embed = embedding_net(x)
     assert isinstance(x_embed, Tensor)
     assert x_embed.shape == (batch_size, output_dim)
+
+
+def test_lru_pipeline():
+    """Test an entire pipeline run using the LRU embedding."""
+
+    def _simulator(thetas: Tensor) -> Tensor:
+        """Create a simple simulator for a one-mass dampened spring system."""
+        assert thetas.shape[-1] == 3, "Expected 3 parameters: m, k, d"
+        num_time_steps = 200
+        dt = 0.002
+        eps = 1e-3
+
+        init_state = torch.tensor([[0.2], [0.5]])
+
+        xs = []
+        for theta in thetas:
+            # Create the matrices for the ODE, given the parameters.
+            m, k, d = theta
+            omega = torch.sqrt(k / m)  # eigen frequency [Hz]
+            zeta = d / (2.0 * torch.sqrt(m * k))  # damping ratio [-]
+            A = torch.tensor([[0, 1], [-(omega**2), -2.0 * zeta * omega]])
+            B = torch.tensor([[0], [1.0 / m]])
+
+            # Set a fixed initial position and velocity.
+            x = init_state.clone()
+
+            # Simulate.
+            for t in range(num_time_steps):
+                # Make some force act on the mass.
+                if t < num_time_steps // 2:
+                    u = torch.tensor([[-5.0]])
+                else:
+                    u = torch.tensor([[2.0]])
+
+                # Compute the ODE's right hand side.
+                x_dot = A @ x + B @ u
+
+                # Integrate one step (forward Euler).
+                x = x + x_dot * dt + eps * torch.randn((2, 1))
+                xs.append(x.T.clone())
+
+        return torch.cat(xs, dim=0)
+
+    traj = _simulator(torch.tensor([[1.0, 15.0, 0.7]]))
+    assert traj.shape == (200, 2)
