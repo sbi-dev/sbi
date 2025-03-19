@@ -6,6 +6,9 @@ import torch.nn as nn
 from torch import Tensor
 
 from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
+from sbi.neural_nets.estimators.shape_handling import (
+    reshape_to_batch_event,
+)
 from sbi.utils.vector_field_utils import VectorFieldNet
 
 
@@ -51,65 +54,19 @@ class FlowMatchingEstimator(ConditionalDensityEstimator):
         return self._embedding_net
 
     def forward(self, input: Tensor, condition: Tensor, t: Tensor) -> Tensor:
-        """
-        Forward pass of the FlowMatchingEstimator.
-
-        Args:
-            input: The input tensor.
-            condition: The condition tensor.
-            t: The time tensor.
-
-        Returns:
-            The estimated vector field.
-        """
-        # temporal fix that will be removed when the nn builders are updated
-        t = self._get_temporal_t_shape_fix(t)
-
-        batch_shape = torch.broadcast_shapes(
-            input.shape[: -len(self.input_shape)],
-            condition.shape[: -len(self.condition_shape)],
-        )
-
-        input = torch.broadcast_to(input, batch_shape + self.input_shape)
-        condition = torch.broadcast_to(condition, batch_shape + self.condition_shape)
-        t = torch.broadcast_to(t, batch_shape + t.shape[1:])
-
-        # the network expects 2D input, so we flatten the input if necessary
-        # and remember the original shape
-        target_shape = input.shape
-        input = input.reshape(-1, input.shape[-1])
-        condition = condition.reshape(-1, condition.shape[-1])
-        t = t.reshape(-1, t.shape[-1])
-
         # embed the input and condition
         embedded_condition = self._embedding_net(condition)
+        zscored_input = self.zscore_transform_input(input)
 
-        # call the network to get the estimated vector field
-        v = self.net(theta=input, x=embedded_condition, t=t)
+        # broadcast to match shapes of theta, x, and t
+        zscored_input, embedded_condition = broadcast(
+            zscored_input,  # type: ignore
+            embedded_condition,
+            ignore=1,
+        )
 
-        # reshape to the original shape
-        v = v.reshape(*target_shape)
-        return v
-
-    def loss(
-        self, input: Tensor, condition: Tensor, times: Optional[Tensor] = None, **kwargs
-    ) -> Tensor:
-        r"""Return the loss for training the density estimator.
-
-        More precisely, we compute the conditional flow matching loss with naive optimal
-        trajectories as described in the original paper [1]_:
-
-        .. math::
-            \mathbb{E}_{\theta_0 \sim p_{data}, t \sim \text{Uniform}[0, 1]},
-            \theta_t = t \cdot \theta_1 + (1 - t) \cdot \theta_0,
-            \left[ \| v(\theta_t, t; x_o = x_o) - (\theta_1 - \theta_0) \|^2 \right]
-
-        where :math:`v(\theta_t, t; x_o)` is the vector field estimated by the neural
-        network (see Equation 1 in [1]_ with added conditioning on :math:`x_o`. The
-        notation is changed to match the standard SBI notation: :math:`\theta_0 = x_0`
-        and :math:`\theta_1 = x_1`).
-
-        The loss is computed as the mean squared error between the vector field:
+        # return the estimated vector field
+        return self.net(theta=zscored_input, x_emb_cond=embedded_condition, t=t)
 
         .. math::
             L(\theta_0, \theta_1, t, x_o) = \| v(\theta_t, t; x_o) -
@@ -161,21 +118,32 @@ class FlowMatchingEstimator(ConditionalDensityEstimator):
         .. math::
             d\theta_t = v(\theta_t, t; x_o) dt
 
-        with initial :math:`\theta_1` sampled from the base distribution.
-        Here :math:`v(\theta_t, t; x_o)` is the vector field estimated by the
-        flow matching neural network (see Equation 1 in [1]_ with added
-        conditioning on :math:`x_o`).
+        # the flow will apply and take into account input zscoring.
+        input_reshaped = reshape_to_batch_event(input, input.shape[2:])
+        condition = reshape_to_batch_event(condition, condition.shape[2:])
+        log_probs = self.flow(condition=condition).log_prob(input_reshaped)
+        log_probs = log_probs.reshape(input.shape[0], input.shape[1])
+        return log_probs
 
-        Args:
-            input: :math:`\theta_t`.
-            condition: Conditioning variable :math:`x_o`.
-            times: Time :math:`t`.
-
-        Returns:
-            Estimated vector field :math:`v(\theta_t, t; x_o)`.
-            The shape is the same as the input.
-        """
-        return self.forward(input, condition, times)
+    def sample(self, sample_shape: torch.Size, condition: Tensor, **kwargs) -> Tensor:
+        batch_size_ = condition.shape[0]
+        print("before reshape, condition", condition.shape)
+        # condition = reshape_to_batch_event(condition, condition.shape[2:])
+        print("during sampling, condition", condition.shape)
+        samples = self.flow(condition=condition).sample(sample_shape)
+        # sample shape right now is (num_samples,)
+        print(
+            "during sampling, sample_shape",
+            sample_shape,
+            "input shape",
+            self.input_shape,
+        )
+        # samples = self.custom_euler_integration(
+        #     condition=condition, sample_shape=sample_shape
+        # )
+        print("after custom euler integration, samples", samples.shape)
+        samples = torch.reshape(samples, (sample_shape[0], batch_size_, -1))
+        return samples
 
     def score(self, input: Tensor, condition: Tensor, t: Tensor) -> Tensor:
         r"""Score function of the vector field estimator.
@@ -243,6 +211,16 @@ class FlowMatchingEstimator(ConditionalDensityEstimator):
         .. math::
             \g(t) = \sqrt{2(t + \sigma_{min}) / (1 - t)}
 
+        print("in zuko, condition", condition.shape)
+        transform = zuko.transforms.ComposedTransform(
+            FreeFormJacobianTransform(
+                f=lambda t, input: self.forward(input, condition, t),
+                t0=condition.new_tensor(0.0),
+                t1=condition.new_tensor(1.0),
+                phi=(condition, *self.net.parameters()),
+            ),
+            self.zscore_transform_input,
+        )
 
         Args:
             input: Parameters :math:`\theta_t`.
@@ -258,74 +236,21 @@ class FlowMatchingEstimator(ConditionalDensityEstimator):
             / torch.maximum(1 - times, torch.tensor(1e-6).to(times))
         )
 
-    def mean_t_fn(self, times: Tensor) -> Tensor:
-        r"""Linear coefficient of the perturbation kernel expectation
-        :math:`\mu_t(t) = E[\theta_t | \theta_0]` for the flow matching estimator.
-
-        The perturbation kernel for rectified flows with Gaussian base distribution is:
-
-        .. math::
-            N(\theta_t; \mu_t(t), \sigma_t(t)^2) ,
-            \mu_t(t) = (1 - t) \cdot \theta_0 + t \cdot \mu_{base}
-            \sigma_t(t) = t \cdot \sigma_{base}
-
-        So far, the implementation of iid methods assumes that the mean_base
-        :math:`\mu_{base}` is 0. Therefore, the linear coefficient of the perturbation
-        kernel mean is simply :math:`1 - t`.
-
-        Args:
-            times: SDE time variable in [0,1].
-
-        Returns:
-            Mean function at a given time.
-        """
-        mean_t = 1 - times
-        for _ in range(len(self.input_shape)):
-            mean_t = mean_t.unsqueeze(-1)
-        return mean_t
-
-    def std_fn(self, times: Tensor) -> Tensor:
-        r"""Standard deviation of the perturbation kernel :math:`\sigma_t(t)`
-        for the flow matching estimator.
-
-        The perturbation kernel for rectified flows with Gaussian base distribution is:
-
-        .. math::
-            N(\theta_t; \mu_t(t), \sigma_t(t)^2) ,
-            \mu_t(t) = (1 - t) \cdot \theta_0 + t \cdot \mu_{base}
-            \sigma_t(t) = t \cdot \sigma_{base}
-
-        Taking into account the noise scale :math:`\sigma_{min}`, the standard deviation
-        becomes:
-
-        .. math::
-            \sigma_t(t) = (t + \sigma_{min}) \cdot \sigma_{base}
-
-        Note that in the current implementation, the base distribution is Gaussian with
-        zero mean and unit variance.
-
-        Args:
-            times: SDE time variable in [0,1].
-
-        Returns:
-            Standard deviation at a given time.
-        """
-        std_t = times + self.noise_scale
-        for _ in range(len(self.input_shape)):
-            std_t = std_t.unsqueeze(-1)
-        return std_t
-
-    # this method will be removed in PR #1501
-    def _get_temporal_t_shape_fix(self, t: Tensor) -> Tensor:
-        """
-        This is a hack that allows us to use
-        the old nn builders that assume positional embedding of time
-        inside the forward method, resulting in a shape of (..., num_freqs * 2).
-        """
-        if t.ndim == 0:
-            t = t.reshape(1, 1)
-        elif t.ndim == 1:
-            t = t[..., None]
-        if t.shape[-1] == 1:
-            t = t.expand(*t.shape[:-1], self.num_freqs * 2)
-        return t
+    def custom_euler_integration(
+        self, condition: Tensor, sample_shape: torch.Size
+    ) -> Tensor:
+        theta_t = torch.randn(
+            list(sample_shape) * condition.shape[0] + list(self.input_shape),
+            device=condition.device,
+        )
+        # reshape condition to repliocate sample_shape times in batch dim
+        condition = (
+            condition.unsqueeze(0)
+            .repeat(sample_shape[0], 1, 1)
+            .reshape(-1, *condition.shape[1:])
+        )
+        for i in range(100):
+            theta_t = theta_t + self.forward(
+                theta_t, condition, torch.ones(theta_t.shape[0]) * i / 100
+            )
+        return theta_t

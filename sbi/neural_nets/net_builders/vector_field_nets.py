@@ -61,7 +61,7 @@ class SinusoidalTimeEmbedding(nn.Module):
         self.out_features = embed_dim
 
     def forward(self, t: Tensor) -> Tensor:
-        """Embed time using transformer sinusoidal embeddings.
+        """embed time using transformer sinusoidal embeddings.
 
         args:
             t: time tensor of shape (batch_size, 1) or (batch_size,) or scalar ()
@@ -135,10 +135,11 @@ class AdaMLPBlock(nn.Module):
         )
 
         # Initialize the last layer to zero
-        self.ada_ln[-1].weight.data *= 0.1
+        self.ada_ln[-1].weight.data.zero_()
         self.ada_ln[-1].bias.data.zero_()
 
         # MLP block
+        # NOTE: This can be made more flexible to support layer types.
         self.block = nn.Sequential(
             nn.Linear(hidden_dim, hidden_dim * mlp_ratio),
             activation(),
@@ -225,7 +226,6 @@ class GlobalEmbeddingMLP(nn.Module):
         for _i in range(num_intermediate_layers):
             self.mlp_blocks.append(
                 nn.Sequential(
-                    activation(),
                     nn.Linear(hidden_dim, hidden_dim * mlp_ratio),
                     activation(),
                     nn.Linear(hidden_dim * mlp_ratio, hidden_dim),
@@ -236,13 +236,17 @@ class GlobalEmbeddingMLP(nn.Module):
 
     def forward(self, t: Tensor, x_emb: Optional[Tensor] = None) -> Tensor:
         t_emb = self.time_emb(t)
-        if x_emb is not None:
-            t_emb = torch.broadcast_to(t_emb, (*x_emb.shape[:-1], t_emb.shape[-1]))
-            cond_emb = torch.cat([x_emb, t_emb], dim=-1)
+
+        try:
+            cond_emb = torch.cat([x_emb, t_emb], dim=-1) if x_emb is not None else t_emb
+        except Exception as e:
+            print("x_emb", (x_emb.shape if x_emb is not None else "None"))
+            print("t_emb", t_emb.shape)
+            raise e
 
         cond_emb = self.input_layer(cond_emb)
-        for mlp_block in self.mlp_blocks:
-            cond_emb = mlp_block(cond_emb)
+        for i in range(self.num_intermediate_layers):
+            cond_emb = self.mlp_blocks[i](cond_emb)
         return self.output_layer(cond_emb)
 
 
@@ -316,13 +320,12 @@ class VectorFieldMLP(VectorFieldNet):
             fourier_scale=fourier_scale,
             activation=activation,
         )
-        self.input_dim = hidden_features
 
         # Input layer
         self.layers.append(nn.Linear(input_dim, hidden_features))
 
         # Hidden layers
-        for _ in range(num_layers):
+        for _ in range(num_layers - 1):
             self.layers.append(
                 AdaMLPBlock(
                     hidden_dim=hidden_features,
@@ -347,9 +350,24 @@ class VectorFieldMLP(VectorFieldNet):
             Vector field evaluation at the provided points.
         """
 
-        h = theta
+        # # Convert theta to the shape [sample_size * batch_size, D]
+        # if theta.ndim == 3:
+        #     sample_size = theta.shape[0]
+        #     batch_size = theta.shape[1]
+        #     h = theta.reshape(sample_size * batch_size, -1)
+        #     x = x.reshape(sample_size * batch_size, -1)
+        #     t = t.reshape(sample_size * batch_size, -1)
+        # else:
+        #     raise ValueError(
+        #         f"Invalid theta shape: {theta.shape},\
+        #             should be [sample_size, batch_size, D]"
+        #     )
 
+        h = theta
         # Get condition embedding
+        # print("in vector field mlp, x", x.shape)
+        # print("in vector field mlp, theta", h.shape)
+        # print("in vector field mlp, t", t.shape)
         cond_emb = self.global_mlp(t, x_emb=x_emb_cond)
 
         # Forward pass through MLP
@@ -359,6 +377,10 @@ class VectorFieldMLP(VectorFieldNet):
             h = layer(h, cond_emb)
 
         h = self.layers[-1](h)  # hidden to output
+
+        # # Convert h to the shape [sample_size, batch_size, D]
+        # if theta.ndim == 3:
+        #     h = h.reshape(sample_size, batch_size, -1)
 
         return h
 
@@ -378,7 +400,7 @@ class DiTBlock(nn.Module):
         mlp_ratio: int = 2,
         activation: Callable = nn.GELU,
     ):
-        """Initialize dit transformer block.
+        """initialize dit transformer block.
 
         args:
             hidden_dim: dimension of hidden features
@@ -397,7 +419,7 @@ class DiTBlock(nn.Module):
         )
 
         # initialize last layer to zero
-        self.ada_affine[-1].weight.data *= 0.1
+        self.ada_affine[-1].weight.data.zero_()
         self.ada_affine[-1].bias.data.zero_()
 
         # attention
@@ -417,7 +439,7 @@ class DiTBlock(nn.Module):
         self.norm2 = nn.LayerNorm(hidden_dim)
 
     def forward(self, x: Tensor, cond: Tensor) -> Tensor:
-        """Forward pass through the block.
+        """forward pass through the block.
 
         args:
             x: input tensor (b, d)
@@ -487,7 +509,7 @@ class DiTBlockWithCrossAttention(nn.Module):
         )
 
         # initialize the last layer to zero
-        self.time_mlp[-1].weight.data *= 0.1
+        self.time_mlp[-1].weight.data.zero_()
         self.time_mlp[-1].bias.data.zero_()
 
         # self-attention
@@ -669,16 +691,33 @@ class VectorFieldTransformer(VectorFieldNet):
         self.output_proj = nn.Linear(hidden_features, 1)
 
     def forward(self, theta: Tensor, x_emb_cond: Tensor, t: Tensor) -> Tensor:
-        """Forward pass through the transformer.
+        """forward pass through the transformer.
 
-        Args:
+        args:
             theta: parameters (for FMPE) or state (for NPSE)
             x: conditioning information
             t: time parameter embedding
 
-        Returns:
-            Vector field evaluation at the provided points
+        returns:
+            vector field evaluation at the provided points
         """
+
+        # Convert theta to the shape [sample_size * batch_size, D]
+        # if theta.ndim == 3:
+        #     sample_size = theta.shape[0]
+        #     batch_size = theta.shape[1]
+        #     h = theta.reshape(sample_size * batch_size, -1)
+        #     x = (
+        #         x.reshape(sample_size * batch_size, -1)
+        #         if not self.is_x_emb_seq
+        #         else x.reshape(sample_size * batch_size, x.shape[-2], x.shape[-1])
+        #     )
+        #     t = t.reshape(sample_size * batch_size, -1)
+        # else:
+        #     raise ValueError(
+        #         f"Invalid theta shape: {theta.shape},\
+        #             should be [sample_size, batch_size, D]"
+        #     )
 
         h = theta
         # Get condition embedding
@@ -696,10 +735,12 @@ class VectorFieldTransformer(VectorFieldNet):
                 h = block(h, x_emb_cond, cond_emb)
             else:
                 h = block(h, cond_emb)
-
         # project to output dimension
         h = self.output_proj(h)
         h = h.squeeze(-1)
+        # Convert h to the shape [sample_size, batch_size, D]
+        # if theta.ndim == 3:
+        #     h = h.reshape(sample_size, batch_size, -1)
 
         return h
 
