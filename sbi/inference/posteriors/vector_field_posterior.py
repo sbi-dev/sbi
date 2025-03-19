@@ -13,9 +13,11 @@ from sbi.inference.potentials.vector_field_potential import (
     PosteriorVectorFieldBasedPotential,
     vector_field_estimator_based_potential,
 )
-from sbi.neural_nets.estimators.vector_field_estimator import ConditionalVectorFieldEstimator
 from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
+)
+from sbi.neural_nets.estimators.vector_field_estimator import (
+    ConditionalVectorFieldEstimator,
 )
 from sbi.samplers.rejection import rejection
 from sbi.samplers.score.correctors import Corrector
@@ -93,7 +95,7 @@ class VectorFieldPosterior(NeuralPosterior):
         self.max_sampling_batch_size = max_sampling_batch_size
 
         self._purpose = """It samples from the diffusion model given the \
-            score_estimator."""
+            vector_field_estimator."""
 
     def sample(
         self,
@@ -184,7 +186,9 @@ class VectorFieldPosterior(NeuralPosterior):
                 proposal_sampling_kwargs=proposal_sampling_kwargs,
             )[0]
 
-        samples = samples.reshape(sample_shape + self.vector_field_estimator.input_shape)
+        samples = samples.reshape(
+            sample_shape + self.vector_field_estimator.input_shape
+        )
         return samples
 
     def _sample_via_diffusion(
@@ -274,7 +278,9 @@ class VectorFieldPosterior(NeuralPosterior):
         """
         num_samples = torch.Size(sample_shape).numel()
 
-        samples = self.potential_fn.neural_ode(self.potential_fn.x_o).sample(torch.Size((num_samples,)))
+        samples = self.potential_fn.neural_ode(self.potential_fn.x_o).sample(
+            torch.Size((num_samples,))
+        )
 
         return samples
 
@@ -301,9 +307,7 @@ class VectorFieldPosterior(NeuralPosterior):
             `(len(θ),)`-shaped log posterior probability $\log p(\theta|x)$ for θ in the
             support of the prior, -∞ (corresponding to 0 probability) outside.
         """
-        self.potential_fn.set_x(
-            self._x_else_default_x(x), **(ode_kwargs or {})
-        )
+        self.potential_fn.set_x(self._x_else_default_x(x), **(ode_kwargs or {}))
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
         return self.potential_fn(
