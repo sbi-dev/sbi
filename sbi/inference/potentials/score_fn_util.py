@@ -1,12 +1,13 @@
 import functools
 import math
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from typing import Callable, Optional, Type
 
 import torch
+import torch.nn.functional as F
 from torch import Tensor
 from torch.distributions import Distribution
-import torch.nn.functional as F
 
 from sbi.neural_nets.estimators.score_estimator import ConditionalScoreEstimator
 from sbi.utils.score_utils import (
@@ -17,8 +18,6 @@ from sbi.utils.score_utils import (
     solve_diag_or_dense,
 )
 from sbi.utils.torchutils import ensure_theta_batched
-
-from dataclasses import dataclass
 
 IID_METHODS = {}
 GUIDANCE_METHODS = {}
@@ -116,12 +115,14 @@ class ScoreAdaptation(ABC):
     def __call__(self, theta: Tensor, x_o: Tensor, time: Optional[Tensor] = None):
         pass
 
+
 @dataclass
 class AffineClassifierFreeGuidanceCfg:
     prior_scale: float | Tensor = 1.0
     prior_shift: float | Tensor = 0.0
     likelihood_scale: float | Tensor = 1.0
     likelihood_shift: float | Tensor = 0.0
+
 
 @register_guidance_method("affine_classifier_free", AffineClassifierFreeGuidanceCfg)
 class AffineClassifierFreeGuidance(ScoreAdaptation):
@@ -180,10 +181,12 @@ class AffineClassifierFreeGuidance(ScoreAdaptation):
 
         return ll_score_mod + prior_score_mod
 
+
 @dataclass
 class ImpaintGuidanceCfg:
     conditioned_indices: list[int]
     imputed_value: float | Tensor
+
 
 @register_guidance_method("impaint", ImpaintGuidanceCfg)
 class ImpaintGuidance(ScoreAdaptation):
@@ -285,6 +288,7 @@ class UniversalGuidance(ScoreAdaptation):
         guidance_score = self.guidance_fn_score(denoised_input, condition, m, std)
 
         return score + guidance_score
+
 
 @dataclass
 class IntervalGuidanceCfg:
