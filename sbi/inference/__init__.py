@@ -40,11 +40,13 @@ from sbi.inference.posteriors import (
     RejectionPosterior,
     ScorePosterior,
     VIPosterior,
+    VectorFieldPosterior,
 )
 from sbi.inference.potentials import (
     likelihood_estimator_based_potential,
     mixed_likelihood_estimator_based_potential,
     posterior_estimator_based_potential,
     ratio_estimator_based_potential,
+    vector_field_estimator_based_potential,
 )
 from sbi.utils.simulation_utils import simulate_for_sbi

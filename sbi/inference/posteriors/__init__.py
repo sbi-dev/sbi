@@ -4,4 +4,5 @@ from sbi.inference.posteriors.importance_posterior import ImportanceSamplingPost
 from sbi.inference.posteriors.mcmc_posterior import MCMCPosterior
 from sbi.inference.posteriors.rejection_posterior import RejectionPosterior
 from sbi.inference.posteriors.score_posterior import ScorePosterior
+from sbi.inference.posteriors.vector_field_posterior import VectorFieldPosterior
 from sbi.inference.posteriors.vi_posterior import VIPosterior
