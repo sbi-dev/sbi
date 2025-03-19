@@ -113,12 +113,17 @@ def clamp_and_warn(name: str, value: float, min_val: float, max_val: float) -> f
     return clamped_val
 
 
-ZScoreType = Literal[
-    "affine-independent",
-    "affine-structured",
-    "logit-independent",
-    "logit-structured",
-    "none",
+ZScoreType = Union[
+    Literal[
+        "affine-independent",
+        "affine-structured",
+        "logit-independent",
+        "logit-structured",
+        "structured",
+        "independent",
+        "none",
+    ],
+    None,
 ]
 
 
@@ -163,10 +168,29 @@ def z_score_parser(z_score_flag: Optional[ZScoreType]) -> Tuple[Union[str, None]
     ]:
         transform_type, structured_data = z_score_flag.split("-")
         structured_data = structured_data == "structured"
+    elif z_score_flag == "structured":
+        # Raise warning if structured was passed
+        warnings.warn(
+            "structured z-scoring is depreciated as of sbi v0.23.3. It will be "
+            "removed in a future release. Use `affine-independent`,`affine-structured`,"
+            "`logit-independent`, `logit-structured`, `none`, None."
+            "to indicate z-scoring option. Now defaulting to 'affine-independent'.",
+            stacklevel=2,
+        )
+        transform_type, structured_data = "affine", True
+    elif z_score_flag == "independent":
+        warnings.warn(
+            "independent z-scoring is depreciated as of sbi v0.23.3. It will be "
+            "removed in a future release. Use `affine-independent`,`affine-structured`,"
+            "`logit-independent`, `logit-structured`, `none`, None."
+            "to indicate z-scoring option. Now defaulting to 'affine-independent'.",
+            stacklevel=2,
+        )
+        transform_type, structured_data = "affine", False
     else:
         raise ValueError(
-            "Invalid z-scoring option. Use 'affine-independent', 'affine-structured'",
-            "'logit-independent', 'logit-structured', 'identity'.",
+            "Invalid z-scoring option. Use `affine-independent`, `affine-structured`",
+            "`logit-independent`, `logit-structured`, `none`.",
         )
 
     return transform_type, structured_data
