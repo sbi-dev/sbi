@@ -516,8 +516,8 @@ class ImprovedVPScoreEstimator(ConditionalScoreEstimator):
         std_0: Union[Tensor, float] = 1.0,
         t_min: float = 1e-5,
         t_max: float = 1.0,
-            pmean: float = 1.2,
-            pstd: float = -1.2
+            pmean: float = -1.2,
+            pstd: float = 1.2
     ) -> None:
 
         self.pmean, self.pstd = pmean, pstd

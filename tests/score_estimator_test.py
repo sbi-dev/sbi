@@ -166,14 +166,14 @@ def test_times_schedule():
     t_mu = ivpse.t_min + delta/2.
     t_std = delta/8.
 
+    assert exp == obs
+    assert times.shape == torch.Size((10,))
+
     ndist = stats.norm(t_mu, t_std)
     lo,hi = ndist.ppf(.01), ndist.ppf(.99)
 
-    assert exp == obs
-    assert times.shape == torch.Size((10,))
     assert times.max().item() <= hi
     assert times.min().item() >= lo
-
     assert times.max().item() < ivpse.t_max
     assert times.min().item() > ivpse.t_min
 
@@ -192,5 +192,9 @@ def test_noise_schedule():
 
     assert exp == obs
     assert noise.shape == torch.Size((10,))
-    assert noise.max().item() < ivpse.beta_max
-    assert noise.min().item() >= ivpse.beta_min
+
+    ndist = stats.norm(ivpse.pmean, ivpse.pstd)
+    lo,hi = ndist.ppf(.01), ndist.ppf(.99)
+
+    assert noise.max().item() < hi
+    assert noise.min().item() > lo
