@@ -26,16 +26,21 @@ class NeuralODE(LazyDistribution):
             self, 
             f: NeuralODEFuncType,
             net: nn.Module, 
-            t0: float = 0.0,
-            t1: float = 1.0,
+            mean_base: Tensor,
+            std_base: Tensor,
+            t_min: float = 0.0,
+            t_max: float = 1.0,
             **kwargs
         ):
         super().__init__()
         self.f = f
         self.net = net
-        self.t0 = t0
-        self.t1 = t1
+        self.t_min = t_min
+        self.t_max = t_max
+        self.mean_base = mean_base
+        self.std_base = std_base
+        self.kwargs = kwargs
 
     @abstractmethod
-    def forward(self, condition: Tensor) -> Distribution:
+    def forward(self, condition: Tensor, **kwargs) -> Distribution:
         pass
