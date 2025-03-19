@@ -2,7 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import warnings
-from typing import Literal, Optional
+from typing import Optional
 
 import torch
 from torch import Tensor, nn
@@ -68,7 +68,6 @@ def _build_mixed_density_estimator(
     hidden_layers: int = 2,
     tail_bound: float = 10.0,
     log_transform_x: bool = True,
-    mode: Literal["mnle", "mnpe"] = "mnle",
     **kwargs,
 ) -> MixedDensityEstimator:
     """Base function for building mixed neural density estimators.
@@ -147,28 +146,15 @@ def _build_mixed_density_estimator(
         num_disc = len(num_categorical_columns)
     cont_x, disc_x = _separate_input(batch_x, num_discrete_columns=num_disc)
 
-    # The embedding net is applied to the continuous part of the parameters
-    # MNPE: parameters are in batch_x, MNLE: parameters are in batch_y
-    if mode.lower() == "mnpe":
-        z_score_x_bool, structured_x = z_score_parser(z_score_x)
-        if z_score_x_bool:
-            embedding_net_x = nn.Sequential(
-                standardizing_net(cont_x, structured_x), embedding_net
-            )
-        else:
-            embedding_net_x = embedding_net
-        embedding_net_y = standardizing_net(batch_y)
-    elif mode.lower() == "mnle":
-        z_score_y_bool, structured_y = z_score_parser(z_score_y)
-        if z_score_y_bool:
-            embedding_net_y = nn.Sequential(
-                standardizing_net(batch_y, structured_y), embedding_net
-            )
-        else:
-            embedding_net_y = embedding_net
-        embedding_net_x = nn.Identity()
+    # The embeedding net is applied to the continuous part of the inputs
+    z_score_y_bool, structured_y = z_score_parser(z_score_y)
+    if z_score_y_bool:
+        embedding_net_y = nn.Sequential(
+            standardizing_net(batch_y, structured_y), embedding_net
+        )
     else:
-        raise ValueError(f"Invalid mode: {mode}, must be one of 'mnle' or 'mnpe'.")
+        embedding_net_y = embedding_net
+    embedding_net_x = nn.Identity()
 
     # embed
     embedded_batch_x = embedding_net_x(cont_x)
@@ -201,10 +187,12 @@ def _build_mixed_density_estimator(
     continuous_net = model_builders[flow_model](
         # TODO: add support for optional log-transform in flow builders.
         batch_x=(
-            torch.log(embedded_batch_x + 1e-10) if log_transform_x else embedded_batch_x
+            torch.log(embedded_batch_x + 1e-10)
+            if log_transform_x
+            else embedded_batch_x  # MNLE thing since x is data in mnle
         ),  # log transform manually.
         batch_y=combined_condition,
-        z_score_x="none" if mode.lower() == "mnpe" else z_score_x,
+        z_score_x=z_score_x,
         z_score_y="none",  # combined condition is already z-scored for mnle
         # combined embedding net for discrete and continuous data.
         embedding_net=combined_embedding_net,
@@ -229,6 +217,7 @@ def _build_mixed_density_estimator(
 def build_mnle(
     batch_x: Tensor,
     batch_y: Tensor,
+    log_transform_x: bool = True,
     **kwargs,
 ) -> MixedDensityEstimator:
     """Returns a mixed neural likelihood estimator.
@@ -238,19 +227,22 @@ def build_mnle(
     Args:
         batch_x: Batch of xs (data), used to infer dimensionality.
         batch_y: Batch of ys (parameters), used to infer dimensionality.
+        log_transform_x: whether to apply a log-transform to x. This is by default true
+            because x is data in MNLE.
         **kwargs: Additional arguments passed to _build_mixed_density_estimator.
 
     Returns:
         MixedDensityEstimator for MNLE.
     """
     return _build_mixed_density_estimator(
-        batch_x=batch_x, batch_y=batch_y, mode="mnle", **kwargs
+        batch_x=batch_x, batch_y=batch_y, log_transform_x=log_transform_x, **kwargs
     )
 
 
 def build_mnpe(
     batch_x: Tensor,
     batch_y: Tensor,
+    log_transform_x: bool = False,
     **kwargs,
 ) -> MixedDensityEstimator:
     """Returns a mixed neural posterior estimator.
@@ -260,11 +252,13 @@ def build_mnpe(
     Args:
         batch_x: Batch of xs (parameters), used to infer dimensionality.
         batch_y: Batch of ys (data), used to infer dimensionality.
+        log_transform_x: whether to apply a log-transform to x. This is by default false
+            because x is data in MNPE.
         **kwargs: Additional arguments passed to _build_mixed_density_estimator.
 
     Returns:
         MixedDensityEstimator for MNPE.
     """
     return _build_mixed_density_estimator(
-        batch_x=batch_x, batch_y=batch_y, mode="mnpe", **kwargs
+        batch_x=batch_x, batch_y=batch_y, log_transform_x=log_transform_x, **kwargs
     )
