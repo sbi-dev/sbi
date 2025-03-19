@@ -209,7 +209,7 @@ class PosteriorScoreBasedPotential(BasePotential):
                     self.score_estimator, self.prior, **(self.iid_params or {})
                 )
 
-                score = score_fn_iid(theta, self.x_o, time)
+                score = score_fn_iid(theta, self.x_o, time) 
 
         return score
 
