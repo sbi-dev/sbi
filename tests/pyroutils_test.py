@@ -131,15 +131,16 @@ def test_pyro_gaussian_model(
     num_dim, num_trials, num_simulations=500, num_samples=500, warmup_steps=500
 ):
     """Test consistency of MCMC samples between the true and estimated likelihood."""
+    # Get data we will condition on
     _, x_o = pyro_gaussian_model(num_trials=num_trials, num_dim=num_dim)
 
+    # Get MCMC samples from a model using the true likelihood
     nuts_kernel = NUTS(pyro_gaussian_model)
     mcmc = MCMC(nuts_kernel, num_samples=num_samples, warmup_steps=warmup_steps)
     mcmc.run(x_o=x_o)
-
     pyro_samples = torch.from_numpy(np.array(mcmc.get_samples()["theta"]))
 
-    # Run sbi
+    # Simulated data from the true model and use it to train the estimator
     prior = single_level_prior_theta(num_dim=num_dim)
     theta = []
     x = []
@@ -149,10 +150,10 @@ def test_pyro_gaussian_model(
         x.append(torch.from_numpy(np.array(xi)))
     theta = torch.stack(theta, dim=0).float()
     x = torch.stack(x, dim=0).float().squeeze()
-
     trainer = NLE(prior=prior).append_simulations(theta=theta, x=x)
     density_estimator = trainer.train()
 
+    # Define a model that uses the estimated likelihood
     def sbi_pyro_model(likelihood, x_o=None):
         theta = pyro.sample("theta", single_level_prior_theta(num_dim))  # (D,)
 
@@ -166,16 +167,14 @@ def test_pyro_gaussian_model(
         else:
             return x_o
 
-    # Check that the model runs
     theta, x = sbi_pyro_model(density_estimator)
     sbi_pyro_model(density_estimator, x_o=x)
 
-    # Run inference
+    # Get MCMC samples from a model that uses the estimated likelihood
     nuts_kernel = NUTS(sbi_pyro_model)
     mcmc = MCMC(nuts_kernel, num_samples=num_samples, warmup_steps=warmup_steps)
     mcmc.run(x_o=x_o, likelihood=density_estimator)
-
-    # Compare posterior samples
     sbi_samples = mcmc.get_samples()["theta"]
 
+    # Compare posterior samples
     check_c2st(sbi_samples, pyro_samples, tol=0.1, alg="pyro MCMC vs SBI-pyro MCMC")
