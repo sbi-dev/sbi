@@ -30,7 +30,6 @@ from torch.distributions import (
     AffineTransform,
     Distribution,
     Independent,
-    Transform,
     biject_to,
     constraints,
 )
@@ -156,7 +155,10 @@ def z_score_parser(z_score_flag: Optional["str"]) -> Tuple[bool, bool]:
         # Got one of two valid z-scoring methods.
         z_score_bool = True
         structured_data = z_score_flag == "structured"
-
+    elif z_score_flag == "logit":
+        # Do not z-score if logit transform. Logit is not estimated from data,
+        # but from the prior bounds, so structured/indpendent does not matter.
+        z_score_bool, structured_data = False, False
     else:
         # Return warning due to invalid option, defaults to not z-scoring.
         raise ValueError(
@@ -218,112 +220,6 @@ def standardizing_transform_zuko(
         scale=1 / t_std,
         buffer=True,
     )
-
-
-class BoundedLogitTransform(Transform):
-    """
-    Implements a logit transformation for data bounded within a given interval
-    (min_val, max_val), mapping it to the real line (-inf, inf). This transformation
-    is useful for normalizing bounded data while ensuring numerical stability.
-
-    The transformation follows:
-        x' = log((x - min_val) / (max_val - min_val))
-        - log(1 - (x - min_val) / (max_val - min_val))
-
-    The inverse transformation applies the sigmoid function
-    to map back to (min_val, max_val).
-
-    Attributes:
-        min_val (float): The lower bound of the input domain.
-        max_val (float): The upper bound of the input domain.
-        eps (float): A small value to prevent numerical issues at the boundaries.
-        domain (Constraint): Defines the valid input range as (min_val, max_val).
-        codomain (Constraint): Defines the output range as the real line (-inf, inf).
-    """
-
-    def __init__(self, min_val: float, max_val: float, eps: float = 1e-5):
-        super().__init__()
-        self.min_val = min_val
-        self.max_val = max_val
-        self.eps = eps  # Avoids numerical instability at boundaries
-
-        # Define domain and codomain
-        self.domain = constraints.interval(min_val, max_val)  # Input is in (min, max)
-        self.codomain = constraints.real  # Output is unbounded
-
-    def __call__(self, x: Tensor) -> Tensor:
-        # Normalize to (0,1)
-        x = (x - self.min_val) / (self.max_val - self.min_val)
-        x = torch.clamp(x, self.eps, 1 - self.eps)  # Prevents log(0) or log(∞)
-        return torch.log(x) - torch.log(1 - x)  # Logit function
-
-    def inv(self, y: Tensor) -> Tensor:
-        # Sigmoid and scale back to (min, max)
-        return self.min_val + (self.max_val - self.min_val) * torch.sigmoid(y)
-
-    def log_abs_det_jacobian(self, x: Tensor, y: Tensor) -> Tensor:
-        """
-        Computes the log absolute determinant of the Jacobian of the transformation.
-        Needed for proper transformation in Zuko flows.
-        """
-        x = (x - self.min_val) / (self.max_val - self.min_val)
-        x = torch.clamp(x, self.eps, 1 - self.eps)
-        log_det = (
-            -torch.log(x) - torch.log(1 - x) - torch.log(self.max_val - self.min_val)
-        )
-        return log_det
-
-
-def logit_transform_zuko(
-    batch_t: Tensor, structured_dims: bool = False, eps: float = 1e-5
-) -> zuko.flows.UnconditionalTransform:
-    """
-    Builds logit-transforming transform for Zuko flows on a bounded interval.
-
-    Args:
-        batch_t: Batched tensor from which min and max values are computed.
-        eps: Small constant to avoid numerical issues at 0 and 1.
-
-    Returns:
-        Logit transformation for the given range.
-    """
-    min_val, max_val = min_max_estimation(batch_t, structured_dims)
-
-    return zuko.flows.UnconditionalTransform(
-        BoundedLogitTransform,
-        min_val=min_val,
-        max_val=max_val,
-        eps=eps,
-        buffer=True,
-    )
-
-
-def min_max_estimation(
-    batch_t: Tensor, structured_dims: bool = False
-) -> Tuple[float, float]:
-    """
-    Estimates the minimum and maximum values of a batched tensor.
-
-    Args:
-        batch_t: Batched tensor from which min and max values are computed.
-        structured_dims: Whether data dimensions are structured (e.g., time-series,
-            images), which requires computing min and max per sample first before
-            aggregating over samples for a single min and max for the batch, or
-            independent (default), which computes min and max values independently.
-
-    Returns:
-        Tuple of min and max values for the given tensor.
-    """
-    is_valid_t, *_ = handle_invalid_x(batch_t, True)
-
-    if structured_dims:
-        min_val = torch.min(batch_t[is_valid_t], dim=1).values
-        max_val = torch.max(batch_t[is_valid_t], dim=1).values
-    else:
-        min_val = torch.min(batch_t[is_valid_t], dim=0).values
-        max_val = torch.max(batch_t[is_valid_t], dim=0).values
-
-    return min_val, max_val
 
 
 def z_standardization(
@@ -806,7 +702,8 @@ def mcmc_transform(
     It does two things:
     1) When the prior support is bounded, it transforms the parameters into unbounded
         space.
-    2) It z-scores the parameters such that MCMC is performed in a z-scored space.
+    2) It z-scores the parameters such that MCMC is performed in a z-scored space
+    (when logit transformed, no z-scoring is applied/needed).
 
     Args:
         prior: The prior distribution.
