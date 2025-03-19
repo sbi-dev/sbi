@@ -9,20 +9,34 @@ import torch.nn.functional as F
 from torch import Tensor, nn
 
 
+# TODO: add code reference
 class SpectralConvEmbedding(nn.Module):
     def __init__(
         self,
         n_points: int,
         modes: int,
+        n_channels: int = 1,
         conv_channels: int = 8,
         num_layers: int = 3,
-        channels: int = 1,
         n_positions: Optional[Union[np.ndarray, List[float]]] = None,
     ):
-        # TODO: add docstring
+        """SpectralConvEmbedding is a neural network module that applies spectral
+        convolution to 1D input data (that can come from multiple channels).
+        It uses a series of spectral convolution layers and pointwise
+        convolution layers to transform the input tensor.
 
+        Args:
+            n_points: Number of points in the 1D input data.
+            modes: Number of modes for the spectral convolution,
+                at most floor(n_points/2) + 1.
+            n_channels: Number of channels in the input data.
+            conv_channels: Number of convolution channels (same for in and out).
+            num_layers: Number of convolution layers.
+            n_positions: Positions for the spectral convolution.
+                If not provided, uses equispaced points.
+
+        """
         super().__init__()
-
         assert modes <= n_points // 2 + 1, (
             "Modes should be at most floor(n_points/2) + 1"
         )
@@ -30,10 +44,10 @@ class SpectralConvEmbedding(nn.Module):
         self.modes = modes
         self.n_positions = n_positions
         self.conv_channels = conv_channels
-        self.channels = channels
+        self.n_channels = n_channels
 
         # layers
-        self.fc0 = nn.Linear(channels, self.conv_channels)
+        self.fc0 = nn.Linear(n_channels, self.conv_channels)
         self.conv_layers = nn.ModuleList([
             SpectralConv1d_SMM(self.conv_channels, self.conv_channels, self.modes)
             for _ in range(num_layers)
@@ -50,20 +64,22 @@ class SpectralConvEmbedding(nn.Module):
         """Network forward pass.
 
         Args:
-            x: Input tensor (batch_size, num_features)
+            x: Input tensor (batch_size, channels * n_points).
 
         Returns:
-            Network output (batch_size, num_features).
+            Network output (batch_size, conv_channels * modes).
         """
-        # excepts x to habe shape (batch_size, channels * n_points)
-        # TODO: have size check so that x.shape[-1] = channels* input_shape
-        # (however cnn.py does not check it)
+
+        assert x.shape[-1] == self.n_channels * self.n_points, (
+            f"Input tensor should have shape (batch_size, n_channels * n_points), "
+            f"got {x.shape[-1]} instead of {self.n_channels * self.n_points}"
+        )
         batch_size = x.shape[0]
-        x = x.view(batch_size, self.channels, -1)  # (#batch, #channels, #points)
-        n_points = x.shape[-1]
+        x.reshape(batch_size, self.n_channels, -1)  # (batch_size, channels, n_points)
+
         x = self.fc0(x.permute(0, 2, 1)).permute(0, 2, 1)
 
-        fourier_transform = VFT(batch_size, n_points, self.modes, self.n_positions)
+        fourier_transform = VFT(batch_size, self.n_points, self.modes, self.n_positions)
 
         for conv, w in zip(self.conv_layers, self.w_layers, strict=False):
             x1 = conv(x, fourier_transform)
@@ -71,12 +87,9 @@ class SpectralConvEmbedding(nn.Module):
             x = x1 + x2
             x = F.gelu(x)
 
-        # TODO: make it optional whether to use FNO spectral output?
         x_spec = self.conv_last(x, fourier_transform)
 
-        return x_spec.reshape(
-            batch_size, -1
-        )  # TODO: needs to be 1D? (sbi requires 1D output)
+        return x_spec.reshape(batch_size, -1)
 
 
 # class for fully nonequispaced 1d points
@@ -87,7 +100,7 @@ class VFT:
         self.modes = modes
 
         if n_positions is not None:
-            # only works if positions are the same for all samples
+            # only works if positions are the same for all data samples
             new_times = n_positions.repeat(self.batch_size, 1) / n_positions.max()
         else:
             new_times = (torch.arange(self.number_points) / self.number_points).repeat(
@@ -108,7 +121,7 @@ class VFT:
         return forward_mat, inverse_mat
 
     def forward(self, data, norm='forward'):
-        # data should have shape: (#batch, #points, #channel)
+        # data has shape: (batch_size, n_points, conv_channel)
         data_fwd = torch.bmm(self.V_fwd, data)
         if norm == 'forward':
             data_fwd /= self.number_points
@@ -128,14 +141,23 @@ class VFT:
 
 
 class SpectralConv1d_SMM(nn.Module):
-    def __init__(self, in_channels, out_channels, modes):
+    """
+    A 1D spectral convolutional layer using the Fourier transform.
+    This layer applies a learned complex multiplication in the frequency domain.
+
+    Args:
+        in_channels: Number of input channels.
+        out_channels: Number of output channels.
+        modes: Number of Fourier modes to multiply,
+            at most floor(N/2) + 1.
+    """
+
+    def __init__(self, in_channels: int, out_channels: int, modes: int):
         super(SpectralConv1d_SMM, self).__init__()
 
         self.in_channels = in_channels
         self.out_channels = out_channels
-        self.modes = (
-            modes  # Number of Fourier modes to multiply, at most floor(N/2) + 1
-        )
+        self.modes = modes  # Number of Fourier modes to multiply
 
         self.scale = 1 / (in_channels * out_channels)
         self.weights1 = nn.Parameter(
@@ -145,12 +167,29 @@ class SpectralConv1d_SMM(nn.Module):
 
     # Complex multiplication
     def compl_mul1d(self, input, weights):
-        # (batch, in_channel, x,y ), (in_channel, out_channel, x,y)
-        # -> (batch, out_channel, x,y)
+        """
+        Performs complex multiplication in the Fourier domain.
+
+        Args:
+            input: Input tensor of shape (batch, in_channel, n_points).
+            weights: Weight tensor of shape (in_channel, out_channel, n_points).
+
+        Returns:
+            torch.Tensor: Output tensor of shape (batch, out_channel, n_points).
+        """
         return torch.einsum("bix,iox->box", input, weights)
 
     def forward(self, x, transform):
-        # x shape: (#batch, #channels, #points)
+        """
+        Forward pass of the spectral convolution layer.
+
+        Args:
+            x: Input tensor of shape (batch, channels, points).
+            transform: Fourier transform operator with forward and inverse methods.
+
+        Returns:
+            The real part of the transformed output tensor.
+        """
         batchsize = x.shape[0]
 
         x = x.permute(0, 2, 1)
@@ -167,10 +206,9 @@ class SpectralConv1d_SMM(nn.Module):
             dtype=torch.cfloat,
             device=x.device,
         )
-        out_ft[:, :, : self.modes] = self.compl_mul1d(x_ft, self.weights1)
+        out_ft = self.compl_mul1d(x_ft, self.weights1)
 
-        # #Return to physical space
-
+        # Return to physical space
         x_ft = out_ft.permute(0, 2, 1)
         x = transform.inverse(x_ft, norm='backward')  # x [4, 20, 512, 512]
         x = x.permute(0, 2, 1)
@@ -178,6 +216,16 @@ class SpectralConv1d_SMM(nn.Module):
         return x.real
 
         def last_layer(self, x, transform):
+            """
+            Applies the last layer transformation in the Fourier domain.
+
+            Args:
+                x: Input tensor of shape (batch, channels, points).
+                transform: Fourier transform operator with forward and inverse methods.
+
+            Returns:
+                Transformed output tensor (in Fourier domain).
+            """
             x = x.permute(0, 2, 1)
 
             # Compute Fourier coeffcients up to factor of e^(- something constant)
