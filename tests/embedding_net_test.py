@@ -15,6 +15,7 @@ from sbi.neural_nets.embedding_nets import (
     CNNEmbedding,
     FCEmbedding,
     PermutationInvariantEmbedding,
+    SpectralConvEmbedding,
 )
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
@@ -164,6 +165,46 @@ def test_1d_and_2d_cnn_embedding_net(input_shape, num_channels):
         x = x.unsqueeze(1).repeat(
             1, num_channels, *[1 for _ in range(len(input_shape))]
         )
+
+    trainer = NPE(prior=prior, density_estimator=estimator_provider)
+    trainer.append_simulations(theta, x).train(max_num_epochs=2)
+    posterior = trainer.build_posterior().set_default_x(xo)
+
+    s = posterior.sample((10,))
+    posterior.potential(s)
+
+
+@pytest.mark.parametrize("n_points", (32, 16))
+@pytest.mark.parametrize("modes", (4, 8))
+@pytest.mark.parametrize("in_channels", (1, 2))
+@pytest.mark.parametrize("conv_channels", (8, 5))
+@pytest.mark.parametrize("num_layers", (2, 3))
+def test_spectral_conf_embedding(
+    n_points, modes, in_channels, conv_channels, num_layers
+):
+    estimator_provider = posterior_nn(
+        "mdn",
+        embedding_net=SpectralConvEmbedding(
+            n_points,
+            modes=modes,
+            in_channels=in_channels,
+            conv_channels=conv_channels,
+            num_layers=num_layers,
+        ),
+    )
+
+    num_dim = in_channels * n_points
+
+    def simulator(theta):
+        return torch.rand_like(theta) + theta
+
+    xo = torch.ones(num_dim)
+
+    prior = MultivariateNormal(torch.zeros(num_dim), torch.eye(num_dim))
+
+    num_simulations = 1000
+    theta = prior.sample(torch.Size((num_simulations,)))
+    x = simulator(theta)
 
     trainer = NPE(prior=prior, density_estimator=estimator_provider)
     trainer.append_simulations(theta, x).train(max_num_epochs=2)
