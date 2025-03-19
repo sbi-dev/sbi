@@ -85,6 +85,7 @@ def test_estimator_distribution_basic_properties(
     num_simulations: int = 100,
     dim: int = 5,
 ):
+    """Test basic properties of the estimator distribution."""
     prior = torch.distributions.MultivariateNormal(
         loc=torch.zeros(dim), covariance_matrix=torch.diag(torch.ones(dim))
     )
