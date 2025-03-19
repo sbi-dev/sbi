@@ -15,10 +15,10 @@ from sbi import utils as utils
 from sbi.analysis import conditional_potential
 from sbi.inference import (
     FMPE,
-    DirectPosterior,
     MCMCPosterior,
-    posterior_estimator_based_potential,
+    VectorFieldPosterior,
     simulate_for_sbi,
+    vector_field_estimator_based_potential,
 )
 from sbi.neural_nets.factory import flowmatching_nn
 from sbi.simulators.linear_gaussian import (
@@ -187,8 +187,8 @@ def test_c2st_fmpe_for_different_dims_and_resume_training(density_estimator="mlp
     # Test whether we can stop and resume.
     posterior_estimator = inference.train(resume_training=True)
 
-    posterior = DirectPosterior(
-        prior=prior, posterior_estimator=posterior_estimator
+    posterior = VectorFieldPosterior(
+        prior=prior, vector_field_estimator=posterior_estimator
     ).set_default_x(x_o)
     samples = posterior.sample((num_samples,))
 
@@ -249,14 +249,14 @@ def test_sample_conditional():
         max_num_epochs=60
     )
 
-    posterior = DirectPosterior(
-        prior=prior, posterior_estimator=posterior_estimator
+    posterior = VectorFieldPosterior(
+        prior=prior, vector_field_estimator=posterior_estimator
     ).set_default_x(x_o)
     samples = posterior.sample((50,))
 
     # Evaluate the conditional density be drawing samples and smoothing with a Gaussian
     # kde.
-    potential_fn, theta_transform = posterior_estimator_based_potential(
+    potential_fn, theta_transform = vector_field_estimator_based_potential(
         posterior_estimator, prior=prior, x_o=x_o
     )
     (
