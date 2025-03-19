@@ -115,85 +115,55 @@ def clamp_and_warn(name: str, value: float, min_val: float, max_val: float) -> f
 
 ZScoreType = Union[
     Literal[
-        "affine-independent",
-        "affine-structured",
-        "logit-independent",
-        "logit-structured",
-        "structured",
         "independent",
+        "structured",
+        "logit",
         "none",
     ],
     None,
 ]
 
 
-def z_score_parser(z_score_flag: Optional[ZScoreType]) -> Tuple[Union[str, None], bool]:
-    """Parses string z-score flag into booleans.This function interprets a z-scoring
-    flag string to determine the type of transformation (affine, logit, or none)
-    and whether the data dimensions are structured or independent.
+def z_score_parser(z_score_flag: Optional["str"]) -> Tuple[bool, bool]:
+    """Parses string z-score flag into booleans.
+
+    Converts string flag into booleans denoting whether to z-score or not, and whether
+    data dimensions are structured or independent.
 
     Args:
-        z_score_flag (Optional[str]): A string specifying the z-scoring method.
-        - `none` or `None`: No transformation is applied.
-        - `affine-independent`: Applies standard z-scoring with independent dimensions.
-        - `affine-structured`: Applies standard z-scoring with structured dimensions.
-        - `logit-independent`: Applies logit transformation with independent dimensions.
-        - `logit-structured`: Applies logit transformation with structured dimensions.
+        z_score_flag: str flag for z-scoring method stating whether the data
+            dimensions are "structured" or "independent", or does not require z-scoring
+            ("none" or None).
 
     Returns:
-        tuple:
-        - transform_type (Optional[str]): The type of transformation,
-          either `"affine"`, `"logit"`, or `None` if no transformation is applied.
-        - structured_data (bool): A boolean indicating whether
-          the data dimensions are structured (`True`) or independent (`False`).
+        Flag for whether or not to z-score, and whether data is structured
     """
     if isinstance(z_score_flag, bool):
         # Raise warning if boolean was passed.
         warnings.warn(
-            "Boolean flag for z-scoring is deprecated as of sbi v0.23.3. It will be "
-            "removed in a future release. Use `affine-independent`,`affine-structured`,"
-            "`logit-independent`, `logit-structured`, `none`."
-            "to indicate z-scoring option. Now defaulting to 'affine-independent'.",
+            "Boolean flag for z-scoring is deprecated as of sbi v0.18.0. It will be "
+            "removed in a future release. Use 'none', 'independent', or 'structured' "
+            "to indicate z-scoring option.",
             stacklevel=2,
         )
-        transform_type, structured_data = "affine", False
+        z_score_bool, structured_data = z_score_flag, False
 
-    if z_score_flag in [None, "none"]:
-        transform_type, structured_data = None, False
-    elif z_score_flag in [
-        "affine-independent",
-        "affine-structured",
-        "logit-independent",
-        "logit-structured",
-    ]:
-        transform_type, structured_data = z_score_flag.split("-")
-        structured_data = structured_data == "structured"
-    elif z_score_flag == "structured":
-        # Raise warning if structured was passed
-        warnings.warn(
-            "structured z-scoring is depreciated as of sbi v0.23.3. It will be "
-            "removed in a future release. Use `affine-independent`,`affine-structured`,"
-            "`logit-independent`, `logit-structured`, `none`, None."
-            "to indicate z-scoring option. Now defaulting to 'affine-independent'.",
-            stacklevel=2,
-        )
-        transform_type, structured_data = "affine", True
-    elif z_score_flag == "independent":
-        warnings.warn(
-            "independent z-scoring is depreciated as of sbi v0.23.3. It will be "
-            "removed in a future release. Use `affine-independent`,`affine-structured`,"
-            "`logit-independent`, `logit-structured`, `none`, None."
-            "to indicate z-scoring option. Now defaulting to 'affine-independent'.",
-            stacklevel=2,
-        )
-        transform_type, structured_data = "affine", False
+    elif (z_score_flag is None) or (z_score_flag == "none"):
+        # Return Falses if "none" or None was passed.
+        z_score_bool, structured_data = False, False
+
+    elif (z_score_flag == "independent") or (z_score_flag == "structured"):
+        # Got one of two valid z-scoring methods.
+        z_score_bool = True
+        structured_data = z_score_flag == "structured"
+
     else:
+        # Return warning due to invalid option, defaults to not z-scoring.
         raise ValueError(
-            "Invalid z-scoring option. Use `affine-independent`, `affine-structured`",
-            "`logit-independent`, `logit-structured`, `none`.",
+            "Invalid z-scoring option. Use 'none', 'independent', or 'structured'."
         )
 
-    return transform_type, structured_data
+    return z_score_bool, structured_data
 
 
 def standardizing_transform(
