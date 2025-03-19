@@ -65,7 +65,9 @@ class EstimatorDistribution(pyro.distributions.TorchDistribution):
         )
 
     @abstractmethod
-    def get_condition_and_event_shapes(estimator: Any) -> Tuple[torch.Size, torch.Size]:
+    def get_condition_and_event_shapes(
+        self, estimator: Any
+    ) -> Tuple[torch.Size, torch.Size]:
         pass
 
     @abstractmethod
@@ -133,8 +135,8 @@ class ConditionedEstimatorDistribution(EstimatorDistribution):
     A conditioned `sbi` estimator wrapped as a Pyro distribution.
     """
 
-    @staticmethod
     def get_condition_and_event_shapes(
+        self,
         estimator: ConditionalEstimator,
     ) -> Tuple[torch.Size, torch.Size]:
         return estimator.condition_shape, estimator.input_shape
