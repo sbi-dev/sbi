@@ -6,10 +6,9 @@ from math import exp, pi
 from typing import Callable, Optional, Union
 
 import torch
+from sbi.neural_nets.estimators.base import ConditionalVectorFieldEstimator
 from scipy import stats
 from torch import Tensor, nn
-
-from sbi.neural_nets.estimators.base import ConditionalVectorFieldEstimator
 
 
 class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
@@ -397,11 +396,112 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         else:
             raise ValueError(f"Weight function {weight_fn} not recognized.")
 
-
 #TODO: experiment with time schedule with more samples around .5 (check edm paper)
 #TODO: impacts on training and evaluate
 #TODO: check effect in mini sbibm -> converges faster (focus on more important)
 class VPScoreEstimator(ConditionalScoreEstimator):
+    """Class for score estimators with variance preserving SDEs (i.e., DDPM)."""
+
+    def __init__(
+        self,
+        net: nn.Module,
+        input_shape: torch.Size,
+        condition_shape: torch.Size,
+        weight_fn: Union[str, Callable] = "max_likelihood",
+        beta_min: float = 0.01,
+        beta_max: float = 10.0,
+        mean_0: Union[Tensor, float] = 0.0,
+        std_0: Union[Tensor, float] = 1.0,
+        t_min: float = 1e-5,
+        t_max: float = 1.0,
+            pmean: float = 1.2,
+            pstd: float = -1.2
+    ) -> None:
+
+        self.pmean, self.pstd = pmean, pstd
+        noise_dist = stats.norm(pmean, pstd**2)
+        self.beta_min = exp(noise_dist.ppf(0.01))
+        self.beta_max = exp(noise_dist.ppf(0.99))
+
+        super().__init__(
+            net,
+            input_shape,
+            condition_shape,
+            mean_0=mean_0,
+            std_0=std_0,
+            weight_fn=weight_fn,
+            beta_min=beta_min,
+            beta_max=beta_max,
+            t_min=t_min,
+            t_max=t_max,
+        )
+
+    def mean_t_fn(self, times: Tensor) -> Tensor:
+        """Conditional mean function for variance preserving SDEs.
+        Args:
+            times: SDE time variable in [0,1].
+
+        Returns:
+            Conditional mean at a given time.
+        """
+        phi = torch.exp(
+            -0.25 * times**2.0 * (self.beta_max - self.beta_min)
+            - 0.5 * times * self.beta_min
+        )
+        for _ in range(len(self.input_shape)):
+            phi = phi.unsqueeze(-1)
+        return phi
+
+    def std_fn(self, times: Tensor) -> Tensor:
+        """Standard deviation function for variance preserving SDEs.
+        Args:
+            times: SDE time variable in [0,1].
+
+        Returns:
+            Standard deviation at a given time.
+        """
+        std = 1.0 - torch.exp(
+            -0.5 * times**2.0 * (self.beta_max - self.beta_min) - times * self.beta_min
+        )
+        for _ in range(len(self.input_shape)):
+            std = std.unsqueeze(-1)
+        return torch.sqrt(std)
+
+    def drift_fn(self, input: Tensor, times: Tensor) -> Tensor:
+        """Drift function for variance preserving SDEs.
+
+        Args:
+            input: Original data, x0.
+            times: SDE time variable in [0,1].
+
+        Returns:
+            Drift function at a given time.
+        """
+        phi = -0.5 * self.noise_schedule(times)
+        while len(phi.shape) < len(input.shape):
+            phi = phi.unsqueeze(-1)
+        return phi * input
+
+    def diffusion_fn(self, input: Tensor, times: Tensor) -> Tensor:
+        """Diffusion function for variance preserving SDEs.
+
+        Args:
+            input: Original data, x0.
+            times: SDE time variable in [0,1].
+
+        Returns:
+            Drift function at a given time.
+        """
+        g = torch.sqrt(self.noise_schedule(times))
+        while len(g.shape) < len(input.shape):
+            g = g.unsqueeze(-1)
+        return g
+
+
+#TODO: experiment with time schedule with more samples around .5 (check edm paper)
+#TODO: impacts on training and evaluate
+#TODO: check effect in mini sbibm -> converges faster (focus on more important)
+class ImprovedVPScoreEstimator(ConditionalScoreEstimator):
     """Class for score estimators with variance preserving SDEs (i.e., DDPM)."""
 
     def __init__(
