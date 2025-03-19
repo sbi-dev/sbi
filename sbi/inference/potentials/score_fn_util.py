@@ -131,12 +131,12 @@ class AffineClassifierFreeGuidance(ScoreAdaptation):
         cfg: AffineClassifierFreeGuidanceCfg,
         device: str = "cpu",
     ):
-        """This class manages manipulating the score estimator to temper of shift the
+        """This class manages manipulating the score estimator to temper or shift the
         prior and likelihood.
 
         This is usually known as classifier-free guidance. And works by decomposing the
         posterior score into a prior and likelihood component. These can then be scaled
-        and shifted to impose additional constraints on the posterior.
+        and shifted to impose change the posterior to p
 
         Args:
             score_estimator: The score estimator.
@@ -178,6 +178,113 @@ class AffineClassifierFreeGuidance(ScoreAdaptation):
         prior_score_mod = prior_score * self.prior_scale + self.prior_shift
 
         return ll_score_mod + prior_score_mod
+
+@dataclass
+class ImpaintGuidanceCfg:
+    conditioned_indices: list[int]
+    imputed_value: float | Tensor
+
+
+@register_guidance_method("impaint", ImpaintGuidanceCfg)
+class ImpaintGuidance(ScoreAdaptation):
+    def __init__(
+        self,
+        score_estimator: ConditionalScoreEstimator,
+        prior: Optional[Distribution],
+        cfg: ImpaintGuidanceCfg,
+        device: str = "cpu",
+    ):
+        """This class manages manipulating the score estimator to impute values for
+        certain indices of the input.
+
+        Args:
+            score_estimator: The score estimator.
+            prior: The prior distribution.
+            cfg: Configuration for the impaint guidance.
+            device: The device on which to evaluate the potential.
+        """
+        self.conditioned_indices = torch.tensor(cfg.conditioned_indices, device=device)
+        self.imputed_value = torch.tensor(cfg.imputed_value, device=device)
+        super().__init__(score_estimator, prior, device)
+
+    def __call__(self, input: Tensor, condition: Tensor, time: Optional[Tensor] = None):
+        if time is None:
+            time = torch.tensor([self.score_estimator.t_min])
+
+        noise = torch.randn_like(self.imputed_value)
+        m = self.score_estimator.mean_t_fn(time)
+        std = self.score_estimator.std_fn(time)
+        imputed_value_t = m * self.imputed_value + std * noise
+
+        input = input.clone()
+        input[..., self.conditioned_indices] = imputed_value_t
+
+        score = self.score_estimator(input, condition, time)
+
+        # Set score to zero for the conditioned indices
+        score[..., self.conditioned_indices] = 0.0
+
+        return score
+
+
+@dataclass
+class UniversalGuidanceCfg:
+    guidance_fn: Callable[[Tensor, Tensor, Tensor, Tensor], Tensor]
+    guidance_fn_score: Optional[Callable[[Tensor, Tensor, Tensor, Tensor], Tensor]] = (
+        None
+    )
+
+
+@register_guidance_method("universal", UniversalGuidanceCfg)
+class UniversalGuidance(ScoreAdaptation):
+    def __init__(
+        self,
+        score_estimator: ConditionalScoreEstimator,
+        prior: Optional[Distribution],
+        cfg: UniversalGuidanceCfg,
+        device: str = "cpu",
+    ):
+        """This class manages manipulating the score estimator using a custom guidance
+        function.
+
+        Args:
+            score_estimator: The score estimator.
+            prior: The prior distribution.
+            cfg: Configuration for the universal guidance.
+            device: The device on which to evaluate the potential.
+        """
+        self.guidance_fn = cfg.guidance_fn
+
+        if cfg.guidance_fn_score is None:
+
+            def guidance_fn_score(input, condition, m, std):
+                with torch.enable_grad():
+                    input = input.detach().clone().requires_grad_(True)
+                    score = torch.autograd.grad(
+                        cfg.guidance_fn(input, condition, m, std).sum(),
+                        input,
+                        create_graph=True,
+                    )[0]
+                return score
+
+            self.guidance_fn_score = guidance_fn_score
+        else:
+            self.guidance_fn_score = cfg.guidance_fn_score
+
+        super().__init__(score_estimator, prior, device)
+
+    def __call__(self, input: Tensor, condition: Tensor, time: Optional[Tensor] = None):
+        if time is None:
+            time = torch.tensor([self.score_estimator.t_min])
+        score = self.score_estimator(input, condition, time)
+        m = self.score_estimator.mean_t_fn(time)
+        std = self.score_estimator.std_fn(time)
+
+        # Tweedie's formula for denoising
+        denoised_input = (input + std**2 * score) / m
+        guidance_score = self.guidance_fn_score(denoised_input, condition, m, std)
+
+        return score + guidance_score
 
 
 class IIDScoreFunction(ABC):
