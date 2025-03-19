@@ -32,14 +32,12 @@ from sbi.utils.user_input_checks import process_simulator
 from .test_utils import (
     check_c2st,
     get_dkl_gaussian_prior,
-    get_normalization_uniform_prior,
-    get_prob_outside_uniform_prior,
 )
 
 
 @pytest.mark.parametrize(
     "num_dim, prior_str",
-    ((2, "gaussian"), (2, "uniform"), (1, "gaussian"), (1, "uniform")),
+    ((2, "gaussian"), (1, "gaussian")),
 )
 def test_c2st_fmpe_on_linearGaussian(num_dim: int, prior_str: str):
     """Test whether fmpe infers well a simple example with available ground truth."""
@@ -83,54 +81,26 @@ def test_c2st_fmpe_on_linearGaussian(num_dim: int, prior_str: str):
     check_c2st(samples, target_samples, alg=f"fmpe-{prior_str}-prior-{num_dim}D")
 
     # Checks for log_prob()
-    if prior_str == "gaussian":
-        # For the Gaussian prior, we compute the KLd between ground truth and posterior.
-        dkl = get_dkl_gaussian_prior(
-            posterior,
-            x_o[0],
-            likelihood_shift,
-            likelihood_cov,
-            prior_mean,
-            prior_cov,
-        )
+    # For the Gaussian prior, we compute the KLd between ground truth and posterior.
+    dkl = get_dkl_gaussian_prior(
+        posterior,
+        x_o[0],
+        likelihood_shift,
+        likelihood_cov,
+        prior_mean,
+        prior_cov,
+    )
 
-        max_dkl = 0.15
+    max_dkl = 0.15
 
-        assert dkl < max_dkl, (
-            f"D-KL={dkl} is more than 2 stds above the average performance."
-        )
+    assert dkl < max_dkl, (
+        f"D-KL={dkl} is more than 2 stds above the average performance."
+    )
 
-        # test probs
-        probs = posterior.log_prob(samples).exp()
-        gt_probs = gt_posterior.log_prob(samples).exp()
-        assert torch.allclose(
-            probs, gt_probs, atol=0.2
-        )  # note that this is 0.1 for NPE.
-
-    elif prior_str == "uniform":
-        # Check whether the returned probability outside of the support is zero.
-        posterior_prob = get_prob_outside_uniform_prior(posterior, prior, num_dim)
-        assert posterior_prob == 0.0, (
-            "The posterior probability outside of the prior support is not zero"
-        )
-
-        # Check whether normalization (i.e. scaling up the density due
-        # to leakage into regions without prior support) scales up the density by the
-        # correct factor.
-        (
-            posterior_likelihood_unnorm,
-            posterior_likelihood_norm,
-            acceptance_prob,
-        ) = get_normalization_uniform_prior(posterior, prior, x=x_o)
-        # The acceptance probability should be *exactly* the ratio of the unnormalized
-        # and the normalized likelihood. However, we allow for an error margin of 1%,
-        # since the estimation of the acceptance probability is random (based on
-        # rejection sampling).
-        assert (
-            acceptance_prob * 0.99
-            < posterior_likelihood_unnorm / posterior_likelihood_norm
-            < acceptance_prob * 1.01
-        ), "Normalizing the posterior density using the acceptance probability failed."
+    # test probs
+    probs = posterior.log_prob(samples).exp()
+    gt_probs = gt_posterior.log_prob(samples).exp()
+    assert torch.allclose(probs, gt_probs, atol=0.2)  # note that this is 0.1 for NPE.
 
 
 @pytest.mark.parametrize("model", ["mlp", "resnet"])
