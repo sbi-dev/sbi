@@ -227,21 +227,19 @@ Diagnostics
    :caption: Getting started
 
    installation
-
-.. toctree::
-   :hidden:
-   :maxdepth: 1
-
    tutorials
-   faq
+   advanced_tutorials
+   examples
+   how_to_guide
+
 
 .. toctree::
    :hidden:
    :maxdepth: 2
    :caption: More guides/resources
 
-   advanced_tutorials
    sbi
+   faq
    contributor_guide
    changelog
    credits
