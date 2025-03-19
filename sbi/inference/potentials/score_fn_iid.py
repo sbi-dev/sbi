@@ -7,7 +7,9 @@ import torch
 from torch import Tensor
 from torch.distributions import Distribution
 
-from sbi.neural_nets.estimators.vector_field_estimator import ConditionalVectorFieldEstimator
+from sbi.neural_nets.estimators.vector_field_estimator import (
+    ConditionalVectorFieldEstimator,
+)
 from sbi.utils.score_utils import (
     add_diag_or_dense,
     denoise,
@@ -84,7 +86,9 @@ class IIDScoreFunction(ABC):
         if not vector_field_estimator.SCORE_DEFINED:
             raise ValueError("Score is not defined for this vector field estimator.")
         if not vector_field_estimator.MARGINALS_DEFINED:
-            raise ValueError("Marginals are not defined for this vector field estimator.")
+            raise ValueError(
+                "Marginals are not defined for this vector field estimator."
+            )
 
         self.vector_field_estimator = vector_field_estimator.to(device).eval()
         self.prior = prior
@@ -179,7 +183,7 @@ class FNPEScoreFunction(IIDScoreFunction):
 
         # Compute the per-sample score
         inputs = ensure_theta_batched(inputs)
-        base_score = self.vector_field_estimator(inputs, conditions, time)
+        base_score = self.vector_field_estimator.score(inputs, conditions, time)
 
         # Compute the prior score
         prior_score = self.prior_score_weight_fn(time) * self.prior_score_fn(inputs)
@@ -538,8 +542,8 @@ class AutoGaussCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
         r"""
         This method extends the by estimating the posterior precision using
         approximate posterior samples obtained from a diffusion model (using the
-        vector_field_estimator) [1]. This method has a slight initialization overhead, but
-        generally provides more accurate results than simple heuristics.
+        vector_field_estimator) [1]. This method has a slight initialization overhead,
+        but generally provides more accurate results than simple heuristics.
 
         Args:
             vector_field_estimator: The neural network modeling the score.

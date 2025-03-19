@@ -10,16 +10,17 @@ from zuko.distributions import NormalizingFlow
 
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.inference.potentials.score_fn_iid import get_iid_method
-
-from sbi.neural_nets.estimators.vector_field_estimator import ConditionalVectorFieldEstimator
 from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
     reshape_to_sample_batch_event,
 )
+from sbi.neural_nets.estimators.vector_field_estimator import (
+    ConditionalVectorFieldEstimator,
+)
+from sbi.samplers.ode_solvers import build_neural_ode
 from sbi.sbi_types import TorchTransform
 from sbi.utils.sbiutils import mcmc_transform, within_support
 from sbi.utils.torchutils import ensure_theta_batched
-from sbi.samplers.ode_solvers import build_neural_ode
 
 
 def vector_field_estimator_based_potential(
@@ -67,7 +68,7 @@ class PosteriorVectorFieldBasedPotential(BasePotential):
         r"""Returns the score function for score-based methods.
 
         Args:
-            score_estimator: The neural network modelling the score.
+            vector_field_estimator: The neural network modelling the score.
             prior: The prior distribution.
             x_o: The observed data at which to evaluate the posterior.
             iid_method: Which method to use for computing the score in the iid setting.
@@ -96,14 +97,13 @@ class PosteriorVectorFieldBasedPotential(BasePotential):
 
         super().__init__(prior, x_o, device=device)
 
-
     def set_x(
         self,
         x_o: Optional[Tensor],
         x_is_iid: Optional[bool] = False,
         iid_method: str = "auto_gauss",
         iid_params: Optional[Dict[str, Any]] = None,
-        **ode_kwargs
+        **ode_kwargs,
     ):
         """
         Set the observed data and whether it is IID.
@@ -143,16 +143,23 @@ class PosteriorVectorFieldBasedPotential(BasePotential):
         """
 
         if self.x_is_iid:
-            if self.vector_field_estimator.MARGINALS_DEFINED and self.vector_field_estimator.SCORE_DEFINED:
+            if (
+                self.vector_field_estimator.MARGINALS_DEFINED
+                and self.vector_field_estimator.SCORE_DEFINED
+            ):
                 raise NotImplementedError(
-                    "Potential function evaluation in the IID setting is not yet supported"
-                    " for vector field based methods. Sampling does however work via `.sample`. "
-                    "If you intended to evaluate the posterior given a batch of (non-iid) "
+                    "Potential function evaluation in the "
+                    "IID setting is not yet supported"
+                    " for vector field based methods. "
+                    "Sampling does however work via `.sample`. "
+                    "If you intended to evaluate the posterior "
+                    "given a batch of (non-iid) "
                     "x use `log_prob_batched`."
                 )
             else:
                 raise NotImplementedError(
-                    "IID is not supported for this vector field estimator since the required methods (marginals or score) are not defined."
+                    "IID is not supported for this vector field estimator "
+                    "since the required methods (marginals or score) are not defined."
                 )
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
@@ -181,15 +188,18 @@ class PosteriorVectorFieldBasedPotential(BasePotential):
         Args:
             theta: The parameters at which to evaluate the potential gradient.
             time: The diffusion time. If None, then `t_min` of the
-                self.score_estimator is used (i.e. we evaluate the gradient of the
-                actual data distribution).
+                self.vector_field_estimator is used
+                (i.e. we evaluate the gradient of the actual data distribution).
             track_gradients: Whether to track gradients.
 
         Returns:
             The gradient of the potential function.
         """
         if not self.vector_field_estimator.SCORE_DEFINED:
-            raise ValueError("Gradient is not available since the score is not defined for this vector field estimator.")
+            raise ValueError(
+                "Gradient is not available since the score"
+                "is not defined for this vector field estimator."
+            )
 
         if time is None:
             time = torch.tensor([self.vector_field_estimator.t_min])
@@ -217,9 +227,7 @@ class PosteriorVectorFieldBasedPotential(BasePotential):
 
         return score
 
-    def rebuild_flow(
-        self, **kwargs
-    ) -> NormalizingFlow:
+    def rebuild_flow(self, **kwargs) -> NormalizingFlow:
         """
         Rebuilds the continuous normalizing flow. This is used when
         a new default x is set, or to evaluate the log probs at higher precision.
@@ -239,9 +247,10 @@ class PosteriorVectorFieldBasedPotential(BasePotential):
 
 class DifferentiablePotentialFunction(torch.autograd.Function):
     """
-    A wrapper of PosteriorScoreBasedPotential with a custom autograd function to compute
-    the gradient of log_prob with respect to theta. Instead of backpropagating through
-    the continuous normalizing flow, we use the gradient of the score estimator.
+    A wrapper of PosteriorVectorFieldBasedPotential with a custom autograd function
+    to compute the gradient of log_prob with respect to theta. Instead of
+    backpropagating through the continuous normalizing flow, we use the gradient
+    of the score estimator.
 
     """
 
@@ -277,12 +286,12 @@ class CallableDifferentiablePotentialFunction:
     only supports static methods, and so it can't be given the potential class directly.
     """
 
-    def __init__(self, posterior_score_based_potential):
-        self.posterior_score_based_potential = posterior_score_based_potential
+    def __init__(self, posterior_vector_field_potential):
+        self.posterior_vector_field_potential = posterior_vector_field_potential
 
     def __call__(self, input):
         return DifferentiablePotentialFunction.apply(
             input,
-            self.posterior_score_based_potential.__call__,
-            self.posterior_score_based_potential.gradient,
+            self.posterior_vector_field_potential.__call__,
+            self.posterior_vector_field_potential.gradient,
         )
