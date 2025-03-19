@@ -5,7 +5,7 @@ import numpy as np
 import torch
 from torch import Tensor, nn
 from torch._higher_order_ops.associative_scan import associative_scan
-
+from typing import Tuple
 class LRUEmbedding(nn.Module):
     """Embedding network backed by a stack of Linear Recurrent Unit (LRU) layers.
 
@@ -238,18 +238,27 @@ class LRU(nn.Module):
         B_norm = self.B * self.gamma.unsqueeze(dim=-1)
 
         # For details on parallel scan, check discussion in Smith et al (2022).
-        Lambda_elements = self.lambda_complex.tile(input.size(1), 1)
         Bu_elements = input.to(self.B.dtype)@B_norm.T
+        Lambda_elements = self.lambda_complex.view(1,1,-1).expand(Bu_elements.shape)
         elements = (Lambda_elements, Bu_elements)
-        _, states = associative_scan(binary_operator_diag, elements,dim=1) # all x_k
+        _, states = associative_scan(binary_operator_diag, elements,dim=1,combine_mode='generic') # all x_k
         y = (states @ self.C.mT).real + input * self.D
         return y
     
-def binary_operator_diag(element_i, element_j):
-   # Binary operator for parallel scan of linear recurrence.
-   a_i, bu_i = element_i
-   a_j, bu_j = element_j
-   return a_j * a_i, a_j * bu_i + bu_j
+
+#@torch.jit.script
+def binary_operator_diag(element_i: Tuple[torch.Tensor, torch.Tensor], element_j: Tuple[torch.Tensor, torch.Tensor]):
+    """Binary operator for parallel scan of linear recurrence.
+    Args:
+        element_i: tuple containing a_i and bu_i at position i
+        element_j: tuple containing a_j and bu_j at position j
+    Returns:
+        new element ( _out, bu_out )
+    """
+    a_i, bu_i = element_i
+    a_j, bu_j = element_j
+    # a_j * a_i, torch.addcmul(bu_j, a_j, bu_i)
+    return a_j * a_i, a_j * bu_i + bu_j
 
 
     # def forward_scan(self, input_sequence):
