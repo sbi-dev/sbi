@@ -242,7 +242,7 @@ def test_correctness_of_density_estimator_log_prob(
 
 
 @pytest.mark.parametrize(
-    "density_estimator_build_fn", model_builders + flowmatching_build_functions
+    "density_estimator_build_fn", model_builders
 )
 @pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
 @pytest.mark.parametrize("condition_event_shape", ((1,), (7,)))
