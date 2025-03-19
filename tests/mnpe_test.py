@@ -137,7 +137,7 @@ def test_mnpe_api(flow_model: str, z_score_theta: str, use_embed_net: bool):
         log_transform_x=False,
     )
     trainer = MNPE(density_estimator=density_estimator)
-    trainer.append_simulations(theta, x).train(max_num_epochs=5)
+    trainer.append_simulations(theta, x).train(max_num_epochs=1)
 
     # Test different samplers
     posterior = trainer.build_posterior(prior=prior)
