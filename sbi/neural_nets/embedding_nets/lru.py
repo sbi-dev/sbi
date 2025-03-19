@@ -1,11 +1,12 @@
 from math import sqrt
-from typing import Optional
+from typing import Optional, Tuple
 
 import numpy as np
 import torch
 from torch import Tensor, nn
 from torch._higher_order_ops.associative_scan import associative_scan
-from typing import Tuple
+
+
 class LRUEmbedding(nn.Module):
     """Embedding network backed by a stack of Linear Recurrent Unit (LRU) layers.
 
@@ -25,14 +26,14 @@ class LRUEmbedding(nn.Module):
         max_phase=2 * np.pi,
         bidirectional: bool = False,
         dropout: float = 0.0,
-        norm: bool = False,
+        apply_normalization_layer: bool = False,
         aggregate_func: [str, callable] = "last_ts",
     ):
         """Fully-connected multi-layer neural network to be used as embedding network.
 
         Args:
             input_dim: Dimensionality of input that will be passed to the embedding net.
-            output_dim: Dimensionality of the output.
+            output_dim: Dimensionality of the output, i.e, the resulting features.
             hidden_dim: Number of hidden units in each layer of the embedding network.
             num_layers: Number of layers of the embedding network. (Minimum of 2).
         """
@@ -50,16 +51,14 @@ class LRUEmbedding(nn.Module):
                 max_phase=max_phase,
                 bidirectional=bidirectional,
                 dropout=dropout,
-                norm = norm
+                norm=norm,
             )
             for _ in range(num_layers)
         ]
-        
+
         if aggregate_func == "last_ts":
-            self.aggregation = lambda x: x[:,-1,:]
-        elif aggregate_func == "mean":
-            self.aggregation = lambda x: x.mean(dim=1)
-        elif aggregate_func == "sum":
+            self.aggregation = lambda x: x[:, -1, :]
+        elif aggregate_func == "mean" or aggregate_func == "sum":
             self.aggregation = lambda x: x.mean(dim=1)
         elif isinstance(aggregate_func, str):
             raise ValueError(f"aggretate_func {aggregate_func} not implemented")
@@ -95,17 +94,24 @@ class LRUBlock(nn.Module):
     def __init__(
         self,
         hidden_dim: int,
-        state_dim: int = 20,
-        r_min=0.0,
-        r_max=1.0,
-        max_phase=2 * np.pi,
+        state_dim: int,
+        r_min: float,
+        r_max: float,
+        max_phase: float = 2 * np.pi,
         bidirectional: bool = False,
         dropout: float = 0.0,
         norm: bool = False,
     ):
         super().__init__()
         # https://github.com/NicolasZucchet/minimal-LRU/blob/main/lru/model.py
-        self.lru = LRU(hidden_dim, state_dim, r_min, r_max, max_phase,bidirectional)
+        self.lru = LRU(
+            input_dim=hidden_dim,
+            state_dim=state_dim,
+            r_min=r_min,
+            r_max=r_max,
+            max_phase=max_phase,
+            bidirectional=bidirectional,
+        )
         self.out1 = nn.Linear(hidden_dim, hidden_dim)
         self.out2 = nn.Linear(hidden_dim, hidden_dim)
         self.GELU = nn.GELU()
@@ -113,10 +119,10 @@ class LRUBlock(nn.Module):
         self.dropout = nn.Dropout(dropout) if dropout > 0 else nn.Identity()
         self.norm = nn.LayerNorm(hidden_dim) if norm else nn.Identity()
 
-    def forward(self, x: Tensor) -> Tensor:
+    def forward(self, input: Tensor) -> Tensor:
         # Batch, len_sequence, hidden_dim
         # normalization
-        y = self.norm(x)
+        y = self.norm(input)
 
         # run LRU
         y = self.lru(y)
@@ -128,7 +134,7 @@ class LRUBlock(nn.Module):
         y = self.dropout(y)
 
         # skip connection
-        y = y + x
+        y = y + input
         return y
 
 
@@ -136,8 +142,8 @@ class LRU(nn.Module):
     """A single Linear Recurrent Unit (LRU).
 
     This implementation, just like all other, makes the simplification
-    that `output_dim = input_dim`. The benefor is that you can stack
-    multiple LRU instances without linear layers inbetween, and the
+    that `output_dim = input_dim`. The benefit is that you can stack
+    multiple LRU instances without linear layers in between, and the
     skip connections `D` become element-wise, i.e., `D` is a vector.
     """
 
@@ -145,21 +151,18 @@ class LRU(nn.Module):
         self,
         input_dim: int,
         state_dim: int,
-        r_min: float = 0.0,
-        r_max: float = 1.0,
-        max_phase: float = 2 * torch.pi,
-        bidirectional: bool = False,
+        r_min: float,
+        r_max: float,
+        max_phase: float,
+        bidirectional: bool,
     ):
         super().__init__()
         self.bidirectional = bidirectional
         # between r_min and r_max, with phase in [0, max_phase].
         self.state_dim = state_dim
 
-
-
         if bidirectional:
             state_dim = state_dim * 2
-
 
         u1 = torch.rand(size=(state_dim,))
         u2 = torch.rand(size=(state_dim,))
@@ -168,16 +171,14 @@ class LRU(nn.Module):
         )
         self.log_theta = nn.Parameter(torch.log(max_phase * u2))
 
-        # Glorot initialized Input/Output projection matrices.
+        # Create the Glorot-initialized projection matrices.
         B_re = torch.randn(size=(state_dim, input_dim)) / sqrt(2 * input_dim)
         B_im = torch.randn(size=(state_dim, input_dim)) / sqrt(2 * input_dim)
         self.B = nn.Parameter(torch.complex(B_re, B_im))
         C_re = torch.randn(size=(input_dim, state_dim)) / sqrt(2 * input_dim)
         C_im = torch.randn(size=(input_dim, state_dim)) / sqrt(2 * input_dim)
         self.C = nn.Parameter(torch.complex(C_re, C_im))
-        self.D = nn.Parameter(
-            torch.randn(size=(input_dim,))
-        )  # simplified skip connection
+        self.D = nn.Parameter(torch.randn(size=(input_dim,)))
 
         gamma_log = torch.log(torch.sqrt(1 - torch.abs(self.lambda_complex) ** 2))
         self.log_gamma = nn.Parameter(gamma_log)
@@ -196,17 +197,34 @@ class LRU(nn.Module):
 
     @property
     def gamma(self) -> Tensor:
+        """Get the input normalization."""
         return torch.exp(self.log_gamma)
 
     def forward(
         self, input: Tensor, state: Optional[Tensor] = None, mode: str = "loop"
     ) -> Tensor:
+        """Run the forward pass.
+
+        Args:
+            input: Sequential data of shape (batch_size, sequence_length,
+                input_dim)
+            state: Initial hidden state of the LRU, if `None`, it will be
+                initialized to zero.
+            mode: Whether to run the forward pass in a for-loop or using an
+                associative scan. The former one is the naive implementation
+                while the latter one relies on very recent features of PyTorch.
+
+        Return:
+            Transformed data of shape (batch_size, sequence_length,
+                input_dim)
+        """
+
         # Initialize the hidden state if not given.
         if self.bidirectional:
-            expected_state_shape = (input.size(0), self.state_dim*2)
+            expected_state_shape = (input.size(0), self.state_dim * 2)
         else:
             expected_state_shape = (input.size(0), self.state_dim)
-            
+
         if state is None:
             state = torch.complex(
                 torch.zeros(expected_state_shape, device=input.device),
@@ -214,9 +232,9 @@ class LRU(nn.Module):
             )
         else:
             state = state.to(device=input.device)
-            assert state.shape == expected_state_shape, (
-                f"Invalid state shape {state.shape}, expected {expected_state_shape}"
-            )
+            assert (
+                state.shape == expected_state_shape
+            ), f"Invalid state shape {state.shape}, expected {expected_state_shape}"
 
         match mode:
             case "scan":
@@ -245,23 +263,32 @@ class LRU(nn.Module):
         output = (states @ self.C.mT).real + input * self.D
 
         return output
-    
+
     def _forward_scan(self, input: Tensor, state: Tensor) -> Tensor:
         # Input size: (B, L, H)
 
         B_norm = self.B * self.gamma.unsqueeze(dim=-1)
 
         # For details on parallel scan, check discussion in Smith et al (2022).
-    
-        Bu_elements = input.to(self.B.dtype)@B_norm.T
-       
+
+        Bu_elements = input.to(self.B.dtype) @ B_norm.T
+
         if state is not None:
-            Bu_elements[:, 0, :self.state_dim] = Bu_elements[:, 0, :self.state_dim] + \
-                (self.lambda_complex[:self.state_dim].view(1,-1) * state[:,:self.state_dim])
-        Lambda_elements = self.lambda_complex.view(1,1,-1).expand(Bu_elements.shape)
-        
-        elements = (Lambda_elements[:,:,:self.state_dim], Bu_elements[:,:,:self.state_dim])
-        _, states = associative_scan(binary_operator_diag, elements,dim=1, combine_mode='generic') # all x_k
+            Bu_elements[:, 0, : self.state_dim] = Bu_elements[
+                :, 0, : self.state_dim
+            ] + (
+                self.lambda_complex[: self.state_dim].view(1, -1)
+                * state[:, : self.state_dim]
+            )
+        Lambda_elements = self.lambda_complex.view(1, 1, -1).expand(Bu_elements.shape)
+
+        elements = (
+            Lambda_elements[:, :, : self.state_dim],
+            Bu_elements[:, :, : self.state_dim],
+        )
+        _, states = associative_scan(
+            binary_operator_diag, elements, dim=1, combine_mode="generic"
+        )  # all x_k
 
         if self.bidirectional:
             if state is not None:
@@ -273,12 +300,15 @@ class LRU(nn.Module):
             )
             states = torch.cat([states, inner_states2], dim=-1)
         output = (states @ self.C.mT).real + input * self.D
-        
-        return output
-    
 
-#@torch.jit.script
-def binary_operator_diag(element_i: Tuple[torch.Tensor, torch.Tensor], element_j: Tuple[torch.Tensor, torch.Tensor]):
+        return output
+
+
+# @torch.jit.script
+def binary_operator_diag(
+    element_i: Tuple[torch.Tensor, torch.Tensor],
+    element_j: Tuple[torch.Tensor, torch.Tensor],
+):
     """Binary operator for parallel scan of linear recurrence.
     Args:
         element_i: tuple containing a_i and bu_i at position i
@@ -291,9 +321,9 @@ def binary_operator_diag(element_i: Tuple[torch.Tensor, torch.Tensor], element_j
     # a_j * a_i, torch.addcmul(bu_j, a_j, bu_i)
     return a_j * a_i, a_j * bu_i + bu_j
 
-
     # def forward_scan(self, input_sequence):
-    #     """Forward pass of the LRU layer. Output y and input_sequence are of shape (batchsize, length, hidden_dim)."""
+    #     """Forward pass of the LRU layer. Output y and input_sequence are of shape
+    # (batchsize, length, hidden_dim)."""
 
     #     Lambda = torch.exp(-torch.exp(self.nu_log) + 1j * torch.exp(self.theta_log))
 
