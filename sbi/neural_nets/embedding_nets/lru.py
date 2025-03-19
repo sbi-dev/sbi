@@ -231,24 +231,16 @@ class LRU(nn.Module):
         B_norm = self.B * self.gamma.unsqueeze(dim=-1)
 
         states = []
-        state_t = state[:, :self.state_dim:]
-
-        for u_step in input.split(1, dim=1):  # dim=1 is the time dimension
-            u_step = u_step.squeeze(1).to(dtype=B_norm.dtype)
-            state_t = self.lambda_complex[:self.state_dim] * state_t + u_step @ B_norm[:self.state_dim].T
-            states.append(state_t)
-        states = torch.stack(states, dim=1)
-
+        state_t = state
+        uB = input.to(dtype=B_norm.dtype) @ B_norm.T
 
         if self.bidirectional:
-            inner_states2 = []
-            state_t = state[:, self.state_dim:]
-            for u_step in reversed(input.split(1, dim=1)):
-                u_step = u_step.squeeze(1).to(dtype=B_norm.dtype)
-                state_t = self.lambda_complex[self.state_dim:] * state_t + u_step @ B_norm[self.state_dim:].T
-                inner_states2.append(state_t)
-            inner_states2 = torch.stack(inner_states2, dim=1)
-            states = torch.cat([states, inner_states2], dim=-1)
+            uB = torch.cat([uB[:,:,:self.state_dim],uB[:,::-1,self.state_dim:]],dim=-1) 
+
+        for u_step in uB.split(1, dim=1):  # dim=1 is the time dimension
+            state_t = self.lambda_complex * state_t + u_step.squeeze(1)
+            states.append(state_t)
+        states = torch.stack(states, dim=1)
 
         output = (states @ self.C.mT).real + input * self.D
 
@@ -275,9 +267,9 @@ class LRU(nn.Module):
             if state is not None:
                 Bu_elements[:, -1, self.state_dim:] = Bu_elements[:, -1, self.state_dim:] + \
                 (self.lambda_complex[self.state_dim:].view(1,-1) * state[:,self.state_dim:])
-            elements = (Lambda_elements[:,:,self.state_dim:], Bu_elements[:,:,self.state_dim:])
+            elements = (Lambda_elements[:,:,self.state_dim:], torch.flip(Bu_elements[:,:,self.state_dim:],dims=[1]))
             _, inner_states2 = associative_scan(
-                binary_operator_diag, elements, dim=1, combine_mode = 'generic', reverse=True
+                binary_operator_diag, elements, dim=1, combine_mode = 'generic', reverse=False
             )
             states = torch.cat([states, inner_states2], dim=-1)
         output = (states @ self.C.mT).real + input * self.D
