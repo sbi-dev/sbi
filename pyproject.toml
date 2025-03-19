@@ -75,6 +75,7 @@ dev = [
     "pytest-xdist",
     "pytest-harvest",
     "torchtestcase",
+    "syrupy"
 ]
 
 [project.urls]

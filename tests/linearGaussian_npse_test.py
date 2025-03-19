@@ -1,6 +1,8 @@
+from dataclasses import dataclass
 from typing import List
 
 import pytest
+from coverage.files import actual_path
 from torch import eye, ones, zeros
 from torch.distributions import MultivariateNormal
 
@@ -64,6 +66,7 @@ def _initialize_experiment(
 def npse_trained_model(request):
     """Module-scoped fixture that trains a score estimator for NPSE tests."""
     num_dim, num_simulations, num_samples = 2, 5_000, 1_000
+    stop_after_epochs = 200
     sde_type, prior_type = request.param
 
     (
@@ -81,7 +84,7 @@ def npse_trained_model(request):
     inference = NPSE(prior, show_progress_bars=True, sde_type=sde_type)
 
     score_estimator = inference.append_simulations(theta, x).train(
-        stop_after_epochs=200
+        stop_after_epochs=stop_after_epochs
     )
 
     return {
@@ -225,6 +228,56 @@ def test_npse_iid_inference(npse_trained_model, iid_method, num_trial):
         tol=0.05 * min(num_trial, 8),
     )
 
+
+@pytest.mark.parametrize(
+    "sde_type, prior_type",
+    [
+        pytest.param("ve", None, id="ve-None"),
+        pytest.param("vp", "gaussian", id="vp-gaussian"),
+    ],
+)
+@pytest.mark.parametrize(
+    "iid_method, num_trial",
+    [
+        pytest.param("fnpe", 3, id="fnpe-2trials", marks=pytest.mark.slow),
+        pytest.param("gauss", 3, id="gauss-6trials", marks=pytest.mark.slow),
+        pytest.param("auto_gauss", 8, id="auto_gauss-8trials"),
+        pytest.param(
+             "auto_gauss", 16, id="auto_gauss-16trials", marks=pytest.mark.slow
+        ),
+        pytest.param("jac_gauss", 8, id="jac_gauss-8trials", marks=pytest.mark.slow),
+    ],
+)
+def test_npse_iid_inference_snapshot(sde_type, prior_type, iid_method, num_trial, snapshot):
+    # score_estimator = snapshot_npse_trained_model["score_estimator"]
+    # inference = snapshot_npse_trained_model["inference"]
+    # x_o = snapshot_npse_trained_model["x_o"]
+    # num_samples = snapshot_npse_trained_model["num_samples"]
+    num_dim, num_simulations, num_samples = 1, 10, 10
+    stop_after_epochs = 1
+
+    (
+        prior,
+        target_samples,
+        theta,
+        x,
+        x_o,
+        likelihood_shift,
+        likelihood_cov,
+        prior_mean,
+        prior_cov,
+    ) = _initialize_experiment(num_dim, num_samples, num_simulations, prior_type)
+
+    inference = NPSE(prior, show_progress_bars=True, sde_type=sde_type)
+
+    score_estimator = inference.append_simulations(theta, x).train(
+        stop_after_epochs=stop_after_epochs
+    )
+
+    posterior = inference.build_posterior(score_estimator)
+    posterior.set_default_x(x_o)
+    samples = posterior.sample((num_samples,), iid_method=iid_method)
+    assert samples == snapshot
 
 @pytest.mark.slow
 @pytest.mark.parametrize("npse_trained_model", [("vp", "gaussian")], indirect=True)
