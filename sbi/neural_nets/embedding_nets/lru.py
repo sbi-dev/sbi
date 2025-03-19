@@ -26,7 +26,7 @@ class LRUEmbedding(nn.Module):
         bidirectional: bool = False,
         dropout: float = 0.0,
         norm: bool = False,
-        aggretate_func : callable | str = "last_ts"
+        aggregate_func: [str, callable] = "last_ts",
     ):
         """Fully-connected multi-layer neural network to be used as embedding network.
 
@@ -54,17 +54,16 @@ class LRUEmbedding(nn.Module):
             for _ in range(num_layers)
         ]
         
-        if aggretate_func == "last_ts":
-            def aggretate_func(x):
-                return x[:,-1,:]
-        elif aggretate_func == "mean":
-            def aggretate_func(x):
-                return x.mean(dim=1)
-        elif aggretate_func == "sum":
-            def aggretate_func(x):
-                return x.sum(dim=1)
-        elif isinstance(aggretate_func, str):
-            raise ValueError(f"aggretate_func {aggretate_func} not implemented")
+        if aggregate_func == "last_ts":
+            self.aggregation = lambda x: x[:,-1,:]
+        elif aggregate_func == "mean":
+            self.aggregation = lambda x: x.mean(dim=1)
+        elif aggregate_func == "sum":
+            self.aggregation = lambda x: x.mean(dim=1)
+        elif isinstance(aggregate_func, str):
+            raise ValueError(f"aggretate_func {aggregate_func} not implemented")
+        else:
+            self.aggregation = aggregate_func
 
         self.output = nn.Linear(hidden_dim, output_dim)
 
@@ -84,7 +83,7 @@ class LRUEmbedding(nn.Module):
         x = self.net(x)  # (batch_size, len_sequence, output_dim)
 
         # Pooling
-        x = self.aggretate_func(x)
+        x = self.aggregation(x)
 
         # output embedding
         x = self.output(x)
