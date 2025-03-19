@@ -1,7 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import torch
 from torch import Tensor
@@ -112,6 +112,9 @@ class PosteriorScoreBasedPotential(BasePotential):
         # See #1450.
         if not x_is_iid and (self._x_o is not None):
             self.flow = self.rebuild_flow(atol=atol, rtol=rtol, exact=exact)
+        elif self._x_o is not None:
+            # case when x_is_iid
+            self.flows = self.rebuild_flows_for_batch(atol=atol, rtol=rtol, exact=exact)
 
     def __call__(
         self,
@@ -128,6 +131,8 @@ class PosteriorScoreBasedPotential(BasePotential):
             The potential function, i.e., the log probability of the posterior.
         """
 
+        '''
+        #Implemented for now
         if self.x_is_iid:
             raise NotImplementedError(
                 "Potential function evaluation in the IID setting is not yet supported"
@@ -135,6 +140,7 @@ class PosteriorScoreBasedPotential(BasePotential):
                 "If you intended to evaluate the posterior given a batch of (non-iid) "
                 "x use `log_prob_batched`."
             )
+        '''
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
         theta_density_estimator = reshape_to_sample_batch_event(
@@ -143,7 +149,29 @@ class PosteriorScoreBasedPotential(BasePotential):
         self.score_estimator.eval()
 
         with torch.set_grad_enabled(track_gradients):
-            log_probs = self.flow.log_prob(theta_density_estimator).squeeze(-1)
+            if self.x_is_iid:
+                assert self.prior is not None, (
+                    "Prior is required for evaluating log_prob with iid observations."
+                )
+                assert self.flows is not None, (
+                    "Flows for each iid x are required for evaluating log_prob."
+                )
+                n = self.x_o.shape[0]  # number of iid samples
+                iid_posteriors_prob = torch.sum(
+                    torch.stack(
+                        [
+                            flow.log_prob(theta_density_estimator).squeeze(-1)
+                            for flow in self.flows
+                        ],
+                        dim=0,
+                    ),
+                    dim=0,
+                )
+                log_probs = iid_posteriors_prob - (n - 1) * self.prior.log_prob(
+                    theta_density_estimator
+                )
+            else:
+                log_probs = self.flow.log_prob(theta_density_estimator).squeeze(-1)
             # Force probability to be zero outside prior support.
             in_prior_support = within_support(self.prior, theta)
 
@@ -239,6 +267,32 @@ class PosteriorScoreBasedPotential(BasePotential):
             condition=x_density_estimator, atol=atol, rtol=rtol, exact=exact
         )
         return flow
+
+    def rebuild_flows_for_batch(
+        self, atol: float = 1e-5, rtol: float = 1e-6, exact: bool = True
+    ) -> List[NormalizingFlow]:
+        """
+        Rebuilds the continuous normalizing flows for each iid in x_o. This is used when
+        a new default x_o is set, or to evaluate the log probs at higher precision.
+        """
+        if self._x_o is None:
+            raise ValueError(
+                "No observed data x_o is available. Please reinitialize \
+                the potential or manually set self._x_o."
+            )
+        flows = []
+        for i in range(self._x_o.shape[0]):
+            independent_flow = self._x_o[i]
+            # TODO check event_shape
+            x_density_estimator = reshape_to_batch_event(
+                independent_flow, event_shape=self.score_estimator.condition_shape
+            )
+
+            flow = self.get_continuous_normalizing_flow(
+                condition=x_density_estimator, atol=atol, rtol=rtol, exact=exact
+            )
+            flows.append(flow)
+        return flows
 
 
 def build_freeform_jacobian_transform(

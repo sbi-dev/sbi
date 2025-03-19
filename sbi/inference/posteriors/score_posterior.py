@@ -312,8 +312,15 @@ class ScorePosterior(NeuralPosterior):
             `(len(θ),)`-shaped log posterior probability $\log p(\theta|x)$ for θ in the
             support of the prior, -∞ (corresponding to 0 probability) outside.
         """
+        x = self._x_else_default_x(x)
+        x = reshape_to_batch_event(x, self.score_estimator.condition_shape)
+        is_iid = x.shape[0] > 1
         self.potential_fn.set_x(
-            self._x_else_default_x(x), atol=atol, rtol=rtol, exact=exact
+            self._x_else_default_x(x),
+            x_is_iid=is_iid,
+            atol=atol,
+            rtol=rtol,
+            exact=exact,
         )
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
