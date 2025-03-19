@@ -1,13 +1,10 @@
+from abc import abstractmethod
+from typing import Callable
 
-from typing import Callable, Tuple
-from abc import ABC, abstractmethod
-
-import torch
 import torch.nn as nn
 from torch import Tensor
 from torch.distributions import Distribution
 from zuko.lazy import LazyDistribution
-
 
 NeuralODEFuncType = Callable[[Tensor, Tensor, Tensor], Tensor]
 NEURAL_ODE_FUNC_DOCS = """Neural ODE function that computes the time derivative.
@@ -23,15 +20,15 @@ Returns:
 
 class NeuralODE(LazyDistribution):
     def __init__(
-            self, 
-            f: NeuralODEFuncType,
-            net: nn.Module, 
-            mean_base: Tensor,
-            std_base: Tensor,
-            t_min: float = 0.0,
-            t_max: float = 1.0,
-            **kwargs
-        ):
+        self,
+        f: NeuralODEFuncType,
+        net: nn.Module,
+        mean_base: Tensor,
+        std_base: Tensor,
+        t_min: float = 0.0,
+        t_max: float = 1.0,
+        **kwargs,
+    ):
         super().__init__()
         self.f = f
         self.net = net

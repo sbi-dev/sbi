@@ -8,7 +8,9 @@ from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi.inference.posteriors.vector_field_posterior import VectorFieldPosterior
 from sbi.inference.trainers.npse.vector_field_inference import VectorFieldInference
-from sbi.neural_nets.estimators.vector_field_estimator import ConditionalVectorFieldEstimator
+from sbi.neural_nets.estimators.vector_field_estimator import (
+    ConditionalVectorFieldEstimator,
+)
 from sbi.neural_nets.factory import posterior_score_nn
 
 
@@ -52,8 +54,8 @@ class NPSE(VectorFieldInference):
             - Geffner, Tomas, George Papamakarios, and Andriy Mnih. "Score modeling for
                 simulation-based inference." ICML 2023.
             - Sharrock, Louis, et al. "Sequential neural score estimation: Likelihood-
-                free inference with conditional score based diffusion models." ICML 2024.
-            """
+                free inference with conditional score based diffusion models." ICML 2024
+        """
         super().__init__(
             prior=prior,
             vector_field_estimator=score_estimator,
@@ -67,7 +69,6 @@ class NPSE(VectorFieldInference):
     def _build_default_nn_fn(self, **kwargs):
         score_net_type = kwargs.pop("vector_field_estimator", "mlp")
         return posterior_score_nn(score_net_type=score_net_type, **kwargs)
-    
 
     def build_posterior(
         self,
@@ -76,7 +77,8 @@ class NPSE(VectorFieldInference):
         sample_with: str = "sde",
     ) -> VectorFieldPosterior:
         r"""Build posterior from the score estimator. Note that
-        this is the same as the FMPE posterior, but the sample_with method is set to "sde" by default.
+        this is the same as the FMPE posterior, but the sample_with
+        method is set to "sde" by default.
 
         For NPSE, the posterior distribution that is returned here implements the
         following functionality over the raw neural density estimator:

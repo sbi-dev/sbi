@@ -7,5 +7,7 @@ from sbi.neural_nets.estimators.flowmatching_estimator import FlowMatchingEstima
 from sbi.neural_nets.estimators.mixed_density_estimator import MixedDensityEstimator
 from sbi.neural_nets.estimators.nflows_flow import NFlowsFlow
 from sbi.neural_nets.estimators.score_estimator import ConditionalScoreEstimator
+from sbi.neural_nets.estimators.vector_field_estimator import (
+    ConditionalVectorFieldEstimator,
+)
 from sbi.neural_nets.estimators.zuko_flow import ZukoFlow
-from sbi.neural_nets.estimators.vector_field_estimator import ConditionalVectorFieldEstimator

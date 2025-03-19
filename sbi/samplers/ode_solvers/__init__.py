@@ -4,9 +4,9 @@ Neural ODEs for sampling.
 
 import torch.nn as nn
 from torch import Tensor
+
 from sbi.samplers.ode_solvers.base import NeuralODE, NeuralODEFuncType
 from sbi.samplers.ode_solvers.zuko_ode import ZukoNeuralODE
-
 
 __all__ = [
     "NeuralODE",
@@ -17,13 +17,13 @@ __all__ = [
 
 
 def build_neural_ode(
-        f: NeuralODEFuncType, 
-        net: nn.Module,
-        mean_base: Tensor,
-        std_base: Tensor,
-        backend: str = "zuko", 
-        **kwargs
-    ) -> NeuralODE:
+    f: NeuralODEFuncType,
+    net: nn.Module,
+    mean_base: Tensor,
+    std_base: Tensor,
+    backend: str = "zuko",
+    **kwargs,
+) -> NeuralODE:
     """
     Build a NeuralODE from a function and a neural network.
 
@@ -37,7 +37,7 @@ def build_neural_ode(
 
     Returns:
         A NeuralODE object.
-    
+
     Raises:
         ValueError: If the backend is not supported.
     """

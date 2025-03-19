@@ -44,7 +44,9 @@ class Diffuser:
                 string. Defaults to None.
         """
         # Set predictor and corrector
-        self.set_predictor(predictor, vector_field_potential, **(predictor_params or {}))
+        self.set_predictor(
+            predictor, vector_field_potential, **(predictor_params or {})
+        )
         self.set_corrector(corrector, **(corrector_params or {}))
         self.device = self.predictor.device
 
@@ -58,7 +60,9 @@ class Diffuser:
 
         # Extract relevant shapes from the score function
         self.input_shape = vector_field_potential.vector_field_estimator.input_shape
-        self.condition_shape = vector_field_potential.vector_field_estimator.condition_shape
+        self.condition_shape = (
+            vector_field_potential.vector_field_estimator.condition_shape
+        )
         condition_dim = len(self.condition_shape)
         # TODO: this is the iid setting and we don't want to generate num_obs samples,
         # but only one sample given the condition.

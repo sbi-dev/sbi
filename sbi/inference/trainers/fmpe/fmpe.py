@@ -9,10 +9,10 @@ from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi import utils as utils
 from sbi.inference.posteriors.vector_field_posterior import VectorFieldPosterior
-
+from sbi.inference.trainers.npse.vector_field_inference import VectorFieldInference
 from sbi.neural_nets import flowmatching_nn
 from sbi.neural_nets.estimators import ConditionalVectorFieldEstimator
-from sbi.inference.trainers.npse.vector_field_inference import VectorFieldInference
+
 
 class FMPE(VectorFieldInference):
     """
@@ -54,7 +54,7 @@ class FMPE(VectorFieldInference):
     def _build_default_nn_fn(self, **kwargs):
         model = kwargs.pop("vector_field_estimator", "mlp")
         return flowmatching_nn(model=model, **kwargs)
-    
+
     def build_posterior(
         self,
         vector_field_estimator: Optional[ConditionalVectorFieldEstimator] = None,
@@ -62,22 +62,25 @@ class FMPE(VectorFieldInference):
         sample_with: str = "ode",
     ) -> VectorFieldPosterior:
         r"""Build posterior from the flow matching estimator. Note that
-        this is the same as the NPSE posterior, but the sample_with method is set to "ode" by default.
+        this is the same as the NPSE posterior, but the sample_with method
+        is set to "ode" by default.
 
-        For FMPE, the posterior distribution that is returned here implements the
-        following functionality over the raw neural density estimator:
-        - correct the calculation of the log probability such that it compensates for
-            the leakage.
-        - reject samples that lie outside of the prior bounds.
+        For FMPE, the posterior distribution that is returned here implements
+        the following functionality over the raw neural density estimator:
+            - correct the calculation of the log probability such that
+              it compensates for the leakage.
+            - reject samples that lie outside of the prior bounds.
 
         Args:
-            vector_field_estimator: The flow matching estimator that the posterior is based on.
-                If `None`, use the latest neural flow matching estimator that was trained.
+            vector_field_estimator: The flow matching estimator that
+                the posterior is based on. If `None`, use the latest neural
+                flow matching estimator that was trained.
             prior: Prior distribution.
-            sample_with: Method to use for sampling from the posterior. Can be one of
-                'sde' (default) or 'ode'. The 'sde' method uses the score to
-                do a Langevin diffusion step, while the 'ode' method uses the score to
-                define a probabilistic ODE and solves it with a numerical ODE solver.
+            sample_with: Method to use for sampling from the posterior.
+                Can be one of 'sde' (default) or 'ode'. The 'sde' method uses
+                the score to do a Langevin diffusion step, while the 'ode' method
+                uses the score to define a probabilistic ODE and solves it with
+                a numerical ODE solver.
 
         Returns:
             Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods.

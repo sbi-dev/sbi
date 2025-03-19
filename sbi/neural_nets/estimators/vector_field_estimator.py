@@ -1,4 +1,3 @@
-
 from abc import abstractmethod
 
 import torch
@@ -23,22 +22,31 @@ class ConditionalVectorFieldEstimator(ConditionalEstimator):
 
     """
 
-    # When implementing custom estimators, the following properties should be set:
+    # When implementing custom estimators,
+    # the following properties should be set:
 
-    # Whether the score is defined for this estimator. Required for gradient-based methods.
+    # Whether the score is defined for this estimator.
+    # Required for gradient-based methods.
     # It should be set to True only if score is implemented.
     SCORE_DEFINED: bool = True
 
-    # Whether the SDE functions - score, drift and diffusion - are defined for this estimator. 
+    # Whether the SDE functions - score, drift and diffusion -
+    # are defined for this estimator.
     # Required for SDE sampling.
     SDE_DEFINED: bool = True
 
-    # Whether the marginals are defined for this estimator. Required for iid methods.
+    # Whether the marginals are defined for this estimator.
+    # Required for iid methods.
     # It should be set to True only if mean_t_fn and std_fn are implemented.
     MARGINALS_DEFINED: bool = True
 
     def __init__(
-        self, net: nn.Module, input_shape: torch.Size, condition_shape: torch.Size, t_min: float = 0., t_max: float = 1.0,
+        self,
+        net: nn.Module,
+        input_shape: torch.Size,
+        condition_shape: torch.Size,
+        t_min: float = 0.0,
+        t_max: float = 1.0,
     ) -> None:
         r"""Base class for vector field estimators.
 
@@ -71,19 +79,19 @@ class ConditionalVectorFieldEstimator(ConditionalEstimator):
 
     # -------------------------- BASE DISTRIBUTION METHODS --------------------------
 
-    # We assume that the base distribution is a Gaussian distribution 
+    # We assume that the base distribution is a Gaussian distribution
     # and that it is the same for ODE and SDE.
 
     @property
     def mean_base(self) -> Tensor:
-        r"""Mean of the base distribution (the initial noise at time t=T).""" 
+        r"""Mean of the base distribution (the initial noise at time t=T)."""
         return torch.zeros(1, *self.input_shape)
 
     @property
     def std_base(self) -> Tensor:
-        r"""Standard deviation of the base distribution (the initial noise at time t=T).""" 
+        r"""Standard deviation of the base distribution
+        (the initial noise at time t=T)."""
         return torch.ones(1, *self.input_shape)
-    
 
     # -------------------------- ODE METHODS --------------------------
 
@@ -95,7 +103,7 @@ class ConditionalVectorFieldEstimator(ConditionalEstimator):
             input: variable whose distribution is estimated.
             condition: Conditioning variable.
             t: Time.
-        
+
         Raises:
             NotImplementedError: This method should be implemented by sub-classes.
         """
@@ -114,7 +122,6 @@ class ConditionalVectorFieldEstimator(ConditionalEstimator):
             NotImplementedError: This method should be implemented by sub-classes.
         """
         raise NotImplementedError("This method should be implemented by sub-classes.")
-    
 
     def mean_t_fn(self, times: Tensor) -> Tensor:
         r"""Conditional mean function, E[xt|x0], specifying the "mean factor" at a given
@@ -129,7 +136,6 @@ class ConditionalVectorFieldEstimator(ConditionalEstimator):
         """
         raise NotImplementedError
 
-
     def std_fn(self, times: Tensor) -> Tensor:
         r"""Standard deviation function of the noise distribution at a given time,
 
@@ -142,7 +148,7 @@ class ConditionalVectorFieldEstimator(ConditionalEstimator):
             NotImplementedError: This method should be implemented by sub-classes.
         """
         raise NotImplementedError
-    
+
     def drift_fn(self, input: Tensor, times: Tensor) -> Tensor:
         r"""Drift function of the vector field estimator.
 
@@ -153,9 +159,9 @@ class ConditionalVectorFieldEstimator(ConditionalEstimator):
         Raises:
             NotImplementedError: This method should be implemented by sub-classes.
 
-        """     
+        """
         raise NotImplementedError
-    
+
     def diffusion_fn(self, input: Tensor, times: Tensor) -> Tensor:
         r"""Diffusion function of the vector field estimator.
 

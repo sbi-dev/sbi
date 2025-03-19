@@ -4,11 +4,12 @@ from typing import Optional
 
 import torch
 import torch.nn as nn
-
 from torch import Tensor
 from zuko.utils import broadcast
 
-from sbi.neural_nets.estimators.vector_field_estimator import ConditionalVectorFieldEstimator
+from sbi.neural_nets.estimators.vector_field_estimator import (
+    ConditionalVectorFieldEstimator,
+)
 
 
 # abstract class to ensure forward signature for flow matching networks
@@ -19,16 +20,22 @@ class VectorFieldNet(nn.Module, ABC):
 
 class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
     r"""
-    
-    Rectified flow matching estimator class that estimates the conditional vector field, 
+
+    Rectified flow matching estimator class that estimates the conditional vector field,
     i.e. the expectation E[x_t - x_0 | x_0 = x].
 
     """
-    
-    SCORE_DEFINED: bool = True  # Whether the score is defined for this estimator. Required for gradient-based methods.
-    SDE_DEFINED: bool = True  # Whether the SDE functions - score, drift and diffusion - are defined for this estimator. 
-    MARGINALS_DEFINED: bool = True  # Whether the marginals are defined for this estimator. Required for iid methods.
-    
+
+    # Whether the score is defined for this estimator.
+    # Required for gradient-based methods.
+    SCORE_DEFINED: bool = True
+    # Whether the SDE functions - score, drift and diffusion -
+    # are defined for this estimator.
+    SDE_DEFINED: bool = True
+    # Whether the marginals are defined for this estimator.
+    # Required for iid methods.
+    MARGINALS_DEFINED: bool = True
+
     def __init__(
         self,
         net: VectorFieldNet,
@@ -58,7 +65,9 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
 
         self.noise_scale = noise_scale
         # Identity transform for z-scoring the input
-        self._embedding_net = embedding_net if embedding_net is not None else nn.Identity()
+        self._embedding_net = (
+            embedding_net if embedding_net is not None else nn.Identity()
+        )
 
         self.register_buffer("freqs", torch.arange(1, num_freqs + 1) * math.pi)
         self.register_buffer('zeros', torch.zeros(input_shape))
@@ -87,7 +96,9 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         # return the estimated vector field
         return self.net(theta=input, x=embedded_condition, t=t)
 
-    def loss(self, input: Tensor, condition: Tensor, times: Optional[Tensor] = None, **kwargs) -> Tensor:
+    def loss(
+        self, input: Tensor, condition: Tensor, times: Optional[Tensor] = None, **kwargs
+    ) -> Tensor:
         """Return the loss for training the density estimator. More precisely,
         we compute the conditional flow matching loss with naive optimal
         trajectories as described in the original paper.
@@ -95,8 +106,9 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         Args:
             theta: Parameters.
             x: Observed data.
-            times: Time steps to compute the loss at. Optional, will sample from [0, 1] if not provided.
-        
+            times: Time steps to compute the loss at.
+                Optional, will sample from [0, 1] if not provided.
+
         Returns:
             Loss value.
         """
@@ -146,7 +158,6 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         """
         v = self.forward(input, condition, t)
         return (-(1 - t) * v - input) / torch.maximum(t, torch.tensor(1e-6))
-    
 
     def drift_fn(self, input: Tensor, times: Tensor) -> Tensor:
         """Drift function for the flow matching estimator.
@@ -158,7 +169,7 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         Returns:
             Drift function at a given time.
         """
-        return - input / torch.maximum(1 - times, torch.tensor(1e-6))
+        return -input / torch.maximum(1 - times, torch.tensor(1e-6))
 
     def diffusion_fn(self, input: Tensor, times: Tensor) -> Tensor:
         """Diffusion function for the flow matching estimator.
@@ -170,14 +181,15 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         Returns:
             Diffusion function at a given time.
         """
-        return torch.sqrt(2 * times /  torch.maximum(1 - times, torch.tensor(1e-6)))
-    
+        return torch.sqrt(2 * times / torch.maximum(1 - times, torch.tensor(1e-6)))
+
     def mean_t_fn(self, times: Tensor) -> Tensor:
-        r"""Linear coefficient of the perturbation kernel mean for the flow matching estimator.
+        r"""Linear coefficient of the perturbation kernel mean
+        for the flow matching estimator.
 
         The general form of the perturbation kernel for rectified flows is:
             mean_t(t) = (1 - t) * mean_0 + t * mean_base
-        
+
         So far, the implementation of iid methods assumes that the mean_base is 0.
 
         Args:
@@ -192,7 +204,8 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         return mean_t
 
     def std_fn(self, times: Tensor) -> Tensor:
-        """Standard deviation of the perturbation kernel for the flow matching estimator.
+        """Standard deviation of the perturbation kernel
+        for the flow matching estimator.
 
         The general form of the perturbation kernel for rectified flows is:
             std_t(t) = t * std_base
@@ -207,4 +220,3 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         for _ in range(len(self.input_shape)):
             std_t = std_t.unsqueeze(-1)
         return std_t
-  

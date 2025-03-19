@@ -18,10 +18,10 @@ from sbi.inference import NeuralInference
 from sbi.inference.posteriors import (
     DirectPosterior,
 )
-
 from sbi.inference.posteriors.vector_field_posterior import VectorFieldPosterior
-from sbi.neural_nets.estimators.vector_field_estimator import ConditionalVectorFieldEstimator
-
+from sbi.neural_nets.estimators.vector_field_estimator import (
+    ConditionalVectorFieldEstimator,
+)
 from sbi.utils import (
     check_estimator_arg,
     handle_invalid_x,
@@ -45,18 +45,18 @@ class VectorFieldInference(NeuralInference):
         show_progress_bars: bool = True,
         **kwargs,
     ):
-        """Base class for vector field inference methods. It is used 
+        """Base class for vector field inference methods. It is used
         both for NPSE and FMPE.
 
-        NOTE: Vector field inference does not support multi-round inference with flexible proposals yet.
-        You can try to run multi-round with truncated proposals, but note that this is
-        not tested yet.
+        NOTE: Vector field inference does not support multi-round inference
+        with flexible proposals yet. You can try to run multi-round with
+        truncated proposals, but note that this is not tested yet.
 
         Args:
             prior: Prior distribution.
-            vector_field_estimator: Neural network architecture for the score estimator. Can be
-                a string (e.g. 'mlp' or 'ada_mlp') or a callable that returns a neural
-                network.
+            vector_field_estimator: Neural network architecture for the score estimator.
+                Can be a string (e.g. 'mlp' or 'ada_mlp') or a callable that returns a
+                neural network.
             device: Device to run the training on.
             logging_level: Logging level for the training. Can be an integer or a
                 string.
