@@ -11,6 +11,9 @@ from zuko.transforms import FreeFormJacobianTransform
 from zuko.utils import broadcast
 
 from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
+from sbi.neural_nets.estimators.shape_handling import (
+    reshape_to_batch_event,
+)
 from sbi.utils.vector_field_utils import VectorFieldNet
 
 
@@ -59,24 +62,19 @@ class FlowMatchingEstimator(ConditionalDensityEstimator):
         return self._embedding_net
 
     def forward(self, input: Tensor, condition: Tensor, t: Tensor) -> Tensor:
-        # positional encoding of time steps
-        t = self.freqs * t[..., None]
-        t = torch.cat((t.cos(), t.sin()), dim=-1)
-
         # embed the input and condition
         embedded_condition = self._embedding_net(condition)
         zscored_input = self.zscore_transform_input(input)
 
         # broadcast to match shapes of theta, x, and t
-        zscored_input, embedded_condition, t = broadcast(
+        zscored_input, embedded_condition = broadcast(
             zscored_input,  # type: ignore
             embedded_condition,
-            t,
             ignore=1,
         )
 
         # return the estimated vector field
-        return self.net(theta=zscored_input, x=embedded_condition, t=t)
+        return self.net(theta=zscored_input, x_emb_cond=embedded_condition, t=t)
 
     def loss(self, input: Tensor, condition: Tensor, **kwargs) -> Tensor:
         """Return the loss for training the density estimator. More precisely,
@@ -115,12 +113,30 @@ class FlowMatchingEstimator(ConditionalDensityEstimator):
         )
 
         # the flow will apply and take into account input zscoring.
-        log_probs = self.flow(condition=condition).log_prob(input)
+        input_reshaped = reshape_to_batch_event(input, input.shape[2:])
+        condition = reshape_to_batch_event(condition, condition.shape[2:])
+        log_probs = self.flow(condition=condition).log_prob(input_reshaped)
+        log_probs = log_probs.reshape(input.shape[0], input.shape[1])
         return log_probs
 
     def sample(self, sample_shape: torch.Size, condition: Tensor, **kwargs) -> Tensor:
-        # the flow will take care of inverse z-scoring.
+        batch_size_ = condition.shape[0]
+        print("before reshape, condition", condition.shape)
+        # condition = reshape_to_batch_event(condition, condition.shape[2:])
+        print("during sampling, condition", condition.shape)
         samples = self.flow(condition=condition).sample(sample_shape)
+        # sample shape right now is (num_samples,)
+        print(
+            "during sampling, sample_shape",
+            sample_shape,
+            "input shape",
+            self.input_shape,
+        )
+        # samples = self.custom_euler_integration(
+        #     condition=condition, sample_shape=sample_shape
+        # )
+        print("after custom euler integration, samples", samples.shape)
+        samples = torch.reshape(samples, (sample_shape[0], batch_size_, -1))
         return samples
 
     def sample_and_log_prob(
@@ -144,6 +160,7 @@ class FlowMatchingEstimator(ConditionalDensityEstimator):
             NormalizingFlow: flow with log_prob and sample methods via probability ODEs.
         """
 
+        print("in zuko, condition", condition.shape)
         transform = zuko.transforms.ComposedTransform(
             FreeFormJacobianTransform(
                 f=lambda t, input: self.forward(input, condition, t),
@@ -158,3 +175,22 @@ class FlowMatchingEstimator(ConditionalDensityEstimator):
             transform=transform,
             base=DiagNormal(self.zeros, self.ones).expand(condition.shape[:-1]),
         )
+
+    def custom_euler_integration(
+        self, condition: Tensor, sample_shape: torch.Size
+    ) -> Tensor:
+        theta_t = torch.randn(
+            list(sample_shape) * condition.shape[0] + list(self.input_shape),
+            device=condition.device,
+        )
+        # reshape condition to repliocate sample_shape times in batch dim
+        condition = (
+            condition.unsqueeze(0)
+            .repeat(sample_shape[0], 1, 1)
+            .reshape(-1, *condition.shape[1:])
+        )
+        for i in range(100):
+            theta_t = theta_t + self.forward(
+                theta_t, condition, torch.ones(theta_t.shape[0]) * i / 100
+            )
+        return theta_t
