@@ -32,6 +32,7 @@ inference.
 - [Handling invalid simulations](06_restriction_estimator.md)
 - [Crafting summary statistics](08_crafting_summary_statistics.md)
 - [Importance sampling posteriors](15_importance_sampled_posteriors.md)
+- [Score-based methods : improvements and new features](20_score_based_methods_new_features.md)
 </div>
 
 ## Diagnostics
