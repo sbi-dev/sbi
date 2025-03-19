@@ -372,7 +372,7 @@ class UnconditionalDensityEstimator(UnconditionalEstimator):
             Sample-wise log probabilities.
         """
 
-        return self._neural_net.log_prob(x)
+        return self._neural_net.log_prob(x).detach()
 
     def sample(self, sample_shape: torch.Size()) -> Tensor:
         r"""Return samples from the density estimator.

@@ -2,9 +2,10 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import time
-from abc import ABC
 from copy import deepcopy
-from typing import Callable, Optional, Tuple, Union
+from datetime import datetime
+from pathlib import Path
+from typing import Callable, Dict, Optional, Tuple, Union
 
 import torch
 from torch import Tensor
@@ -14,33 +15,47 @@ from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard.writer import SummaryWriter
 
-from sbi.inference.trainers.base import NeuralInference
 from sbi.neural_nets.estimators import UnconditionalDensityEstimator
 from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
 )
 from sbi.neural_nets.factory import marginal_nn
-from sbi.utils import check_estimator_arg
-from sbi.utils.torchutils import assert_all_finite
+from sbi.utils import check_estimator_arg, get_log_root
+from sbi.utils.torchutils import assert_all_finite, process_device
 
 
-class MarginalTrainer(NeuralInference, ABC):
+class MarginalTrainer:
     def __init__(
         self,
         density_estimator: Union[str, Callable] = "MAF",
         device: str = "cpu",
-        logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
         show_progress_bars: bool = True,
     ):
         """Base class for Marginal estimation method."""
 
-        super().__init__(
-            prior=None,
-            device=device,
-            logging_level=logging_level,
-            summary_writer=summary_writer,
-            show_progress_bars=show_progress_bars,
+        self._device = process_device(device)
+        self._neural_net = None
+
+        self._show_progress_bars = show_progress_bars
+
+        # Initialize list that indicates the round from which simulations were drawn.
+        self._data_round_index = []
+
+        self._round = 0
+        self._val_loss = float("Inf")
+
+        self._summary_writer = (
+            self._default_summary_writer() if summary_writer is None else summary_writer
+        )
+
+        # Logging during training (by SummaryWriter).
+        self._summary = dict(
+            epochs_trained=[],
+            best_validation_loss=[],
+            validation_loss=[],
+            training_loss=[],
+            epoch_durations_sec=[],
         )
 
         check_estimator_arg(density_estimator)
@@ -106,7 +121,12 @@ class MarginalTrainer(NeuralInference, ABC):
         Returns:
             Negative log prob.
         """
-        x = reshape_to_batch_event(x, event_shape=self._neural_net.input_shape)
+        if self._neural_net is None:
+            raise ValueError(
+                "Neural network has not been initialized. Please call `train` first."
+            )
+        else:
+            x = reshape_to_batch_event(x, event_shape=self._neural_net.input_shape)
         loss = self._neural_net.loss(x)
         assert_all_finite(loss, "loss")
         return loss
@@ -235,3 +255,138 @@ class MarginalTrainer(NeuralInference, ABC):
         self._neural_net.zero_grad(set_to_none=True)
 
         return deepcopy(self._neural_net)
+
+    def _default_summary_writer(self) -> SummaryWriter:
+        """Return summary writer logging to method- and simulator-specific directory."""
+
+        method = self.__class__.__name__
+        logdir = Path(
+            get_log_root(), method, datetime.now().isoformat().replace(":", "_")
+        )
+        return SummaryWriter(logdir)
+
+    def _converged(self, epoch: int, stop_after_epochs: int) -> bool:
+        """Return whether the training converged yet and save best model state so far.
+
+        Checks for improvement in validation performance over previous epochs.
+
+        Args:
+            epoch: Current epoch in training.
+            stop_after_epochs: How many fruitless epochs to let pass before stopping.
+
+        Returns:
+            Whether the training has stopped improving, i.e. has converged.
+        """
+        converged = False
+
+        assert self._neural_net is not None
+        neural_net = self._neural_net
+
+        # (Re)-start the epoch count with the first epoch or any improvement.
+        if epoch == 0 or self._val_loss < self._best_val_loss:
+            self._best_val_loss = self._val_loss
+            self._epochs_since_last_improvement = 0
+            self._best_model_state_dict = deepcopy(neural_net.state_dict())
+        else:
+            self._epochs_since_last_improvement += 1
+
+        # If no validation improvement over many epochs, stop training.
+        if self._epochs_since_last_improvement > stop_after_epochs - 1:
+            neural_net.load_state_dict(self._best_model_state_dict)
+            converged = True
+
+        return converged
+
+    @staticmethod
+    def _describe_round(round_: int, summary: Dict[str, list]) -> str:
+        epochs = summary["epochs_trained"][-1]
+        best_validation_loss = summary["best_validation_loss"][-1]
+
+        description = f"""
+        -------------------------
+        ||||| ROUND {round_ + 1} STATS |||||:
+        -------------------------
+        Epochs trained: {epochs}
+        Best validation performance: {best_validation_loss:.4f}
+        -------------------------
+        """
+
+        return description
+
+    @staticmethod
+    def _maybe_show_progress(show: bool, epoch: int) -> None:
+        if show:
+            # end="\r" deletes the print statement when a new one appears.
+            # https://stackoverflow.com/questions/3419984/. `\r` in the beginning due
+            # to #330.
+            print("\r", f"Training neural network. Epochs trained: {epoch}", end="")
+
+    def _summarize(
+        self,
+        round_: int,
+    ) -> None:
+        """Update the summary_writer with statistics for a given round.
+
+        During training several performance statistics are added to the summary, e.g.,
+        using `self._summary['key'].append(value)`. This function writes these values
+        into summary writer object.
+
+        Args:
+            round: index of round
+
+        Scalar tags:
+            - epochs_trained:
+                number of epochs trained
+            - best_validation_loss:
+                best validation loss (for each round).
+            - validation_loss:
+                validation loss for every epoch (for each round).
+            - training_loss
+                training loss for every epoch (for each round).
+            - epoch_durations_sec
+                epoch duration for every epoch (for each round)
+
+        """
+
+        # Add most recent training stats to summary writer.
+        self._summary_writer.add_scalar(
+            tag="epochs_trained",
+            scalar_value=self._summary["epochs_trained"][-1],
+            global_step=round_ + 1,
+        )
+
+        self._summary_writer.add_scalar(
+            tag="best_validation_loss",
+            scalar_value=self._summary["best_validation_loss"][-1],
+            global_step=round_ + 1,
+        )
+
+        # Add validation loss for every epoch.
+        # Offset with all previous epochs.
+        offset = (
+            torch.tensor(self._summary["epochs_trained"][:-1], dtype=torch.int)
+            .sum()
+            .item()
+        )
+        for i, vlp in enumerate(self._summary["validation_loss"][offset:]):
+            self._summary_writer.add_scalar(
+                tag="validation_loss",
+                scalar_value=vlp,
+                global_step=offset + i,
+            )
+
+        for i, tlp in enumerate(self._summary["training_loss"][offset:]):
+            self._summary_writer.add_scalar(
+                tag="training_loss",
+                scalar_value=tlp,
+                global_step=offset + i,
+            )
+
+        for i, eds in enumerate(self._summary["epoch_durations_sec"][offset:]):
+            self._summary_writer.add_scalar(
+                tag="epoch_durations_sec",
+                scalar_value=eds,
+                global_step=offset + i,
+            )
+
+        self._summary_writer.flush()
