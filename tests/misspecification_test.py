@@ -15,7 +15,7 @@ from sbi.neural_nets.embedding_nets import FCEmbedding
 seed = 2025
 
 
-@pytest.mark.parametrize("D, N", ((2, 1000)))
+@pytest.mark.parametrize("D, N", ((2, 1000),))
 def test_mmd_x_space(D: int, N: int):
     """MMD in x-space on Gaussian data.
     Args:
@@ -80,7 +80,7 @@ def test_mmd_x_space(D: int, N: int):
     assert p_val_mis < 0.05, f"Expected small p_val , obtained {p_val_mis}"
 
 
-@pytest.mark.parametrize("D, N", ((2, 1000)))
+@pytest.mark.parametrize("D, N", ((2, 1000),))
 def test_mmd_x_emedding(D: int, N: int):
     """MMD in x-space on Gaussian data.
     Args:
