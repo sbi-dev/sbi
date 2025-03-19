@@ -3,6 +3,9 @@
 
 from __future__ import annotations
 
+import sys
+
+import pymc
 import pytest
 import torch
 from torch import eye, ones, zeros
@@ -393,7 +396,18 @@ def test_c2st_multi_round_nle_on_linearGaussian_vi(num_trials: int):
         pytest.param("slice_np", "uniform", marks=pytest.mark.mcmc),
         pytest.param("slice_np_vectorized", "gaussian", marks=pytest.mark.mcmc),
         pytest.param("slice_np_vectorized", "uniform", marks=pytest.mark.mcmc),
-        pytest.param("nuts_pymc", "gaussian", marks=pytest.mark.mcmc),
+        pytest.param(
+            "nuts_pymc",
+            "gaussian",
+            marks=(
+                pytest.mark.mcmc,
+                pytest.mark.skipif(
+                    condition=sys.version_info >= (3, 10)
+                    and pymc.__version__ >= "5.20.1",
+                    reason="Inconsistent behaviour with pymc>=5.20.1 and python>=3.10",
+                ),
+            ),
+        ),
         pytest.param("nuts_pyro", "uniform", marks=pytest.mark.mcmc),
         pytest.param("hmc_pymc", "gaussian", marks=pytest.mark.mcmc),
         ("rejection", "uniform"),

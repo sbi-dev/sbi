@@ -6,6 +6,7 @@ from __future__ import annotations
 import sys
 
 import numpy as np
+import pymc
 import pytest
 import torch
 from torch import eye, ones, zeros
@@ -187,11 +188,9 @@ def test_c2st_pymc_sampler_on_Gaussian(
         "hmc_pyro",
         pytest.param(
             "nuts_pymc",
-            marks=pytest.mark.xfail(
-                condition=sys.version_info >= (3, 10),
-                reason="Fails with pymc>=5.20.1 and python>=3.10",
-                strict=True,
-                raises=TypeError,
+            marks=pytest.mark.skipif(
+                condition=sys.version_info >= (3, 10) and pymc.__version__ >= "5.20.1",
+                reason="Inconsistent behaviour with pymc>=5.20.1 and python>=3.10",
             ),
         ),
         "hmc_pymc",
