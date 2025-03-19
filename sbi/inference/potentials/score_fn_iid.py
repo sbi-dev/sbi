@@ -683,7 +683,7 @@ class JacCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
         with torch.enable_grad():
             # NOTE: torch.func can be realtively unstable...
             jac_fn = torch.func.jacrev(  # type: ignore
-                lambda x: self.vector_field_estimator(x, conditions, time)
+                lambda x: self.vector_field_estimator.score(x, conditions, time)
             )
             jac_fn = torch.func.vmap(torch.func.vmap(jac_fn))  # type: ignore
             jac = jac_fn(inputs).squeeze(1)
