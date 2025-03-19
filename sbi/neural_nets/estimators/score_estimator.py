@@ -180,7 +180,7 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         # update device if required
         self.device = input.device if self.device != input.device else self.device
 
-        # Sample diffusion times.
+        # Sample times from the Markov chain
         if times is None:
             times = self.times_schedule(input.shape[0])
 
@@ -619,7 +619,7 @@ class ImprovedVPScoreEstimator(ConditionalScoreEstimator):
         Generative Models", https://arxiv.org/abs/2206.00364
         """
 
-        samples = torch.randn_like(times)*(self.pstd**2) + self.pmean
+        samples = torch.randn_like(times)*(self.pstd) + self.pmean
         return torch.exp(samples)
 
     def times_schedule(self,
@@ -828,9 +828,10 @@ class VEScoreEstimator(ConditionalScoreEstimator):
         Returns:
             Diffusion function at a given time.
         """
-        sigmas = self.sigma_min * (self.sigma_max / self.sigma_min) ** times
+        sigma_scale = self.sigma_max / self.sigma_min
+        sigmas = self.sigma_min * (sigma_scale) ** times
         g = sigmas * math.sqrt(
-            (2 * math.log(self.sigma_max / self.sigma_min))
+            (2 * math.log(sigma_scale))
         )
 
         while len(g.shape) < len(input.shape):
