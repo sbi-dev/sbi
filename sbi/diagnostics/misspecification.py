@@ -99,6 +99,9 @@ def calc_misspecification_mmd(
     n_shuffle: number of shuffles for computing mmds und H_0
     max_samples: maximum number of samples to use
     mmd_mode: mode of MMD calculation ("biased" or "unbiased")
+    returns:
+        p_val, (mmd_baseline,mmd): p-value of the misspecification test
+                                    (MMDs under H_0, mmd)
     """
     if mode == "x_space":
         z_obs = x_obs
