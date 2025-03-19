@@ -10,7 +10,7 @@ from pyro.infer import MCMC, NUTS
 
 from sbi.inference import NLE, NPE, NRE
 from sbi.utils.pyroutils import (
-    ConditionedEstimatorDistribution,
+    ConditionalDensityEstimatorDistribution,
     RatioEstimatorDistribution,
     get_transforms,
 )
@@ -76,8 +76,8 @@ def test_unbounded_transform():
 @pytest.mark.parametrize(
     "trainer_cls, distribution_cls",
     [
-        (NLE, ConditionedEstimatorDistribution),
-        (NPE, ConditionedEstimatorDistribution),
+        (NLE, ConditionalDensityEstimatorDistribution),
+        (NPE, ConditionalDensityEstimatorDistribution),
         (NRE, RatioEstimatorDistribution),
     ],
 )
@@ -141,7 +141,7 @@ def test_estimator_distribution_basic_properties(
 @pytest.mark.parametrize(
     "trainer_cls, distribution_cls",
     [
-        (NLE, ConditionedEstimatorDistribution),
+        (NLE, ConditionalDensityEstimatorDistribution),
         (NRE, RatioEstimatorDistribution),
     ],
 )

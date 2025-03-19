@@ -10,7 +10,7 @@ import torch.distributions.constraints as constraints
 from pyro import poutine as poutine
 from torch.distributions import biject_to
 
-from sbi.neural_nets.estimators.base import ConditionalEstimator
+from sbi.neural_nets.estimators import ConditionalDensityEstimator
 from sbi.neural_nets.ratio_estimators import RatioEstimator
 
 
@@ -104,7 +104,7 @@ class EstimatorDistribution(pyro.distributions.TorchDistribution):
         return type(self)(self.estimator, condition)
 
 
-class ConditionedEstimatorDistribution(EstimatorDistribution):
+class ConditionalDensityEstimatorDistribution(EstimatorDistribution):
     """
     A conditioned `sbi` estimator wrapped as a Pyro distribution.
     """
@@ -112,7 +112,7 @@ class ConditionedEstimatorDistribution(EstimatorDistribution):
     def get_condition_and_event_shapes(self) -> Tuple[torch.Size, torch.Size]:
         return self.estimator.condition_shape, self.estimator.input_shape
 
-    def __init__(self, estimator: ConditionalEstimator, condition: torch.Tensor):
+    def __init__(self, estimator: ConditionalDensityEstimator, condition: torch.Tensor):
         """
         Condition an `sbi` estimator and wrap it as a Pyro distribution.
 
@@ -129,7 +129,7 @@ class ConditionedEstimatorDistribution(EstimatorDistribution):
 
     def log_prob(self, x: torch.Tensor) -> torch.Tensor:
         """Compute log probability of `x`."""
-        # ConditionalEstimator expects a batch shape of (batch_dim,)
+        # ConditionalDensityEstimator expects a batch shape of (batch_dim,)
         # and sample shape of (sample_dim,)
         sample_shape = x.shape[: -len(self.event_shape) - len(self.batch_shape)]
         x = x.reshape(-1, self.batch_shape.numel(), *self.event_shape)
