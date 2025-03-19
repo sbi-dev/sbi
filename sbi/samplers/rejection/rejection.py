@@ -253,11 +253,6 @@ def accept_reject_sample(
 
     # Progress bar can be skipped, e.g. when sampling after each round just for
     # logging.
-    pbar = tqdm(
-        disable=not show_progress_bars,
-        total=num_samples,
-        desc=f"Drawing {num_samples} posterior samples",
-    )
     if proposal_sampling_kwargs is None:
         proposal_sampling_kwargs = {}
 
@@ -268,6 +263,12 @@ def accept_reject_sample(
     # But this would require giving the method the condition_shape explicitly...
     if "condition" in proposal_sampling_kwargs:
         num_xos = proposal_sampling_kwargs["condition"].shape[0]
+
+    pbar = tqdm(
+        disable=not show_progress_bars,
+        total=num_samples,
+        desc=f"Drawing {num_samples} posterior samples for {num_xos} observations",
+    )
 
     accepted = [[] for _ in range(num_xos)]
     acceptance_rate = torch.full((num_xos,), float("Nan"))
@@ -321,7 +322,7 @@ def accept_reject_sample(
             max(int(1.5 * num_remaining / max(min_acceptance_rate, 1e-12)), 100),
         )
         if (
-            num_sampled_total.min().item() > 1000
+            num_samples_possible > 1000
             and min_acceptance_rate < warn_acceptance
             and not leakage_warning_raised
         ):
