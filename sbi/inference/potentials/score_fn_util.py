@@ -2,7 +2,7 @@ import functools
 import math
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Callable, Optional, Type
+from typing import Callable, Optional, Type, Union
 
 import torch
 import torch.nn.functional as F
@@ -118,10 +118,10 @@ class ScoreAdaptation(ABC):
 
 @dataclass
 class AffineClassifierFreeGuidanceCfg:
-    prior_scale: float | Tensor = 1.0
-    prior_shift: float | Tensor = 0.0
-    likelihood_scale: float | Tensor = 1.0
-    likelihood_shift: float | Tensor = 0.0
+    prior_scale: Union[float, Tensor] = 1.0
+    prior_shift: Union[float, Tensor] = 0.0
+    likelihood_scale: Union[float, Tensor] = 1.0
+    likelihood_shift: Union[float, Tensor] = 0.0
 
 
 @register_guidance_method("affine_classifier_free", AffineClassifierFreeGuidanceCfg)
@@ -173,8 +173,9 @@ class AffineClassifierFreeGuidance(ScoreAdaptation):
         posterior_score = self.score_estimator(
             input=input, condition=condition, time=time
         )
+        print(input.shape)
         prior_score = self.marginal_prior_score(input, time)
-
+        print(posterior_score.shape, prior_score.shape)
         ll_score = posterior_score - prior_score
         ll_score_mod = ll_score * self.likelihood_scale + self.likelihood_shift
         prior_score_mod = prior_score * self.prior_scale + self.prior_shift
@@ -292,8 +293,8 @@ class UniversalGuidance(ScoreAdaptation):
 
 @dataclass
 class IntervalGuidanceCfg:
-    lower_bound: float | Tensor
-    upper_bound: float | Tensor
+    lower_bound: Optional[Union[float, Tensor]]
+    upper_bound: Optional[Union[float, Tensor]]
     scale_factor: float = 0.1
 
 
