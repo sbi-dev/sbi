@@ -15,7 +15,8 @@ from sbi.neural_nets.embedding_nets import (
     CNNEmbedding,
     FCEmbedding,
     PermutationInvariantEmbedding,
-    ResNetEmbedding,
+    ResNetEmbedding1D,
+    ResNetEmbedding2D,
 )
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
@@ -181,10 +182,17 @@ def test_1d_and_2d_cnn_embedding_net(input_shape, num_channels):
 def test_2d_ResNet_cnn_embedding_net(
     input_shape, num_channels, change_c_mode, n_stages
 ):
+    c_stages = [16, 32, 64, 128]
+    blocks_per_stage = [2, 2, 2, 2]
     estimator_provider = posterior_nn(
         "mdn",
-        embedding_net=ResNetEmbedding(
-            c_in=num_channels, n_stages=n_stages, change_c_mode=change_c_mode, c_out=20
+        embedding_net=ResNetEmbedding2D(
+            c_in=num_channels,
+            n_stages=n_stages,
+            change_c_mode=change_c_mode,
+            c_out=20,
+            c_stages=c_stages[:n_stages],
+            blocks_per_stage=blocks_per_stage[:n_stages],
         ),
     )
 
@@ -208,6 +216,44 @@ def test_2d_ResNet_cnn_embedding_net(
         x = x.unsqueeze(1).repeat(
             1, num_channels, *[1 for _ in range(len(input_shape))]
         )
+
+    trainer = NPE(prior=prior, density_estimator=estimator_provider)
+    trainer.append_simulations(theta, x).train(max_num_epochs=2)
+    posterior = trainer.build_posterior().set_default_x(xo)
+
+    s = posterior.sample((10,))
+    posterior.potential(s)
+
+
+@pytest.mark.parametrize("input_shape", [(2,), (128,)])
+@pytest.mark.parametrize("n_blocks", (1, 20))
+@pytest.mark.parametrize("c_internal", (2, 20))
+@pytest.mark.parametrize("c_hidden_final", (2, 20))
+def test_1d_ResNet_fc_embedding_net(input_shape, n_blocks, c_internal, c_hidden_final):
+    estimator_provider = posterior_nn(
+        "mdn",
+        embedding_net=ResNetEmbedding1D(
+            c_in=input_shape[0],
+            c_out=20,
+            n_blocks=n_blocks,
+            c_internal=c_internal,
+        ),
+    )
+
+    num_dim = input_shape[0]
+
+    def simulator1d(theta):
+        return torch.rand_like(theta) + theta
+
+    if len(input_shape) == 1:
+        simulator = simulator1d
+        xo = torch.ones(1, *input_shape)
+
+    prior = MultivariateNormal(torch.zeros(num_dim), torch.eye(num_dim))
+
+    num_simulations = 1000
+    theta = prior.sample(torch.Size((num_simulations,)))
+    x = simulator(theta)
 
     trainer = NPE(prior=prior, density_estimator=estimator_provider)
     trainer.append_simulations(theta, x).train(max_num_epochs=2)

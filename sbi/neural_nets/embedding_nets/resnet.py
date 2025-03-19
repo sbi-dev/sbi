@@ -297,7 +297,7 @@ class ResNetEmbedding1D(nn.Module):
         residual_block_kwargs: Union[Dict, None] = None,
         n_blocks: int = 20,
         c_internal: int = 128,
-        c_hiden_final: int = 1000,
+        c_hidden_final: int = 1000,
         activation: Type[nn.Module] = nn.ReLU,
     ) -> None:
         """
@@ -360,11 +360,11 @@ class ResNetEmbedding1D(nn.Module):
 
         # Final aggregation network
         self.final = nn.Sequential(
-            nn.Linear(c_internal, c_hiden_final),
+            nn.Linear(c_internal, c_hidden_final),
             activation(),
-            nn.Linear(c_hiden_final, c_hiden_final),
+            nn.Linear(c_hidden_final, c_hidden_final),
             activation(),
-            nn.Linear(c_hiden_final, c_out),
+            nn.Linear(c_hidden_final, c_out),
         )
 
         # Residual blocks
