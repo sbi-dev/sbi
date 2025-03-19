@@ -169,13 +169,13 @@ class DirectPosterior(NeuralPosterior):
         num_samples = torch.Size(sample_shape).numel()
         condition_shape = self.posterior_estimator.condition_shape
         x = reshape_to_batch_event(x, event_shape=condition_shape)
-        num_obs = x.shape[0]
+        num_xos = x.shape[0]
 
         # throw warning if num_x * num_samples is too large
-        if num_obs * num_samples > 50_000:
+        if num_xos * num_samples > 50_000:
             warnings.warn(
                 "Note that for batched sampling, the direct posterior sampling "
-                "generates {num_obs} * {num_samples} = {num_obs * num_samples} "
+                "generates {num_xos} * {num_samples} = {num_xos * num_samples} "
                 "samples. This can be slow and memory-intensive. Consider "
                 "reducing the number of samples or batch size.",
                 stacklevel=2,
