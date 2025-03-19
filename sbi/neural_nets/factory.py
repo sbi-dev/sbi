@@ -444,7 +444,7 @@ def posterior_score_nn(
     z_score_theta: Optional[str] = None,
     z_score_x: Optional[str] = None,
     t_embedding_dim: int = 16,
-    hidden_features: int = 50,
+    hidden_features: int = 64,
     embedding_net: nn.Module = nn.Identity(),
     **kwargs: Any,
 ) -> Callable:
