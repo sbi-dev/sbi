@@ -12,7 +12,8 @@ def __getattr__(name):
         "CNNEmbedding",
         "FCEmbedding",
         "PermutationInvariantEmbedding",
-        "ResNetEmbedding",
+        "ResNetEmbedding1D",
+        "ResNetEmbedding2D",
     ]:
         raise ImportError(
             "As of sbi v0.23.0, you have to import embedding networks from "
