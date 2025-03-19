@@ -205,8 +205,8 @@ class PosteriorScoreBasedPotential(BasePotential):
         r"""Returns the normalizing flow for the score-based estimator."""
 
         # Compute the base density
-        mean_t = self.score_estimator.mean_t
-        std_t = self.score_estimator.std_t
+        mean_t = self.score_estimator.mean_base
+        std_t = self.score_estimator.std_base
         base_density = torch.distributions.Normal(mean_t, std_t)
         # TODO: is this correct? should we use append base_density for each dimension?
         for _ in range(len(self.score_estimator.input_shape)):
