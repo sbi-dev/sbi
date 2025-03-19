@@ -1013,7 +1013,7 @@ def build_zuko_flow(
     hidden_features: Union[Sequence[int], int] = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
-    x_dist: Optional[Distribution] = None,
+    x_dist: Union[Distribution, None] = None,
     **kwargs,
 ) -> ZukoFlow:
     """
@@ -1126,7 +1126,7 @@ def build_zuko_flow(
         # Only x can be logit transformed (not y), if a distribution
         # over x is provided (for NPE: this would be the prior
         # over theta).
-        if z_score_x == "logit":
+        if z_score_x == "logit" and x_dist is not None:
             transforms = (
                 # mcmc transform maps from a bounded to unbound space.
                 mcmc_transform(x_dist),
