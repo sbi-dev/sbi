@@ -36,6 +36,10 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
     can still approx. the score by Tweedie's formula, but training might be easier.
     """
 
+    SCORE_DEFINED: bool = True  # Whether the score is defined for this estimator. Required for gradient-based methods.
+    SDE_DEFINED: bool = True  # Whether the SDE functions - score, drift and diffusion - are defined for this estimator. 
+    MARGINALS_DEFINED: bool = True  # Whether the marginals are defined for this estimator. Required for iid methods.
+
     def __init__(
         self,
         net: nn.Module,
@@ -61,14 +65,10 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
                 - a custom function that returns a Callable.
 
         """
-        super().__init__(net, input_shape, condition_shape)
+        super().__init__(net, input_shape, condition_shape, t_min, t_max)
 
         # Set lambdas (variance weights) function.
         self._set_weight_fn(weight_fn)
-
-        # Min time for diffusion (0 can be numerically unstable).
-        self.t_min = t_min
-        self.t_max = t_max
 
         # Starting mean and std of the target distribution (otherwise assumes 0,1).
         # This will be used to precondition the score network to improve training.
@@ -81,11 +81,21 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         self.register_buffer("std_0", std_0.clone().detach())
 
         # We estimate the mean and std of the source distribution at time t_max.
-        mean_t = self.approx_marginal_mean(torch.tensor([t_max]))
-        std_t = self.approx_marginal_std(torch.tensor([t_max]))
-        self.register_buffer("mean_t", mean_t)
-        self.register_buffer("std_t", std_t)
+        mean_base = self.approx_marginal_mean(torch.tensor([t_max]))
+        std_base = self.approx_marginal_std(torch.tensor([t_max]))
+        self.register_buffer("_mean_base", mean_base)
+        self.register_buffer("_std_base", std_base)
 
+    @property
+    def mean_base(self) -> Tensor:
+        r"""Mean of the base distribution (the initial noise at time t=T).""" 
+        return self._mean_base
+
+    @property
+    def std_base(self) -> Tensor:
+        r"""Standard deviation of the base distribution (the initial noise at time t=T).""" 
+        return self._std_base
+    
     def forward(self, input: Tensor, condition: Tensor, time: Tensor) -> Tensor:
         r"""Forward pass of the score estimator network to compute the conditional score
         at a given time.
