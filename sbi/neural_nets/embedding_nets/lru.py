@@ -194,7 +194,7 @@ class LRU(nn.Module):
         return torch.exp(self.log_gamma)
 
     def forward(
-        self, input: Tensor, state: Optional[Tensor] = None, mode: str = "scan"
+        self, input: Tensor, state: Optional[Tensor] = None, mode: str = "loop"
     ) -> Tensor:
         # Initialize the hidden state if not given.
         expected_state_shape = (input.size(0), self.state_dim)
@@ -240,10 +240,14 @@ class LRU(nn.Module):
         # For details on parallel scan, check discussion in Smith et al (2022).
         Bu_elements = input.to(self.B.dtype)@B_norm.T
         Lambda_elements = self.lambda_complex.view(1,1,-1).expand(Bu_elements.shape)
+        #Lambda_elements = self.lambda_complex.tile(input.shape[0],input.shape[1],1)#.contiguous()
+
         elements = (Lambda_elements, Bu_elements)
         _, states = associative_scan(binary_operator_diag, elements,dim=1,combine_mode='generic') # all x_k
-        y = (states @ self.C.mT).real + input * self.D
-        return y
+        
+        output = (states @ self.C.mT).real + input * self.D
+        
+        return output
     
 
 #@torch.jit.script
