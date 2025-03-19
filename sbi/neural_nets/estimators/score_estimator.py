@@ -8,7 +8,7 @@ from typing import Callable, Optional, Union
 import torch
 from torch import Tensor, nn
 
-from sbi.neural_nets.estimators.base import ConditionalVectorFieldEstimator
+from sbi.neural_nets.estimators.vector_field_estimator import ConditionalVectorFieldEstimator
 
 
 class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
@@ -133,6 +133,19 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         output_score = -scale * score_pred - score_gaussian
 
         return output_score
+    
+    def score(self, input: Tensor, condition: Tensor, t: Tensor) -> Tensor:
+        """Score function of the score estimator.
+
+        Args:
+            input: variable whose distribution is estimated.
+            condition: Conditioning variable.
+            t: Time.
+
+        Returns:
+            Score function value.
+        """
+        return self.forward(input=input, condition=condition, time=t)
 
     def loss(
         self,
@@ -337,6 +350,24 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
             self.weight_fn = weight_fn
         else:
             raise ValueError(f"Weight function {weight_fn} not recognized.")
+        
+    def ode_fn(self, input: Tensor, condition: Tensor, t: Tensor) -> Tensor:
+        """ODE flow function of the score estimator.
+
+        Args:
+            input: variable whose distribution is estimated.
+            condition: Conditioning variable.
+            t: Time.
+
+        Returns:
+            ODE flow function value at a given time.
+        """
+        score = self.forward(input=input, condition=condition, time=t)
+        f = self.drift_fn(input, t)
+        g = self.diffusion_fn(input, t)
+        v = f - 0.5 * g**2 * score
+        return v
+
 
 
 class VPScoreEstimator(ConditionalScoreEstimator):
