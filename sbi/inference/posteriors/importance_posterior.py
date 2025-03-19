@@ -210,9 +210,9 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         show_progress_bars: bool = True,
     ) -> Tensor:
         raise NotImplementedError(
-            "Batched sampling is not implemented for ImportanceSamplingPosterior. \
-            Alternatively you can use `sample` in a loop \
-            [posterior.sample(theta, x_o) for x_o in x]."
+            "Batched sampling is not implemented for ImportanceSamplingPosterior. "
+            "Alternatively you can use `sample` in a loop "
+            "[posterior.sample(theta, x_o) for x_o in x]."
         )
 
     def _importance_sample(
