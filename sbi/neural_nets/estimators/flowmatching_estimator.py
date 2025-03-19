@@ -161,9 +161,34 @@ class FlowMatchingEstimator(ConditionalDensityEstimator):
         """
 
         print("in zuko, condition", condition.shape)
+
+        # Define a wrapper function that properly handles dimensions during sampling
+        def vector_field_fn(t, input):
+            # When sampling, Zuko adds a sample dimension at the front
+            # During sampling, input shape will be [num_samples, batch_size, dim]
+            # But during training, it's just [batch_size, dim]
+            orig_shape = input.shape
+            if len(orig_shape) == 3:  # When sampling (has sample dimension)
+                # Reshape to merge the first two dims for processing
+                num_samples, batch_size = orig_shape[0], orig_shape[1]
+                flat_input = input.reshape(num_samples * batch_size, -1)
+
+                # Repeat condition to match the flattened input
+                expanded_condition = condition.repeat(num_samples, 1)
+
+                # Call forward with flattened tensors
+                t_expanded = t.expand(flat_input.shape[0])
+                vector_field = self.forward(flat_input, expanded_condition, t_expanded)
+
+                # Reshape back to original shape
+                return vector_field.reshape(orig_shape)
+            else:
+                # During training or evaluation, dimensions are as expected
+                return self.forward(input, condition, t)
+
         transform = zuko.transforms.ComposedTransform(
             FreeFormJacobianTransform(
-                f=lambda t, input: self.forward(input, condition, t),
+                f=vector_field_fn,
                 t0=condition.new_tensor(0.0),
                 t1=condition.new_tensor(1.0),
                 phi=(condition, *self.net.parameters()),
