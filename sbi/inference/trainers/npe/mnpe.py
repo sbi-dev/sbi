@@ -14,7 +14,7 @@ from sbi.inference.posteriors import (
 )
 from sbi.inference.trainers.npe.npe_c import NPE_C
 from sbi.neural_nets.estimators import MixedDensityEstimator
-from sbi.sbi_types import TensorboardSummaryWriter, TorchModule
+from sbi.sbi_types import TensorboardSummaryWriter
 from sbi.utils.sbiutils import del_entries
 
 
@@ -89,7 +89,7 @@ class MNPE(NPE_C):
 
     def build_posterior(
         self,
-        density_estimator: Optional[TorchModule] = None,
+        density_estimator: Optional[MixedDensityEstimator] = None,
         prior: Optional[Distribution] = None,
         sample_with: str = "direct",
         mcmc_method: str = "slice_np_vectorized",
