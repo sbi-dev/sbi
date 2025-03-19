@@ -15,6 +15,7 @@ from sbi.neural_nets.embedding_nets import (
     CNNEmbedding,
     FCEmbedding,
     PermutationInvariantEmbedding,
+    TransformerEmbedding,
 )
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
@@ -164,6 +165,75 @@ def test_1d_and_2d_cnn_embedding_net(input_shape, num_channels):
         x = x.unsqueeze(1).repeat(
             1, num_channels, *[1 for _ in range(len(input_shape))]
         )
+
+    trainer = NPE(prior=prior, density_estimator=estimator_provider)
+    trainer.append_simulations(theta, x).train(max_num_epochs=2)
+    posterior = trainer.build_posterior().set_default_x(xo)
+
+    s = posterior.sample((10,))
+    posterior.potential(s)
+
+
+@pytest.mark.parametrize(
+    "config",
+    (
+        {
+            "num_attention_heads": 16,
+            "num_key_value_heads": 16,
+            "attention_dropout": 0.9,
+            "hidden_size": 16 * 8,
+            "pos_emb": "rotary",
+            "intermediate_size": 64,
+            "mlp_activation": "relu",
+            "num_hidden_layers": 12,
+            "is_causal": True,
+        },
+        {
+            "num_attention_heads": 16,
+            "num_key_value_heads": 16,
+            "attention_dropout": 0.9,
+            "hidden_size": 16 * 8,
+            "pos_emb": "none",
+            "intermediate_size": 64,
+            "mlp_activation": "relu",
+            "num_hidden_layers": 12,
+            "is_causal": True,
+        },
+        {
+            "num_attention_heads": 16,
+            "num_key_value_heads": 16,
+            "attention_dropout": 0.9,
+            "hidden_size": 16 * 8,
+            "pos_emb": "positional",
+            "intermediate_size": 64,
+            "mlp_activation": "relu",
+            "num_hidden_layers": 12,
+            "is_causal": True,
+        },
+    ),
+)
+@pytest.mark.parametrize("seq_length", (24,))
+def test_transformer_embedding(config, seq_length):
+    estimator_provider = posterior_nn(
+        "mdn",
+        embedding_net=TransformerEmbedding(config=config),
+    )
+
+    def simulator(theta):
+        x = MultivariateNormal(
+            loc=theta, covariance_matrix=0.5 * torch.eye(config["hidden_size"])
+        )
+        return x.sample().unsqueeze(1).repeat(1, seq_length, 1)
+
+    xo = torch.ones(1, seq_length, config["hidden_size"])
+
+    prior = MultivariateNormal(
+        torch.zeros(config["hidden_size"]), torch.eye(config["hidden_size"])
+    )
+
+    num_simulations = 50
+    theta = prior.sample(torch.Size((num_simulations,)))
+    x = simulator(theta)
 
     trainer = NPE(prior=prior, density_estimator=estimator_provider)
     trainer.append_simulations(theta, x).train(max_num_epochs=2)

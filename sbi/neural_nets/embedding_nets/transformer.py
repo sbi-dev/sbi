@@ -2,7 +2,13 @@ import math
 from typing import Optional, Tuple
 
 import torch
+import torch.nn.functional as F
 from torch import nn
+
+ACT2FN = {
+    "relu": F.relu,
+    "gelu": F.gelu,
+}
 
 
 class PositionalEncoder(nn.Module):
@@ -13,7 +19,7 @@ class PositionalEncoder(nn.Module):
         div_term = self.power ** (torch.arange(0, embedding_dim, 2) / embedding_dim)
         self.register_buffer("div_term", tensor=div_term, persistent=False)
 
-    def forward(self, x, position_ids: Optional[torch.tensor] = None):
+    def forward(self, x, position_ids: Optional[torch.Tensor] = None):
         seq_length = x.shape[-2]
         if position_ids is None:
             position_ids = torch.arange(0, seq_length, 1).to(x)
@@ -27,12 +33,22 @@ class PositionalEncoder(nn.Module):
         return x + pe
 
 
+class DummyEncoder(nn.Module):
+    def __init__(self, **kwargs):
+        super().__init__()
+
+    def forward(self, x, **kwargs):
+        return x
+
+
 class RotaryEncoder(nn.Module):
     def __init__(self, embedding_dim: int, power: Optional[float] = 10e4):
         super().__init__()
         self.power = power
         self.embedding_dim = embedding_dim
-        div_term = self.power ** (torch.arange(0, embedding_dim, 2) / embedding_dim)
+        div_term = self.power ** (
+            torch.arange(0, embedding_dim, 2) / embedding_dim
+        ).repeat_interleave(2)
         self.register_buffer("div_term", tensor=div_term, persistent=False)
 
     def rotate_half(self, x):
@@ -41,7 +57,7 @@ class RotaryEncoder(nn.Module):
         x2 = x[..., x.shape[-1] // 2 :]
         return torch.cat((-x2, x1), dim=-1)
 
-    def forward(self, x, position_ids: Optional[torch.tensor] = None) -> torch.Tensor:
+    def forward(self, x, position_ids: Optional[torch.Tensor] = None) -> torch.Tensor:
         """Applies Rotary Position Embedding to the query and key tensors.
 
         Args:
@@ -64,7 +80,11 @@ class RotaryEncoder(nn.Module):
         return x_embed
 
 
-POSITION_EMB = {"positional": PositionalEncoder, "rotary": RotaryEncoder}
+POSITION_EMB = {
+    "positional": PositionalEncoder,
+    "rotary": RotaryEncoder,
+    "none": DummyEncoder,
+}
 
 
 class FullAttention(nn.Module):
@@ -106,7 +126,7 @@ class FullAttention(nn.Module):
         attention_mask: Optional[torch.Tensor] = None,
         position_ids: Optional[torch.LongTensor] = None,
         output_attentions: bool = False,
-    ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
+    ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         bsz, q_len, _ = hidden_states.size()
 
         qkv = self.qkv_proj(hidden_states)
@@ -128,8 +148,8 @@ class FullAttention(nn.Module):
             bsz, q_len, self.num_key_value_heads, self.head_dim
         ).transpose(1, 2)
 
-        query_states = self.pos_emb(query_states, position_ids)
-        key_states = self.pos_emb(key_states, position_ids)
+        query_states = self.pos_emb(query_states, position_ids=position_ids)
+        key_states = self.pos_emb(key_states, position_ids=position_ids)
 
         # repeat k/v heads if n_kv_heads < n_heads
         key_states = key_states.repeat_interleave(
@@ -172,3 +192,218 @@ class FullAttention(nn.Module):
             attn_weights = None
 
         return attn_output, attn_weights
+
+
+class MLP(nn.Module):
+    # Adapted from https://github.com/huggingface/transformers/main/src/transformers/models/phi3/modeling_phi3.py
+
+    def __init__(self, config):
+        super().__init__()
+
+        self.config = config
+        self.gate_up_proj = nn.Linear(
+            config["hidden_size"], 2 * config["intermediate_size"], bias=False
+        )
+        self.down_proj = nn.Linear(
+            config["intermediate_size"], config["hidden_size"], bias=False
+        )
+
+        self.activation_fn = ACT2FN[config["mlp_activation"]]
+
+    def forward(self, x: torch.FloatTensor) -> torch.FloatTensor:
+        up_states = self.gate_up_proj(x)
+        gate, up_states = up_states.chunk(2, dim=-1)
+        up_states = up_states * self.activation_fn(gate)
+
+        return self.down_proj(up_states)
+
+
+# Copied from https://github.com/huggingface/transformers/main/src/transformers/models/phi3/modeling_phi3.py
+class RMSNorm(nn.Module):
+    def __init__(self, hidden_size, eps=1e-6):
+        """
+        RMSNorm is equivalent to T5LayerNorm
+        """
+        super().__init__()
+        self.weight = nn.Parameter(torch.ones(hidden_size))
+        self.variance_epsilon = eps
+
+    def forward(self, x):
+        input_dtype = x.dtype
+        x = x.to(torch.float32)
+        variance = x.pow(2).mean(-1, keepdim=True)
+        x = x * torch.rsqrt(variance + self.variance_epsilon)
+        return self.weight * x.to(input_dtype)
+
+    def extra_repr(self):
+        return f"{tuple(self.weight.shape)}, eps={self.variance_epsilon}"
+
+
+class TransformerBlock(nn.Module):
+    def __init__(self, config, layer_idx: int):
+        super().__init__()
+        self.hidden_size = config["hidden_size"]
+
+        self.self_attn = FullAttention(config=config, layer_idx=layer_idx)
+
+        self.mlp = MLP(config)
+        self.input_layernorm = RMSNorm(
+            config["hidden_size"], eps=config.get("rms_norm_eps", 1e-05)
+        )
+        self.post_attention_layernorm = RMSNorm(
+            config["hidden_size"], eps=config.get("rms_norm_eps", 1e-05)
+        )
+
+    def forward(
+        self,
+        hidden_states: torch.Tensor,
+        attention_mask: Optional[torch.Tensor] = None,
+        position_ids: Optional[torch.LongTensor] = None,
+        output_attentions: Optional[bool] = False,
+        **kwargs,
+    ) -> Tuple[torch.FloatTensor, Optional[torch.FloatTensor]]:
+        """
+        Args:
+            hidden_states (`torch.FloatTensor`): input to the layer of shape `(batch,
+            seq_len, embed_dim)`
+            attention_mask (`torch.FloatTensor`, *optional*):
+                attention mask of size `(batch_size, sequence_length)`
+            output_attentions (`bool`, *optional*):
+                Whether or not to return the attention tensors
+            kwargs (`dict`, *optional*):
+                Arbitrary kwargs to be ignored
+        """
+        residual = hidden_states
+
+        hidden_states = self.input_layernorm(hidden_states)
+
+        # Self Attention
+        hidden_states, self_attn_weights = self.self_attn(
+            hidden_states=hidden_states,
+            attention_mask=attention_mask,
+            position_ids=position_ids,
+            output_attentions=output_attentions,
+            **kwargs,
+        )
+        hidden_states = residual + hidden_states
+
+        # Fully Connected
+        residual = hidden_states
+        hidden_states = self.post_attention_layernorm(hidden_states)
+        hidden_states = self.mlp(hidden_states)
+        hidden_states = residual + hidden_states
+
+        outputs = (hidden_states,)
+
+        if output_attentions:
+            outputs += (self_attn_weights,)
+
+        return outputs
+
+
+class TransformerEmbedding(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+
+        self.layers = nn.ModuleList([
+            TransformerBlock(config, layer_idx)
+            for layer_idx in range(config["num_hidden_layers"])
+        ])
+        self.is_causal = config["is_causal"]
+
+        self.norm = RMSNorm(
+            config["hidden_size"], eps=config.get("rms_norm_eps", 1e-05)
+        )
+
+    def causal_mask(
+        self,
+        sequence_length: int,
+        batch_size: int,
+        dtype: torch.dtype,
+        device: torch.device,
+        min_dtype: float,
+        attention_mask: Optional[torch.Tensor] = None,
+        **kwargs,
+    ):
+        causal_mask = torch.full(
+            (sequence_length, sequence_length),
+            fill_value=min_dtype,
+            dtype=dtype,
+            device=device,
+        )
+        if sequence_length != 1:
+            causal_mask = torch.triu(causal_mask, diagonal=1)
+        causal_mask = causal_mask[None, None, :, :].expand(batch_size, 1, -1, -1)
+        if attention_mask is not None:
+            causal_mask = (
+                causal_mask.clone()
+            )  # copy to contiguous memory for in-place edit
+            mask_length = attention_mask.shape[-1]
+            padding_mask = (
+                causal_mask[:, :, :, :mask_length] + attention_mask[:, None, None, :]
+            )
+            padding_mask = padding_mask == 0
+            causal_mask[:, :, :, :mask_length] = causal_mask[
+                :, :, :, :mask_length
+            ].masked_fill(padding_mask, min_dtype)
+        return causal_mask
+
+    def forward(
+        self,
+        input_embeddings: torch.Tensor,
+        attention_mask: Optional[torch.tensor] = None,
+        output_attentions: Optional[bool] = False,
+        output_hidden_states: Optional[bool] = False,
+        position_ids: Optional[torch.LongTensor] = None,
+        **kwargs,
+    ) -> Tuple[torch.Tensor, Optional[Tuple[torch.Tensor, torch.Tensor]]]:
+        """
+        Args:
+            hidden_states (`torch.FloatTensor`): input to the layer of shape `(batch,
+            seq_len, embed_dim)`
+            attention_mask (`torch.FloatTensor`, *optional*):
+                attention mask of size `(batch_size, sequence_length)`
+            output_attentions (`bool`, *optional*):
+                Whether or not to return the attention tensors
+            kwargs (`dict`, *optional*):
+                Arbitrary kwargs
+        """
+        if self.is_causal:
+            dtype, device = input_embeddings.dtype, input_embeddings.device
+            attention_mask = self.causal_mask(
+                sequence_length=input_embeddings.shape[1],
+                dtype=input_embeddings.dtype,
+                device=device,
+                batch_size=input_embeddings.shape[0],
+                min_dtype=torch.finfo(dtype).min,
+            )
+        else:
+            attention_mask = None
+
+        # decoder layers
+        all_hidden_states = () if output_hidden_states else None
+        all_self_attns = () if output_attentions else None
+        hidden_states = input_embeddings
+        for decoder_layer in self.layers:
+            if output_hidden_states:
+                all_hidden_states += (hidden_states,)
+
+            layer_outputs = decoder_layer(
+                hidden_states,
+                attention_mask=attention_mask,
+                position_ids=position_ids,
+                output_attentions=output_attentions,
+            )
+
+            hidden_states = layer_outputs[0]
+            if output_attentions:
+                all_self_attns += (layer_outputs[1],)
+
+        hidden_states = self.norm(hidden_states)
+        if output_hidden_states:
+            all_hidden_states += (hidden_states,)
+
+        if output_attentions or output_hidden_states:
+            return hidden_states[:, -1, :], (all_hidden_states, all_self_attns)
+
+        return hidden_states[:, -1, :]
