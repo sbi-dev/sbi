@@ -11,6 +11,7 @@ from pyro import poutine as poutine
 from torch.distributions import biject_to
 
 from sbi.neural_nets.estimators.base import ConditionalEstimator
+from sbi.neural_nets.ratio_estimators import RatioEstimator
 
 
 def get_transforms(model: Callable, *model_args: Any, **model_kwargs: Any):
@@ -46,36 +47,25 @@ class EstimatorDistribution(pyro.distributions.TorchDistribution):
     Base class for a conditioned `sbi` estimator wrapped as a Pyro distribution.
     """
 
-    @property
-    def support(self):
-        # TODO: check if we can infer a more specific support from the estimator
-        return constraints.real  # Assume continuous values
-
     def __init__(self, estimator: Any, condition: torch.Tensor):
         self._estimator = estimator
-        self._condition_shape, event_shape = self.get_condition_and_event_shapes(
-            estimator
-        )
+        condition_shape, event_shape = self.get_condition_and_event_shapes()
         self._check_condition_shape(condition)
         self._condition = condition
-        self._condition_reshaped = condition.reshape(-1, *self._condition_shape)
+        self._condition_reshaped = condition.reshape(-1, *condition_shape)
         super().__init__(
-            batch_shape=condition.shape[: -len(self._condition_shape)],
+            batch_shape=condition.shape[: -len(condition_shape)],
             event_shape=event_shape,
         )
 
     @abstractmethod
-    def get_condition_and_event_shapes(
-        self, estimator: Any
-    ) -> Tuple[torch.Size, torch.Size]:
+    def get_condition_and_event_shapes(self) -> Tuple[torch.Size, torch.Size]:
         pass
 
-    @abstractmethod
-    def _estimator_log_prob(
-        self, x: torch.Tensor, condition: torch.Tensor
-    ) -> torch.Tensor:
-        """The log probability method of the estimator."""
-        pass
+    @property
+    def support(self):
+        # TODO: check if we can infer a more specific support from the estimator
+        return constraints.real  # Assume continuous values
 
     @property
     def estimator(self):
@@ -89,44 +79,28 @@ class EstimatorDistribution(pyro.distributions.TorchDistribution):
 
     def _check_condition_shape(self, condition: torch.Tensor):
         """Check that the shape of `condition` is compatible with the estimator."""
-        if len(condition.shape) < len(self._condition_shape):
+        condition_shape, _ = self.get_condition_and_event_shapes()
+        if len(condition.shape) < len(condition_shape):
             raise ValueError(
                 "Dimensionality of condition is too small and does not match the "
-                f"expected dimensionality {len(self._condition_shape)}. "
+                f"expected dimensionality {len(condition_shape)}. "
                 "It should be compatible with condition_shape "
-                f"{self._condition_shape}."
+                f"{condition_shape}."
             )
         else:
-            condition_shape = condition.shape[-len(self._condition_shape) :]
-            if condition_shape != self._condition_shape:
+            condition_shape = condition.shape[-len(condition_shape) :]
+            if condition_shape != condition_shape:
                 raise ValueError(
                     f"Condition shape {condition_shape} is not compatible with "
-                    f"estimator condition shape {self._condition_shape}"
+                    f"estimator condition shape {condition_shape}"
                 )
-
-    def sample(self, sample_shape: torch.Size = torch.Size()) -> torch.Tensor:
-        """Generate samples from the conditioned estimator."""
-        if not hasattr(self.estimator, "sample"):
-            raise NotImplementedError("Sampling is not implemented for this estimator.")
-        draws = self.estimator.sample(sample_shape, condition=self._condition_reshaped)
-        # reshape (batch_dim,) -> batch_shape
-        return draws.reshape(*sample_shape, *self.batch_shape, *self.event_shape)
-
-    def log_prob(self, x: torch.Tensor) -> torch.Tensor:
-        """Compute log probability of x given theta."""
-        # ConditionalEstimator expects a batch shape of (batch_dim,)
-        # and sample shape of (sample_dim,)
-        sample_shape = x.shape[: -len(self.event_shape) - len(self.batch_shape)]
-        x = x.reshape(-1, self.batch_shape.numel(), *self.event_shape)
-        lp = self._estimator_log_prob(x, self._condition_reshaped)
-        # reshape (sample_dim, batch_dim,) -> (*sample_shape, *batch_shape)
-        return lp.reshape(*sample_shape, *self.batch_shape)
 
     def expand(self, batch_shape: torch.Size, _instance=None):
         """Expand the batch shape of the distribution."""
         # because batch shape of the distribution is entirely determined by the
         # condition, we only need to expand the condition
-        condition = self.condition.expand(*batch_shape, *self._condition_shape)
+        condition_shape, _ = self.get_condition_and_event_shapes()
+        condition = self.condition.expand(*batch_shape, *condition_shape)
         return type(self)(self.estimator, condition)
 
 
@@ -135,11 +109,8 @@ class ConditionedEstimatorDistribution(EstimatorDistribution):
     A conditioned `sbi` estimator wrapped as a Pyro distribution.
     """
 
-    def get_condition_and_event_shapes(
-        self,
-        estimator: ConditionalEstimator,
-    ) -> Tuple[torch.Size, torch.Size]:
-        return estimator.condition_shape, estimator.input_shape
+    def get_condition_and_event_shapes(self) -> Tuple[torch.Size, torch.Size]:
+        return self.estimator.condition_shape, self.estimator.input_shape
 
     def __init__(self, estimator: ConditionalEstimator, condition: torch.Tensor):
         """
@@ -151,11 +122,60 @@ class ConditionedEstimatorDistribution(EstimatorDistribution):
         """
         super().__init__(estimator, condition)
 
-    @property
-    def condition_shape(self):
-        return self.estimator.condition_shape
-
     def _estimator_log_prob(
         self, x: torch.Tensor, condition: torch.Tensor
     ) -> torch.Tensor:
         return self.estimator.log_prob(x, condition=condition)
+
+    def log_prob(self, x: torch.Tensor) -> torch.Tensor:
+        """Compute log probability of `x`."""
+        # ConditionalEstimator expects a batch shape of (batch_dim,)
+        # and sample shape of (sample_dim,)
+        sample_shape = x.shape[: -len(self.event_shape) - len(self.batch_shape)]
+        x = x.reshape(-1, self.batch_shape.numel(), *self.event_shape)
+        lp = self.estimator.log_prob(x, condition=self._condition_reshaped)
+        # reshape (sample_dim, batch_dim,) -> (*sample_shape, *batch_shape)
+        return lp.reshape(*sample_shape, *self.batch_shape)
+
+    def sample(self, sample_shape: torch.Size = torch.Size()) -> torch.Tensor:
+        """Generate samples from the conditioned estimator."""
+        if not hasattr(self.estimator, "sample"):
+            raise NotImplementedError("Sampling is not implemented for this estimator.")
+        draws = self.estimator.sample(sample_shape, condition=self._condition_reshaped)
+        # reshape (batch_dim,) -> batch_shape
+        return draws.reshape(*sample_shape, *self.batch_shape, *self.event_shape)
+
+
+class RatioEstimatorDistribution(EstimatorDistribution):
+    """
+    A conditioned `sbi` ratio estimator wrapped as a Pyro distribution.
+    """
+
+    def __init__(self, estimator: RatioEstimator, condition: torch.Tensor):
+        """
+        Condition an `sbi` ratio estimator and wrap it as a Pyro distribution.
+
+        Args:
+            estimator: A trained ratio estimator
+            condition: The conditioning parameter for the estimator.
+        """
+        super().__init__(estimator, condition)
+
+    def get_condition_and_event_shapes(self) -> Tuple[torch.Size, torch.Size]:
+        return self.estimator.theta_shape, self.estimator.x_shape
+
+    def log_prob(self, x: torch.Tensor) -> torch.Tensor:
+        """Compute log probability of `x`."""
+        # RatioEstimator expects condition to have leading shape (sample_dim, batch_dim)
+        # and x to have leading shape (batch_dim,)
+        # while Pyro expects x to have leading shape (*sample_shape, *batch_shape)
+        # so we need to reshape x to have leading shape (batch_dim,), where
+        # batch_dim=sample_shape.numel() + self.batch_shape.numel(),
+        # and we need to expand the condition to have leading shape (1, batch_dim)
+        sample_shape = x.shape[: -len(self.event_shape) - len(self.batch_shape)]
+        condition_shape, _ = self.get_condition_and_event_shapes()
+        condition = self.condition.expand(
+            *sample_shape, *self.batch_shape, *condition_shape
+        )
+        lp = self.estimator.unnormalized_log_ratio(theta=condition, x=x)
+        return lp

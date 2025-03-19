@@ -8,9 +8,10 @@ import pytest
 import torch
 from pyro.infer import MCMC, NUTS
 
-from sbi.inference import NLE, NPE
+from sbi.inference import NLE, NPE, NRE
 from sbi.utils.pyroutils import (
     ConditionedEstimatorDistribution,
+    RatioEstimatorDistribution,
     get_transforms,
 )
 from tests.test_utils import check_c2st
@@ -77,6 +78,7 @@ def test_unbounded_transform():
     [
         (NLE, ConditionedEstimatorDistribution),
         (NPE, ConditionedEstimatorDistribution),
+        (NRE, RatioEstimatorDistribution),
     ],
 )
 def test_estimator_distribution_basic_properties(
@@ -98,15 +100,25 @@ def test_estimator_distribution_basic_properties(
     estimator_dist = distribution_cls(estimator=density_estimator, condition=theta)
     assert isinstance(estimator_dist, distribution_cls)
     assert estimator_dist.estimator == density_estimator
-    assert estimator_dist.condition_shape == torch.Size([dim])
+    assert estimator_dist.get_condition_and_event_shapes() == (
+        torch.Size([dim]),
+        torch.Size([dim]),
+    )
     assert estimator_dist.batch_shape == torch.Size([num_simulations])
     assert estimator_dist.event_shape == torch.Size([dim])
     assert estimator_dist.support == torch.distributions.constraints.real
 
     # Test sample method
-    assert estimator_dist.sample().shape == torch.Size([num_simulations, dim])
-    x_samples = estimator_dist.sample(torch.Size([3]))
-    assert x_samples.shape == torch.Size([3, num_simulations, dim])
+    if trainer_cls is not NRE:
+        assert estimator_dist.sample().shape == torch.Size([num_simulations, dim])
+        x_samples = estimator_dist.sample(torch.Size([3]))
+        assert x_samples.shape == torch.Size([3, num_simulations, dim])
+    else:
+        with pytest.raises(NotImplementedError):
+            estimator_dist.sample()
+        with pytest.raises(NotImplementedError):
+            estimator_dist.sample(torch.Size([3]))
+        x_samples = torch.distributions.Normal(theta, 1.0).sample(torch.Size([3]))
 
     # Test log_prob method
     assert estimator_dist.log_prob(x).shape == torch.Size([num_simulations])
@@ -117,7 +129,6 @@ def test_estimator_distribution_basic_properties(
     assert isinstance(estimator_dist_expanded, distribution_cls)
     assert estimator_dist_expanded.batch_shape == torch.Size([2, num_simulations])
     assert estimator_dist_expanded.event_shape == estimator_dist.event_shape
-    assert estimator_dist_expanded.condition_shape == estimator_dist.condition_shape
     assert torch.equal(
         estimator_dist_expanded.condition,
         theta.expand(torch.Size([2, num_simulations, dim])),
@@ -127,8 +138,21 @@ def test_estimator_distribution_basic_properties(
 
 @pytest.mark.parametrize("num_dim", [3, 5])
 @pytest.mark.parametrize("num_trials", [1, 5])
+@pytest.mark.parametrize(
+    "trainer_cls, distribution_cls",
+    [
+        (NLE, ConditionedEstimatorDistribution),
+        (NRE, RatioEstimatorDistribution),
+    ],
+)
 def test_pyro_gaussian_model(
-    num_dim, num_trials, num_simulations=500, num_samples=500, warmup_steps=500
+    trainer_cls,
+    distribution_cls,
+    num_dim,
+    num_trials,
+    num_simulations=500,
+    num_samples=500,
+    warmup_steps=500,
 ):
     """Test consistency of MCMC samples between the true and estimated likelihood."""
     # Get data we will condition on
@@ -150,7 +174,7 @@ def test_pyro_gaussian_model(
         x.append(torch.from_numpy(np.array(xi)))
     theta = torch.stack(theta, dim=0).float()
     x = torch.stack(x, dim=0).float().squeeze()
-    trainer = NLE(prior=prior).append_simulations(theta=theta, x=x)
+    trainer = trainer_cls(prior=prior).append_simulations(theta=theta, x=x)
     density_estimator = trainer.train()
 
     # Define a model that uses the estimated likelihood
@@ -158,17 +182,16 @@ def test_pyro_gaussian_model(
         theta = pyro.sample("theta", single_level_prior_theta(num_dim))  # (D,)
 
         with pyro.plate("trials", num_trials):
-            x = pyro.sample(
-                "x", ConditionedEstimatorDistribution(likelihood, theta), obs=x_o
-            )
+            x = pyro.sample("x", distribution_cls(likelihood, theta), obs=x_o)
 
         if x_o is None:
             return theta, x
         else:
             return x_o
 
-    theta, x = sbi_pyro_model(density_estimator)
-    sbi_pyro_model(density_estimator, x_o=x)
+    if trainer_cls is not NRE:
+        theta, x = sbi_pyro_model(density_estimator)
+    sbi_pyro_model(density_estimator, x_o=x_o)
 
     # Get MCMC samples from a model that uses the estimated likelihood
     nuts_kernel = NUTS(sbi_pyro_model)
