@@ -172,7 +172,7 @@ class DirectPosterior(NeuralPosterior):
         num_xos = x.shape[0]
 
         # throw warning if num_x * num_samples is too large
-        if num_xos * num_samples > 50_000:
+        if num_xos * num_samples > 2**21:  # 2 million-ish
             warnings.warn(
                 "Note that for batched sampling, the direct posterior sampling "
                 "generates {num_xos} * {num_samples} = {num_xos * num_samples} "
