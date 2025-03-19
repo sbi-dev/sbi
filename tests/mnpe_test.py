@@ -128,12 +128,12 @@ def test_mnpe_api(flow_model: str, z_score_theta: str, use_embed_net: bool):
     x = mixed_param_simulator(theta)
 
     # Build estimator manually
-    theta_embedding = FCEmbedding(1, 1)  # simple embedding net, 1 continuous parameter
+    x_embedding = FCEmbedding(1, 1)  # simple embedding net, 1 continuous parameter
     density_estimator = posterior_nn(
         model="mnpe",
         flow_model=flow_model,
         z_score_theta=z_score_theta,
-        embedding_net=theta_embedding if use_embed_net else torch.nn.Identity(),
+        embedding_net=x_embedding if use_embed_net else torch.nn.Identity(),
         log_transform_x=False,
     )
     trainer = MNPE(density_estimator=density_estimator)
