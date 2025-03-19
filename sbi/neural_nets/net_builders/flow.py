@@ -1079,25 +1079,25 @@ def build_zuko_flow(
         transform = flow_built.transform
         if transform_type_x == "affine":
             transform = (
-                transform,
                 standardizing_transform_zuko(batch_x, structured_x),
+                transform,
             )
         elif transform_type_x == "logit":
             transform = (
-                transform,
                 logit_transform_zuko(batch_x, structured_x),
+                transform,
             )
     else:
         transform = flow_built.transform.transforms
         if transform_type_x == "affine":
             transform = (
-                *transform,
                 standardizing_transform_zuko(batch_x, structured_x),
+                *transform,
             )
         elif transform_type_x == "logit":
             transform = (
-                *transform,
                 logit_transform_zuko(batch_x, structured_x),
+                *transform,
             )
 
     if transform_type_y == "affine" or transform_type_y == "logit":
