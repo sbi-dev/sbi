@@ -166,12 +166,7 @@ class RatioEstimatorDistribution(EstimatorDistribution):
 
     def log_prob(self, x: torch.Tensor) -> torch.Tensor:
         """Compute log probability of `x`."""
-        # RatioEstimator expects condition to have leading shape (sample_dim, batch_dim)
-        # and x to have leading shape (batch_dim,)
-        # while Pyro expects x to have leading shape (*sample_shape, *batch_shape)
-        # so we need to reshape x to have leading shape (batch_dim,), where
-        # batch_dim=sample_shape.numel() + self.batch_shape.numel(),
-        # and we need to expand the condition to have leading shape (1, batch_dim)
+        # RatioEstimator expects condition and x to have the same leading shape
         sample_shape = x.shape[: -len(self.event_shape) - len(self.batch_shape)]
         condition_shape, _ = self.get_condition_and_event_shapes()
         condition = self.condition.expand(
