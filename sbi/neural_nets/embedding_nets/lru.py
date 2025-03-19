@@ -50,6 +50,7 @@ class LRUEmbedding(nn.Module):
                 max_phase=max_phase,
                 bidirectional=bidirectional,
                 dropout=dropout,
+                norm = norm
             )
             for _ in range(num_layers)
         ]
@@ -104,7 +105,7 @@ class LRUBlock(nn.Module):
     ):
         super().__init__()
         # https://github.com/NicolasZucchet/minimal-LRU/blob/main/lru/model.py
-        self.lru = LRU(hidden_dim, state_dim, r_min, r_max, max_phase)
+        self.lru = LRU(hidden_dim, state_dim, r_min, r_max, max_phase,bidirectional)
         self.out1 = nn.Linear(hidden_dim, hidden_dim)
         self.out2 = nn.Linear(hidden_dim, hidden_dim)
         self.GELU = nn.GELU()
@@ -150,11 +151,15 @@ class LRU(nn.Module):
         bidirectional: bool = False,
     ):
         super().__init__()
+        self.bidirectional = bidirectional
+        # between r_min and r_max, with phase in [0, max_phase].
         self.state_dim = state_dim
 
-        # between r_min and r_max, with phase in [0, max_phase].
+
+
         if bidirectional:
             state_dim = state_dim * 2
+
 
         u1 = torch.rand(size=(state_dim,))
         u2 = torch.rand(size=(state_dim,))
@@ -197,7 +202,11 @@ class LRU(nn.Module):
         self, input: Tensor, state: Optional[Tensor] = None, mode: str = "loop"
     ) -> Tensor:
         # Initialize the hidden state if not given.
-        expected_state_shape = (input.size(0), self.state_dim)
+        if self.bidirectional:
+            expected_state_shape = (input.size(0), self.state_dim*2)
+        else:
+            expected_state_shape = (input.size(0), self.state_dim)
+            
         if state is None:
             state = torch.complex(
                 torch.zeros(expected_state_shape, device=input.device),
@@ -222,11 +231,24 @@ class LRU(nn.Module):
         B_norm = self.B * self.gamma.unsqueeze(dim=-1)
 
         states = []
+        state_t = state[:, :self.state_dim:]
+
         for u_step in input.split(1, dim=1):  # dim=1 is the time dimension
             u_step = u_step.squeeze(1).to(dtype=B_norm.dtype)
-            state = self.lambda_complex * state + u_step @ B_norm.T
-            states.append(state)
+            state_t = self.lambda_complex[:self.state_dim] * state_t + u_step @ B_norm[:self.state_dim].T
+            states.append(state_t)
         states = torch.stack(states, dim=1)
+
+
+        if self.bidirectional:
+            inner_states2 = []
+            state_t = state[:, self.state_dim:]
+            for u_step in reversed(input.split(1, dim=1)):
+                u_step = u_step.squeeze(1).to(dtype=B_norm.dtype)
+                state_t = self.lambda_complex[self.state_dim:] * state_t + u_step @ B_norm[self.state_dim:].T
+                inner_states2.append(state_t)
+            inner_states2 = torch.stack(inner_states2, dim=1)
+            states = torch.cat([states, inner_states2], dim=-1)
 
         output = (states @ self.C.mT).real + input * self.D
 
@@ -238,13 +260,26 @@ class LRU(nn.Module):
         B_norm = self.B * self.gamma.unsqueeze(dim=-1)
 
         # For details on parallel scan, check discussion in Smith et al (2022).
+    
         Bu_elements = input.to(self.B.dtype)@B_norm.T
+       
+        if state is not None:
+            Bu_elements[:, 0, :self.state_dim] = Bu_elements[:, 0, :self.state_dim] + \
+                (self.lambda_complex[:self.state_dim].view(1,-1) * state[:,:self.state_dim])
         Lambda_elements = self.lambda_complex.view(1,1,-1).expand(Bu_elements.shape)
-        #Lambda_elements = self.lambda_complex.tile(input.shape[0],input.shape[1],1)#.contiguous()
-
-        elements = (Lambda_elements, Bu_elements)
-        _, states = associative_scan(binary_operator_diag, elements,dim=1,combine_mode='generic') # all x_k
         
+        elements = (Lambda_elements[:,:,:self.state_dim], Bu_elements[:,:,:self.state_dim])
+        _, states = associative_scan(binary_operator_diag, elements,dim=1, combine_mode='generic') # all x_k
+
+        if self.bidirectional:
+            if state is not None:
+                Bu_elements[:, -1, self.state_dim:] = Bu_elements[:, -1, self.state_dim:] + \
+                (self.lambda_complex[self.state_dim:].view(1,-1) * state[:,self.state_dim:])
+            elements = (Lambda_elements[:,:,self.state_dim:], Bu_elements[:,:,self.state_dim:])
+            _, inner_states2 = associative_scan(
+                binary_operator_diag, elements, dim=1, combine_mode = 'generic', reverse=True
+            )
+            states = torch.cat([states, inner_states2], dim=-1)
         output = (states @ self.C.mT).real + input * self.D
         
         return output
