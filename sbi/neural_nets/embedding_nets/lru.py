@@ -4,7 +4,7 @@ from typing import Optional
 import numpy as np
 import torch
 from torch import Tensor, nn
-
+from torch._higher_order_ops.associative_scan import associative_scan
 
 class LRUEmbedding(nn.Module):
     """Embedding network backed by a stack of Linear Recurrent Unit (LRU) layers.
@@ -16,7 +16,7 @@ class LRUEmbedding(nn.Module):
     def __init__(
         self,
         input_dim: int,
-        output_dim: int = 10,
+        output_dim: int,
         state_dim: int = 20,
         hidden_dim: int = 20,
         num_layers: int = 2,
@@ -80,7 +80,7 @@ class LRUEmbedding(nn.Module):
             Network output (batch_size, output_dim).
         """
         x = self.embedding(x)
-        x = self.net(x)  # (batch_size, len_sequence, output_dim)
+        x = self.layers(x)  # (batch_size, len_sequence, output_dim)
 
         # Pooling
         x = self.aggregation(x)
@@ -144,7 +144,7 @@ class LRU(nn.Module):
         self,
         input_dim: int,
         state_dim: int,
-        r_min: float = 0.1,
+        r_min: float = 0.0,
         r_max: float = 1.0,
         max_phase: float = 2 * torch.pi,
         bidirectional: bool = False,
@@ -194,7 +194,7 @@ class LRU(nn.Module):
         return torch.exp(self.log_gamma)
 
     def forward(
-        self, input: Tensor, state: Optional[Tensor] = None, mode: str = "loop"
+        self, input: Tensor, state: Optional[Tensor] = None, mode: str = "scan"
     ) -> Tensor:
         # Initialize the hidden state if not given.
         expected_state_shape = (input.size(0), self.state_dim)
@@ -231,6 +231,26 @@ class LRU(nn.Module):
         output = (states @ self.C.mT).real + input * self.D
 
         return output
+    
+    def _forward_scan(self, input: Tensor, state: Tensor) -> Tensor:
+        # Input size: (B, L, H)
+
+        B_norm = self.B * self.gamma.unsqueeze(dim=-1)
+
+        # For details on parallel scan, check discussion in Smith et al (2022).
+        Lambda_elements = self.lambda_complex.tile(input.size(1), 1)
+        Bu_elements = input.to(self.B.dtype)@B_norm.T
+        elements = (Lambda_elements, Bu_elements)
+        _, states = associative_scan(binary_operator_diag, elements,dim=1) # all x_k
+        y = (states @ self.C.mT).real + input * self.D
+        return y
+    
+def binary_operator_diag(element_i, element_j):
+   # Binary operator for parallel scan of linear recurrence.
+   a_i, bu_i = element_i
+   a_j, bu_j = element_j
+   return a_j * a_i, a_j * bu_i + bu_j
+
 
     # def forward_scan(self, input_sequence):
     #     """Forward pass of the LRU layer. Output y and input_sequence are of shape (batchsize, length, hidden_dim)."""
