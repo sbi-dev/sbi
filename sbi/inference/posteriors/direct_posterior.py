@@ -26,7 +26,8 @@ from sbi.utils.user_input_checks import check_prior
 
 class DirectPosterior(NeuralPosterior):
     r"""Posterior $p(\theta|x_o)$ with `log_prob()` and `sample()` methods, only
-    applicable to SNPE.<br/><br/>
+    applicable to SNPE.
+
     SNPE trains a neural network to directly approximate the posterior distribution.
     However, for bounded priors, the neural network can have leakage: it puts non-zero
     mass in regions where the prior is zero. The `DirectPosterior` class wraps the

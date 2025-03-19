@@ -34,7 +34,8 @@ from sbi.utils.torchutils import atleast_2d_float32_tensor, ensure_theta_batched
 
 
 class VIPosterior(NeuralPosterior):
-    r"""Provides VI (Variational Inference) to sample from the posterior.<br/><br/>
+    r"""Provides VI (Variational Inference) to sample from the posterior.
+
     SNLE or SNRE train neural networks to approximate the likelihood(-ratios).
     `VIPosterior` allows to learn a tractable variational posterior $q(\theta)$ which
     approximates the true posterior $p(\theta|x_o)$. After this second training stage,
