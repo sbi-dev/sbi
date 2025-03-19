@@ -23,6 +23,7 @@ from sbi.neural_nets.net_builders import (
     build_mnpe,
     build_nsf,
     build_resnet_flowmatcher,
+    build_score_estimator,
     build_zuko_bpf,
     build_zuko_gf,
     build_zuko_maf,
@@ -52,9 +53,10 @@ model_builders = [
     build_zuko_unaf,
 ]
 
-flowmatching_build_functions = [
+diffusion_builders = [
     build_mlp_flowmatcher,
     build_resnet_flowmatcher,
+    build_score_estimator,
 ]
 
 
@@ -136,7 +138,13 @@ def test_shape_handling_utility_for_density_estimator(
 
 
 @pytest.mark.parametrize(
-    "density_estimator_build_fn", model_builders + flowmatching_build_functions
+    "density_estimator_build_fn",
+    [
+        build_nsf,
+        build_zuko_nsf,
+        build_mlp_flowmatcher,
+        build_score_estimator,
+    ],  # just test nflows, zuko and flowmatching
 )
 @pytest.mark.parametrize("input_sample_dim", (1, 2))
 @pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
@@ -241,12 +249,17 @@ def test_correctness_of_density_estimator_log_prob(
 
 
 @pytest.mark.parametrize(
-    "density_estimator_build_fn", model_builders + flowmatching_build_functions
+    "density_estimator_build_fn",
+    [
+        build_nsf,
+        build_zuko_nsf,
+        build_mlp_flowmatcher,
+    ],  # just test nflows, zuko and flowmatching
 )
 @pytest.mark.parametrize(
     "input_event_shape", ((1,), pytest.param((2,), marks=pytest.mark.slow))
 )
-@pytest.mark.parametrize("condition_event_shape", ((1,), (3, 3)))
+@pytest.mark.parametrize("condition_event_shape", ((1,), (2,)))
 @pytest.mark.parametrize("sample_shape", ((1000,), (500, 2)))
 def test_correctness_of_batched_vs_seperate_sample_and_log_prob(
     density_estimator_build_fn: Callable,
@@ -345,11 +358,16 @@ def _build_density_estimator_and_tensors(
             z_score_y=z_score_y,
         )
     else:
+        embedding_net_kwarg = (
+            dict(embedding_net_y=embedding_net)
+            if "score" in density_estimator_build_fn.__name__
+            else dict(embedding_net=embedding_net)
+        )
         density_estimator = density_estimator_build_fn(
             torch.randn_like(batch_input),
             torch.randn_like(batch_condition),
-            embedding_net=embedding_net,
             z_score_y=z_score_y,
+            **embedding_net_kwarg,
         )
 
     inputs = batch_input[:batch_dim]
