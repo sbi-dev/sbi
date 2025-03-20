@@ -102,9 +102,4 @@ def test_npse_snapshot(
     posterior = inference.build_posterior(score_estimator, sample_with=sample_with)
     posterior.set_default_x(x_o)
     samples = posterior.sample((num_samples,), iid_method=iid_method)
-    ndarrays_regression.check(
-        {
-            'values': samples.numpy(),
-        },
-        default_tolerance=dict(atol=1e-2, rtol=1e-2),
-    )
+    ndarrays_regression.check({'values': samples.numpy()})
