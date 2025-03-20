@@ -83,22 +83,22 @@ def calculate_p_misspecification(
 
 
 def calc_misspecification_mmd(
-    inference,
     x_obs,
     x,
+    inference=None,
     mode="x_space",
     n_shuffle=1_000,
     max_samples=1_000,
     mmd_mode="biased",
 ):
-    """calculate the p-value of the misspecification test.
-    inference: inference object
+    """misspecification test based on MMD in data- or embedding space.
     x_obs: observed data
     x: synthetic data
-    mode: mode of MMD calculation ("x_space" or "embedding")
+    inference: sbi inference object (only used if mode == "embedding")
+    mode: space of MMD calculation ("x_space" or "embedding")
     n_shuffle: number of shuffles for computing mmds und H_0
     max_samples: maximum number of samples to use
-    mmd_mode: mode of MMD calculation ("biased" or "unbiased")
+    mmd_mode: approximation of MMD calculation ("biased" or "unbiased")
     returns:
         p_val, (mmd_baseline,mmd): p-value of the misspecification test
                                     (MMDs under H_0, mmd)
@@ -107,8 +107,13 @@ def calc_misspecification_mmd(
         z_obs = x_obs
         z = x
     elif mode == "embedding":
+        if inference is None:
+            raise ValueError(
+                "inference should not be None if mode is 'embedding'."
+                "please provide an sbi inference object"
+            )
         if isinstance(inference._neural_net, type(None)):
-            raise ValueError("no neural net provieded, neural_net should not be None")
+            raise ValueError("no neural net provided, neural_net should not be None")
         if isinstance(inference._neural_net.embedding_net, nn.modules.linear.Identity):
             raise Warning(
                 "The embedding net is might be the identity function,"
@@ -117,7 +122,7 @@ def calc_misspecification_mmd(
         z_obs = inference._neural_net.embedding_net(x_obs).detach()
         z = inference._neural_net.embedding_net(x).detach()
     else:
-        raise ValueError("mode should be either x_space or embedding")
+        raise ValueError("mode should be either 'x_space' or 'embedding'")
 
     p_val, (mmds_baseline, mmd) = calculate_p_misspecification(
         z_obs, z, n_shuffle=n_shuffle, max_samples=max_samples, mode=mmd_mode
