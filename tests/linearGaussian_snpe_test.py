@@ -292,10 +292,8 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str):
             "mdn", z_score_x="structured", num_components=5
         )
         method_str = "snpe_c"
-
     elif method_str == "snpe_a":
         density_estimator = "mdn_snpe_a"
-
     else:
         density_estimator = "maf"
 
@@ -319,7 +317,6 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str):
         posterior1 = DirectPosterior(
             prior=prior, posterior_estimator=posterior_estimator
         ).set_default_x(x_o)
-
         theta = posterior1.sample((1000,))
         x = simulator(theta)
         posterior_estimator = inference.append_simulations(
@@ -328,7 +325,6 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str):
         posterior = DirectPosterior(
             prior=prior, posterior_estimator=posterior_estimator
         ).set_default_x(x_o)
-
     elif method_str == "snpe_c":
         inference = NPE_C(**creation_args)
         theta = prior.sample((900,))
@@ -341,7 +337,6 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str):
         x = simulator(theta)
         _ = inference.append_simulations(theta, x, proposal=posterior1).train()
         posterior = inference.build_posterior().set_default_x(x_o)
-
     elif method_str == "snpe_a":
         inference = NPE_A(**creation_args)
         proposal = prior
@@ -356,7 +351,6 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str):
             _ = inference.train(max_num_epochs=200, final_round=final_round)
             posterior = inference.build_posterior().set_default_x(x_o)
             proposal = posterior
-
     elif method_str.startswith("tsnpe"):
         sample_method = "rejection" if method_str == "tsnpe_rejection" else "sir"
         inference = NPE_C(**creation_args)
