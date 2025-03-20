@@ -2,18 +2,13 @@ from typing import Optional, Union
 
 import torch
 import torch.nn as nn
-from torch import Tensor
-
 from sbi.neural_nets.estimators.score_estimator import (
-    ConditionalScoreEstimator,
-    GaussianFourierTimeEmbedding,
-    ImprovedScoreEstimator,
-    SubVPScoreEstimator,
-    VEScoreEstimator,
-    VPScoreEstimator,
-)
-from sbi.utils.sbiutils import standardizing_net, z_score_parser, z_standardization
+    ConditionalScoreEstimator, GaussianFourierTimeEmbedding,
+    SubVPScoreEstimator, VEScoreEstimator, VPScoreEstimator)
+from sbi.utils.sbiutils import (standardizing_net, z_score_parser,
+                                z_standardization)
 from sbi.utils.user_input_checks import check_data_device
+from torch import Tensor
 
 
 class EmbedInputs(nn.Module):
@@ -116,7 +111,6 @@ def build_score_estimator(
         batch_y: Batch of ys, used to infer dimensionality and (optional) z-scoring.
         sde_type: SDE type used, which defines the mean and std functions. One of:
             - 'vp': Variance preserving.
-            - 'vp++': Variance preserving.
             - 'subvp': Sub-variance preserving.
             - 've': Variance exploding.
             Defaults to 'vp'.
@@ -196,8 +190,6 @@ def build_score_estimator(
         estimator = VEScoreEstimator
     elif sde_type == "subvp":
         estimator = SubVPScoreEstimator
-    elif sde_type == "vp++":
-        estimator = ImprovedScoreEstimator
     else:
         raise ValueError(f"SDE type: {sde_type} not supported.")
 
