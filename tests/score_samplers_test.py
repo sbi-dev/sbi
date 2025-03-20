@@ -17,6 +17,7 @@ from sbi.neural_nets.net_builders import build_score_estimator
 from sbi.samplers.score import Diffuser
 from sbi.utils import BoxUniform, MultipleIndependent
 
+
 def build_some_priors(num_dim: int):
     # Diag normal prior
     prior1 = Independent(Normal(torch.zeros(num_dim), torch.ones(num_dim)), 1)
@@ -39,6 +40,7 @@ def build_some_priors(num_dim: int):
     priors = [prior1, prior2, prior2_2, prior3, prior4, prior5]  # Something broke
 
     return priors
+
 
 @pytest.mark.parametrize("sde_type", ["vp", "ve", "subvp"])
 @pytest.mark.parametrize(
@@ -92,7 +94,10 @@ def test_score_fn_guidance(sde_type, guidance_method, num_dim):
     mean0 = torch.zeros(num_dim)
     std0 = torch.ones(num_dim)
     score_fn = _build_gaussian_score_estimator(sde_type, (num_dim,), mean0, std0)
-    x_o = torch.ones((1,1,))
+    x_o = torch.ones((
+        1,
+        1,
+    ))
     score_fn.set_x(x_o, guidance_method=guidance_method)
     inputs = torch.ones((1, 1, num_dim))
     time = torch.ones(1)
