@@ -6,6 +6,7 @@ from __future__ import annotations
 import sys
 from typing import Tuple, Union
 
+import pymc
 import pytest
 import torch
 import torch.distributions.transforms as torch_tf
@@ -76,10 +77,10 @@ pytestmark = pytest.mark.skipif(
             "nuts_pymc",
             marks=(
                 pytest.mark.mcmc,
-                pytest.mark.xfail(
-                    condition=sys.version_info >= (3, 10),
-                    reason="Fails with pymc>=5.20.1 and python>=3.10",
-                    raises=TypeError,
+                pytest.mark.skipif(
+                    condition=sys.version_info >= (3, 10)
+                    and pymc.__version__ >= "5.20.1",
+                    reason="Inconsistent behaviour with pymc>=5.20.1 and python>=3.10",
                 ),
             ),
         ),
