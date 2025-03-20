@@ -5,6 +5,12 @@ from copy import deepcopy
 from typing import Any, Callable, Optional, Union
 
 import torch
+from torch import Tensor, ones
+from torch.distributions import Distribution
+from torch.nn.utils.clip_grad import clip_grad_norm_
+from torch.optim.adam import Adam
+from torch.utils.tensorboard.writer import SummaryWriter
+
 from sbi import utils as utils
 from sbi.inference import NeuralInference
 from sbi.inference.posteriors import DirectPosterior
@@ -21,11 +27,6 @@ from sbi.utils import (
 )
 from sbi.utils.sbiutils import ImproperEmpirical, mask_sims_from_prior
 from sbi.utils.torchutils import assert_all_finite
-from torch import Tensor, ones
-from torch.distributions import Distribution
-from torch.nn.utils.clip_grad import clip_grad_norm_
-from torch.optim.adam import Adam
-from torch.utils.tensorboard.writer import SummaryWriter
 
 
 class NPSE(NeuralInference):

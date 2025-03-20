@@ -2,14 +2,18 @@ from typing import Optional, Union
 
 import torch
 import torch.nn as nn
-from sbi.neural_nets.estimators.score_estimator import (
-    ConditionalScoreEstimator, GaussianFourierTimeEmbedding,
-    ImprovedScoreEstimator, SubVPScoreEstimator, VEScoreEstimator,
-    VPScoreEstimator)
-from sbi.utils.sbiutils import (standardizing_net, z_score_parser,
-                                z_standardization)
-from sbi.utils.user_input_checks import check_data_device
 from torch import Tensor
+
+from sbi.neural_nets.estimators.score_estimator import (
+    ConditionalScoreEstimator,
+    GaussianFourierTimeEmbedding,
+    ImprovedScoreEstimator,
+    SubVPScoreEstimator,
+    VEScoreEstimator,
+    VPScoreEstimator,
+)
+from sbi.utils.sbiutils import standardizing_net, z_score_parser, z_standardization
+from sbi.utils.user_input_checks import check_data_device
 
 
 class EmbedInputs(nn.Module):

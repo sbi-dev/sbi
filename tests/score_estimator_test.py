@@ -7,11 +7,13 @@ from typing import Tuple
 
 import pytest
 import torch
+
 from sbi.neural_nets.embedding_nets import CNNEmbedding
 from sbi.neural_nets.estimators.score_estimator import (
-    ConditionalScoreEstimator, ImprovedScoreEstimator, VPScoreEstimator)
+    ConditionalScoreEstimator,
+    ImprovedScoreEstimator,
+)
 from sbi.neural_nets.net_builders import build_score_estimator
-from scipy import stats
 
 
 @pytest.mark.parametrize("sde_type", ["vp", "ve", "subvp", "vp++"])
@@ -164,8 +166,8 @@ def test_times_schedule():
     assert exp == obs
     assert times.shape == torch.Size((10,))
 
-    assert times[0 ,...] != ivpse.t_min
-    assert times[-1,...] != ivpse.t_max
+    assert times[0, ...] != ivpse.t_min
+    assert times[-1, ...] != ivpse.t_max
 
     assert torch.allclose(times.max(), torch.Tensor([ivpse.beta_max]))
     assert torch.allclose(times.min(), torch.Tensor([ivpse.beta_min]))
@@ -184,4 +186,4 @@ def test_noise_schedule():
 
     assert exp == obs
     assert noise.shape == torch.Size((10,))
-    assert torch.allclose(times,noise)
+    assert torch.allclose(times, noise)
