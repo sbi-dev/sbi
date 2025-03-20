@@ -227,4 +227,9 @@ def test_pyro_gaussian_model(
     sbi_samples = mcmc.get_samples()["theta"]
 
     # Compare posterior samples
-    check_c2st(sbi_samples, pyro_samples, tol=0.1, alg="pyro MCMC vs SBI-pyro MCMC")
+    check_c2st(
+        sbi_samples,
+        pyro_samples,
+        tol=0.1,
+        alg=f"pyro MCMC vs SBI-pyro-{trainer_cls.__name__} MCMC",
+    )
