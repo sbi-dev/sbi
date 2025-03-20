@@ -9,10 +9,7 @@ import pytest
 import torch
 from sbi.neural_nets.embedding_nets import CNNEmbedding
 from sbi.neural_nets.estimators.score_estimator import (
-    ConditionalScoreEstimator,
-    ImprovedVPScoreEstimator,
-    VPScoreEstimator,
-)
+    ConditionalScoreEstimator, ImprovedScoreEstimator, VPScoreEstimator)
 from sbi.neural_nets.net_builders import build_score_estimator
 from scipy import stats
 
@@ -159,25 +156,19 @@ def test_times_schedule():
     with pytest.raises(NotImplementedError):
         ConditionalScoreEstimator(id_net, inpt_shape, cond_shape)
 
-    ivpse = ImprovedVPScoreEstimator(id_net, inpt_shape, cond_shape)
+    ivpse = ImprovedScoreEstimator(id_net, inpt_shape, cond_shape)
     exp = ivpse.device
     times = ivpse.times_schedule(10)
     obs = times.device
 
-    delta = ivpse.t_max - ivpse.t_min
-    t_mu = ivpse.t_min + delta / 2.0
-    t_std = delta / 8.0
-
     assert exp == obs
     assert times.shape == torch.Size((10,))
 
-    ndist = stats.norm(t_mu, t_std)
-    lo, hi = ndist.ppf(0.01), ndist.ppf(0.99)
+    assert times[0 ,...] != ivpse.t_min
+    assert times[-1,...] != ivpse.t_max
 
-    assert times.max().item() <= hi
-    assert times.min().item() >= lo
-    assert times.max().item() < ivpse.t_max
-    assert times.min().item() > ivpse.t_min
+    assert torch.allclose(times.max(), torch.Tensor([ivpse.beta_max]))
+    assert torch.allclose(times.min(), torch.Tensor([ivpse.beta_min]))
 
 
 def test_noise_schedule():
@@ -185,7 +176,7 @@ def test_noise_schedule():
     inpt_shape = (4,)
     cond_shape = (4,)
 
-    ivpse = ImprovedVPScoreEstimator(id_net, inpt_shape, cond_shape)
+    ivpse = ImprovedScoreEstimator(id_net, inpt_shape, cond_shape)
     exp = ivpse.device
     times = ivpse.times_schedule(10)
     noise = ivpse.noise_schedule(times)
@@ -193,9 +184,4 @@ def test_noise_schedule():
 
     assert exp == obs
     assert noise.shape == torch.Size((10,))
-
-    ndist = stats.norm(ivpse.pmean, ivpse.pstd)
-    lo, hi = ndist.ppf(0.01), ndist.ppf(0.99)
-
-    assert noise.max().item() < hi
-    assert noise.min().item() > lo
+    assert torch.allclose(times,noise)
