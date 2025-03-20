@@ -108,6 +108,7 @@ def test_unbounded_transform():
     assert to_bounded(to_unbounded(prior(1000))).max() < 1.0
 
 
+@pytest.mark.parametrize("num_dim", [2, 5])
 @pytest.mark.parametrize(
     "trainer_cls, distribution_cls",
     [
@@ -119,13 +120,16 @@ def test_unbounded_transform():
 def test_estimator_distribution_basic_properties(
     trainer_cls,
     distribution_cls,
+    num_dim,
     num_simulations: int = 100,
-    dim: int = 5,
 ):
     """Test basic properties of the estimator distribution."""
-    prior = torch.distributions.MultivariateNormal(
-        loc=torch.zeros(dim), covariance_matrix=torch.diag(torch.ones(dim))
-    )
+    if num_dim == 0:
+        prior = torch.distributions.Normal(0.0, 1.0)
+    else:
+        prior = torch.distributions.MultivariateNormal(
+            loc=torch.zeros(num_dim), covariance_matrix=torch.diag(torch.ones(num_dim))
+        )
     theta = prior.sample(torch.Size([num_simulations]))
     x = torch.distributions.Normal(theta, 1.0).sample()
     trainer = trainer_cls(prior=prior).append_simulations(theta=theta, x=x)
@@ -140,18 +144,18 @@ def test_estimator_distribution_basic_properties(
     assert isinstance(estimator_dist, distribution_cls)
     assert estimator_dist.estimator == density_estimator
     assert estimator_dist.get_condition_and_event_shapes() == (
-        torch.Size([dim]),
-        torch.Size([dim]),
+        torch.Size([num_dim]),
+        torch.Size([num_dim]),
     )
     assert estimator_dist.batch_shape == torch.Size([num_simulations])
-    assert estimator_dist.event_shape == torch.Size([dim])
+    assert estimator_dist.event_shape == torch.Size([num_dim])
     assert estimator_dist.support == torch.distributions.constraints.real
 
     # Test sample method
     if trainer_cls is not NRE:
-        assert estimator_dist.sample().shape == torch.Size([num_simulations, dim])
+        assert estimator_dist.sample().shape == torch.Size([num_simulations, num_dim])
         x_samples = estimator_dist.sample(torch.Size([3]))
-        assert x_samples.shape == torch.Size([3, num_simulations, dim])
+        assert x_samples.shape == torch.Size([3, num_simulations, num_dim])
     else:
         with pytest.raises(NotImplementedError):
             estimator_dist.sample()
@@ -170,7 +174,7 @@ def test_estimator_distribution_basic_properties(
     assert estimator_dist_expanded.event_shape == estimator_dist.event_shape
     assert torch.equal(
         estimator_dist_expanded.condition,
-        theta.expand(torch.Size([2, num_simulations, dim])),
+        theta.expand(torch.Size([2, num_simulations, num_dim])),
     )
     assert estimator_dist_expanded.estimator == estimator_dist.estimator
 
