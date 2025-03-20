@@ -1,0 +1,824 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://sbi-dev.github.io/sbi/dev/tutorials/20_score_based_methods_new_features/">
+      
+      
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.9">
+    
+    
+      
+        <title>Score-based methods : improvements and new features - sbi</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.4af4bdda.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+  
+  
+    
+    
+  
+  
+  <style>:root{--md-admonition-icon--note:url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2016%2016%22%3E%3Cpath%20d%3D%22M1%207.775V2.75C1%201.784%201.784%201%202.75%201h5.025c.464%200%20.91.184%201.238.513l6.25%206.25a1.75%201.75%200%200%201%200%202.474l-5.026%205.026a1.75%201.75%200%200%201-2.474%200l-6.25-6.25A1.75%201.75%200%200%201%201%207.775m1.5%200c0%20.066.026.13.073.177l6.25%206.25a.25.25%200%200%200%20.354%200l5.025-5.025a.25.25%200%200%200%200-.354l-6.25-6.25a.25.25%200%200%200-.177-.073H2.75a.25.25%200%200%200-.25.25ZM6%205a1%201%200%201%201%200%202%201%201%200%200%201%200-2%22/%3E%3C/svg%3E');}</style>
+
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../static/global.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#score-based-methods-improvements-and-new-features" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="sbi" class="md-header__button md-logo" aria-label="sbi" data-md-component="logo">
+      
+  <img src="../../static/logo.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            sbi
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Score-based methods : improvements and new features
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="http://github.com/sbi-dev/sbi" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    sbi-dev/sbi
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="sbi" class="md-nav__button md-logo" aria-label="sbi" data-md-component="logo">
+      
+  <img src="../../static/logo.svg" alt="logo">
+
+    </a>
+    sbi
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="http://github.com/sbi-dev/sbi" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    sbi-dev/sbi
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../index.md" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Tutorials and Examples
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    API Reference
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    FAQ
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Contributing
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Contributing
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contribute/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    How to contribute
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../code_of_conduct/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Code of Conduct
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../citation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Citation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../credits/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Credits
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#key-concepts-of-npse" class="md-nav__link">
+    <span class="md-ellipsis">
+      Key concepts of NPSE
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#single-observation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Single observation
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Single observation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#training-and-improved-convergence-checks" class="md-nav__link">
+    <span class="md-ellipsis">
+      Training and improved convergence checks
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sampling-procedures" class="md-nav__link">
+    <span class="md-ellipsis">
+      Sampling procedures
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#map-estimation" class="md-nav__link">
+    <span class="md-ellipsis">
+      MAP estimation
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#batched-sampling" class="md-nav__link">
+    <span class="md-ellipsis">
+      Batched sampling
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#score-based-methods-for-iid-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      Score-based methods for i.i.d. data
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="score-based-methods-improvements-and-new-features">Score-based methods : improvements and new features<a class="headerlink" href="#score-based-methods-improvements-and-new-features" title="Permanent link">&para;</a></h1>
+<p><code>sbi</code> incorporates recent algorithms based on Score Matching generative models. This is encoded in the sbi class NPSE (Neural Posterior Score Estimation).</p>
+<p>In this tutorial, we will show how to use NPSE and highlight the new functionalities of score-based methods with a toy example.</p>
+<p>For more information, see :</p>
+<p><strong>Score Matching</strong>:</p>
+<ul>
+<li>
+<p>Hyvärinen, A. &ldquo;Estimation of Non-Normalized Statistical Models by Score Matching.&rdquo; JMLR 2005.</p>
+</li>
+<li>
+<p>Song, Y., et al. &ldquo;Score-Based Generative Modeling through Stochastic Differential Equations.&rdquo; ICLR 2021.</p>
+</li>
+<li>
+<p>Geffner, T., Papamakarios, G., and Mnih, A. &ldquo;Score modeling for simulation-based inference.&rdquo; NeurIPS 2022 Workshop on Score-Based Methods. 2022.</p>
+</li>
+<li>
+<p>Sharrock, L., Simons, J., et al. &ldquo;Sequential neural score estimation: Likelihood-free inference with conditional score based diffusion models.&rdquo; ICML 2024.</p>
+</li>
+<li>
+<p>Karras, T.,  Aittala, M., et al. &ldquo;Elucidating the Design Space of Diffusion-Based Generative Models.&rdquo; NeurIPS 2022.</p>
+</li>
+<li>
+<p>Linhart J., et al. &ldquo;Diffusion posterior sampling for simulation-based inference in tall data settings.&rdquo; 2024</p>
+</li>
+</ul>
+<h2 id="key-concepts-of-npse">Key concepts of NPSE<a class="headerlink" href="#key-concepts-of-npse" title="Permanent link">&para;</a></h2>
+<p>NPSE approximates a target posterior distribution <span class="arithmatex">\(p_0(\theta|x_0)\)</span> by learning its score function, i.e., gradient of the log-density of the (diffused) posterior <span class="arithmatex">\(\nabla_{\theta}\log p_t(\theta|x)\)</span>, for all times <span class="arithmatex">\(t\)</span> and all conditional observations <span class="arithmatex">\(x\)</span>, using the denoising score matching loss. Score-based generative models are indeed closely linked to diffusion models, especially during the sampling phase.</p>
+<p>Note that only the <strong>single-round</strong> version of NPSE is implemented currently.</p>
+<p>Sampling from the target posterior <span class="arithmatex">\(p_0(\theta|x_0)\)</span> can be split into <span class="arithmatex">\(2\)</span> steps :
+- <em>forward</em> step : diffuse samples from <span class="arithmatex">\(p_0(\theta|x_0)\)</span> over time and learn the diffused scores i.e. <span class="arithmatex">\(\nabla_{\theta}\log p_t(\theta|x)\)</span> for all <span class="arithmatex">\(t \in [0,t_{\max}]\)</span>. At the end (<span class="arithmatex">\(t=t_{\max}\)</span>) the diffused posterior is really close to a standard Gaussian.
+- <em>reverse</em> step : reverse the diffusion process, starting from a standard Gaussian, using the learnt scores to get new samples from <span class="arithmatex">\(p_0(\theta|x_0)\)</span>.</p>
+<p>We first introduce the sampling for a posterior given a <strong>single</strong> observation  <span class="arithmatex">\(x_0\)</span> and then for <strong>tall</strong> posterior (when <span class="arithmatex">\(x_0\)</span> is  a batch of i.i.d. observations).</p>
+<h2 id="single-observation">Single observation<a class="headerlink" href="#single-observation" title="Permanent link">&para;</a></h2>
+<p>In this section, <span class="arithmatex">\(x_0\)</span> is a single observation. We define a simple simulator in 2D.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.distributions</span><span class="w"> </span><span class="kn">import</span> <span class="n">MultivariateNormal</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.analysis</span><span class="w"> </span><span class="kn">import</span> <span class="n">pairplot</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference</span><span class="w"> </span><span class="kn">import</span> <span class="n">NPSE</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="c1"># Example toy simulator</span>
+<span class="c1"># Define the prior</span>
+<span class="n">num_dims</span> <span class="o">=</span> <span class="mi">2</span>
+<span class="n">num_simulations</span> <span class="o">=</span> <span class="mi">5000</span>
+<span class="n">prior</span> <span class="o">=</span> <span class="n">MultivariateNormal</span><span class="p">(</span><span class="n">loc</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">num_dims</span><span class="p">),</span> <span class="n">covariance_matrix</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="n">num_dims</span><span class="p">))</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Linear gaussian simulator.&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">theta</span> <span class="o">+</span> <span class="mf">1.0</span> <span class="o">+</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn_like</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span> <span class="o">*</span> <span class="mf">0.1</span>
+
+<span class="c1"># Produce simulations</span>
+<span class="n">theta</span> <span class="o">=</span> <span class="n">prior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_simulations</span><span class="p">,))</span>
+<span class="n">x</span> <span class="o">=</span> <span class="n">simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
+
+<span class="c1"># Ground truth parameter/observation</span>
+<span class="n">theta_o</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">num_dims</span><span class="p">)</span>
+<span class="n">x_o</span> <span class="o">=</span> <span class="n">simulator</span><span class="p">(</span><span class="n">theta_o</span><span class="p">)</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="c1"># Instantiate NPSE and append simulations</span>
+<span class="n">inference</span> <span class="o">=</span> <span class="n">NPSE</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span> <span class="n">sde_type</span><span class="o">=</span><span class="s2">&quot;vp&quot;</span><span class="p">)</span>
+<span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
+</code></pre></div>
+<p>The argument <code>sde_type</code> defines whether the forward diffusion process has a noising schedule that is Variance Exploding (<code>ve</code>, i.e., <a href="https://proceedings.neurips.cc/paper/2019/hash/3001ef257407d5a371a96dcd947c7d93-Abstract.html?ref=https://githubhelp.com">SMLD</a>), Variance Preserving (<code>vp</code>, i.e., <a href="https://proceedings.neurips.cc/paper/2020/hash/4c5bcfec8584af0d967f1ab10179ca4b-Abstract.html">DDPM</a>), or sub-Variance Preserving (<code>subvp</code>) in the limit.<br />
+The current default noising schedule is <code>ve</code>. As we care more about sampling quality than sampling times in our example, we choose to work with the <code>vp</code> option.</p>
+<h3 id="training-and-improved-convergence-checks">Training and improved convergence checks<a class="headerlink" href="#training-and-improved-convergence-checks" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="c1"># Train the score estimator</span>
+<span class="n">score_estimator</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 56 epochs.
+</code></pre></div>
+
+<p>The method <code>train</code> calls the denoising score-matching loss corresponding to the chosen noising schedule (VE, VP, subVP). As the variance of the loss may be high, especially for times <span class="arithmatex">\(t\)</span> near <span class="arithmatex">\(0\)</span>, <strong>control variates</strong> are automatically used in the expression of the loss.  </p>
+<p>As NPSE deals with times, <strong>convergence</strong> checks have been changed during training : the validation loss is now evaluated at a <strong>fixed</strong> set of times <span class="arithmatex">\(T = \{t_0,..,t_N\}\)</span> to reduce its variance, meaning that the entire validation batch is only evaluated at all times <span class="arithmatex">\(t_i \in T\)</span>.  </p>
+<p>After training, we obtain an <strong>amortized</strong> score estimate that approximates the score of the diffused posterior distribution for all times <span class="arithmatex">\(t \in [0,t_{\max}]\)</span> and <strong>any</strong> conditional observation <span class="arithmatex">\(x\)</span>, i.e. <span class="arithmatex">\(\nabla_{\theta}\log p_t(\theta|x)\)</span>.<br />
+We can use these score estimates to reverse the diffusion process and sample from the target distribution.</p>
+<h3 id="sampling-procedures">Sampling procedures<a class="headerlink" href="#sampling-procedures" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="c1"># Build the posterior using the trained score estimate, and sample with the sde option</span>
+<span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">(</span><span class="n">score_estimator</span><span class="p">,</span> <span class="n">sample_with</span><span class="o">=</span><span class="s2">&quot;sde&quot;</span><span class="p">)</span>
+<span class="n">samples</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">10000</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_o</span><span class="p">,</span> <span class="n">predictor</span><span class="o">=</span><span class="s2">&quot;euler_maruyama&quot;</span><span class="p">,</span> <span class="n">corrector</span><span class="o">=</span><span class="s2">&quot;langevin&quot;</span><span class="p">)</span>
+</code></pre></div>
+<p>The argument <code>sample_with</code> allows to choose which kind of solver we want to use to reverse the diffusion equation :</p>
+<ul>
+<li>
+<p><code>"ode"</code> : builds the probability flow ODE using the zuko library. We can sample from the flow afterwards by calling <code>.sample()</code></p>
+</li>
+<li>
+<p><code>"sde"</code> : solves the reverse SDE by alternating <strong>prediction</strong> and <strong>correction</strong> steps  </p>
+</li>
+</ul>
+<p>Both options contain <strong>rejection sampling</strong> steps to ensure prior coverage.<br />
+Note that in the <code>"sde"</code> option, the only available predictor is <code>"euler_maruyama"</code> and the available correctors are <code>"langevin"</code> (for <strong>Unadjusted Langevin Dynamics</strong>) and <code>"gibbs"</code>.  </p>
+<p>The argument <code>x_o</code> in the <code>.sample()</code> method indicates which observation is set before sampling from the corresponding posterior and replaces the <code>.set_default()</code>method.</p>
+<h3 id="map-estimation">MAP estimation<a class="headerlink" href="#map-estimation" title="Permanent link">&para;</a></h3>
+<p>It is possible to get a Maximum A Posterior (MAP) estimate in the case of score-based methods. Note that in this case, you should <strong>first</strong> set the default observation, using the <code>set_default_x</code> method !<br />
+The optimization procedure (gradient ascent) aims at finding a maximizer <span class="arithmatex">\(\theta_{\max}\)</span> of the posterior log-probability <span class="arithmatex">\(\log p(\theta|x_0)\)</span>. <br />
+The optimization can be interrupted at any time if the user sees that the log-probability converges : the best estimate will still be saved and can be accessed with <code>.map()</code>.  </p>
+<p>The default values used by this function (e.g. number of optimization steps, number of starting positions, learning rate) might require hand-tuning from the user for the problem at hand.</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># MAP estimation</span>
+<span class="n">posterior</span><span class="o">.</span><span class="n">set_default_x</span><span class="p">(</span><span class="n">x_o</span><span class="p">)</span>
+<span class="n">map_est</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">num_iter</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;The MAP estimate is : &quot;</span><span class="p">,</span> <span class="n">map_est</span><span class="p">)</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>The MAP estimate is :  tensor([[0.1307, 0.0084]])
+</code></pre></div>
+
+<p>The argument <code>num_iter</code> indicates the number of optimization steps (gradient ascent) that the algorithm takes to find the MAP. In our simple example, a small number of iterations is sufficient for the the log-probability (of the posterior) to converge.</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Plot posterior samples and MAP</span>
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">pairplot</span><span class="p">(</span>
+    <span class="n">samples</span><span class="p">,</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mi">5</span><span class="p">),</span>
+    <span class="n">diag</span> <span class="o">=</span> <span class="s2">&quot;kde&quot;</span><span class="p">,</span>
+    <span class="n">upper</span><span class="o">=</span><span class="s2">&quot;contour&quot;</span><span class="p">,</span>
+    <span class="n">diag_kwargs</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">bins</span><span class="o">=</span><span class="mi">100</span><span class="p">),</span>
+    <span class="n">upper_kwargs</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">levels</span><span class="o">=</span><span class="p">[</span><span class="mf">0.95</span><span class="p">]),</span>
+    <span class="n">points</span><span class="o">=</span><span class="p">[</span><span class="n">map_est</span><span class="p">,</span><span class="n">theta_o</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">0</span><span class="p">)],</span> <span class="c1"># add ground truth thetas and MAP</span>
+    <span class="n">fig_kwargs</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span>
+        <span class="n">points_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;markersize&quot;</span><span class="p">:</span> <span class="mi">6</span><span class="p">}</span>
+    <span class="p">)</span>
+<span class="p">)</span>
+<span class="n">ax</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">legend</span><span class="p">([</span><span class="sa">r</span><span class="s2">&quot;$\theta_0$&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;$\theta_</span><span class="si">{MAP}</span><span class="s2">$&quot;</span><span class="p">],</span> <span class="n">loc</span><span class="o">=</span><span class="s2">&quot;upper right&quot;</span><span class="p">)</span><span class="c1">#, bbox_to_anchor=[2.0, 1.0, 0.0, 0.0]);</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">sca</span><span class="p">(</span><span class="n">ax</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">]);</span>
+</code></pre></div>
+<p><img alt="png" src="../20_score_based_methods_new_features_files/20_score_based_methods_new_features_16_0.png" /></p>
+<h3 id="batched-sampling">Batched sampling<a class="headerlink" href="#batched-sampling" title="Permanent link">&para;</a></h3>
+<p>Given a batch of observations <span class="arithmatex">\([x_1, ..., x_B]\)</span> (not necessarily i.i.d.), it is also possible to get samples from posteriors <span class="arithmatex">\(p(\theta|x_1)\)</span>, &hellip; ,<span class="arithmatex">\(p(\theta|x_B)\)</span>, in a vectorized manner and without retraining the score network ! This is implemented in the <code>.sample_batched()</code> method of the posterior.<br />
+The argument <code>sample_shape</code> specifies the desired number of samples for <strong>each</strong> posterior.</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Sample in a vectorized manner from different posteriors</span>
+<span class="n">num_obs</span> <span class="o">=</span> <span class="mi">5</span>
+<span class="n">theta_batch</span> <span class="o">=</span> <span class="n">prior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_obs</span><span class="p">,))</span> <span class="c1"># get 5 different parameters</span>
+<span class="n">x_batch</span> <span class="o">=</span> <span class="n">simulator</span><span class="p">(</span><span class="n">theta_batch</span><span class="p">)</span> <span class="c1"># get 5 corresponding obs</span>
+<span class="n">posterior_batched_samples</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample_batched</span><span class="p">(</span><span class="n">sample_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">100</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_batch</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;The size of the batched samples is : &quot;</span><span class="p">,</span> <span class="n">posterior_batched_samples</span><span class="o">.</span><span class="n">size</span><span class="p">())</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>The size of the batched samples is :  torch.Size([100, 5, 2])
+</code></pre></div>
+
+<h2 id="score-based-methods-for-iid-data">Score-based methods for i.i.d. data<a class="headerlink" href="#score-based-methods-for-iid-data" title="Permanent link">&para;</a></h2>
+<p>In this section, <span class="arithmatex">\(x_0\)</span> is a batch of <strong>i.i.d.</strong> observations, <span class="arithmatex">\(x_0=[x_0^0,...,x_0^N]\)</span>. It is possible to sample from the <em>tall</em> posterior distribution <span class="arithmatex">\(p(\theta|x_0^0,...,x_0^N)\)</span> using NPSE trained for <strong>individual</strong> observations !  </p>
+<p>Once the score estimate is trained (see previous section), sampling from <span class="arithmatex">\(p(\theta|x_0^0,...,x_0^N)\)</span> is split into <span class="arithmatex">\(2\)</span> steps :</p>
+<ul>
+<li>
+<p>estimate the scores of the <em>tall</em> posterior for all times <span class="arithmatex">\(t\)</span> based on the learnt scores of <strong>individual</strong> posteriors <span class="arithmatex">\(p(\theta|x_0^i)\)</span> for all <span class="arithmatex">\(i\)</span>. <span class="arithmatex">\(4\)</span> different methods are implemented for the moment.</p>
+</li>
+<li>
+<p>reverse the diffusion process or perform Langevin dynamics using the estimated scores  </p>
+</li>
+</ul>
+<p>Note that in this i.i.d. setting, only the <code>"sde"</code> option for sampling is implemented for the moment.  </p>
+<p>In the example, we will draw different observations from the same parameter <span class="arithmatex">\(\theta_0\)</span> and see how the posterior evolves with an increasing number of conditional observations.</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Build the tall posterior, and sample using sde option</span>
+<span class="n">tall_posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">(</span><span class="n">score_estimator</span><span class="p">,</span> <span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span> <span class="n">sample_with</span><span class="o">=</span><span class="s2">&quot;sde&quot;</span><span class="p">)</span>
+<span class="n">x_iid</span> <span class="o">=</span> <span class="n">simulator</span><span class="p">(</span><span class="n">theta_o</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="mi">20</span><span class="p">,</span><span class="mi">1</span><span class="p">))</span>
+
+<span class="c1"># Sample from a posterior conditioned with 5 observations</span>
+<span class="n">tall_samples_5_obs</span> <span class="o">=</span> <span class="n">tall_posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">sample_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">1000</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_iid</span><span class="p">[:</span><span class="mi">5</span><span class="p">,:],</span> <span class="n">iid_method</span><span class="o">=</span><span class="s2">&quot;gauss&quot;</span><span class="p">)</span>
+<span class="c1"># Sample from a posterior conditioned with 10 observations</span>
+<span class="n">tall_samples_10_obs</span> <span class="o">=</span> <span class="n">tall_posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">sample_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">1000</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_iid</span><span class="p">[:</span><span class="mi">10</span><span class="p">,:],</span> <span class="n">iid_method</span><span class="o">=</span><span class="s2">&quot;gauss&quot;</span><span class="p">)</span>
+<span class="c1"># Sample from a posterior conditioned with 20 observations</span>
+<span class="n">tall_samples_20_obs</span> <span class="o">=</span> <span class="n">tall_posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">sample_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">1000</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_iid</span><span class="p">,</span> <span class="n">iid_method</span><span class="o">=</span><span class="s2">&quot;gauss&quot;</span><span class="p">)</span>
+</code></pre></div>
+<p>Note that the posterior object created by the <code>.build_posterior()</code> is essentially the same as in the previous section (with single observations).  </p>
+<p>To sample, we call <code>.sample()</code> as before but we now pass a <strong>batch</strong> of observations to the argument <code>x</code> : the algorithm will assume those to be i.i.d. and automatically switch to the i.i.d. setting.  </p>
+<p>The argument <code>iid_method</code> only applies when <code>x</code> is a <strong>batch</strong> of observations.<br />
+It specifies the method used to estimate the scores of the <em>tall</em> posterior at different times <span class="arithmatex">\(t\)</span> using the scores of individual posteriors.  For the moment the available options are :</p>
+<ul>
+<li>
+<p><code>"jac_gauss"</code>, <code>"gauss"</code> and <code>"auto_gauss"</code> (see <a href="https://arxiv.org/abs/2404.07593">Linhart et al., 2024</a> for more details)</p>
+</li>
+<li>
+<p><code>"fnpe"</code>, standing for Factorized Neural Posterior Estimation (see <a href="https://arxiv.org/abs/2209.14249">Geffner et al., 2023</a> for more details).</p>
+</li>
+</ul>
+<div class="highlight"><pre><span></span><code><span class="c1"># Plot the samples and the ground truth parameter</span>
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">pairplot</span><span class="p">(</span>
+    <span class="n">samples</span><span class="o">=</span><span class="p">[</span><span class="n">tall_samples_5_obs</span><span class="p">,</span><span class="n">tall_samples_10_obs</span><span class="p">,</span><span class="n">tall_samples_20_obs</span><span class="p">],</span>
+    <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">10</span><span class="p">),</span>
+    <span class="n">points</span><span class="o">=</span><span class="n">theta_o</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span>
+    <span class="n">diag</span><span class="o">=</span><span class="s2">&quot;kde&quot;</span><span class="p">,</span>
+    <span class="n">upper</span><span class="o">=</span><span class="s2">&quot;contour&quot;</span><span class="p">,</span>
+    <span class="n">diag_kwargs</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">bins</span><span class="o">=</span><span class="mi">100</span><span class="p">),</span>
+    <span class="n">upper_kwargs</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">levels</span><span class="o">=</span><span class="p">[</span><span class="mf">0.95</span><span class="p">]),</span>
+    <span class="n">fig_kwargs</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span>
+        <span class="c1">#points_colors=[&quot;k&quot;],</span>
+        <span class="n">points_offdiag</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">markersize</span><span class="o">=</span><span class="mi">10</span><span class="p">),</span>
+    <span class="p">),</span>
+<span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">sca</span><span class="p">(</span><span class="n">ax</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span>
+    <span class="p">[</span><span class="s2">&quot;5 obs&quot;</span><span class="p">,</span> <span class="s2">&quot;10_obs&quot;</span><span class="p">,</span><span class="s2">&quot;20 obs&quot;</span><span class="p">]</span>
+    <span class="o">+</span> <span class="p">[</span><span class="sa">r</span><span class="s2">&quot;$\theta_0$&quot;</span><span class="p">],</span>
+    <span class="n">frameon</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">fontsize</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span>
+<span class="p">);</span>
+</code></pre></div>
+<p><img alt="png" src="../20_score_based_methods_new_features_files/20_score_based_methods_new_features_22_0.png" /></p>
+<p>As expected, the posterior concentrates around the ground truth parameter <span class="arithmatex">\(\theta_0\)</span> as the number of i.i.d. conditional observations increases.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        <div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/sbi-dev/sbi" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 512"><!--! Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M186.1 328.7c0 20.9-10.9 55.1-36.7 55.1s-36.7-34.2-36.7-55.1 10.9-55.1 36.7-55.1 36.7 34.2 36.7 55.1M480 278.2c0 31.9-3.2 65.7-17.5 95-37.9 76.6-142.1 74.8-216.7 74.8-75.8 0-186.2 2.7-225.6-74.8-14.6-29-20.2-63.1-20.2-95 0-41.9 13.9-81.5 41.5-113.6-5.2-15.8-7.7-32.4-7.7-48.8 0-21.5 4.9-32.3 14.6-51.8 45.3 0 74.3 9 108.8 36 29-6.9 58.8-10 88.7-10 27 0 54.2 2.9 80.4 9.2 34-26.7 63-35.2 107.8-35.2 9.8 19.5 14.6 30.3 14.6 51.8 0 16.4-2.6 32.7-7.7 48.2 27.5 32.4 39 72.3 39 114.2m-64.3 50.5c0-43.9-26.7-82.6-73.5-82.6-18.9 0-37 3.4-56 6-14.9 2.3-29.8 3.2-45.1 3.2-15.2 0-30.1-.9-45.1-3.2-18.7-2.6-37-6-56-6-46.8 0-73.5 38.7-73.5 82.6 0 87.8 80.4 101.3 150.4 101.3h48.2c70.3 0 150.6-13.4 150.6-101.3m-82.6-55.1c-25.8 0-36.7 34.2-36.7 55.1s10.9 55.1 36.7 55.1 36.7-34.2 36.7-55.1-10.9-55.1-36.7-55.1"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "../..", "features": ["content.code.copy"], "search": "../../assets/javascripts/workers/search.f8cc74c7.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.c8b220af.min.js"></script>
+      
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-MML-AM_CHTML"></script>
+      
+    
+  </body>
+</html>
