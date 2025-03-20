@@ -2,21 +2,30 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import warnings
-from typing import Dict, Optional, Sequence
+from typing import Dict, Optional, Sequence, Union
 
 import torch
 from torch import Tensor, float32
 from torch.distributions import Distribution, constraints
 
 
-def get_distribution_parameters(dist, device):
-    '''Used to get the tensors of the parameters in torch distributions.
+def get_distribution_parameters(
+    dist: torch.distributions, device: Union[str, torch.device]
+) -> Dict:
+    """Used to get the tensors of the parameters in torch distributions.
+
     Returns the tensors relocated to device.
-    '''
+    """
     params = {param: getattr(dist, param).to(device) for param in dist.arg_constraints}
+    # torch.distributions.MultivariateNormal calculates precision
+    # matrix from covariance, and stores it in the arg_constraints.
+    # When reinstantiating, we must provide only one of them.
     if isinstance(dist, torch.distributions.MultivariateNormal):
         params['precision_matrix'] = None
         params['scale_tril'] = None
+    # torch.distributions.MultivariateNormal calculates logits
+    # from probabilities, and stores it in the arg_constraints.
+    # When reinstantiating, we must provide only one of them.
     elif isinstance(dist, torch.distributions.Binomial):
         params['logits'] = None
     return params
@@ -96,7 +105,7 @@ class CustomPriorWrapper(Distribution):
                 stacklevel=2,
             )
 
-    def to(self, device):
+    def to(self, device: Union[str, torch.device]) -> None:
         raise NotImplementedError(
             "This class is not supported on the GPU. Use on cpu or use \
             any of `PytorchReturnTypeWrapper`, `BoxUniform`, or `MultipleIndependent`."
@@ -170,7 +179,7 @@ class PytorchReturnTypeWrapper(Distribution):
     def support(self):
         return self.prior.support
 
-    def to(self, device):
+    def to(self, device: Union[str, torch.device]) -> None:
         params = get_distribution_parameters(self.prior, device)
         self.prior = type(self.prior)(**params)
         self.device = device
@@ -345,14 +354,14 @@ class MultipleIndependent(Distribution):
             reinterpreted_batch_ndims=1,
         )
 
-    def to(self, device):
+    def to(self, device: Union[str, torch.device]) -> None:
         # Move the values of the arg_constraints dictionary to the specified device
         for i in range(len(self.dists)):
             if hasattr(self.dists[i], "to"):
-                self.dists[i].to(device)
+                self.dists[i].to(device)  # type: ignore
             else:
                 params = get_distribution_parameters(self.dists[i], device)
-                self.dists[i] = type(self.dists[i])(**params)
+                self.dists[i] = type(self.dists[i])(**params)  # type: ignore
         self.device = device
 
 
