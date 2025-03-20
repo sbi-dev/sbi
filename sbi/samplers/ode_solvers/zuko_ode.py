@@ -1,3 +1,5 @@
+from typing import Any, Dict
+
 import torch.nn as nn
 from torch import Tensor
 from torch.distributions import Distribution
@@ -64,7 +66,9 @@ class ZukoNeuralODE(NeuralODE):
         self.exact = exact
 
     def forward(self, condition: Tensor, **kwargs) -> Distribution:
-        ode_kwargs = dict(atol=self.atol, rtol=self.rtol, exact=self.exact)
+        ode_kwargs: Dict[str, Any] = dict(
+            atol=self.atol, rtol=self.rtol, exact=self.exact
+        )
         ode_kwargs.update(kwargs)
 
         transform = FreeFormJacobianTransform(
