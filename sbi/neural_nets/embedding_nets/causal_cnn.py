@@ -83,13 +83,13 @@ class CausalCNNEmbedding(nn.Module):
         assert isinstance(input_shape, Tuple), (
             "input_shape must be a Tuple of size 1, e.g. (timepoints,)."
         )
-        assert len(input_shape) == 1, "Currently only 1D causal CNNs are supported"
+        assert len(input_shape) == 1, "Currently only 1D causal CNNs are supported."
         self.input_shape = (in_channels, *input_shape)
 
         tot_timepoints = input_shape[0]
         assert tot_timepoints >= pool_kernel_size, (
             "Please ensure that the pool kernel size is not "
-            "larger than the number of observed timepoints"
+            "larger than the number of observed timepoints."
         )
         max_dil_exp = 10
         if dilation_per_layer is None:
@@ -123,9 +123,13 @@ class CausalCNNEmbedding(nn.Module):
                 out_channels_per_layer[-1],
                 int(tot_timepoints / pool_kernel_size),
             )
+            assert aggregator_out_shape[-1] > 1, (
+                "Your dimensionality is allready small,"
+                "Please ensure a larger input size or use a custom aggregator."
+            )
             non_causal_kernel_sizes = [
-                min(8, aggregator_out_shape[-1]),
-                min(4, int(aggregator_out_shape[-1] / 2)),
+                min(9, aggregator_out_shape[-1]),
+                min(5, int(aggregator_out_shape[-1] / 2)),
             ]
             non_causal_channel_sizes = [64, output_dim]
             non_causal_layers = []
@@ -137,7 +141,7 @@ class CausalCNNEmbedding(nn.Module):
                     out_channels=non_causal_channel_sizes[ll],
                     kernel_size=non_causal_kernel_sizes[ll],
                     stride=1,
-                    padding=1,
+                    padding='same',
                 )
                 maxpool = nn.AvgPool1d(
                     kernel_size=2 if aggregator_out_shape[-1] > 2 else 1
