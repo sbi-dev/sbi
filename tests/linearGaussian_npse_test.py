@@ -137,15 +137,15 @@ def _train_npse(
 
 @pytest.fixture
 def npse_trained_model(request):
+    num_simulations = 5_000
+    stop_after_epochs = 200
+    training_batch_size = 100
     test_case: NpseTestCase = request.param
     inference = NPSE(
         test_case.prior, sde_type=test_case.sde_type, show_progress_bars=True
     )
-    num_simulations = 5
-    stop_after_epochs = 1
     theta, x = test_case.get_training_data(num_simulations)
     inference.append_simulations(theta, x)
-    training_batch_size = x.shape[0]
     inference, score_estimator = _train_npse(
         test_case, num_simulations, stop_after_epochs, training_batch_size
     )
@@ -157,11 +157,11 @@ def npse_trained_model(request):
 @pytest.mark.parametrize("iid_method", iid_methods)
 @pytest.mark.parametrize("npse_trained_model", test_cases_all, indirect=True)
 def test_c2st(npse_trained_model, iid_method, sample_with):
+    num_samples = 1_000
     inference, score_estimator, test_case = npse_trained_model
     num_dim = test_case.num_dim
     sde_type = test_case.sde_type
     prior_str = test_case.prior_type
-    num_samples = 10
 
     posterior = inference.build_posterior(score_estimator, sample_with=sample_with)
     posterior.set_default_x(test_case.x_o)
@@ -190,7 +190,6 @@ def test_c2st(npse_trained_model, iid_method, sample_with):
 def test_kld_gaussian(npse_trained_model):
     # For the Gaussian prior, we compute the KLd between ground truth and
     # posterior.
-    num_samples = 10
     inference, score_estimator, test_case = npse_trained_model
     posterior = inference.build_posterior(score_estimator)
     posterior.set_default_x(test_case.x_o)
@@ -201,7 +200,6 @@ def test_kld_gaussian(npse_trained_model):
         test_case.likelihood_cov,
         test_case.prior_mean,
         test_case.prior_cov,
-        num_samples=num_samples,
     )
     max_dkl = 0.15
     assert dkl < max_dkl, (
