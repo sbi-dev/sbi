@@ -1,10 +1,18 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import sys
+
 import pytest
 import torch
 from torch import eye, ones, zeros
-from torch.distributions import Exponential, LogNormal, MultivariateNormal, Uniform
+from torch.distributions import (
+    Exponential,
+    LogNormal,
+    MultivariateNormal,
+    TransformedDistribution,
+    Uniform,
+)
 from torch.distributions.transforms import (
     AffineTransform,
     ExpTransform,
@@ -84,3 +92,23 @@ def test_mcmc_transform(prior, enable_transform):
 
     log_abs_det = tf.log_abs_det_jacobian(samples_original, unconstrained_samples)
     assert log_abs_det.shape == torch.Size([num_samples])
+
+
+@pytest.mark.xfail(
+    reason="Known issue in PyTorch https://github.com/pytorch/pytorch/issues/20682",
+    strict=False,
+)
+def test_transformed_dist_support():
+    """
+    Test whether the support of the transformed distribution is correct.
+    This is a known pytorch issue
+    SBI issue: https://github.com/sbi-dev/sbi/issues/738
+    PyTorch issue: https://github.com/pytorch/pytorch/issues/20682
+    """
+    base = Uniform(zeros(1), ones(1))
+    dist = TransformedDistribution(base, AffineTransform(zeros(1), ones(1)))
+    assert not dist.support.check(100 * ones(1)).item(), (
+        "Support check failed with python version={} and torch version={}".format(
+            sys.version, torch.__version__
+        )
+    )
