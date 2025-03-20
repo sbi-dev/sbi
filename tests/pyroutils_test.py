@@ -44,7 +44,9 @@ def pyro_gaussian_model(x_o=None, num_dim=None, num_trials=1, sigma_x=0.5):
     # Sample observations (batch shape: N, event shape: D)
     with pyro.plate("trials", num_trials):
         x = pyro.sample(
-            "x", dist.MultivariateNormal(theta, sigma_x**2 * torch.eye(num_dim)), obs=x_o
+            "x",
+            dist.MultivariateNormal(theta, sigma_x**2 * torch.eye(num_dim)),
+            obs=x_o,
         )
 
     if x_o is None:
