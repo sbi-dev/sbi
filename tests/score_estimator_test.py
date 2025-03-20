@@ -7,16 +7,13 @@ from typing import Tuple
 
 import pytest
 import torch
-
 from sbi.neural_nets.embedding_nets import CNNEmbedding
 from sbi.neural_nets.estimators.score_estimator import (
-    ConditionalScoreEstimator,
-    ImprovedScoreEstimator,
-)
+    ConditionalScoreEstimator, VPScoreEstimator)
 from sbi.neural_nets.net_builders import build_score_estimator
 
 
-@pytest.mark.parametrize("sde_type", ["vp", "ve", "subvp", "vp++"])
+@pytest.mark.parametrize("sde_type", ["vp", "ve", "subvp"])
 @pytest.mark.parametrize("input_sample_dim", (1, 2))
 @pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
 @pytest.mark.parametrize("condition_event_shape", ((1,), (7,)))
@@ -45,7 +42,7 @@ def test_score_estimator_loss_shapes(
 
 
 @pytest.mark.gpu
-@pytest.mark.parametrize("sde_type", ["vp", "ve", "subvp", "vp++"])
+@pytest.mark.parametrize("sde_type", ["vp", "ve", "subvp"])
 @pytest.mark.parametrize("device", ["cpu", "cuda"])
 def test_score_estimator_on_device(sde_type, device):
     """Test whether DensityEstimators can be moved to the device."""
@@ -67,7 +64,7 @@ def test_score_estimator_on_device(sde_type, device):
     assert str(loss.device).split(":")[0] == device, "Loss device mismatch."
 
 
-@pytest.mark.parametrize("sde_type", ["vp", "ve", "subvp", "vp++"])
+@pytest.mark.parametrize("sde_type", ["vp", "ve", "subvp"])
 @pytest.mark.parametrize("input_sample_dim", (1, 2))
 @pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
 @pytest.mark.parametrize("condition_event_shape", ((1,), (7,)))
@@ -158,19 +155,16 @@ def test_times_schedule():
     with pytest.raises(NotImplementedError):
         ConditionalScoreEstimator(id_net, inpt_shape, cond_shape)
 
-    ivpse = ImprovedScoreEstimator(id_net, inpt_shape, cond_shape)
-    exp = ivpse.device
-    times = ivpse.times_schedule(10)
+    vpse = VPScoreEstimator(id_net, inpt_shape, cond_shape)
+    exp = vpse.device
+    times = vpse.times_schedule(10)
     obs = times.device
 
     assert exp == obs
     assert times.shape == torch.Size((10,))
 
-    assert times[0, ...] != ivpse.t_min
-    assert times[-1, ...] != ivpse.t_max
-
-    assert torch.allclose(times.max(), torch.Tensor([ivpse.beta_max]))
-    assert torch.allclose(times.min(), torch.Tensor([ivpse.beta_min]))
+    assert times[0, ...] >= vpse.t_min
+    assert times[-1, ...] <= vpse.t_max
 
 
 def test_noise_schedule():
@@ -178,12 +172,14 @@ def test_noise_schedule():
     inpt_shape = (4,)
     cond_shape = (4,)
 
-    ivpse = ImprovedScoreEstimator(id_net, inpt_shape, cond_shape)
-    exp = ivpse.device
-    times = ivpse.times_schedule(10)
-    noise = ivpse.noise_schedule(times)
+    vpse = VPScoreEstimator(id_net, inpt_shape, cond_shape)
+    exp = vpse.device
+    times = vpse.times_schedule(10)
+    noise = vpse.noise_schedule(times)
     obs = noise.device
 
     assert exp == obs
     assert noise.shape == torch.Size((10,))
-    assert torch.allclose(times, noise)
+
+    assert noise[0, ...] >= vpse.beta_min
+    assert noise[-1, ...] <= vpse.beta_max
