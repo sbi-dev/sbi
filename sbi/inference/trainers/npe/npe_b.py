@@ -112,10 +112,10 @@ class NPE_B(PosteriorEstimator):
         for k, density in enumerate(self._proposal_roundwise):
             # we accept the k th proposal log prob to be -Inf at theta
             # meaning that theta is out of the k th proposal range
-            utils.assert_not_nan_or_plus_inf(
-                density.log_prob(theta), "proposal log probs of proposal samples"
-            )
             log_previous_proposals[:, k] = density.log_prob(theta)
+            utils.assert_not_nan_or_plus_inf(
+                log_previous_proposals[:, k], "proposal log probs of proposal samples"
+            )
 
         log_proposal = torch.logsumexp(log_prop + log_previous_proposals, dim=1)
         proposal = torch.exp(log_proposal)
@@ -126,4 +126,6 @@ class NPE_B(PosteriorEstimator):
 
         theta = reshape_to_sample_batch_event(theta, theta.shape[1:])
 
-        return importance_weights * self._neural_net.log_prob(theta, x)
+        posterior_log_probs = self._neural_net.log_prob(theta, x).squeeze(dim=0)
+
+        return importance_weights * posterior_log_probs
