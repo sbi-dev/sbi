@@ -7,18 +7,19 @@ from torch.distributions import Distribution
 from zuko.lazy import LazyDistribution
 
 NeuralODEFuncType = Callable[[Tensor, Tensor, Tensor], Tensor]
-NEURAL_ODE_FUNC_DOCS = """Neural ODE function that computes the time derivative.
-Must accept three arguments in the order:
-    - input (Tensor): The input state tensor
-    - condition (Tensor): The conditioning tensor
-    - time (Tensor): The time parameter tensor
-
-Returns:
-    Tensor: The computed time derivative
-"""
 
 
 class NeuralODE(LazyDistribution):
+    r"""
+    Base class for Neural ODEs that implements the LazyDistribution
+    interface by `zuko`. Given the condition :math:`x_o`,
+    it returns the distribution object with `log_prob` and
+    `sample` methods. These methods internally solve the ODE
+    for the provided function :math:`f(x_t, t, x_o)` and
+    track the log det Jacobian of the continuous flow when
+    calculating the `log_prob`.
+    """
+
     def __init__(
         self,
         f: NeuralODEFuncType,
@@ -29,6 +30,26 @@ class NeuralODE(LazyDistribution):
         t_max: float = 1.0,
         **kwargs,
     ):
+        r"""
+        Initialize the NeuralODE class.
+
+        Args:
+            f: The function to be integrated.
+                Must accept three arguments in the order:
+                    - input (Tensor): The input state tensor :math:`\theta_t`
+                    - condition (Tensor): The conditioning tensor :math:`x_o`
+                    - time (Tensor): The time parameter tensor :math:`t`
+            net: The neural network that is used by the function :math:`f`.
+                This is never called explicitly by the NeuralODE class,
+                but is used to track the parameters of the neural network.
+            mean_base: The mean of the base distribution.
+                Expected shape: (1, theta_dim).
+            std_base: The std of the base distribution.
+                Expected shape: (1, theta_dim).
+            t_min: The minimum time value for the ODE solver.
+            t_max: The maximum time value for the ODE solver.
+            **kwargs: Additional arguments for the ODE solver.
+        """
         super().__init__()
         self.f = f
         self.net = net

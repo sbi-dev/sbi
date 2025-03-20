@@ -20,12 +20,44 @@ class ZukoNeuralODE(NeuralODE):
         rtol: float = 1e-5,
         exact: bool = True,
     ) -> None:
+        r"""
+        Initialize the ZukoNeuralODE class.
+
+        Args:
+            f: The function to be integrated.
+                Must accept three arguments in the order:
+                    - input (Tensor): The input state tensor :math:`\theta_t`
+                    - condition (Tensor): The conditioning tensor :math:`x_o`
+                    - time (Tensor): The time parameter tensor :math:`t`
+            net: The neural network that is used by the function :math:`f`.
+                This is never called explicitly by the NeuralODE class,
+                but is used to track the parameters of the neural network.
+            mean_base: The mean of the base distribution.
+                Expected shape: (1, theta_dim).
+            std_base: The std of the base distribution.
+                Expected shape: (1, theta_dim).
+            t_min: The minimum time value for the ODE solver.
+            t_max: The maximum time value for the ODE solver.
+            atol: The absolute tolerance for the ODE solver.
+            rtol: The relative tolerance for the ODE solver.
+            exact: Whether to use the exact ODE solver.
+        """
+
         super().__init__(
-            f, net, mean_base, std_base, t_min, t_max, atol=atol, rtol=rtol, exact=exact
+            f,
+            net,
+            mean_base,
+            std_base,
+            t_min,
+            t_max,
         )
 
+        self.atol = atol
+        self.rtol = rtol
+        self.exact = exact
+
     def forward(self, condition: Tensor, **kwargs) -> Distribution:
-        ode_kwargs = dict(self.kwargs)
+        ode_kwargs = dict(atol=self.atol, rtol=self.rtol, exact=self.exact)
         ode_kwargs.update(kwargs)
 
         transform = FreeFormJacobianTransform(
