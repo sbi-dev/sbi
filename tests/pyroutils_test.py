@@ -55,6 +55,21 @@ def pyro_gaussian_model(x_o=None, num_dim=None, num_trials=1, sigma_x=0.5):
         return x_o
 
 
+@pytest.fixture
+def data_and_pyro_gaussian_mcmc_samples(num_dim, num_trials, num_samples, warmup_steps):
+    """Generate observed data and return MCMC samples from the true model."""
+    # Get data we will condition on
+    _, x_o = pyro_gaussian_model(num_trials=num_trials, num_dim=num_dim)
+
+    # Get MCMC samples from a model using the true likelihood
+    nuts_kernel = NUTS(pyro_gaussian_model)
+    mcmc = MCMC(nuts_kernel, num_samples=num_samples, warmup_steps=warmup_steps)
+    mcmc.run(x_o=x_o)
+    pyro_samples = mcmc.get_samples()["theta"]
+
+    return x_o, pyro_samples
+
+
 def test_unbounded_transform():
     prior_dim = 10
     prior_params = {
@@ -142,6 +157,8 @@ def test_estimator_distribution_basic_properties(
     assert estimator_dist_expanded.estimator == estimator_dist.estimator
 
 
+@pytest.mark.parametrize("num_samples", [500])
+@pytest.mark.parametrize("warmup_steps", [500])
 @pytest.mark.parametrize("num_dim", [3, 5])
 @pytest.mark.parametrize("num_trials", [1, 5])
 @pytest.mark.parametrize(
@@ -152,23 +169,17 @@ def test_estimator_distribution_basic_properties(
     ],
 )
 def test_pyro_gaussian_model(
+    data_and_pyro_gaussian_mcmc_samples,
     trainer_cls,
     distribution_cls,
     num_dim,
     num_trials,
     num_simulations=500,
-    num_samples=500,
-    warmup_steps=500,
+    num_samples,
+    warmup_steps,
 ):
     """Test consistency of MCMC samples between the true and estimated likelihood."""
-    # Get data we will condition on
-    _, x_o = pyro_gaussian_model(num_trials=num_trials, num_dim=num_dim)
-
-    # Get MCMC samples from a model using the true likelihood
-    nuts_kernel = NUTS(pyro_gaussian_model)
-    mcmc = MCMC(nuts_kernel, num_samples=num_samples, warmup_steps=warmup_steps)
-    mcmc.run(x_o=x_o)
-    pyro_samples = mcmc.get_samples()["theta"]
+    x_o, pyro_samples = data_and_pyro_gaussian_mcmc_samples
 
     # Simulated data from the true model and use it to train the estimator
     prior = single_level_prior_theta(num_dim=num_dim)
