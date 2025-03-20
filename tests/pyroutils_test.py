@@ -162,7 +162,7 @@ def test_pyro_gaussian_model(
     nuts_kernel = NUTS(pyro_gaussian_model)
     mcmc = MCMC(nuts_kernel, num_samples=num_samples, warmup_steps=warmup_steps)
     mcmc.run(x_o=x_o)
-    pyro_samples = torch.from_numpy(np.array(mcmc.get_samples()["theta"]))
+    pyro_samples = mcmc.get_samples()["theta"]
 
     # Simulated data from the true model and use it to train the estimator
     prior = single_level_prior_theta(num_dim=num_dim)
