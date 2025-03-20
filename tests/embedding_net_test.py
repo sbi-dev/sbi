@@ -9,7 +9,7 @@ from torch import Tensor, eye, ones, zeros
 from torch.distributions import MultivariateNormal
 
 from sbi import utils
-from sbi.inference import FMPE, NLE, NPE, NRE
+from sbi.inference import FMPE, NLE, NPE, NRE, simulate_for_sbi
 from sbi.neural_nets import classifier_nn, flowmatching_nn, likelihood_nn, posterior_nn
 from sbi.neural_nets.embedding_nets import (
     CNNEmbedding,
@@ -22,9 +22,14 @@ from sbi.simulators.linear_gaussian import (
     linear_gaussian,
     true_posterior_linear_gaussian_mvn_prior,
 )
-
+from sbi.utils.user_input_checks import (
+        check_sbi_inputs,
+        process_prior,
+        process_simulator,
+    )
 from .test_utils import check_c2st
 
+import math
 
 @pytest.mark.mcmc
 @pytest.mark.parametrize("method", ["NPE", "NLE", "NRE", "FMPE"])
@@ -371,43 +376,67 @@ def test_lru_embedding_net_isolated(
 def test_lru_pipeline():
     """Test an entire pipeline run using the LRU embedding."""
 
-    def _simulator(thetas: Tensor) -> Tensor:
+    def _simulator(thetas: Tensor, num_time_steps=500, dt = 0.002, eps=.05) -> Tensor:
         """Create a simple simulator for a one-mass dampened spring system."""
         assert thetas.shape[-1] == 3, "Expected 3 parameters: m, k, d"
-        num_time_steps = 200
-        dt = 0.002
-        eps = 1e-3
-
         init_state = torch.tensor([[0.2], [0.5]])
 
         xs = []
-        for theta in thetas:
-            # Create the matrices for the ODE, given the parameters.
-            m, k, d = theta
-            omega = torch.sqrt(k / m)  # eigen frequency [Hz]
-            zeta = d / (2.0 * torch.sqrt(m * k))  # damping ratio [-]
-            A = torch.tensor([[0, 1], [-(omega**2), -2.0 * zeta * omega]])
-            B = torch.tensor([[0], [1.0 / m]])
+        #for theta in thetas:
+        # Create the matrices for the ODE, given the parameters.
+        m, k, d = thetas
+        omega = torch.sqrt(k / m)  # eigen frequency [Hz]
+        zeta = d / (2.0 * torch.sqrt(m * k))  # damping ratio [-]
+        A = torch.tensor([[0, 1], [-(omega**2), -2.0 * zeta * omega]])
 
-            # Set a fixed initial position and velocity.
-            x = init_state.clone()
+        # Set a fixed initial position and velocity.
+        x = init_state.clone()
 
-            # Simulate.
-            for t in range(num_time_steps):
-                # Make some force act on the mass.
-                if t < num_time_steps // 2:
-                    u = torch.tensor([[-5.0]])
-                else:
-                    u = torch.tensor([[2.0]])
+        # Simulate.
+        for t in range(num_time_steps):
 
-                # Compute the ODE's right hand side.
-                x_dot = A @ x + B @ u
+            # Compute the ODE's right hand side.
+            x_dot = A @ x
 
-                # Integrate one step (forward Euler).
-                x = x + x_dot * dt + eps * torch.randn((2, 1))
-                xs.append(x.T.clone())
+            # Integrate one step (forward Euler Maruyama).
+            x = x + x_dot * dt + eps * math.sqrt(dt) * torch.randn((2, 1))
+            xs.append(x.T.clone())
 
         return torch.cat(xs, dim=0)
+    traj = _simulator(torch.tensor([1.0, 15.0, 0.7]))
+    assert traj.shape == (500, 2)
 
-    traj = _simulator(torch.tensor([[1.0, 15.0, 0.7]]))
-    assert traj.shape == (200, 2)
+    # embedding
+    embedding_net = LRUEmbedding(
+        input_dim=2,
+        output_dim=3,
+        
+    )
+
+    # set prior distribution for the parameters
+    prior = utils.BoxUniform(
+        low=torch.tensor([0.4, 10.0, 0.5]), high=torch.tensor([2.0, 20.0, 1.0])
+    )
+
+    # make a SBI-wrapper on the simulator object for compatibility
+    prior, num_parameters, prior_returns_numpy = process_prior(prior)
+    simulator_wrapper = process_simulator(_simulator, prior, prior_returns_numpy)
+    check_sbi_inputs(simulator_wrapper, prior)
+
+    # instantiate the neural density estimator
+    neural_posterior = posterior_nn(model="maf", embedding_net=embedding_net)
+
+    # setup the inference procedure with NPE
+    inferer = NPE(prior=prior, density_estimator=neural_posterior)
+
+    # run the inference procedure on one round and 10000 simulated data points
+    theta, x = simulate_for_sbi(simulator_wrapper, prior, num_simulations=10)
+    density_estimator = inferer.append_simulations(theta, x).train(training_batch_size=5,max_num_epochs=3)
+    posterior = inferer.build_posterior(density_estimator)
+    
+    # generate posterior samples
+    true_parameter = torch.tensor([.5, 15.0, 0.7])
+    x_observed = _simulator(true_parameter)
+    samples = posterior.set_default_x(x_observed).sample((10,))
+        
+    assert samples.shape == (10, 3)
