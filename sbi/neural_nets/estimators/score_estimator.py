@@ -6,10 +6,9 @@ from math import exp, pi
 from typing import Callable, Optional, Union
 
 import torch
+from sbi.neural_nets.estimators.base import ConditionalVectorFieldEstimator
 from scipy import stats
 from torch import Tensor, nn
-
-from sbi.neural_nets.estimators.base import ConditionalVectorFieldEstimator
 
 
 class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
@@ -129,13 +128,14 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         std = self.approx_marginal_std(time)
 
         # As input to the neural net we want to have something that changes proportianl
-        # to how the scores change
+        # to how the scores change (a la c_noise in edm)
         time_enc = self.std_fn(time)
 
-        # Time dependent z-scoring! Keeps input at similar scales
+        # Time dependent z-scoring! Keeps input at similar scales (c_in in edm)
         input_enc = (input - mean) / std
 
-        # Approximate score becoming exact for t -> t_max, "skip connection" (c_skip in edm)
+        # Approximate score becoming exact for t -> t_max, "skip connection"
+        # (a la c_skip in edm)
         score_gaussian = (input - mean) / std**2
 
         # Score prediction by the network
@@ -145,6 +145,7 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         # The learnable part will be largly scaled at the beginning of the diffusion
         # and the gaussian part (where it should end up) will dominate at the end of
         # the diffusion.
+        # (a la c_out in edm)
         scale = self.mean_t_fn(time) / self.std_fn(time)
         output_score = -scale * score_pred - score_gaussian
 
@@ -416,14 +417,8 @@ class VPScoreEstimator(ConditionalScoreEstimator):
         mean_0: Union[Tensor, float] = 0.0,
         std_0: Union[Tensor, float] = 1.0,
         t_min: float = 1e-5,
-        t_max: float = 1.0,
-        pmean: float = 1.2,
-        pstd: float = -1.2,
+        t_max: float = 1.0
     ) -> None:
-        self.pmean, self.pstd = pmean, pstd
-        noise_dist = stats.norm(pmean, pstd**2)
-        self.beta_min = exp(noise_dist.ppf(0.01))
-        self.beta_max = exp(noise_dist.ppf(0.99))
 
         super().__init__(
             net,
@@ -515,6 +510,7 @@ class ImprovedScoreEstimator(ConditionalScoreEstimator):
         weight_fn: Union[str, Callable] = "max_likelihood",
         beta_min: float = 0.002,  # sigma_min in the paper
         beta_max: float = 80.0,  # sigma_max in the paper
+        beta_data: float = .5, #sigma_data in the paper
         mean_0: Union[Tensor, float] = 0.0,
         std_0: Union[Tensor, float] = 1.0,
         t_min: float = 1e-5,  # will be ignored due to EDM setup
@@ -523,12 +519,15 @@ class ImprovedScoreEstimator(ConditionalScoreEstimator):
         pstd: float = 1.2,  # std of noise scheme for training
         sigma_data: float = 0.5,
     ) -> None:
+
+
+        #TODO: store sigma values for training in extra field
         self.pmean, self.pstd = pmean, pstd
         noise_dist = stats.norm(pmean, pstd**2)
-
         self.sigma_min = exp(noise_dist.ppf(0.01))
         self.sigma_max = exp(noise_dist.ppf(0.99))
 
+        self.beta_data = beta_data #sigma data from edm paper
         self.rho = 7
 
         super().__init__(
@@ -546,34 +545,33 @@ class ImprovedScoreEstimator(ConditionalScoreEstimator):
 
     def mean_t_fn(self, times: Tensor) -> Tensor:
         """Conditional mean function for EDM-style DMs.
+        This is required to model c_in.
+
         Args:
             times: time variable in [0,1].
 
         Returns:
             Conditional mean at a given time.
         """
-        phi = torch.exp(
-            -0.25 * times**2.0 * (self.beta_max - self.beta_min)
-            - 0.5 * times * self.beta_min
-        )
+        noise = self.noise_schedule(times)
+        phi = 1./torch.sqrt(noise**2 + self.beta_data**2)
         for _ in range(len(self.input_shape)):
             phi = phi.unsqueeze(-1)
         return phi
 
     def std_fn(self, times: Tensor) -> Tensor:
         """Standard deviation function for EDM style DMs.
+        This is akin to c_noise in the network/precond parametrisation.
         Args:
             times: time variable in [0,1].
 
         Returns:
             Standard deviation at a given time.
         """
-        std = 1.0 - torch.exp(
-            -0.5 * times**2.0 * (self.beta_max - self.beta_min) - times * self.beta_min
-        )
+        std = .25*torch.log(times)
         for _ in range(len(self.input_shape)):
             std = std.unsqueeze(-1)
-        return torch.sqrt(std)
+        return std
 
     def drift_fn(self, input: Tensor, times: Tensor) -> Tensor:
         """Drift function for variance preserving SDEs.
