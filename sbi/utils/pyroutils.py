@@ -52,7 +52,6 @@ class EstimatorDistribution(pyro.distributions.TorchDistribution):
         condition_shape, event_shape = self.get_condition_and_event_shapes()
         self._check_condition_shape(condition)
         self._condition = condition
-        self._condition_reshaped = condition.reshape(-1, *condition_shape)
         super().__init__(
             batch_shape=condition.shape[: -len(condition_shape)],
             event_shape=event_shape,
@@ -95,22 +94,11 @@ class EstimatorDistribution(pyro.distributions.TorchDistribution):
                     f"estimator condition shape {condition_shape}"
                 )
 
-    def expand(self, batch_shape: torch.Size, _instance=None):
-        """Expand the batch shape of the distribution."""
-        # because batch shape of the distribution is entirely determined by the
-        # condition, we only need to expand the condition
-        condition_shape, _ = self.get_condition_and_event_shapes()
-        condition = self.condition.expand(*batch_shape, *condition_shape)
-        return type(self)(self.estimator, condition)
-
 
 class ConditionalDensityEstimatorDistribution(EstimatorDistribution):
     """
     A conditioned `sbi` estimator wrapped as a Pyro distribution.
     """
-
-    def get_condition_and_event_shapes(self) -> Tuple[torch.Size, torch.Size]:
-        return self.estimator.condition_shape, self.estimator.input_shape
 
     def __init__(self, estimator: ConditionalDensityEstimator, condition: torch.Tensor):
         """
@@ -121,11 +109,12 @@ class ConditionalDensityEstimatorDistribution(EstimatorDistribution):
             condition: The conditioning parameter for the estimator.
         """
         super().__init__(estimator, condition)
+        self._condition_reshaped = self.condition.reshape(
+            -1, *self.estimator.condition_shape
+        )
 
-    def _estimator_log_prob(
-        self, x: torch.Tensor, condition: torch.Tensor
-    ) -> torch.Tensor:
-        return self.estimator.log_prob(x, condition=condition)
+    def get_condition_and_event_shapes(self) -> Tuple[torch.Size, torch.Size]:
+        return self.estimator.condition_shape, self.estimator.input_shape
 
     def log_prob(self, x: torch.Tensor) -> torch.Tensor:
         """Compute log probability of `x`."""
@@ -144,6 +133,15 @@ class ConditionalDensityEstimatorDistribution(EstimatorDistribution):
         draws = self.estimator.sample(sample_shape, condition=self._condition_reshaped)
         # reshape (batch_dim,) -> batch_shape
         return draws.reshape(*sample_shape, *self.batch_shape, *self.event_shape)
+
+    def expand(
+        self, batch_shape: torch.Size, _instance=None
+    ) -> "ConditionalDensityEstimatorDistribution":
+        """Expand the batch shape of the distribution."""
+        # because batch shape of the distribution is entirely determined by the
+        # condition, we only need to expand the condition
+        condition = self.condition.expand(*batch_shape, *self.estimator.condition_shape)
+        return ConditionalDensityEstimatorDistribution(self.estimator, condition)
 
 
 class RatioEstimatorDistribution(EstimatorDistribution):
@@ -174,3 +172,12 @@ class RatioEstimatorDistribution(EstimatorDistribution):
         )
         lp = self.estimator.unnormalized_log_ratio(theta=condition, x=x)
         return lp
+
+    def expand(
+        self, batch_shape: torch.Size, _instance=None
+    ) -> "RatioEstimatorDistribution":
+        """Expand the batch shape of the distribution."""
+        # because batch shape of the distribution is entirely determined by the
+        # condition, we only need to expand the condition
+        condition = self.condition.expand(*batch_shape, *self.estimator.theta_shape)
+        return RatioEstimatorDistribution(self.estimator, condition)
