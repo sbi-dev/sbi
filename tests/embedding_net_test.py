@@ -378,44 +378,47 @@ def test_lru_pipeline():
 
     def _simulator(thetas: Tensor, num_time_steps=500, dt = 0.002, eps=.05) -> Tensor:
         """Create a simple simulator for a one-mass dampened spring system."""
-        assert thetas.shape[-1] == 3, "Expected 3 parameters: m, k, d"
+        assert thetas.shape[-1] == 2, "Expected 2 parameters: k, d"
         init_state = torch.tensor([[0.2], [0.5]])
 
         xs = []
         #for theta in thetas:
         # Create the matrices for the ODE, given the parameters.
-        m, k, d = thetas
+        k, d = thetas
+        m = 1.0
         omega = torch.sqrt(k / m)  # eigen frequency [Hz]
         zeta = d / (2.0 * torch.sqrt(m * k))  # damping ratio [-]
         A = torch.tensor([[0, 1], [-(omega**2), -2.0 * zeta * omega]])
+        B = torch.tensor([[0], [1.0 / m]])
 
         # Set a fixed initial position and velocity.
         x = init_state.clone()
+        u = torch.tensor([[1.3]])
 
         # Simulate.
         for t in range(num_time_steps):
 
             # Compute the ODE's right hand side.
-            x_dot = A @ x
+            x_dot = A @ x + B @ u
 
             # Integrate one step (forward Euler Maruyama).
             x = x + x_dot * dt + eps * math.sqrt(dt) * torch.randn((2, 1))
             xs.append(x.T.clone())
 
         return torch.cat(xs, dim=0)
-    traj = _simulator(torch.tensor([1.0, 15.0, 0.7]))
+    traj = _simulator(torch.tensor([15.0, 0.7]))
     assert traj.shape == (500, 2)
 
     # embedding
     embedding_net = LRUEmbedding(
         input_dim=2,
-        output_dim=3,
+        output_dim=2,
         
     )
 
     # set prior distribution for the parameters
     prior = utils.BoxUniform(
-        low=torch.tensor([0.4, 10.0, 0.5]), high=torch.tensor([2.0, 20.0, 1.0])
+        low=torch.tensor([10.0, 0.5]), high=torch.tensor([20.0, 1.0])
     )
 
     # make a SBI-wrapper on the simulator object for compatibility
@@ -435,8 +438,9 @@ def test_lru_pipeline():
     posterior = inferer.build_posterior(density_estimator)
     
     # generate posterior samples
-    true_parameter = torch.tensor([.5, 15.0, 0.7])
+    true_parameter = torch.tensor([15.0, 0.7])
     x_observed = _simulator(true_parameter)
     samples = posterior.set_default_x(x_observed).sample((10,))
         
-    assert samples.shape == (10, 3)
+    assert samples.shape == (10, 2)
+test_lru_pipeline()
