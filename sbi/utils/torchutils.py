@@ -15,7 +15,7 @@ from sbi.sbi_types import Array, OneOrMore
 from sbi.utils.typechecks import is_nonnegative_int, is_positive_int
 
 
-def process_device(device: Union[str, torch.device]) -> Union[str, torch.device]:
+def process_device(device: Union[str, torch.device]) -> str:
     """Set and return the default device to cpu or gpu (cuda, mps).
 
     Args:
@@ -52,6 +52,8 @@ def process_device(device: Union[str, torch.device]) -> Union[str, torch.device]
         # Else, check whether the custom device is valid.
         else:
             check_device(device)
+            if isinstance(device, torch.device):
+                device = device.type
 
         return device
 
