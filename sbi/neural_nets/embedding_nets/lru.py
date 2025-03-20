@@ -9,7 +9,9 @@ from torch._higher_order_ops.associative_scan import associative_scan
 
 class LRUEmbedding(nn.Module):
     """Embedding network backed by a stack of Linear Recurrent Unit (LRU) blocks.
-    Each LRU block is comprised of an LRU net
+
+    Each LRU block is comprised of an `LRU` instance surrounded by input normalization,
+    dropout, nonlinearities, state mixing, and a skip connection.
 
     See also:
         A. Orvieto et al. 2023, https://arxiv.org/pdf/2303.06349
@@ -20,12 +22,13 @@ class LRUEmbedding(nn.Module):
         input_dim: int,
         output_dim: int,
         state_dim: int = 20,
-        hidden_dim: int = 20,
+        hidden_dim: int = 40,
         num_blocks: int = 2,
         r_min=0.0,
         r_max=1.0,
-        max_phase=2 * np.pi,
+        phase_max=2 * np.pi,
         bidirectional: bool = False,
+        mode: str = "loop",
         dropout: float = 0.0,
         apply_input_normalization: bool = False,
         aggregate_func: [str, callable] = "last_step",
@@ -39,6 +42,11 @@ class LRUEmbedding(nn.Module):
             state_dim: Dimensionality of the LRU layers hidden state.
             hidden_dim: Number of hidden units in each layer of the embedding network.
             num_blocks: Number of LRU blocks in the embedding network.
+            r_min: Minimum distance of the state-dynamics matrix' eigenvalues from
+                the origin in the complex plane.
+            r_max: Maximum distance of the state-dynamics matrix' eigenvalues from
+                the origin in the complex plane. Must be `< 1` to yield a stable system.
+            phase_max: For longer sequences, a smaller value is advised, e.g. `< pi/10`
         """
         super().__init__()
 
@@ -51,8 +59,9 @@ class LRUEmbedding(nn.Module):
                 state_dim=state_dim,
                 r_min=r_min,
                 r_max=r_max,
-                max_phase=max_phase,
+                phase_max=phase_max,
                 bidirectional=bidirectional,
+                mode=mode,
                 dropout=dropout,
                 apply_input_normalization=apply_input_normalization,
             )
@@ -69,36 +78,33 @@ class LRUEmbedding(nn.Module):
         else:
             self.aggregation = aggregate_func
 
-        self.output = nn.Linear(hidden_dim, output_dim)
+        self.output_linear = nn.Linear(hidden_dim, output_dim)
 
-    def forward(self, x: Tensor) -> Tensor:
+    def forward(self, input: Tensor) -> Tensor:
         """Embed a batch of 2-dim observations, e.g. a multi-dimensional
         time series.
 
         Args:
-            x: Input tensor (batch_size, len_sequence, num_features)
+            input: Sequential data, i.e., observations, of shape (batch_size,
+                len_sequence, input_dim)
 
         Returns:
-            Network output (batch_size, output_dim).
+            Network output, i.e., features, of shape (batch_size, output_dim).
         """
-        x = self.linear_input(x)
-        x = self.lru_blocks(x)  # (batch_size, len_sequence, output_dim)
-
-        # Pooling
-        x = self.aggregation(x)
-
-        # output embedding
-        x = self.output(x)
-        return x
+        output = self.linear_input(input)  # (batch_size, len_sequence, hidden_dim)
+        output = self.lru_blocks(output)  # (batch_size, len_sequence, hidden_dim)
+        output = self.aggregation(output)  # (batch_size, hidden_dim)
+        output = self.output_linear(output)  # (batch_size, output_dim)
+        return output
 
 
 class LRUBlock(nn.Module):
-    """
+    """Stack of layers surrounding a `LRU`.
 
     Note:
-        The `LRUBlock` class is intended to be used with a preceding and succeeding
-        linear layers which take care of converting the dimensions such that all
-        LRU blocks can be stacked without intermediate linear layers.
+        The `_LRUBlock` class is intended to be used with a preceding and succeeding
+        linear layers which take care of converting the dimensions such that all LRU
+        blocks can be stacked without intermediate linear layers.
 
     See also:
         The `SequenceLayer` class in
@@ -111,8 +117,9 @@ class LRUBlock(nn.Module):
         state_dim: int,
         r_min: float,
         r_max: float,
-        max_phase: float,
+        phase_max: float,
         bidirectional: bool,
+        mode: str,
         dropout: float,
         apply_input_normalization: bool,
     ):
@@ -127,8 +134,9 @@ class LRUBlock(nn.Module):
             state_dim=state_dim,
             r_min=r_min,
             r_max=r_max,
-            max_phase=max_phase,
+            phase_max=phase_max,
             bidirectional=bidirectional,
+            mode=mode,
         )
         self.dropout = nn.Dropout(dropout)
         self.nonlinearity = nn.SiLU()  # could also use another one here
@@ -142,6 +150,10 @@ class LRUBlock(nn.Module):
 
         Args:
             inputs: Sequential data of shape (batch_size, sequence_length,
+                hidden_dim)
+
+        Returns:
+            Transformed sequential data of shape (batch_size, sequence_length,
                 hidden_dim)
         """
         y = self.input_norm(input)
@@ -158,10 +170,17 @@ class LRUBlock(nn.Module):
 class LRU(nn.Module):
     """A single Linear Recurrent Unit (LRU).
 
-    This implementation, just like all other, makes the simplification
-    that `output_dim = input_dim`. The benefit is that you can stack
-    multiple LRU instances without linear layers in between, and the
-    skip connections `D` become element-wise, i.e., `D` is a vector.
+    This implementation, just like the others, makes the simplification that
+    `output_dim = input_dim`. The benefit is that you can stack multiple LRU
+    instances without linear layers in between, and the skip connections `D`
+    become element-wise, i.e., `D` is a vector.
+
+    For the bidirectional mode, we flit the inputs and the resulting states/outputs.
+    This is in line with how the authors of
+    https://arxiv.org/pdf/2202.09729
+    are doing it. This is not the same as scipy's `filtfilt` though, as we are not
+    flipping the outputs and running the same process again, i.e., here it is done
+    sequentially and not in parallel.
     """
 
     def __init__(
@@ -170,26 +189,36 @@ class LRU(nn.Module):
         state_dim: int,
         r_min: float,
         r_max: float,
-        max_phase: float,
+        phase_max: float,
         bidirectional: bool,
+        mode: str,
     ):
         super().__init__()
-        self.bidirectional = bidirectional
-        # between r_min and r_max, with phase in [0, max_phase].
-        self.state_dim = state_dim
 
+        # Check and store the inputs.
+        if not isinstance(input_dim, int) or input_dim <= 0:
+            raise ValueError("input_dim must be a positive integer.")
+        if not isinstance(state_dim, int) or input_dim <= 0:
+            raise ValueError("state_dim must be a positive integer.")
+        if not (0 <= r_min < r_max <= 1):
+            raise ValueError(
+                f"Invalid {r_min=} and/or {r_max=}. They must suffice "
+                "0 <= r_min < r_max <= 1"
+            )
+        self.state_dim = state_dim
+        self.bidirectional = bidirectional
+        self.mode = mode
         if bidirectional:
             state_dim = state_dim * 2
 
         # Sample two independent random variables to initialize lambda between
         # two rings (r_min, r_max) on the complex plane.
         # See Lambda 3.2 in the paper.
-        u1 = torch.rand(size=(state_dim,))
-        u2 = torch.rand(size=(state_dim,))
-        self.log_nu = nn.Parameter(
-            torch.log(-0.5 * torch.log(u1 * (r_max**2 - r_min**2) + r_min**2))
-        )
-        self.log_theta = nn.Parameter(torch.log(max_phase * u2))
+        r_unit_sample = torch.rand(size=(state_dim,))
+        r_init = r_unit_sample * (r_max**2 - r_min**2) + r_min**2
+        self.log_nu = nn.Parameter(torch.log(-0.5 * torch.log(r_init)))
+        theta_init = phase_max * torch.rand(size=(state_dim,))
+        self.log_theta = nn.Parameter(torch.log(theta_init))
 
         # Create the Glorot-initialized projection matrices.
         B_re = torch.randn(size=(state_dim, input_dim)) / sqrt(2 * input_dim)
@@ -222,18 +251,20 @@ class LRU(nn.Module):
         return torch.exp(self.log_gamma)
 
     def forward(
-        self, input: Tensor, state: Optional[Tensor] = None, mode: str = "loop"
+        self, input: Tensor, state: Optional[Tensor] = None, mode: Optional[str] = None
     ) -> Tensor:
         """Run the forward pass.
 
         Args:
             input: Sequential data of shape (batch_size, sequence_length,
                 input_dim)
-            state: Initial hidden state of the LRU, if `None`, it will be
-                initialized to a complex zero tensor of the expected shape.
-            mode: Whether to run the forward pass in a for-loop or using an
-                associative scan. The former one is the naive implementation
-                while the latter one relies on very recent features of PyTorch.
+            state: Initial hidden state of the LRU, if `None`, it will be initialized
+                to a complex zero tensor of the expected shape.
+            mode: Whether to run the forward pass in a for-loop `"loop"` or using an
+                associative scan `"scan"`. The former one is the naive implementation
+                while the latter one relies on very recent features of PyTorch. If
+                set to `None` (default) the forward pass will use the mode given at
+                initialization.
 
         Return:
             Transformed sequential data of shape (batch_size, sequence_length,
@@ -258,12 +289,14 @@ class LRU(nn.Module):
                 "expected {expected_state_shape}"  # fmt: skip
             )
 
+        # Detemine which mode to run the forward method with.
+        mode = mode or self.mode
         match mode:
             case "scan":
-                y = self._forward_scan(input, state)
+                output = self._forward_scan(input, state)
             case "loop":
-                y = self._forward_loop(input, state)
-        return y
+                output = self._forward_loop(input, state)
+        return output
 
     def _forward_loop(self, input: Tensor, state: Tensor) -> Tensor:
         """Straightforward implementation of the forward pass.
@@ -306,7 +339,8 @@ class LRU(nn.Module):
             x.append(x_t)
         x = torch.stack(x, dim=1)
 
-        if self.bidirectional:  # TODO do the states need to be flipped in the end?
+        # Reverse the temporal oder of the 2nd block, i.e., 2nd direction.
+        if self.bidirectional:
             x = torch.cat(
                 [
                     x[:, :, : self.state_dim],
@@ -315,6 +349,7 @@ class LRU(nn.Module):
                 dim=-1,
             )
 
+        # Compute the output (for both directions at the same time).
         y = (x @ self.C.mT).real + input * self.D
 
         return y
