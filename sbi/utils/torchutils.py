@@ -61,7 +61,7 @@ def gpu_available() -> bool:
     return torch.cuda.is_available() or torch.backends.mps.is_available()
 
 
-def check_device(device: str) -> None:
+def check_device(device: Union[str, torch.device]) -> None:
     """Check whether the device is valid.
 
     Args:
