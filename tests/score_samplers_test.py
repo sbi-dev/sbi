@@ -85,20 +85,39 @@ def test_score_fn_iid_on_different_priors(sde_type, iid_method, num_dim):
 @pytest.mark.parametrize(
     "guidance_method",
     [
-        "affine_classifier_free",
+        ("affine_classifier_free", {"likelihood_scale": 0.1}),
+        ("affine_classifier_free", {"likelihood_scale": 10.0, "prior_scale": 1.0}),
+        (
+            "affine_classifier_free",
+            {
+                "likelihood_scale": 0.1,
+                "prior_scale": 1.0,
+                "prior_shift": 1.0,
+                "likelihood_shift": 1.0,
+            },
+        ),
+        ("universal", {"guidance_fn": lambda x, t, y, z: x}),
+        (
+            "universal",
+            {
+                "guidance_fn": lambda x, t, y, z: x + 1.0,
+                "guidance_fn_score": lambda x, t, y, z: x,
+            },
+        ),
+        ("interval", {"lower_bound": 0.0, "upper_bound": 1.0}),
+        ("interval", {"lower_bound": None, "upper_bound": 1.0}),
+        ("interval", {"lower_bound": -1.0, "upper_bound": None}),
     ],
 )
 @pytest.mark.parametrize("num_dim", [1, 2, 3])
-def test_score_fn_guidance(sde_type, guidance_method, num_dim):
+def test_score_fn_guidance_general(sde_type, guidance_method, num_dim):
     """ """
     mean0 = torch.zeros(num_dim)
     std0 = torch.ones(num_dim)
     score_fn = _build_gaussian_score_estimator(sde_type, (num_dim,), mean0, std0)
-    x_o = torch.ones((
-        1,
-        1,
-    ))
-    score_fn.set_x(x_o, guidance_method=guidance_method)
+    x_o = torch.ones((1, 1))
+    guidance_name, guidance_params = guidance_method
+    score_fn.set_x(x_o, guidance_method=guidance_name, guidance_params=guidance_params)
     inputs = torch.ones((1, 1, num_dim))
     time = torch.ones(1)
 

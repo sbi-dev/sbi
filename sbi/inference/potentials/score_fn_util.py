@@ -173,9 +173,7 @@ class AffineClassifierFreeGuidance(ScoreAdaptation):
         posterior_score = self.score_estimator(
             input=input, condition=condition, time=time
         )
-        print(input.shape)
         prior_score = self.marginal_prior_score(input, time)
-        print(posterior_score.shape, prior_score.shape)
         ll_score = posterior_score - prior_score
         ll_score_mod = ll_score * self.likelihood_scale + self.likelihood_shift
         prior_score_mod = prior_score * self.prior_scale + self.prior_shift
@@ -184,60 +182,11 @@ class AffineClassifierFreeGuidance(ScoreAdaptation):
 
 
 @dataclass
-class ImpaintGuidanceCfg:
-    conditioned_indices: list[int]
-    imputed_value: float | Tensor
-
-
-@register_guidance_method("impaint", ImpaintGuidanceCfg)
-class ImpaintGuidance(ScoreAdaptation):
-    def __init__(
-        self,
-        score_estimator: ConditionalScoreEstimator,
-        prior: Optional[Distribution],
-        cfg: ImpaintGuidanceCfg,
-        device: str = "cpu",
-    ):
-        """This class manages manipulating the score estimator to impute values for
-        certain indices of the input.
-
-        Args:
-            score_estimator: The score estimator.
-            prior: The prior distribution.
-            cfg: Configuration for the impaint guidance.
-            device: The device on which to evaluate the potential.
-        """
-        self.conditioned_indices = torch.tensor(cfg.conditioned_indices, device=device)
-        self.imputed_value = torch.tensor(cfg.imputed_value, device=device)
-        super().__init__(score_estimator, prior, device)
-
-    def __call__(self, input: Tensor, condition: Tensor, time: Optional[Tensor] = None):
-        if time is None:
-            time = torch.tensor([self.score_estimator.t_min])
-
-        noise = torch.randn_like(self.imputed_value)
-        m = self.score_estimator.mean_t_fn(time)
-        std = self.score_estimator.std_fn(time)
-        imputed_value_t = m * self.imputed_value + std * noise
-
-        input = input.clone()
-        input[..., self.conditioned_indices] = imputed_value_t
-
-        score = self.score_estimator(input, condition, time)
-
-        # Set score to zero for the conditioned indices
-        score[..., self.conditioned_indices] = 0.0
-
-        return score
-
-
-@dataclass
 class UniversalGuidanceCfg:
     guidance_fn: Callable[[Tensor, Tensor, Tensor, Tensor], Tensor]
     guidance_fn_score: Optional[Callable[[Tensor, Tensor, Tensor, Tensor], Tensor]] = (
         None
     )
-
 
 @register_guidance_method("universal", UniversalGuidanceCfg)
 class UniversalGuidance(ScoreAdaptation):
@@ -295,8 +244,8 @@ class UniversalGuidance(ScoreAdaptation):
 class IntervalGuidanceCfg:
     lower_bound: Optional[Union[float, Tensor]]
     upper_bound: Optional[Union[float, Tensor]]
-    scale_factor: float = 0.1
-
+    mask: Optional[Tensor] = None
+    scale_factor: float = 0.5
 
 @register_guidance_method("interval", IntervalGuidanceCfg)
 class IntervalGuidance(UniversalGuidance):
@@ -317,10 +266,29 @@ class IntervalGuidance(UniversalGuidance):
         """
 
         def interval_fn(input, condition, m, std):
+            if cfg.lower_bound is None and cfg.upper_bound is None:
+                raise ValueError(
+                    "At least one of lower_bound or upper_bound is required. Otherwise"
+                    " the guidance function has no effect."
+                )
+
             scale = cfg.scale_factor / (m**2 * std**2)
-            return F.logsigmoid(scale * (input - cfg.upper_bound)) + F.logsigmoid(
-                -scale * (input - cfg.lower_bound)
+            upper_bound = (
+                F.logsigmoid(scale * (input - cfg.upper_bound))
+                if cfg.upper_bound is not None
+                else torch.zeros_like(input)
             )
+            lower_bound = (
+                F.logsigmoid(-scale * (input - cfg.lower_bound))
+                if cfg.lower_bound is not None
+                else torch.zeros_like(input)
+            )
+            out = upper_bound + lower_bound
+            if cfg.mask is not None:
+                if cfg.mask.shape != out.shape:
+                    cfg.mask = cfg.mask.unsqueeze(0).expand_as(out)
+                out = torch.where(cfg.mask, out, torch.zeros_like(out))
+            return out
 
         super().__init__(
             score_estimator,
