@@ -21,13 +21,13 @@ def get_distribution_parameters(
     # matrix from covariance, and stores it in the arg_constraints.
     # When reinstantiating, we must provide only one of them.
     if isinstance(dist, torch.distributions.MultivariateNormal):
-        params['precision_matrix'] = None
-        params['scale_tril'] = None
+        params["precision_matrix"] = None
+        params["scale_tril"] = None
     # torch.distributions.MultivariateNormal calculates logits
     # from probabilities, and stores it in the arg_constraints.
     # When reinstantiating, we must provide only one of them.
     elif isinstance(dist, torch.distributions.Binomial):
-        params['logits'] = None
+        params["logits"] = None
     return params
 
 
