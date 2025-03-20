@@ -10,6 +10,7 @@ from torch import Tensor, nn
 
 # TODO: add code reference
 
+
 # Class that can perform Fourier trafo for non-equally spaced grids
 class VFT:
     def __init__(self, batch_size, n_points, modes, n_positions):
@@ -18,22 +19,25 @@ class VFT:
         self.modes = modes
 
         if n_positions is not None:
-
             # Only works if positions are the same for all data samples
-            # TODO: if n_positions is a list, do we need to transform it to an array before we can do this?
-            new_times = (n_positions.repeat(self.batch_size, 1) / n_positions.max())[:, None, :]
+            n_positions = torch.tensor(n_positions)
+            new_times = (n_positions.repeat(self.batch_size, 1) / n_positions.max())[
+                :, None, :
+            ]
         else:
-            new_times = ((torch.arange(self.number_points) / self.number_points).repeat(
-                self.batch_size, 1
-            ))[:, None, :]
+            new_times = (
+                (torch.arange(self.number_points) / self.number_points).repeat(
+                    self.batch_size, 1
+                )
+            )[:, None, :]
 
         self.new_times = new_times * 2 * np.pi
 
         self.X_ = torch.arange(modes).repeat(self.batch_size, 1)[:, :, None].float()
-        self.V_fwd, self.V_inv = self.make_matrix() # V_fwd: (batch, modes, points) V_inf: (batch, points, modes)
+        # V_fwd: (batch, modes, points) V_inf: (batch, points, modes)
+        self.V_fwd, self.V_inv = self.make_matrix()
 
     def make_matrix(self):
-
         X_mat = torch.bmm(self.X_, self.new_times)
         forward_mat = torch.exp(-1j * (X_mat))
 
@@ -44,7 +48,9 @@ class VFT:
     def forward(self, data, norm='forward'):
         # data has shape: (batch_size, n_points, conv_channel)
 
-        data_fwd = torch.bmm(self.V_fwd, data) # data_fwd: (batch, modes, conv_channels)
+        data_fwd = torch.bmm(
+            self.V_fwd, data
+        )  # data_fwd: (batch, modes, conv_channels)
         if norm == 'forward':
             data_fwd /= self.number_points
         elif norm == 'ortho':
@@ -55,14 +61,14 @@ class VFT:
     def inverse(self, data, norm='backward'):
         # data has shape (batch, modes, conv_channels)
 
-        data_inv = torch.bmm(self.V_inv, data)  # data_inv: (batch, n_points, conv_channels)
+        data_inv = torch.bmm(self.V_inv, data)  # (batch, n_points, conv_channels)
         if norm == 'backward':
             data_inv /= self.number_points
         elif norm == 'ortho':
             data_inv /= np.sqrt(self.number_points)
 
         return data_inv
-    
+
 
 class SpectralConv1d_SMM(nn.Module):
     """
@@ -81,7 +87,7 @@ class SpectralConv1d_SMM(nn.Module):
 
         self.in_channels = in_channels
         self.out_channels = out_channels
-        self.modes = modes  # Number of selected Fourier modes 
+        self.modes = modes  # Number of selected Fourier modes
 
         self.scale = 1 / (in_channels * out_channels)
         self.weights1 = nn.Parameter(
@@ -114,22 +120,19 @@ class SpectralConv1d_SMM(nn.Module):
         Returns:
             The real part of the transformed output tensor.
         """
-        batchsize = x.shape[0]
-
         # Compute Fourier coeffcients up to factor of e^(- something constant)
-        x_ft = transform.forward(x.cfloat(), norm='forward') 
+        x_ft = transform.forward(x.cfloat(), norm='forward')
         x_ft = x_ft.permute(0, 2, 1)
-
-        out_ft = self.compl_mul1d(x_ft, self.weights1) # TODO: if initialization left out, make sure this returns complex numbers
+        # TODO: if initialization left out, make sure this returns complex numbers
+        out_ft = self.compl_mul1d(x_ft, self.weights1)
         x_ft = out_ft.permute(0, 2, 1)
-        
+
         # Return to physical space
-        x = transform.inverse(x_ft, norm='backward')  # x [4, 20, 512, 512]
+        x = transform.inverse(x_ft, norm='backward')
 
-        return x.real # dimension (batch, points, conv_channels)
+        return x.real  # dimension (batch, points, conv_channels)
 
-    
-    # Last convolutional layer that returns Fourier coefficients for embedding 
+    # Last convolutional layer that returns Fourier coefficients for embedding
     def last_layer(self, x, transform):
         """
         Last convolutional layer returning Fourier coefficients to be used as embedding
@@ -146,11 +149,13 @@ class SpectralConv1d_SMM(nn.Module):
         x_ft = transform.forward(x.cfloat(), norm='forward')
 
         x_ft = x_ft.permute(0, 2, 1)
-        x_ft = self.compl_mul1d(x_ft, self.weights1) # dimension (batch, conv_channels, modes)
-        x_ft = x_ft.permute(0, 2, 1) # dimension (batch, modes, conv_channels)
+        x_ft = self.compl_mul1d(
+            x_ft, self.weights1
+        )  # (batch_size, conv_channels, modes)
+        x_ft = x_ft.permute(0, 2, 1)  # (batch_size, modes, conv_channels)
 
-        return torch.view_as_real(x_ft) # dimension (batch, 2*modes, conv_channels)
-        
+        return torch.view_as_real(x_ft)  # (batch_size, 2*modes, conv_channels)
+
 
 class SpectralConvEmbedding(nn.Module):
     def __init__(
@@ -160,15 +165,15 @@ class SpectralConvEmbedding(nn.Module):
         in_channels: int = 1,
         conv_channels: int = 8,
         num_layers: int = 3,
-        n_positions: Optional[Union[np.ndarray, List[float]]] = None,
+        n_positions: Optional[Union[np.ndarray, List[float], Tensor]] = None,
     ):
-        """SpectralConvEmbedding is a neural network module that performs convolution 
+        """SpectralConvEmbedding is a neural network module that performs convolution
         in Fourier space for 1D input data (that can have multiple channels).
         It uses a series of spectral convolution layers and pointwise
         convolution layers to transform the input tensor.
 
         Args:
-            n_points: Number of points in the 1D input data. 
+            n_points: Number of points in the 1D input data.
             modes: Number of modes considered in the spectral convolution,
                 at most floor(n_points/2) + 1.
             in_channels: Number of channels in the input data.
@@ -189,27 +194,27 @@ class SpectralConvEmbedding(nn.Module):
         self.conv_channels = conv_channels
         self.num_layers = num_layers
         self.n_positions = n_positions
-        
-        
-        # Initialize fully connected layer to raise number of input channels to number of convolutional channels 
-        self.fc0 = nn.Linear(self.in_channels, self.conv_channels) 
-        
+
+        # Initialize fully connected layer to raise number of
+        # input channels to number of convolutional channels
+        self.fc0 = nn.Linear(self.in_channels, self.conv_channels)
+
         # Inititalize layers performing convolution in Fourier space
         self.conv_layers = nn.ModuleList([
             SpectralConv1d_SMM(self.conv_channels, self.conv_channels, self.modes)
             for _ in range(self.num_layers)
-        ])  
+        ])
 
-        # Initialize layer performing pointwise convolution 
+        # Initialize layer performing pointwise convolution
         self.w_layers = nn.ModuleList([
             nn.Conv1d(self.conv_channels, self.conv_channels, 1)
             for _ in range(self.num_layers)
         ])
 
-        # Initialize last layer returning embedded input in Fourier space 
+        # Initialize last layer returning embedded input in Fourier space
         self.conv_last = SpectralConv1d_SMM(
             self.conv_channels, self.conv_channels, self.modes
-        ) 
+        )
 
     def forward(self, x: Tensor) -> Tensor:
         """Network forward pass.
@@ -218,7 +223,7 @@ class SpectralConvEmbedding(nn.Module):
             x: Input tensor (batch_size, channels * n_points).
 
         Returns:
-            Network output (batch_size, conv_channels * modes). 
+            Network output (batch_size, conv_channels * modes).
         """
 
         assert x.shape[-1] == self.in_channels * self.n_points, (
@@ -226,25 +231,22 @@ class SpectralConvEmbedding(nn.Module):
             f"got {x.shape[-1]} instead of {self.in_channels * self.n_points}"
         )
 
-        # Reshape data 
+        # Reshape data
         batch_size = x.shape[0]
         x = x.view(batch_size, -1, self.in_channels)
-        x = self.fc0(x) # dimension (batch_size, n_points, in_channels)
+        x = self.fc0(x)  # dimension (batch_size, n_points, in_channels)
         print('Shape x after linear layer: ', x.shape)
 
-        # Initialize Fourier transform for arbitrarily spaced points 
+        # Initialize Fourier transform for arbitrarily spaced points
         fourier_transform = VFT(batch_size, self.n_points, self.modes, self.n_positions)
 
         for conv, w in zip(self.conv_layers, self.w_layers, strict=False):
             x1 = conv(x, fourier_transform)
-            x2 = w(x.permute(0, 2, 1)) # permutation added here as we changed shape of input data
-            x = x1 + x2.permute(0, 2, 1)
-            x = F.gelu(x)
+            x2 = w(x.permute(0, 2, 1))
+            x = F.gelu(x1 + x2.permute(0, 2, 1))
 
-        x_spec = self.conv_last.last_layer(x, fourier_transform) # TODO: last_layer was missing here before. check that this is correct like this 
+        # TODO: last_layer was missing here before. check that this is correct like this
+        x_spec = self.conv_last.last_layer(x, fourier_transform)
         # this x_spec would have shape (batch, 2*modes, conv_channels)
 
-        return x_spec.reshape(batch_size, -1) # flatten array to use with SBI 
-
-
-
+        return x_spec.reshape(batch_size, -1)  # flatten array to use with SBI
