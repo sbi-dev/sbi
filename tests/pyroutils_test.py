@@ -219,6 +219,8 @@ def test_estimator_distribution_basic_properties(
     # Test checking of condition shape
     with pytest.raises(ValueError):
         distribution_cls(estimator=density_estimator, condition=theta[:, :1])
+    with pytest.raises(ValueError):
+        distribution_cls(estimator=density_estimator, condition=theta[:, 0])
 
     # Test basic properties
     estimator_dist = distribution_cls(estimator=density_estimator, condition=theta)
