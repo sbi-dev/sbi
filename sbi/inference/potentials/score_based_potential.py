@@ -272,7 +272,6 @@ class PosteriorScoreBasedPotential(BasePotential):
         flows = []
         for i in range(self._x_o.shape[0]):
             iid_x = self._x_o[i]
-            # TODO check event_shape
             x_density_estimator = reshape_to_batch_event(
                 iid_x, event_shape=self.score_estimator.condition_shape
             )
