@@ -163,8 +163,8 @@ def _build_mixed_density_estimator(
     discrete_net = build_categoricalmassestimator(
         disc_x,
         batch_y,
-        z_score_x="none",
-        z_score_y="none",
+        z_score_x="none",  # discrete data should not be z-scored
+        z_score_y="none",  # y-embedding net already z-scores
         num_hidden=hidden_features,
         num_layers=hidden_layers,
         embedding_net=embedding_net,
@@ -191,7 +191,7 @@ def _build_mixed_density_estimator(
         ),
         batch_y=combined_condition,
         z_score_x=z_score_x,
-        z_score_y="none",  # combined condition is already z-scored for mnle
+        z_score_y="none",  # combined condition is already z-scored
         # combined embedding net for discrete and continuous data.
         embedding_net=combined_embedding_net,
         num_bins=num_bins,
