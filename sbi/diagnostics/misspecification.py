@@ -1,13 +1,11 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
-
-import torch
-import torch.nn as nn
-
 # code for MMD from:
 # https://github.com/mackelab/labproject/blob/main/labproject/metrics/MMD_torch.py
 
-# NOTE: all tensors should be of shape (n_samples, n_features)
+
+import torch
+import torch.nn as nn
 
 
 def rbf_kernel(x, y, bandwidth):
