@@ -117,7 +117,10 @@ def calc_misspecification_mmd(
                 "please provide an sbi inference object"
             )
         if not hasattr(inference, '_neural_net'):
-            raise ValueError("no neural net provided, neural_net should not be None")
+            raise ValueError(
+                "no neural net found,"
+                "neural_net should not be None when mode is 'embedding'"
+            )
         if isinstance(inference._neural_net.embedding_net, nn.modules.linear.Identity):
             raise Warning(
                 "The embedding net might be the identity function,"
