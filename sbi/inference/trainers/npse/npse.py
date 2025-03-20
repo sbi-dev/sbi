@@ -5,17 +5,9 @@ from copy import deepcopy
 from typing import Any, Callable, Optional, Union
 
 import torch
-from torch import Tensor, ones
-from torch.distributions import Distribution
-from torch.nn.utils.clip_grad import clip_grad_norm_
-from torch.optim.adam import Adam
-from torch.utils.tensorboard.writer import SummaryWriter
-
 from sbi import utils as utils
 from sbi.inference import NeuralInference
-from sbi.inference.posteriors import (
-    DirectPosterior,
-)
+from sbi.inference.posteriors import DirectPosterior
 from sbi.inference.posteriors.score_posterior import ScorePosterior
 from sbi.neural_nets.estimators.score_estimator import ConditionalScoreEstimator
 from sbi.neural_nets.factory import posterior_score_nn
@@ -29,6 +21,11 @@ from sbi.utils import (
 )
 from sbi.utils.sbiutils import ImproperEmpirical, mask_sims_from_prior
 from sbi.utils.torchutils import assert_all_finite
+from torch import Tensor, ones
+from torch.distributions import Distribution
+from torch.nn.utils.clip_grad import clip_grad_norm_
+from torch.optim.adam import Adam
+from torch.utils.tensorboard.writer import SummaryWriter
 
 
 class NPSE(NeuralInference):
@@ -304,9 +301,14 @@ class NPSE(NeuralInference):
         self._neural_net.to(self._device)
 
         if isinstance(validation_times, int):
-            validation_times = torch.linspace(
-                self._neural_net.t_min, self._neural_net.t_max, validation_times
-            )
+            if hasattr(self._neural_net, "times_schedule"):
+                validation_times = self._neural_net.times_schedule(validation_times)
+            else:
+                validation_times = torch.linspace(
+                    self._neural_net.t_min,
+                    self._neural_net.t_max,
+                    steps=validation_times,
+                )
         assert isinstance(
             validation_times, Tensor
         )  # let pyright know validation_times is a Tensor.
