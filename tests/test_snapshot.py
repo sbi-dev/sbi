@@ -78,8 +78,9 @@ def test_npse_snapshot(
     sample_with,
     ndarrays_regression,
 ):
-    num_simulations, num_samples = 10, 10
+    num_simulations, num_samples = 5, 10
     stop_after_epochs = 1
+    steps = 5
 
     (
         prior,
@@ -101,7 +102,7 @@ def test_npse_snapshot(
 
     posterior = inference.build_posterior(score_estimator, sample_with=sample_with)
     posterior.set_default_x(x_o)
-    samples = posterior.sample((num_samples,), iid_method=iid_method)
+    samples = posterior.sample((num_samples,), iid_method=iid_method, steps=steps)
     ndarrays_regression.check(
         {'values': samples.numpy()}, default_tolerance=dict(atol=1e-3, rtol=1e-2)
     )
