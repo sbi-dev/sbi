@@ -13,7 +13,7 @@ from torch.distributions import Gamma, Independent, MultivariateNormal, Normal, 
 from sbi.inference.potentials.score_based_potential import (
     score_estimator_based_potential,
 )
-from sbi.neural_nets.net_builders import build_score_estimator
+from sbi.neural_nets import posterior_score_nn
 from sbi.samplers.score import Diffuser
 from sbi.utils import BoxUniform, MultipleIndependent
 
@@ -125,12 +125,12 @@ def _build_gaussian_score_estimator(
         def forward(self, input, condition, time):
             return torch.zeros_like(input)
 
-    score_estimator = build_score_estimator(
-        building_thetas,
-        building_xs,
+    score_estimator = posterior_score_nn(
         sde_type=sde_type,
-        score_net=DummyNet(),
-    )
+        score_net_type="mlp",
+        input_shape=input_event_shape,
+        embedding_net=torch.nn.Identity(),
+    )(building_thetas, building_xs)
 
     score_fn, _ = score_estimator_based_potential(
         score_estimator, prior=None, x_o=torch.ones((1,))
