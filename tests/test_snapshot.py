@@ -96,4 +96,4 @@ def test_npse_snapshot(
     posterior = inference.build_posterior(score_estimator, sample_with=sample_with)
     posterior.set_default_x(x_o)
     samples = posterior.sample((num_samples,), iid_method=iid_method)
-    assert samples == snapshot
+    assert snapshot == samples.tolist()
