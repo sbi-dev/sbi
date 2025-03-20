@@ -28,7 +28,7 @@ def vector_field_estimator_based_potential(
     prior: Optional[Distribution],
     x_o: Optional[Tensor],
     enable_transform: bool = True,
-    **kwargs
+    **kwargs,
 ) -> Tuple["PosteriorVectorFieldBasedPotential", TorchTransform]:
     r"""Returns the potential function gradient for score estimators.
 

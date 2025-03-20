@@ -338,6 +338,7 @@ def test_fmpe_map():
         f"{map_} != {gt_posterior.mean}"
     )
 
+
 @pytest.mark.skip(reason="Multiple rounds of training are not supported by FMPE yet.")
 def test_multi_round_handling_fmpe():
     """Test whether we can append data and train multiple times with FMPE."""

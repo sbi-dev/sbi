@@ -42,7 +42,7 @@ from .test_utils import check_c2st, get_dkl_gaussian_prior
         "fmpe_1d_uniform",
         "fmpe_3d_gaussian",
         "fmpe_3d_uniform",
-    ]
+    ],
 )
 def test_c2st_npse_on_linearGaussian(
     init_dict, inference_cls, num_dim: int, prior_str: str, sample_with: List[str]
@@ -87,7 +87,8 @@ def test_c2st_npse_on_linearGaussian(
     # amortize the training when testing sample_with.
     for method in sample_with:
         posterior = inference.build_posterior(
-            score_estimator, sample_with=method,
+            score_estimator,
+            sample_with=method,
             neural_ode_backend="zuko",
             neural_ode_kwargs={"atol": 1e-4, "rtol": 1e-4, "exact": False},
         )

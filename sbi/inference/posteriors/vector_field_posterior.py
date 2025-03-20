@@ -78,7 +78,7 @@ class VectorFieldPosterior(NeuralPosterior):
             prior,
             x_o=None,
             enable_transform=enable_transform,
-            **kwargs
+            **kwargs,
         )
         super().__init__(
             potential_fn=potential_fn,
