@@ -96,7 +96,8 @@ def test_mcmc_transform(prior, enable_transform):
 
 @pytest.mark.xfail(
     reason="Known issue in PyTorch https://github.com/pytorch/pytorch/issues/20682",
-    strict=False,
+    strict=True,
+    raises=AssertionError,
 )
 def test_transformed_dist_support():
     """
