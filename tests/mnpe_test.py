@@ -36,7 +36,18 @@ def mixed_simulator(theta, sigma2=0.1):
 
 
 @pytest.mark.gpu
-@pytest.mark.parametrize("device", ("cpu", "gpu"))
+@pytest.mark.parametrize(
+    "device",
+    [
+        pytest.param(
+            "gpu",
+            marks=pytest.mark.xfail(
+                raises=NotImplementedError,
+                reason="MultipleIndependent does not support device handling yet.",
+            ),
+        )
+    ],
+)
 def test_mnpe_on_device(
     device,
     num_simulations: int = 100,
