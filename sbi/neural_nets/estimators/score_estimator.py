@@ -128,14 +128,13 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         std = self.approx_marginal_std(time)
 
         # As input to the neural net we want to have something that changes proportianl
-        # to how the scores change (a la c_noise in edm)
+        # to how the scores change
         time_enc = self.std_fn(time)
 
-        # Time dependent z-scoring! Keeps input at similar scales (c_in in edm)
+        # Time dependent z-scoring! Keeps input at similar scales
         input_enc = (input - mean) / std
 
         # Approximate score becoming exact for t -> t_max, "skip connection"
-        # (a la c_skip in edm)
         score_gaussian = (input - mean) / std**2
 
         # Score prediction by the network
@@ -145,7 +144,6 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         # The learnable part will be largly scaled at the beginning of the diffusion
         # and the gaussian part (where it should end up) will dominate at the end of
         # the diffusion.
-        # (a la c_out in edm)
         scale = self.mean_t_fn(time) / self.std_fn(time)
         output_score = -scale * score_pred - score_gaussian
 
@@ -182,7 +180,7 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         # update device if required
         self.device = input.device if self.device != input.device else self.device
 
-        # Sample times from the Markov chain
+        # Sample times from the Markov chain, use batch dimension
         if times is None:
             times = self.times_schedule(input.shape[0])
 
@@ -355,7 +353,7 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         self, num_samples: int, t_min: float = None, t_max: float = None
     ) -> Tensor:
         """
-        Construction time samples for evaluating the diffusion model.
+        Time samples for evaluating the diffusion model.
         Perform uniform sampling of time variables within the range [t_min, t_max].
         The `times` tensor will be put on the same device as the stored network.
 
@@ -374,7 +372,12 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         t_min = self.t_min if isinstance(t_min, type(None)) else t_min
         t_max = self.t_max if isinstance(t_max, type(None)) else t_max
 
-        return torch.rand(num_samples, device=self.device) * (t_max - t_min) + t_min
+        times = torch.rand(num_samples, device=self.device) * (t_max - t_min) + t_min
+
+        # t_min and t_max need to be part of the sequence
+        times[0,...] = t_min
+        times[-1,...] = t_max
+        return torch.Tensor(sorted(times))
 
     def _set_weight_fn(self, weight_fn: Union[str, Callable]):
         """Set the weight function.
@@ -493,162 +496,6 @@ class VPScoreEstimator(ConditionalScoreEstimator):
         while len(g.shape) < len(input.shape):
             g = g.unsqueeze(-1)
         return g
-
-
-class ImprovedScoreEstimator(ConditionalScoreEstimator):
-    """Implement EDM-like score matching estimator as in [1]
-
-    [1] Karras et al "Elucidating the Design Space of Diffusion-Based
-        Generative Models", https://arxiv.org/abs/2206.00364
-    """
-
-    def __init__(
-        self,
-        net: nn.Module,
-        input_shape: torch.Size,
-        condition_shape: torch.Size,
-        weight_fn: Union[str, Callable] = "max_likelihood",
-        beta_min: float = 0.002,  # sigma_min in the paper
-        beta_max: float = 80.0,  # sigma_max in the paper
-        beta_data: float = .5, #sigma_data in the paper
-        mean_0: Union[Tensor, float] = 0.0,
-        std_0: Union[Tensor, float] = 1.0,
-        t_min: float = 1e-5,  # will be ignored due to EDM setup
-        t_max: float = 1.0,  #
-        pmean: float = -1.2,  # mean of noise scheme for training
-        pstd: float = 1.2,  # std of noise scheme for training
-        sigma_data: float = 0.5,
-    ) -> None:
-
-
-        #TODO: store sigma values for training in extra field
-        self.pmean, self.pstd = pmean, pstd
-        noise_dist = stats.norm(pmean, pstd**2)
-        self.sigma_min = exp(noise_dist.ppf(0.01))
-        self.sigma_max = exp(noise_dist.ppf(0.99))
-
-        self.beta_data = beta_data #sigma data from edm paper
-        self.rho = 7
-
-        super().__init__(
-            net,
-            input_shape,
-            condition_shape,
-            mean_0=mean_0,
-            std_0=std_0,
-            weight_fn=weight_fn,
-            beta_min=beta_min,
-            beta_max=beta_max,
-            t_min=t_min,
-            t_max=t_max,
-        )
-
-    def mean_t_fn(self, times: Tensor) -> Tensor:
-        """Conditional mean function for EDM-style DMs.
-        This is required to model c_in.
-
-        Args:
-            times: time variable in [0,1].
-
-        Returns:
-            Conditional mean at a given time.
-        """
-        noise = self.noise_schedule(times)
-        phi = 1./torch.sqrt(noise**2 + self.beta_data**2)
-        for _ in range(len(self.input_shape)):
-            phi = phi.unsqueeze(-1)
-        return phi
-
-    def std_fn(self, times: Tensor) -> Tensor:
-        """Standard deviation function for EDM style DMs.
-        This is akin to c_noise in the network/precond parametrisation.
-        Args:
-            times: time variable in [0,1].
-
-        Returns:
-            Standard deviation at a given time.
-        """
-        std = .25*torch.log(times)
-        for _ in range(len(self.input_shape)):
-            std = std.unsqueeze(-1)
-        return std
-
-    def drift_fn(self, input: Tensor, times: Tensor) -> Tensor:
-        """Drift function for variance preserving SDEs.
-
-        Args:
-            input: Original data, x0.
-            times: SDE time variable in [0,1].
-
-        Returns:
-            Drift function at a given time.
-        """
-        phi = -0.5 * self.noise_schedule(times)
-        while len(phi.shape) < len(input.shape):
-            phi = phi.unsqueeze(-1)
-        return phi * input
-
-    def diffusion_fn(self, input: Tensor, times: Tensor) -> Tensor:
-        """Diffusion function for variance preserving SDEs.
-
-        Args:
-            input: Original data, x0.
-            times: SDE time variable in [0,1].
-
-        Returns:
-            Drift function at a given time.
-        """
-        g = torch.sqrt(self.noise_schedule(times))
-        while len(g.shape) < len(input.shape):
-            g = g.unsqueeze(-1)
-        return g
-
-    def noise_schedule(self, times: Tensor) -> Tensor:
-        """
-        Generate a beta schedule similar to suggestions in the EDM [1] paper.
-
-        This method acts as a fallback in case derivative classes do not
-        implement it on their own. It calculates a linear beta schedule defined
-        by the input `times`, which represent the normalized time steps t ∈ [0, 1].
-
-        Args:
-            times (Tensor):
-                SDE times in [0, 1]. This tensor will be regenerated from
-                self.times_schedule
-
-        Returns:
-            Tensor: Generated beta schedule at a given time.
-
-        [1] Karras et al "Elucidating the Design Space of Diffusion-Based
-        Generative Models", https://arxiv.org/abs/2206.00364
-        """
-        return times
-
-    def times_schedule(
-        self, num_samples: int, t_min: float = None, t_max: float = None
-    ) -> Tensor:
-        """
-        Construct time samples as suggested in EDM paper [1].
-
-        Args:
-            num_samples (int): Number of samples to generate.
-            t_min (float, optional): The minimum time value. Defaults to self.t_min.
-            t_max (float, optional): The maximum time value. Defaults to self.t_max.
-
-        Returns:
-            Tensor: A tensor of sampled time variables scaled and shifted to
-                    the range [0,1].
-
-        [1] Karras et al "Elucidating the Design Space of Diffusion-Based
-        Generative Models", https://arxiv.org/abs/2206.00364
-        """
-        times = torch.linspace(0.0, 1.0, steps=num_samples)
-        inv_rho = 1.0 / self.rho
-
-        beta_scale = self.beta_max ** (inv_rho) - self.beta_min ** (inv_rho)
-        offset = self.beta_min ** (inv_rho)
-
-        return (offset + beta_scale * times) ** (self.rho)
 
 
 class SubVPScoreEstimator(ConditionalScoreEstimator):
@@ -840,9 +687,6 @@ class VEScoreEstimator(ConditionalScoreEstimator):
             g = g.unsqueeze(-1)
 
         return g
-
-
-# TODO: try to add a EDM-like estimator
 
 
 class GaussianFourierTimeEmbedding(nn.Module):
