@@ -38,7 +38,6 @@ from sbi.inference.posteriors import (
     ImportanceSamplingPosterior,
     MCMCPosterior,
     RejectionPosterior,
-    ScorePosterior,
     VIPosterior,
     VectorFieldPosterior,
 )
