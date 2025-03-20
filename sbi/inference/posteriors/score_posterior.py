@@ -14,9 +14,7 @@ from sbi.inference.potentials.score_based_potential import (
     score_estimator_based_potential,
 )
 from sbi.neural_nets.estimators.score_estimator import ConditionalScoreEstimator
-from sbi.neural_nets.estimators.shape_handling import (
-    reshape_to_batch_event,
-)
+from sbi.neural_nets.estimators.shape_handling import reshape_to_batch_event
 from sbi.samplers.rejection import rejection
 from sbi.samplers.score.correctors import Corrector
 from sbi.samplers.score.diffuser import Diffuser
@@ -223,11 +221,8 @@ class ScorePosterior(NeuralPosterior):
 
         num_samples = torch.Size(sample_shape).numel()
 
-        max_sampling_batch_size = (
-            self.max_sampling_batch_size
-            if max_sampling_batch_size is None
-            else max_sampling_batch_size
-        )
+        if max_sampling_batch_size is None:
+            max_sampling_batch_size = self.max_sampling_batch_size
 
         if ts is None:
             t_max = self.score_estimator.t_max

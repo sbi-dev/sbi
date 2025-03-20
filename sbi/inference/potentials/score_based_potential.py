@@ -131,17 +131,6 @@ class PosteriorScoreBasedPotential(BasePotential):
             The potential function, i.e., the log probability of the posterior.
         """
 
-        '''
-        #Implemented for now
-        if self.x_is_iid:
-            raise NotImplementedError(
-                "Potential function evaluation in the IID setting is not yet supported"
-                " for score-based methods. Sampling does however work via `.sample`. "
-                "If you intended to evaluate the posterior given a batch of (non-iid) "
-                "x use `log_prob_batched`."
-            )
-        '''
-
         theta = ensure_theta_batched(torch.as_tensor(theta))
         theta_density_estimator = reshape_to_sample_batch_event(
             theta, theta.shape[1:], leading_is_sample=True
@@ -169,7 +158,7 @@ class PosteriorScoreBasedPotential(BasePotential):
                 )
                 log_probs = iid_posteriors_prob - (n - 1) * self.prior.log_prob(
                     theta_density_estimator
-                )
+                ).squeeze(-1)
             else:
                 log_probs = self.flow.log_prob(theta_density_estimator).squeeze(-1)
             # Force probability to be zero outside prior support.
@@ -282,10 +271,10 @@ class PosteriorScoreBasedPotential(BasePotential):
             )
         flows = []
         for i in range(self._x_o.shape[0]):
-            independent_flow = self._x_o[i]
+            iid_x = self._x_o[i]
             # TODO check event_shape
             x_density_estimator = reshape_to_batch_event(
-                independent_flow, event_shape=self.score_estimator.condition_shape
+                iid_x, event_shape=self.score_estimator.condition_shape
             )
 
             flow = self.get_continuous_normalizing_flow(
