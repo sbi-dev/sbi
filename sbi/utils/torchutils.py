@@ -313,6 +313,11 @@ class BoxUniform(Independent):
         # Device handling
         device = low.device.type if device is None else device
         device = process_device(device)
+        self.device = device
+        self.reinterpreted_batch_ndims = reinterpreted_batch_ndims
+
+        self.low = torch.as_tensor(low, dtype=torch.float32, device=device)
+        self.high = torch.as_tensor(high, dtype=torch.float32, device=device)
 
         super().__init__(
             Uniform(
@@ -325,6 +330,35 @@ class BoxUniform(Independent):
                 validate_args=False,
             ),
             reinterpreted_batch_ndims,
+        )
+
+    def to(self, device: Union[str, torch.device]):
+        """
+        Moves the distribution to the specified device **in place**.
+
+        Args:
+            device (str): Target device (e.g., "cpu", "cuda", "mps").
+
+        Returns:
+            self (BoxUniform): The modified BoxUniform instance.
+        """
+        # Update the device attribute
+        self.device = device
+
+        if not isinstance(device, torch.device):
+            device = torch.device(device)
+
+        # Move tensors to the new device
+        self.low = self.low.to(device=device)
+        self.high = self.high.to(device=device)
+
+        super().__init__(
+            Uniform(
+                low=self.low,
+                high=self.high,
+                validate_args=False,
+            ),
+            self.reinterpreted_batch_ndims,
         )
 
 
