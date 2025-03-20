@@ -1,4 +1,3 @@
-import math
 from abc import ABC, abstractmethod
 from typing import Optional
 
@@ -23,14 +22,15 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
     Rectified flow matching estimator class that estimates the conditional vector field,
     :math:`v(\theta_t, t; x_o) = \mathbb{E}[\theta_1 - \theta_0 | \theta_t, x_o = x_o]`
 
-    This estimator implements the flow matching approach where the vector field is learned
-    by matching the flow between the base and target distributions. The vector field
-    represents the instantaneous change in the distribution at time t.
-    
+    This estimator implements the flow matching approach where the vector field is
+    learned by matching the flow between the base and target distributions. The vector
+    field represents the instantaneous change in the distribution at time t.
+
     References
     ----------
     .. [1] Liu, X., Gong, C., & Liu, Q. (2023).
-           "Flow Straight and Fast: Learning to Generate and Transfer Data with Rectified Flow"
+           "Flow Straight and Fast: Learning to Generate and Transfer Data with
+           Rectified Flow"
            *International Conference on Learning Representations (ICLR)*
            https://arxiv.org/abs/2209.03003
 
@@ -60,7 +60,7 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         input_shape: torch.Size,
         condition_shape: torch.Size,
         embedding_net: Optional[nn.Module] = None,
-        num_freqs: int = 3,
+        num_freqs: int = 3,  # This is ignored!
         noise_scale: float = 1e-3,
         zscore_transform_input=None,  # This is ignored!
         **kwargs,
@@ -73,34 +73,37 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
             condition_shape: Shape of the condition :math:`x_o`.
             embedding_net: Embedding network for the condition.
             num_freqs: Number of frequencies to use for the positional time encoding.
+                This is ignored and will be removed.
             noise_scale: Scale of the noise added to the vector field
                 (:math:`\sigma_{min}` in [2]_).
             zscore_transform_input: Whether to z-score the input.
-                This is deprecated. It is ignored and will be removed.
+                This is ignored and will be removed.
         """
 
         super().__init__(
             net=net, input_shape=input_shape, condition_shape=condition_shape
         )
 
+        self.num_freqs = num_freqs
         self.noise_scale = noise_scale
         # Identity transform for z-scoring the input
         self._embedding_net = (
             embedding_net if embedding_net is not None else nn.Identity()
         )
 
-        self.register_buffer("freqs", torch.arange(1, num_freqs + 1) * math.pi)
-        self.register_buffer('zeros', torch.zeros(input_shape))
-        self.register_buffer('ones', torch.ones(input_shape))
-
     @property
     def embedding_net(self):
         return self._embedding_net
 
     def forward(self, input: Tensor, condition: Tensor, t: Tensor) -> Tensor:
-        # positional encoding of time steps
-        t = self.freqs * t[..., None]
-        t = torch.cat((t.cos(), t.sin()), dim=-1)
+        # temporal fix that will be removed when the nn builders are updated
+        t = self._get_temporal_t_shape_fix(t)
+
+        # the network expects 2D input, so we flatten the input if necessary
+        # and remember the original shape
+        target_shape = input.shape
+        if input.ndim > 2:
+            input = input.reshape(-1, input.shape[-1])
 
         # embed the input and condition
         embedded_condition = self._embedding_net(condition)
@@ -113,8 +116,12 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
             ignore=1,
         )
 
-        # return the estimated vector field
-        return self.net(theta=input, x=embedded_condition, t=t)
+        # call the network to get the estimated vector field
+        v = self.net(theta=input, x=embedded_condition, t=t)
+
+        # reshape to the original shape
+        v = v.reshape(*target_shape)
+        return v
 
     def loss(
         self, input: Tensor, condition: Tensor, times: Optional[Tensor] = None, **kwargs
@@ -128,25 +135,25 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
             \theta_t = t \cdot \theta_1 + (1 - t) \cdot \theta_0,
             \left[ \| v(\theta_t, t; x_o = x_o) - (\theta_1 - \theta_0) \|^2 \right]
 
-        where :math:`v(\theta_t, t; x_o)` is the vector field estimated by the neural network
-        (see Equation 1 in [1]_ with added conditioning on :math:`x_o`. The notation
-        is changed to match the standard SBI notation: :math:`\theta_0 = x_0` and
-        :math:`\theta_1 = x_1`).
+        where :math:`v(\theta_t, t; x_o)` is the vector field estimated by the neural
+        network (see Equation 1 in [1]_ with added conditioning on :math:`x_o`. The
+        notation is changed to match the standard SBI notation: :math:`\theta_0 = x_0`
+        and :math:`\theta_1 = x_1`).
 
         The loss is computed as the mean squared error between the vector field:
 
         .. math::
-            L(\theta_0, \theta_1, t, x_o) = \| v(\theta_t, t; x_o) - (\theta_1 - \theta_0) \|^2
-        
+            L(\theta_0, \theta_1, t, x_o) = \| v(\theta_t, t; x_o) -
+            (\theta_1 - \theta_0) \|^2
+
             where
 
             .. math::
                 \theta_1 \sim p_{base}
                 \theta_t = t \cdot \theta_1 + (1 - t) \cdot \theta_0
 
-            Additionally, the small noise :math:`\sigma_{min}` is added to the vector field
-            as per [2]_ to address numerical issues at small times.
-        
+            Additionally, the small noise :math:`\sigma_{min}` is added to the
+            vector field as per [2]_ to address numerical issues at small times.
 
         Args:
             theta: Parameters (:math:`\theta_0`).
@@ -161,12 +168,12 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         # different time steps
         if times is None:
             times = torch.rand(input.shape[:-1], device=input.device, dtype=input.dtype)
-        t_ = times[..., None]
+        times_ = times[..., None]
 
         # sample from probability path at time t
         # TODO: Change to notation from Lipman et al. or Tong et al.
         theta_1 = torch.randn_like(input)
-        theta_t = (1 - t_) * input + (t_ + self.noise_scale) * theta_1
+        theta_t = (1 - times_) * input + (times_ + self.noise_scale) * theta_1
 
         # compute vector field at the sampled time steps
         vector_field = theta_1 - input
@@ -185,8 +192,10 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         .. math::
             d\theta_t = v(\theta_t, t; x_o) dt
 
-        where :math:`v(\theta_t, t; x_o)` is the vector field estimated by the neural network
-        (see Equation 1 in [1]_ with added conditioning on :math:`x_o`).
+        with initial :math:`\theta_1` sampled from the base distribution.
+        Here :math:`v(\theta_t, t; x_o)` is the vector field estimated by the
+        flow matching neural network (see Equation 1 in [1]_ with added
+        conditioning on :math:`x_o`).
 
         Args:
             input: :math:`\theta_t`.
@@ -194,7 +203,7 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
             t: Time :math:`t`.
 
         Returns:
-            Estimated vector field :math:`v(\theta_t, t; x_o)`. 
+            Estimated vector field :math:`v(\theta_t, t; x_o)`.
             The shape is the same as the input.
         """
         return self.forward(input, condition, t)
@@ -205,7 +214,8 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         The score function is calculated based on [3]_ (see Equation 13):
 
         .. math::
-            \nabla_{\theta_t} \log p(\theta_t | x_o) = (- (1 - t) v(\theta_t, t; x_o) - \theta_0 ) / t
+            \nabla_{\theta_t} \log p(\theta_t | x_o) =
+            (- (1 - t) v(\theta_t, t; x_o) - \theta_0 ) / t
 
         Args:
             input: variable whose distribution is estimated.
@@ -215,9 +225,10 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         Returns:
             Score function of the vector field estimator.
         """
-        # TODO: derive taking into account the noise sigma_min added to the vector field.
+        # TODO: derive taking into account the noise sigma_min added to the vector field
         v = self.forward(input, condition, t)
-        return (-(1 - t) * v - input) / torch.maximum(t, torch.tensor(1e-6))
+        score = (-(1 - t) * v - input) / torch.maximum(t, torch.tensor(1e-6))
+        return score
 
     def drift_fn(self, input: Tensor, times: Tensor) -> Tensor:
         r"""Drift function for the flow matching estimator.
@@ -227,10 +238,12 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         .. math::
             f(t) = - \theta_t / (1 - t)
 
-        The drift function :math:`f(t)` and diffusion function :math:`\g(t)` enable SDE sampling:
+        The drift function :math:`f(t)` and diffusion function :math:`\g(t)`
+        enable SDE sampling:
 
         .. math::
-            d\theta_t = [f(t) - g(t)^2 \nabla_{\theta_t} \log p(\theta_t | x_o)]dt + \g(t) dW_t
+            d\theta_t = [f(t) - g(t)^2 \nabla_{\theta_t} \log p(\theta_t | x_o)]dt
+            + \g(t) dW_t
 
         where :math:`dW_t` is the Wiener process.
 
@@ -241,7 +254,7 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         Returns:
             Drift function at a given time.
         """
-        # TODO: derive taking into account the noise sigma_min added to the vector field.
+        # TODO: derive taking into account the noise sigma_min added to the vector field
         return -input / torch.maximum(1 - times, torch.tensor(1e-6))
 
     def diffusion_fn(self, input: Tensor, times: Tensor) -> Tensor:
@@ -259,12 +272,12 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         Returns:
             Diffusion function at a given time.
         """
-        # TODO: derive taking into account the noise sigma_min added to the vector field.
+        # TODO: derive taking into account the noise sigma_min added to the vector field
         return torch.sqrt(2 * times / torch.maximum(1 - times, torch.tensor(1e-6)))
 
     def mean_t_fn(self, times: Tensor) -> Tensor:
-        r"""Linear coefficient of the perturbation kernel mean :math:`\mu_t(t)`
-        for the flow matching estimator.
+        r"""Linear coefficient of the perturbation kernel expectation
+        :math:`\mu_t(t) = E[\theta_t | \theta_0]` for the flow matching estimator.
 
         The perturbation kernel for rectified flows with Gaussian base distribution is:
 
@@ -273,8 +286,9 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
             \mu_t(t) = (1 - t) \cdot \theta_0 + t \cdot \mu_{base}
             \sigma_t(t) = t \cdot \sigma_{base}
 
-        So far, the implementation of iid methods assumes that the mean_base :math:`\mu_{base}` is 0.
-        Therefore, the linear coefficient of the perturbation kernel mean is simply :math:`1 - t`.
+        So far, the implementation of iid methods assumes that the mean_base
+        :math:`\mu_{base}` is 0. Therefore, the linear coefficient of the perturbation
+        kernel mean is simply :math:`1 - t`.
 
         Args:
             times: SDE time variable in [0,1].
@@ -282,7 +296,7 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         Returns:
             Mean function at a given time.
         """
-        # TODO: derive taking into account the noise sigma_min added to the vector field.
+        # TODO: derive taking into account the noise sigma_min added to the vector field
         mean_t = 1 - times
         for _ in range(len(self.input_shape)):
             mean_t = mean_t.unsqueeze(-1)
@@ -305,8 +319,22 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         Returns:
             Standard deviation at a given time.
         """
-        # TODO: derive taking into account the noise sigma_min added to the vector field.
+        # TODO: derive taking into account the noise sigma_min added to the vector field
         std_t = times * self.std_base
         for _ in range(len(self.input_shape)):
             std_t = std_t.unsqueeze(-1)
         return std_t
+
+    def _get_temporal_t_shape_fix(self, t: Tensor) -> Tensor:
+        """
+        This is a hack that allows us to use
+        the old nn builders that assume positional embedding of time
+        inside the forward method, resulting in a shape of (..., num_freqs * 2).
+        """
+        if t.ndim == 0:
+            t = t.reshape(1, 1)
+        elif t.ndim == 1:
+            t = t[..., None]
+        if t.shape[-1] == 1:
+            t = t.expand(*t.shape[:-1], self.num_freqs * 2)
+        return t
