@@ -34,7 +34,7 @@ from .test_utils import (
 )
 
 
-@pytest.mark.parametrize("num_dim", ((2,), (1,)))
+@pytest.mark.parametrize("num_dim", (2, 1))
 def test_c2st_fmpe_on_linearGaussian(num_dim: int):
     """Test whether fmpe infers well a simple example with available ground truth."""
 
@@ -44,10 +44,10 @@ def test_c2st_fmpe_on_linearGaussian(num_dim: int):
     prior_str = "gaussian"
 
     # likelihood_mean will be likelihood_shift+theta
-    likelihood_shift = -1.0 * ones(num_dim)
+    likelihood_shift = -1.0 * ones((num_dim,))
     likelihood_cov = 0.3 * eye(num_dim)
 
-    prior_mean = zeros(num_dim)
+    prior_mean = zeros((num_dim,))
     prior_cov = eye(num_dim)
     prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
     gt_posterior = true_posterior_linear_gaussian_mvn_prior(
