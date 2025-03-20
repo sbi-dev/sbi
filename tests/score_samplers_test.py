@@ -36,7 +36,7 @@ def build_some_priors(num_dim: int):
         ])
 
     # Bug in Independent introduced????
-    priors = [prior1, prior2, prior2_2]#, prior3, prior4]#, prior5] Something broke
+    priors = [prior1, prior2, prior2_2, prior3, prior4, prior5]  # Something broke
 
     return priors
 

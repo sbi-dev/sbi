@@ -52,7 +52,7 @@ def denoise(p: Distribution, m: Tensor, s: Tensor, x_t: Tensor) -> Distribution:
 
 def denoise_independent(
     p: Independent, m: Tensor, s: Tensor, x_t: Tensor
-) -> Independent:
+) -> Independent | Distribution:
     """Denoise an independent distribution.
 
     Args:
@@ -64,7 +64,12 @@ def denoise_independent(
     Returns:
         The posterior independent distribution.
     """
-    return Independent(denoise(p.base_dist, m, s, x_t), p.reinterpreted_batch_ndims)
+    denoised_base_dist = denoise(p.base_dist, m, s, x_t)
+    batch_shape = denoised_base_dist.batch_shape
+    if len(batch_shape) < p.reinterpreted_batch_ndims:
+        return denoised_base_dist
+    else:
+        return Independent(denoised_base_dist, p.reinterpreted_batch_ndims)
 
 
 def denoise_gaussian(p: Normal, m: Tensor, s: Tensor, x_t: Tensor) -> Normal:
@@ -229,7 +234,9 @@ def marginalize(p: Distribution, m: Tensor, s: Tensor) -> Distribution:
         return marginalize_empirical(p, m, s)
 
 
-def marginalize_independent(p: Independent, m: Tensor, s: Tensor) -> Independent:
+def marginalize_independent(
+    p: Independent, m: Tensor, s: Tensor
+) -> Independent | Distribution:
     """Marginalize an independent distribution.
 
     Args:
@@ -240,7 +247,12 @@ def marginalize_independent(p: Independent, m: Tensor, s: Tensor) -> Independent
     Returns:
         The marginal independent distribution.
     """
-    return Independent(marginalize(p.base_dist, m, s), p.reinterpreted_batch_ndims)
+    marg_base_dist = marginalize(p.base_dist, m, s)
+    batch_shape = marg_base_dist.batch_shape
+    if len(batch_shape) < p.reinterpreted_batch_ndims:
+        return marg_base_dist
+    else:
+        return Independent(marg_base_dist, p.reinterpreted_batch_ndims)
 
 
 def marginalize_mixture(

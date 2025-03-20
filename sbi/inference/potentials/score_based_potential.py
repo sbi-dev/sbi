@@ -194,13 +194,15 @@ class PosteriorScoreBasedPotential(BasePotential):
         if self.guidance_method is not None:
             score_wrapper, cfg = get_guidance_method(self.guidance_method)
             cfg_params = cfg(**(self.guidance_params or {}))
-            score_fn = score_wrapper(self.score_estimator, self.prior, cfg_params)
+            score_estimator = score_wrapper(
+                self.score_estimator, self.prior, cfg_params
+            )
         else:
-            score_fn = self.score_estimator
+            score_estimator = self.score_estimator
 
         with torch.set_grad_enabled(track_gradients):
             if not self.x_is_iid or self._x_o.shape[0] == 1:
-                score = score_fn(input=theta, condition=self.x_o, time=time)
+                score = score_estimator(input=theta, condition=self.x_o, time=time)
             else:
                 assert self.prior is not None, "Prior is required for iid methods."
 
