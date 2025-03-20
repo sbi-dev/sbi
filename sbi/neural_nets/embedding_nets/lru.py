@@ -1,5 +1,5 @@
 from math import sqrt
-from typing import Optional
+from typing import Callable, Optional
 
 import numpy as np
 import torch
@@ -31,7 +31,7 @@ class LRUEmbedding(nn.Module):
         mode: str = "loop",
         dropout: float = 0.0,
         apply_input_normalization: bool = False,
-        aggregate_func: [str, callable] = "last_step",
+        aggregate_fcn: [str, Callable] = "last_step",
     ):
         """
         Args:
@@ -41,18 +41,37 @@ class LRUEmbedding(nn.Module):
                 this embedding model.
             state_dim: Dimensionality of the LRU layers hidden state.
             hidden_dim: Number of hidden units in each layer of the embedding network.
-            num_blocks: Number of LRU blocks in the embedding network.
+            num_blocks: Number of LRU blocks in the embedding network. Must be >= 1.
             r_min: Minimum distance of the state-dynamics matrix' eigenvalues from
                 the origin in the complex plane.
             r_max: Maximum distance of the state-dynamics matrix' eigenvalues from
                 the origin in the complex plane. Must be `< 1` to yield a stable system.
-            phase_max: For longer sequences, a smaller value is advised, e.g. `< pi/10`
+            phase_max: Maximum value for the LRUs' phase initialization. When working
+                with longer sequences, a smaller value is advised, e.g. `< pi/10`.
+            bidirectional: Whether the LRUs should be run bi-directionally. This is
+                expected to produce richer features at the cost of doubling the
+                (internal) state dimension.
+            mode: Whether to run the LRU's forward passes in a for-loop `mode="loop"`
+                or using an associative scan `mode="scan"`. The former one is the naive
+                implementation while the latter one relies on very recent features of
+                PyTorch. Note that at the point of writing this, PyTorch's associative
+                scan function does no support a backward pass.
+            dropout: Dropout rate applied to the hidden states of the LRU blocks.
+                There are two dropout layers in each LRU block, one after the LRU and
+                one after the state mixing.
+            apply_input_normalization: Whether to apply input normalization to the
+                inputs of each LRU Block, see `LRUBlock.forward()`.
+            aggregate_fcn: Function to aggregate the sequence of hidden states. Can be
+                `"last_step"` to take the last hidden state, `"mean"` to take the mean
+
         """
         super().__init__()
 
         # The first layer is defined by the observations' input dimension.
-        self.linear_input = nn.Linear(input_dim, hidden_dim)
+        self.input_layer = nn.Linear(input_dim, hidden_dim)
 
+        if num_blocks < 1:
+            raise ValueError("num_blocks must be >= 1.")
         lru_blocks = [
             LRUBlock(
                 hidden_dim=hidden_dim,
@@ -69,16 +88,16 @@ class LRUEmbedding(nn.Module):
         ]
         self.lru_blocks = nn.Sequential(*lru_blocks)
 
-        if aggregate_func == "last_step":
+        if aggregate_fcn == "last_step":
             self.aggregation = lambda x: x[:, -1, :]
-        elif aggregate_func == "mean" or aggregate_func == "sum":
+        elif aggregate_fcn == "mean":
             self.aggregation = lambda x: x.mean(dim=1)
-        elif isinstance(aggregate_func, str):
-            raise ValueError(f"aggretate_func {aggregate_func} not implemented")
+        elif isinstance(aggregate_fcn, str):
+            raise ValueError(f"aggretate_func {aggregate_fcn} not implemented")
         else:
-            self.aggregation = aggregate_func
+            self.aggregation = aggregate_fcn
 
-        self.output_linear = nn.Linear(hidden_dim, output_dim)
+        self.output_layer = nn.Linear(hidden_dim, output_dim)
 
     def forward(self, input: Tensor) -> Tensor:
         """Embed a batch of 2-dim observations, e.g. a multi-dimensional
@@ -91,10 +110,10 @@ class LRUEmbedding(nn.Module):
         Returns:
             Network output, i.e., features, of shape (batch_size, output_dim).
         """
-        output = self.linear_input(input)  # (batch_size, len_sequence, hidden_dim)
+        output = self.input_layer(input)  # (batch_size, len_sequence, hidden_dim)
         output = self.lru_blocks(output)  # (batch_size, len_sequence, hidden_dim)
         output = self.aggregation(output)  # (batch_size, hidden_dim)
-        output = self.output_linear(output)  # (batch_size, output_dim)
+        output = self.output_layer(output)  # (batch_size, output_dim)
         return output
 
 
@@ -203,8 +222,14 @@ class LRU(nn.Module):
         if not (0 <= r_min < r_max <= 1):
             raise ValueError(
                 f"Invalid {r_min=} and/or {r_max=}. They must suffice "
-                "0 <= r_min < r_max <= 1"
+                "0 <= r_min < r_max <= 1."
             )
+        if not (0 <= phase_max <= 2 * torch.pi):
+            raise ValueError(
+                f"Invalid {phase_max=}. I must suffice 0 <= phase_max <= 2 pi."
+            )
+        if mode not in ("loop", "scan"):
+            raise ValueError(f"Invalid {mode=}. Must be 'loop' or 'scan'.")
         self.state_dim = state_dim
         self.bidirectional = bidirectional
         self.mode = mode
@@ -317,7 +342,7 @@ class LRU(nn.Module):
         # Precompute the influence of the inputs one the states. This is faster
         # than many small matrix-vector multiplications within the loop.
         u = input.to(dtype=B_norm.dtype)
-        u_times_B_norm = u @ B_norm.T
+        u_times_B_norm = u @ B_norm.T  # complex-values
 
         if self.bidirectional:
             # If the network is run bidirectionally, we simply repeat the input
@@ -355,54 +380,56 @@ class LRU(nn.Module):
         return y
 
     def _forward_scan(self, input: Tensor, state: Tensor) -> Tensor:
-        # Input size: (B, L, H)
-
+        """For details on parallel scan, check discussion in Smith et al (2022)."""
+        # Normalize the input-facing matrix.
         B_norm = self.B * self.gamma.unsqueeze(dim=-1)
 
-        # For details on parallel scan, check discussion in Smith et al (2022).
+        # Precompute the influence of the inputs one the states.
+        u = input.to(dtype=B_norm.dtype)
+        u_times_B_norm = u @ B_norm.T  # complex-values
 
-        Bu_elements = input.to(self.B.dtype) @ B_norm.T
-
-        if state is not None:
-            Bu_elements[:, 0, : self.state_dim] = Bu_elements[
-                :, 0, : self.state_dim
-            ] + (
-                self.lambda_complex[: self.state_dim].view(1, -1)
-                * state[:, : self.state_dim]
-            )
-        Lambda_elements = self.lambda_complex.view(1, 1, -1).expand(Bu_elements.shape)
-
-        elements = (
-            Lambda_elements[:, :, : self.state_dim],
-            Bu_elements[:, :, : self.state_dim],
+        u_times_B_norm[:, 0, : self.state_dim] = u_times_B_norm[
+            :, 0, : self.state_dim
+        ] + (
+            self.lambda_complex[: self.state_dim].view(1, -1)
+            * state[:, : self.state_dim]
         )
-        _, states = associative_scan(
+        lambdas = self.lambda_complex.view(1, 1, -1).expand(u_times_B_norm.shape)
+
+        # Create the elements container, and run the scan.
+        # The result is the complete sequence x.
+        elements = (
+            lambdas[:, :, : self.state_dim],
+            u_times_B_norm[:, :, : self.state_dim],
+        )
+        _, x = associative_scan(
             binary_operator_diag, elements, dim=1, combine_mode="generic"
-        )  # all x_k
+        )
 
         if self.bidirectional:
-            if state is not None:
-                Bu_elements[:, -1, self.state_dim :] = Bu_elements[
-                    :, -1, self.state_dim :
-                ] + (
-                    self.lambda_complex[self.state_dim :].view(1, -1)
-                    * state[:, self.state_dim :]
-                )
-            elements = (
-                Lambda_elements[:, :, self.state_dim :],
-                Bu_elements[:, :, self.state_dim :],
+            u_times_B_norm[:, -1, self.state_dim :] = u_times_B_norm[
+                :, -1, self.state_dim :
+            ] + (
+                self.lambda_complex[self.state_dim :].view(1, -1)
+                * state[:, self.state_dim :]
             )
-            _, inner_states2 = associative_scan(
+            elements = (
+                lambdas[:, :, self.state_dim :],
+                u_times_B_norm[:, :, self.state_dim :],
+            )
+            _, x_bi = associative_scan(
                 binary_operator_diag,
                 elements,
                 dim=1,
                 combine_mode="generic",
                 reverse=True,
             )
-            states = torch.cat([states, inner_states2], dim=-1)
-        output = (states @ self.C.mT).real + input * self.D
+            x = torch.cat([x, x_bi], dim=-1)
 
-        return output
+        # Compute the output (for both directions at the same time).
+        y = (x @ self.C.mT).real + input * self.D
+
+        return y
 
 
 # @torch.jit.script  # TODO
