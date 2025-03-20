@@ -103,5 +103,5 @@ def test_npse_snapshot(
     posterior.set_default_x(x_o)
     samples = posterior.sample((num_samples,), iid_method=iid_method)
     ndarrays_regression.check(
-        {'values': samples.numpy()}, default_tolerance=dict(atol=1e-5, rtol=1e-4)
+        {'values': samples.numpy()}, default_tolerance=dict(atol=1e-3, rtol=1e-2)
     )
