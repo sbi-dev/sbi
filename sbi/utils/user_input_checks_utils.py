@@ -10,7 +10,7 @@ from torch.distributions import Distribution, constraints
 
 
 def get_distribution_parameters(
-    dist: torch.distributions, device: Union[str, torch.device]
+    dist: torch.distributions.Distribution, device: Union[str, torch.device]
 ) -> Dict:
     """Used to get the tensors of the parameters in torch distributions.
 
