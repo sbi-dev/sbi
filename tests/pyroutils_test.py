@@ -7,6 +7,7 @@ import pytest
 import torch
 from pyro.infer import MCMC, NUTS
 from pyro.infer.predictive import Predictive
+from torch.distributions import constraints
 
 from sbi.inference import NLE, NPE, NRE
 from sbi.utils.pyroutils import (
@@ -229,7 +230,8 @@ def test_estimator_distribution_basic_properties(
     )
     assert estimator_dist.batch_shape == torch.Size([num_simulations])
     assert estimator_dist.event_shape == torch.Size([num_dim])
-    assert estimator_dist.support == torch.distributions.constraints.real
+    # work around for equality check of constraints not implemented
+    assert str(estimator_dist.support) == str(constraints.real_vector)
 
     # Test sample method
     if trainer_cls is not NRE:

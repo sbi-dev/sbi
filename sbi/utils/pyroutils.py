@@ -2,7 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from abc import abstractmethod
-from typing import Any, Callable, Tuple
+from typing import Any, Callable, Tuple, Union
 
 import pyro.distributions
 import torch
@@ -62,9 +62,18 @@ class EstimatorDistribution(pyro.distributions.TorchDistribution):
         pass
 
     @property
-    def support(self):
-        # TODO: check if we can infer a more specific support from the estimator
-        return constraints.real  # Assume continuous values
+    def support(self) -> constraints.Constraint:
+        # Note: this will currently be wrong for estimators with discrete or mixed
+        # support (e.g. `MixedDensityEstimator`). Torch constraints currently don't
+        # support mixed support, and support is primarily used for choosing
+        # unconstraining transforms for priors.
+        num_input_dims = len(self.event_shape)
+        if num_input_dims == 0:
+            # currently this branch isn't reachable by any of the estimators, but we
+            # include it to be safe
+            return constraints.real
+        else:
+            return constraints.independent(constraints.real, num_input_dims)
 
     @property
     def estimator(self):
