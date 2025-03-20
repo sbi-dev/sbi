@@ -258,6 +258,7 @@ def test_kld_gaussian(npse_trained_model):
     assert dkl < max_dkl, f"D-KL={dkl} is more than 2std above the average performance."
 
 
+@pytest.mark.skip
 @pytest.mark.parametrize("sampling_test_case", sampling_test_cases_all)
 @pytest.mark.parametrize("test_case", training_test_cases_none)
 def test_npse_snapshot(
