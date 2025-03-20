@@ -12,6 +12,7 @@ from sbi.utils.user_input_checks_utils import (
 @pytest.mark.gpu
 @pytest.mark.parametrize("device", ["cpu", "gpu"])
 def test_BoxUniform(device: str):
+    """Test moving BoxUniform prior between devices."""
     device = process_device(device)
     low = torch.tensor([0.0])
     high = torch.tensor([1.0])
@@ -52,6 +53,10 @@ def test_BoxUniform(device: str):
     ],
 )
 def test_PytorchReturnTypeWrapper(device: str, prior: torch.distributions):
+    """Test moving PytorchReturnTypeWrapper objects between devices.
+
+    Asserts that samples, prior, and log_probs are in device.
+    """
     device = process_device(device)
     prior = PytorchReturnTypeWrapper(prior)
 
@@ -71,6 +76,12 @@ def test_PytorchReturnTypeWrapper(device: str, prior: torch.distributions):
 @pytest.mark.gpu
 @pytest.mark.parametrize("device", ["cpu", "gpu"])
 def test_MultipleIndependent(device: str):
+    """Test moving MultipleIndependent objects between devices.
+
+    Asserts that samples, prior, and log_probs are in device.
+    Uses Gamma, Beta, Normal and Binomial, from
+    torch.distributions and BoxUniform form sbi.
+    """
     device = process_device(device)
     dists = [
         Gamma(torch.tensor([1.0]), torch.tensor([0.5])),
