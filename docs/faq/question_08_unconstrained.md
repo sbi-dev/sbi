@@ -1,10 +1,10 @@
-# My rejection-sampling algorithm gets stuck?
+# The inference gets stuck?
 
 If you've encountered the following warning:
 
 ```
 WARNING:root:Only 0.002% proposal samples were accepted. It
-                        may take a long time to collect the remaining 980
+                        may take a long time to collect the remaining 99980
                         samples. Consider interrupting (Ctrl-C) and switching to a
                         different sampling method with
                         `build_posterior(..., sample_with='mcmc')`. or
