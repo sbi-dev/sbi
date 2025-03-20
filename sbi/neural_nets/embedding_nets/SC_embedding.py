@@ -1,6 +1,11 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+# This code is based on and adapted from the GitHub repositories of these three papers:
+# https://arxiv.org/pdf/2010.08895
+# https://arxiv.org/pdf/2305.19663
+# https://arxiv.org/pdf/2405.14558
+
 from typing import List, Optional, Union
 
 import numpy as np
@@ -8,19 +13,34 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor, nn
 
-# TODO: add code reference
-
 
 # Class that can perform Fourier trafo for non-equally spaced grids
 class VFT:
-    def __init__(self, batch_size, n_points, modes, n_positions):
+    """Class performing Fourier transformations for non-equally
+    and equally spaced 1d grids.
+
+    Args:
+        batch_size: Training batch size
+        n_points: Number of 1d grid points
+        modes: number of Fourier modes that should be used
+        (maximal floor(n_points/2) + 1)
+        n_positions: Grid point positions. If not provided, equispaced points are used.
+    """
+
+    def __init__(
+        self,
+        batch_size: int,
+        n_points: int,
+        modes: int,
+        n_positions: Optional[Union[np.ndarray, List[float], Tensor]] = None,
+    ):
         self.number_points = n_points
         self.batch_size = batch_size
         self.modes = modes
 
         if n_positions is not None:
-            # Only works if positions are the same for all data samples
-            n_positions = torch.tensor(n_positions)
+            if not torch.is_tensor(n_positions):
+                n_positions = torch.tensor(n_positions)
             new_times = (n_positions.repeat(self.batch_size, 1) / n_positions.max())[
                 :, None, :
             ]
@@ -46,11 +66,9 @@ class VFT:
         return forward_mat, inverse_mat
 
     def forward(self, data, norm='forward'):
-        # data has shape: (batch_size, n_points, conv_channel)
-
-        data_fwd = torch.bmm(
-            self.V_fwd, data
-        )  # data_fwd: (batch, modes, conv_channels)
+        # data: (batch_size, n_points, conv_channel)
+        # data_fwd: (batch, modes, conv_channels)
+        data_fwd = torch.bmm(self.V_fwd, data)
         if norm == 'forward':
             data_fwd /= self.number_points
         elif norm == 'ortho':
@@ -59,9 +77,9 @@ class VFT:
         return data_fwd
 
     def inverse(self, data, norm='backward'):
-        # data has shape (batch, modes, conv_channels)
-
-        data_inv = torch.bmm(self.V_inv, data)  # (batch, n_points, conv_channels)
+        # data: (batch, modes, conv_channels)
+        # data_inv: (batch, n_points, conv_channels)
+        data_inv = torch.bmm(self.V_inv, data)
         if norm == 'backward':
             data_inv /= self.number_points
         elif norm == 'ortho':
@@ -123,14 +141,13 @@ class SpectralConv1d_SMM(nn.Module):
         # Compute Fourier coeffcients up to factor of e^(- something constant)
         x_ft = transform.forward(x.cfloat(), norm='forward')
         x_ft = x_ft.permute(0, 2, 1)
-        # TODO: if initialization left out, make sure this returns complex numbers
         out_ft = self.compl_mul1d(x_ft, self.weights1)
         x_ft = out_ft.permute(0, 2, 1)
 
         # Return to physical space
         x = transform.inverse(x_ft, norm='backward')
 
-        return x.real  # dimension (batch, points, conv_channels)
+        return x.real  # (batch, points, conv_channels)
 
     # Last convolutional layer that returns Fourier coefficients for embedding
     def last_layer(self, x, transform):
@@ -253,8 +270,9 @@ class SpectralConvEmbedding(nn.Module):
             x = F.gelu(x)
 
         # Send data through last convolutional layer which returns data in Fourier space
-        # (batch, modes, conv_channels, 2)
-        x_spec = self.conv_last.last_layer(x, fourier_transform)
+        x_spec = self.conv_last.last_layer(
+            x, fourier_transform
+        )  # (batch, 2*modes, conv_channels)
 
         # Reduce the number of channels with last layer
         x_spec = self.fc_last(x_spec)  # (batch, 2*modes, out_channels)
