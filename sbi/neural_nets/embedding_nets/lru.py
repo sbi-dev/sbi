@@ -51,7 +51,7 @@ class LRUEmbedding(nn.Module):
                 max_phase=max_phase,
                 bidirectional=bidirectional,
                 dropout=dropout,
-                norm=norm,
+                apply_normalization_layer=apply_normalization_layer,
             )
             for _ in range(num_layers)
         ]
@@ -100,7 +100,7 @@ class LRUBlock(nn.Module):
         max_phase: float = 2 * np.pi,
         bidirectional: bool = False,
         dropout: float = 0.0,
-        norm: bool = False,
+        apply_normalization_layer: bool = False,
     ):
         super().__init__()
         # https://github.com/NicolasZucchet/minimal-LRU/blob/main/lru/model.py
@@ -117,7 +117,7 @@ class LRUBlock(nn.Module):
         self.GELU = nn.GELU()
         self.sigmoid = nn.Sigmoid()
         self.dropout = nn.Dropout(dropout) if dropout > 0 else nn.Identity()
-        self.norm = nn.LayerNorm(hidden_dim) if norm else nn.Identity()
+        self.norm = nn.LayerNorm(hidden_dim) if apply_normalization_layer else nn.Identity()
 
     def forward(self, input: Tensor) -> Tensor:
         # Batch, len_sequence, hidden_dim
@@ -253,12 +253,16 @@ class LRU(nn.Module):
         uB = input.to(dtype=B_norm.dtype) @ B_norm.T
 
         if self.bidirectional:
-            uB = torch.cat([uB[:,:,:self.state_dim],uB[:,::-1,self.state_dim:]],dim=-1) 
+            uB = torch.cat([uB[:,:,:self.state_dim],torch.flip(uB[:,:,self.state_dim:],dims=[1])],dim=-1) 
 
         for u_step in uB.split(1, dim=1):  # dim=1 is the time dimension
             state_t = self.lambda_complex * state_t + u_step.squeeze(1)
             states.append(state_t)
         states = torch.stack(states, dim=1)
+
+        if self.bidirectional:
+            states = torch.cat([states[:,:,:self.state_dim],torch.flip(states[:,:,self.state_dim:],dims=[1])],dim=-1) 
+
 
         output = (states @ self.C.mT).real + input * self.D
 
@@ -294,9 +298,9 @@ class LRU(nn.Module):
             if state is not None:
                 Bu_elements[:, -1, self.state_dim:] = Bu_elements[:, -1, self.state_dim:] + \
                 (self.lambda_complex[self.state_dim:].view(1,-1) * state[:,self.state_dim:])
-            elements = (Lambda_elements[:,:,self.state_dim:], torch.flip(Bu_elements[:,:,self.state_dim:],dims=[1]))
+            elements = (Lambda_elements[:,:,self.state_dim:], Bu_elements[:,:,self.state_dim:])
             _, inner_states2 = associative_scan(
-                binary_operator_diag, elements, dim=1, combine_mode = 'generic', reverse=False
+                binary_operator_diag, elements, dim=1, combine_mode = 'generic', reverse=True
             )
             states = torch.cat([states, inner_states2], dim=-1)
         output = (states @ self.C.mT).real + input * self.D
