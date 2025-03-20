@@ -2,7 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from abc import abstractmethod
-from typing import Any, Callable, Tuple, Union
+from typing import Any, Callable, Tuple
 
 import pyro.distributions
 import torch
