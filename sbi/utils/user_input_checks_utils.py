@@ -189,9 +189,8 @@ class PytorchReturnTypeWrapper(Distribution):
         """
         Move the distribution to the specified device.
 
-        It moves the distribution parameters to the specific device
-        because pytorch distribution does not have a `to` method.
-        It also updates the device attribute.
+        Moves the distribution parameters to the specific device
+        and updates the device attribute.
 
         Args:
             device: device to move the distribution to.
@@ -380,6 +379,7 @@ class MultipleIndependent(Distribution):
             device: device to move the distribution to.
         """
         for i in range(len(self.dists)):
+            # ignoring because it is related to torch and not sbi
             if hasattr(self.dists[i], "to"):
                 self.dists[i].to(device)  # type: ignore
             else:

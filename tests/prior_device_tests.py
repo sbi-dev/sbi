@@ -17,20 +17,28 @@ def test_BoxUniform(device: str):
     high = torch.tensor([1.0])
     prior = BoxUniform(low, high)
     sample = prior.sample((1,))
-    assert prior.device == "cpu"
-    assert sample.device.type == "cpu"
+    assert prior.device == "cpu", "Prior is not initially in cpu."
+    assert sample.device.type == "cpu", "sample is not initially in cpu."
     log_probs = prior.log_prob(sample)
-    assert log_probs.device.type == "cpu"
+    assert log_probs.device.type == "cpu", "Log probs are not initially in cpu."
 
     prior.to(device)
-    assert prior.device == device
-    assert prior.low.device.type == device.strip(":0")
-    assert prior.high.device.type == device.strip(":0")
+    assert prior.device == device, f"Prior was not moved to {device}."
+    assert prior.low.device.type == device.strip(":0"), (
+        f"BoxUniform low tensor is not in {device}."
+    )
+    assert prior.high.device.type == device.strip(":0"), (
+        f"BoxUniform high tensor is not in {device}."
+    )
 
     sample_device = prior.sample((100,))
-    assert sample_device.device.type == device.strip(":0")
+    assert sample_device.device.type == device.strip(":0"), (
+        f"sample tensor is not in {device}."
+    )
     log_probs = prior.log_prob(sample_device)
-    assert log_probs.device.type == device.strip(":0")
+    assert log_probs.device.type == device.strip(":0"), (
+        f"log_prob tensor is not in {device}."
+    )
 
 
 @pytest.mark.gpu
@@ -48,12 +56,16 @@ def test_PytorchReturnTypeWrapper(device: str, prior: torch.distributions):
     prior = PytorchReturnTypeWrapper(prior)
 
     prior.to(device)
-    assert prior.device == device
+    assert prior.device == device, f"Prior was not correctly moved to {device}."
 
     sample_device = prior.sample((100,))
-    assert sample_device.device.type == device.strip(":0")
+    assert sample_device.device.type == device.strip(":0"), (
+        f"sample was not correctly moved to {device}."
+    )
     log_probs = prior.log_prob(sample_device)
-    assert log_probs.device.type == device.strip(":0")
+    assert log_probs.device.type == device.strip(":0"), (
+        f"log_prob was not correctly moved to {device}."
+    )
 
 
 @pytest.mark.gpu
@@ -69,10 +81,15 @@ def test_MultipleIndependent(device: str):
     ]
 
     prior = MultipleIndependent(dists)
+
     prior.to(device)
-    assert prior.device == device
+    assert prior.device == device, f"Prior was not correctly moved to {device}."
 
     sample_device = prior.sample((100,))
-    assert sample_device.device.type == device.strip(":0")
+    assert sample_device.device.type == device.strip(":0"), (
+        f"sample was not correctly moved to {device}."
+    )
     log_probs = prior.log_prob(sample_device)
-    assert log_probs.device.type == device.strip(":0")
+    assert log_probs.device.type == device.strip(":0"), (
+        f"log_prob was not correctly moved to {device}."
+    )
