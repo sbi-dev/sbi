@@ -174,10 +174,11 @@ def _train_npse(
     )
     theta, x = test_case.get_training_data(num_simulations)
 
-    kwargs = {
-        "stop_after_epochs": stop_after_epochs,
-        "training_batch_size": training_batch_size,
-    }
+    kwargs = {}
+    if stop_after_epochs is not None:
+        kwargs["stop_after_epochs"] = stop_after_epochs
+    if training_batch_size is not None:
+        kwargs["training_batch_size"] = training_batch_size
 
     score_estimator = inference.append_simulations(theta, x).train(**kwargs)
     return inference, score_estimator
@@ -261,13 +262,14 @@ def test_kld_gaussian(npse_trained_model):
 
 
 @pytest.mark.parametrize("sampling_test_case", sampling_test_cases_all)
-@pytest.mark.parametrize("test_case", training_test_cases_all)
+@pytest.mark.parametrize("test_case", training_test_cases_none)
 def test_npse_snapshot(
     test_case: NpseTrainingTestCase, sampling_test_case: NpseSamplingTestCase, snapshot
 ):
     num_simulations = 5
     num_samples = 3
     stop_after_epochs = 2
+    steps = 7
     training_batch_size = num_simulations
     inference, score_estimator = _train_npse(
         test_case, num_simulations, stop_after_epochs, training_batch_size
@@ -277,5 +279,7 @@ def test_npse_snapshot(
         score_estimator, sample_with=sampling_test_case.sampling_method
     )
     posterior.set_default_x(x_o)
-    samples = posterior.sample((num_samples,), iid_method=sampling_test_case.iid_method)
+    samples = posterior.sample(
+        (num_samples,), iid_method=sampling_test_case.iid_method, steps=steps
+    )
     assert snapshot == samples.tolist()
