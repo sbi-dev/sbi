@@ -9,6 +9,16 @@ from torch import Tensor, float32
 from torch.distributions import Distribution, constraints
 
 
+def get_distribution_parameters(dist, device):
+    params = {param: getattr(dist, param).to(device) for param in dist.arg_constraints}
+    if isinstance(dist, torch.distributions.MultivariateNormal):
+        params['precision_matrix'] = None
+        params['scale_tril'] = None
+    elif isinstance(dist, torch.distributions.Binomial):
+        params['logits'] = None
+    return params
+
+
 class CustomPriorWrapper(Distribution):
     def __init__(
         self,
@@ -118,6 +128,7 @@ class PytorchReturnTypeWrapper(Distribution):
         )
 
         self.prior = prior
+        self.device = None
         self.return_type = return_type
 
     def log_prob(self, value) -> Tensor:
@@ -149,6 +160,11 @@ class PytorchReturnTypeWrapper(Distribution):
     @property
     def support(self):
         return self.prior.support
+
+    def to(self, device):
+        params = get_distribution_parameters(self.prior, device)
+        self.prior = type(self.prior)(**params)
+        self.device = device
 
 
 class MultipleIndependent(Distribution):
