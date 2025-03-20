@@ -1078,6 +1078,14 @@ def build_zuko_flow(
                 standardizing_transform_zuko(batch_x, structured_x),
                 transform,
             )
+        # Only x (i.e., prior for NPE) can be logit transformed (not y)
+        # when x_dist is provided.
+        if z_score_x == "logit" and x_dist is not None:
+            transform = (
+                # mcmc transform provides a mapping from a
+                # bound to unbound space.
+                transform,
+            )
 
         z_score_y_bool, structured_y = z_score_parser(z_score_y)
         if z_score_y_bool:
