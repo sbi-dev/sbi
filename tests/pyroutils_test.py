@@ -141,7 +141,7 @@ def data_and_pyro_hierarchical_gaussian_mcmc_samples(
 
 
 @pytest.fixture
-def num_simulations(trainer_cls, num_trials, num_dim=1, num_subjects=1):
+def num_simulations(trainer_cls, num_trials, num_dim, num_subjects):
     num_simulations = num_dim * num_subjects * num_trials * 200
     if trainer_cls is NRE:
         num_simulations *= 5
@@ -259,6 +259,7 @@ def test_estimator_distribution_basic_properties(
     assert estimator_dist_expanded.estimator == estimator_dist.estimator
 
 
+@pytest.mark.parametrize("num_subjects", [1])  # unused, required by fixture
 @pytest.mark.parametrize("num_samples", [500])
 @pytest.mark.parametrize("warmup_steps", [500])
 @pytest.mark.parametrize("num_dim", [3, 5])
@@ -319,6 +320,7 @@ def test_pyro_gaussian_model(
     )
 
 
+@pytest.mark.parametrize("num_dim", [1])  # unused, required by fixture
 @pytest.mark.parametrize("num_samples", [500])
 @pytest.mark.parametrize("warmup_steps", [500])
 @pytest.mark.parametrize("num_trials", [1, 3])
