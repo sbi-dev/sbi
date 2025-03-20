@@ -96,6 +96,10 @@ def test_estimator_distribution_basic_properties(
     trainer = trainer_cls(prior=prior).append_simulations(theta=theta, x=x)
     density_estimator = trainer.train()
 
+    # Test checking of condition shape
+    with pytest.raises(ValueError):
+        distribution_cls(estimator=density_estimator, condition=theta[:, :1])
+
     # Test basic properties
     estimator_dist = distribution_cls(estimator=density_estimator, condition=theta)
     assert isinstance(estimator_dist, distribution_cls)

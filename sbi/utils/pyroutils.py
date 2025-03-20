@@ -78,20 +78,20 @@ class EstimatorDistribution(pyro.distributions.TorchDistribution):
 
     def _check_condition_shape(self, condition: torch.Tensor):
         """Check that the shape of `condition` is compatible with the estimator."""
-        condition_shape, _ = self.get_condition_and_event_shapes()
-        if len(condition.shape) < len(condition_shape):
+        condition_shape_expected, _ = self.get_condition_and_event_shapes()
+        if len(condition.shape) < len(condition_shape_expected):
             raise ValueError(
                 "Dimensionality of condition is too small and does not match the "
-                f"expected dimensionality {len(condition_shape)}. "
+                f"expected dimensionality {len(condition_shape_expected)}. "
                 "It should be compatible with condition_shape "
-                f"{condition_shape}."
+                f"{condition_shape_expected}."
             )
         else:
-            condition_shape = condition.shape[-len(condition_shape) :]
-            if condition_shape != condition_shape:
+            condition_shape = condition.shape[-len(condition_shape_expected) :]
+            if condition_shape != condition_shape_expected:
                 raise ValueError(
                     f"Condition shape {condition_shape} is not compatible with "
-                    f"estimator condition shape {condition_shape}"
+                    f"estimator condition shape {condition_shape_expected}"
                 )
 
 
