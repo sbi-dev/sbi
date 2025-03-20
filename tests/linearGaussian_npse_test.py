@@ -266,8 +266,8 @@ def test_npse_snapshot(
     test_case: NpseTrainingTestCase, sampling_test_case: NpseSamplingTestCase, snapshot
 ):
     num_simulations = 5
-    num_samples = 2
-    stop_after_epochs = 1
+    num_samples = 3
+    stop_after_epochs = 2
     training_batch_size = num_simulations
     inference, score_estimator = _train_npse(
         test_case, num_simulations, stop_after_epochs, training_batch_size
