@@ -192,7 +192,6 @@ def test_pyro_gaussian_model(
     distribution_cls,
     num_dim,
     num_trials,
-    num_simulations,
     gaussian_simulation_data,
     num_samples,
     warmup_steps,
