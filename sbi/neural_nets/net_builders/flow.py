@@ -18,6 +18,8 @@ from torch.distributions import Distribution
 from sbi.neural_nets.estimators import NFlowsFlow, ZukoFlow
 from sbi.utils.nn_utils import MADEMoGWrapper, get_numel
 from sbi.utils.sbiutils import (
+    biject_transform_zuko,
+    mcmc_transform,
     standardizing_net,
     standardizing_transform,
     standardizing_transform_zuko,
@@ -1073,7 +1075,21 @@ def build_zuko_flow(
         transform = flow_built.transform
 
         z_score_x_bool, structured_x = z_score_parser(z_score_x)
-        if z_score_x_bool:
+
+        # Only x (i.e., prior for NPE) can be logit transformed (not y)
+        # when x_dist is provided.
+        if z_score_x == "logit" and x_dist is not None and hasattr(x_dist, "support"):
+            logit_transform = mcmc_transform(x_dist)
+            transform = (
+                biject_transform_zuko(logit_transform),
+                transform,
+            )
+        elif z_score_x == "logit" and x_dist is None:
+            raise ValueError(
+                "Logit transformation requires a distribution provided through `x_dist`"
+                "with supported bounds (see `mcmc_transform`).",
+            )
+        elif z_score_x_bool:
             transform = (
                 standardizing_transform_zuko(batch_x, structured_x),
                 transform,
@@ -1092,7 +1108,19 @@ def build_zuko_flow(
         transforms = flow_built.transform.transforms
 
         z_score_x_bool, structured_x = z_score_parser(z_score_x)
-        if z_score_x_bool:
+
+        if z_score_x == "logit" and x_dist is not None and hasattr(x_dist, "support"):
+            logit_transform = mcmc_transform(x_dist)
+            transforms = (
+                biject_transform_zuko(logit_transform),
+                *transforms,
+            )
+        elif z_score_x == "logit" and x_dist is None:
+            raise ValueError(
+                "Logit transformation requires a distribution provided through `x_dist`"
+                "with supported bounds (see `mcmc_transform`).",
+            )
+        elif z_score_x_bool:
             transforms = (
                 standardizing_transform_zuko(batch_x, structured_x),
                 *transforms,

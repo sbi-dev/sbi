@@ -222,6 +222,35 @@ def standardizing_transform_zuko(
     )
 
 
+class CallableTransform:
+    """Wraps a PyTorch Transform to be used in Zuko UnconditionalTransform."""
+
+    def __init__(self, transform):
+        self.transform = transform
+
+    def __call__(self):
+        return self.transform
+
+
+def biject_transform_zuko(
+    transform,
+) -> zuko.flows.UnconditionalTransform:
+    """
+    Builds logit-transforming transform for Zuko flows on a bounded interval.
+
+    Args:
+        transform: A logit transformation for the given support.
+        eps: Small constant to avoid numerical issues at 0 and 1.
+
+    Returns:
+        Logit transformation for the given range.
+    """
+    return zuko.flows.UnconditionalTransform(
+        CallableTransform(transform),
+        buffer=True,
+    )
+
+
 def z_standardization(
     batch_t: Tensor,
     structured_dims: bool = False,
