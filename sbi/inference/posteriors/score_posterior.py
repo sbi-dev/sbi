@@ -140,6 +140,17 @@ class ScorePosterior(NeuralPosterior):
                 "auto_gauss" for these reasons.
             iid_params: Additional parameters passed to the iid method. See the specific
                 `IIDScoreFunction` child class for details.
+            guidance_method: Method to guide the diffusion process. If None, no guidance
+                is used. currently we support `affine_classifier_free`, which allows to
+                scale and shift the "likelihood" or "prior" score contribution. This can
+                be used to perform "super" conditioning i.e. shring the variance of the
+                likelihood. `Universal` can be used to guide the diffusion process with
+                a general guidance function. `Interval` is an isntance of that where
+                the guidance function constraints the diffusion process to a given
+                interval.
+            guidance_params: Additional parameters passed to the guidance method. See
+                the specific `ScoreAdaptation` child class for details, specifically
+                `AffineClassifierFreeCfg`, `UniversalCfg`, and `IntervalCfg`.
             max_sampling_batch_size: Maximum batch size for sampling.
             sample_with: Deprecated - use `.build_posterior(sample_with=...)` prior to
                 `.sample()`.

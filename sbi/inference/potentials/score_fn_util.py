@@ -112,7 +112,7 @@ class ScoreAdaptation(ABC):
         self.device = device
 
     @abstractmethod
-    def __call__(self, theta: Tensor, x_o: Tensor, time: Optional[Tensor] = None):
+    def __call__(self, input: Tensor, condition: Tensor, time: Optional[Tensor] = None):
         pass
 
 
@@ -143,7 +143,14 @@ class AffineClassifierFreeGuidance(ScoreAdaptation):
         Args:
             score_estimator: The score estimator.
             prior: The prior distribution.
+            cfg: Configuration for the affine classifier-free guidance. This includes
+                the scale and shift applied to the prior and likelihood contributions.
             device: The device on which to evaluate the potential.
+
+        References:
+        - [1] Classifier-Free Diffusion Guidance (2022)
+        - [2] All-in-one simulation-based inference (2024)
+
         """
 
         if prior is None:
@@ -206,6 +213,11 @@ class UniversalGuidance(ScoreAdaptation):
             prior: The prior distribution.
             cfg: Configuration for the universal guidance.
             device: The device on which to evaluate the potential.
+
+
+
+        References:
+        - [1] Universal Guidance for Diffusion Models (2022)
         """
         self.guidance_fn = cfg.guidance_fn
 
@@ -265,6 +277,9 @@ class IntervalGuidance(UniversalGuidance):
             prior: The prior distribution.
             cfg: Configuration specifying the interval bounds.
             device: The device on which to evaluate the potential.
+
+        References:
+        - [2] All-in-one simulation-based inference (2024)
         """
 
         def interval_fn(input, condition, m, std):
