@@ -103,13 +103,13 @@ class ResNetEmbedding2D(nn.Module):
         c_out: int = 20,
         c_hidden_fc: int = 1000,
         n_stages: int = 4,
-        blocks_per_stage: Union[List, None] = None,
-        c_stages: Union[List, None] = None,
+        blocks_per_stage: Optional[List] = None,
+        c_stages: Optional[List] = None,
         activation: Type[nn.Module] = nn.ReLU,
         change_c_mode: str = "conv",
         construct_mapping: Callable = construct_simple_conv_net,
-        construct_mapping_kwargs: Union[Dict, None] = None,
-        residual_block_kwargs: Union[Dict, None] = None,
+        construct_mapping_kwargs: Optional[Dict] = None,
+        residual_block_kwargs: Optional[Dict] = None,
     ) -> None:
         """
         Residual neural network mapping image-like data to a fixed sized vector.
@@ -416,10 +416,10 @@ class ResidualBLock(nn.Module):
     def __init__(
         self,
         c_in: int,
-        c_out: Union[int, None],
+        c_out: Optional[int],
         is_conv_block: bool,
         construct_mapping: Callable,
-        construct_mapping_kwargs: Union[Dict, None],
+        construct_mapping_kwargs: Optional[Dict],
         activation: Type[nn.Module],
         downsample: bool = False,
         change_c_mode: str = "conv",
