@@ -406,10 +406,10 @@ def test_kde(bandwidth, transform, sample_weights):
 
 
 @pytest.mark.parametrize(
-    "z_x", [True, False, None, "none", "independent", "structured"]
+    "z_x", [True, False, None, "none", "independent", "structured", "logit"]
 )
 @pytest.mark.parametrize(
-    "z_theta", [True, False, None, "none", "independent", "structured"]
+    "z_theta", [True, False, None, "none", "independent", "structured", "logit"]
 )
 @pytest.mark.parametrize("builder", [likelihood_nn, posterior_nn, classifier_nn])
 def test_z_scoring_structured(z_x, z_theta, builder):
