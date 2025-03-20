@@ -171,7 +171,11 @@ class MultipleIndependent(Distribution):
         dists: Sequence[Distribution],
         validate_args=None,
         arg_constraints: Optional[Dict[str, constraints.Constraint]] = None,
+        device: Optional[str] = None,
     ):
+        if device is not None:
+            raise NotImplementedError("device is not supported yet")
+
         self._check_distributions(dists)
         if validate_args is not None:
             [d.set_default_validate_args(validate_args) for d in dists]
