@@ -20,6 +20,7 @@ class VFT:
 
         if n_positions is not None:
             # Only works if positions are the same for all data samples
+            n_positions = torch.tensor(n_positions)
             new_times = (n_positions.repeat(self.batch_size, 1) / n_positions.max())[
                 :, None, :
             ]
@@ -33,8 +34,8 @@ class VFT:
         self.new_times = new_times * 2 * np.pi
 
         self.X_ = torch.arange(modes).repeat(self.batch_size, 1)[:, :, None].float()
-        self.V_fwd, self.V_inv = self.make_matrix()
         # V_fwd: (batch, modes, points) V_inf: (batch, points, modes)
+        self.V_fwd, self.V_inv = self.make_matrix()
 
     def make_matrix(self):
         X_mat = torch.bmm(self.X_, self.new_times)
@@ -47,8 +48,9 @@ class VFT:
     def forward(self, data, norm='forward'):
         # data has shape: (batch_size, n_points, conv_channel)
 
-        data_fwd = torch.bmm(self.V_fwd, data)
-        # data_fwd: (batch, modes, conv_channels)
+        data_fwd = torch.bmm(
+            self.V_fwd, data
+        )  # data_fwd: (batch, modes, conv_channels)
         if norm == 'forward':
             data_fwd /= self.number_points
         elif norm == 'ortho':
@@ -59,8 +61,7 @@ class VFT:
     def inverse(self, data, norm='backward'):
         # data has shape (batch, modes, conv_channels)
 
-        data_inv = torch.bmm(self.V_inv, data)
-        # data_inv: (batch, n_points, conv_channels)
+        data_inv = torch.bmm(self.V_inv, data)  # (batch, n_points, conv_channels)
         if norm == 'backward':
             data_inv /= self.number_points
         elif norm == 'ortho':
@@ -119,10 +120,10 @@ class SpectralConv1d_SMM(nn.Module):
         Returns:
             The real part of the transformed output tensor.
         """
-
         # Compute Fourier coeffcients up to factor of e^(- something constant)
         x_ft = transform.forward(x.cfloat(), norm='forward')
         x_ft = x_ft.permute(0, 2, 1)
+        # TODO: if initialization left out, make sure this returns complex numbers
         out_ft = self.compl_mul1d(x_ft, self.weights1)
         x_ft = out_ft.permute(0, 2, 1)
 
@@ -166,7 +167,7 @@ class SpectralConvEmbedding(nn.Module):
         out_channels: int = 3,
         conv_channels: int = 8,
         num_layers: int = 3,
-        n_positions: Optional[Union[np.ndarray, List[float]]] = None,
+        n_positions: Optional[Union[np.ndarray, List[float], Tensor]] = None,
     ):
         """SpectralConvEmbedding is a neural network module that performs convolution
         in Fourier space for 1D input data (that can have multiple channels).
@@ -197,8 +198,8 @@ class SpectralConvEmbedding(nn.Module):
         self.num_layers = num_layers
         self.n_positions = n_positions
 
-        # Initialize fully connected layer to raise number of input channels
-        # to number of convolutional channels
+        # Initialize fully connected layer to raise number of
+        # input channels to number of convolutional channels
         self.fc0 = nn.Linear(self.in_channels, self.conv_channels)
 
         # Inititalize layers performing convolution in Fourier space
