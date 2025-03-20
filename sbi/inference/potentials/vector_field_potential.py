@@ -130,13 +130,13 @@ class PosteriorVectorFieldBasedPotential(BasePotential):
     def __call__(
         self,
         theta: Tensor,
-        track_gradients: bool = True,
+        track_gradients: bool = False,
     ) -> Tensor:
         """Return the potential (posterior log prob) via probability flow ODE.
 
         Args:
             theta: The parameters at which to evaluate the potential.
-            track_gradients: Whether to track gradients.
+            track_gradients: Whether to track gradients. Default is False.
 
         Returns:
             The potential function, i.e., the log probability of the posterior.
@@ -181,7 +181,10 @@ class PosteriorVectorFieldBasedPotential(BasePotential):
             return masked_log_prob
 
     def gradient(
-        self, theta: Tensor, time: Optional[Tensor] = None, track_gradients: bool = True
+        self,
+        theta: Tensor,
+        time: Optional[Tensor] = None,
+        track_gradients: bool = False,
     ) -> Tensor:
         r"""Returns the potential function gradient for score-based methods.
 
@@ -190,7 +193,7 @@ class PosteriorVectorFieldBasedPotential(BasePotential):
             time: The diffusion time. If None, then `t_min` of the
                 self.vector_field_estimator is used
                 (i.e. we evaluate the gradient of the actual data distribution).
-            track_gradients: Whether to track gradients.
+            track_gradients: Whether to track gradients. Default is False.
 
         Returns:
             The gradient of the potential function.
