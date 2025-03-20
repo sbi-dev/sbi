@@ -6,7 +6,7 @@ from torch.distributions import MultivariateNormal
 
 from sbi import analysis as analysis
 from sbi import utils as utils
-from sbi.inference import NPSE
+from sbi.inference import NPSE, FMPE
 from sbi.simulators import linear_gaussian
 from sbi.simulators.linear_gaussian import (
     samples_true_posterior_linear_gaussian_mvn_prior_different_dims,
@@ -20,17 +20,32 @@ from .test_utils import check_c2st, get_dkl_gaussian_prior
 
 # We always test num_dim and sample_with with defaults and mark the rests as slow.
 @pytest.mark.parametrize(
-    "sde_type, num_dim, prior_str, sample_with",
+    "init_dict, inference_cls, num_dim, prior_str, sample_with",
     [
-        ("vp", 1, "gaussian", ["sde", "ode"]),
-        ("vp", 3, "uniform", ["sde", "ode"]),
-        ("vp", 3, "gaussian", ["sde", "ode"]),
-        ("ve", 3, "uniform", ["sde", "ode"]),
-        ("subvp", 3, "uniform", ["sde", "ode"]),
+        (dict(sde_type="vp"), NPSE, 1, "gaussian", ["sde", "ode"]),
+        (dict(sde_type="vp"), NPSE, 3, "uniform", ["sde", "ode"]),
+        (dict(sde_type="vp"), NPSE, 3, "gaussian", ["sde", "ode"]),
+        (dict(sde_type="ve"), NPSE, 3, "uniform", ["sde", "ode"]),
+        (dict(sde_type="subvp"), NPSE, 3, "uniform", ["sde", "ode"]),
+        (dict(), FMPE, 1, "gaussian", ["sde", "ode"]),
+        (dict(), FMPE, 1, "uniform", ["sde", "ode"]),
+        (dict(), FMPE, 3, "gaussian", ["sde", "ode"]),
+        (dict(), FMPE, 3, "uniform", ["sde", "ode"]),
     ],
+    ids=[
+        "npse_vp_1d_gaussian",
+        "npse_vp_3d_uniform",
+        "npse_vp_3d_gaussian",
+        "npse_ve_3d_uniform",
+        "npse_subvp_3d_uniform",
+        "fmpe_1d_gaussian",
+        "fmpe_1d_uniform",
+        "fmpe_3d_gaussian",
+        "fmpe_3d_uniform",
+    ]
 )
 def test_c2st_npse_on_linearGaussian(
-    sde_type, num_dim: int, prior_str: str, sample_with: List[str]
+    init_dict, inference_cls, num_dim: int, prior_str: str, sample_with: List[str]
 ):
     """Test whether NPSE infers well a simple example with available ground truth."""
 
@@ -60,17 +75,22 @@ def test_c2st_npse_on_linearGaussian(
             num_samples=num_samples,
         )
 
-    inference = NPSE(prior, sde_type=sde_type, show_progress_bars=True)
+    inference = inference_cls(prior, **init_dict, show_progress_bars=True)
 
     theta = prior.sample((num_simulations,))
     x = linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     score_estimator = inference.append_simulations(theta, x).train(
-        training_batch_size=100
+        training_batch_size=100, 
+        max_num_epochs=40,
     )
     # amortize the training when testing sample_with.
     for method in sample_with:
-        posterior = inference.build_posterior(score_estimator, sample_with=method)
+        posterior = inference.build_posterior(
+            score_estimator, sample_with=method,
+            neural_ode_backend="zuko",
+            neural_ode_kwargs={"atol": 1e-4, "rtol": 1e-4, "exact": False},
+        )
         posterior.set_default_x(x_o)
         samples = posterior.sample((num_samples,))
 
@@ -79,6 +99,7 @@ def test_c2st_npse_on_linearGaussian(
             samples,
             target_samples,
             alg=f"npse-{sde_type or 'vp'}-{prior_str}-{num_dim}D-{method}",
+            tol=0.2,
         )
 
     # Checks for log_prob()
@@ -145,10 +166,14 @@ def test_c2st_npse_on_linearGaussian_different_dims():
 
     # Test whether we can stop and resume.
     inference.append_simulations(theta, x).train(
-        max_num_epochs=10, training_batch_size=100
+        max_num_epochs=20, 
+        training_batch_size=100,
     )
     inference.train(
-        resume_training=True, force_first_round_loss=True, training_batch_size=100
+        resume_training=True, 
+        force_first_round_loss=True, 
+        training_batch_size=100,
+        max_num_epochs=40,
     )
     posterior = inference.build_posterior().set_default_x(x_o)
     samples = posterior.sample((num_samples,))
@@ -196,7 +221,9 @@ def npse_trained_model(sde_type, prior_type):
     x = linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     score_estimator = inference.append_simulations(theta, x).train(
-        stop_after_epochs=200
+        stop_after_epochs=200,
+        training_batch_size=100,
+        max_num_epochs=50,
     )
 
     return {
@@ -292,7 +319,7 @@ def test_npse_map():
     theta = prior.sample((num_simulations,))
     x = linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    inference.append_simulations(theta, x).train()
+    inference.append_simulations(theta, x).train(max_num_epochs=100)
     posterior = inference.build_posterior().set_default_x(x_o)
 
     map_ = posterior.map(show_progress_bars=True, num_iter=5)

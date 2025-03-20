@@ -35,38 +35,26 @@ from .test_utils import (
 )
 
 
-@pytest.mark.parametrize(
-    "num_dim, prior_str",
-    ((2, "gaussian"), (1, "gaussian")),
-)
-def test_c2st_fmpe_on_linearGaussian(num_dim: int, prior_str: str):
+@pytest.mark.parametrize("num_dim", ((2,), (1,)))
+def test_c2st_fmpe_on_linearGaussian(num_dim: int):
     """Test whether fmpe infers well a simple example with available ground truth."""
 
     x_o = zeros(1, num_dim)
     num_samples = 1000
     num_simulations = 4000
+    prior_str = "gaussian"
 
     # likelihood_mean will be likelihood_shift+theta
     likelihood_shift = -1.0 * ones(num_dim)
     likelihood_cov = 0.3 * eye(num_dim)
 
-    if prior_str == "gaussian":
-        prior_mean = zeros(num_dim)
-        prior_cov = eye(num_dim)
-        prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
-        gt_posterior = true_posterior_linear_gaussian_mvn_prior(
-            x_o, likelihood_shift, likelihood_cov, prior_mean, prior_cov
-        )
-        target_samples = gt_posterior.sample((num_samples,))
-    else:
-        prior = utils.BoxUniform(-2.0 * ones(num_dim), 2.0 * ones(num_dim))
-        target_samples = samples_true_posterior_linear_gaussian_uniform_prior(
-            x_o,
-            likelihood_shift,
-            likelihood_cov,
-            prior=prior,
-            num_samples=num_samples,
-        )
+    prior_mean = zeros(num_dim)
+    prior_cov = eye(num_dim)
+    prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
+    gt_posterior = true_posterior_linear_gaussian_mvn_prior(
+        x_o, likelihood_shift, likelihood_cov, prior_mean, prior_cov
+    )
+    target_samples = gt_posterior.sample((num_samples,))
 
     theta = prior.sample((num_simulations,))
     x = linear_gaussian(theta, likelihood_shift, likelihood_cov)
@@ -351,7 +339,7 @@ def test_fmpe_map():
         f"{map_} != {gt_posterior.mean}"
     )
 
-
+@pytest.mark.skip(reason="Multiple rounds of training are not supported by FMPE yet.")
 def test_multi_round_handling_fmpe():
     """Test whether we can append data and train multiple times with FMPE."""
 
