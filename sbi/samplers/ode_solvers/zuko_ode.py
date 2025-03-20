@@ -23,6 +23,12 @@ class ZukoNeuralODE(NeuralODE):
         r"""
         Initialize the ZukoNeuralODE class.
 
+        References:
+        ----------
+        .. [1] FFJORD: Free-form Continuous Dynamics for Scalable Reversible Generative
+           Models (Grathwohl et al., 2018)
+           https://arxiv.org/abs/1810.01367
+
         Args:
             f: The function to be integrated.
                 Must accept three arguments in the order:
@@ -40,7 +46,8 @@ class ZukoNeuralODE(NeuralODE):
             t_max: The maximum time value for the ODE solver.
             atol: The absolute tolerance for the ODE solver.
             rtol: The relative tolerance for the ODE solver.
-            exact: Whether to use the exact ODE solver.
+            exact: Whether the exact log-determinant of the Jacobian or an unbiased
+            stochastic estimate thereof is calculated.
         """
 
         super().__init__(

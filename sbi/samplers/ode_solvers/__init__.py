@@ -22,6 +22,8 @@ def build_neural_ode(
     mean_base: Tensor,
     std_base: Tensor,
     backend: str = "zuko",
+    t_min: float = 0.0,
+    t_max: float = 1.0,
     **kwargs,
 ) -> NeuralODE:
     """
@@ -33,6 +35,8 @@ def build_neural_ode(
         mean_base: The mean of the base distribution.
         std_base: The std of the base distribution.
         backend: The backend to be used. Currently only "zuko" is supported.
+        t_min: The minimum time value.
+        t_max: The maximum time value.
         **kwargs: Additional arguments provided to the backend.
 
     Returns:
@@ -42,6 +46,6 @@ def build_neural_ode(
         ValueError: If the backend is not supported.
     """
     if backend == "zuko":
-        return ZukoNeuralODE(f, net, mean_base, std_base, **kwargs)
+        return ZukoNeuralODE(f, net, mean_base, std_base, t_min, t_max, **kwargs)
     else:
         raise ValueError(f"Backend {backend} not supported")

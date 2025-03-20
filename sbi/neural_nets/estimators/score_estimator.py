@@ -72,6 +72,10 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
                 - "identity": constant weights (1.),
                 - "max_likelihood": weights proportional to the diffusion function, or
                 - a custom function that returns a Callable.
+            mean_0: Approximate mean of the target distribution.
+            std_0: Approximate standard deviation of the target distribution.
+            t_min: Minimum time value.
+            t_max: Maximum time value.
 
         """
         super().__init__(net, input_shape, condition_shape, t_min, t_max)
@@ -90,21 +94,10 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         self.register_buffer("std_0", std_0.clone().detach())
 
         # We estimate the mean and std of the source distribution at time t_max.
-        mean_base = self.approx_marginal_mean(torch.tensor([t_max]))
-        std_base = self.approx_marginal_std(torch.tensor([t_max]))
-        self.register_buffer("_mean_base", mean_base)
-        self.register_buffer("_std_base", std_base)
-
-    @property
-    def mean_base(self) -> Tensor:
-        r"""Mean of the base distribution (the initial noise at time t=T)."""
-        return self._mean_base
-
-    @property
-    def std_base(self) -> Tensor:
-        r"""Standard deviation of the base distribution
-        (the initial noise at time t=T)."""
-        return self._std_base
+        mean_base = self.approx_marginal_mean(torch.tensor([t_max])).flatten()[0]
+        std_base = self.approx_marginal_std(torch.tensor([t_max])).flatten()[0]
+        self._mean_base.fill_(mean_base)
+        self._std_base.fill_(std_base)
 
     def forward(self, input: Tensor, condition: Tensor, time: Tensor) -> Tensor:
         r"""Forward pass of the score estimator

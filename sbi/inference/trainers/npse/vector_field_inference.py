@@ -176,7 +176,7 @@ class VectorFieldInference(NeuralInference):
         learning_rate: float = 5e-4,
         validation_fraction: float = 0.1,
         stop_after_epochs: int = 50,
-        max_num_epochs: int = 2**31 - 1,
+        max_num_epochs: int = 500,
         clip_max_norm: Optional[float] = 5.0,
         calibration_kernel: Optional[Callable] = None,
         ema_loss_decay: float = 0.1,

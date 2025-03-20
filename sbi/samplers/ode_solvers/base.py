@@ -16,7 +16,7 @@ class NeuralODE(LazyDistribution):
     it returns the distribution object with `log_prob` and
     `sample` methods. These methods internally solve the ODE
     for the provided function :math:`f(x_t, t, x_o)` and
-    track the log det Jacobian of the continuous flow when
+    track the log-determinant of the Jacobian when
     calculating the `log_prob`.
     """
 
