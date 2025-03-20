@@ -115,34 +115,27 @@ class FlowMatchingEstimator(ConditionalDensityEstimator):
         # the flow will apply and take into account input zscoring.
         input_reshaped = reshape_to_batch_event(input, input.shape[2:])
         condition = reshape_to_batch_event(condition, condition.shape[2:])
-        log_probs = self.flow(condition=condition).log_prob(input_reshaped)
+        embedded_condition = self._embedding_net(condition)
+        log_probs = self.flow(condition=embedded_condition).log_prob(input_reshaped)
         log_probs = log_probs.reshape(input.shape[0], input.shape[1])
         return log_probs
 
     def sample(self, sample_shape: torch.Size, condition: Tensor, **kwargs) -> Tensor:
         batch_size_ = condition.shape[0]
-        print("before reshape, condition", condition.shape)
-        # condition = reshape_to_batch_event(condition, condition.shape[2:])
-        print("during sampling, condition", condition.shape)
-        samples = self.flow(condition=condition).sample(sample_shape)
-        # sample shape right now is (num_samples,)
-        print(
-            "during sampling, sample_shape",
-            sample_shape,
-            "input shape",
-            self.input_shape,
-        )
-        # samples = self.custom_euler_integration(
-        #     condition=condition, sample_shape=sample_shape
-        # )
-        print("after custom euler integration, samples", samples.shape)
+
+        embedded_condition = self._embedding_net(condition)
+        samples = self.flow(condition=embedded_condition).sample(sample_shape)
+
         samples = torch.reshape(samples, (sample_shape[0], batch_size_, -1))
         return samples
 
     def sample_and_log_prob(
         self, sample_shape: torch.Size, condition: Tensor, **kwargs
     ) -> Tuple[Tensor, Tensor]:
-        samples, log_probs = self.flow(condition).rsample_and_log_prob(sample_shape)
+        embedded_condition = self._embedding_net(condition)
+        samples, log_probs = self.flow(
+            condition=embedded_condition
+        ).rsample_and_log_prob(sample_shape)
 
         return samples, log_probs
 
@@ -159,8 +152,6 @@ class FlowMatchingEstimator(ConditionalDensityEstimator):
         Returns:
             NormalizingFlow: flow with log_prob and sample methods via probability ODEs.
         """
-
-        print("in zuko, condition", condition.shape)
 
         # Define a wrapper function that properly handles dimensions during sampling
         def vector_field_fn(t, input):
@@ -200,22 +191,3 @@ class FlowMatchingEstimator(ConditionalDensityEstimator):
             transform=transform,
             base=DiagNormal(self.zeros, self.ones).expand(condition.shape[:-1]),
         )
-
-    def custom_euler_integration(
-        self, condition: Tensor, sample_shape: torch.Size
-    ) -> Tensor:
-        theta_t = torch.randn(
-            list(sample_shape) * condition.shape[0] + list(self.input_shape),
-            device=condition.device,
-        )
-        # reshape condition to repliocate sample_shape times in batch dim
-        condition = (
-            condition.unsqueeze(0)
-            .repeat(sample_shape[0], 1, 1)
-            .reshape(-1, *condition.shape[1:])
-        )
-        for i in range(100):
-            theta_t = theta_t + self.forward(
-                theta_t, condition, torch.ones(theta_t.shape[0]) * i / 100
-            )
-        return theta_t
