@@ -12,6 +12,7 @@ from torch.distributions import MultivariateNormal
 
 from sbi.neural_nets.embedding_nets import CNNEmbedding
 from sbi.neural_nets.estimators.shape_handling import reshape_to_sample_batch_event
+from sbi.neural_nets.estimators.zuko_flow import ZukoFlow
 from sbi.neural_nets.net_builders import (
     build_categoricalmassestimator,
     build_made,
@@ -33,6 +34,8 @@ from sbi.neural_nets.net_builders import (
     build_zuko_sospf,
     build_zuko_unaf,
 )
+from sbi.neural_nets.net_builders.flow import build_zuko_flow
+from sbi.utils.torchutils import BoxUniform
 
 # List of all density estimator builders for testing.
 model_builders = [
@@ -435,3 +438,45 @@ def test_mixed_density_estimator(
     # Test samples
     samples = density_estimator.sample(sample_shape, condition=conditions)
     assert samples.shape == (*sample_shape, batch_dim, *input_event_shape)
+
+
+def test_build_zuko_flow_logit():
+    batch_x = torch.randn(10, 5)
+    batch_y = torch.randn(10, 3)
+    num_dim = 5
+    x_dist = BoxUniform(
+        low=-2 * torch.ones(num_dim), high=2 * torch.ones(num_dim)
+    )  # Define a bounded distribution
+
+    # Test case where x_dist is provided (should not raise an error)
+    try:
+        flow = build_zuko_flow(
+            which_nf="MAF",
+            batch_x=batch_x,
+            batch_y=batch_y,
+            z_score_x="logit",
+            z_score_y="logit",
+            x_dist=x_dist,
+        )
+        assert isinstance(flow, ZukoFlow)
+        print(
+            "Test passed: build_zuko_flow works with logit transformation"
+            "when x_dist is provided."
+        )
+    except Exception as e:
+        raise AssertionError(f"Test failed with exception: {e}") from e
+
+    # Test case where x_dist is missing (should raise ValueError)
+    with pytest.raises(
+        ValueError,
+        match="Logit transformation requires a distribution provided through `x_dist`",
+    ):
+        build_zuko_flow(
+            which_nf="MAF",
+            batch_x=batch_x,
+            batch_y=batch_y,
+            z_score_x="logit",
+            z_score_y="logit",
+            x_dist=None,  # No distribution provided
+        )
+        print("Test passed: ValueError raised when x_dist is missing.")
