@@ -1,10 +1,12 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-# This code is based on and adapted from the GitHub repositories of these three papers:
+# This code is based on on the following three papers
 # https://arxiv.org/pdf/2010.08895
 # https://arxiv.org/pdf/2305.19663
 # https://arxiv.org/pdf/2405.14558
+# and partially copied from the following repository:
+# https://github.com/camlab-ethz/FUSE
 
 from typing import List, Optional, Union
 
@@ -14,7 +16,6 @@ import torch.nn.functional as F
 from torch import Tensor, nn
 
 
-# Class that can perform Fourier trafo for non-equally spaced grids
 class VFT:
     """Class performing Fourier transformations for non-equally
     and equally spaced 1d grids.
@@ -23,7 +24,7 @@ class VFT:
         batch_size: Training batch size
         n_points: Number of 1d grid points
         modes: number of Fourier modes that should be used
-        (maximal floor(n_points/2) + 1)
+            (maximal floor(n_points/2) + 1)
         n_positions: Grid point positions. If not provided, equispaced points are used.
     """
 
@@ -58,6 +59,8 @@ class VFT:
         self.V_fwd, self.V_inv = self.make_matrix()
 
     def make_matrix(self):
+        """Create Fourier matrix for forward and inverse transformation"""
+
         X_mat = torch.bmm(self.X_, self.new_times)
         forward_mat = torch.exp(-1j * (X_mat))
 
@@ -66,9 +69,12 @@ class VFT:
         return forward_mat, inverse_mat
 
     def forward(self, data, norm='forward'):
-        # data: (batch_size, n_points, conv_channel)
-        # data_fwd: (batch, modes, conv_channels)
-        data_fwd = torch.bmm(self.V_fwd, data)
+        """Perform forward Fourier transformation
+        Args:
+            data: Input data with shape (batch_size, n_points, conv_channel)
+        """
+
+        data_fwd = torch.bmm(self.V_fwd, data)  # (batch, modes, conv_channels)
         if norm == 'forward':
             data_fwd /= self.number_points
         elif norm == 'ortho':
@@ -77,9 +83,12 @@ class VFT:
         return data_fwd
 
     def inverse(self, data, norm='backward'):
-        # data: (batch, modes, conv_channels)
-        # data_inv: (batch, n_points, conv_channels)
-        data_inv = torch.bmm(self.V_inv, data)
+        """Perform inverse Fourier transformation
+        Args:
+            data: Input data with shape (batch_size, modes, conv_channel)
+        """
+
+        data_inv = torch.bmm(self.V_inv, data)  # (batch, n_points, conv_channels)
         if norm == 'backward':
             data_inv /= self.number_points
         elif norm == 'ortho':
@@ -105,7 +114,7 @@ class SpectralConv1d_SMM(nn.Module):
 
         self.in_channels = in_channels
         self.out_channels = out_channels
-        self.modes = modes  # Number of selected Fourier modes
+        self.modes = modes
 
         self.scale = 1 / (in_channels * out_channels)
         self.weights1 = nn.Parameter(
@@ -113,7 +122,6 @@ class SpectralConv1d_SMM(nn.Module):
             * torch.rand(in_channels, out_channels, self.modes, dtype=torch.cfloat)
         )
 
-    # Complex multiplication
     def compl_mul1d(self, input, weights):
         """
         Performs complex multiplication in the Fourier domain.
@@ -136,7 +144,8 @@ class SpectralConv1d_SMM(nn.Module):
             transform: Fourier transform operator with forward and inverse methods.
 
         Returns:
-            The real part of the transformed output tensor.
+            The real part of the transformed output tensor
+            with shape (batch, points, conv_channels).
         """
         # Compute Fourier coeffcients up to factor of e^(- something constant)
         x_ft = transform.forward(x.cfloat(), norm='forward')
@@ -147,9 +156,8 @@ class SpectralConv1d_SMM(nn.Module):
         # Return to physical space
         x = transform.inverse(x_ft, norm='backward')
 
-        return x.real  # (batch, points, conv_channels)
+        return x.real
 
-    # Last convolutional layer that returns Fourier coefficients for embedding
     def last_layer(self, x, transform):
         """
         Last convolutional layer returning Fourier coefficients to be used as embedding
@@ -159,7 +167,7 @@ class SpectralConv1d_SMM(nn.Module):
             transform: Fourier transform operator with forward and inverse methods.
 
         Returns:
-            Transformed output tensor (in Fourier domain).
+            Transformed output tensor of shape (batch, 2*modes, conv_channels).
         """
 
         # Compute Fourier coeffcients up to factor of e^(- something constant)
@@ -172,7 +180,7 @@ class SpectralConv1d_SMM(nn.Module):
         x_ft = x_ft.permute(0, 1, 3, 2)
         x_ft = x_ft.reshape(x.shape[0], 2 * self.modes, self.out_channels)
 
-        return x_ft  # (batch, 2*modes, conv_channels)
+        return x_ft
 
 
 class SpectralConvEmbedding(nn.Module):
@@ -257,7 +265,7 @@ class SpectralConvEmbedding(nn.Module):
         # Reshape data
         batch_size = x.shape[0]
         x = x.view(batch_size, -1, self.in_channels)
-        x = self.fc0(x)  # dimension (batch_size, n_points, in_channels)
+        x = self.fc0(x)  # (batch_size, n_points, in_channels)
 
         # Initialize Fourier transform for arbitrarily spaced points
         fourier_transform = VFT(batch_size, self.n_points, self.modes, self.n_positions)
@@ -277,4 +285,4 @@ class SpectralConvEmbedding(nn.Module):
         # Reduce the number of channels with last layer
         x_spec = self.fc_last(x_spec)  # (batch, 2*modes, out_channels)
 
-        return x_spec.reshape(batch_size, -1)  # flatten array to use with SBI
+        return x_spec.reshape(batch_size, -1)
