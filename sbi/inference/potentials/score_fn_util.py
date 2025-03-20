@@ -274,12 +274,12 @@ class IntervalGuidance(UniversalGuidance):
 
             scale = cfg.scale_factor / (m**2 * std**2)
             upper_bound = (
-                F.logsigmoid(scale * (input - cfg.upper_bound))
+                F.logsigmoid(-scale * (input - cfg.upper_bound))
                 if cfg.upper_bound is not None
                 else torch.zeros_like(input)
             )
             lower_bound = (
-                F.logsigmoid(-scale * (input - cfg.lower_bound))
+                F.logsigmoid(scale * (input - cfg.lower_bound))
                 if cfg.lower_bound is not None
                 else torch.zeros_like(input)
             )

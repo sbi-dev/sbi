@@ -1,6 +1,7 @@
 from typing import List
 
 import pytest
+import torch
 from torch import eye, ones, zeros
 from torch.distributions import MultivariateNormal
 
@@ -217,7 +218,7 @@ def npse_trained_model(sde_type, prior_type):
 
 @pytest.mark.slow
 @pytest.mark.parametrize(
-    "iid_method, num_trial",
+    "iid_method, num_trial",    
     [
         pytest.param("fnpe", 3, id="fnpe-2trials"),
         pytest.param("gauss", 3, id="gauss-6trials"),
@@ -269,6 +270,87 @@ def test_npse_iid_inference(
         alg=f"npse-{sde_type}-{prior_type}-{num_dim}-{iid_method}-{num_trial}iid-trials",
         tol=0.05 * min(num_trial, 8),
     )
+
+@pytest.mark.slow
+@pytest.mark.parametrize(
+    "guidance_params",
+    [
+        pytest.param({"lower_bound": 0.0, "upper_bound": 1.0}, id="upper and lower"),
+        pytest.param({"lower_bound": None, "upper_bound": 1.5}, id="only upper"),
+        pytest.param({"lower_bound": 1.0, "upper_bound": None}, id="only lower"),
+    ],
+)
+def test_npse_interval_guidance(npse_trained_model, guidance_params):
+    """Test whether NPSE infers well a simple example with available ground truth."""
+    num_samples = 1000
+
+    # Extract data from fixture
+    score_estimator = npse_trained_model["score_estimator"]
+    inference = npse_trained_model["inference"]
+    num_dim = npse_trained_model["num_dim"]
+
+    x_o = zeros(1, num_dim)
+    posterior = inference.build_posterior(score_estimator)
+    posterior.set_default_x(x_o)
+    samples = posterior.sample(
+        (num_samples,), guidance_method="interval", guidance_params=guidance_params
+    )
+    samples_soft_lower = torch.min(samples, dim=0).values + 1e-1
+    samples_soft_upper = torch.max(samples, dim=0).values - 1e-1
+
+    if guidance_params["lower_bound"] is not None:
+        assert (samples_soft_lower >= guidance_params["lower_bound"]).all()
+    if guidance_params["upper_bound"] is not None:
+        assert (samples_soft_upper <= guidance_params["upper_bound"]).all()
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize(
+    "guidance_params",
+    [
+        pytest.param({"likelihood_scale": 2.0}, id="increase_likelihood"),
+        pytest.param({"likelihood_scale": 0.5}, id="decrease likelihood"),
+    ],
+)
+def test_npse_affine_classifier_free(npse_trained_model, guidance_params):
+    """Test whether NPSE infers well a simple example with available ground truth."""
+    num_samples = 1000
+
+    # Extract data from fixture
+    score_estimator = npse_trained_model["score_estimator"]
+    inference = npse_trained_model["inference"]
+    num_dim = npse_trained_model["num_dim"]
+    likelihood_shift = npse_trained_model["likelihood_shift"]
+    likelihood_cov = npse_trained_model["likelihood_cov"]
+    prior_mean = npse_trained_model["prior_mean"]
+    prior_cov = npse_trained_model["prior_cov"]
+    prior = npse_trained_model["prior"]
+    if not isinstance(prior, MultivariateNormal):
+        return
+
+    x_o = zeros(1, num_dim)
+    posterior = inference.build_posterior(score_estimator)
+    posterior.set_default_x(x_o)
+    samples = posterior.sample(
+        (num_samples,),
+        guidance_method="affine_classifier_free",
+        guidance_params=guidance_params,
+    )
+
+    if "likelihood_scale" in guidance_params:
+        adapted_likelihood_shift = (
+            likelihood_shift * guidance_params["likelihood_scale"]
+        )
+        posterior = true_posterior_linear_gaussian_mvn_prior(
+            x_o, adapted_likelihood_shift, likelihood_cov, prior_mean, prior_cov
+        )
+        target_samples = posterior.sample((num_samples,))
+        # Compute the c2st and assert it is near chance level of 0.5.
+        check_c2st(
+            samples,
+            target_samples,
+            alg=f"npse-vp-gaussian-{num_dim}-affine_classifier_free",
+        )
 
 
 @pytest.mark.slow
