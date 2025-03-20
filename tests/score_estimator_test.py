@@ -9,7 +9,7 @@ import pytest
 import torch
 
 from sbi.neural_nets.embedding_nets import CNNEmbedding
-from sbi.neural_nets.net_builders import build_score_estimator
+from sbi.neural_nets.net_builders import build_mlp_vector_field
 
 
 @pytest.mark.parametrize("sde_type", ["vp", "ve", "subvp"])
@@ -45,7 +45,7 @@ def test_score_estimator_loss_shapes(
 @pytest.mark.parametrize("device", ["cpu", "cuda"])
 def test_score_estimator_on_device(sde_type, device):
     """Test whether DensityEstimators can be moved to the device."""
-    score_estimator = build_score_estimator(
+    score_estimator = build_mlp_vector_field(
         torch.randn(100, 1), torch.randn(100, 1), sde_type=sde_type
     )
     score_estimator.to(device)
@@ -123,7 +123,7 @@ def _build_score_estimator_and_tensors(
     else:
         embedding_net_x = torch.nn.Identity()
 
-    score_estimator = build_score_estimator(
+    score_estimator = build_mlp_vector_field(
         torch.randn_like(building_thetas),
         torch.randn_like(building_xs),
         sde_type=sde_type,
