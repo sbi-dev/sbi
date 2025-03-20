@@ -28,6 +28,7 @@ def vector_field_estimator_based_potential(
     prior: Optional[Distribution],
     x_o: Optional[Tensor],
     enable_transform: bool = True,
+    **kwargs
 ) -> Tuple["PosteriorVectorFieldBasedPotential", TorchTransform]:
     r"""Returns the potential function gradient for score estimators.
 
@@ -36,11 +37,13 @@ def vector_field_estimator_based_potential(
         prior: The prior distribution.
         x_o: The observed data at which to evaluate the vector field.
         enable_transform: Whether to enable transforms. Not supported yet.
+        **kwargs: Additional keyword arguments passed to
+            `PosteriorVectorFieldBasedPotential`.
     """
     device = str(next(vector_field_estimator.parameters()).device)
 
     potential_fn = PosteriorVectorFieldBasedPotential(
-        vector_field_estimator, prior, x_o, device=device
+        vector_field_estimator, prior, x_o, device=device, **kwargs
     )
 
     if prior is not None:
@@ -84,15 +87,16 @@ class PosteriorVectorFieldBasedPotential(BasePotential):
         self.iid_method = iid_method
         self.iid_params = iid_params
 
-        self.neural_ode_backend = neural_ode_backend
-        self.neural_ode_kwargs = neural_ode_kwargs or {}
+        neural_ode_kwargs = neural_ode_kwargs or {}
         self.neural_ode = build_neural_ode(
             self.vector_field_estimator.ode_fn,
             self.vector_field_estimator.net,
             self.vector_field_estimator.mean_base,
             self.vector_field_estimator.std_base,
-            backend=self.neural_ode_backend,
-            **self.neural_ode_kwargs,
+            backend=neural_ode_backend,
+            t_min=self.vector_field_estimator.t_min,
+            t_max=self.vector_field_estimator.t_max,
+            **neural_ode_kwargs,
         )
 
         super().__init__(prior, x_o, device=device)

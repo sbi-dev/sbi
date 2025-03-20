@@ -451,6 +451,7 @@ class VectorFieldInference(NeuralInference):
         vector_field_estimator: Optional[ConditionalVectorFieldEstimator] = None,
         prior: Optional[Distribution] = None,
         sample_with: str = "sde",
+        **kwargs,
     ) -> VectorFieldPosterior:
         r"""Build posterior from the score estimator.
 
@@ -468,6 +469,8 @@ class VectorFieldInference(NeuralInference):
                 'sde' (default) or 'ode'. The 'sde' method uses the score to
                 do a Langevin diffusion step, while the 'ode' method uses the score to
                 define a probabilistic ODE and solves it with a numerical ODE solver.
+            **kwargs: Additional keyword arguments passed to
+                `PosteriorVectorFieldBasedPotential`.
 
         Returns:
             Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods.
@@ -497,6 +500,7 @@ class VectorFieldInference(NeuralInference):
             prior,
             device=device,
             sample_with=sample_with,
+            **kwargs,
         )
 
         self._posterior = posterior

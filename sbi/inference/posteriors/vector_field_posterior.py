@@ -53,6 +53,7 @@ class VectorFieldPosterior(NeuralPosterior):
         device: Optional[str] = None,
         enable_transform: bool = True,
         sample_with: str = "sde",
+        **kwargs,
     ):
         """
         Args:
@@ -67,6 +68,8 @@ class VectorFieldPosterior(NeuralPosterior):
                 returned for `theta_transform`. True is not supported yet.
             sample_with: Whether to sample from the posterior using the ODE-based
                 sampler or the SDE-based sampler.
+            **kwargs: Additional keyword arguments passed to
+                `PosteriorVectorFieldBasedPotential`.
         """
 
         check_prior(prior)
@@ -75,6 +78,7 @@ class VectorFieldPosterior(NeuralPosterior):
             prior,
             x_o=None,
             enable_transform=enable_transform,
+            **kwargs
         )
         super().__init__(
             potential_fn=potential_fn,

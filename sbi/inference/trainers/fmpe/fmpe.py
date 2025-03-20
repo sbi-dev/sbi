@@ -60,6 +60,7 @@ class FMPE(VectorFieldInference):
         vector_field_estimator: Optional[ConditionalVectorFieldEstimator] = None,
         prior: Optional[Distribution] = None,
         sample_with: str = "ode",
+        **kwargs,
     ) -> VectorFieldPosterior:
         r"""Build posterior from the flow matching estimator. Note that
         this is the same as the NPSE posterior, but the sample_with method
@@ -81,6 +82,9 @@ class FMPE(VectorFieldInference):
                 the score to do a Langevin diffusion step, while the 'ode' method
                 uses the score to define a probabilistic ODE and solves it with
                 a numerical ODE solver.
+            **kwargs: Additional keyword arguments passed to
+                `PosteriorVectorFieldBasedPotential`.
+
 
         Returns:
             Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods.
@@ -89,4 +93,5 @@ class FMPE(VectorFieldInference):
             vector_field_estimator=vector_field_estimator,
             prior=prior,
             sample_with=sample_with,
+            **kwargs,
         )
