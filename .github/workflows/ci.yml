@@ -64,7 +64,7 @@ jobs:
     #     [ -f .testmondata ] && chmod u+w .testmondata || true
 
     - name: Run fast CPU tests with coverage
-      run: uv run pytest -v -n auto -m "not slow and not gpu" --cov=sbi --cov-report=xml --splitting-algorithm least_duration --splits ${{ matrix.split_size }} --group ${{ matrix.group_number }} tests/ #--testmon-forceselect
+      run: uv run pytest -v -n auto -m "not slow and not gpu" --cov=sbi --cov-report=xml --splitting-algorithm least_duration --splits ${{ matrix.split_size }} --group ${{ matrix.group_number }} tests/test_snapshot.py #--testmon-forceselect
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4
