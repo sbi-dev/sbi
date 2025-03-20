@@ -332,21 +332,16 @@ class BoxUniform(Independent):
             reinterpreted_batch_ndims,
         )
 
-    def to(self, device: Union[str, torch.device]):
+    def to(self, device: Union[str, torch.device]) -> None:
         """
         Moves the distribution to the specified device **in place**.
 
         Args:
-            device (str): Target device (e.g., "cpu", "cuda", "mps").
-
-        Returns:
-            self (BoxUniform): The modified BoxUniform instance.
+            device: Target device (e.g., "cpu", "cuda", "mps").
         """
         # Update the device attribute
         self.device = device
-
-        if not isinstance(device, torch.device):
-            device = torch.device(device)
+        device = process_device(device)
 
         # Move tensors to the new device
         self.low = self.low.to(device=device)
