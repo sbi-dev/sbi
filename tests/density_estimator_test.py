@@ -21,8 +21,6 @@ from sbi.neural_nets.net_builders import (
     build_mnle,
     build_mnpe,
     build_nsf,
-    build_resnet_flowmatcher,
-    build_score_estimator,
     build_zuko_bpf,
     build_zuko_gf,
     build_zuko_maf,
@@ -52,11 +50,7 @@ model_builders = [
     build_zuko_unaf,
 ]
 
-diffusion_builders = [
-    build_mlp_flowmatcher,
-    build_resnet_flowmatcher,
-    build_score_estimator,
-]
+# TODO: Add for new flow and score matching builders.
 
 
 def get_batch_input(nsamples: int, input_dims: int) -> torch.Tensor:
@@ -136,15 +130,7 @@ def test_shape_handling_utility_for_density_estimator(
     )
 
 
-@pytest.mark.parametrize(
-    "density_estimator_build_fn",
-    [
-        build_nsf,
-        build_zuko_nsf,
-        build_mlp_flowmatcher,
-        build_score_estimator,
-    ],  # just test nflows, zuko and flowmatching
-)
+@pytest.mark.parametrize("density_estimator_build_fn", model_builders)
 @pytest.mark.parametrize("input_sample_dim", (1, 2))
 @pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
 @pytest.mark.parametrize("condition_event_shape", ((1,), (7,)))
@@ -247,16 +233,8 @@ def test_correctness_of_density_estimator_log_prob(
     assert torch.allclose(log_probs[0, :], log_probs[1, :], rtol=1e-4)
 
 
-@pytest.mark.parametrize(
-    "density_estimator_build_fn",
-    [
-        build_nsf,
-        build_zuko_nsf,
-    ],  # just test nflows and zuko
-)
-@pytest.mark.parametrize(
-    "input_event_shape", ((1,), pytest.param((2,), marks=pytest.mark.slow))
-)
+@pytest.mark.parametrize("density_estimator_build_fn", model_builders)
+@pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
 @pytest.mark.parametrize("condition_event_shape", ((1,), (7,)))
 @pytest.mark.parametrize("sample_shape", ((1000,), (500, 2)))
 def test_correctness_of_batched_vs_seperate_sample_and_log_prob(

@@ -59,6 +59,7 @@ class FlowMatchingEstimator(ConditionalDensityEstimator):
         zscored_input = self.zscore_transform_input(input)
 
         # broadcast to match shapes of theta, x, and t
+        # NOTE: This add the third dimension
         zscored_input, embedded_condition = broadcast(
             zscored_input,  # type: ignore
             embedded_condition,
@@ -211,24 +212,26 @@ class FlowMatchingEstimator(ConditionalDensityEstimator):
             # When sampling, Zuko adds a sample dimension at the front
             # During sampling, input shape will be [num_samples, batch_size, dim]
             # But during training, it's just [batch_size, dim]
-            orig_shape = input.shape
-            if len(orig_shape) == 3:  # When sampling (has sample dimension)
-                # Reshape to merge the first two dims for processing
-                num_samples, batch_size = orig_shape[0], orig_shape[1]
-                flat_input = input.reshape(num_samples * batch_size, -1)
+            # orig_shape = input.shape
+            # if len(orig_shape) == 3:  # When sampling (has sample dimension)
+            #     # Reshape to merge the first two dims for processing
+            #     num_samples, batch_size = orig_shape[0], orig_shape[1]
+            #     flat_input = input.reshape(num_samples * batch_size, -1)
 
-                # Repeat condition to match the flattened input
-                expanded_condition = condition.repeat(num_samples, 1)
+            #     # Repeat condition to match the flattened input
+            #     expanded_condition = condition.repeat(num_samples, 1)
 
-                # Call forward with flattened tensors
-                t_expanded = t.expand(flat_input.shape[0])
-                vector_field = self.forward(flat_input, expanded_condition, t_expanded)
+            #     # Call forward with flattened tensors
+            #     t_expanded = t.expand(flat_input.shape[0])
+            #     vector_field = self.forward(flat_input, expanded_condition,
+            # t_expanded)
 
-                # Reshape back to original shape
-                return vector_field.reshape(orig_shape)
-            else:
-                # During training or evaluation, dimensions are as expected
-                return self.forward(input, condition, t)
+            #     # Reshape back to original shape
+            #     return vector_field.reshape(orig_shape)
+            # else:
+            #     # During training or evaluation, dimensions are as expected
+            #     return self.forward(input, condition, t)
+            return self.forward(input, condition, t)
 
         transform = zuko.transforms.ComposedTransform(
             FreeFormJacobianTransform(
