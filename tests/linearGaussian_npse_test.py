@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from itertools import product
 from typing import Optional
 
 import pytest
@@ -20,7 +21,7 @@ SAMPLING_METHODS = ["sde", "ode"]
 
 
 @dataclass
-class NpseTestCase:
+class NpseTrainingTestCase:
     num_dim: int
     prior_type: Optional[str]
     sde_type: str
@@ -95,62 +96,88 @@ class NpseSamplingTestCase:
     num_trials: int
 
 
-trainig_test_cases_gaussian = [
-    pytest.param(NpseTestCase(1, "gaussian", "vp"), id="gaussian_prior-dim_1-vp"),
-    pytest.param(NpseTestCase(1, "gaussian", "ve"), id="gaussian_prior-dim_1-ve"),
-    pytest.param(NpseTestCase(2, "gaussian", "ve"), id="gaussian_prior-dim_2-ve"),
-    pytest.param(NpseTestCase(2, "gaussian", "vp"), id="gaussian_prior-dim_2-vp"),
-    pytest.param(NpseTestCase(2, "gaussian", "subvp"), id="gaussian_prior-dim_2-subvp"),
+training_test_cases_gaussian = [
+    pytest.param(
+        NpseTrainingTestCase(1, "gaussian", "vp"), id="gaussian_prior-dim_1-vp"
+    ),
+    pytest.param(
+        NpseTrainingTestCase(1, "gaussian", "ve"), id="gaussian_prior-dim_1-ve"
+    ),
+    pytest.param(
+        NpseTrainingTestCase(2, "gaussian", "ve"), id="gaussian_prior-dim_2-ve"
+    ),
+    pytest.param(
+        NpseTrainingTestCase(2, "gaussian", "vp"), id="gaussian_prior-dim_2-vp"
+    ),
+    pytest.param(
+        NpseTrainingTestCase(2, "gaussian", "subvp"), id="gaussian_prior-dim_2-subvp"
+    ),
 ]
 
 training_test_cases_uniform = [
-    pytest.param(NpseTestCase(3, "uniform", "ve"), id="uniform_prior-dim_3-ve"),
-    pytest.param(NpseTestCase(3, "uniform", "vp"), id="uniform_prior-dim_3-vp"),
-    pytest.param(NpseTestCase(3, "uniform", "subvp"), id="uniform_prior-dim_3-subvp"),
+    pytest.param(NpseTrainingTestCase(3, "uniform", "ve"), id="uniform_prior-dim_3-ve"),
+    pytest.param(NpseTrainingTestCase(3, "uniform", "vp"), id="uniform_prior-dim_3-vp"),
+    pytest.param(
+        NpseTrainingTestCase(3, "uniform", "subvp"), id="uniform_prior-dim_3-subvp"
+    ),
 ]
 
 training_test_cases_none = [
-    pytest.param(NpseTestCase(2, None, "ve"), id="None_prior-dim_3-ve"),
-    pytest.param(NpseTestCase(2, None, "vp"), id="None_prior-dim_3-vp"),
-    pytest.param(NpseTestCase(2, None, "subvp"), id="None_prior-dim_3-subvp"),
+    pytest.param(NpseTrainingTestCase(2, None, "ve"), id="None_prior-dim_3-ve"),
+    pytest.param(NpseTrainingTestCase(2, None, "vp"), id="None_prior-dim_3-vp"),
+    pytest.param(NpseTrainingTestCase(2, None, "subvp"), id="None_prior-dim_3-subvp"),
 ]
 
 training_test_cases_all = (
-    trainig_test_cases_gaussian + training_test_cases_uniform + training_test_cases_none
+    training_test_cases_gaussian
+    + training_test_cases_uniform
+    + training_test_cases_none
 )
 
 sampling_test_cases_1_trial = [
-    # product
+    pytest.param(
+        NpseSamplingTestCase(iid, sampling, 1), id=f"{iid}-{sampling}-trials_1"
+    )
+    for iid, sampling in product(IID_METHODS, SAMPLING_METHODS)
 ]
 
-# "fnpe", "gauss", "auto_gauss", "jac_gauss"
 sampling_test_cases_n_trials = [
-    pytest.param(NpseSamplingTestCase("fnpe", "sde", 3)),
-    pytest.param(NpseSamplingTestCase("gauss", "sde", 3)),
-    pytest.param(NpseSamplingTestCase("auto_gauss", "sde", 3)),
-    pytest.param(NpseSamplingTestCase("jac_gauss", "sde", 3)),
-    pytest.param(NpseSamplingTestCase("fnpe", "sde", 8)),
-    pytest.param(NpseSamplingTestCase("gauss", "sde", 8)),
-    pytest.param(NpseSamplingTestCase("auto_gauss", "sde", 8)),
-    pytest.param(NpseSamplingTestCase("jac_gauss", "sde", 8)),
+    pytest.param(NpseSamplingTestCase("fnpe", "sde", 3), id="fnpe-sde-trials_3"),
+    pytest.param(NpseSamplingTestCase("gauss", "sde", 3), id="gauss-sde-trials_3"),
+    pytest.param(
+        NpseSamplingTestCase("auto_gauss", "sde", 3), id="auto_gauss-sde-trials_3"
+    ),
+    pytest.param(
+        NpseSamplingTestCase("jac_gauss", "sde", 3), id="jac_gauss-sde-trials_3"
+    ),
+    pytest.param(NpseSamplingTestCase("fnpe", "sde", 8), id="fnpe-sde-trials_8"),
+    pytest.param(NpseSamplingTestCase("gauss", "sde", 8), id="gauss-sde-trials_8"),
+    pytest.param(
+        NpseSamplingTestCase("auto_gauss", "sde", 8), id="auto_gauss-sde-trials_8"
+    ),
+    pytest.param(
+        NpseSamplingTestCase("jac_gauss", "sde", 8), id="jac_gauss-sde-trials_8"
+    ),
 ]
 
 sampling_test_cases_all = sampling_test_cases_1_trial + sampling_test_cases_n_trials
 
 
 def _train_npse(
-    test_case: NpseTestCase, num_simulations, stop_after_epochs, training_batch_size
+    test_case: NpseTrainingTestCase,
+    num_simulations,
+    stop_after_epochs,
+    training_batch_size,
 ):
     inference = NPSE(
         test_case.prior, show_progress_bars=True, sde_type=test_case.sde_type
     )
     theta, x = test_case.get_training_data(num_simulations)
 
-    kwargs = {}
-    if stop_after_epochs is not None:
-        kwargs["stop_after_epochs"] = stop_after_epochs
-    if training_batch_size is not None:
-        kwargs["training_batch_size"] = training_batch_size
+    kwargs = {
+        "stop_after_epochs": stop_after_epochs,
+        "training_batch_size": training_batch_size,
+    }
 
     score_estimator = inference.append_simulations(theta, x).train(**kwargs)
     return inference, score_estimator
@@ -161,7 +188,7 @@ def npse_trained_model(request):
     num_simulations = 5_000
     stop_after_epochs = 200
     training_batch_size = 100
-    test_case: NpseTestCase = request.param
+    test_case: NpseTrainingTestCase = request.param
     inference = NPSE(
         test_case.prior, sde_type=test_case.sde_type, show_progress_bars=True
     )
@@ -174,58 +201,28 @@ def npse_trained_model(request):
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize("sample_with", SAMPLING_METHODS)
-@pytest.mark.parametrize("iid_method", IID_METHODS)
 @pytest.mark.parametrize("npse_trained_model", training_test_cases_all, indirect=True)
-def test_c2st(npse_trained_model, iid_method, sample_with):
+@pytest.mark.parametrize("sampling_test_case", sampling_test_cases_all)
+def test_c2st(npse_trained_model, sampling_test_case: NpseSamplingTestCase):
     num_samples = 1_000
     inference, score_estimator, test_case = npse_trained_model
-    x_o = zeros(1, test_case.num_dim)
 
-    _validate_c2st(
-        iid_method, inference, num_samples, sample_with, score_estimator, test_case, x_o
+    x_o = zeros(sampling_test_case.num_trials, test_case.num_dim)
+    posterior = inference.build_posterior(
+        score_estimator, sample_with=sampling_test_case.sampling_method
     )
-
-
-@pytest.mark.slow
-@pytest.mark.parametrize(
-    "iid_method, num_trials", [(IID_METHODS[0], 3), (IID_METHODS[1], 3)]
-)
-@pytest.mark.parametrize("npse_trained_model", training_test_cases_all, indirect=True)
-def test_c2st_num_trials(npse_trained_model, iid_method, num_trials):
-    num_samples = 1_000
-    sample_with = "sde"
-    inference, score_estimator, test_case = npse_trained_model
-
-    _validate_c2st(
-        iid_method,
-        inference,
-        num_samples,
-        sample_with,
-        score_estimator,
-        test_case,
-        num_trials,
-    )
-
-
-def _validate_c2st(
-    iid_method,
-    inference,
-    num_samples,
-    sample_with,
-    score_estimator,
-    test_case,
-    num_trials,
-):
-    x_o = zeros(num_trials, test_case.num_dim)
-    posterior = inference.build_posterior(score_estimator, sample_with=sample_with)
     posterior.set_default_x(x_o)
-    npse_samples = posterior.sample((num_samples,), iid_method=iid_method)
+    npse_samples = posterior.sample(
+        (num_samples,), iid_method=sampling_test_case.iid_method
+    )
     check_c2st(
         npse_samples,
-        test_case.get_target_samples(npse_samples.shape[0], num_trials=num_trials),
+        test_case.get_target_samples(
+            npse_samples.shape[0], num_trial=sampling_test_case.num_trials
+        ),
         alg=f"npse-{test_case.sde_type or 'vp'}-{test_case.prior_type}"
-        f"-{test_case.num_dim}D-{sample_with}",
+        f"-{test_case.num_dim}D-{sampling_test_case.sampling_method}",
+        tol=0.05 * min(sampling_test_case.num_trials, 8),
     )
     if test_case.prior_type == "gaussian":
         gt_posterior = true_posterior_linear_gaussian_mvn_prior(
@@ -242,60 +239,31 @@ def _validate_c2st(
 
 @pytest.mark.slow
 @pytest.mark.parametrize(
-    "iid_method, num_trials", [(IID_METHODS[0], 3), (IID_METHODS[1], 3)]
-)
-@pytest.mark.parametrize("npse_trained_model", training_test_cases_all, indirect=True)
-def test_c2st_num_trials_obsolete(npse_trained_model, iid_method, num_trials):
-    num_samples = 1_000
-    sample_with = "sde"
-    inference, score_estimator, test_case = npse_trained_model
-    num_dim = test_case.num_dim
-    prior_str = test_case.prior_type
-
-    posterior = inference.build_posterior(score_estimator)
-    x_o, target_samples = test_case.get_target_samples(num_trials, num_dim)
-
-    posterior.set_default_x(x_o)
-
-    npse_samples = posterior.sample((num_samples,), iid_method=iid_method)
-    check_c2st(
-        npse_samples,
-        target_samples,
-        alg=f"npse-{prior_str}-{num_dim}D-{sample_with}",
-        tol=0.05 * min(test_case.num_trial, 8),
-    )
-
-
-@pytest.mark.slow
-@pytest.mark.parametrize(
-    "npse_trained_model", trainig_test_cases_gaussian, indirect=True
+    "npse_trained_model", training_test_cases_gaussian, indirect=True
 )
 def test_kld_gaussian(npse_trained_model):
     # For the Gaussian prior, we compute the KLd between ground truth and
     # posterior.
     inference, score_estimator, test_case = npse_trained_model
+    x_o = zeros(1, test_case.num_dim)
     posterior = inference.build_posterior(score_estimator)
-    posterior.set_default_x(test_case.x_o)
+    posterior.set_default_x(x_o)
     dkl = get_dkl_gaussian_prior(
         posterior,
-        test_case.x_o[0],
+        x_o[0],
         test_case.likelihood_shift,
         test_case.likelihood_cov,
         test_case.prior_mean,
         test_case.prior_cov,
     )
     max_dkl = 0.15
-    assert dkl < max_dkl, (
-        f"D-KL={dkl} is more than 2 stds above the average performance."
-    )
+    assert dkl < max_dkl, f"D-KL={dkl} is more than 2std above the average performance."
 
 
+@pytest.mark.parametrize("sampling_test_case", sampling_test_cases_all)
 @pytest.mark.parametrize("test_case", training_test_cases_all)
-@pytest.mark.parametrize("sample_with", SAMPLING_METHODS)
-@pytest.mark.parametrize("iid_method", IID_METHODS)
-@pytest.mark.parametrize("num_trial", [1, 3])
 def test_npse_snapshot(
-    test_case: NpseTestCase, sample_with, iid_method, num_trial, snapshot
+    test_case: NpseTrainingTestCase, sampling_test_case: NpseSamplingTestCase, snapshot
 ):
     num_simulations = 5
     num_samples = 2
@@ -304,8 +272,10 @@ def test_npse_snapshot(
     inference, score_estimator = _train_npse(
         test_case, num_simulations, stop_after_epochs, training_batch_size
     )
-    x_o = zeros(num_trial, test_case.num_dim)
-    posterior = inference.build_posterior(score_estimator, sample_with=sample_with)
+    x_o = zeros(sampling_test_case.num_trials, test_case.num_dim)
+    posterior = inference.build_posterior(
+        score_estimator, sample_with=sampling_test_case.sampling_method
+    )
     posterior.set_default_x(x_o)
-    samples = posterior.sample((num_samples,), iid_method=iid_method)
+    samples = posterior.sample((num_samples,), iid_method=sampling_test_case.iid_method)
     assert snapshot == samples.tolist()
