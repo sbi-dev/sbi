@@ -83,7 +83,8 @@ dev = [
     "pytest-harvest",
     "pytest-split",
     "torchtestcase",
-    "syrupy"
+    "syrupy",
+    "pytest-regressions"
 ]
 
 [project.urls]
