@@ -1,7 +1,6 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-import warnings
 from functools import partial
 from typing import List, Optional, Sequence, Union
 
@@ -14,13 +13,10 @@ from pyknos.nflows.transforms.splines import (
     rational_quadratic,  # pyright: ignore[reportAttributeAccessIssue]
 )
 from torch import Tensor, nn, relu, tanh, tensor, uint8
-from torch.distributions import Distribution
 
 from sbi.neural_nets.estimators import NFlowsFlow, ZukoFlow
 from sbi.utils.nn_utils import MADEMoGWrapper, get_numel
 from sbi.utils.sbiutils import (
-    ZScoreType,
-    mcmc_transform,
     standardizing_net,
     standardizing_transform,
     standardizing_transform_zuko,
@@ -35,8 +31,8 @@ nflow_specific_kwargs = ["num_bins", "num_components", "tail_bound"]
 def build_made(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Optional[ZScoreType] = "independent",
-    z_score_y: Optional[ZScoreType] = "independent",
+    z_score_x: Optional[str] = "independent",
+    z_score_y: Optional[str] = "independent",
     hidden_features: int = 50,
     num_mixture_components: int = 10,
     embedding_net: nn.Module = nn.Identity(),
@@ -106,8 +102,8 @@ def build_made(
 def build_maf(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Optional[ZScoreType] = "independent",
-    z_score_y: Optional[ZScoreType] = "independent",
+    z_score_x: Optional[str] = "independent",
+    z_score_y: Optional[str] = "independent",
     hidden_features: int = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
@@ -194,8 +190,8 @@ def build_maf(
 def build_maf_rqs(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Optional[ZScoreType] = "independent",
-    z_score_y: Optional[ZScoreType] = "independent",
+    z_score_x: Optional[str] = "independent",
+    z_score_y: Optional[str] = "independent",
     hidden_features: int = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
@@ -306,8 +302,8 @@ def build_maf_rqs(
 def build_nsf(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Optional[ZScoreType] = "independent",
-    z_score_y: Optional[ZScoreType] = "independent",
+    z_score_x: Optional[str] = "independent",
+    z_score_y: Optional[str] = "independent",
     hidden_features: int = 50,
     num_transforms: int = 5,
     num_bins: int = 10,
@@ -428,8 +424,8 @@ def build_nsf(
 def build_zuko_nice(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Optional[ZScoreType] = "independent",
-    z_score_y: Optional[ZScoreType] = "independent",
+    z_score_x: Optional[str] = "independent",
+    z_score_y: Optional[str] = "independent",
     hidden_features: Union[Sequence[int], int] = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
@@ -483,8 +479,8 @@ def build_zuko_nice(
 def build_zuko_maf(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Optional[ZScoreType] = "independent",
-    z_score_y: Optional[ZScoreType] = "independent",
+    z_score_x: Optional[str] = "independent",
+    z_score_y: Optional[str] = "independent",
     hidden_features: Union[Sequence[int], int] = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
@@ -535,8 +531,8 @@ def build_zuko_maf(
 def build_zuko_nsf(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Optional[ZScoreType] = "independent",
-    z_score_y: Optional[ZScoreType] = "independent",
+    z_score_x: Optional[str] = "independent",
+    z_score_y: Optional[str] = "independent",
     hidden_features: Union[Sequence[int], int] = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
@@ -596,8 +592,8 @@ def build_zuko_nsf(
 def build_zuko_ncsf(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Optional[ZScoreType] = "independent",
-    z_score_y: Optional[ZScoreType] = "independent",
+    z_score_x: Optional[str] = "independent",
+    z_score_y: Optional[str] = "independent",
     hidden_features: Union[Sequence[int], int] = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
@@ -652,8 +648,8 @@ def build_zuko_ncsf(
 def build_zuko_sospf(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Optional[ZScoreType] = "independent",
-    z_score_y: Optional[ZScoreType] = "independent",
+    z_score_x: Optional[str] = "independent",
+    z_score_y: Optional[str] = "independent",
     hidden_features: Union[Sequence[int], int] = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
@@ -706,8 +702,8 @@ def build_zuko_sospf(
 def build_zuko_naf(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Optional[ZScoreType] = "independent",
-    z_score_y: Optional[ZScoreType] = "independent",
+    z_score_x: Optional[str] = "independent",
+    z_score_y: Optional[str] = "independent",
     hidden_features: Union[Sequence[int], int] = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
@@ -772,8 +768,8 @@ def build_zuko_naf(
 def build_zuko_unaf(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Optional[ZScoreType] = "independent",
-    z_score_y: Optional[ZScoreType] = "independent",
+    z_score_x: Optional[str] = "independent",
+    z_score_y: Optional[str] = "independent",
     hidden_features: Union[Sequence[int], int] = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
@@ -838,8 +834,8 @@ def build_zuko_unaf(
 def build_zuko_cnf(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Optional[ZScoreType] = "independent",
-    z_score_y: Optional[ZScoreType] = "independent",
+    z_score_x: Optional[str] = "independent",
+    z_score_y: Optional[str] = "independent",
     hidden_features: Union[Sequence[int], int] = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
@@ -892,8 +888,8 @@ def build_zuko_cnf(
 def build_zuko_gf(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Optional[ZScoreType] = "independent",
-    z_score_y: Optional[ZScoreType] = "independent",
+    z_score_x: Optional[str] = "independent",
+    z_score_y: Optional[str] = "independent",
     hidden_features: Union[Sequence[int], int] = 50,
     num_transforms: int = 3,
     embedding_net: nn.Module = nn.Identity(),
@@ -949,8 +945,8 @@ def build_zuko_gf(
 def build_zuko_bpf(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Optional[ZScoreType] = "independent",
-    z_score_y: Optional[ZScoreType] = "independent",
+    z_score_x: Optional[str] = "independent",
+    z_score_y: Optional[str] = "independent",
     hidden_features: Union[Sequence[int], int] = 50,
     num_transforms: int = 3,
     embedding_net: nn.Module = nn.Identity(),
@@ -1008,12 +1004,11 @@ def build_zuko_flow(
     which_nf: str,
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Optional[ZScoreType] = "independent",
-    z_score_y: Optional[ZScoreType] = "independent",
+    z_score_x: Optional[str] = "independent",
+    z_score_y: Optional[str] = "independent",
     hidden_features: Union[Sequence[int], int] = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
-    x_dist: Union[Distribution, None] = None,
     **kwargs,
 ) -> ZukoFlow:
     """
@@ -1029,16 +1024,11 @@ def build_zuko_flow(
             - `structured`: treat dimensions as related, therefore compute mean and std
             over the entire batch, instead of per-dimension. Should be used when each
             sample is, for example, a time series or an image.
-            - `logit`: Applies logit transformation, if bounds from `x_dist` are given.
         z_score_y: Whether to z-score ys passing into the network, same options as
             z_score_x.
         hidden_features: The number of hidden features in the flow. Defaults to 50.
         num_transforms: The number of transformations in the flow. Defaults to 5.
         embedding_net: The embedding network to use. Defaults to nn.Identity().
-        x_dist: The distribution over x, used to determine the bounds for the logit
-            transformation. x_dist is typically the prior for NPE. For NLE/NRE,
-            it might be some rough bounded distribution over the data provided
-            additionally by the user.
         **kwargs: Additional keyword arguments to pass to the flow constructor.
 
     Returns:
@@ -1077,31 +1067,9 @@ def build_zuko_flow(
 
         z_score_x_bool, structured_x = z_score_parser(z_score_x)
         if z_score_x_bool:
-            # data is not z-score x if it is logit transformed.
             transform = (
+                transform,
                 standardizing_transform_zuko(batch_x, structured_x),
-                transform,
-            )
-
-        # Only x can be logit transformed (not y), if a distribution
-        # over x is provided (for NPE: this would be the prior
-        # over theta).
-        if z_score_x == "logit" and x_dist is not None:
-            transform = (
-                # mcmc transform is ~logit transform:
-                # maps from a bounded to unbound space.
-                mcmc_transform(x_dist),
-                transform,
-            )
-        else:
-            transform = (
-                standardizing_transform_zuko(batch_x, structured_x),
-                transform,
-            )
-            warnings.warn(
-                "Logit transformation is only available if x_dist is provided. "
-                "The data will be standardized instead.",
-                stacklevel=2,
             )
 
         z_score_y_bool, structured_y = z_score_parser(z_score_y)
@@ -1119,28 +1087,8 @@ def build_zuko_flow(
         z_score_x_bool, structured_x = z_score_parser(z_score_x)
         if z_score_x_bool:
             transforms = (
+                *transforms,
                 standardizing_transform_zuko(batch_x, structured_x),
-                *transforms,
-            )
-
-        # Only x can be logit transformed (not y), if a distribution
-        # over x is provided (for NPE: this would be the prior
-        # over theta).
-        if z_score_x == "logit" and x_dist is not None:
-            transforms = (
-                # mcmc transform maps from a bounded to unbound space.
-                mcmc_transform(x_dist),
-                *transforms,
-            )
-        else:
-            transforms = (
-                standardizing_transform_zuko(batch_x, structured_x),
-                *transforms,
-            )
-            warnings.warn(
-                "Logit transformation is only available if x_dist is provided. "
-                "The data will be standardized instead.",
-                stacklevel=2,
             )
 
         z_score_y_bool, structured_y = z_score_parser(z_score_y)
@@ -1166,6 +1114,7 @@ def build_zuko_flow(
 class ContextSplineMap(nn.Module):
     """
     Neural network from `context` to the spline parameters.
+
     We cannot use the resnet as conditioner to learn each dimension conditioned
     on the other dimensions (because there is only one). Instead, we learn the
     spline parameters directly. In the case of conditinal density estimation,
