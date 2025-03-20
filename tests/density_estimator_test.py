@@ -466,6 +466,24 @@ def test_build_zuko_flow_logit():
     except Exception as e:
         raise AssertionError(f"Test failed with exception: {e}") from e
 
+    # Test to cover CNF
+    try:
+        flow = build_zuko_flow(
+            which_nf="CNF",
+            batch_x=batch_x,
+            batch_y=batch_y,
+            z_score_x="logit",
+            z_score_y="logit",
+            x_dist=x_dist,
+        )
+        assert isinstance(flow, ZukoFlow)
+        print(
+            "Test passed: build_zuko_flow works with logit transformation"
+            "when x_dist is provided."
+        )
+    except Exception as e:
+        raise AssertionError(f"Test failed with exception: {e}") from e
+
     # Test case where x_dist is missing (should raise ValueError)
     with pytest.raises(
         ValueError,
@@ -473,6 +491,20 @@ def test_build_zuko_flow_logit():
     ):
         build_zuko_flow(
             which_nf="MAF",
+            batch_x=batch_x,
+            batch_y=batch_y,
+            z_score_x="logit",
+            z_score_y="logit",
+            x_dist=None,  # No distribution provided
+        )
+        print("Test passed: ValueError raised when x_dist is missing.")
+
+    with pytest.raises(
+        ValueError,
+        match="Logit transformation requires a distribution provided through `x_dist`",
+    ):
+        build_zuko_flow(
+            which_nf="CNF",
             batch_x=batch_x,
             batch_y=batch_y,
             z_score_x="logit",
