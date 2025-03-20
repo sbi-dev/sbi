@@ -10,6 +10,9 @@ from torch.distributions import Distribution, constraints
 
 
 def get_distribution_parameters(dist, device):
+    '''Used to get the tensors of the parameters in torch distributions.
+    Returns the tensors relocated to device.
+    '''
     params = {param: getattr(dist, param).to(device) for param in dist.arg_constraints}
     if isinstance(dist, torch.distributions.MultivariateNormal):
         params['precision_matrix'] = None
@@ -92,6 +95,12 @@ class CustomPriorWrapper(Distribution):
                 UserWarning,
                 stacklevel=2,
             )
+
+    def to(self, device):
+        raise NotImplementedError(
+            "This class is not supported on the GPU. Use on cpu or use \
+            any of `PytorchReturnTypeWrapper`, `BoxUniform`, or `MultipleIndependent`."
+        )
 
     @property
     def mean(self):

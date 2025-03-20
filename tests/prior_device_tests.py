@@ -28,9 +28,9 @@ def test_BoxUniform(device: str):
 
 @pytest.mark.gpu
 @pytest.mark.parametrize("device", ["cpu", "mps", "gpu"])
-def test_ReturnTypeWrapper(device: str):
+def test_PytorchReturnTypeWrapper(device: str):
     device = process_device(device)
-    prior = torch.distributions.Normal(loc=0.0, scale=1.0)
+    prior = Normal(loc=0.0, scale=1.0)
     prior = PytorchReturnTypeWrapper(prior)
 
     prior.to(device)
@@ -38,7 +38,7 @@ def test_ReturnTypeWrapper(device: str):
 
 
 @pytest.mark.gpu
-@pytest.mark.parametrize("device", ["mps"])
+@pytest.mark.parametrize("device", ["cpu", "mps", "gpu"])
 def test_MultipleIndependent(device: str):
     device = process_device(device)
     dists = [
