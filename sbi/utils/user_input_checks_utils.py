@@ -193,6 +193,7 @@ class MultipleIndependent(Distribution):
             [d.set_default_validate_args(validate_args) for d in dists]
 
         self.dists = dists
+        self.device = None
         # numel() instead of event_shape because for all dists both is possible,
         # event_shape=[1] or batch_shape=[1]
         self.dims_per_dist = [d.sample().numel() for d in self.dists]
@@ -330,6 +331,16 @@ class MultipleIndependent(Distribution):
             constraints.cat(supports, dim=-1, lengths=self.dims_per_dist),
             reinterpreted_batch_ndims=1,
         )
+
+    def to(self, device):
+        # Move the values of the arg_constraints dictionary to the specified device
+        for i in range(len(self.dists)):
+            if hasattr(self.dists[i], "to"):
+                self.dists[i].to(device)
+            else:
+                params = get_distribution_parameters(self.dists[i], device)
+                self.dists[i] = type(self.dists[i])(**params)
+        self.device = device
 
 
 def build_support(
