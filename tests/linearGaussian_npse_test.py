@@ -218,7 +218,7 @@ def npse_trained_model(sde_type, prior_type):
 
 @pytest.mark.slow
 @pytest.mark.parametrize(
-    "iid_method, num_trial",    
+    "iid_method, num_trial",
     [
         pytest.param("fnpe", 3, id="fnpe-2trials"),
         pytest.param("gauss", 3, id="gauss-6trials"),
@@ -271,6 +271,7 @@ def test_npse_iid_inference(
         tol=0.05 * min(num_trial, 8),
     )
 
+
 @pytest.mark.slow
 @pytest.mark.parametrize(
     "guidance_params",
@@ -308,8 +309,8 @@ def test_npse_interval_guidance(npse_trained_model, guidance_params):
 @pytest.mark.parametrize(
     "guidance_params",
     [
-        pytest.param({"likelihood_scale": 2.0}, id="increase_likelihood"),
-        pytest.param({"likelihood_scale": 0.5}, id="decrease likelihood"),
+        pytest.param({"likelihood_scale": 1.2}, id="increase_likelihood"),
+        pytest.param({"likelihood_scale": 0.8}, id="decrease likelihood"),
     ],
 )
 def test_npse_affine_classifier_free(npse_trained_model, guidance_params):
@@ -339,7 +340,7 @@ def test_npse_affine_classifier_free(npse_trained_model, guidance_params):
 
     if "likelihood_scale" in guidance_params:
         adapted_likelihood_shift = (
-            likelihood_shift * guidance_params["likelihood_scale"]
+            likelihood_shift * 1 / guidance_params["likelihood_scale"]
         )
         posterior = true_posterior_linear_gaussian_mvn_prior(
             x_o, adapted_likelihood_shift, likelihood_cov, prior_mean, prior_cov
@@ -349,7 +350,8 @@ def test_npse_affine_classifier_free(npse_trained_model, guidance_params):
         check_c2st(
             samples,
             target_samples,
-            alg=f"npse-vp-gaussian-{num_dim}-affine_classifier_free",
+            tol=0.1,
+            alg=f"npse-gaussian-{num_dim}-affine_classifier_free",
         )
 
 

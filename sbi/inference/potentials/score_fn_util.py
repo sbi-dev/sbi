@@ -188,6 +188,7 @@ class UniversalGuidanceCfg:
         None
     )
 
+
 @register_guidance_method("universal", UniversalGuidanceCfg)
 class UniversalGuidance(ScoreAdaptation):
     def __init__(
@@ -246,6 +247,7 @@ class IntervalGuidanceCfg:
     upper_bound: Optional[Union[float, Tensor]]
     mask: Optional[Tensor] = None
     scale_factor: float = 0.5
+
 
 @register_guidance_method("interval", IntervalGuidanceCfg)
 class IntervalGuidance(UniversalGuidance):
