@@ -142,9 +142,9 @@ def data_and_pyro_hierarchical_gaussian_mcmc_samples(
 
 @pytest.fixture
 def num_simulations(trainer_cls, num_trials, num_dim, num_subjects):
-    num_simulations = num_dim * num_subjects * num_trials * 200
+    num_simulations = num_dim * num_subjects * num_trials * 400
     if trainer_cls is NRE:
-        num_simulations *= 5
+        num_simulations *= 6
     return num_simulations
 
 
