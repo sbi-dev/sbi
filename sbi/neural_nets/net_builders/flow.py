@@ -18,7 +18,6 @@ from torch.distributions import Distribution
 from sbi.neural_nets.estimators import NFlowsFlow, ZukoFlow
 from sbi.utils.nn_utils import MADEMoGWrapper, get_numel
 from sbi.utils.sbiutils import (
-    mcmc_transform,
     standardizing_net,
     standardizing_transform,
     standardizing_transform_zuko,
@@ -1076,16 +1075,7 @@ def build_zuko_flow(
         z_score_x_bool, structured_x = z_score_parser(z_score_x)
         if z_score_x_bool:
             transform = (
-                transform,
                 standardizing_transform_zuko(batch_x, structured_x),
-            )
-        # Only x (i.e., prior for NPE) can be logit transformed (not y)
-        # when x_dist is provided.
-        if z_score_x == "logit" and x_dist is not None:
-            transform = (
-                # mcmc transform provides a mapping from a
-                # bound to unbound space.
-                mcmc_transform(x_dist),
                 transform,
             )
 
@@ -1104,8 +1094,8 @@ def build_zuko_flow(
         z_score_x_bool, structured_x = z_score_parser(z_score_x)
         if z_score_x_bool:
             transforms = (
-                *transforms,
                 standardizing_transform_zuko(batch_x, structured_x),
+                *transforms,
             )
 
         z_score_y_bool, structured_y = z_score_parser(z_score_y)
