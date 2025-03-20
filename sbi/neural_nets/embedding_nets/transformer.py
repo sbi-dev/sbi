@@ -48,7 +48,7 @@ class RotaryEncoder(nn.Module):
         self.embedding_dim = embedding_dim
         div_term = self.power ** (
             torch.arange(0, embedding_dim, 2) / embedding_dim
-        ).repeat_interleave(2)
+        ).repeat(2)
         self.register_buffer("div_term", tensor=div_term, persistent=False)
 
     def rotate_half(self, x):
