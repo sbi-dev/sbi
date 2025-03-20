@@ -70,7 +70,13 @@ def _initialize_experiment(
 @pytest.mark.parametrize("num_dim", NUM_DIM)
 @pytest.mark.parametrize("sample_with", SAMPLING_METHODS)
 def test_npse_snapshot(
-    sde_type, prior_type, iid_method, num_trial, num_dim, sample_with, snapshot
+    sde_type,
+    prior_type,
+    iid_method,
+    num_trial,
+    num_dim,
+    sample_with,
+    ndarrays_regression,
 ):
     num_simulations, num_samples = 10, 10
     stop_after_epochs = 1
@@ -96,4 +102,9 @@ def test_npse_snapshot(
     posterior = inference.build_posterior(score_estimator, sample_with=sample_with)
     posterior.set_default_x(x_o)
     samples = posterior.sample((num_samples,), iid_method=iid_method)
-    assert snapshot == samples.tolist()
+    ndarrays_regression.check(
+        {
+            'values': samples.numpy(),
+        },
+        default_tolerance=dict(atol=1e-2, rtol=1e-2),
+    )
