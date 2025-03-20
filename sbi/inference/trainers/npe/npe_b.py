@@ -9,6 +9,7 @@ from torch.distributions import Distribution
 
 import sbi.utils as utils
 from sbi.inference.trainers.npe.npe_base import PosteriorEstimator
+from sbi.neural_nets.estimators.shape_handling import reshape_to_sample_batch_event
 from sbi.sbi_types import TensorboardSummaryWriter
 from sbi.utils.sbiutils import del_entries
 
@@ -82,21 +83,47 @@ class NPE_B(PosteriorEstimator):
         """
 
         # Evaluate prior
-        utils.assert_all_finite(self._prior.log_prob(theta), "prior eval")
+        # we accept prior log prob to be -Inf at theta
+        # meaning that theta is out of the prior range (the weight is thus 0)
+        utils.assert_not_nan_or_plus_inf(
+            self._prior.log_prob(theta), "prior log probs of proposal samples"
+        )
         prior = torch.exp(self._prior.log_prob(theta))
 
         # Evaluate proposal
         # (as theta comes from prior and proposal from previous rounds,
         # the last proposal is actually a mixture of the prior
-        # and of all the previous proposals with coefficients 1/round)
-        prop = 1.0 / (self._round + 1)
-        proposal = torch.zeros(theta.size(0), device=theta.device)
+        # and of all the previous proposals with coefficients representing
+        # the proportion of the new theta added at each round)
+        prop = torch.zeros(self._round + 1, device=theta.device)
+        nb_samples = 0  # total number of theta from all the rounds
 
-        for density in self._proposal_roundwise:
-            utils.assert_all_finite(density.log_prob(theta), "proposal eval")
-            proposal += prop * torch.exp(density.log_prob(theta))
+        for k in range(self._round + 1):
+            nb_samples += self._theta_roundwise[k].size(0)
+            # the number of new theta sampled in the round k
+            prop[k] = self._theta_roundwise[k].size(0)
 
-        # Construct the importance weights
+        prop /= nb_samples
+        log_prop = torch.log(prop).repeat(theta.size(0), 1)
+
+        log_previous_proposals = torch.zeros(
+            (theta.size(0), self._round + 1), device=theta.device
+        )
+        for k, density in enumerate(self._proposal_roundwise):
+            # we accept the k th proposal log prob to be -Inf at theta
+            # meaning that theta is out of the k th proposal range
+            utils.assert_not_nan_or_plus_inf(
+                density.log_prob(theta), "proposal log probs of proposal samples"
+            )
+            log_previous_proposals[:, k] = density.log_prob(theta)
+
+        log_proposal = torch.logsumexp(log_prop + log_previous_proposals, dim=1)
+        proposal = torch.exp(log_proposal)
+
+        # Construct the importance weights and normalize them
         importance_weights = prior / proposal
+        importance_weights /= importance_weights.sum()
 
-        return importance_weights * self._neural_net.log_prob(theta.unsqueeze(0), x)
+        theta = reshape_to_sample_batch_event(theta, theta.shape[1:])
+
+        return importance_weights * self._neural_net.log_prob(theta, x)
