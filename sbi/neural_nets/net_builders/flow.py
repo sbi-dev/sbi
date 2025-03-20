@@ -1084,6 +1084,7 @@ def build_zuko_flow(
             transform = (
                 # mcmc transform provides a mapping from a
                 # bound to unbound space.
+                standardizing_transform_zuko(batch_x, structured_x),
                 transform,
             )
 
