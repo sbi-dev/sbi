@@ -210,6 +210,20 @@ def test_1d_and_2d_cnn_embedding_net(input_shape, num_channels):
             "num_hidden_layers": 12,
             "is_causal": True,
         },
+        {
+            "num_attention_heads": 16,
+            "num_key_value_heads": 16,
+            "attention_dropout": 0.9,
+            "hidden_size": 16 * 8,
+            "pos_emb": "positional",
+            "intermediate_size": 64,
+            "mlp_activation": "relu",
+            "num_hidden_layers": 12,
+            "is_causal": True,
+            "ffn": "moe",
+            "num_local_experts": 4,
+            "num_experts_per_tok": 1,
+        },
     ),
 )
 @pytest.mark.parametrize("seq_length", (24,))
