@@ -6,7 +6,7 @@ from torch.distributions import MultivariateNormal
 
 from sbi import analysis as analysis
 from sbi import utils as utils
-from sbi.inference import NPSE, FMPE
+from sbi.inference import FMPE, NPSE
 from sbi.simulators import linear_gaussian
 from sbi.simulators.linear_gaussian import (
     samples_true_posterior_linear_gaussian_mvn_prior_different_dims,
@@ -81,7 +81,7 @@ def test_c2st_npse_on_linearGaussian(
     x = linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     score_estimator = inference.append_simulations(theta, x).train(
-        training_batch_size=100, 
+        training_batch_size=100,
         max_num_epochs=40,
     )
     # amortize the training when testing sample_with.
@@ -166,12 +166,12 @@ def test_c2st_npse_on_linearGaussian_different_dims():
 
     # Test whether we can stop and resume.
     inference.append_simulations(theta, x).train(
-        max_num_epochs=20, 
+        max_num_epochs=20,
         training_batch_size=100,
     )
     inference.train(
-        resume_training=True, 
-        force_first_round_loss=True, 
+        resume_training=True,
+        force_first_round_loss=True,
         training_batch_size=100,
         max_num_epochs=40,
     )

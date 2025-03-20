@@ -24,7 +24,6 @@ from sbi.neural_nets.factory import flowmatching_nn
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
     samples_true_posterior_linear_gaussian_mvn_prior_different_dims,
-    samples_true_posterior_linear_gaussian_uniform_prior,
     true_posterior_linear_gaussian_mvn_prior,
 )
 from sbi.utils.user_input_checks import process_simulator
