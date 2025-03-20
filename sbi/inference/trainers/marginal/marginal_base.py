@@ -5,7 +5,7 @@ import time
 from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
-from typing import Callable, Dict, Optional, Tuple, Union
+from typing import Callable, Optional, Tuple, Union
 
 import torch
 from torch import Tensor
@@ -32,17 +32,12 @@ class MarginalTrainer:
         summary_writer: Optional[SummaryWriter] = None,
         show_progress_bars: bool = True,
     ):
-        """Base class for Marginal estimation method."""
+        """Utility class for training a marginal estimator method."""
 
         self._device = process_device(device)
         self._neural_net = None
 
         self._show_progress_bars = show_progress_bars
-
-        # Initialize list that indicates the round from which simulations were drawn.
-        self._data_round_index = []
-
-        self._round = 0
         self._val_loss = float("Inf")
 
         self._summary_writer = (
@@ -70,7 +65,7 @@ class MarginalTrainer:
         validation_fraction: float = 0.1,
         dataloader_kwargs: Optional[dict] = None,
     ) -> Tuple[data.DataLoader, data.DataLoader]:
-        x = self.get_simulations()
+        x = self.get_samples()
         dataset = data.TensorDataset(x)
 
         # Get total number of training examples.
@@ -106,11 +101,11 @@ class MarginalTrainer:
 
         return train_loader, val_loader
 
-    def append_simulations(self, x) -> "MarginalTrainer":
+    def append_samples(self, x) -> "MarginalTrainer":
         self._x = x
         return self
 
-    def get_simulations(self) -> Tensor:
+    def get_samples(self) -> Tensor:
         return self._x
 
     def loss(self, x: Tensor) -> Tensor:
@@ -139,8 +134,6 @@ class MarginalTrainer:
         stop_after_epochs: int = 20,
         max_num_epochs: int = 2**31 - 1,
         clip_max_norm: Optional[float] = 5.0,
-        resume_training: bool = False,
-        show_train_summary: bool = False,
         dataloader_kwargs: Optional[dict] = None,
     ) -> UnconditionalDensityEstimator:
         r"""Return density estimator that approximates the distribution $p(x)$.
@@ -176,7 +169,7 @@ class MarginalTrainer:
 
         if self._neural_net is None:
             # Get x to initialize NN
-            x = self.get_simulations()
+            x = self.get_samples()
             # Use only training data for building the neural net (z-scoring transforms)
 
             self._neural_net = self._build_neural_net(
@@ -237,18 +230,12 @@ class MarginalTrainer:
 
             self._maybe_show_progress(self._show_progress_bars, self.epoch)
 
-        # self._report_convergence_at_end(self.epoch, stop_after_epochs, max_num_epochs)
-
         # Update summary.
         self._summary["epochs_trained"].append(self.epoch)
         self._summary["best_validation_loss"].append(self._best_val_loss)
 
         # Update tensorboard and summary dict.
         self._summarize(round_=self._round)
-
-        # Update description for progress bar.
-        if show_train_summary:
-            print(self._describe_round(self._round, self._summary))
 
         # Avoid keeping the gradients in the resulting network, which can
         # cause memory leakage when benchmarking.
@@ -296,22 +283,6 @@ class MarginalTrainer:
             converged = True
 
         return converged
-
-    @staticmethod
-    def _describe_round(round_: int, summary: Dict[str, list]) -> str:
-        epochs = summary["epochs_trained"][-1]
-        best_validation_loss = summary["best_validation_loss"][-1]
-
-        description = f"""
-        -------------------------
-        ||||| ROUND {round_ + 1} STATS |||||:
-        -------------------------
-        Epochs trained: {epochs}
-        Best validation performance: {best_validation_loss:.4f}
-        -------------------------
-        """
-
-        return description
 
     @staticmethod
     def _maybe_show_progress(show: bool, epoch: int) -> None:

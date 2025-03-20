@@ -126,7 +126,7 @@ class ConditionalDensityEstimator(ConditionalEstimator):
     Note:
         We assume that the input to the density estimator is a tensor of shape
         (sample_dim, batch_dim, *input_shape), where input_shape is the dimensionality
-        of the input. The condition is a tensor of shape (batch_dim, *condition_shape),
+        of the input. The condition is a tensor of shape (batch_size, *condition_shape),
         where condition_shape is the shape of the condition tensor.
 
     """
@@ -224,12 +224,11 @@ class ConditionalDensityEstimator(ConditionalEstimator):
 
 
 class ConditionalVectorFieldEstimator(ConditionalEstimator):
-    r"""Base class for conditional vector field (e.g., score and ODE flow) estimators.
+    r"""Base class for vector field (e.g., score and ODE flow) estimators.
 
-    The conditional vector field estimator class is a wrapper around neural
-    networks that allows to evaluate the `vector_field`, and provide the `loss`
-    of $\theta,x$ pairs. Here $\theta$ would be the `input` and $x$ would be
-    the `condition`.
+    The vector field estimator class is a wrapper around neural networks that allows to
+    evaluate the `vector_field`, and provide the `loss` of $\theta,x$ pairs. Here
+    $\theta$ would be the `input` and $x$ would be the `condition`.
 
     Note:
         We assume that the input to the density estimator is a tensor of shape
@@ -372,7 +371,8 @@ class UnconditionalDensityEstimator(UnconditionalEstimator):
             Sample-wise log probabilities.
         """
 
-        return self._neural_net.log_prob(x).detach()
+        self._neural_net.eval()
+        return self._neural_net.log_prob(x)
 
     def sample(self, sample_shape: torch.Size()) -> Tensor:
         r"""Return samples from the density estimator.
