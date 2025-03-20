@@ -235,13 +235,9 @@ class GlobalEmbeddingMLP(nn.Module):
 
     def forward(self, t: Tensor, x_emb: Optional[Tensor] = None) -> Tensor:
         t_emb = self.time_emb(t)
-
-        try:
-            cond_emb = torch.cat([x_emb, t_emb], dim=-1) if x_emb is not None else t_emb
-        except Exception as e:
-            print("x_emb", (x_emb.shape if x_emb is not None else "None"))
-            print("t_emb", t_emb.shape)
-            raise e
+        if x_emb is not None:
+            t_emb = torch.broadcast_to(t_emb, (*x_emb.shape[:-1], t_emb.shape[-1]))
+            cond_emb = torch.cat([x_emb, t_emb], dim=-1)
 
         cond_emb = self.input_layer(cond_emb)
         for i in range(self.num_intermediate_layers):

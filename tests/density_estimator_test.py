@@ -18,7 +18,6 @@ from sbi.neural_nets.net_builders import (
     build_maf,
     build_maf_rqs,
     build_mdn,
-    build_mlp_flowmatcher,
     build_mnle,
     build_mnpe,
     build_nsf,
