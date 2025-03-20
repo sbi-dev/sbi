@@ -1,12 +1,12 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-import numpy as np
 import pyro
 import pyro.distributions as dist
 import pytest
 import torch
 from pyro.infer import MCMC, NUTS
+from pyro.infer.predictive import Predictive
 
 from sbi.inference import NLE, NPE, NRE
 from sbi.utils.pyroutils import (
@@ -68,6 +68,24 @@ def data_and_pyro_gaussian_mcmc_samples(num_dim, num_trials, num_samples, warmup
     pyro_samples = mcmc.get_samples()["theta"]
 
     return x_o, pyro_samples
+
+
+@pytest.fixture
+def num_simulations(trainer_cls, num_dim, num_trials):
+    num_simulations = num_dim * num_trials * 200
+    if trainer_cls is NRE:
+        num_simulations *= 5
+    return num_simulations
+
+
+@pytest.fixture
+def gaussian_simulation_data(num_simulations, num_dim):
+    samples = Predictive(
+        pyro_gaussian_model, num_samples=num_simulations, parallel=True
+    )(num_dim=num_dim, num_trials=1)
+    theta = samples['theta'].squeeze(1)
+    x = samples['x'].squeeze(1)
+    return theta, x
 
 
 def test_unbounded_transform():
@@ -174,23 +192,16 @@ def test_pyro_gaussian_model(
     distribution_cls,
     num_dim,
     num_trials,
-    num_simulations=500,
+    num_simulations,
+    gaussian_simulation_data,
     num_samples,
     warmup_steps,
 ):
     """Test consistency of MCMC samples between the true and estimated likelihood."""
     x_o, pyro_samples = data_and_pyro_gaussian_mcmc_samples
 
-    # Simulated data from the true model and use it to train the estimator
+    theta, x = gaussian_simulation_data
     prior = single_level_prior_theta(num_dim=num_dim)
-    theta = []
-    x = []
-    for _ in range(num_simulations):
-        ti, xi = pyro_gaussian_model(num_trials=1, num_dim=num_dim)
-        theta.append(torch.from_numpy(np.array(ti)))
-        x.append(torch.from_numpy(np.array(xi)))
-    theta = torch.stack(theta, dim=0).float()
-    x = torch.stack(x, dim=0).float().squeeze()
     trainer = trainer_cls(prior=prior).append_simulations(theta=theta, x=x)
     density_estimator = trainer.train()
 
@@ -207,7 +218,7 @@ def test_pyro_gaussian_model(
             return x_o
 
     if trainer_cls is not NRE:
-        theta, x = sbi_pyro_model(density_estimator)
+        _, _ = sbi_pyro_model(density_estimator)
     sbi_pyro_model(density_estimator, x_o=x_o)
 
     # Get MCMC samples from a model that uses the estimated likelihood
