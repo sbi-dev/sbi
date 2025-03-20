@@ -76,8 +76,12 @@ def test_mmd_x_space(D: int, N: int):
         mode="x_space",
     )
     # check p_vals
-    assert p_val_well > 0.05, f"Expected large p_val , obtained {p_val_well}"
-    assert p_val_mis < 0.05, f"Expected small p_val , obtained {p_val_mis}"
+    assert p_val_well > 0.05, (
+        f"Expected large p_val for well-specified data, obtained {p_val_well}"
+    )
+    assert p_val_mis < 0.05, (
+        f"Expected small p_val for misspecified data, obtained {p_val_mis}"
+    )
 
 
 @pytest.mark.parametrize("D, N", ((2, 1000),))
