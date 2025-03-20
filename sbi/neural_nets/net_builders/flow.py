@@ -13,6 +13,7 @@ from pyknos.nflows.transforms.splines import (
     rational_quadratic,  # pyright: ignore[reportAttributeAccessIssue]
 )
 from torch import Tensor, nn, relu, tanh, tensor, uint8
+from torch.distributions import Distribution
 
 from sbi.neural_nets.estimators import NFlowsFlow, ZukoFlow
 from sbi.utils.nn_utils import MADEMoGWrapper, get_numel
@@ -1009,6 +1010,7 @@ def build_zuko_flow(
     hidden_features: Union[Sequence[int], int] = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
+    x_dist: Optional[Distribution] = None,
     **kwargs,
 ) -> ZukoFlow:
     """
@@ -1024,11 +1026,16 @@ def build_zuko_flow(
             - `structured`: treat dimensions as related, therefore compute mean and std
             over the entire batch, instead of per-dimension. Should be used when each
             sample is, for example, a time series or an image.
+            - `logit`: Applies logit transformation, if bounds from `x_dist` are given.
         z_score_y: Whether to z-score ys passing into the network, same options as
             z_score_x.
         hidden_features: The number of hidden features in the flow. Defaults to 50.
         num_transforms: The number of transformations in the flow. Defaults to 5.
         embedding_net: The embedding network to use. Defaults to nn.Identity().
+        x_dist: The distribution over x, used to determine the bounds for the logit
+            transformation. x_dist is typically the prior for NPE. For NLE/NRE,
+            it might be some rough bounded distribution over the data provided
+            additionally by the user.
         **kwargs: Additional keyword arguments to pass to the flow constructor.
 
     Returns:
