@@ -274,8 +274,8 @@ def gaussian_kde_log_eval(samples, query):
 class BoxUniform(Independent):
     def __init__(
         self,
-        low: Tensor,
-        high: Tensor,
+        low: Union[Tensor, Array],
+        high: Union[Tensor, Array],
         reinterpreted_batch_ndims: int = 1,
         device: Optional[str] = None,
     ):
