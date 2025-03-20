@@ -97,6 +97,12 @@ class CustomPriorWrapper(Distribution):
             )
 
     def to(self, device):
+        """
+        Move the distribution to the specified device. Not implemented for this class.
+
+        Raises:
+            NotImplementedError.
+        """
         raise NotImplementedError(
             "This class is not supported on the GPU. Use on cpu or use \
             any of `PytorchReturnTypeWrapper`, `BoxUniform`, or `MultipleIndependent`."
@@ -171,6 +177,16 @@ class PytorchReturnTypeWrapper(Distribution):
         return self.prior.support
 
     def to(self, device):
+        """
+        Move the distribution to the specified device.
+
+        It moves the distribution parameters to the specific device
+        because pytorch distribution does not have a `to` method.
+        It also updates the device attribute.
+
+        Args:
+            device: device to move the distribution to.
+        """
         params = get_distribution_parameters(self.prior, device)
         self.prior = type(self.prior)(**params)
         self.device = device
@@ -346,7 +362,14 @@ class MultipleIndependent(Distribution):
         )
 
     def to(self, device):
-        # Move the values of the arg_constraints dictionary to the specified device
+        """
+        Move the distribution to the specified device.
+        If the distribution has the `to` method, it is used. Otherwise, the
+        parameters of the distribution are moved to the specified device.
+
+        Args:
+            device: device to move the distribution to.
+        """
         for i in range(len(self.dists)):
             if hasattr(self.dists[i], "to"):
                 self.dists[i].to(device)
