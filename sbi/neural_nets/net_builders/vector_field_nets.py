@@ -61,7 +61,7 @@ class SinusoidalTimeEmbedding(nn.Module):
         self.out_features = embed_dim
 
     def forward(self, t: Tensor) -> Tensor:
-        """embed time using transformer sinusoidal embeddings.
+        """Embed time using transformer sinusoidal embeddings.
 
         args:
             t: time tensor of shape (batch_size, 1) or (batch_size,) or scalar ()
@@ -139,7 +139,6 @@ class AdaMLPBlock(nn.Module):
         self.ada_ln[-1].bias.data.zero_()
 
         # MLP block
-        # NOTE: This can be made more flexible to support layer types.
         self.block = nn.Sequential(
             nn.Linear(hidden_dim, hidden_dim * mlp_ratio),
             activation(),
@@ -350,24 +349,9 @@ class VectorFieldMLP(VectorFieldNet):
             Vector field evaluation at the provided points.
         """
 
-        # # Convert theta to the shape [sample_size * batch_size, D]
-        # if theta.ndim == 3:
-        #     sample_size = theta.shape[0]
-        #     batch_size = theta.shape[1]
-        #     h = theta.reshape(sample_size * batch_size, -1)
-        #     x = x.reshape(sample_size * batch_size, -1)
-        #     t = t.reshape(sample_size * batch_size, -1)
-        # else:
-        #     raise ValueError(
-        #         f"Invalid theta shape: {theta.shape},\
-        #             should be [sample_size, batch_size, D]"
-        #     )
-
         h = theta
+
         # Get condition embedding
-        # print("in vector field mlp, x", x.shape)
-        # print("in vector field mlp, theta", h.shape)
-        # print("in vector field mlp, t", t.shape)
         cond_emb = self.global_mlp(t, x_emb=x_emb_cond)
 
         # Forward pass through MLP
@@ -377,10 +361,6 @@ class VectorFieldMLP(VectorFieldNet):
             h = layer(h, cond_emb)
 
         h = self.layers[-1](h)  # hidden to output
-
-        # # Convert h to the shape [sample_size, batch_size, D]
-        # if theta.ndim == 3:
-        #     h = h.reshape(sample_size, batch_size, -1)
 
         return h
 
@@ -400,7 +380,7 @@ class DiTBlock(nn.Module):
         mlp_ratio: int = 2,
         activation: Callable = nn.GELU,
     ):
-        """initialize dit transformer block.
+        """Initialize dit transformer block.
 
         args:
             hidden_dim: dimension of hidden features
@@ -439,7 +419,7 @@ class DiTBlock(nn.Module):
         self.norm2 = nn.LayerNorm(hidden_dim)
 
     def forward(self, x: Tensor, cond: Tensor) -> Tensor:
-        """forward pass through the block.
+        """Forward pass through the block.
 
         args:
             x: input tensor (b, d)
@@ -691,33 +671,16 @@ class VectorFieldTransformer(VectorFieldNet):
         self.output_proj = nn.Linear(hidden_features, 1)
 
     def forward(self, theta: Tensor, x_emb_cond: Tensor, t: Tensor) -> Tensor:
-        """forward pass through the transformer.
+        """Forward pass through the transformer.
 
-        args:
+        Args:
             theta: parameters (for FMPE) or state (for NPSE)
             x: conditioning information
             t: time parameter embedding
 
-        returns:
-            vector field evaluation at the provided points
+        Returns:
+            Vector field evaluation at the provided points
         """
-
-        # Convert theta to the shape [sample_size * batch_size, D]
-        # if theta.ndim == 3:
-        #     sample_size = theta.shape[0]
-        #     batch_size = theta.shape[1]
-        #     h = theta.reshape(sample_size * batch_size, -1)
-        #     x = (
-        #         x.reshape(sample_size * batch_size, -1)
-        #         if not self.is_x_emb_seq
-        #         else x.reshape(sample_size * batch_size, x.shape[-2], x.shape[-1])
-        #     )
-        #     t = t.reshape(sample_size * batch_size, -1)
-        # else:
-        #     raise ValueError(
-        #         f"Invalid theta shape: {theta.shape},\
-        #             should be [sample_size, batch_size, D]"
-        #     )
 
         h = theta
         # Get condition embedding
@@ -735,12 +698,10 @@ class VectorFieldTransformer(VectorFieldNet):
                 h = block(h, x_emb_cond, cond_emb)
             else:
                 h = block(h, cond_emb)
+
         # project to output dimension
         h = self.output_proj(h)
         h = h.squeeze(-1)
-        # Convert h to the shape [sample_size, batch_size, D]
-        # if theta.ndim == 3:
-        #     h = h.reshape(sample_size, batch_size, -1)
 
         return h
 
