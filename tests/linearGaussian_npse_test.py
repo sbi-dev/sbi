@@ -67,8 +67,7 @@ class NpseTrainingTestCase:
         x = linear_gaussian(theta, self.likelihood_shift, self.likelihood_cov)
         return theta, x
 
-    def get_target_samples(self, num_samples: int, num_trial: int = 1):
-        x_o = zeros(num_trial, self.num_dim)
+    def get_target_samples(self, num_samples: int, x_o):
         if self.prior_type in {"gaussian", None}:
             gt_posterior = true_posterior_linear_gaussian_mvn_prior(
                 x_o,
@@ -218,9 +217,7 @@ def test_c2st(npse_trained_model, sampling_test_case: NpseSamplingTestCase):
     )
     check_c2st(
         npse_samples,
-        test_case.get_target_samples(
-            npse_samples.shape[0], num_trial=sampling_test_case.num_trials
-        ),
+        test_case.get_target_samples(npse_samples.shape[0], x_o),
         alg=f"npse-{test_case.sde_type or 'vp'}-{test_case.prior_type}"
         f"-{test_case.num_dim}D-{sampling_test_case.sampling_method}",
         tol=0.05 * min(sampling_test_case.num_trials, 8),
