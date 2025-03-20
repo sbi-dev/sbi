@@ -27,7 +27,7 @@ class LRUEmbedding(nn.Module):
         max_phase=2 * np.pi,
         bidirectional: bool = False,
         dropout: float = 0.0,
-        apply_normalization_layer: bool = False,
+        apply_input_normalization: bool = False,
         aggregate_func: [str, callable] = "last_step",
     ):
         """
@@ -54,7 +54,7 @@ class LRUEmbedding(nn.Module):
                 max_phase=max_phase,
                 bidirectional=bidirectional,
                 dropout=dropout,
-                apply_input_normalization=apply_normalization_layer,
+                apply_input_normalization=apply_input_normalization,
             )
             for _ in range(num_blocks)
         ]
@@ -132,8 +132,8 @@ class LRUBlock(nn.Module):
         )
         self.dropout = nn.Dropout(dropout)
         self.nonlinearity = nn.SiLU()  # could also use another one here
-        self.state_mixing_pre_glu = nn.Linear(hidden_dim * 2, hidden_dim)
-        self.glu = nn.GLU()
+        self.state_mixing_pre_glu = nn.Linear(hidden_dim, hidden_dim * 2)
+        self.glu = nn.GLU(dim=-1)
 
     def forward(self, input: Tensor) -> Tensor:
         """Forward pass through an LRU block, which also contains input
@@ -253,9 +253,10 @@ class LRU(nn.Module):
             )
         else:
             state = state.to(device=input.device)
-            assert (
-                state.shape == expected_state_shape
-            ), f"Invalid state shape {state.shape}, expected {expected_state_shape}"
+            assert state.shape == expected_state_shape, (
+                f"Invalid state shape {state.shape}, "  # fmt: skip
+                "expected {expected_state_shape}"  # fmt: skip
+            )
 
         match mode:
             case "scan":
@@ -314,7 +315,7 @@ class LRU(nn.Module):
                 dim=-1,
             )
 
-        y = (x @ self.C.mT).real + u * self.D
+        y = (x @ self.C.mT).real + input * self.D
 
         return y
 

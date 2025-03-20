@@ -17,7 +17,7 @@ from sbi.neural_nets.embedding_nets import (
     LRUEmbedding,
     PermutationInvariantEmbedding,
 )
-from sbi.neural_nets.embedding_nets.lru import LRU
+from sbi.neural_nets.embedding_nets.lru import LRU, LRUBlock
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
     true_posterior_linear_gaussian_mvn_prior,
@@ -254,13 +254,16 @@ def test_npe_with_with_iid_embedding_varying_num_trials(trial_factor=50):
             )
 
 
+@pytest.mark.parametrize(
+    "bidirectional", [True, False], ids=["one-directional", "bi-directional"]
+)
 def test_lru_isolated(
+    bidirectional: bool,
     input_dim: int = 7,
     state_dim: int = 11,
     r_min: float = 0.1,
     r_max: float = 1.0,
     max_phase: float = 2 * torch.pi,
-    bidirectional: bool = False,
     batch_size: int = 16,
     sequence_len: int = 50,
 ):
@@ -278,30 +281,90 @@ def test_lru_isolated(
 
     y = lru(x)
     assert isinstance(y, Tensor)
+    assert torch.is_floating_point(y), "Output tensor is not a real tensor"
     assert y.shape == (batch_size, sequence_len, input_dim)
 
 
+@pytest.mark.parametrize(
+    "bidirectional", [True, False], ids=["one-directional", "bi-directional"]
+)
+@pytest.mark.parametrize(
+    "apply_input_normalization",
+    [True, False],
+    ids=["input-normalization", "no-input-normalization"],
+)
+def test_lru_block_isolated(
+    bidirectional: bool,
+    apply_input_normalization: bool,
+    hidden_dim: int = 7,
+    state_dim: int = 11,
+    r_min: float = 0.6,
+    r_max: float = 1.0,
+    max_phase: float = 2 * torch.pi,
+    dropout: float = 0.5,
+    batch_size: int = 16,
+    sequence_len: int = 50,
+):
+    """Run some random data through an LRUBlock."""
+    lru_block = LRUBlock(
+        hidden_dim=hidden_dim,
+        state_dim=state_dim,
+        r_min=r_min,
+        r_max=r_max,
+        max_phase=max_phase,
+        bidirectional=bidirectional,
+        dropout=dropout,
+        apply_input_normalization=apply_input_normalization,
+    )
+
+    x = torch.randn(batch_size, sequence_len, hidden_dim)
+
+    y = lru_block(x)
+    assert isinstance(y, Tensor)
+    assert torch.is_floating_point(y), "Output tensor is not a real tensor"
+    assert y.shape == (batch_size, sequence_len, hidden_dim)
+
+
+@pytest.mark.parametrize(
+    "bidirectional", [True, False], ids=["one-directional", "bi-directional"]
+)
+@pytest.mark.parametrize("aggregate_func", ["last_step"], ids=["last-step"])
 def test_lru_embedding_net_isolated(
-    observation_dim: int = 7,
+    bidirectional: bool,
+    aggregate_func: str,
     output_dim: int = 5,
     input_dim: int = 7,
     state_dim: int = 11,
-    r_min: float = 0.1,
+    hidden_dim: int = 19,
+    num_blocks: int = 2,
+    r_min: float = 0.6,
     r_max: float = 1.0,
     max_phase: float = 2 * torch.pi,
-    bidirectional: bool = False,
+    dropout: float = 0.5,
     batch_size: int = 16,
     sequence_len: int = 50,
 ):
     """Run some random data trough an LRUEmbedding network."""
     embedding_net = LRUEmbedding(
-        input_dim=observation_dim, output_dim=output_dim, hidden_dim=9, num_layers=3
+        input_dim=input_dim,  # = observation_dim
+        output_dim=output_dim,
+        state_dim=state_dim,
+        hidden_dim=hidden_dim,
+        num_blocks=num_blocks,
+        r_min=r_min,
+        r_max=r_max,
+        max_phase=max_phase,
+        bidirectional=bidirectional,
+        dropout=dropout,
+        apply_input_normalization=True,
+        aggregate_func=aggregate_func,
     )
 
-    x = torch.randn(batch_size, 100, observation_dim)
+    x = torch.randn(batch_size, sequence_len, input_dim)
 
     x_embed = embedding_net(x)
     assert isinstance(x_embed, Tensor)
+    assert torch.is_floating_point(x_embed), "Output tensor is not a real tensor"
     assert x_embed.shape == (batch_size, output_dim)
 
 
