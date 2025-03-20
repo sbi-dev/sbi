@@ -7,7 +7,7 @@ from torch import eye, ones, zeros
 from torch.distributions import MultivariateNormal
 
 from sbi import utils as utils
-from sbi.inference import NPSE
+from sbi.inference import NPSE, ScorePosterior
 from sbi.simulators import linear_gaussian
 from sbi.simulators.linear_gaussian import (
     samples_true_posterior_linear_gaussian_uniform_prior,
@@ -50,7 +50,7 @@ class NpseTrainingTestCase:
 
     @property
     def prior(self):
-        if self.prior_type in {"gaussian", None}:
+        if self.prior_type == "gaussian":
             prior = MultivariateNormal(
                 loc=self.prior_mean, covariance_matrix=self.prior_cov
             )
@@ -68,7 +68,7 @@ class NpseTrainingTestCase:
         return theta, x
 
     def get_target_samples(self, num_samples: int, x_o):
-        if self.prior_type in {"gaussian", None}:
+        if self.prior_type == "gaussian":
             gt_posterior = true_posterior_linear_gaussian_mvn_prior(
                 x_o,
                 self.likelihood_shift,
@@ -77,7 +77,7 @@ class NpseTrainingTestCase:
                 self.prior_cov,
             )
             target_samples = gt_posterior.sample((num_samples,))
-        else:  # prior_type == "uniform"
+        elif self.prior_type == "uniform":
             target_samples = samples_true_posterior_linear_gaussian_uniform_prior(
                 x_o,
                 self.likelihood_shift,
@@ -85,6 +85,8 @@ class NpseTrainingTestCase:
                 prior=self.prior,
                 num_samples=num_samples,
             )
+        else:
+            raise NotImplementedError(f"Unsupported prior type: {self.prior_type}")
         return target_samples
 
 
@@ -121,17 +123,8 @@ training_test_cases_uniform = [
     ),
 ]
 
-training_test_cases_none = [
-    pytest.param(NpseTrainingTestCase(2, None, "ve"), id="None_prior-dim_3-ve"),
-    pytest.param(NpseTrainingTestCase(2, None, "vp"), id="None_prior-dim_3-vp"),
-    pytest.param(NpseTrainingTestCase(2, None, "subvp"), id="None_prior-dim_3-subvp"),
-]
 
-training_test_cases_all = (
-    training_test_cases_gaussian
-    + training_test_cases_uniform
-    + training_test_cases_none
-)
+training_test_cases_all = training_test_cases_gaussian + training_test_cases_uniform
 
 sampling_test_cases_1_trial = [
     pytest.param(
@@ -168,9 +161,7 @@ def _train_npse(
     stop_after_epochs,
     training_batch_size,
 ):
-    inference = NPSE(
-        test_case.prior, show_progress_bars=True, sde_type=test_case.sde_type
-    )
+    inference = NPSE(show_progress_bars=True, sde_type=test_case.sde_type)
     theta, x = test_case.get_training_data(num_simulations)
 
     kwargs = {}
@@ -206,10 +197,11 @@ def npse_trained_model(request):
 def test_c2st(npse_trained_model, sampling_test_case: NpseSamplingTestCase):
     num_samples = 1_000
     inference, score_estimator, test_case = npse_trained_model
-
     x_o = zeros(sampling_test_case.num_trials, test_case.num_dim)
-    posterior = inference.build_posterior(
-        score_estimator, sample_with=sampling_test_case.sampling_method
+    posterior = ScorePosterior(
+        score_estimator,
+        prior=test_case.prior,
+        sample_with=sampling_test_case.sampling_method,
     )
     posterior.set_default_x(x_o)
     npse_samples = posterior.sample(
@@ -258,9 +250,8 @@ def test_kld_gaussian(npse_trained_model):
     assert dkl < max_dkl, f"D-KL={dkl} is more than 2std above the average performance."
 
 
-@pytest.mark.skip
 @pytest.mark.parametrize("sampling_test_case", sampling_test_cases_all)
-@pytest.mark.parametrize("test_case", training_test_cases_none)
+@pytest.mark.parametrize("test_case", training_test_cases_all)
 def test_npse_snapshot(
     test_case: NpseTrainingTestCase, sampling_test_case: NpseSamplingTestCase, snapshot
 ):
@@ -273,10 +264,13 @@ def test_npse_snapshot(
         test_case, num_simulations, stop_after_epochs, training_batch_size
     )
     x_o = zeros(sampling_test_case.num_trials, test_case.num_dim)
-    posterior = inference.build_posterior(
-        score_estimator, sample_with=sampling_test_case.sampling_method
+    posterior = ScorePosterior(
+        score_estimator,
+        prior=test_case.prior,
+        sample_with=sampling_test_case.sampling_method,
     )
     posterior.set_default_x(x_o)
+
     samples = posterior.sample(
         (num_samples,), iid_method=sampling_test_case.iid_method, steps=steps
     )
