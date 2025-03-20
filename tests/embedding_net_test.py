@@ -262,8 +262,9 @@ def test_lru_isolated(
     max_phase: float = 2 * torch.pi,
     bidirectional: bool = False,
     batch_size: int = 16,
+    sequence_len: int = 50,
 ):
-    """Run some random data trough an LRU network."""
+    """Run some random data trough an LRU layer."""
     lru = LRU(
         input_dim=input_dim,
         state_dim=state_dim,
@@ -273,20 +274,30 @@ def test_lru_isolated(
         bidirectional=bidirectional,
     )
 
-    x = torch.randn(batch_size, 100, input_dim)
+    x = torch.randn(batch_size, sequence_len, input_dim)
 
     y = lru(x)
     assert isinstance(y, Tensor)
-    assert y.shape == (batch_size, 100, input_dim)
+    assert y.shape == (batch_size, sequence_len, input_dim)
 
 
 def test_lru_embedding_net_isolated(
-    observation_dim: int = 7, output_dim: int = 5, batch_size: int = 16
+    observation_dim: int = 7,
+    output_dim: int = 5,
+    input_dim: int = 7,
+    state_dim: int = 11,
+    r_min: float = 0.1,
+    r_max: float = 1.0,
+    max_phase: float = 2 * torch.pi,
+    bidirectional: bool = False,
+    batch_size: int = 16,
+    sequence_len: int = 50,
 ):
     """Run some random data trough an LRUEmbedding network."""
     embedding_net = LRUEmbedding(
         input_dim=observation_dim, output_dim=output_dim, hidden_dim=9, num_layers=3
     )
+
     x = torch.randn(batch_size, 100, observation_dim)
 
     x_embed = embedding_net(x)
