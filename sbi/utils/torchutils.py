@@ -15,7 +15,7 @@ from sbi.sbi_types import Array, OneOrMore
 from sbi.utils.typechecks import is_nonnegative_int, is_positive_int
 
 
-def process_device(device: Union[str, torch.device]) -> str:
+def process_device(device: Union[str, torch.device]) -> Union[str, torch.device]:
     """Set and return the default device to cpu or gpu (cuda, mps).
 
     Args:
