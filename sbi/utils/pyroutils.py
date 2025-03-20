@@ -137,8 +137,6 @@ class ConditionalDensityEstimatorDistribution(EstimatorDistribution):
 
     def sample(self, sample_shape: torch.Size = torch.Size()) -> torch.Tensor:
         """Generate samples from the conditioned estimator."""
-        if not hasattr(self.estimator, "sample"):
-            raise NotImplementedError("Sampling is not implemented for this estimator.")
         draws = self.estimator.sample(sample_shape, condition=self._condition_reshaped)
         # reshape (batch_dim,) -> batch_shape
         return draws.reshape(*sample_shape, *self.batch_shape, *self.event_shape)
