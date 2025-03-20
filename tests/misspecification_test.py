@@ -11,8 +11,15 @@ from sbi.diagnostics.misspecification import calc_misspecification_mmd
 from sbi.inference import NPE
 from sbi.neural_nets import posterior_nn
 from sbi.neural_nets.embedding_nets import FCEmbedding
+from sbi.utils.sbiutils import seed_all_backends
 
 seed = 2025
+
+
+# Use seed automatically for every test function.
+@pytest.fixture(autouse=True)
+def set_seed():
+    seed_all_backends(seed)
 
 
 @pytest.mark.parametrize("D, N", ((2, 1000),))
@@ -22,7 +29,6 @@ def test_mmd_x_space(D: int, N: int):
         D: observation and parameter dimension
         N: number of samples
     """
-    torch.manual_seed(seed)
 
     # true prior -- the observation comes from here
     mean_true = torch.zeros(D)
@@ -37,11 +43,6 @@ def test_mmd_x_space(D: int, N: int):
 
     def simulator(theta):
         return theta + torch.randn_like(theta)
-
-    # generate training data for well-specified model:
-    # not needed for this test
-    # theta_train = prior_true.sample((N,))
-    # x_train = simulator(theta_train)
 
     # validation set to compute MMD distribution in the
     # well-specified case
@@ -74,7 +75,6 @@ def test_mmd_x_space(D: int, N: int):
         x=x_val,
         mode="x_space",
     )
-    print(p_val_well, p_val_mis)
     # check p_vals
     assert p_val_well > 0.05, f"Expected large p_val , obtained {p_val_well}"
     assert p_val_mis < 0.05, f"Expected small p_val , obtained {p_val_mis}"
@@ -87,7 +87,6 @@ def test_mmd_x_emedding(D: int, N: int):
         D: observation and parameter dimension
         N: number of samples
     """
-    torch.manual_seed(seed)
 
     # true prior -- the observation comes from here
     mean_true = torch.zeros(D)
@@ -147,7 +146,10 @@ def test_mmd_x_emedding(D: int, N: int):
         x=x_val,
         mode="embedding",
     )
-    print(p_val_well, p_val_mis)
     # check p_vals
-    assert p_val_well > 0.05, f"Expected large p_val , obtained {p_val_well}"
-    assert p_val_mis < 0.05, f"Expected small p_val , obtained {p_val_mis}"
+    assert p_val_well > 0.05, (
+        f"Expected large p_val for well-specified data, obtained {p_val_well}"
+    )
+    assert p_val_mis < 0.05, (
+        f"Expected small p_val for misspecified data, obtained {p_val_mis}"
+    )

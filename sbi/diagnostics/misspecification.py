@@ -37,21 +37,26 @@ def compute_rbf_mmd(x, y, bandwidth=1.0, mode="biased"):
 
 
 def compute_rbf_mmd_median_heuristic(x, y, mode="biased"):
-    # https://arxiv.org/pdf/1707.07269.pdf
+    """median heuristic for bandwidth parameter as described in
+    Large sample analysis of the median heuristic, Garreau et al, 2018
+    (https://arxiv.org/abs/1707.07269)
+    """
     bandwidth = median_heuristic(x, y)
     return compute_rbf_mmd(x, y, bandwidth, mode)
 
 
-def calculate_baseline_mmd(x_obs, y, n_shuffle=1_000, max_samples=1_000, mode="biased"):
-    """calculate the MMD between two sets of synthetic data.
-    x_obs: observed data. only used to determine the number of samples for one set
+def calculate_baseline_mmd(n_obs, y, n_shuffle=1_000, max_samples=1_000, mode="biased"):
+    """calculates the MMD between two sets of synthetic data.
+       needed to compute the distribution of mmds under the null hypothesis
+       that synthetic and observed samples come from the same distribution.
+    n_obs: number of observed data points,
+        used to determine the number of samples for one set
     y: synthetic data
     n_shuffle: number of shuffles
     max_samples: maximum number of samples to use
     mode: mode of MMD calculation
     """
     mmds = torch.zeros(n_shuffle)
-    n_obs = x_obs.shape[0]
     if n_obs > y.shape[0]:
         raise ValueError(
             "n of observed samples should be less than n of synthetic samples"
@@ -75,7 +80,7 @@ def calculate_p_misspecification(
     mode: mode of MMD calculation ("biased" or "unbiased")
     """
     mmds_baseline = calculate_baseline_mmd(
-        x_obs, x, n_shuffle=n_shuffle, max_samples=max_samples, mode=mode
+        x_obs.shape[0], x, n_shuffle=n_shuffle, max_samples=max_samples, mode=mode
     )
     mmd = compute_rbf_mmd_median_heuristic(x_obs, x[:max_samples], mode=mode)
     p_val = 1 - (mmds_baseline < mmd).sum().item() / n_shuffle
@@ -96,8 +101,9 @@ def calc_misspecification_mmd(
     x: synthetic data
     inference: sbi inference object (only used if mode == "embedding")
     mode: space of MMD calculation ("x_space" or "embedding")
-    n_shuffle: number of shuffles for computing mmds und H_0
+    n_shuffle: number of shuffles for computing mmds under H_0
     max_samples: maximum number of samples to use
+        (when we have too many synthetic samples x)
     mmd_mode: approximation of MMD calculation ("biased" or "unbiased")
     returns:
         p_val, (mmd_baseline,mmd): p-value of the misspecification test
@@ -112,12 +118,12 @@ def calc_misspecification_mmd(
                 "inference should not be None if mode is 'embedding'."
                 "please provide an sbi inference object"
             )
-        if isinstance(inference._neural_net, type(None)):
+        if not hasattr(inference, '_neural_net'):
             raise ValueError("no neural net provided, neural_net should not be None")
         if isinstance(inference._neural_net.embedding_net, nn.modules.linear.Identity):
             raise Warning(
-                "The embedding net is might be the identity function,"
-                "in which case the MMD is computed in the x-space."
+                "The embedding net might be the identity function,"
+                "in that case the MMD is computed in the x-space."
             )
         z_obs = inference._neural_net.embedding_net(x_obs).detach()
         z = inference._neural_net.embedding_net(x).detach()
