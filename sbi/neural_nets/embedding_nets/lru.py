@@ -27,7 +27,7 @@ class LRUEmbedding(nn.Module):
         r_min=0.0,
         r_max=1.0,
         phase_max=2 * np.pi,
-        bidirectional: bool = False,
+        bidirectional: bool = True,
         mode: str = "loop",
         dropout: float = 0.0,
         apply_input_normalization: bool = False,

@@ -2,11 +2,33 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import warnings
-from typing import Dict, Optional, Sequence
+from typing import Dict, Optional, Sequence, Union
 
 import torch
 from torch import Tensor, float32
 from torch.distributions import Distribution, constraints
+
+
+def get_distribution_parameters(
+    dist: torch.distributions.Distribution, device: Union[str, torch.device]
+) -> Dict:
+    """Used to get the tensors of the parameters in torch distributions.
+
+    Returns the tensors relocated to device.
+    """
+    params = {param: getattr(dist, param).to(device) for param in dist.arg_constraints}
+    # torch.distributions.MultivariateNormal calculates precision
+    # matrix from covariance, and stores it in the arg_constraints.
+    # When reinstantiating, we must provide only one of them.
+    if isinstance(dist, torch.distributions.MultivariateNormal):
+        params["precision_matrix"] = None
+        params["scale_tril"] = None
+    # torch.distributions.MultivariateNormal calculates logits
+    # from probabilities, and stores it in the arg_constraints.
+    # When reinstantiating, we must provide only one of them.
+    elif isinstance(dist, torch.distributions.Binomial):
+        params["logits"] = None
+    return params
 
 
 class CustomPriorWrapper(Distribution):
@@ -83,6 +105,18 @@ class CustomPriorWrapper(Distribution):
                 stacklevel=2,
             )
 
+    def to(self, device: Union[str, torch.device]) -> None:
+        """
+        Move the distribution to the specified device. Not implemented for this class.
+
+        Raises:
+            NotImplementedError.
+        """
+        raise NotImplementedError(
+            "This class is not supported on the GPU. Use on cpu or use \
+            any of `PytorchReturnTypeWrapper`, `BoxUniform`, or `MultipleIndependent`."
+        )
+
     @property
     def mean(self):
         return torch.as_tensor(
@@ -118,6 +152,7 @@ class PytorchReturnTypeWrapper(Distribution):
         )
 
         self.prior = prior
+        self.device = None
         self.return_type = return_type
 
     def log_prob(self, value) -> Tensor:
@@ -150,6 +185,20 @@ class PytorchReturnTypeWrapper(Distribution):
     def support(self):
         return self.prior.support
 
+    def to(self, device: Union[str, torch.device]) -> None:
+        """
+        Move the distribution to the specified device.
+
+        Moves the distribution parameters to the specific device
+        and updates the device attribute.
+
+        Args:
+            device: device to move the distribution to.
+        """
+        params = get_distribution_parameters(self.prior, device)
+        self.prior = type(self.prior)(**params)
+        self.device = device
+
 
 class MultipleIndependent(Distribution):
     """Wrap a sequence of PyTorch distributions into a joint PyTorch distribution.
@@ -171,12 +220,17 @@ class MultipleIndependent(Distribution):
         dists: Sequence[Distribution],
         validate_args=None,
         arg_constraints: Optional[Dict[str, constraints.Constraint]] = None,
+        device: Optional[str] = None,
     ):
+        if device is not None:
+            raise NotImplementedError("device is not supported yet")
+
         self._check_distributions(dists)
         if validate_args is not None:
             [d.set_default_validate_args(validate_args) for d in dists]
 
         self.dists = dists
+        self.device = None
         # numel() instead of event_shape because for all dists both is possible,
         # event_shape=[1] or batch_shape=[1]
         self.dims_per_dist = [d.sample().numel() for d in self.dists]
@@ -314,6 +368,24 @@ class MultipleIndependent(Distribution):
             constraints.cat(supports, dim=-1, lengths=self.dims_per_dist),
             reinterpreted_batch_ndims=1,
         )
+
+    def to(self, device: Union[str, torch.device]) -> None:
+        """
+        Move the distribution to the specified device.
+        If the distribution has the `to` method, it is used. Otherwise, the
+        parameters of the distribution are moved to the specified device.
+
+        Args:
+            device: device to move the distribution to.
+        """
+        for i in range(len(self.dists)):
+            # ignoring because it is related to torch and not sbi
+            if hasattr(self.dists[i], "to"):
+                self.dists[i].to(device)  # type: ignore
+            else:
+                params = get_distribution_parameters(self.dists[i], device)
+                self.dists[i] = type(self.dists[i])(**params)  # type: ignore
+        self.device = device
 
 
 def build_support(
