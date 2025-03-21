@@ -84,7 +84,8 @@ dev = [
     "pytest-split",
     "torchtestcase",
     "syrupy",
-    "pytest-regressions"
+    "pytest-regressions",
+    "pytest-timeout"
 ]
 
 [project.urls]
