@@ -22,8 +22,8 @@ class FCEmbedding(nn.Module):
         """
         super().__init__()
         layers = [nn.Linear(input_dim, num_hiddens), nn.ReLU()]
-        # The first and last layer is defined by the input and output dimension.
-        # Therefore the "number of hidden layers" is num_layers - 2.
+        # first and last layer is defined by the input and output dimension.
+        # therefor the "number of hidden layeres" is num_layers-2
         for _ in range(num_layers - 2):
             layers.append(nn.Linear(num_hiddens, num_hiddens))
             layers.append(nn.ReLU())
