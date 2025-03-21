@@ -1,7 +1,6 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from abc import abstractmethod
 from typing import Any, Callable, Tuple
 
 import pyro.distributions
@@ -57,9 +56,8 @@ class EstimatorDistribution(pyro.distributions.TorchDistribution):
             event_shape=event_shape,
         )
 
-    @abstractmethod
     def get_condition_and_event_shapes(self) -> Tuple[torch.Size, torch.Size]:
-        pass
+        raise NotImplementedError
 
     @property
     def support(self) -> constraints.Constraint:
