@@ -3,6 +3,7 @@ from sbi.utils.analysis_utils import get_1d_marginal_peaks_from_kde
 from sbi.utils.io import get_data_root, get_log_root, get_project_root
 from sbi.utils.kde import KDEWrapper, get_kde
 from sbi.utils.potentialutils import pyro_potential_wrapper, transformed_potential
+from sbi.utils.pyroutils import to_pyro_distribution
 from sbi.utils.restriction_estimator import (
     RestrictedPrior,
     RestrictionEstimator,
