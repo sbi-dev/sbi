@@ -83,7 +83,8 @@ class RejectionPosterior(NeuralPosterior):
         self.device = device
         self.potential_fn.to(device)
         self.proposal.to(device)
-        if hasattr(self, "_x"):
+        x_o = None
+        if hasattr(self, "_x") and (self._x is not None):
             x_o = self._x.to(device)
 
         self.theta_transform = mcmc_transform(self.proposal, device=device)
@@ -94,7 +95,7 @@ class RejectionPosterior(NeuralPosterior):
             x_shape=self.x_shape,
         )
         # super().__init__ erase the self._x, so we need to set it again
-        if hasattr(self, "_x"):
+        if x_o is not None:
             self.set_default_x(x_o)
 
     def log_prob(
