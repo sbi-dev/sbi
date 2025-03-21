@@ -1018,6 +1018,13 @@ def build_zuko_flow(
     """
     Fundamental building blocks to build a Zuko normalizing flow model.
 
+    There are only 3 cases we consider in the if statements down below:
+
+    z_score_x is independent or none or structured, in which case we just use
+                 the normal standardizing transform.
+    z_score_x is logit but xdist is not valid, in which case we raise an error
+    z_score_x is logit and xdist is valid, in which case we give the logit transform.
+
     Args:
         which_nf (str): The type of normalizing flow to build.
         batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring.
