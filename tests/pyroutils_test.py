@@ -226,7 +226,7 @@ def test_estimator_distribution_basic_properties(
     estimator_dist = distribution_cls(estimator=density_estimator, condition=theta)
     assert isinstance(estimator_dist, distribution_cls)
     assert estimator_dist.estimator == density_estimator
-    assert estimator_dist.get_condition_and_event_shapes() == (
+    assert estimator_dist._get_condition_and_event_shapes() == (
         torch.Size([num_dim]),
         torch.Size([num_dim]),
     )

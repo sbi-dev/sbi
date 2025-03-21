@@ -48,7 +48,7 @@ class EstimatorDistribution(pyro.distributions.TorchDistribution):
 
     def __init__(self, estimator: Any, condition: torch.Tensor):
         self._estimator = estimator
-        condition_shape, event_shape = self.get_condition_and_event_shapes()
+        condition_shape, event_shape = self._get_condition_and_event_shapes()
         self._check_condition_shape(condition)
         self._condition = condition
         super().__init__(
@@ -56,7 +56,7 @@ class EstimatorDistribution(pyro.distributions.TorchDistribution):
             event_shape=event_shape,
         )
 
-    def get_condition_and_event_shapes(self) -> Tuple[torch.Size, torch.Size]:
+    def _get_condition_and_event_shapes(self) -> Tuple[torch.Size, torch.Size]:
         raise NotImplementedError
 
     @property
@@ -85,7 +85,7 @@ class EstimatorDistribution(pyro.distributions.TorchDistribution):
 
     def _check_condition_shape(self, condition: torch.Tensor):
         """Check that the shape of `condition` is compatible with the estimator."""
-        condition_shape_expected, _ = self.get_condition_and_event_shapes()
+        condition_shape_expected, _ = self._get_condition_and_event_shapes()
         if len(condition.shape) < len(condition_shape_expected):
             raise ValueError(
                 "Dimensionality of condition is too small and does not match the "
@@ -120,7 +120,7 @@ class ConditionalDensityEstimatorDistribution(EstimatorDistribution):
             -1, *self.estimator.condition_shape
         )
 
-    def get_condition_and_event_shapes(self) -> Tuple[torch.Size, torch.Size]:
+    def _get_condition_and_event_shapes(self) -> Tuple[torch.Size, torch.Size]:
         return self.estimator.condition_shape, self.estimator.input_shape
 
     def log_prob(self, x: torch.Tensor) -> torch.Tensor:
@@ -164,14 +164,14 @@ class RatioEstimatorDistribution(EstimatorDistribution):
         """
         super().__init__(estimator, condition)
 
-    def get_condition_and_event_shapes(self) -> Tuple[torch.Size, torch.Size]:
+    def _get_condition_and_event_shapes(self) -> Tuple[torch.Size, torch.Size]:
         return self.estimator.theta_shape, self.estimator.x_shape
 
     def log_prob(self, x: torch.Tensor) -> torch.Tensor:
         """Compute log probability of `x`."""
         # RatioEstimator expects condition and x to have the same leading shape
         sample_shape = x.shape[: -len(self.event_shape) - len(self.batch_shape)]
-        condition_shape, _ = self.get_condition_and_event_shapes()
+        condition_shape, _ = self._get_condition_and_event_shapes()
         condition = self.condition.expand(
             *sample_shape, *self.batch_shape, *condition_shape
         )
