@@ -444,12 +444,15 @@ def test_vi_on_gpu(num_dim: int, q: str, vi_method: str, sampling_method: str):
         ("gpu", None),
         ("cpu", "cpu"),
         ("gpu", "gpu"),
+        (torch.device("cpu"), torch.device("cpu")),
         pytest.param("gpu", "cpu", marks=pytest.mark.xfail),
         pytest.param("cpu", "gpu", marks=pytest.mark.xfail),
     ],
 )
 def test_boxuniform_device_handling(arg_device, device):
-    """Test mismatch between device passed via low / high and device kwarg."""
+    """Test mismatch between device passed via low / high and device kwarg.
+
+    Also tests torch.device as argument of process_device."""
 
     arg_device = process_device(arg_device)
     device = process_device(device)
