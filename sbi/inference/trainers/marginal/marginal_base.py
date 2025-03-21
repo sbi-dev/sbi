@@ -5,7 +5,7 @@ import time
 from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
-from typing import Callable, Optional, Tuple, Union
+from typing import Callable, Literal, Optional, Tuple, Union
 
 import torch
 from torch import Tensor
@@ -27,12 +27,33 @@ from sbi.utils.torchutils import assert_all_finite, process_device
 class MarginalTrainer:
     def __init__(
         self,
-        density_estimator: Union[str, Callable] = "MAF",
+        density_estimator: Union[
+            Literal["bpf", "maf", "naf", "ncsf", "nsf", "sospf", "unaf"],
+            Callable[[Tensor], torch.nn.Module],
+        ] = "nsf",
         device: str = "cpu",
         summary_writer: Optional[SummaryWriter] = None,
         show_progress_bars: bool = True,
     ):
-        """Utility class for training a marginal estimator method."""
+        """Utility class for training a marginal estimator method.
+
+        Args:
+            density_estimator: Density estimator to use. Can be a string or a callable.
+                If a string, it must be one of the following:
+                - "bpf": Bijector Polynomial Flow
+                - "maf": Masked Autoregressive Flow
+                - "naf": Neural Autoregressive Flow
+                - "ncsf": Neural Conditional Spline Flow
+                - "nsf": Neural Spline Flow
+                - "sospf": Sum-of-Squares Polynomial Flow
+                - "unaf": Unconditional Neural Autoregressive Flow
+                If a callable, it must be a function that returns a neural network
+                that inherits from `UnconditionalDensityEstimator`.
+            device: Device to use for training. Can be "cpu" or "cuda".
+            summary_writer: Summary writer for logging training progress. If None,
+                a new writer is created.
+            show_progress_bars: Whether to show progress bars during training.
+        """
 
         self._device = process_device(device)
         self._neural_net = None
@@ -65,6 +86,8 @@ class MarginalTrainer:
         validation_fraction: float = 0.1,
         dataloader_kwargs: Optional[dict] = None,
     ) -> Tuple[data.DataLoader, data.DataLoader]:
+        """Return training and validation dataloaders."""
+
         x = self.get_samples()
         dataset = data.TensorDataset(x)
 
