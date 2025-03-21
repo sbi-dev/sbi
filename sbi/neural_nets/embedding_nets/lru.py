@@ -1,5 +1,5 @@
 from math import sqrt
-from typing import Callable, Optional
+from typing import Callable, Optional, Tuple
 
 import numpy as np
 import torch
@@ -447,9 +447,9 @@ class LRU(nn.Module):
 
 
 def binary_operator_diag(
-    element_i: tuple[Tensor, Tensor],
-    element_j: tuple[Tensor, Tensor],
-) -> tuple[Tensor, Tensor]:
+    element_i: Tuple[Tensor, Tensor],
+    element_j: Tuple[Tensor, Tensor],
+) -> Tuple[Tensor, Tensor]:
     """Binary operator for parallel scan of linear recurrence.
 
     Args:
