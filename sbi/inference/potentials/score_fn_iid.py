@@ -399,7 +399,9 @@ class BaseGaussCorrectedScoreFunction(IIDScoreFunction):
         if time is None:
             time = torch.tensor([self.vector_field_estimator.t_min])
 
-        base_score = self.vector_field_estimator(inputs, conditions, time, **kwargs)
+        base_score = self.vector_field_estimator.score(
+            inputs, conditions, time, **kwargs
+        )
         prior_score = self.marginal_prior_score_fn(time, inputs)
 
         # Marginal prior precision
