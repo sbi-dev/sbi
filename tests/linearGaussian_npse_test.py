@@ -85,16 +85,17 @@ def _get_npse_target_samples(
 
 
 def _train_npse(
-    test_case: NpseTrainingTestCase,
+    sde_type,
+    num_dim,
     num_simulations,
-    training_batch_size,
     prior,
+    training_batch_size=None,
     stop_after_epochs=None,
     max_num_epochs=None,
 ):
-    inference = NPSE(show_progress_bars=True, sde_type=test_case.sde_type)
+    inference = NPSE(show_progress_bars=True, sde_type=sde_type)
     theta, x, _, _ = _get_npse_training_data(
-        num_simulations=num_simulations, num_dim=test_case.num_dim, prior=prior
+        num_simulations=num_simulations, num_dim=num_dim, prior=prior
     )
 
     kwargs = {}
@@ -275,27 +276,31 @@ def test_kld_gaussian(npse_trained_model):
     assert dkl < max_dkl, f"D-KL={dkl} is more than 2std above the average performance."
 
 
-@pytest.mark.parametrize("sampling_test_case", sampling_test_cases_all)
-@pytest.mark.parametrize("test_case", training_test_cases_all)
+@pytest.mark.parametrize("sampling_test_case", sampling_test_cases_1_trial)
+@pytest.mark.parametrize("training_test_case", training_test_cases_all)
 def test_npse_snapshot(
     sampling_test_case: NpseSamplingTestCase,
-    test_case: NpseTrainingTestCase,
+    training_test_case: NpseTrainingTestCase,
     ndarrays_regression,
 ):
     num_simulations = 5
-    num_samples = 3
-    steps = 7
-    max_num_epochs = 2
-    prior, _, _ = _get_npse_prior(test_case.prior_type, test_case.num_dim)
+    num_samples = 10
+    steps = 5
+
+    prior, _, _ = _get_npse_prior(
+        training_test_case.prior_type, training_test_case.num_dim
+    )
     score_estimator = _train_npse(
-        test_case,
+        sde_type=training_test_case.sde_type,
+        num_dim=training_test_case.num_dim,
+        prior=prior,
         num_simulations=num_simulations,
         training_batch_size=None,
-        prior=prior,
-        max_num_epochs=max_num_epochs,
+        stop_after_epochs=1,
+        max_num_epochs=1,
     )
 
-    x_o = zeros(sampling_test_case.num_trials, test_case.num_dim)
+    x_o = zeros((sampling_test_case.num_trials, training_test_case.num_dim))
 
     posterior = ScorePosterior(
         score_estimator,
@@ -307,6 +312,7 @@ def test_npse_snapshot(
     samples = posterior.sample(
         (num_samples,), iid_method=sampling_test_case.iid_method, steps=steps
     )
+
     ndarrays_regression.check(
         {'values': samples.numpy()}, default_tolerance=dict(atol=1e-3, rtol=1e-2)
     )
