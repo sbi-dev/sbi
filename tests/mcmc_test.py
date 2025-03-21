@@ -257,6 +257,7 @@ def test_getting_inference_diagnostics(method, mcmc_params_fast: dict):
     )
 
 
+@pytest.mark.mcmc
 def test_direct_mcmc_unconditional():
     "Test MCMCPosterior from user defined potential (unconditional)"
     num_samples = 100
@@ -293,6 +294,7 @@ def test_direct_mcmc_unconditional():
     )
 
 
+@pytest.mark.mcmc
 def test_direct_mcmc_conditional():
     "Test MCMCPosterior from user defined potential (conditional)"
     theta_dim = 2
