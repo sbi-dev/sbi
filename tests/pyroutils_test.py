@@ -264,7 +264,7 @@ def test_estimator_distribution_basic_properties(
 
 
 @pytest.mark.parametrize("num_subjects", [1])  # unused, required by fixture
-@pytest.mark.parametrize("num_samples", [500])
+@pytest.mark.parametrize("num_samples", [1_000])
 @pytest.mark.parametrize("warmup_steps", [500])
 @pytest.mark.parametrize("num_dim", [3, 5])
 @pytest.mark.parametrize("num_trials", [1, 5])
@@ -325,7 +325,7 @@ def test_pyro_gaussian_model(
 
 
 @pytest.mark.parametrize("num_dim", [1])  # unused, required by fixture
-@pytest.mark.parametrize("num_samples", [500])
+@pytest.mark.parametrize("num_samples", [1_000])
 @pytest.mark.parametrize("warmup_steps", [500])
 @pytest.mark.parametrize("num_trials", [1, 3])
 @pytest.mark.parametrize("num_subjects", [1, 2])
