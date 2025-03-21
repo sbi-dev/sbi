@@ -1068,8 +1068,8 @@ def build_zuko_flow(
         z_score_x_bool, structured_x = z_score_parser(z_score_x)
         if z_score_x_bool:
             transform = (
-                transform,
                 standardizing_transform_zuko(batch_x, structured_x),
+                transform,
             )
 
         z_score_y_bool, structured_y = z_score_parser(z_score_y)
@@ -1087,8 +1087,8 @@ def build_zuko_flow(
         z_score_x_bool, structured_x = z_score_parser(z_score_x)
         if z_score_x_bool:
             transforms = (
-                *transforms,
                 standardizing_transform_zuko(batch_x, structured_x),
+                *transforms,
             )
 
         z_score_y_bool, structured_y = z_score_parser(z_score_y)

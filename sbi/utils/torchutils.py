@@ -15,7 +15,7 @@ from sbi.sbi_types import Array, OneOrMore
 from sbi.utils.typechecks import is_nonnegative_int, is_positive_int
 
 
-def process_device(device: str) -> str:
+def process_device(device: Union[str, torch.device]) -> str:
     """Set and return the default device to cpu or gpu (cuda, mps).
 
     Args:
@@ -52,6 +52,8 @@ def process_device(device: str) -> str:
         # Else, check whether the custom device is valid.
         else:
             check_device(device)
+            if isinstance(device, torch.device):
+                device = device.type
 
         return device
 
@@ -61,7 +63,7 @@ def gpu_available() -> bool:
     return torch.cuda.is_available() or torch.backends.mps.is_available()
 
 
-def check_device(device: str) -> None:
+def check_device(device: Union[str, torch.device]) -> None:
     """Check whether the device is valid.
 
     Args:
@@ -274,8 +276,8 @@ def gaussian_kde_log_eval(samples, query):
 class BoxUniform(Independent):
     def __init__(
         self,
-        low: Tensor,
-        high: Tensor,
+        low: Union[Tensor, Array],
+        high: Union[Tensor, Array],
         reinterpreted_batch_ndims: int = 1,
         device: Optional[str] = None,
     ):
@@ -313,6 +315,11 @@ class BoxUniform(Independent):
         # Device handling
         device = low.device.type if device is None else device
         device = process_device(device)
+        self.device = device
+        self.reinterpreted_batch_ndims = reinterpreted_batch_ndims
+
+        self.low = torch.as_tensor(low, dtype=torch.float32, device=device)
+        self.high = torch.as_tensor(high, dtype=torch.float32, device=device)
 
         super().__init__(
             Uniform(
@@ -325,6 +332,30 @@ class BoxUniform(Independent):
                 validate_args=False,
             ),
             reinterpreted_batch_ndims,
+        )
+
+    def to(self, device: Union[str, torch.device]) -> None:
+        """
+        Moves the distribution to the specified device **in place**.
+
+        Args:
+            device: Target device (e.g., "cpu", "cuda", "mps").
+        """
+        # Update the device attribute
+        self.device = device
+        device = process_device(device)
+
+        # Move tensors to the new device
+        self.low = self.low.to(device=device)
+        self.high = self.high.to(device=device)
+
+        super().__init__(
+            Uniform(
+                low=self.low,
+                high=self.high,
+                validate_args=False,
+            ),
+            self.reinterpreted_batch_ndims,
         )
 
 
