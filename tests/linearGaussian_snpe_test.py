@@ -8,7 +8,7 @@ import pytest
 import torch
 from scipy.stats import gaussian_kde
 from torch import eye, ones, zeros
-from torch.distributions import Binomial, MultivariateNormal
+from torch.distributions import MultivariateNormal
 
 from sbi import analysis as analysis
 from sbi import utils as utils
@@ -734,6 +734,7 @@ def test_multiround_mog_training():
 
 def test_bimodal_posterior_npe():
     import matplotlib.pyplot as plt
+    from torch.distributions import Binomial
 
     dim = 2
 
