@@ -27,9 +27,9 @@ class LRUEmbedding(nn.Module):
         state_dim: int = 20,
         hidden_dim: int = 40,
         num_blocks: int = 2,
-        r_min : float=0.0,
-        r_max=1.0,
-        phase_max=2 * np.pi,
+        r_min: float = 0.0,
+        r_max: float = 1.0,
+        phase_max: float = 2 * np.pi,
         bidirectional: bool = True,
         mode: str = "loop",
         dropout: float = 0.0,
@@ -224,12 +224,12 @@ class LRU(nn.Module):
             raise ValueError("state_dim must be a positive integer.")
         if not (0 <= r_min < r_max <= 1):
             raise ValueError(
-                f"Invalid {r_min=} and/or {r_max=}. They must suffice "
+                f"Invalid {r_min=} and/or {r_max: float = }. They must suffice "
                 "0 <= r_min < r_max <= 1."
             )
         if not (0 <= phase_max <= 2 * torch.pi):
             raise ValueError(
-                f"Invalid {phase_max=}. I must suffice 0 <= phase_max <= 2 pi."
+                f"Invalid {phase_max: float = }. I must suffice 0 <= phase_max <= 2 pi."
             )
         if mode not in ("loop", "scan"):
             raise ValueError(f"Invalid {mode=}. Must be 'loop' or 'scan'.")
