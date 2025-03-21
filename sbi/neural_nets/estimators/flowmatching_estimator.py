@@ -4,7 +4,6 @@ from typing import Optional
 import torch
 import torch.nn as nn
 from torch import Tensor
-from zuko.utils import broadcast
 
 from sbi.neural_nets.estimators.vector_field_estimator import (
     ConditionalVectorFieldEstimator,
@@ -96,25 +95,38 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         return self._embedding_net
 
     def forward(self, input: Tensor, condition: Tensor, t: Tensor) -> Tensor:
+        """
+        Forward pass of the FlowMatchingEstimator.
+
+        Args:
+            input: The input tensor.
+            condition: The condition tensor.
+            t: The time tensor.
+
+        Returns:
+            The estimated vector field.
+        """
         # temporal fix that will be removed when the nn builders are updated
         t = self._get_temporal_t_shape_fix(t)
+
+        batch_shape = torch.broadcast_shapes(
+            input.shape[: -len(self.input_shape)],
+            condition.shape[: -len(self.condition_shape)],
+        )
+
+        input = torch.broadcast_to(input, batch_shape + self.input_shape)
+        condition = torch.broadcast_to(condition, batch_shape + self.condition_shape)
+        t = torch.broadcast_to(t, batch_shape + t.shape[1:])
 
         # the network expects 2D input, so we flatten the input if necessary
         # and remember the original shape
         target_shape = input.shape
-        if input.ndim > 2:
-            input = input.reshape(-1, input.shape[-1])
+        input = input.reshape(-1, input.shape[-1])
+        condition = condition.reshape(-1, condition.shape[-1])
+        t = t.reshape(-1, t.shape[-1])
 
         # embed the input and condition
         embedded_condition = self._embedding_net(condition)
-
-        # broadcast to match shapes of theta, x, and t
-        input, embedded_condition, t = broadcast(
-            input,  # type: ignore
-            embedded_condition,
-            t,
-            ignore=1,
-        )
 
         # call the network to get the estimated vector field
         v = self.net(theta=input, x=embedded_condition, t=t)
@@ -226,7 +238,7 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
             Score function of the vector field estimator.
         """
         # TODO: derive taking into account the noise sigma_min added to the vector field
-        v = self.forward(input, condition, t)
+        v = self(input, condition, t)
         score = (-(1 - t) * v - input) / torch.maximum(t, torch.tensor(1e-6))
         return score
 
@@ -320,7 +332,7 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
             Standard deviation at a given time.
         """
         # TODO: derive taking into account the noise sigma_min added to the vector field
-        std_t = times * self.std_base
+        std_t = times * self.std_base.flatten()[0]
         for _ in range(len(self.input_shape)):
             std_t = std_t.unsqueeze(-1)
         return std_t
