@@ -1,7 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple, Union
 
 import torch
 from torch import Tensor
@@ -78,6 +78,23 @@ class PosteriorScoreBasedPotential(BasePotential):
         self.iid_method = iid_method
         self.iid_params = iid_params
         super().__init__(prior, x_o, device=device)
+
+    def to(self, device: Union[str, torch.device]) -> None:
+        """
+        Move score_estimator, prior and x_o to the given device.
+
+        It also set the device attribute to the given device.
+
+        Args:
+            device: Device to move the score_estimator, prior and x_o to.
+        """
+
+        self.device = device
+        self.score_estimator.to(device)
+        if self.prior:
+            self.prior.to(device)
+        if self._x_o:
+            self._x_o = self._x_o.to(device)
 
     def set_x(
         self,
