@@ -12,7 +12,7 @@ PREDICTORS = {}
 
 def get_predictor(
     name: str,
-    vector_field_potential: 'PosteriorVectorFieldBasedPotential',  # noqa: F821 # type: ignore
+    vector_field_potential: 'VectorFieldBasedPotential',  # noqa: F821 # type: ignore
     **kwargs,
 ) -> "Predictor":
     """Helper function to get predictor by name.
@@ -52,7 +52,7 @@ class Predictor(ABC):
 
     def __init__(
         self,
-        potential_fn: 'PosteriorVectorFieldBasedPotential',  # noqa: F821 # type: ignore
+        potential_fn: 'VectorFieldBasedPotential',  # noqa: F821 # type: ignore
     ):
         """Initialize predictor.
 
@@ -92,7 +92,7 @@ class Predictor(ABC):
 class EulerMaruyama(Predictor):
     def __init__(
         self,
-        potential_fn: 'PosteriorVectorFieldBasedPotential ',  # noqa: F821 # type: ignore
+        potential_fn: 'VectorFieldBasedPotential ',  # noqa: F821 # type: ignore
         eta: float = 1.0,
     ):
         """Simple Euler-Maruyama discretization of the associated family of reverse

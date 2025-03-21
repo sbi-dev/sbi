@@ -29,7 +29,7 @@ def vector_field_estimator_based_potential(
     x_o: Optional[Tensor],
     enable_transform: bool = True,
     **kwargs,
-) -> Tuple["PosteriorVectorFieldBasedPotential", TorchTransform]:
+) -> Tuple["VectorFieldBasedPotential", TorchTransform]:
     r"""Returns the potential function gradient for score estimators.
 
     Args:
@@ -38,11 +38,11 @@ def vector_field_estimator_based_potential(
         x_o: The observed data at which to evaluate the vector field.
         enable_transform: Whether to enable transforms. Not supported yet.
         **kwargs: Additional keyword arguments passed to
-            `PosteriorVectorFieldBasedPotential`.
+            `VectorFieldBasedPotential`.
     """
     device = str(next(vector_field_estimator.parameters()).device)
 
-    potential_fn = PosteriorVectorFieldBasedPotential(
+    potential_fn = VectorFieldBasedPotential(
         vector_field_estimator, prior, x_o, device=device, **kwargs
     )
 
@@ -56,7 +56,7 @@ def vector_field_estimator_based_potential(
     return potential_fn, theta_transform
 
 
-class PosteriorVectorFieldBasedPotential(BasePotential):
+class VectorFieldBasedPotential(BasePotential):
     def __init__(
         self,
         vector_field_estimator: ConditionalVectorFieldEstimator,
@@ -254,7 +254,7 @@ class PosteriorVectorFieldBasedPotential(BasePotential):
 
 class DifferentiablePotentialFunction(torch.autograd.Function):
     """
-    A wrapper of PosteriorVectorFieldBasedPotential with a custom autograd function
+    A wrapper of `VectorFieldBasedPotential` with a custom autograd function
     to compute the gradient of log_prob with respect to theta. Instead of
     backpropagating through the continuous normalizing flow, we use the gradient
     of the score estimator.

@@ -96,7 +96,7 @@ class NPSE(VectorFieldInference):
                 do a Langevin diffusion step, while the 'ode' method uses the score to
                 define a probabilistic ODE and solves it with a numerical ODE solver.
             **kwargs: Additional keyword arguments passed to
-                `PosteriorVectorFieldBasedPotential`.
+                `VectorFieldBasedPotential`.
 
 
         Returns:

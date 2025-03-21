@@ -26,7 +26,7 @@ class Diffuser:
 
     def __init__(
         self,
-        vector_field_potential: 'PosteriorVectorFieldBasedPotential',  # noqa: F821 # type: ignore
+        vector_field_potential: 'VectorFieldBasedPotential',  # noqa: F821 # type: ignore
         predictor: Union[str, Predictor],
         corrector: Optional[Union[str, Corrector]] = None,
         predictor_params: Optional[dict] = None,
@@ -71,7 +71,7 @@ class Diffuser:
     def set_predictor(
         self,
         predictor: Union[str, Predictor],
-        vector_field_potential: 'PosteriorVectorFieldBasedPotential',  # noqa: F821 # type: ignore
+        vector_field_potential: 'VectorFieldBasedPotential',  # noqa: F821 # type: ignore
         **kwargs,
     ):
         """Set the predictor for the diffusion-based sampler."""

@@ -10,7 +10,7 @@ from torch.distributions import Distribution
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials.vector_field_potential import (
     CallableDifferentiablePotentialFunction,
-    PosteriorVectorFieldBasedPotential,
+    VectorFieldBasedPotential,
     vector_field_estimator_based_potential,
 )
 from sbi.neural_nets.estimators.shape_handling import (
@@ -69,7 +69,7 @@ class VectorFieldPosterior(NeuralPosterior):
             sample_with: Whether to sample from the posterior using the ODE-based
                 sampler or the SDE-based sampler.
             **kwargs: Additional keyword arguments passed to
-                `PosteriorVectorFieldBasedPotential`.
+                `VectorFieldBasedPotential`.
         """
 
         check_prior(prior)
@@ -86,7 +86,7 @@ class VectorFieldPosterior(NeuralPosterior):
             device=device,
         )
         # Set the potential function type.
-        self.potential_fn: PosteriorVectorFieldBasedPotential = potential_fn
+        self.potential_fn: VectorFieldBasedPotential = potential_fn
 
         self.prior = prior
         self.vector_field_estimator = vector_field_estimator
