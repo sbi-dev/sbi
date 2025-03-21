@@ -21,6 +21,8 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ['3.10']
+        split_size: [4]
+        group_number: [1, 2, 3, 4]
 
     steps:
     - name: Checkout
@@ -62,7 +64,7 @@ jobs:
     #     [ -f .testmondata ] && chmod u+w .testmondata || true
 
     - name: Run fast CPU tests with coverage
-      run: uv run pytest -v -n auto -m "not slow and not gpu" --cov=sbi --cov-report=xml tests/ #--testmon-forceselect
+      run: uv run pytest -v -n auto -m "not slow and not gpu" --cov=sbi --cov-report=xml --splitting-algorithm least_duration --splits ${{ matrix.split_size }} --group ${{ matrix.group_number }} tests/ #--testmon-forceselect
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4

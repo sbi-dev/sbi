@@ -6,7 +6,7 @@ from sbi.inference.trainers.base import (
 )
 from sbi.inference.trainers.fmpe import FMPE
 from sbi.inference.trainers.nle import MNLE, NLE_A
-from sbi.inference.trainers.npe import NPE_A, NPE_B, NPE_C  # noqa: F401
+from sbi.inference.trainers.npe import MNPE, NPE_A, NPE_B, NPE_C  # noqa: F401
 from sbi.inference.trainers.npse import NPSE
 from sbi.inference.trainers.nre import BNRE, NRE_A, NRE_B, NRE_C  # noqa: F401
 
