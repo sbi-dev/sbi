@@ -159,7 +159,7 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         Returns:
             Score function value.
         """
-        return self.forward(input=input, condition=condition, time=t)
+        return self(input=input, condition=condition, time=t)
 
     def loss(
         self,
