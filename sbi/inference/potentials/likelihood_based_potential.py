@@ -2,7 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import warnings
-from typing import Callable, List, Optional, Tuple
+from typing import Callable, List, Optional, Tuple, Union
 
 import torch
 from torch import Tensor
@@ -80,6 +80,21 @@ class LikelihoodBasedPotential(BasePotential):
         super().__init__(prior, x_o, device)
         self.likelihood_estimator = likelihood_estimator
         self.likelihood_estimator.eval()
+
+    def to(self, device: Union[str, torch.device]) -> None:
+        """
+        Move likelihood_estimator, prior and x_o to the given device.
+
+        It also set the device attribute to the given device.
+
+        Args:
+            device: Device to move the likelihood_estimator, prior and x_o to.
+        """
+        self.device = device
+        self.likelihood_estimator.to(device)
+        self.prior.to(device)
+        if self._x_o:
+            self._x_o = self._x_o.to(device)
 
     def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
         r"""Returns the potential $\log(p(x_o|\theta)p(\theta))$.
@@ -161,8 +176,8 @@ class LikelihoodBasedPotential(BasePotential):
 
             return _log_likelihood_over_iid_trials_and_local_theta(
                 x=x_o.to(self.device),
-                global_theta=global_theta,
-                local_theta=local_theta,
+                global_theta=global_theta.to(self.device),
+                local_theta=local_theta.to(self.device),
                 estimator=self.likelihood_estimator,
                 track_gradients=track_gradients,
             )
