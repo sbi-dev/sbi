@@ -107,6 +107,8 @@ class ScorePosterior(NeuralPosterior):
         ts: Optional[Tensor] = None,
         iid_method: str = "auto_gauss",
         iid_params: Optional[Dict] = None,
+        guidance_method: Optional[str] = None,
+        guidance_params: Optional[Dict] = None,
         max_sampling_batch_size: int = 10_000,
         sample_with: Optional[str] = None,
         show_progress_bars: bool = True,
@@ -138,6 +140,17 @@ class ScorePosterior(NeuralPosterior):
                 "auto_gauss" for these reasons.
             iid_params: Additional parameters passed to the iid method. See the specific
                 `IIDScoreFunction` child class for details.
+            guidance_method: Method to guide the diffusion process. If None, no guidance
+                is used. currently we support `affine_classifier_free`, which allows to
+                scale and shift the "likelihood" or "prior" score contribution. This can
+                be used to perform "super" conditioning i.e. shring the variance of the
+                likelihood. `Universal` can be used to guide the diffusion process with
+                a general guidance function. `Interval` is an isntance of that where
+                the guidance function constraints the diffusion process to a given
+                interval.
+            guidance_params: Additional parameters passed to the guidance method. See
+                the specific `ScoreAdaptation` child class for details, specifically
+                `AffineClassifierFreeCfg`, `UniversalCfg`, and `IntervalCfg`.
             max_sampling_batch_size: Maximum batch size for sampling.
             sample_with: Deprecated - use `.build_posterior(sample_with=...)` prior to
                 `.sample()`.
@@ -155,7 +168,12 @@ class ScorePosterior(NeuralPosterior):
         x = reshape_to_batch_event(x, self.score_estimator.condition_shape)
         is_iid = x.shape[0] > 1
         self.potential_fn.set_x(
-            x, x_is_iid=is_iid, iid_method=iid_method, iid_params=iid_params
+            x,
+            x_is_iid=is_iid,
+            iid_method=iid_method,
+            iid_params=iid_params,
+            guidance_method=guidance_method,
+            guidance_params=guidance_params,
         )
 
         num_samples = torch.Size(sample_shape).numel()
