@@ -13,6 +13,7 @@ from sbi.inference import FMPE, NLE, NPE, NRE
 from sbi.neural_nets import classifier_nn, flowmatching_nn, likelihood_nn, posterior_nn
 from sbi.neural_nets.embedding_nets import (
     CNNEmbedding,
+    CausalCNNEmbedding,
     FCEmbedding,
     PermutationInvariantEmbedding,
 )
@@ -134,6 +135,52 @@ def test_1d_and_2d_cnn_embedding_net(input_shape, num_channels):
         "mdn",
         embedding_net=CNNEmbedding(
             input_shape, in_channels=num_channels, output_dim=20
+        ),
+    )
+
+    num_dim = input_shape[0]
+
+    def simulator2d(theta):
+        x = MultivariateNormal(
+            loc=theta, covariance_matrix=0.5 * torch.eye(num_dim)
+        ).sample()
+        return x.unsqueeze(2).repeat(1, 1, input_shape[1])
+
+    def simulator1d(theta):
+        return torch.rand_like(theta) + theta
+
+    if len(input_shape) == 1:
+        simulator = simulator1d
+        xo = torch.ones(1, num_channels, *input_shape).squeeze(1)
+    else:
+        simulator = simulator2d
+        xo = torch.ones(1, num_channels, *input_shape).squeeze(1)
+
+    prior = MultivariateNormal(torch.zeros(num_dim), torch.eye(num_dim))
+
+    num_simulations = 1000
+    theta = prior.sample(torch.Size((num_simulations,)))
+    x = simulator(theta)
+    if num_channels > 1:
+        x = x.unsqueeze(1).repeat(
+            1, num_channels, *[1 for _ in range(len(input_shape))]
+        )
+
+    trainer = NPE(prior=prior, density_estimator=estimator_provider)
+    trainer.append_simulations(theta, x).train(max_num_epochs=2)
+    posterior = trainer.build_posterior().set_default_x(xo)
+
+    s = posterior.sample((10,))
+    posterior.potential(s)
+
+
+@pytest.mark.parametrize("input_shape", [(32,), (64,)])
+@pytest.mark.parametrize("num_channels", (1, 2, 3))
+def test_1d_causal_cnn_embedding_net(input_shape, num_channels):
+    estimator_provider = posterior_nn(
+        "mdn",
+        embedding_net=CausalCNNEmbedding(
+            input_shape, in_channels=num_channels, pool_kernel_size=2, output_dim=20
         ),
     )
 
