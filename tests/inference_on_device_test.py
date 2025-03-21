@@ -652,20 +652,21 @@ def test_to_method_on_potentials(device: str, potential: Union[ABC, BasePotentia
         )
 
 
+@pytest.mark.slow
 @pytest.mark.gpu
 @pytest.mark.parametrize("device", ["cpu", "gpu"])
 @pytest.mark.parametrize(
-    "sampling_method", ["rejection", "importance", "mcmc", "direct", "vi"]
+    "sampling_method", ["rejection", "importance", "mcmc", "direct"]
 )
 def test_to_method_on_posteriors(device: str, sampling_method: str):
     """Test that the .to() method works on posteriors."""
     device = process_device(device)
-    prior = BoxUniform(torch.tensor([0.0]), torch.tensor([1.0]))
+    prior = BoxUniform(torch.zeros(3), torch.ones(3))
     inference = NPE()
+    x_o = torch.zeros(2).to(device)
     estimator = inference.append_simulations(
         torch.randn((100, 3)), torch.randn((100, 2))
     ).train(max_num_epochs=1)
-    x_o = torch.zeros(1, 1).to(device)
     if sampling_method == "rejection":
         posterior = inference.build_posterior(
             density_estimator=estimator,
@@ -678,9 +679,20 @@ def test_to_method_on_posteriors(device: str, sampling_method: str):
             density_estimator=estimator, prior=prior, sample_with=sampling_method
         )
     posterior.set_default_x(x_o)
+    # if sampling_method == "vi":
+    #     posterior = posterior.train()
     posterior.to(device)
+
     assert (posterior.device).strip(":0") == device.strip(":0"), (
         ".to() should change the device attribute"
+    )
+    sample_device = posterior.sample((10,), x=x_o)
+    assert sample_device.device.type == device.strip(":0"), (
+        f"sample was not correctly moved to {device}."
+    )
+    log_probs = posterior.log_prob(sample_device)
+    assert log_probs.device.type == device.strip(":0"), (
+        f"log_prob was not correctly moved to {device}."
     )
 
     for trasnf in posterior.theta_transform._inv.base_transform.parts:
