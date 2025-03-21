@@ -62,7 +62,7 @@ class PosteriorBasedPotential(BasePotential):
     def __init__(
         self,
         posterior_estimator: ConditionalDensityEstimator,
-        prior: Optional[Distribution] = None,
+        prior: Distribution,
         x_o: Optional[Tensor] = None,
         device: str = "cpu",
     ):
