@@ -679,8 +679,6 @@ def test_to_method_on_posteriors(device: str, sampling_method: str):
             density_estimator=estimator, prior=prior, sample_with=sampling_method
         )
     posterior.set_default_x(x_o)
-    # if sampling_method == "vi":
-    #     posterior = posterior.train()
     posterior.to(device)
 
     assert (posterior.device).strip(":0") == device.strip(":0"), (
