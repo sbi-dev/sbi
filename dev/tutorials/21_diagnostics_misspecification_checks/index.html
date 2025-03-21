@@ -1,0 +1,1191 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://sbi-dev.github.io/sbi/dev/tutorials/21_diagnostics_misspecification_checks/">
+      
+      
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.9">
+    
+    
+      
+        <title>Model Misspecification in SBI - sbi</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.4af4bdda.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+  
+  
+    
+    
+  
+  
+  <style>:root{--md-admonition-icon--note:url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2016%2016%22%3E%3Cpath%20d%3D%22M1%207.775V2.75C1%201.784%201.784%201%202.75%201h5.025c.464%200%20.91.184%201.238.513l6.25%206.25a1.75%201.75%200%200%201%200%202.474l-5.026%205.026a1.75%201.75%200%200%201-2.474%200l-6.25-6.25A1.75%201.75%200%200%201%201%207.775m1.5%200c0%20.066.026.13.073.177l6.25%206.25a.25.25%200%200%200%20.354%200l5.025-5.025a.25.25%200%200%200%200-.354l-6.25-6.25a.25.25%200%200%200-.177-.073H2.75a.25.25%200%200%200-.25.25ZM6%205a1%201%200%201%201%200%202%201%201%200%200%201%200-2%22/%3E%3C/svg%3E');}</style>
+
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../static/global.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#model-misspecification-in-sbi" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="sbi" class="md-header__button md-logo" aria-label="sbi" data-md-component="logo">
+      
+  <img src="../../static/logo.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            sbi
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Model Misspecification in SBI
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="http://github.com/sbi-dev/sbi" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    sbi-dev/sbi
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="sbi" class="md-nav__button md-logo" aria-label="sbi" data-md-component="logo">
+      
+  <img src="../../static/logo.svg" alt="logo">
+
+    </a>
+    sbi
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="http://github.com/sbi-dev/sbi" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    sbi-dev/sbi
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../index.md" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Tutorials and Examples
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    API Reference
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    FAQ
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Contributing
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Contributing
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contribute/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    How to contribute
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../code_of_conduct/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Code of Conduct
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../citation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Citation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../credits/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Credits
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-2d-gaussian-simulator" class="md-nav__link">
+    <span class="md-ellipsis">
+      1. 2D Gaussian Simulator
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. 2D Gaussian Simulator">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#define-the-ground-truth-and-misspecified-priors" class="md-nav__link">
+    <span class="md-ellipsis">
+      Define the ground-truth and misspecified priors
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#create-the-training-dataset-for-the-npe-ie-theta-x-pairs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Create the training dataset for the NPE, i.e., \((\theta, x)\) pairs
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#train-our-inference-object" class="md-nav__link">
+    <span class="md-ellipsis">
+      Train our inference object
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#create-the-observations-x_obs-to-do-inference" class="md-nav__link">
+    <span class="md-ellipsis">
+      Create the observations \(x_{obs}\) to do inference
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#misspecification-detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      Misspecification detection
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="model-misspecification-in-sbi">Model Misspecification in SBI<a class="headerlink" href="#model-misspecification-in-sbi" title="Permanent link">&para;</a></h1>
+<p>In this tutorial, we would describe how to detect prior misspecification, one instance of model misspecification in Simulation-based Inference (SBI), and demonstrate it on two simulators: a toy 2d Gaussian mean inference task, and the <a href="https://en.wikipedia.org/wiki/Hodgkin%E2%80%93Huxley_model">Hodgkin-Huxley
+model</a> from neuroscience. General familiarity with the SBI toolkit will be assumed. Note that other forms of model misspecification such as misspecified likelihood or presence of noise are also prevalent in the SBI literature [1], but the scope of this tutorial would be limited to prior misspecification.</p>
+<p>References:
+- [1][Schmitt et al, 2024](<a href="https://arxiv.org/abs/2112.08866">https://arxiv.org/abs/2112.08866</a>)
+- [2][Kelly et al, 2025](<a href="https://arxiv.org/abs/2503.12315">https://arxiv.org/abs/2503.12315</a>)
+- [3][Gretton et al, 2012](<a href="https://www.jmlr.org/papers/volume13/gretton12a/gretton12a.pdf">https://www.jmlr.org/papers/volume13/gretton12a/gretton12a.pdf</a>)</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mpl</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch.distributions</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">dist</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.diagnostics.misspecification</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">calc_misspecification_mmd</span><span class="p">,</span>  <span class="c1"># Import the MMD diagnostic</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference</span><span class="w"> </span><span class="kn">import</span> <span class="n">NPE</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.neural_nets</span><span class="w"> </span><span class="kn">import</span> <span class="n">posterior_nn</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.neural_nets.embedding_nets</span><span class="w"> </span><span class="kn">import</span> <span class="n">FCEmbedding</span>
+
+<span class="c1"># Set seed</span>
+<span class="n">seed</span> <span class="o">=</span> <span class="mi">2025</span>
+<span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="c1"># remove top and right axis from plots</span>
+<span class="n">mpl</span><span class="o">.</span><span class="n">rcParams</span><span class="p">[</span><span class="s2">&quot;axes.spines.right&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span>
+<span class="n">mpl</span><span class="o">.</span><span class="n">rcParams</span><span class="p">[</span><span class="s2">&quot;axes.spines.top&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span>
+</code></pre></div>
+<h2 id="1-2d-gaussian-simulator">1. 2D Gaussian Simulator<a class="headerlink" href="#1-2d-gaussian-simulator" title="Permanent link">&para;</a></h2>
+<p>In this example, we work with the following simulator: the prior <span class="arithmatex">\(\theta \sim \mathcal{N}(0, I_d)\)</span>, and the observations <span class="arithmatex">\(x|\theta \sim \mathcal{N}(\theta, I_d)\)</span>, where <span class="arithmatex">\(d\)</span> is the dimensionality of the problem. For the purposes of this example, we would assume the observations, i.e., <span class="arithmatex">\(x_o\)</span> would come from the (true) data generating process above.</p>
+<p>Now we demonstrate a concrete example of model misspecification scenario in SBI. We assume our posterior inference network (e.g., NPE) would be fitted on <span class="arithmatex">\((\theta, x)\)</span> pairs where the <span class="arithmatex">\(\theta\)</span> values are sampled from <span class="arithmatex">\(\mathcal{N}(\mu, I_d)\)</span> (instead of <span class="arithmatex">\(\mathcal{N}(0, I_d)\)</span>, i.e., with some offset mean <span class="arithmatex">\(\mu\)</span>), and the corresponding observations <span class="arithmatex">\(x\)</span> were generated using the simulator as above. We refer to this manifestation of model misspecification as <strong>prior misspecification</strong>, and demonstrate how we can identify this using (one or many) observations <span class="arithmatex">\(x_o\)</span> during test time, following the maximum mean discrepancy (MMD) based approach outlined in [1]. </p>
+<p>The core idea of the method is to compute a distribution of MMD values among the synthetic simulations (<span class="arithmatex">\(x\)</span>) the model was trained on, and perform an out-of-distribution/p-value check for the MMD between the synthetic simulations and the <span class="arithmatex">\(x_o\)</span>. Since we will often encounter only one observation <span class="arithmatex">\(x_o\)</span> during inference, we would make use of the biased version of sample-based MMD recommended in [3].</p>
+<h3 id="define-the-ground-truth-and-misspecified-priors">Define the ground-truth and misspecified priors<a class="headerlink" href="#define-the-ground-truth-and-misspecified-priors" title="Permanent link">&para;</a></h3>
+<p>The &ldquo;ground-truth&rdquo; prior simply means the <span class="arithmatex">\(x_{obs}\)</span> will come from this prior distribution through the simulator.
+The misspecified prior: the NPE will be trained on <span class="arithmatex">\((\theta, x)\)</span> pairs coming from this prior. Note that the simulator code is same in both cases.</p>
+<div class="highlight"><pre><span></span><code><span class="n">dim</span> <span class="o">=</span> <span class="mi">2</span>  <span class="c1"># observation dimension</span>
+<span class="c1"># true prior -- the observation comes from here</span>
+<span class="n">mean_true</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">dim</span><span class="p">)</span>
+<span class="n">cov_true</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="n">dim</span><span class="p">)</span>
+<span class="n">prior_true</span> <span class="o">=</span> <span class="n">dist</span><span class="o">.</span><span class="n">MultivariateNormal</span><span class="p">(</span><span class="n">loc</span><span class="o">=</span><span class="n">mean_true</span><span class="p">,</span> <span class="n">covariance_matrix</span><span class="o">=</span><span class="n">cov_true</span><span class="p">)</span>
+
+
+<span class="c1"># the NPE will be trained on samples from this misspecified prior</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">give_misspec_prior</span><span class="p">(</span><span class="n">mu0</span><span class="p">,</span> <span class="n">tau0</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">mu0</span><span class="o">.</span><span class="n">ndim</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;mu0 should be a 1d tensor of shape [dim]&quot;</span><span class="p">)</span>
+    <span class="n">dim</span> <span class="o">=</span> <span class="n">mu0</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">dist</span><span class="o">.</span><span class="n">MultivariateNormal</span><span class="p">(</span><span class="n">loc</span><span class="o">=</span><span class="n">mu0</span><span class="p">,</span> <span class="n">covariance_matrix</span><span class="o">=</span><span class="n">tau0</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="n">dim</span><span class="p">))</span>
+
+
+<span class="n">offset</span> <span class="o">=</span> <span class="mi">4</span>
+<span class="n">mu0</span> <span class="o">=</span> <span class="n">mean_true</span> <span class="o">+</span> <span class="n">offset</span>  <span class="c1"># just offset, applies in all directions</span>
+<span class="n">tau0</span> <span class="o">=</span> <span class="mf">1.0</span>  <span class="c1"># 1.0 means no change in covariance matrix</span>
+<span class="n">prior_mis</span> <span class="o">=</span> <span class="n">give_misspec_prior</span><span class="p">(</span><span class="n">mu0</span><span class="p">,</span> <span class="n">tau0</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">theta</span> <span class="o">+</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn_like</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="create-the-training-dataset-for-the-npe-ie-theta-x-pairs">Create the training dataset for the NPE, i.e., <span class="arithmatex">\((\theta, x)\)</span> pairs<a class="headerlink" href="#create-the-training-dataset-for-the-npe-ie-theta-x-pairs" title="Permanent link">&para;</a></h3>
+<p>As we will see later, we can only train one NPE on the well-specified dataset, and simulate the other scenarios exploiting the symmetry present in our setting.
+We will also generate a validation dataset, to compute many <em>self</em> MMDs or the distribution of MMDs which will be utilised later for the actual misspecification check.</p>
+<div class="highlight"><pre><span></span><code><span class="n">num_simulations</span> <span class="o">=</span> <span class="mi">1000</span>
+
+<span class="c1"># generate training data for clean/well-specified model</span>
+<span class="n">theta_well</span> <span class="o">=</span> <span class="n">prior_true</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_simulations</span><span class="p">,))</span>
+<span class="n">x_well</span> <span class="o">=</span> <span class="n">simulator</span><span class="p">(</span><span class="n">theta_well</span><span class="p">)</span>
+
+
+<span class="c1"># validation set to compute MMD distribution in the well-specified case</span>
+<span class="c1"># this could just be a subset of the training data</span>
+
+<span class="n">num_validations_mmd</span> <span class="o">=</span> <span class="mi">1000</span>
+<span class="n">theta_val_well</span> <span class="o">=</span> <span class="n">prior_true</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_validations_mmd</span><span class="p">,))</span>
+<span class="n">x_val_well</span> <span class="o">=</span> <span class="n">simulator</span><span class="p">(</span><span class="n">theta_val_well</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="n">theta_well</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="n">theta_val_well</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>torch.Size([1000, 2]) torch.Size([1000, 2])
+</code></pre></div>
+
+<h3 id="train-our-inference-object">Train our inference object<a class="headerlink" href="#train-our-inference-object" title="Permanent link">&para;</a></h3>
+<p>We are only training one NPE inference with an embedding network to demonstrate the MMD-based misspecification check both on the original <em>x-space</em> and the <em>embedding</em> space.</p>
+<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train_npe_with_embedding</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">embeddding_net</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="n">neural_posterior</span> <span class="o">=</span> <span class="n">posterior_nn</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">&quot;maf&quot;</span><span class="p">,</span> <span class="n">embedding_net</span><span class="o">=</span><span class="n">embeddding_net</span><span class="p">)</span>
+    <span class="n">inference</span> <span class="o">=</span> <span class="n">NPE</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span> <span class="n">density_estimator</span><span class="o">=</span><span class="n">neural_posterior</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+    <span class="n">inference</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
+    <span class="n">_</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">inference</span>
+
+
+<span class="n">emb_net_well</span> <span class="o">=</span> <span class="n">FCEmbedding</span><span class="p">(</span>
+    <span class="n">input_dim</span><span class="o">=</span><span class="n">dim</span><span class="p">,</span> <span class="n">output_dim</span><span class="o">=</span><span class="n">dim</span><span class="p">,</span> <span class="n">num_layers</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">num_hiddens</span><span class="o">=</span><span class="mi">20</span>
+<span class="p">)</span>  <span class="c1"># minimal embedding network</span>
+<span class="n">NPE_well_embd</span> <span class="o">=</span> <span class="n">train_npe_with_embedding</span><span class="p">(</span>
+    <span class="n">theta_well</span><span class="p">,</span> <span class="n">x_well</span><span class="p">,</span> <span class="n">prior</span><span class="o">=</span><span class="n">prior_true</span><span class="p">,</span> <span class="n">embeddding_net</span><span class="o">=</span><span class="n">emb_net_well</span>
+<span class="p">)</span>  <span class="c1"># modified the emb_net</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 199 epochs.
+</code></pre></div>
+
+<h3 id="create-the-observations-x_obs-to-do-inference">Create the observations <span class="arithmatex">\(x_{obs}\)</span> to do inference<a class="headerlink" href="#create-the-observations-x_obs-to-do-inference" title="Permanent link">&para;</a></h3>
+<p>We will generate two observations: one from the ground-truth prior to demonstrate the case where we <strong>do not</strong> have any model misspecification. The second observation will be generated from the misspecified prior to <em>simulate</em> the model misspecification scenario when our inference was trained on the misspecified data, but the observation comes from the ground-truth prior. </p>
+<div class="highlight"><pre><span></span><code><span class="c1"># do inference given observed data</span>
+<span class="n">num_observations</span> <span class="o">=</span> <span class="mi">1</span>
+<span class="n">theta_o</span> <span class="o">=</span> <span class="n">prior_true</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_observations</span><span class="p">,))</span>
+<span class="n">x_o</span> <span class="o">=</span> <span class="n">simulator</span><span class="p">(</span><span class="n">theta_o</span><span class="p">)</span>
+
+<span class="c1"># we can also create observation from the misspecified prior x_o_mis</span>
+<span class="n">theta_o_mis</span> <span class="o">=</span> <span class="n">prior_mis</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_observations</span><span class="p">,))</span>
+<span class="n">x_o_mis</span> <span class="o">=</span> <span class="n">simulator</span><span class="p">(</span><span class="n">theta_o_mis</span><span class="p">)</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span> <span class="mi">4</span><span class="p">),</span> <span class="n">dpi</span><span class="o">=</span><span class="mi">80</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">x_val_well</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">x_val_well</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">],</span> <span class="s2">&quot;o&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;well-specified x&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">x_o_mis</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">x_o_mis</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">],</span> <span class="s2">&quot;o&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;red&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="sa">r</span><span class="s2">&quot;misspecified $x_o$&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">loc</span><span class="o">=</span><span class="s1">&#39;lower right&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</code></pre></div>
+<p><img alt="png" src="../21_diagnostics_misspecification_checks_files/21_diagnostics_misspecification_checks_12_0.png" /></p>
+<h3 id="misspecification-detection">Misspecification detection<a class="headerlink" href="#misspecification-detection" title="Permanent link">&para;</a></h3>
+<p>Here we only demonstrate misspecification detection on the embedding space. Note that the corresponding scenarios on the x-space could be simply tested by passing <code>inference=None</code> and <code>mode=x_space</code> in the functions below.</p>
+<p>The primary interface to detect prior misspecification is through the <code>calc_misspecification_mmd()</code> function that expects the following arguments:
+- <code>inference</code> object: this is the trained NPE object with or without embedding network
+- <code>x_obs</code>: the actual observation, we detect whether this observation is misspecified with respect to the distribution seen by the NPE object during training
+- <code>x</code>: a reference validation set of synthetic observations from the training distribution, this could in principle be a separated out subset of the training observations,
+but here we choose to pass a validation set
+- <code>mode</code>: whether to compute the mmds in the embedding space (<code>embedding</code>) or the original observation space (<code>x_space</code>).</p>
+<p>The function returns <code>p-value</code> of the test, along with a tuple of the reference/baseline mmds and the mmd between <code>x_obs</code> and the validation set <code>x</code>. We can simply inspect the <code>p-value</code> and also visualize the distribution as done below:</p>
+<div class="highlight"><pre><span></span><code><span class="n">p_val</span><span class="p">,</span> <span class="p">(</span><span class="n">mmds_baseline</span><span class="p">,</span> <span class="n">mmd</span><span class="p">)</span> <span class="o">=</span> <span class="n">calc_misspecification_mmd</span><span class="p">(</span>
+    <span class="n">inference</span><span class="o">=</span><span class="n">NPE_well_embd</span><span class="p">,</span> <span class="n">x_obs</span><span class="o">=</span><span class="n">x_o</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="n">x_val_well</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;embedding&#39;</span>
+<span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;p-val: </span><span class="si">{</span><span class="n">p_val</span><span class="si">:</span><span class="s2">.6f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+<span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span> <span class="mi">4</span><span class="p">),</span> <span class="n">dpi</span><span class="o">=</span><span class="mi">80</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">hist</span><span class="p">(</span><span class="n">mmds_baseline</span><span class="o">.</span><span class="n">numpy</span><span class="p">(),</span> <span class="n">bins</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span><span class="n">alpha</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;baseline&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="n">mmd</span><span class="o">.</span><span class="n">item</span><span class="p">(),</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;red&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="sa">r</span><span class="s1">&#39;MMD(x, $x_o$)&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s1">&#39;Count&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s1">&#39;MMD&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>p-val: 0.501000
+</code></pre></div>
+
+<p><img alt="png" src="../21_diagnostics_misspecification_checks_files/21_diagnostics_misspecification_checks_14_1.png" /></p>
+<p><strong>Interpretation:</strong> In the above example, the observed data <span class="arithmatex">\(x_o\)</span> comes from the same ground truth prior as what the NPE estimator was trained on. As detected by the check above, the <span class="arithmatex">\(p\)</span>-value for the null hypothesis <span class="arithmatex">\(H_0\)</span> (that the distribution of MMDs between samples in <code>x_val_well</code> (intra) and the distribution of MMDs between <code>x_val_well</code> and <code>x_o</code> are same) came out to be <span class="arithmatex">\(0.501 \gt 0.05\)</span>, so we fail to reject the null hypothesis, i.e., no misspecification is detected in this case.</p>
+<p>Now we turn to the situation where there is a misspecification.</p>
+<div class="highlight"><pre><span></span><code><span class="n">p_val</span><span class="p">,</span> <span class="p">(</span><span class="n">mmds_baseline</span><span class="p">,</span> <span class="n">mmd</span><span class="p">)</span> <span class="o">=</span> <span class="n">calc_misspecification_mmd</span><span class="p">(</span>
+    <span class="n">inference</span><span class="o">=</span><span class="n">NPE_well_embd</span><span class="p">,</span> <span class="n">x_obs</span><span class="o">=</span><span class="n">x_o_mis</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="n">x_val_well</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;embedding&#39;</span>
+<span class="p">)</span>
+
+<span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span> <span class="mi">4</span><span class="p">),</span> <span class="n">dpi</span><span class="o">=</span><span class="mi">80</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;p-val: </span><span class="si">{</span><span class="n">p_val</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">hist</span><span class="p">(</span><span class="n">mmds_baseline</span><span class="o">.</span><span class="n">numpy</span><span class="p">(),</span> <span class="n">bins</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span><span class="n">alpha</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;baseline&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="n">mmd</span><span class="o">.</span><span class="n">item</span><span class="p">(),</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;red&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="sa">r</span><span class="s1">&#39;MMD(x, $x_o$)&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s1">&#39;Count&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s1">&#39;MMD&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>p-val: 0.0
+</code></pre></div>
+
+<p><img alt="png" src="../21_diagnostics_misspecification_checks_files/21_diagnostics_misspecification_checks_16_1.png" /></p>
+<p>As expected, in this case the <span class="arithmatex">\(p\)</span>-value is <span class="arithmatex">\(0.0\)</span> so we reject the null hypothesis, and can warn the user that there might be mismatch in distribution between the observed sample <span class="arithmatex">\(x_o\)</span>, and the dataset on which the inference network was trained on.</p>
+<h1 id="misspecification-on-hodgkin-huxley-model-tutorial">Misspecification on Hodgkin-Huxley model: tutorial<a class="headerlink" href="#misspecification-on-hodgkin-huxley-model-tutorial" title="Permanent link">&para;</a></h1>
+<p>In this tutorial, we will check model misspecification on a <a href="https://en.wikipedia.org/wiki/Hodgkin%E2%80%93Huxley_model">Hodgkin-Huxley
+model</a> from
+neuroscience (Hodgkin and Huxley, 1952). </p>
+<p>Note, you find a tutorial on the HH model in the <code>sbi</code> repository under
+<a href="https://github.com/sbi-dev/sbi/blob/main/docs/tutorials/Example_00_HodgkinHuxleyModel.ipynb">docs/tutorials/Example_00_HodgkinHuxleyModel.ipynb</a>.</p>
+<p>Here we assume, that you are already familiar with the Hodgkin-Huxley model and the basic functionality of <code>sbi</code>.</p>
+<p>First we are going to import basic packages.</p>
+<div class="highlight"><pre><span></span><code><span class="o">%</span><span class="n">load_ext</span> <span class="n">autoreload</span>
+<span class="o">%</span><span class="n">autoreload</span> <span class="mi">2</span>
+
+<span class="c1"># visualization</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mpl</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+
+<span class="c1"># HH simulator</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">HH_helper_functions</span><span class="w"> </span><span class="kn">import</span> <span class="n">HHsimulator</span><span class="p">,</span> <span class="n">calculate_summary_statistics</span><span class="p">,</span> <span class="n">syn_current</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi</span><span class="w"> </span><span class="kn">import</span> <span class="n">analysis</span> <span class="k">as</span> <span class="n">analysis</span>
+
+<span class="c1"># sbi</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi</span><span class="w"> </span><span class="kn">import</span> <span class="n">utils</span> <span class="k">as</span> <span class="n">utils</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference</span><span class="w"> </span><span class="kn">import</span> <span class="n">simulate_for_sbi</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.neural_nets.embedding_nets</span><span class="w"> </span><span class="kn">import</span> <span class="n">FCEmbedding</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.utils.user_input_checks</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">check_sbi_inputs</span><span class="p">,</span>
+    <span class="n">process_prior</span><span class="p">,</span>
+    <span class="n">process_simulator</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="c1"># set seed</span>
+<span class="n">seed</span> <span class="o">=</span> <span class="mi">2025</span>
+<span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
+<span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">seed</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="c1"># remove top and right axis from plots</span>
+<span class="n">mpl</span><span class="o">.</span><span class="n">rcParams</span><span class="p">[</span><span class="s2">&quot;axes.spines.right&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span>
+<span class="n">mpl</span><span class="o">.</span><span class="n">rcParams</span><span class="p">[</span><span class="s2">&quot;axes.spines.top&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span>
+</code></pre></div>
+<h2 id="2-hodgkin-huxley-model">2. Hodgkin-Huxley Model<a class="headerlink" href="#2-hodgkin-huxley-model" title="Permanent link">&para;</a></h2>
+<p>Let us assume we current-clamped a neuron and recorded the following voltage trace:</p>
+<p><img src="https://raw.githubusercontent.com/mackelab/delfi/master/docs/docs/tutorials/observed_voltage_trace.png" width="480">
+<br></p>
+<p>We would like to infer the posterior over the two parameters (<span class="arithmatex">\(\color{orange}{\bar g_{Na}}\)</span>,<span class="arithmatex">\(\color{orange}{\bar g_K}\)</span>) of a Hodgkin-Huxley model, given the observed electrophysiological recording above. The model has channel kinetics as in <a href="https://link.springer.com/article/10.1007/s00422-008-0263-8">Pospischil et al. 2008</a>, and is defined by the following set of differential equations (parameters of interest highlighted in orange):</p>
+<div class="arithmatex">\[
+\scriptsize
+\begin{align}
+\color{black}{C_m\frac{dV}{dt}}&amp; \color{black}{=g_1\left(E_1-V\right)}+
+                    \color{orange}{\bar{g}_{Na}} \color{black}{m^3h\left(E_{Na}-V\right)+}
+                    \color{orange}{\bar{g}_{K}} \color{black}{n^4\left(E_K-V\right)+\bar{g}_Mp\left(E_K-V\right)+I_{inj}+\sigma\eta\left(t\right)}\\
+                    \color{black}{\frac{dq}{dt}}&amp;\color{black}{=\frac{q_\infty\left(V\right)-q}{\tau_q\left(V\right)},\;q\in\{m,h,n,p\}}
+\end{align}
+\]</div>
+<div class="highlight"><pre><span></span><code><span class="c1"># current, onset time of stimulation, offset time of stimulation, time step, time, area of some</span>
+<span class="n">I_inj</span><span class="p">,</span> <span class="n">t_on</span><span class="p">,</span> <span class="n">t_off</span><span class="p">,</span> <span class="n">dt</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">A_soma</span> <span class="o">=</span> <span class="n">syn_current</span><span class="p">()</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">run_HH_model</span><span class="p">(</span><span class="n">params</span><span class="p">):</span>
+
+    <span class="n">params</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">params</span><span class="p">)</span>
+
+    <span class="c1"># input current, time step</span>
+    <span class="n">I_inj</span><span class="p">,</span> <span class="n">t_on</span><span class="p">,</span> <span class="n">t_off</span><span class="p">,</span> <span class="n">dt</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">A_soma</span> <span class="o">=</span> <span class="n">syn_current</span><span class="p">()</span>
+
+    <span class="n">t</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">I_inj</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="n">dt</span>
+
+    <span class="c1"># initial voltage V0</span>
+    <span class="n">initial_voltage</span> <span class="o">=</span> <span class="o">-</span><span class="mi">70</span>
+
+    <span class="n">voltage_trace</span> <span class="o">=</span> <span class="n">HHsimulator</span><span class="p">(</span><span class="n">initial_voltage</span><span class="p">,</span> <span class="n">params</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">),</span> <span class="n">dt</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">I_inj</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="nb">dict</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">voltage_trace</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">),</span> <span class="n">time</span><span class="o">=</span><span class="n">t</span><span class="p">,</span> <span class="n">dt</span><span class="o">=</span><span class="n">dt</span><span class="p">,</span> <span class="n">I_inj</span><span class="o">=</span><span class="n">I_inj</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">))</span>
+</code></pre></div>
+<p>And for convenience we define the simulator to return only the voltage trace:</p>
+<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">simulator</span><span class="p">(</span><span class="n">params</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Returns only voltage trace</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">obs</span> <span class="o">=</span> <span class="n">run_HH_model</span><span class="p">(</span><span class="n">params</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">obs</span><span class="p">[</span><span class="s2">&quot;data&quot;</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+</code></pre></div>
+<p>To get an idea of the output of the Hodgkin-Huxley model, let us generate some voltage traces for different parameters (<span class="arithmatex">\(\bar g_{Na}\)</span>,<span class="arithmatex">\(\bar g_K\)</span>), given the input current <span class="arithmatex">\(I_{\text{inj}}\)</span>:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># three sets of (g_Na, g_K)</span>
+<span class="n">params</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mf">10.0</span><span class="p">,</span> <span class="mf">5.0</span><span class="p">],</span> <span class="p">[</span><span class="mf">4.0</span><span class="p">,</span> <span class="mf">1.5</span><span class="p">],</span> <span class="p">[</span><span class="mf">20.0</span><span class="p">,</span> <span class="mf">10.0</span><span class="p">]])</span>
+
+<span class="n">num_samples</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">params</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">])</span>
+<span class="n">sim_samples</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">num_samples</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">I_inj</span><span class="p">)))</span>
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_samples</span><span class="p">):</span>
+    <span class="n">sim_samples</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">run_HH_model</span><span class="p">(</span><span class="n">params</span><span class="o">=</span><span class="n">params</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="p">:])[</span><span class="s2">&quot;data&quot;</span><span class="p">]</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="c1"># colors for traces</span>
+<span class="n">col_min</span> <span class="o">=</span> <span class="mi">2</span>
+<span class="n">num_colors</span> <span class="o">=</span> <span class="n">num_samples</span> <span class="o">+</span> <span class="n">col_min</span>
+<span class="n">cm1</span> <span class="o">=</span> <span class="n">mpl</span><span class="o">.</span><span class="n">cm</span><span class="o">.</span><span class="n">Blues</span>
+<span class="n">col1</span> <span class="o">=</span> <span class="p">[</span><span class="n">cm1</span><span class="p">(</span><span class="mf">1.0</span> <span class="o">*</span> <span class="n">i</span> <span class="o">/</span> <span class="n">num_colors</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">col_min</span><span class="p">,</span> <span class="n">num_colors</span><span class="p">)]</span>
+
+<span class="n">fig</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">7</span><span class="p">,</span> <span class="mi">5</span><span class="p">))</span>
+<span class="n">gs</span> <span class="o">=</span> <span class="n">mpl</span><span class="o">.</span><span class="n">gridspec</span><span class="o">.</span><span class="n">GridSpec</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">height_ratios</span><span class="o">=</span><span class="p">[</span><span class="mi">4</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span>
+<span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplot</span><span class="p">(</span><span class="n">gs</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+<span class="c1"># plot the three voltage traces for different parameter sets</span>
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_samples</span><span class="p">):</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">sim_samples</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="p">:],</span> <span class="n">color</span><span class="o">=</span><span class="n">col1</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">lw</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="n">i</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
+
+<span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s2">&quot;voltage (mV)&quot;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_xticks</span><span class="p">([])</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_yticks</span><span class="p">([</span><span class="o">-</span><span class="mi">80</span><span class="p">,</span> <span class="o">-</span><span class="mi">20</span><span class="p">,</span> <span class="mi">40</span><span class="p">])</span>
+
+<span class="c1"># plot the injected current</span>
+<span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplot</span><span class="p">(</span><span class="n">gs</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">I_inj</span> <span class="o">*</span> <span class="n">A_soma</span> <span class="o">*</span> <span class="mf">1e3</span><span class="p">,</span> <span class="s2">&quot;k&quot;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s2">&quot;time (ms)&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s2">&quot;input (nA)&quot;</span><span class="p">)</span>
+
+<span class="n">ax</span><span class="o">.</span><span class="n">set_xticks</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="nb">max</span><span class="p">(</span><span class="n">t</span><span class="p">)</span> <span class="o">/</span> <span class="mi">2</span><span class="p">,</span> <span class="nb">max</span><span class="p">(</span><span class="n">t</span><span class="p">)])</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_yticks</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mf">1.1</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">I_inj</span> <span class="o">*</span> <span class="n">A_soma</span> <span class="o">*</span> <span class="mf">1e3</span><span class="p">)])</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">yaxis</span><span class="o">.</span><span class="n">set_major_formatter</span><span class="p">(</span><span class="n">mpl</span><span class="o">.</span><span class="n">ticker</span><span class="o">.</span><span class="n">FormatStrFormatter</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%.2f</span><span class="s2">&quot;</span><span class="p">))</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</code></pre></div>
+<p><img alt="png" src="../21_diagnostics_misspecification_checks_files/21_diagnostics_misspecification_checks_32_0.png" /></p>
+<h3 id="prior-over-model-parameters">Prior over model parameters<a class="headerlink" href="#prior-over-model-parameters" title="Permanent link">&para;</a></h3>
+<p>Now that we have the simulator, we need to define a function with the prior over the model parameters (<span class="arithmatex">\(\bar g_{Na}\)</span>,<span class="arithmatex">\(\bar g_K\)</span>), which in this case is chosen to be a Uniform distribution:</p>
+<blockquote>
+<p>Note: This is where you would incorporate prior knowlegde about the parameters you want to infer, e.g., ranges known from literature. </p>
+</blockquote>
+<div class="highlight"><pre><span></span><code><span class="c1"># well specified prior:</span>
+<span class="c1"># prior_min = [0.5, 1e-4] # g_Na, g_K</span>
+<span class="c1"># prior_max = [80.0, 15.0]</span>
+
+<span class="c1"># misspecified prior:</span>
+<span class="n">prior_min</span> <span class="o">=</span> <span class="p">[</span><span class="mf">0.5</span><span class="p">,</span> <span class="mf">1e-4</span><span class="p">]</span>
+<span class="n">prior_max</span> <span class="o">=</span> <span class="p">[</span><span class="mf">40.0</span><span class="p">,</span> <span class="mi">5</span><span class="p">]</span>
+<span class="n">prior</span> <span class="o">=</span> <span class="n">utils</span><span class="o">.</span><span class="n">torchutils</span><span class="o">.</span><span class="n">BoxUniform</span><span class="p">(</span>
+    <span class="n">low</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">as_tensor</span><span class="p">(</span><span class="n">prior_min</span><span class="p">),</span> <span class="n">high</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">as_tensor</span><span class="p">(</span><span class="n">prior_max</span><span class="p">)</span>
+<span class="p">)</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="c1"># Generate training data</span>
+
+<span class="n">theta_train</span><span class="p">,</span> <span class="n">x_train</span> <span class="o">=</span> <span class="n">simulate_for_sbi</span><span class="p">(</span>
+    <span class="n">simulator</span><span class="p">,</span> <span class="n">proposal</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span> <span class="n">num_simulations</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">num_workers</span><span class="o">=</span><span class="mi">4</span>
+<span class="p">)</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>100%|██████████| 500/500 [00:43&lt;00:00, 11.47it/s]
+</code></pre></div>
+
+<p>Now let&rsquo;s sample two observations, which will play the role of the &ldquo;experimental data&rdquo; <code>x_o</code>.
+The first one is coming from parameteres outside of the prior distribution and is therefore misspecified, the second one is a well specified sample.</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Generate misspecified sample</span>
+<span class="n">params_mis</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">70</span><span class="p">,</span> <span class="mi">15</span><span class="p">])</span>
+<span class="n">x_o_mis</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span>
+    <span class="n">run_HH_model</span><span class="p">(</span><span class="n">params</span><span class="o">=</span><span class="n">params_mis</span><span class="p">)[</span><span class="s2">&quot;data&quot;</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float</span>
+<span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+
+<span class="c1"># well specified</span>
+<span class="n">params_o</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">10</span><span class="p">,</span> <span class="mi">4</span><span class="p">])</span>
+<span class="n">x_o</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">run_HH_model</span><span class="p">(</span><span class="n">params</span><span class="o">=</span><span class="n">params_o</span><span class="p">)[</span><span class="s2">&quot;data&quot;</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span>
+    <span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span>
+<span class="p">)</span>
+</code></pre></div>
+<p>Let&rsquo;s have a quick look how these look like, compared to prior predictive samples.</p>
+<div class="highlight"><pre><span></span><code><span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">x_train</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">1</span><span class="p">,</span> <span class="p">:]</span><span class="o">.</span><span class="n">T</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;prior predictive&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">x_train</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="mi">20</span><span class="p">,</span> <span class="p">:]</span><span class="o">.</span><span class="n">T</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.5</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s2">&quot;voltage (mV)&quot;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_xticks</span><span class="p">([])</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_yticks</span><span class="p">([</span><span class="o">-</span><span class="mi">80</span><span class="p">,</span> <span class="o">-</span><span class="mi">20</span><span class="p">,</span> <span class="mi">40</span><span class="p">])</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">x_o_mis</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;red&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;misspecified x_o&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">x_o</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;black&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;well-specified x_o&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
+
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</code></pre></div>
+<p><img alt="png" src="../21_diagnostics_misspecification_checks_files/21_diagnostics_misspecification_checks_40_0.png" /></p>
+<h3 id="a-misspecification-on-raw-data">a) Misspecification on raw data<a class="headerlink" href="#a-misspecification-on-raw-data" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.diagnostics.misspecification</span><span class="w"> </span><span class="kn">import</span> <span class="n">calc_misspecification_mmd</span>
+</code></pre></div>
+<p>Let&rsquo;s first check the well specified observation <code>x_o</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="n">p_val</span><span class="p">,</span> <span class="p">(</span><span class="n">mmds_baseline</span><span class="p">,</span> <span class="n">mmd</span><span class="p">)</span> <span class="o">=</span> <span class="n">calc_misspecification_mmd</span><span class="p">(</span>
+    <span class="n">x_obs</span><span class="o">=</span><span class="n">x_o</span><span class="p">,</span>
+    <span class="n">x</span><span class="o">=</span><span class="n">x_train</span><span class="p">,</span>
+    <span class="n">n_shuffle</span><span class="o">=</span><span class="mi">1_000</span><span class="p">,</span>
+    <span class="n">max_samples</span><span class="o">=</span><span class="mi">1_000</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;p-value: </span><span class="si">{</span><span class="n">p_val</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>p-value: 0.764
+</code></pre></div>
+
+<p>Now let&rsquo;s check the misspecified observation <code>x_o_mis</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="n">p_val_mis</span><span class="p">,</span> <span class="p">(</span><span class="n">_</span><span class="p">,</span> <span class="n">mmd_mis</span><span class="p">)</span> <span class="o">=</span> <span class="n">calc_misspecification_mmd</span><span class="p">(</span>
+    <span class="n">x_obs</span><span class="o">=</span><span class="n">x_o_mis</span><span class="p">,</span>
+    <span class="n">x</span><span class="o">=</span><span class="n">x_train</span><span class="p">,</span>
+    <span class="n">n_shuffle</span><span class="o">=</span><span class="mi">1_000</span><span class="p">,</span>
+    <span class="n">max_samples</span><span class="o">=</span><span class="mi">1_000</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;p-value: </span><span class="si">{</span><span class="n">p_val_mis</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>p-value: 0.0
+</code></pre></div>
+
+<p>This indicates that the observed value <code>x_o_mis</code> is very unlikely under the null hypothesis, which states that that the observation is coming from the true data distribution <span class="arithmatex">\(p(x)\)</span>.</p>
+<p>We can therefore reject <span class="arithmatex">\(H_0\)</span> and have evidence that <code>x_o_mis</code> is coming from a different distribution, e.g. our model is misspecified (in this case in terms of the prior distribution).</p>
+<h3 id="b-misspecification-based-on-summary-statistics">b) Misspecification based on summary statistics<a class="headerlink" href="#b-misspecification-based-on-summary-statistics" title="Permanent link">&para;</a></h3>
+<p>Now, as many neuroscientists work on summary statistics for the Hodgking Huxley model, let&rsquo;s do the same analysis on the summarized data.</p>
+<p>Let&rsquo;s first define an augmented simulator which returns the summary statistics directly and then do the same steps as before:</p>
+<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">simulator_sumstats</span><span class="p">(</span><span class="n">params</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Returns summary statistics from conductance values in `params`.</span>
+
+<span class="sd">    Summarizes the output of the HH simulator and converts it to `torch.Tensor`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">obs</span> <span class="o">=</span> <span class="n">run_HH_model</span><span class="p">(</span><span class="n">params</span><span class="p">)</span>
+    <span class="n">summstats</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">as_tensor</span><span class="p">(</span><span class="n">calculate_summary_statistics</span><span class="p">(</span><span class="n">obs</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">summstats</span>
+
+
+<span class="c1"># Check prior, simulator, consistency</span>
+<span class="n">prior</span><span class="p">,</span> <span class="n">num_parameters</span><span class="p">,</span> <span class="n">prior_returns_numpy</span> <span class="o">=</span> <span class="n">process_prior</span><span class="p">(</span><span class="n">prior</span><span class="p">)</span>
+<span class="n">simulator_sumstats</span> <span class="o">=</span> <span class="n">process_simulator</span><span class="p">(</span><span class="n">simulator_sumstats</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">prior_returns_numpy</span><span class="p">)</span>
+<span class="n">check_sbi_inputs</span><span class="p">(</span><span class="n">simulator_sumstats</span><span class="p">,</span> <span class="n">prior</span><span class="p">)</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="c1"># Generate training data</span>
+<span class="n">theta_train_sumstats</span><span class="p">,</span> <span class="n">x_train_sumstats</span> <span class="o">=</span> <span class="n">simulate_for_sbi</span><span class="p">(</span>
+    <span class="n">simulator_sumstats</span><span class="p">,</span> <span class="n">proposal</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span> <span class="n">num_simulations</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">num_workers</span><span class="o">=</span><span class="mi">4</span>
+<span class="p">)</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>100%|██████████| 500/500 [00:47&lt;00:00, 10.54it/s]
+</code></pre></div>
+
+<div class="highlight"><pre><span></span><code><span class="c1"># Generate misspecified sample</span>
+<span class="n">params_mis</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">70</span><span class="p">,</span> <span class="mi">15</span><span class="p">])</span>
+<span class="n">x_raw</span> <span class="o">=</span> <span class="n">run_HH_model</span><span class="p">(</span><span class="n">params</span><span class="o">=</span><span class="n">params_mis</span><span class="p">)</span>
+<span class="n">x_o_mis_sumstats</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">as_tensor</span><span class="p">(</span>
+    <span class="n">calculate_summary_statistics</span><span class="p">(</span><span class="n">x_raw</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float</span>
+<span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+
+
+<span class="c1"># and well specified</span>
+<span class="n">params_o</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">10</span><span class="p">,</span> <span class="mi">4</span><span class="p">])</span>
+<span class="n">x_raw</span> <span class="o">=</span> <span class="n">run_HH_model</span><span class="p">(</span><span class="n">params</span><span class="o">=</span><span class="n">params_o</span><span class="p">)</span>
+<span class="n">x_o_sumstats</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">as_tensor</span><span class="p">(</span>
+    <span class="n">calculate_summary_statistics</span><span class="p">(</span><span class="n">x_raw</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float</span>
+<span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+</code></pre></div>
+<p>Let&rsquo;s again first look at the well specified observation:</p>
+<div class="highlight"><pre><span></span><code><span class="n">p_val</span><span class="p">,</span> <span class="p">(</span><span class="n">mmds_baseline</span><span class="p">,</span> <span class="n">mmd</span><span class="p">)</span> <span class="o">=</span> <span class="n">calc_misspecification_mmd</span><span class="p">(</span>
+    <span class="n">x_obs</span><span class="o">=</span><span class="n">x_o_sumstats</span><span class="p">,</span>
+    <span class="n">x</span><span class="o">=</span><span class="n">x_train_sumstats</span><span class="p">,</span>
+    <span class="n">n_shuffle</span><span class="o">=</span><span class="mi">1_000</span><span class="p">,</span>
+    <span class="n">max_samples</span><span class="o">=</span><span class="mi">1_000</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;p-value: </span><span class="si">{</span><span class="n">p_val</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>p-value: 0.515
+</code></pre></div>
+
+<p>All good here&hellip;</p>
+<p>Now the misspecified observation:</p>
+<div class="highlight"><pre><span></span><code><span class="n">p_val_mis</span><span class="p">,</span> <span class="p">(</span><span class="n">mmds_baseline</span><span class="p">,</span> <span class="n">mmd</span><span class="p">)</span> <span class="o">=</span> <span class="n">calc_misspecification_mmd</span><span class="p">(</span>
+    <span class="n">x_obs</span><span class="o">=</span><span class="n">x_o_mis_sumstats</span><span class="p">,</span>
+    <span class="n">x</span><span class="o">=</span><span class="n">x_train_sumstats</span><span class="p">,</span>
+    <span class="n">n_shuffle</span><span class="o">=</span><span class="mi">1_000</span><span class="p">,</span>
+    <span class="n">max_samples</span><span class="o">=</span><span class="mi">1_000</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;p-value: </span><span class="si">{</span><span class="n">p_val_mis</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>p-value: 0.14700000000000002
+</code></pre></div>
+
+<p>Interestingly, we can not reject <span class="arithmatex">\(H_0\)</span> in this case, although visually the traces look quite different. 
+This is potentially due to the choice of summary statistics together with the fact that we only have tested one single observation <code>x_o_mis</code>.</p>
+<p>Let&rsquo;s see if this changes, when we have two samples from the true data distribution: <span class="arithmatex">\(X_o = \{x_{o_1}, x_{o_2}\}\)</span>:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Generate two misspecified samples and plot them</span>
+<span class="n">params_mis_mult</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mi">70</span><span class="p">,</span> <span class="mi">15</span><span class="p">],</span> <span class="p">[</span><span class="mi">78</span><span class="p">,</span> <span class="mi">10</span><span class="p">]])</span>
+<span class="n">x_raw</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="n">x_o_mis_sumstats_mult</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">params_mis_mult</span><span class="p">)):</span>
+    <span class="n">x_raw</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">run_HH_model</span><span class="p">(</span><span class="n">params</span><span class="o">=</span><span class="n">params_mis_mult</span><span class="p">[</span><span class="n">i</span><span class="p">]))</span>
+    <span class="n">x_o_mis_sumstats_mult</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">calculate_summary_statistics</span><span class="p">(</span><span class="n">x_raw</span><span class="p">[</span><span class="n">i</span><span class="p">]))</span>
+<span class="n">x_o_mis_sumstats_mult</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">as_tensor</span><span class="p">(</span>
+    <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">x_o_mis_sumstats_mult</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float</span>
+<span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">7</span><span class="p">)</span>
+
+<span class="c1"># plot them</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">x_train</span><span class="p">[:</span><span class="mi">20</span><span class="p">,</span> <span class="p">:]</span><span class="o">.</span><span class="n">T</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.5</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s2">&quot;voltage (mV)&quot;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_xticks</span><span class="p">([])</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_yticks</span><span class="p">([</span><span class="o">-</span><span class="mi">80</span><span class="p">,</span> <span class="o">-</span><span class="mi">20</span><span class="p">,</span> <span class="mi">40</span><span class="p">])</span>
+<span class="n">lines</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;-&quot;</span><span class="p">,</span> <span class="s2">&quot;--&quot;</span><span class="p">]</span>
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">params_mis_mult</span><span class="p">)):</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span>
+        <span class="n">t</span><span class="p">,</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">x_raw</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="s2">&quot;data&quot;</span><span class="p">]),</span>
+        <span class="n">color</span><span class="o">=</span><span class="s2">&quot;red&quot;</span><span class="p">,</span>
+        <span class="n">label</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;misspecified x_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+        <span class="n">ls</span><span class="o">=</span><span class="n">lines</span><span class="p">[</span><span class="n">i</span><span class="p">],</span>
+    <span class="p">)</span>
+
+<span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
+
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</code></pre></div>
+<p><img alt="png" src="../21_diagnostics_misspecification_checks_files/21_diagnostics_misspecification_checks_59_0.png" /></p>
+<div class="highlight"><pre><span></span><code><span class="n">p_val_mis</span><span class="p">,</span> <span class="p">(</span><span class="n">mmds_baseline</span><span class="p">,</span> <span class="n">mmd</span><span class="p">)</span> <span class="o">=</span> <span class="n">calc_misspecification_mmd</span><span class="p">(</span>
+    <span class="n">x_obs</span><span class="o">=</span><span class="n">x_o_mis_sumstats_mult</span><span class="p">,</span>
+    <span class="n">x</span><span class="o">=</span><span class="n">x_train_sumstats</span><span class="p">,</span>
+    <span class="n">n_shuffle</span><span class="o">=</span><span class="mi">10_000</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;p-value: </span><span class="si">{</span><span class="n">p_val_mis</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>p-value: 0.012199999999999989
+</code></pre></div>
+
+<p>In this case the misspecification is detected. </p>
+<h3 id="c-misspecification-in-the-embedding-space">c) Misspecification in the embedding space<a class="headerlink" href="#c-misspecification-in-the-embedding-space" title="Permanent link">&para;</a></h3>
+<p>Instead of using handcrafted summary statistics we can also use an embedding net <span class="arithmatex">\(e\)</span> and investigate if the embedded data <span class="arithmatex">\(z=e(x)\)</span> is misspecified. This idea was used in Schmitt et al. (<a href="https://arxiv.org/abs/2406.03154">https://arxiv.org/abs/2406.03154</a>, where they additionally included a regularizer to the embedding space. Instead we will just use the standard training objective of NPE to optimize the embedding network. </p>
+<p>We therefore first have to run inference, to train the embedding net. 
+In this toy example we will use a fully connected embeddding network to reduce the dimensionality of the voltage traces. </p>
+<p>We will use the same training data as in a).</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># train NPE networks</span>
+<span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="mi">13</span><span class="p">)</span>
+<span class="n">emb_net</span> <span class="o">=</span> <span class="n">FCEmbedding</span><span class="p">(</span>
+    <span class="n">input_dim</span><span class="o">=</span><span class="n">x_train</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">output_dim</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">num_layers</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">num_hiddens</span><span class="o">=</span><span class="mi">50</span>
+<span class="p">)</span>  <span class="c1"># minimal embedding network</span>
+<span class="n">neural_posterior</span> <span class="o">=</span> <span class="n">posterior_nn</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">&quot;maf&quot;</span><span class="p">,</span> <span class="n">embedding_net</span><span class="o">=</span><span class="n">emb_net</span><span class="p">)</span>
+<span class="n">inference</span> <span class="o">=</span> <span class="n">NPE</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span> <span class="n">density_estimator</span><span class="o">=</span><span class="n">neural_posterior</span><span class="p">)</span>
+<span class="n">inference</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta_train</span><span class="p">,</span> <span class="n">x_train</span><span class="p">)</span>
+<span class="n">density_estimator</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
+<span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">(</span><span class="n">density_estimator</span><span class="p">)</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 71 epochs.
+</code></pre></div>
+
+<p>Let&rsquo;s have a superficial check, if the network learned something meaningful. 
+For this we will look at the posterior of the well specified observation <code>x_o</code>.</p>
+<div class="highlight"><pre><span></span><code><span class="n">samples</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">10000</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_o</span><span class="p">)</span>
+<span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">analysis</span><span class="o">.</span><span class="n">pairplot</span><span class="p">(</span>
+    <span class="n">samples</span><span class="p">,</span>
+    <span class="n">title</span><span class="o">=</span><span class="s2">&quot;well specified x_o&quot;</span><span class="p">,</span>
+    <span class="n">limits</span><span class="o">=</span><span class="p">[[</span><span class="n">prior_min</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">prior_max</span><span class="p">[</span><span class="mi">0</span><span class="p">]],</span> <span class="p">[</span><span class="n">prior_min</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">prior_max</span><span class="p">[</span><span class="mi">1</span><span class="p">]]],</span>
+    <span class="n">ticks</span><span class="o">=</span><span class="p">[[</span><span class="n">prior_min</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">prior_max</span><span class="p">[</span><span class="mi">0</span><span class="p">]],</span> <span class="p">[</span><span class="n">prior_min</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">prior_max</span><span class="p">[</span><span class="mi">1</span><span class="p">]]],</span>
+    <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">4</span><span class="p">),</span>
+    <span class="n">points</span><span class="o">=</span><span class="n">params_o</span><span class="p">,</span>
+    <span class="n">points_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;markersize&quot;</span><span class="p">:</span> <span class="mi">6</span><span class="p">},</span>
+    <span class="n">points_colors</span><span class="o">=</span><span class="s2">&quot;r&quot;</span><span class="p">,</span>
+    <span class="c1"># labels=labels_params,</span>
+<span class="p">)</span>
+
+<span class="c1"># prior_min = [0.5, 1e-4]</span>
+<span class="c1"># prior_max = [40.0, 5]</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>Drawing 10000 posterior samples for 1 observations: 10091it [00:00, 215897.30it/s]           
+/var/folders/kx/9z7xgc9916l5ztl7kgxlydkm0000gn/T/ipykernel_20890/1311259568.py:2: DeprecationWarning: you passed deprecated arguments **kwargs: [&#39;title&#39;, &#39;points_offdiag&#39;, &#39;points_colors&#39;], use fig_kwargs instead. We continue calling the deprecated pairplot function
+  fig, axes = analysis.pairplot(
+</code></pre></div>
+
+<p><img alt="png" src="../21_diagnostics_misspecification_checks_files/21_diagnostics_misspecification_checks_66_1.png" /></p>
+<div class="highlight"><pre><span></span><code><span class="n">samples</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">10000</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_o_mis</span><span class="p">)</span>
+<span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">analysis</span><span class="o">.</span><span class="n">pairplot</span><span class="p">(</span>
+    <span class="n">samples</span><span class="p">,</span>
+    <span class="n">title</span><span class="o">=</span><span class="s2">&quot;misspecified x_o&quot;</span><span class="p">,</span>
+    <span class="n">limits</span><span class="o">=</span><span class="p">[[</span><span class="mf">0.5</span><span class="p">,</span> <span class="mi">80</span><span class="p">],</span> <span class="p">[</span><span class="mf">1e-4</span><span class="p">,</span> <span class="mf">15.0</span><span class="p">]],</span>
+    <span class="n">ticks</span><span class="o">=</span><span class="p">[[</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">prior_max</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="mi">80</span><span class="p">],</span> <span class="p">[</span><span class="mf">1e-4</span><span class="p">,</span> <span class="n">prior_max</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="mf">15.0</span><span class="p">]],</span>
+    <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">4</span><span class="p">),</span>
+    <span class="n">points</span><span class="o">=</span><span class="n">params_mis</span><span class="p">,</span>
+    <span class="n">points_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;markersize&quot;</span><span class="p">:</span> <span class="mi">6</span><span class="p">},</span>
+    <span class="n">points_colors</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;r&quot;</span><span class="p">,</span> <span class="s2">&quot;black&quot;</span><span class="p">],</span>
+    <span class="c1"># labels=labels_params,</span>
+<span class="p">)</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>Drawing 10000 posterior samples for 1 observations: 11135it [00:00, 77442.53it/s]                          
+/var/folders/kx/9z7xgc9916l5ztl7kgxlydkm0000gn/T/ipykernel_20890/3696200400.py:2: DeprecationWarning: you passed deprecated arguments **kwargs: [&#39;title&#39;, &#39;points_offdiag&#39;, &#39;points_colors&#39;], use fig_kwargs instead. We continue calling the deprecated pairplot function
+  fig, axes = analysis.pairplot(
+</code></pre></div>
+
+<p><img alt="png" src="../21_diagnostics_misspecification_checks_files/21_diagnostics_misspecification_checks_67_1.png" /></p>
+<p>Obviously, sbi can not infere the true parameters, because they are outside of the support of the prior distribution. sbi is however not failing, but infering some distribution. </p>
+<p>As we have trained an embedding net within the inference object, we can use this to detect misspecification in the embedding space:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># perform two tests for misspecification</span>
+<span class="c1"># 1. well specified model</span>
+<span class="n">p_val_well</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">calc_misspecification_mmd</span><span class="p">(</span>
+    <span class="n">x_obs</span><span class="o">=</span><span class="n">x_o</span><span class="p">,</span>
+    <span class="n">x</span><span class="o">=</span><span class="n">x_train</span><span class="p">,</span>
+    <span class="n">inference</span><span class="o">=</span><span class="n">inference</span><span class="p">,</span>
+    <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;embedding&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;p-value well specified: </span><span class="si">{</span><span class="n">p_val_well</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+<span class="c1"># 2. misspecified model</span>
+<span class="n">p_val_mis</span><span class="p">,</span> <span class="p">(</span><span class="n">mmds_baseline</span><span class="p">,</span> <span class="n">mmd</span><span class="p">)</span> <span class="o">=</span> <span class="n">calc_misspecification_mmd</span><span class="p">(</span>
+    <span class="n">x_obs</span><span class="o">=</span><span class="n">x_o_mis</span><span class="p">,</span>
+    <span class="n">x</span><span class="o">=</span><span class="n">x_train</span><span class="p">,</span>
+    <span class="n">inference</span><span class="o">=</span><span class="n">inference</span><span class="p">,</span>
+    <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;embedding&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;p-value misspecified: </span><span class="si">{</span><span class="n">p_val_mis</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>p-value well specified: 0.489
+p-value misspecified: 0.0
+</code></pre></div>
+
+<p>In this case we can egain detect the misspecification, however as we have note regularized our embedding space, the result should be treated with caution.  </p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        <div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/sbi-dev/sbi" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 512"><!--! Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M186.1 328.7c0 20.9-10.9 55.1-36.7 55.1s-36.7-34.2-36.7-55.1 10.9-55.1 36.7-55.1 36.7 34.2 36.7 55.1M480 278.2c0 31.9-3.2 65.7-17.5 95-37.9 76.6-142.1 74.8-216.7 74.8-75.8 0-186.2 2.7-225.6-74.8-14.6-29-20.2-63.1-20.2-95 0-41.9 13.9-81.5 41.5-113.6-5.2-15.8-7.7-32.4-7.7-48.8 0-21.5 4.9-32.3 14.6-51.8 45.3 0 74.3 9 108.8 36 29-6.9 58.8-10 88.7-10 27 0 54.2 2.9 80.4 9.2 34-26.7 63-35.2 107.8-35.2 9.8 19.5 14.6 30.3 14.6 51.8 0 16.4-2.6 32.7-7.7 48.2 27.5 32.4 39 72.3 39 114.2m-64.3 50.5c0-43.9-26.7-82.6-73.5-82.6-18.9 0-37 3.4-56 6-14.9 2.3-29.8 3.2-45.1 3.2-15.2 0-30.1-.9-45.1-3.2-18.7-2.6-37-6-56-6-46.8 0-73.5 38.7-73.5 82.6 0 87.8 80.4 101.3 150.4 101.3h48.2c70.3 0 150.6-13.4 150.6-101.3m-82.6-55.1c-25.8 0-36.7 34.2-36.7 55.1s10.9 55.1 36.7 55.1 36.7-34.2 36.7-55.1-10.9-55.1-36.7-55.1"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "../..", "features": ["content.code.copy"], "search": "../../assets/javascripts/workers/search.f8cc74c7.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.c8b220af.min.js"></script>
+      
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-MML-AM_CHTML"></script>
+      
+    
+  </body>
+</html>
