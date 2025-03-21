@@ -10,4 +10,4 @@ from sbi.neural_nets.estimators.score_estimator import ConditionalScoreEstimator
 from sbi.neural_nets.estimators.vector_field_estimator import (
     ConditionalVectorFieldEstimator,
 )
-from sbi.neural_nets.estimators.zuko_flow import ZukoFlow
+from sbi.neural_nets.estimators.zuko_flow import ZukoFlow, ZukoUnconditionalFlow
