@@ -20,6 +20,5 @@ inference.
    :maxdepth: 1
 
    tutorials/00_getting_started.ipynb
-   tutorials/01_gaussian_amortized.ipynb
-   tutorials/18_training_interface.ipynb
+   tutorials/01_Bayesian_workflow.ipynb
    tutorials/16_implemented_methods.ipynb

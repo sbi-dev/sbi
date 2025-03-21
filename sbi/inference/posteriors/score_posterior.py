@@ -28,9 +28,10 @@ from sbi.utils.torchutils import ensure_theta_batched
 
 
 class ScorePosterior(NeuralPosterior):
-    r"""Posterior $p(\theta|x_o)$ with `log_prob()` and `sample()` methods. It samples
-    from the diffusion model given the score_estimator and rejects samples that lie
-    outside of the prior bounds.
+    r"""Posterior $p(\theta|x_o)$ with `log_prob()` and `sample()` methods.
+
+    It samples  from the diffusion model given the score_estimator and rejects samples
+    that lie outside of the prior bounds.
 
     The posterior is defined by a score estimator and a prior. The score estimator
     provides the gradient of the log-posterior with respect to the parameters. The prior
