@@ -125,7 +125,8 @@ class NPE_B(PosteriorEstimator):
         importance_weights /= importance_weights.sum()
 
         theta = reshape_to_sample_batch_event(theta, theta.shape[1:])
-
+        # Reshape the density estimator log probs
+        # from (sample_shape, batch_shape) to (batch_shape)
         posterior_log_probs = self._neural_net.log_prob(theta, x).squeeze(dim=0)
 
         return importance_weights * posterior_log_probs
