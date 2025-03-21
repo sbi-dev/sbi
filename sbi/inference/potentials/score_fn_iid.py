@@ -84,10 +84,25 @@ class IIDScoreFunction(ABC):
         """
 
         if not vector_field_estimator.SCORE_DEFINED:
-            raise ValueError("Score is not defined for this vector field estimator.")
+            raise ValueError(
+                "Score is not defined for this vector field estimator. "
+                "You are probably using a vector field estimator that does not "
+                "implement the score function, e.g. an optimal transport-based "
+                "flow matching. IID methods require the score function to be defined "
+                "so they are not applicable to this vector field estimator. "
+                "If you have implemented a custom vector field "
+                "estimator with score defined, set SCORE_DEFINED to True."
+            )
         if not vector_field_estimator.MARGINALS_DEFINED:
             raise ValueError(
-                "Marginals are not defined for this vector field estimator."
+                "Marginals are not defined for this vector field estimator. "
+                "You are probably using a vector field estimator that does not "
+                "implement the marginals mean_t_fn and std_fn, e.g. an "
+                "optimal transport-based flow matching. IID methods require the "
+                "marginals to be defined so they are not applicable to this "
+                "vector field estimator. "
+                "If you have implemented a custom vector field "
+                "estimator with marginals defined, set MARGINALS_DEFINED to True."
             )
 
         self.vector_field_estimator = vector_field_estimator.to(device).eval()
