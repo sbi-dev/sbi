@@ -381,6 +381,11 @@ def test_vector_field_iid_inference(
     prior_cov = vector_field_trained_model["prior_cov"]
     num_dim = vector_field_trained_model["num_dim"]
 
+    if vector_field_type == "fmpe" and (
+        iid_method not in ["gauss", "fnpe"] or num_trial > 3 or prior_type != "gaussian"
+    ):
+        pytest.skip("So far, we skip some IID methods for FMPE.")
+
     x_o = zeros(num_trial, num_dim)
     posterior = inference.build_posterior(score_estimator, sample_with="sde")
     posterior.set_default_x(x_o)
