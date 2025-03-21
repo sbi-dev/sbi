@@ -14,7 +14,6 @@ def causalConv1d(
     kernel_size: int,
     dilation: int = 1,
     stride: int = 1,
-    activation: nn.Module = nn.LeakyReLU(inplace=True),
 ) -> nn.Module:
     """Returns a causal convolution by left padding the input
 
@@ -25,11 +24,9 @@ def causalConv1d(
         dilation: dilation to use in the convolution.
         stride: stride to use in the convolution.
             Stride and dilation cannot both be > 1.
-        activation: activation function to apply after the convolution
 
     Returns:
-        An nn.Sequential object that combines left-padding, 1D convolution
-        and the provided activation.
+        An nn.Sequential object that represents a 1D causal convolution.
     """
     assert not (dilation > 1 and stride > 1), (
         "we don't allow combining stride with dilation."
@@ -44,7 +41,7 @@ def causalConv1d(
         stride=stride,
         padding=0,
     )
-    return nn.Sequential(padding, conv_layer, activation)
+    return nn.Sequential(padding, conv_layer)
 
 
 def WaveNetSRLikeAggregator(
@@ -223,21 +220,25 @@ class CausalCNNEmbedding(nn.Module):
             )
             dilation_per_layer = dilation
 
+        assert max(dilation_per_layer) < total_timepoints, (
+            "Your maximal dilations size used is larger than the number of "
+            "timepoints in your input, please provide a list with smaller dilations."
+        )
         if out_channels_per_layer is None:
             out_channels_per_layer = [16] * num_conv_layers
-        self.padding_size = dilation_per_layer * (kernel_size - 1)
+
         causal_layers = []
         for ll in range(num_conv_layers):
-            padding = nn.ZeroPad1d(padding=(self.padding_size[ll], 0))
-            conv_layer = nn.Conv1d(
-                in_channels=in_channels if ll == 0 else out_channels_per_layer[ll - 1],
-                out_channels=out_channels_per_layer[ll],
-                kernel_size=kernel_size,
-                dilation=dilation_per_layer[ll],
-                stride=1,
-                padding=0,
-            )
-            causal_layers += [padding, conv_layer, activation]
+            causal_layers += [
+                causalConv1d(
+                    in_channels if ll == 0 else out_channels_per_layer[ll - 1],
+                    out_channels_per_layer[ll],
+                    kernel_size,
+                    dilation_per_layer[ll],
+                    1,
+                ),
+                activation,
+            ]
 
         self.causal_cnns = nn.Sequential(*causal_layers)
 
