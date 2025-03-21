@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import math
+
 import pytest
 import torch
 from torch import Tensor, eye, ones, zeros
@@ -23,13 +25,13 @@ from sbi.simulators.linear_gaussian import (
     true_posterior_linear_gaussian_mvn_prior,
 )
 from sbi.utils.user_input_checks import (
-        check_sbi_inputs,
-        process_prior,
-        process_simulator,
-    )
+    check_sbi_inputs,
+    process_prior,
+    process_simulator,
+)
+
 from .test_utils import check_c2st
 
-import math
 
 @pytest.mark.mcmc
 @pytest.mark.parametrize("method", ["NPE", "NLE", "NRE", "FMPE"])
@@ -262,13 +264,15 @@ def test_npe_with_with_iid_embedding_varying_num_trials(trial_factor=50):
 @pytest.mark.parametrize(
     "bidirectional", [True, False], ids=["one-directional", "bi-directional"]
 )
+@pytest.mark.parametrize("mode", ["loop", "scan"], ids=["loop", "scan"])
 def test_lru_isolated(
     bidirectional: bool,
+    mode: str,
     input_dim: int = 7,
     state_dim: int = 11,
     r_min: float = 0.1,
     r_max: float = 1.0,
-    max_phase: float = 2 * torch.pi,
+    phase_max: float = 2 * torch.pi,
     batch_size: int = 16,
     sequence_len: int = 50,
 ):
@@ -278,8 +282,9 @@ def test_lru_isolated(
         state_dim=state_dim,
         r_min=r_min,
         r_max=r_max,
-        max_phase=max_phase,
+        phase_max=phase_max,
         bidirectional=bidirectional,
+        mode=mode,
     )
 
     x = torch.randn(batch_size, sequence_len, input_dim)
@@ -293,6 +298,7 @@ def test_lru_isolated(
 @pytest.mark.parametrize(
     "bidirectional", [True, False], ids=["one-directional", "bi-directional"]
 )
+@pytest.mark.parametrize("mode", ["loop", "scan"], ids=["loop", "scan"])
 @pytest.mark.parametrize(
     "apply_input_normalization",
     [True, False],
@@ -300,12 +306,13 @@ def test_lru_isolated(
 )
 def test_lru_block_isolated(
     bidirectional: bool,
+    mode: str,
     apply_input_normalization: bool,
     hidden_dim: int = 7,
     state_dim: int = 11,
     r_min: float = 0.5,
     r_max: float = 1.0,
-    max_phase: float = 2 * torch.pi,
+    phase_max: float = 2 * torch.pi,
     dropout: float = 0.5,
     batch_size: int = 16,
     sequence_len: int = 50,
@@ -316,8 +323,9 @@ def test_lru_block_isolated(
         state_dim=state_dim,
         r_min=r_min,
         r_max=r_max,
-        max_phase=max_phase,
+        phase_max=phase_max,
         bidirectional=bidirectional,
+        mode=mode,
         dropout=dropout,
         apply_input_normalization=apply_input_normalization,
     )
@@ -333,10 +341,12 @@ def test_lru_block_isolated(
 @pytest.mark.parametrize(
     "bidirectional", [True, False], ids=["one-directional", "bi-directional"]
 )
-@pytest.mark.parametrize("aggregate_func", ["last_step"], ids=["last-step"])
+@pytest.mark.parametrize("mode", ["loop", "scan"], ids=["loop", "scan"])
+@pytest.mark.parametrize("aggregate_fcn", ["last_step"], ids=["last-step"])
 def test_lru_embedding_net_isolated(
     bidirectional: bool,
-    aggregate_func: str,
+    mode: str,
+    aggregate_fcn: str,
     output_dim: int = 5,
     input_dim: int = 7,
     state_dim: int = 11,
@@ -344,7 +354,7 @@ def test_lru_embedding_net_isolated(
     num_blocks: int = 2,
     r_min: float = 0.0,
     r_max: float = 1.0,
-    max_phase: float = 2 * torch.pi,
+    phase_max: float = 2 * torch.pi,
     dropout: float = 0.5,
     batch_size: int = 16,
     sequence_len: int = 50,
@@ -358,11 +368,12 @@ def test_lru_embedding_net_isolated(
         num_blocks=num_blocks,
         r_min=r_min,
         r_max=r_max,
-        max_phase=max_phase,
+        phase_max=phase_max,
         bidirectional=bidirectional,
+        mode=mode,
         dropout=dropout,
         apply_input_normalization=True,
-        aggregate_func=aggregate_func,
+        aggregate_fcn=aggregate_fcn,
     )
 
     x = torch.randn(batch_size, sequence_len, input_dim)
@@ -373,16 +384,15 @@ def test_lru_embedding_net_isolated(
     assert x_embed.shape == (batch_size, output_dim)
 
 
-def test_lru_pipeline():
-    """Test an entire pipeline run using the LRU embedding."""
+def test_lru_pipeline(embedding_feat_dim: int = 17):
+    """Smoke-test an entire pipeline run using the LRU embedding."""
 
-    def _simulator(thetas: Tensor, num_time_steps=500, dt = 0.002, eps=.05) -> Tensor:
+    def _simulator(thetas: Tensor, num_time_steps=500, dt=0.002, eps=0.05) -> Tensor:
         """Create a simple simulator for a one-mass dampened spring system."""
         assert thetas.shape[-1] == 2, "Expected 2 parameters: k, d"
         init_state = torch.tensor([[0.2], [0.5]])
 
         xs = []
-        #for theta in thetas:
         # Create the matrices for the ODE, given the parameters.
         k, d = thetas
         m = 1.0
@@ -396,8 +406,7 @@ def test_lru_pipeline():
         u = torch.tensor([[1.3]])
 
         # Simulate.
-        for t in range(num_time_steps):
-
+        for _ in range(num_time_steps):
             # Compute the ODE's right hand side.
             x_dot = A @ x + B @ u
 
@@ -406,41 +415,39 @@ def test_lru_pipeline():
             xs.append(x.T.clone())
 
         return torch.cat(xs, dim=0)
+
     traj = _simulator(torch.tensor([15.0, 0.7]))
     assert traj.shape == (500, 2)
 
-    # embedding
-    embedding_net = LRUEmbedding(
-        input_dim=2,
-        output_dim=2,
-        
-    )
+    # Create the embedding.
+    embedding_net = LRUEmbedding(input_dim=2, output_dim=embedding_feat_dim)
 
-    # set prior distribution for the parameters
+    # DSt prior distribution for the parameters.
     prior = utils.BoxUniform(
         low=torch.tensor([10.0, 0.5]), high=torch.tensor([20.0, 1.0])
     )
 
-    # make a SBI-wrapper on the simulator object for compatibility
-    prior, num_parameters, prior_returns_numpy = process_prior(prior)
+    # Make a SBI-wrapper on the simulator object for compatibility.
+    prior, _, prior_returns_numpy = process_prior(prior)
     simulator_wrapper = process_simulator(_simulator, prior, prior_returns_numpy)
     check_sbi_inputs(simulator_wrapper, prior)
 
-    # instantiate the neural density estimator
+    # Instantiate the neural density estimator.
     neural_posterior = posterior_nn(model="maf", embedding_net=embedding_net)
 
-    # setup the inference procedure with NPE
+    # Setup the inference procedure with NPE.
     inferer = NPE(prior=prior, density_estimator=neural_posterior)
 
-    # run the inference procedure on one round and 10000 simulated data points
+    # Run the inference procedure on one round.
     theta, x = simulate_for_sbi(simulator_wrapper, prior, num_simulations=10)
-    density_estimator = inferer.append_simulations(theta, x).train(training_batch_size=5,max_num_epochs=3)
+    density_estimator = inferer.append_simulations(theta, x).train(
+        training_batch_size=5, max_num_epochs=3
+    )
     posterior = inferer.build_posterior(density_estimator)
-    
-    # generate posterior samples
+
+    # Generate posterior samples.
     true_parameter = torch.tensor([15.0, 0.7])
     x_observed = _simulator(true_parameter)
     samples = posterior.set_default_x(x_observed).sample((10,))
-        
+
     assert samples.shape == (10, 2)
-test_lru_pipeline()
