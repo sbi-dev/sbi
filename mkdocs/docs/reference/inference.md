@@ -7,6 +7,11 @@
       filters: [ "!^_", "^__", "!^__class__" ]
       inherited_members: true
 
+::: sbi.inference.trainers.npe.npe_b.NPE_B
+    selection:
+      filters: [ "!^_", "^__", "!^__class__" ]
+      inherited_members: true
+
 ::: sbi.inference.trainers.npe.npe_c.NPE_C
     selection:
       filters: [ "!^_", "^__", "!^__class__" ]

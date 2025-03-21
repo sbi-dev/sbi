@@ -15,7 +15,7 @@ from pyknos.nflows.transforms.splines import (
 from torch import Tensor, nn, relu, tanh, tensor, uint8
 from torch.distributions import Distribution
 
-from sbi.neural_nets.estimators import NFlowsFlow, ZukoFlow
+from sbi.neural_nets.estimators import NFlowsFlow, ZukoFlow, ZukoUnconditionalFlow
 from sbi.utils.nn_utils import MADEMoGWrapper, get_numel
 from sbi.utils.sbiutils import (
     biject_transform_zuko,
@@ -1141,6 +1141,92 @@ def build_zuko_flow(
         embedding_net,
         input_shape=batch_x[0].shape,
         condition_shape=batch_y[0].shape,
+    )
+
+    return flow
+
+
+def build_zuko_unconditional_flow(
+    which_nf: str,
+    batch_x: Tensor,
+    z_score_x: Optional[str] = "independent",
+    hidden_features: Union[Sequence[int], int] = 50,
+    num_transforms: int = 5,
+    **kwargs,
+) -> ZukoUnconditionalFlow:
+    """
+    Fundamental building blocks to build a Zuko normalizing flow model.
+
+    Args:
+        which_nf (str): The type of normalizing flow to build.
+        batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring.
+        z_score_x: Whether to z-score xs passing into the network, can be one of:
+            - `none`, or None: do not z-score.
+            - `independent`: z-score each dimension independently.
+            - `structured`: treat dimensions as related, therefore compute mean and std
+            over the entire batch, instead of per-dimension. Should be used when each
+            sample is, for example, a time series or an image.
+        hidden_features: The number of hidden features in the flow. Defaults to 50.
+        num_transforms: The number of transformations in the flow. Defaults to 5.
+        **kwargs: Additional keyword arguments to pass to the flow constructor.
+
+    Returns:
+        ZukoUnconditionalFlow: The constructed Zuko normalizing flow model.
+    """
+
+    # check_data_device(batch_x)
+    x_numel = get_numel(batch_x, embedding_net=None)
+
+    # keep only zuko kwargs
+    kwargs = {k: v for k, v in kwargs.items() if k not in nflow_specific_kwargs}
+
+    if isinstance(hidden_features, int):
+        hidden_features = [hidden_features] * num_transforms
+
+    build_nf = getattr(zuko.flows, which_nf)
+
+    if which_nf == "CNF":
+        flow_built = build_nf(
+            features=x_numel, hidden_features=hidden_features, **kwargs
+        )
+    else:
+        flow_built = build_nf(
+            features=x_numel,
+            hidden_features=hidden_features,
+            transforms=num_transforms,
+            **kwargs,
+        )
+
+    # Continuous normalizing flows (CNF) only have one transform,
+    # so we need to handle them slightly differently.
+    if which_nf == "CNF":
+        transform = flow_built.transform
+
+        z_score_x_bool, structured_x = z_score_parser(z_score_x)
+        if z_score_x_bool:
+            transform = (
+                transform,
+                standardizing_transform_zuko(batch_x, structured_x),
+            )
+
+        # Combine transforms.
+        neural_net = zuko.flows.Flow(transform, flow_built.base)
+    else:
+        transforms = flow_built.transform.transforms
+
+        z_score_x_bool, structured_x = z_score_parser(z_score_x)
+        if z_score_x_bool:
+            transforms = (
+                *transforms,
+                standardizing_transform_zuko(batch_x, structured_x),
+            )
+
+        # Combine transforms.
+        neural_net = zuko.flows.Flow(transforms, flow_built.base)
+
+    flow = ZukoUnconditionalFlow(
+        neural_net,
+        input_shape=batch_x[0].shape,
     )
 
     return flow
