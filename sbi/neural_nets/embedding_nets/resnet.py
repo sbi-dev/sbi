@@ -1,5 +1,5 @@
 from functools import partial
-from typing import Callable, Dict, List, Type, Union
+from typing import Callable, Dict, List, Optional, Type, Union
 
 import torch
 import torch.nn as nn
