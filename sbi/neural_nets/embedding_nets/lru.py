@@ -9,6 +9,9 @@ from torch._higher_order_ops.associative_scan import associative_scan
 
 class LRUEmbedding(nn.Module):
     """Embedding network backed by a stack of Linear Recurrent Unit (LRU) blocks.
+    This type of embedding is intended to be used with sequential data, e.g.
+    time series. So far, the implementation assumes that the sequence length is
+    constant for all observations.
 
     Each LRU block is comprised of an `LRU` instance surrounded by input normalization,
     dropout, nonlinearities, state mixing, and a skip connection.
@@ -158,7 +161,7 @@ class LRUBlock(nn.Module):
             mode=mode,
         )
         self.dropout = nn.Dropout(dropout)
-        self.nonlinearity = nn.SiLU()  # could also use another one here
+        self.nonlinearity = nn.SiLU()  # could also use different one here
         self.state_mixing_pre_glu = nn.Linear(hidden_dim, hidden_dim * 2)
         self.glu = nn.GLU(dim=-1)
 
@@ -295,7 +298,6 @@ class LRU(nn.Module):
             Transformed sequential data of shape (batch_size, sequence_length,
                 input_dim)
         """
-
         # Initialize the hidden state if not given.
         if self.bidirectional:
             expected_state_shape = (input.size(0), self.state_dim * 2)
@@ -380,7 +382,19 @@ class LRU(nn.Module):
         return y
 
     def _forward_scan(self, input: Tensor, state: Tensor) -> Tensor:
-        """For details on parallel scan, check discussion in Smith et al (2022)."""
+        """For details on parallel scan, check discussion in Smith et al (2022).
+
+        Args:
+            input: Sequential data of shape (batch_size, sequence_length,
+                input_dim)
+            state: Initial hidden complex state of the LRU of shape
+                ((batch_size, sequence_length, state_dim),
+                 (batch_size, sequence_length, state_dim)).
+
+        Return:
+            Transformed sequential data of shape (batch_size, sequence_length,
+                input_dim)
+        """
         # Normalize the input-facing matrix.
         B_norm = self.B * self.gamma.unsqueeze(dim=-1)
 
@@ -432,7 +446,6 @@ class LRU(nn.Module):
         return y
 
 
-# @torch.jit.script  # TODO
 def binary_operator_diag(
     element_i: tuple[Tensor, Tensor],
     element_j: tuple[Tensor, Tensor],
