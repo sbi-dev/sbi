@@ -11,6 +11,7 @@ from sbi.inference.potentials.base_potential import BasePotential
 from sbi.samplers.importance.importance_sampling import importance_sample
 from sbi.samplers.importance.sir import sampling_importance_resampling
 from sbi.sbi_types import Shape, TorchTransform
+from sbi.utils.sbiutils import mcmc_transform
 from sbi.utils.torchutils import ensure_theta_batched
 
 
@@ -64,6 +65,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         self.proposal = proposal
         self._normalization_constant = None
         self.method = method
+        self.theta_transform = theta_transform
 
         self.oversampling_factor = oversampling_factor
         self.max_sampling_batch_size = max_sampling_batch_size
@@ -73,6 +75,33 @@ class ImportanceSamplingPosterior(NeuralPosterior):
             "posterior and can evaluate the _unnormalized_ posterior density with "
             ".log_prob()."
         )
+        self.x_shape = x_shape
+
+    def to(self, device):
+        """
+        Move the potential, the proposal and x_o to a new device.
+
+        It also reinstansiates the posterior with the new device.
+
+        Args:
+            device: Device on which to move the posterior to.
+        """
+        self.device = device
+        self.potential_fn.to(device)
+        self.proposal.to(device)
+        if hasattr(self, "_x"):
+            x_o = self._x.to(device)
+
+        self.theta_transform = mcmc_transform(self.proposal, device=device)
+        super().__init__(
+            self.potential_fn,
+            theta_transform=self.theta_transform,
+            device=device,
+            x_shape=self.x_shape,
+        )
+        # super().__init__ erase the self._x, so we need to set it again
+        if hasattr(self, "_x"):
+            self.set_default_x(x_o)
 
     def log_prob(
         self,
@@ -210,9 +239,9 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         show_progress_bars: bool = True,
     ) -> Tensor:
         raise NotImplementedError(
-            "Batched sampling is not implemented for ImportanceSamplingPosterior. "
-            "Alternatively you can use `sample` in a loop "
-            "[posterior.sample(theta, x_o) for x_o in x]."
+            "Batched sampling is not implemented for ImportanceSamplingPosterior. \
+           Alternatively you can use `sample` in a loop \
+           [posterior.sample(theta, x_o) for x_o in x]."
         )
 
     def _importance_sample(
