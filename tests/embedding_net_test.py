@@ -444,3 +444,49 @@ def test_lru_pipeline():
         
     assert samples.shape == (10, 2)
 test_lru_pipeline()
+
+
+
+
+
+
+def test_scan(input_dim=3,output_dim=3,state_dim=4,hidden_dim=2, batch_size=10, sequence_len=7):
+    
+    # causal
+    torch.compiler.reset()
+    embedding = LRUEmbedding(input_dim=input_dim,output_dim=output_dim,state_dim=state_dim,hidden_dim=hidden_dim,num_blocks=1)
+    x = torch.randn(batch_size,sequence_len,input_dim)*.1
+    init_state = torch.zeros(batch_size,state_dim)
+    y_scan = embedding.lru_blocks[0].lru._forward_scan(x,state=init_state)
+    y_loop = embedding.lru_blocks[0].lru._forward_loop(x,state=init_state)
+    assert torch.allclose(y_scan,y_loop,atol=1e-5)
+
+    # causal non zero initial state
+    torch.compiler.reset()
+    embedding = LRUEmbedding(input_dim=input_dim,output_dim=output_dim,state_dim=state_dim,hidden_dim=hidden_dim,num_blocks=1)
+    x = torch.randn(batch_size,sequence_len,input_dim)*.1
+    init_state = torch.randn(batch_size,state_dim)
+    y_scan = embedding.lru_blocks[0].lru._forward_scan(x,state=init_state)
+    y_loop = embedding.lru_blocks[0].lru._forward_loop(x,state=init_state)
+    assert torch.allclose(y_scan,y_loop,atol=1e-5)
+
+
+    # bidirectional
+    torch.compiler.reset()
+    embedding = LRUEmbedding(input_dim=input_dim,output_dim=output_dim,state_dim=state_dim,hidden_dim=hidden_dim,num_blocks=1, bidirectional=True)
+    x = torch.randn(batch_size,sequence_len,input_dim)*.1
+    init_state = torch.zeros(batch_size,state_dim)
+    y_scan = embedding.lru_blocks[0].lru._forward_scan(x,state=init_state)
+    y_loop = embedding.lru_blocks[0].lru._forward_loop(x,state=init_state)
+    assert torch.allclose(y_scan,y_loop,atol=1e-5)
+
+    # bidirectional non zero initial state
+    torch.compiler.reset()
+    embedding = LRUEmbedding(input_dim=input_dim,output_dim=output_dim,state_dim=state_dim,hidden_dim=hidden_dim,num_blocks=1, bidirectional=True)
+    x = torch.randn(batch_size,sequence_len,input_dim)*.1
+    init_state = torch.randn(batch_size,state_dim)
+    y_scan = embedding.lru_blocks[0].lru._forward_scan(x,state=init_state)
+    y_loop = embedding.lru_blocks[0].lru._forward_loop(x,state=init_state)
+    assert torch.allclose(y_scan,y_loop,atol=1e-5)
+
+    torch.compiler.reset()
