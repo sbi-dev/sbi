@@ -185,7 +185,6 @@ def test_spectral_conf_embedding(
     estimator_provider = posterior_nn(
         "mdn",
         embedding_net=SpectralConvEmbedding(
-            n_points,
             modes=modes,
             in_channels=in_channels,
             conv_channels=conv_channels,
