@@ -298,8 +298,8 @@ class AdaMLPBlock(nn.Module):
         )
 
         # Initialize the last layer to zero
-        self.ada_ln[-1].weight.data.zero_()
-        self.ada_ln[-1].bias.data.zero_()
+        self.ada_ln[-1].weight.data.zero_()  # type: ignore
+        self.ada_ln[-1].bias.data.zero_()  # type: ignore
 
         # MLP block
         # NOTE: This can be made more flexible to support layer types.

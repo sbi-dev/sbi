@@ -66,7 +66,7 @@ class FlowMatchingEstimator(ConditionalDensityEstimator):
 
     def forward(self, input: Tensor, condition: Tensor, t: Tensor) -> Tensor:
         # positional encoding of time steps
-        t = self.freqs * t[..., None]
+        t = self.freqs * t[..., None]  # type: ignore
         t = torch.cat((t.cos(), t.sin()), dim=-1)
 
         # embed the input and condition
@@ -162,5 +162,5 @@ class FlowMatchingEstimator(ConditionalDensityEstimator):
 
         return NormalizingFlow(
             transform=transform,
-            base=DiagNormal(self.zeros, self.ones).expand(condition.shape[:-1]),
+            base=DiagNormal(self.zeros, self.ones).expand(condition.shape[:-1]),  # type: ignore
         )
