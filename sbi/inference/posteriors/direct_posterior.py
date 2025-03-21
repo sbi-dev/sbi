@@ -64,6 +64,8 @@ class DirectPosterior(NeuralPosterior):
         # builds it itself. The `potential_fn` and `theta_transform` are used only for
         # obtaining the MAP.
         check_prior(prior)
+        self.enable_transform = enable_transform
+        self.x_shape = x_shape
         potential_fn, theta_transform = posterior_estimator_based_potential(
             posterior_estimator,
             prior,
@@ -78,6 +80,7 @@ class DirectPosterior(NeuralPosterior):
             x_shape=x_shape,
         )
 
+        self.device = device
         self.prior = prior
         self.posterior_estimator = posterior_estimator
 
@@ -86,6 +89,44 @@ class DirectPosterior(NeuralPosterior):
 
         self._purpose = """It samples the posterior network and rejects samples that
             lie outside of the prior bounds."""
+
+    def to(self, device: Union[str, torch.device]) -> None:
+        """Move posterior_estimator, prior and x_o to device.
+
+        Changes the device attribute, reinstanciates the
+        posterior, and resets the default x.
+
+        Args:
+            device: device where to move the posterior to.
+        """
+        self.device = device
+        if hasattr(self.prior, "to"):
+            self.prior.to(device)
+        else:
+            raise ValueError("""Prior has no attribute to(device).""")
+        if hasattr(self.posterior_estimator, "to"):
+            self.posterior_estimator.to(device)
+        else:
+            raise ValueError("""Posterior estimator has no attribute to(device).""")
+
+        potential_fn, theta_transform = posterior_estimator_based_potential(
+            self.posterior_estimator,
+            self.prior,
+            x_o=None,
+            enable_transform=self.enable_transform,
+        )
+        if self._x is not None:
+            x_o = self._x.to(device)
+
+        super().__init__(
+            potential_fn=potential_fn,
+            theta_transform=theta_transform,
+            device=device,
+            x_shape=self.x_shape,
+        )
+        # super().__init__ erase the self._x, so we need to set it again
+        if self._x is not None:
+            self.set_default_x(x_o)
 
     def sample(
         self,
