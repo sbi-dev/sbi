@@ -26,7 +26,6 @@ class FlowMatchingEstimator(ConditionalDensityEstimator):
         embedding_net: nn.Module,
         zscore_transform_input: Optional[Transform] = None,
         num_freqs: int = 3,
-        noise_scale: float = 1e-3,
         **kwargs,
     ) -> None:
         """Creates a vector field estimator for Flow Matching.
@@ -46,7 +45,6 @@ class FlowMatchingEstimator(ConditionalDensityEstimator):
             net=net, input_shape=input_shape, condition_shape=condition_shape
         )
 
-        self.noise_scale = noise_scale
         # Identity transform for z-scoring the input
         if zscore_transform_input is None:
             zscore_transform_input = zuko.transforms.IdentityTransform()
@@ -91,12 +89,11 @@ class FlowMatchingEstimator(ConditionalDensityEstimator):
         t_ = t[..., None]
 
         # sample from probability path at time t
-        # TODO: Change to notation from Lipman et al. or Tong et al.
         epsilon = torch.randn_like(input)
-        theta_prime = (1 - t_) * input + (t_ + self.noise_scale) * epsilon
+        theta_prime = (1 - t_) * epsilon + t_ * input
 
         # compute vector field at the sampled time steps
-        vector_field = epsilon - input
+        vector_field = input - epsilon
 
         # compute the mean squared error between the vector fields
         return torch.mean(

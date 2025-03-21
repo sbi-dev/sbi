@@ -135,7 +135,7 @@ class AdaMLPBlock(nn.Module):
         )
 
         # Initialize the last layer to zero
-        self.ada_ln[-1].weight.data.zero_()
+        self.ada_ln[-1].weight.data *= 0.1
         self.ada_ln[-1].bias.data.zero_()
 
         # MLP block
@@ -225,6 +225,7 @@ class GlobalEmbeddingMLP(nn.Module):
         for _i in range(num_intermediate_layers):
             self.mlp_blocks.append(
                 nn.Sequential(
+                    activation(),
                     nn.Linear(hidden_dim, hidden_dim * mlp_ratio),
                     activation(),
                     nn.Linear(hidden_dim * mlp_ratio, hidden_dim),
@@ -244,8 +245,8 @@ class GlobalEmbeddingMLP(nn.Module):
             raise e
 
         cond_emb = self.input_layer(cond_emb)
-        for i in range(self.num_intermediate_layers):
-            cond_emb = self.mlp_blocks[i](cond_emb)
+        for mlp_block in self.mlp_blocks:
+            cond_emb = mlp_block(cond_emb)
         return self.output_layer(cond_emb)
 
 
@@ -319,12 +320,13 @@ class VectorFieldMLP(VectorFieldNet):
             fourier_scale=fourier_scale,
             activation=activation,
         )
+        self.input_dim = hidden_features
 
         # Input layer
         self.layers.append(nn.Linear(input_dim, hidden_features))
 
         # Hidden layers
-        for _ in range(num_layers - 1):
+        for _ in range(num_layers):
             self.layers.append(
                 AdaMLPBlock(
                     hidden_dim=hidden_features,
@@ -399,7 +401,7 @@ class DiTBlock(nn.Module):
         )
 
         # initialize last layer to zero
-        self.ada_affine[-1].weight.data.zero_()
+        self.ada_affine[-1].weight.data *= 0.1
         self.ada_affine[-1].bias.data.zero_()
 
         # attention
@@ -489,7 +491,7 @@ class DiTBlockWithCrossAttention(nn.Module):
         )
 
         # initialize the last layer to zero
-        self.time_mlp[-1].weight.data.zero_()
+        self.time_mlp[-1].weight.data *= 0.1
         self.time_mlp[-1].bias.data.zero_()
 
         # self-attention
