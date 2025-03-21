@@ -142,7 +142,7 @@ class CausalCNNEmbedding(nn.Module):
         input_shape: Tuple,
         in_channels: int = 1,
         out_channels_per_layer: Optional[List] = None,
-        dilation_per_layer: Optional[List] = None,
+        dilation: Union[str, List] = "exponential_cyclic",
         num_conv_layers: int = 5,
         activation: nn.Module = nn.LeakyReLU(inplace=True),
         pool_kernel_size: int = 160,
@@ -165,24 +165,26 @@ class CausalCNNEmbedding(nn.Module):
 
         Args:
             input_shape: Dimensionality of the input e.g. (num_timepoints,),
-                    currently only 1D is supported.
+                currently only 1D is supported.
             in_channels: Number of input channels, default = 1.
             out_channels_per_layer: number of out_channels for each layer, number
-                    of entries should correspond with num_conv_layers passed below.
-                    Default = 16 in every convolutional layer.
-            dilation_per_layer: dilation size per layer, by default the cyclic,
-                    exponential scheme from WaveNet is used.
+                of entries should correspond with num_conv_layers passed below.
+                Default = 16 in every convolutional layer.
+            dilation: type of dilation to use either one of "none" (dilation = 1
+                in every layer), "exponential" (increase dilation by a factor of 2
+                every layer), "exponential_cyclic" (as exponential, but reset to 1
+                after dilation = 2**9) or pass a list with dilation size per layer.
+                By default the cyclic, exponential scheme from WaveNet is used.
             num_conv_layers: the number of causal convolutional layers
             kernel_size: size of the kernels in the causal convolutional layers.
             activation: activation function to use between convolutions,
-                    default = LeakyReLU.
+                default = LeakyReLU.
             pool_kernel_size: pool size to use for the AvgPool1d operation after
-                    the causal convolutional layers.
+                the causal convolutional layers.
             aggregator: aggregation net that reduces the dimensionality of the data
-                    to a low-dimensional embedding.
+                to a low-dimensional embedding.
             output_dim: number of output units in the final layer when using
-                    the default aggregation
-
+                the default aggregation
         """
 
         super(CausalCNNEmbedding, self).__init__()
@@ -197,12 +199,29 @@ class CausalCNNEmbedding(nn.Module):
             "Please ensure that the pool kernel size is not "
             "larger than the number of observed timepoints."
         )
-        max_dil_exp = 10
-        if dilation_per_layer is None:
-            ## Use dilation scheme as in WaveNet paper
-            dilation_per_layer = [
-                2 ** (i % max_dil_exp) for i in range(num_conv_layers)
-            ]
+        if isinstance(dilation, str):
+            match dilation.lower():
+                case "exponential_cyclic":
+                    max_dil_exp = 10
+                    ## Use dilation scheme as in WaveNet paper
+                    dilation_per_layer = [
+                        2 ** (i % max_dil_exp) for i in range(num_conv_layers)
+                    ]
+                case "exponential":
+                    dilation_per_layer = [2**i for i in range(num_conv_layers)]
+                case "none":
+                    dilation_per_layer = [1] * num_conv_layers
+                case _:
+                    raise ValueError(
+                        f"{dilation} is not a valid option, please use \"none\","
+                        "\"exponential\",or \"exponential_cyclic\", or pass a list "
+                        "of dilation sizes."
+                    )
+        else:
+            assert isinstance(dilation, List), (
+                "Please pass dilation size as list or a string option."
+            )
+            dilation_per_layer = dilation
 
         if out_channels_per_layer is None:
             out_channels_per_layer = [16] * num_conv_layers
