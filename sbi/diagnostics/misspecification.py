@@ -138,3 +138,26 @@ def calc_misspecification_mmd(
         z_obs, z, n_shuffle=n_shuffle, max_samples=max_samples, mode=mmd_mode
     )
     return p_val, (mmds_baseline, mmd)
+
+
+def log_prob_hypothesis_test(log_probs, log_prob_xo, alpha=0.05):
+    """
+    Perform a hypothesis test to check if log_prob_xo is unusually low
+    compared to the given log probabilities from the distribution.
+
+    Parameters:
+    - log_probs: array-like, log probabilities of known samples
+    - log_prob_xo: float, log probability of the test sample
+    - alpha: significance level (default 0.05)
+
+    Returns:
+    - p_value: float, proportion of log_probs below log_prob_xo
+    - reject_H0: bool, whether to reject H0 at the given alpha level
+    """
+    # Compute empirical CDF value (proportion of samples with lower log prob)
+    p_value = (log_probs <= log_prob_xo).float().mean()
+
+    # Reject H0 if p_value is below the significance level
+    reject_H0 = p_value < alpha
+
+    return p_value, reject_H0
