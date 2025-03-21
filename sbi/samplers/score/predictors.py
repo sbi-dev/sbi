@@ -12,16 +12,16 @@ PREDICTORS = {}
 
 def get_predictor(
     name: str,
-    score_based_potential: 'PosteriorScoreBasedPotential',  # noqa: F821 # type: ignore
+    vector_field_potential: 'VectorFieldBasedPotential',  # noqa: F821 # type: ignore
     **kwargs,
 ) -> "Predictor":
     """Helper function to get predictor by name.
 
     Args:
         name: Name of the predictor.
-        score_based_potential: Score-based potential to initialize the predictor.
+        vector_field_potential: Vector field potential to initialize the predictor.
     """
-    return PREDICTORS[name](score_based_potential, **kwargs)
+    return PREDICTORS[name](vector_field_potential, **kwargs)
 
 
 def register_predictor(name: str) -> Callable:
@@ -52,7 +52,7 @@ class Predictor(ABC):
 
     def __init__(
         self,
-        potential_fn: 'PosteriorScoreBasedPotential',  # noqa: F821 # type: ignore
+        potential_fn: 'VectorFieldBasedPotential',  # noqa: F821 # type: ignore
     ):
         """Initialize predictor.
 
@@ -63,8 +63,8 @@ class Predictor(ABC):
         self.device = potential_fn.device
 
         # Extract relevant functions from the score function
-        self.drift = self.potential_fn.score_estimator.drift_fn
-        self.diffusion = self.potential_fn.score_estimator.diffusion_fn
+        self.drift = self.potential_fn.vector_field_estimator.drift_fn
+        self.diffusion = self.potential_fn.vector_field_estimator.diffusion_fn
 
     def __call__(self, theta: Tensor, t1: Tensor, t0: Tensor) -> Tensor:
         """Run prediction.
@@ -92,7 +92,7 @@ class Predictor(ABC):
 class EulerMaruyama(Predictor):
     def __init__(
         self,
-        potential_fn: 'PosteriorScoreBasedPotential',  # noqa: F821 # type: ignore
+        potential_fn: 'VectorFieldBasedPotential ',  # noqa: F821 # type: ignore
         eta: float = 1.0,
     ):
         """Simple Euler-Maruyama discretization of the associated family of reverse

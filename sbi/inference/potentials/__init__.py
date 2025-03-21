@@ -8,3 +8,6 @@ from sbi.inference.potentials.posterior_based_potential import (
 from sbi.inference.potentials.ratio_based_potential import (
     ratio_estimator_based_potential,
 )
+from sbi.inference.potentials.vector_field_potential import (
+    vector_field_estimator_based_potential,
+)

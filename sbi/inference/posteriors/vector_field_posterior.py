@@ -8,14 +8,16 @@ from torch import Tensor
 from torch.distributions import Distribution
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
-from sbi.inference.potentials.score_based_potential import (
+from sbi.inference.potentials.vector_field_potential import (
     CallableDifferentiablePotentialFunction,
-    PosteriorScoreBasedPotential,
-    score_estimator_based_potential,
+    VectorFieldBasedPotential,
+    vector_field_estimator_based_potential,
 )
-from sbi.neural_nets.estimators.score_estimator import ConditionalScoreEstimator
 from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
+)
+from sbi.neural_nets.estimators.vector_field_estimator import (
+    ConditionalVectorFieldEstimator,
 )
 from sbi.samplers.rejection import rejection
 from sbi.samplers.score.correctors import Corrector
@@ -27,7 +29,7 @@ from sbi.utils.sbiutils import gradient_ascent, within_support
 from sbi.utils.torchutils import ensure_theta_batched
 
 
-class ScorePosterior(NeuralPosterior):
+class VectorFieldPosterior(NeuralPosterior):
     r"""Posterior $p(\theta|x_o)$ with `log_prob()` and `sample()` methods. It samples
     from the diffusion model given the score_estimator and rejects samples that lie
     outside of the prior bounds.
@@ -45,17 +47,18 @@ class ScorePosterior(NeuralPosterior):
 
     def __init__(
         self,
-        score_estimator: ConditionalScoreEstimator,
+        vector_field_estimator: ConditionalVectorFieldEstimator,
         prior: Distribution,
         max_sampling_batch_size: int = 10_000,
         device: Optional[str] = None,
         enable_transform: bool = True,
         sample_with: str = "sde",
+        **kwargs,
     ):
         """
         Args:
             prior: Prior distribution with `.log_prob()` and `.sample()`.
-            score_estimator: The trained neural score estimator.
+            vector_field_estimator: The trained neural score estimator.
             max_sampling_batch_size: Batchsize of samples being drawn from
                 the proposal at every iteration.
             device: Training device, e.g., "cpu", "cuda" or "cuda:0". If None,
@@ -65,14 +68,17 @@ class ScorePosterior(NeuralPosterior):
                 returned for `theta_transform`. True is not supported yet.
             sample_with: Whether to sample from the posterior using the ODE-based
                 sampler or the SDE-based sampler.
+            **kwargs: Additional keyword arguments passed to
+                `VectorFieldBasedPotential`.
         """
 
         check_prior(prior)
-        potential_fn, theta_transform = score_estimator_based_potential(
-            score_estimator,
+        potential_fn, theta_transform = vector_field_estimator_based_potential(
+            vector_field_estimator,
             prior,
             x_o=None,
             enable_transform=enable_transform,
+            **kwargs,
         )
         super().__init__(
             potential_fn=potential_fn,
@@ -80,10 +86,10 @@ class ScorePosterior(NeuralPosterior):
             device=device,
         )
         # Set the potential function type.
-        self.potential_fn: PosteriorScoreBasedPotential = potential_fn
+        self.potential_fn: VectorFieldBasedPotential = potential_fn
 
         self.prior = prior
-        self.score_estimator = score_estimator
+        self.vector_field_estimator = vector_field_estimator
 
         self.sample_with = sample_with
         assert self.sample_with in [
@@ -93,7 +99,7 @@ class ScorePosterior(NeuralPosterior):
         self.max_sampling_batch_size = max_sampling_batch_size
 
         self._purpose = """It samples from the diffusion model given the \
-            score_estimator."""
+            vector_field_estimator."""
 
     def sample(
         self,
@@ -139,20 +145,15 @@ class ScorePosterior(NeuralPosterior):
             iid_params: Additional parameters passed to the iid method. See the specific
                 `IIDScoreFunction` child class for details.
             max_sampling_batch_size: Maximum batch size for sampling.
-            sample_with: Deprecated - use `.build_posterior(sample_with=...)` prior to
-                `.sample()`.
+            sample_with: Sampling method to use - 'ode' or 'sde'.
             show_progress_bars: Whether to show a progress bar during sampling.
         """
 
-        if sample_with is not None:
-            raise ValueError(
-                f"You set `sample_with={sample_with}`. As of sbi v0.18.0, setting "
-                f"`sample_with` is no longer supported. You have to rerun "
-                f"`.build_posterior(sample_with={sample_with}).`"
-            )
+        if sample_with is None:
+            sample_with = self.sample_with
 
         x = self._x_else_default_x(x)
-        x = reshape_to_batch_event(x, self.score_estimator.condition_shape)
+        x = reshape_to_batch_event(x, self.vector_field_estimator.condition_shape)
         is_iid = x.shape[0] > 1
         self.potential_fn.set_x(
             x, x_is_iid=is_iid, iid_method=iid_method, iid_params=iid_params
@@ -160,7 +161,7 @@ class ScorePosterior(NeuralPosterior):
 
         num_samples = torch.Size(sample_shape).numel()
 
-        if self.sample_with == "ode":
+        if sample_with == "ode":
             samples = rejection.accept_reject_sample(
                 proposal=self.sample_via_ode,
                 accept_reject_fn=lambda theta: within_support(self.prior, theta),
@@ -168,7 +169,7 @@ class ScorePosterior(NeuralPosterior):
                 show_progress_bars=show_progress_bars,
                 max_sampling_batch_size=max_sampling_batch_size,
             )[0]
-        elif self.sample_with == "sde":
+        elif sample_with == "sde":
             proposal_sampling_kwargs = {
                 "predictor": predictor,
                 "corrector": corrector,
@@ -187,8 +188,14 @@ class ScorePosterior(NeuralPosterior):
                 max_sampling_batch_size=max_sampling_batch_size,
                 proposal_sampling_kwargs=proposal_sampling_kwargs,
             )[0]
+        else:
+            raise ValueError(
+                f"Expected sample_with to be 'ode' or 'sde', but got {sample_with}."
+            )
 
-        samples = samples.reshape(sample_shape + self.score_estimator.input_shape)
+        samples = samples.reshape(
+            sample_shape + self.vector_field_estimator.input_shape
+        )
         return samples
 
     def _sample_via_diffusion(
@@ -229,9 +236,10 @@ class ScorePosterior(NeuralPosterior):
             else max_sampling_batch_size
         )
 
+        # TODO: the time schedule should be provided by the vector field estimator.
         if ts is None:
-            t_max = self.score_estimator.t_max
-            t_min = self.score_estimator.t_min
+            t_max = self.vector_field_estimator.t_max
+            t_min = self.vector_field_estimator.t_min
             ts = torch.linspace(t_max, t_min, steps)
 
         diffuser = Diffuser(
@@ -277,10 +285,9 @@ class ScorePosterior(NeuralPosterior):
         """
         num_samples = torch.Size(sample_shape).numel()
 
-        flow = self.potential_fn.get_continuous_normalizing_flow(
-            condition=self.potential_fn.x_o
+        samples = self.potential_fn.neural_ode(self.potential_fn.x_o).sample(
+            torch.Size((num_samples,))
         )
-        samples = flow.sample(torch.Size((num_samples,)))
 
         return samples
 
@@ -289,9 +296,7 @@ class ScorePosterior(NeuralPosterior):
         theta: Tensor,
         x: Optional[Tensor] = None,
         track_gradients: bool = False,
-        atol: float = 1e-5,
-        rtol: float = 1e-5,
-        exact: bool = False,
+        ode_kwargs: Optional[Dict] = None,
     ) -> Tensor:
         r"""Returns the log-probability of the posterior $p(\theta|x)$.
 
@@ -303,18 +308,13 @@ class ScorePosterior(NeuralPosterior):
             track_gradients: Whether the returned tensor supports tracking gradients.
                 This can be helpful for e.g. sensitivity analysis, but increases memory
                 consumption.
-            atol: Absolute tolerance for the ODE solver.
-            rtol: Relative tolerance for the ODE solver.
-            exact: Whether to use the exact Jacobian of the transformation or an
-                stochastic approximation, which is faster but less accurate.
+            ode_kwargs: Additional keyword arguments for the ODE solver.
 
         Returns:
             `(len(θ),)`-shaped log posterior probability $\log p(\theta|x)$ for θ in the
             support of the prior, -∞ (corresponding to 0 probability) outside.
         """
-        self.potential_fn.set_x(
-            self._x_else_default_x(x), atol=atol, rtol=rtol, exact=exact
-        )
+        self.potential_fn.set_x(self._x_else_default_x(x), **(ode_kwargs or {}))
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
         return self.potential_fn(
@@ -361,8 +361,8 @@ class ScorePosterior(NeuralPosterior):
             Samples from the posteriors of shape (*sample_shape, B, *input_shape)
         """
         num_samples = torch.Size(sample_shape).numel()
-        x = reshape_to_batch_event(x, self.score_estimator.condition_shape)
-        condition_dim = len(self.score_estimator.condition_shape)
+        x = reshape_to_batch_event(x, self.vector_field_estimator.condition_shape)
+        condition_dim = len(self.vector_field_estimator.condition_shape)
         batch_shape = x.shape[:-condition_dim]
         batch_size = batch_shape.numel()
         self.potential_fn.set_x(x)
@@ -383,7 +383,7 @@ class ScorePosterior(NeuralPosterior):
                 max_sampling_batch_size=max_sampling_batch_size,
             )[0]
             samples = samples.reshape(
-                sample_shape + batch_shape + self.score_estimator.input_shape
+                sample_shape + batch_shape + self.vector_field_estimator.input_shape
             )
         elif self.sample_with == "sde":
             proposal_sampling_kwargs = {
@@ -406,7 +406,7 @@ class ScorePosterior(NeuralPosterior):
                 proposal_sampling_kwargs=proposal_sampling_kwargs,
             )[0]
             samples = samples.reshape(
-                sample_shape + batch_shape + self.score_estimator.input_shape
+                sample_shape + batch_shape + self.vector_field_estimator.input_shape
             )
 
         return samples

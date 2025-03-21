@@ -13,7 +13,7 @@ from sbi.samplers.score.predictors import Predictor, get_predictor
 
 
 class Diffuser:
-    """Diffusion-based sampler for score-based sampling.
+    """Diffusion-based sampler for vector field-based sampling.
 
     Requires the gradient of a family of distributions (for different times)
     characterized by the gradient of a potential function (i.e. the score function). The
@@ -26,7 +26,7 @@ class Diffuser:
 
     def __init__(
         self,
-        score_based_potential: 'PosteriorScoreBasedPotential',  # noqa: F821 # type: ignore
+        vector_field_potential: 'VectorFieldBasedPotential',  # noqa: F821 # type: ignore
         predictor: Union[str, Predictor],
         corrector: Optional[Union[str, Corrector]] = None,
         predictor_params: Optional[dict] = None,
@@ -35,7 +35,7 @@ class Diffuser:
         """Init method for the Diffuser class.
 
         Args:
-            score_based_potential_gradient: A time-dependent score-based potential.
+            vector_field_potential: A time-dependent score-based potential.
             predictor: A predictor to propagate samples forward in time.
             corrector (Ooptional): A corrector to refine the samples. Defaults to None.
             predictor_params (optional): Parameters passed to the predictor, if given as
@@ -44,35 +44,39 @@ class Diffuser:
                 string. Defaults to None.
         """
         # Set predictor and corrector
-        self.set_predictor(predictor, score_based_potential, **(predictor_params or {}))
+        self.set_predictor(
+            predictor, vector_field_potential, **(predictor_params or {})
+        )
         self.set_corrector(corrector, **(corrector_params or {}))
         self.device = self.predictor.device
 
         # Extract time limits from the score function
-        self.t_min = score_based_potential.score_estimator.t_min
-        self.t_max = score_based_potential.score_estimator.t_max
+        self.t_min = vector_field_potential.vector_field_estimator.t_min
+        self.t_max = vector_field_potential.vector_field_estimator.t_max
 
         # Extract initial moments
-        self.init_mean = score_based_potential.score_estimator.mean_t
-        self.init_std = score_based_potential.score_estimator.std_t
+        self.init_mean = vector_field_potential.vector_field_estimator.mean_base
+        self.init_std = vector_field_potential.vector_field_estimator.std_base
 
         # Extract relevant shapes from the score function
-        self.input_shape = score_based_potential.score_estimator.input_shape
-        self.condition_shape = score_based_potential.score_estimator.condition_shape
+        self.input_shape = vector_field_potential.vector_field_estimator.input_shape
+        self.condition_shape = (
+            vector_field_potential.vector_field_estimator.condition_shape
+        )
         condition_dim = len(self.condition_shape)
         # TODO: this is the iid setting and we don't want to generate num_obs samples,
         # but only one sample given the condition.
-        self.batch_shape = score_based_potential.x_o.shape[:-condition_dim]
+        self.batch_shape = vector_field_potential.x_o.shape[:-condition_dim]
 
     def set_predictor(
         self,
         predictor: Union[str, Predictor],
-        score_based_potential: 'PosteriorScoreBasedPotential',  # noqa: F821 # type: ignore
+        vector_field_potential: 'VectorFieldBasedPotential',  # noqa: F821 # type: ignore
         **kwargs,
     ):
         """Set the predictor for the diffusion-based sampler."""
         if isinstance(predictor, str):
-            self.predictor = get_predictor(predictor, score_based_potential, **kwargs)
+            self.predictor = get_predictor(predictor, vector_field_potential, **kwargs)
         else:
             self.predictor = predictor
 
