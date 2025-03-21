@@ -20,6 +20,7 @@ from sbi.inference import (
     NPE,
     NPE_A,
     NPE_C,
+    NPSE,
     NRE_A,
     NRE_B,
     NRE_C,
@@ -654,7 +655,7 @@ def test_to_method_on_potentials(device: str, potential: Union[ABC, BasePotentia
 @pytest.mark.gpu
 @pytest.mark.parametrize("device", ["cpu", "gpu"])
 @pytest.mark.parametrize(
-    "sampling_method", ["rejection", "importance", "mcmc", "direct"]
+    "sampling_method", ["rejection", "importance", "mcmc", "direct", "vi"]
 )
 def test_to_method_on_posteriors(device: str, sampling_method: str):
     """Test that the .to() method works on posteriors."""
@@ -686,3 +687,17 @@ def test_to_method_on_posteriors(device: str, sampling_method: str):
         assert str(trasnf(torch.tensor([0.0], device=device)).device).strip(
             ":0"
         ) == device.strip(":0"), "Prior transform is on the correct device."
+
+
+@pytest.mark.gpu
+@pytest.mark.parametrize("device", ["cpu", "gpu"])
+def test_ScorePosterior(device: str):
+    device = process_device(device)
+    prior = BoxUniform(torch.tensor([0, 1]), torch.tensor([1, 2]), device="cpu")
+    inference = NPSE(score_estimator="mlp", prior=prior)
+    density_estimator = inference.append_simulations(
+        torch.randn((100, 3)), torch.randn((100, 2))
+    ).train()
+    posterior = inference.build_posterior(density_estimator, prior)
+    posterior.to(device)
+    assert posterior.device == device, f"ScorePosterior is not in device {device}."
