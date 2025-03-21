@@ -65,6 +65,7 @@ class EstimatorDistribution(pyro.distributions.TorchDistribution):
         # support (e.g. `MixedDensityEstimator`). Torch constraints currently don't
         # support mixed support, and support is primarily used for choosing
         # unconstraining transforms for priors.
+        # see pytorch/pytorch#149718
         num_input_dims = len(self.event_shape)
         if num_input_dims == 0:
             # currently this branch isn't reachable by any of the estimators, but we
