@@ -12,6 +12,7 @@ from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.samplers.rejection.rejection import rejection_sample
 from sbi.sbi_types import Shape, TorchTransform
+from sbi.utils import mcmc_transform
 from sbi.utils.torchutils import ensure_theta_batched
 
 
@@ -63,11 +64,38 @@ class RejectionPosterior(NeuralPosterior):
         self.num_samples_to_find_max = num_samples_to_find_max
         self.num_iter_to_find_max = num_iter_to_find_max
         self.m = m
+        self.x_shape = x_shape
 
         self._purpose = (
             "It provides rejection sampling to .sample() from the posterior and "
             "can evaluate the _unnormalized_ posterior density with .log_prob()."
         )
+
+    def to(self, device: Union[str, torch.device]) -> None:
+        """
+        Move potential fucntion, proposal and x_o to the device.
+
+        This method reinstanciate the posterior and resets the default x_o
+
+        Args:
+            device: The device to move the posterior to.
+        """
+        self.device = device
+        self.potential_fn.to(device)
+        self.proposal.to(device)
+        if hasattr(self, "_x"):
+            x_o = self._x.to(device)
+
+        self.theta_transform = mcmc_transform(self.proposal, device=device)
+        super().__init__(
+            self.potential_fn,
+            theta_transform=self.theta_transform,
+            device=device,
+            x_shape=self.x_shape,
+        )
+        # super().__init__ erase the self._x, so we need to set it again
+        if hasattr(self, "_x"):
+            self.set_default_x(x_o)
 
     def log_prob(
         self, theta: Tensor, x: Optional[Tensor] = None, track_gradients: bool = False
