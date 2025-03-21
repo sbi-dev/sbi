@@ -265,7 +265,7 @@ class LRU(nn.Module):
         self.D = nn.Parameter(torch.randn(size=(input_dim,)))
 
         # Initialize the normalization factor.
-        gamma_log = torch.log(torch.sqrt(1 - torch.abs(self.lambda_complex) ** 2))
+        gamma_log = torch.log(torch.sqrt(1 - self.lambda_abs**2))
         self.log_gamma = nn.Parameter(gamma_log)
 
     @property

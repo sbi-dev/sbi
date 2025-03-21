@@ -342,7 +342,9 @@ def test_lru_block_isolated(
     "bidirectional", [True, False], ids=["one-directional", "bi-directional"]
 )
 @pytest.mark.parametrize("mode", ["loop", "scan"], ids=["loop", "scan"])
-@pytest.mark.parametrize("aggregate_fcn", ["last_step"], ids=["last-step"])
+@pytest.mark.parametrize(
+    "aggregate_fcn", ["last_step", "mean"], ids=["last-step", "mean"]
+)
 def test_lru_embedding_net_isolated(
     bidirectional: bool,
     mode: str,
