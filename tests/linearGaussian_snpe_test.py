@@ -8,7 +8,7 @@ import pytest
 import torch
 from scipy.stats import gaussian_kde
 from torch import eye, ones, zeros
-from torch.distributions import MultivariateNormal
+from torch.distributions import Binomial, MultivariateNormal
 
 from sbi import analysis as analysis
 from sbi import utils as utils
@@ -143,7 +143,7 @@ def test_c2st_npe_on_linearGaussian(num_dim: int, prior_str: str):
         assert ((map_ - ones(num_dim)) ** 2).sum() < 0.5
 
 
-@pytest.mark.slow
+# @pytest.mark.slow
 @pytest.mark.parametrize(
     "density_estimator",
     ["made", "mdn", "maf", "maf_rqs", "nsf", "zuko_maf", "zuko_nsf"],
@@ -254,7 +254,7 @@ def test_c2st_npe_on_linearGaussian_different_dims(density_estimator="maf"):
 
 
 # Test multi-round NPE.
-@pytest.mark.slow
+# @pytest.mark.slow
 @pytest.mark.parametrize(
     "method_str",
     (
@@ -379,7 +379,7 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str):
 
 
 # Testing rejection and mcmc sampling methods.
-@pytest.mark.slow
+# @pytest.mark.slow
 @pytest.mark.parametrize(
     "sample_with, mcmc_method, prior_str",
     (
@@ -488,7 +488,7 @@ def test_api_force_first_round_loss(
         proposal = posterior
 
 
-@pytest.mark.slow
+# @pytest.mark.slow
 @pytest.mark.mcmc
 def test_sample_conditional(mcmc_params_accurate: dict):
     """
@@ -709,7 +709,7 @@ def test_example_posterior(npe_method: type):
     assert posterior is not None
 
 
-@pytest.mark.slow
+# @pytest.mark.slow
 def test_multiround_mog_training():
     "Test whether multi-round training with MDNs is stable. See #669."
 
@@ -730,3 +730,88 @@ def test_multiround_mog_training():
         _ = inference.append_simulations(theta, x, proposal=proposal).train()
         posterior = inference.build_posterior().set_default_x(x_o)
         proposal = posterior
+
+
+def test_bimodal_posterior_npe():
+    import matplotlib.pyplot as plt
+
+    dim = 2
+
+    mean_prior = 1 * torch.ones(dim)
+    cov_prior = torch.eye(dim)
+    prior = MultivariateNormal(
+        loc=mean_prior, precision_matrix=cov_prior
+    )  # N((10, 10), Id)
+
+    sig_lik = torch.tensor([0.1])
+
+    def simulator(theta):
+        # likelihood
+        # 0.5 N(theta, sig^2 Id) + 0.5 N(-theta, sig^2 Id)
+
+        weights = (
+            Binomial(total_count=1, probs=torch.tensor([0.5]))
+            .sample((theta.size(0),))
+            .to(bool)
+            .squeeze()
+        )
+
+        x = torch.zeros_like(theta)
+        eps = torch.randn_like(theta)
+
+        x[weights, :] = theta[weights, :] + sig_lik * eps[weights, :]
+        x[not weights, :] = -theta[not weights, :] + sig_lik * eps[not weights, :]
+        return x
+
+    theta_0 = prior.sample().unsqueeze(0)
+    x_0 = simulator(theta_0)
+
+    inference = NPE_C(prior, density_estimator="mdn")
+
+    theta = prior.sample((5000,))
+    x = simulator(theta)
+    # plt.scatter(x[:,0], x[:,1])
+    # plt.show()
+    _ = inference.append_simulations(theta, x, proposal=prior).train()
+    posterior = inference.build_posterior().set_default_x(x_0)
+    posterior_samples = posterior.sample((10000,))
+
+    def true_posterior(x):
+        # posterior
+        # 0.5 N(x/(sig^2+1), sig^2/(sig^2+1)Id) + 0.5 N(-x/(sig^2+1), sig^2/(sig^2+1)Id)
+
+        weights = (
+            Binomial(total_count=1, probs=torch.tensor([0.5]))
+            .sample((x.size(0),))
+            .to(bool)
+            .squeeze()
+        )
+
+        theta = torch.zeros_like(x)
+        eps = torch.randn_like(x)
+
+        theta[weights, :] = (
+            1.0 / (sig_lik**2 + 1) * x[weights, :]
+            + sig_lik / torch.sqrt(sig_lik**2 + 1) * eps[weights, :]
+        )
+        theta[not weights, :] = (
+            -1.0 / (sig_lik**2 + 1) * x[not weights, :]
+            + sig_lik / torch.sqrt(sig_lik**2 + 1) * eps[not weights, :]
+        )
+        return theta
+
+    true_samples = true_posterior(x_0.repeat(10000, 1))
+
+    plt.scatter(
+        posterior_samples[:, 0], posterior_samples[:, 1], alpha=0.5, s=10, label="simu"
+    )
+    plt.scatter(true_samples[:, 0], true_samples[:, 1], alpha=0.5, s=10, label="true")
+    plt.scatter(x_0[0, 0], x_0[0, 1], color="red", label="x_0")
+    plt.xlabel("X-axis")
+    plt.ylabel("Y-axis")
+    plt.title("Bimodal posterior")
+    plt.grid()
+    plt.legend()
+    plt.show()
+
+    check_c2st(posterior_samples, true_samples, alg="npe")
