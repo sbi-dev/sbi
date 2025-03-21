@@ -4,7 +4,6 @@
 import pytest
 import torch
 from pytest_harvest import ResultsBag
-
 from sbi.inference import FMPE, NLE, NPE, NPSE, NRE
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.trainers.npe import NPE_C

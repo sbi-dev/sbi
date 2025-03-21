@@ -7,8 +7,9 @@ from typing import Tuple
 
 import pytest
 import torch
-
 from sbi.neural_nets.embedding_nets import CNNEmbedding
+from sbi.neural_nets.estimators.score_estimator import (
+    ConditionalScoreEstimator, VPScoreEstimator)
 from sbi.neural_nets.net_builders import build_score_estimator
 
 
@@ -144,3 +145,41 @@ def _build_score_estimator_and_tensors(
     )
     condition = condition
     return score_estimator, inputs, condition
+
+
+def test_times_schedule():
+    id_net = torch.nn.Identity()
+    inpt_shape = (4,)
+    cond_shape = (4,)
+
+    with pytest.raises(NotImplementedError):
+        ConditionalScoreEstimator(id_net, inpt_shape, cond_shape)
+
+    vpse = VPScoreEstimator(id_net, inpt_shape, cond_shape)
+    exp = vpse.device
+    times = vpse.times_schedule(10)
+    obs = times.device
+
+    assert exp == obs
+    assert times.shape == torch.Size((10,))
+
+    assert times[0, ...] >= vpse.t_min
+    assert times[-1, ...] <= vpse.t_max
+
+
+def test_noise_schedule():
+    id_net = torch.nn.Identity()
+    inpt_shape = (4,)
+    cond_shape = (4,)
+
+    vpse = VPScoreEstimator(id_net, inpt_shape, cond_shape)
+    exp = vpse.device
+    times = vpse.times_schedule(10)
+    noise = vpse.noise_schedule(times)
+    obs = noise.device
+
+    assert exp == obs
+    assert noise.shape == torch.Size((10,))
+
+    assert noise[0, ...] >= vpse.beta_min
+    assert noise[-1, ...] <= vpse.beta_max

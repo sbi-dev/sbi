@@ -13,9 +13,7 @@ from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi import utils as utils
 from sbi.inference import NeuralInference
-from sbi.inference.posteriors import (
-    DirectPosterior,
-)
+from sbi.inference.posteriors import DirectPosterior
 from sbi.inference.posteriors.score_posterior import ScorePosterior
 from sbi.neural_nets.estimators.score_estimator import ConditionalScoreEstimator
 from sbi.neural_nets.factory import posterior_score_nn
@@ -304,9 +302,14 @@ class NPSE(NeuralInference):
         self._neural_net.to(self._device)
 
         if isinstance(validation_times, int):
-            validation_times = torch.linspace(
-                self._neural_net.t_min, self._neural_net.t_max, validation_times
-            )
+            if hasattr(self._neural_net, "times_schedule"):
+                validation_times = self._neural_net.times_schedule(validation_times)
+            else:
+                validation_times = torch.linspace(
+                    self._neural_net.t_min,
+                    self._neural_net.t_max,
+                    steps=validation_times,
+                )
         assert isinstance(
             validation_times, Tensor
         )  # let pyright know validation_times is a Tensor.
