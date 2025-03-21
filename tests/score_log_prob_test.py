@@ -79,7 +79,6 @@ def test_score_fn_log_prob(num_dims, iid_batch_size):
     true_prob = true_posterior.log_prob(proposal_samples)
 
     ess = _compute_ess(recovered_prob, true_prob)
-    print(ess)
     assert ess > num_posterior_samples / 2, (
         f"Effective sample size : {ess} too low \
             for number of samples {num_posterior_samples}"
