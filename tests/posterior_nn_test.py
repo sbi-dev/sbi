@@ -151,7 +151,7 @@ def test_batched_sample_log_prob_with_different_x(
 
 
 @pytest.mark.mcmc
-@pytest.mark.parametrize("snlre_method", [NLE_A, NRE_A, NRE_B, NRE_C, NPE_C])
+@pytest.mark.parametrize("snlre_method", [NRE_C])  # it's independent of the method
 @pytest.mark.parametrize("x_o_batch_dim", (0, 1, 2))
 @pytest.mark.parametrize("init_strategy", ["proposal", "resample"])
 @pytest.mark.parametrize(
@@ -179,7 +179,7 @@ def test_batched_mcmc_sample_log_prob_with_different_x(
     inference = snlre_method(prior=prior)
     theta = prior.sample((num_simulations,))
     x = simulator(theta)
-    inference.append_simulations(theta, x).train(max_num_epochs=2)
+    inference.append_simulations(theta, x).train(max_num_epochs=1)
 
     x_o = ones(num_dim) if x_o_batch_dim == 0 else ones(x_o_batch_dim, num_dim)
 

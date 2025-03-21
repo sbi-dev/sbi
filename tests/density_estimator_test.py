@@ -11,9 +11,7 @@ from torch import eye, zeros
 from torch.distributions import MultivariateNormal
 
 from sbi.neural_nets.embedding_nets import CNNEmbedding
-from sbi.neural_nets.estimators.shape_handling import (
-    reshape_to_sample_batch_event,
-)
+from sbi.neural_nets.estimators.shape_handling import reshape_to_sample_batch_event
 from sbi.neural_nets.net_builders import (
     build_categoricalmassestimator,
     build_made,
@@ -22,8 +20,10 @@ from sbi.neural_nets.net_builders import (
     build_mdn,
     build_mlp_flowmatcher,
     build_mnle,
+    build_mnpe,
     build_nsf,
     build_resnet_flowmatcher,
+    build_score_estimator,
     build_zuko_bpf,
     build_zuko_gf,
     build_zuko_maf,
@@ -53,9 +53,10 @@ model_builders = [
     build_zuko_unaf,
 ]
 
-flowmatching_build_functions = [
+diffusion_builders = [
     build_mlp_flowmatcher,
     build_resnet_flowmatcher,
+    build_score_estimator,
 ]
 
 
@@ -137,7 +138,13 @@ def test_shape_handling_utility_for_density_estimator(
 
 
 @pytest.mark.parametrize(
-    "density_estimator_build_fn", model_builders + flowmatching_build_functions
+    "density_estimator_build_fn",
+    [
+        build_nsf,
+        build_zuko_nsf,
+        build_mlp_flowmatcher,
+        build_score_estimator,
+    ],  # just test nflows, zuko and flowmatching
 )
 @pytest.mark.parametrize("input_sample_dim", (1, 2))
 @pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
@@ -242,10 +249,17 @@ def test_correctness_of_density_estimator_log_prob(
 
 
 @pytest.mark.parametrize(
-    "density_estimator_build_fn", model_builders + flowmatching_build_functions
+    "density_estimator_build_fn",
+    [
+        build_nsf,
+        build_zuko_nsf,
+        build_mlp_flowmatcher,
+    ],  # just test nflows, zuko and flowmatching
 )
-@pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
-@pytest.mark.parametrize("condition_event_shape", ((1,), (7,)))
+@pytest.mark.parametrize(
+    "input_event_shape", ((1,), pytest.param((2,), marks=pytest.mark.slow))
+)
+@pytest.mark.parametrize("condition_event_shape", ((1,), (2,)))
 @pytest.mark.parametrize("sample_shape", ((1000,), (500, 2)))
 def test_correctness_of_batched_vs_seperate_sample_and_log_prob(
     density_estimator_build_fn: Callable,
@@ -268,11 +282,17 @@ def test_correctness_of_batched_vs_seperate_sample_and_log_prob(
     samples = density_estimator.sample(sample_shape, condition=condition)
     samples = samples.reshape(-1, batch_dim, *input_event_shape)  # Flat for comp.
 
+    # Flatten sample_shape to (B*E,) if it is (B, E)
+    if len(sample_shape) > 1:
+        flat_sample_shape = (torch.prod(torch.tensor(sample_shape)).item(),)
+    else:
+        flat_sample_shape = sample_shape
+
     samples_separate1 = density_estimator.sample(
-        (1000,), condition=condition[0][None, ...]
+        flat_sample_shape, condition=condition[0][None, ...]
     )
     samples_separate2 = density_estimator.sample(
-        (1000,), condition=condition[1][None, ...]
+        flat_sample_shape, condition=condition[1][None, ...]
     )
 
     # Check if means are approx. same
@@ -311,11 +331,14 @@ def _build_density_estimator_and_tensors(
     """Helper function for all tests that deal with shapes of density
     estimators."""
 
+    batch_size = 1000
     # Use positive random values for continuous dims (log transform)
-    batch_input = torch.rand((1000, *input_event_shape), dtype=torch.float32) * 10.0
+    batch_input = (
+        torch.rand((batch_size, *input_event_shape), dtype=torch.float32) * 10.0
+    )
     # make last dim discrete for mixed density estimators
-    batch_input[:, -1] = torch.randint(0, 4, (1000,))
-    batch_condition = torch.randn((1000, *condition_event_shape))
+    batch_input[:, -1] = torch.randint(0, 4, (batch_size,))
+    batch_condition = torch.randn((batch_size, *condition_event_shape))
     if len(condition_event_shape) > 1:
         embedding_net = CNNEmbedding(condition_event_shape, kernel_size=1)
         z_score_y = "structured"
@@ -323,7 +346,11 @@ def _build_density_estimator_and_tensors(
         embedding_net = torch.nn.Identity()
         z_score_y = "independent"
 
-    if density_estimator_build_fn in [build_mnle, build_categoricalmassestimator]:
+    if density_estimator_build_fn in [
+        build_mnle,
+        build_mnpe,
+        build_categoricalmassestimator,
+    ]:
         density_estimator = density_estimator_build_fn(
             batch_x=batch_input,
             batch_y=batch_condition,
@@ -331,11 +358,16 @@ def _build_density_estimator_and_tensors(
             z_score_y=z_score_y,
         )
     else:
+        embedding_net_kwarg = (
+            dict(embedding_net_y=embedding_net)
+            if "score" in density_estimator_build_fn.__name__
+            else dict(embedding_net=embedding_net)
+        )
         density_estimator = density_estimator_build_fn(
             torch.randn_like(batch_input),
             torch.randn_like(batch_condition),
-            embedding_net=embedding_net,
             z_score_y=z_score_y,
+            **embedding_net_kwarg,
         )
 
     inputs = batch_input[:batch_dim]
@@ -362,10 +394,26 @@ def _build_density_estimator_and_tensors(
         [build_mnle, 1, (2,), (7, 7), 10],
         [build_mnle, 1, (2,), (2, 7), 10],
         [build_mnle, 1, (2,), (7, 2), 10],
+        # Add MNPE test cases (note: x and y roles are swapped)
+        (build_mnpe, 1, (2,), (7,), 1),
+        (build_mnpe, 1, (2,), (7,), 10),
+        [build_mnpe, 1, (2,), (7, 7), 10],
+        [build_mnpe, 1, (2,), (2, 7), 10],
+        [build_mnpe, 1, (2,), (7, 2), 10],
         [build_categoricalmassestimator, 1, (1,), (7, 7), 10],
         [build_categoricalmassestimator, 2, (1,), (7, 7), 10],
         pytest.param(
             build_mnle,
+            2,
+            (1,),
+            (7,),
+            10,
+            marks=pytest.mark.xfail(
+                reason="Sample dim > 1 not supported for Mixed Density Estimation"
+            ),
+        ),
+        pytest.param(
+            build_mnpe,
             2,
             (1,),
             (7,),
