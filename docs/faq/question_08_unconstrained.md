@@ -1,4 +1,4 @@
-# The inference gets stuck?
+# What if almost all posterior samples lie outside the prior bounds for some conditionals?
 
 If you've encountered the following warning:
 
@@ -28,9 +28,9 @@ Instead of standardizing parameters using z-scoring, you can use the logit trans
 - For NLE/NRE (Neural Likelihood Estimation / Neural Ratio Estimation): A rough density approximation over data boundaries is needed, making the process more complex.
 
 
-### How to apply the logit transformation
+### What do I do if my data is highly nonlinear?
 
-To enable logit transformation when defining your density estimator, use:
+Therefore, you can enable the logit transformation when defining your density estimator, use:
 
 ```
 density_estimator_build_fun = posterior_nn(

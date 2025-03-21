@@ -10,7 +10,6 @@ from typing import (
     Callable,
     Dict,
     List,
-    Literal,
     Optional,
     Sequence,
     Tuple,
@@ -112,17 +111,6 @@ def clamp_and_warn(name: str, value: float, min_val: float, max_val: float) -> f
     return clamped_val
 
 
-ZScoreType = Union[
-    Literal[
-        "independent",
-        "structured",
-        "logit",
-        "none",
-    ],
-    None,
-]
-
-
 def z_score_parser(z_score_flag: Optional[str]) -> Tuple[bool, bool]:
     """Parses string z-score flag into booleans.
 
@@ -155,14 +143,15 @@ def z_score_parser(z_score_flag: Optional[str]) -> Tuple[bool, bool]:
         # Got one of two valid z-scoring methods.
         z_score_bool = True
         structured_data = z_score_flag == "structured"
-    elif z_score_flag == "logit":
-        # Do not z-score if logit transform. Logit is not estimated from data,
-        # but from the prior bounds, so structured/indpendent does not matter.
+    elif z_score_flag == "transform_to_unconstrained":
+        # Dependent on the distribution, the biject_to function
+        # will provide e.g., a logit, exponential of z-scored distribution.
         z_score_bool, structured_data = False, False
     else:
         # Return warning due to invalid option, defaults to not z-scoring.
         raise ValueError(
-            "Invalid z-scoring option. Use 'none', 'independent', or 'structured'."
+            "Invalid z-scoring option. Use 'none', 'independent'"
+            "'structured' or 'transform_to_unconstrained."
         )
 
     return z_score_bool, structured_data
@@ -236,14 +225,14 @@ def biject_transform_zuko(
     transform,
 ) -> zuko.flows.UnconditionalTransform:
     """
-    Builds logit-transforming transform for Zuko flows on a bounded interval.
+    Wraps a pytorch transform in a Zuko unconditional transfrom on a bounded interval.
 
     Args:
-        transform: A logit transformation for the given support.
-        eps: Small constant to avoid numerical issues at 0 and 1.
+        transform: a bijective transformation for Zuko, depending on the input
+        (e.g., logit, exponential or z-scored)
 
     Returns:
-        Logit transformation for the given range.
+        Zuko bijective transformation
     """
     return zuko.flows.UnconditionalTransform(
         CallableTransform(transform),

@@ -408,11 +408,29 @@ def test_kde(bandwidth, transform, sample_weights):
 
 @pytest.mark.parametrize(
     "z_x",
-    [True, False, None, "none", "independent", "structured", "logit", "invalid_value"],
+    [
+        True,
+        False,
+        None,
+        "none",
+        "independent",
+        "structured",
+        "transform_to_unconstrained",
+        "invalid_value",
+    ],
 )
 @pytest.mark.parametrize(
     "z_theta",
-    [True, False, None, "none", "independent", "structured", "logit", "invalid_value"],
+    [
+        True,
+        False,
+        None,
+        "none",
+        "independent",
+        "structured",
+        "transform_to_unconstrained",
+        "invalid_value",
+    ],
 )
 def test_z_score_parser(z_x, z_theta):
     if z_theta == "invalid_value":
@@ -432,10 +450,28 @@ def test_z_score_parser(z_x, z_theta):
 
 
 @pytest.mark.parametrize(
-    "z_x", [True, False, None, "none", "independent", "structured", "logit"]
+    "z_x",
+    [
+        True,
+        False,
+        None,
+        "none",
+        "independent",
+        "structured",
+        "transform_to_unconstrained",
+    ],
 )
 @pytest.mark.parametrize(
-    "z_theta", [True, False, None, "none", "independent", "structured", "logit"]
+    "z_theta",
+    [
+        True,
+        False,
+        None,
+        "none",
+        "independent",
+        "structured",
+        "transform_to_unconstrained",
+    ],
 )
 @pytest.mark.parametrize("builder", [likelihood_nn, posterior_nn, classifier_nn])
 def test_z_scoring_structured(z_x, z_theta, builder):
@@ -448,9 +484,7 @@ def test_z_scoring_structured(z_x, z_theta, builder):
     t_batch = torch.stack([(x_sin * (i + 1)) + (i * 2) for i in range(10)])
 
     num_dim = t_batch.shape[1]
-    x_dist = BoxUniform(
-        low=-2 * torch.ones(num_dim), high=2 * torch.ones(num_dim)
-    )  # Normal(0, 1) if (z_x == "logit" or z_theta == "logit") else None
+    x_dist = BoxUniform(low=-2 * torch.ones(num_dim), high=2 * torch.ones(num_dim))
 
     # API tests
     # TODO: Test breaks at "mnle"
