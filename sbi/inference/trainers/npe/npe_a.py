@@ -27,6 +27,8 @@ from sbi.utils.torchutils import BoxUniform, assert_all_finite, atleast_2d
 
 
 class NPE_A(PosteriorEstimator):
+    r"""Neural Posterior Estimation algorithm (NPE-A) as in Papamakarios et al. (2016)."""
+
     def __init__(
         self,
         prior: Optional[Distribution] = None,
@@ -568,9 +570,9 @@ class NPE_A_MDN(ConditionalDensityEstimator):
             Mixture components of the posterior.
         """
         # Remove the batch dimension of `x` (SNPE-A always has a single `x`).
-        assert x.shape[0] == 1, (
-            f"Batchsize of `x_o` == {x.shape[0]}. SNPE-A only supports a single `x_o`."
-        )
+        assert (
+            x.shape[0] == 1
+        ), f"Batchsize of `x_o` == {x.shape[0]}. SNPE-A only supports a single `x_o`."
         x = x.squeeze(dim=0)
 
         # Evaluate the density estimator.

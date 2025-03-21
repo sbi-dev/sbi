@@ -11,6 +11,8 @@ from sbi.utils.sbiutils import del_entries
 
 
 class NLE_A(LikelihoodEstimator):
+    """Neural Likelihood Estimation algorithm (NLE) as in Papamakarios et al. (2019)."""
+
     def __init__(
         self,
         prior: Optional[Distribution] = None,

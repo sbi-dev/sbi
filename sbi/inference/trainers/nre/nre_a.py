@@ -14,6 +14,8 @@ from sbi.utils.torchutils import assert_all_finite
 
 
 class NRE_A(RatioEstimator):
+    """Neural Ratio Estimation algorithm (NRE-A) as in Hermans et al. (2020)."""
+
     def __init__(
         self,
         prior: Optional[Distribution] = None,

@@ -14,6 +14,8 @@ from sbi.utils.sbiutils import del_entries
 
 
 class NPE_B(PosteriorEstimator):
+    """Neural Posterior Estimation algorithm (NPE-B) as in Lueckmann et al. (2017)."""
+
     def __init__(
         self,
         prior: Optional[Distribution] = None,

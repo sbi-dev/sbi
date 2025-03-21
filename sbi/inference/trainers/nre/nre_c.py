@@ -14,6 +14,9 @@ from sbi.utils.torchutils import assert_all_finite
 
 
 class NRE_C(RatioEstimator):
+    r"""Neural Ratio Estimation (NRE-C) algorithm, generalized non-sequential (amortized) version of
+    NRE-A and NRE-B.."""
+
     def __init__(
         self,
         prior: Optional[Distribution] = None,

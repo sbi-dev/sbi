@@ -29,6 +29,8 @@ from sbi.utils.torchutils import BoxUniform, assert_all_finite
 
 
 class NPE_C(PosteriorEstimator):
+    """Neural Posterior Estimation algorithm (NPE-C) as in Greenberg et al. (2019)."""
+
     def __init__(
         self,
         prior: Optional[Distribution] = None,
