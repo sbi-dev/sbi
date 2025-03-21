@@ -82,7 +82,7 @@ class RatioBasedPotential(BasePotential):
         self.device = device
         self.ratio_estimator.to(device)
         self.prior.to(device)
-        if self._x_o:
+        if self._x_o is not None:
             self._x_o = self._x_o.to(device)
 
     def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:

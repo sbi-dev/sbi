@@ -93,7 +93,7 @@ class PosteriorScoreBasedPotential(BasePotential):
         self.score_estimator.to(device)
         if self.prior:
             self.prior.to(device)
-        if self._x_o:
+        if self._x_o is not None:
             self._x_o = self._x_o.to(device)
 
     def set_x(

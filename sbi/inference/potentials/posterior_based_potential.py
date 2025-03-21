@@ -95,9 +95,9 @@ class PosteriorBasedPotential(BasePotential):
 
         self.device = device
         self.posterior_estimator.to(device)
-        if self.prior:
+        if self.prior is not None:
             self.prior.to(device)
-        if self._x_o:
+        if self._x_o is not None:
             self._x_o = self._x_o.to(device)
 
     def set_x(self, x_o: Optional[Tensor], x_is_iid: Optional[bool] = False):

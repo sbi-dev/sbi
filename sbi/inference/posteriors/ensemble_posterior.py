@@ -458,7 +458,7 @@ class EnsemblePotential(BasePotential):
             self.potential_fns[i].to(device)
         self._weights = self._weights.to(device)
         self.prior.to(device)
-        if self._x_o:
+        if self._x_o is not None:
             self._x_o = self._x_o.to(device)
 
     def allow_iid_x(self) -> bool:

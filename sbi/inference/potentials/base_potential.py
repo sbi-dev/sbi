@@ -127,7 +127,7 @@ class CustomPotentialWrapper(BasePotential):
         self.device = device
         if self.prior:
             self.prior.to(device)
-        if self._x_o:
+        if self._x_o is not None:
             self._x_o = self._x_o.to(device)
         super().__init__(self.prior, self._x_o, device)
 
