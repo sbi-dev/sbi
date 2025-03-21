@@ -1,3 +1,4 @@
+import warnings
 from math import sqrt
 from typing import Callable, Optional, Tuple
 
@@ -66,7 +67,6 @@ class LRUEmbedding(nn.Module):
                 inputs of each LRU Block, see `LRUBlock.forward()`.
             aggregate_fcn: Function to aggregate the sequence of hidden states. Can be
                 `"last_step"` to take the last hidden state, `"mean"` to take the mean
-
         """
         super().__init__()
 
@@ -233,6 +233,13 @@ class LRU(nn.Module):
             )
         if mode not in ("loop", "scan"):
             raise ValueError(f"Invalid {mode=}. Must be 'loop' or 'scan'.")
+        if mode == "scan":
+            warnings.warn(
+                "The scan mode currently does not support a backward pass, "
+                "the code will be updated once this is pytorch native",
+                stacklevel=2,
+            )
+
         self.state_dim = state_dim
         self.bidirectional = bidirectional
         self.mode = mode
