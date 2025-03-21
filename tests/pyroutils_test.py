@@ -293,6 +293,7 @@ def test_estimator_distribution_basic_properties(
     assert estimator_dist_expanded.estimator == estimator_dist.estimator
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("num_subjects", [1])  # unused, required by fixture
 @pytest.mark.parametrize("num_samples", [1_000])
 @pytest.mark.parametrize("warmup_steps", [500])
@@ -354,6 +355,7 @@ def test_pyro_gaussian_model(
     )
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("num_dim", [1])  # unused, required by fixture
 @pytest.mark.parametrize("num_samples", [1_000])
 @pytest.mark.parametrize("warmup_steps", [500])
