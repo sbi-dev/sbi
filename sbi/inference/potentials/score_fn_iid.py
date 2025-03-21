@@ -140,7 +140,7 @@ class FactorizedNPEScoreFunction(IIDScoreFunction):
     ) -> None:
         r"""
         The FactorizedNPEScoreFunction implments the
-        "Factorized Neural Posterior Estimation"method for score-based models [1].
+        "Factorized Neural Posterior Estimation" method for score-based models [1].
 
         This method does not apply the necessary corrections for the score function, but
         instead uses a simple weighting of the prior score. This is generally applicable
