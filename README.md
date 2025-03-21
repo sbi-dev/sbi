@@ -70,6 +70,24 @@ If `conda` is installed on the system, an environment for installing `sbi` can b
 conda create -n sbi_env python=3.10 && conda activate sbi_env
 ```
 
+If you are using [`uv`](http://docs.astral.sh/uv/), set up a virtual environment by running:
+
+```bash
+uv venv
+```
+
+Then from `sbi` folder activate the virtual enviroment by running:
+
+- For `macOS` or `Linux` users
+  ```bash
+  source .venv/bin/activate
+  ```
+
+- For `Windows` users
+  ```bash
+  .venv\Scripts\activate
+  ```
+
 ### From PyPI
 
 To install `sbi` from PyPI run

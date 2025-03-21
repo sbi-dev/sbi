@@ -72,6 +72,23 @@ development on `sbi` as per:
 conda create -n sbi_dev python=3.10
 conda activate sbi_dev
 ```
+If you are using [`uv`](http://docs.astral.sh/uv/), set up a virtual environment by running:
+
+```bash
+uv venv
+```
+
+Then from `sbi` folder activate the virtual enviroment by running:
+
+- For `macOS` or `Linux` users
+  ```bash
+  source .venv/bin/activate
+  ```
+
+- For `Windows` users
+  ```bash
+  .venv\Scripts\activate
+  ```
 
 **Step 5**: Install `sbi` in editable mode with
 
@@ -86,6 +103,12 @@ to the `sbi` source code will be reflected the next time you open a Python inter
 and `import sbi` (the `-e` flag of pip stands for an “editable” installation,
 and the `dev` flag installs development and testing dependencies). This requires
 at least Python 3.8.
+
+If you are using [`uv`](http://docs.astral.sh/uv/) you can install the development dependencies using:
+
+```bash
+uv pip install -e ".[dev]"
+```
 
 **Step 6**: Add the upstream remote. This saves a reference to the main `sbi`
 repository, which you can use to keep your repository synchronized with the latest
@@ -109,6 +132,13 @@ upstream        git@github.com:sbi-dev/sbi.git (push)
 
 ```bash
 pip install pre-commit
+pre-commit install
+```
+
+If you are using [`uv`](http://docs.astral.sh/uv/):
+
+```bash
+uv pip install pre-commit
 pre-commit install
 ```
 
@@ -278,6 +308,12 @@ improvements of the documentation, you should first  install the `doc` dependenc
 
 ```bash
 pip install -e ".[doc]"
+```
+
+If you are using [`uv`](http://docs.astral.sh/uv/) you can install the documentation dependencies using:
+
+```bash
+uv pip install -e ".[doc]"
 ```
 
 Then, you can build the website locally by executing in the `mkdocs` folder

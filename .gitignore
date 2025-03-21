@@ -7,6 +7,7 @@
 /*.pyc
 /*.egg
 /*.egg-info
+.venv
 
 # Notebook checkpoints
 .ipynb_checkpoints
