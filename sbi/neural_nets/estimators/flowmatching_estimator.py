@@ -18,10 +18,9 @@ class FlowMatchingEstimator(ConditionalDensityEstimator):
         net: VectorFieldNet,
         input_shape: torch.Size,
         condition_shape: torch.Size,
-        embedding_net: Optional[nn.Module] = None,
-        num_freqs: int = 3,  # This is ignored and will be removed in PR #1501
-        noise_scale: float = 1e-3,
-        zscore_transform_input=None,  # This is ignored and will be removed in PR #1501
+        embedding_net: nn.Module,
+        zscore_transform_input: Optional[Transform] = None,
+        num_freqs: int = 3,
         **kwargs,
     ) -> None:
         r"""Creates a vector field estimator for Flow Matching.
@@ -43,11 +42,15 @@ class FlowMatchingEstimator(ConditionalDensityEstimator):
             net=net, input_shape=input_shape, condition_shape=condition_shape
         )
 
-        self.num_freqs = num_freqs  # This will be removed in PR #1501
-        self.noise_scale = noise_scale
-        self._embedding_net = (
-            embedding_net if embedding_net is not None else nn.Identity()
-        )
+        # Identity transform for z-scoring the input
+        if zscore_transform_input is None:
+            zscore_transform_input = zuko.transforms.IdentityTransform()
+        self.zscore_transform_input: Transform = zscore_transform_input
+        self._embedding_net = embedding_net
+
+        self.register_buffer("freqs", torch.arange(1, num_freqs + 1) * math.pi)
+        self.register_buffer('zeros', torch.zeros(input_shape))
+        self.register_buffer('ones', torch.ones(input_shape))
 
     @property
     def embedding_net(self):
@@ -98,12 +101,11 @@ class FlowMatchingEstimator(ConditionalDensityEstimator):
         times_ = times[..., None]
 
         # sample from probability path at time t
-        # TODO: Change to notation from Lipman et al. or Tong et al.
-        theta_1 = torch.randn_like(input)
-        theta_t = (1 - times_) * input + (times_ + self.noise_scale) * theta_1
+        epsilon = torch.randn_like(input)
+        theta_prime = (1 - t_) * epsilon + t_ * input
 
         # compute vector field at the sampled time steps
-        vector_field = theta_1 - input
+        vector_field = input - epsilon
 
         # compute the mean squared error between the vector fields
         return torch.mean(
