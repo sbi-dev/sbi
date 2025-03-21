@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from typing import Callable
+from typing import Any, Callable, Dict
 
 import torch.nn as nn
 from torch import Tensor
@@ -57,8 +57,44 @@ class NeuralODE(LazyDistribution):
         self.t_max = t_max
         self.mean_base = mean_base
         self.std_base = std_base
-        self.kwargs = kwargs
+        self.params: Dict[str, Any] = kwargs
+
+    def update_params(self, **kwargs) -> None:
+        """
+        Update the parameters of the ODE solver.
+
+        Args:
+            **kwargs: Keyword arguments for the ODE solver.
+        """
+        self.params.update(kwargs)
+
+    def forward(self, condition: Tensor, **kwargs) -> Distribution:
+        """
+        Forward pass of the NeuralODE.
+
+        Args:
+            condition: The condition tensor.
+            **kwargs: Additional arguments for the ODE solver.
+
+        Returns:
+            The distribution object with `log_prob` and
+            `sample` methods.
+        """
+        ode_kwargs = self.params.copy()
+        ode_kwargs.update(kwargs)
+        return self.get_distribution(condition, **ode_kwargs)
 
     @abstractmethod
-    def forward(self, condition: Tensor, **kwargs) -> Distribution:
+    def get_distribution(self, condition: Tensor, **kwargs) -> Distribution:
+        """
+        Get the distribution object with `log_prob` and
+        `sample` methods.
+
+        Args:
+            condition: The condition tensor.
+            **kwargs: Additional arguments for the ODE solver.
+
+        Raises:
+            NotImplementedError: This method should be implemented by the subclasses.
+        """
         pass

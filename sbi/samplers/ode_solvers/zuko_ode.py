@@ -1,4 +1,6 @@
-from typing import Any, Dict
+"""
+Zuko ODE solver.
+"""
 
 import torch.nn as nn
 from torch import Tensor
@@ -59,24 +61,29 @@ class ZukoNeuralODE(NeuralODE):
             std_base,
             t_min,
             t_max,
+            atol=atol,
+            rtol=rtol,
+            exact=exact,
         )
 
-        self.atol = atol
-        self.rtol = rtol
-        self.exact = exact
+    def get_distribution(self, condition: Tensor, **kwargs) -> Distribution:
+        """
+        Get the distribution that wraps the ODE solver.
 
-    def forward(self, condition: Tensor, **kwargs) -> Distribution:
-        ode_kwargs: Dict[str, Any] = dict(
-            atol=self.atol, rtol=self.rtol, exact=self.exact
-        )
-        ode_kwargs.update(kwargs)
+        Args:
+            condition: The condition tensor.
+            **kwargs: Additional arguments for the ODE solver.
 
+        Returns:
+            The distribution object with `log_prob` and
+            `sample` methods that wraps the ODE solver.
+        """
         transform = FreeFormJacobianTransform(
             f=lambda t, input: self.f(input, condition, t),
             t0=condition.new_tensor(self.t_min),
             t1=condition.new_tensor(self.t_max),
             phi=(condition, *self.net.parameters()),
-            **ode_kwargs,
+            **kwargs,
         )
 
         return NormalizingFlow(
