@@ -1,7 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Any, Callable, Tuple
+from typing import Any, Callable, Tuple, Union
 
 import pyro.distributions
 import torch
@@ -187,3 +187,38 @@ class RatioEstimatorDistribution(EstimatorDistribution):
         # condition, we only need to expand the condition
         condition = self.condition.expand(*batch_shape, *self.estimator.theta_shape)
         return RatioEstimatorDistribution(self.estimator, condition)
+
+
+def to_pyro_distribution(
+    estimator: Union[ConditionalDensityEstimator, RatioEstimator],
+    condition: torch.Tensor,
+) -> EstimatorDistribution:
+    """Wrap a supported `sbi` estimator as a Pyro distribution.
+
+    Args:
+        estimator: A trained `sbi` estimator. Either a `ConditionalDensityEstimator` or
+        a `RatioEstimator`.
+        condition: The conditioning parameter for the estimator.
+
+    Returns:
+        A Pyro distribution wrapping the estimator.
+
+    Raises:
+        ValueError: If `estimator` is not a `ConditionalDensityEstimator` or
+        `RatioEstimator`.
+
+    Note:
+        If `estimator` input has discrete or mixed support (e.g.
+        `MixedDensityEstimator`), then the resulting distribution is only suitable as a
+        likelihood in a Pyro model. Only distributions with continuous support may be
+        used as priors in a Pyro model.
+    """
+    if isinstance(estimator, ConditionalDensityEstimator):
+        return ConditionalDensityEstimatorDistribution(estimator, condition)
+    elif isinstance(estimator, RatioEstimator):
+        return RatioEstimatorDistribution(estimator, condition)
+    else:
+        raise ValueError(
+            f"Unsupported estimator type: {type(estimator)}. "
+            "Supported types are ConditionalDensityEstimator and RatioEstimator."
+        )

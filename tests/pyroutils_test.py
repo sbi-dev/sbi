@@ -14,6 +14,7 @@ from sbi.utils.pyroutils import (
     ConditionalDensityEstimatorDistribution,
     RatioEstimatorDistribution,
     get_transforms,
+    to_pyro_distribution,
 )
 from tests.test_utils import check_c2st
 
@@ -187,6 +188,35 @@ def test_unbounded_transform():
 
     assert to_unbounded(prior(1000)).max() > 1.0
     assert to_bounded(to_unbounded(prior(1000))).max() < 1.0
+
+
+@pytest.mark.parametrize(
+    "trainer_cls, distribution_cls",
+    [
+        (NLE, ConditionalDensityEstimatorDistribution),
+        (NPE, ConditionalDensityEstimatorDistribution),
+        (None, None),
+    ],
+)
+def test_to_pyro_distribution(
+    trainer_cls, distribution_cls, num_simulations=100, num_dim=2
+):
+    """Test that to_pyro_distribution correctly wraps a trained estimator."""
+    prior = torch.distributions.MultivariateNormal(
+        loc=torch.zeros(num_dim), covariance_matrix=torch.diag(torch.ones(num_dim))
+    )
+    theta = prior.sample(torch.Size([num_simulations]))
+
+    if trainer_cls is None:
+        with pytest.raises(ValueError):
+            to_pyro_distribution(None, theta)
+    else:
+        x = torch.distributions.Normal(theta, 1.0).sample()
+        trainer = trainer_cls(prior=prior).append_simulations(theta=theta, x=x)
+        density_estimator = trainer.train()
+        estimator_dist = to_pyro_distribution(density_estimator, theta)
+        assert isinstance(estimator_dist, distribution_cls)
+        assert torch.equal(estimator_dist.condition, theta)
 
 
 @pytest.mark.parametrize("num_dim", [2, 5])
