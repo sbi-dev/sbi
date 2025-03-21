@@ -274,9 +274,9 @@ def vector_field_trained_model(vector_field_type, prior_type):
 
     # likelihood_mean will be likelihood_shift+theta
     likelihood_shift = -1.0 * ones(num_dim)
-    # The likelihood covariance is increased to make the iid inference easier
-    # (otherwise the posterior gets too tight and the c2st is too high).
-    # However, it doesn't save FMPE in some settings.
+    # The likelihood covariance is increased to make the iid inference easier,
+    # (otherwise the posterior gets too tight and the c2st is too high),
+    # but it doesn't really improve the results for both FMPE and NPSE.
     likelihood_cov = 0.9 * eye(num_dim)
 
     if prior_type == "gaussian" or (prior_type is None):
@@ -348,10 +348,10 @@ def test_vector_field_sde_ode_sampling_equivalence(vector_field_trained_model):
     )
 
 
-# TODO: Currently, c2st is too high for FMPE with >= 8 number of observations,
-# so some tests fail so far. It is unclear at the moment whether this is due to
-# some issues with the implementation or it is simply the case with
-# flow matching (compositional flow matching hasn't been tested yet elsewhere).
+# TODO: Currently, c2st is too high for FMPE (e.g., > 3 number of observations),
+# so some tests are skipped so far. It is unclear at the moment whether this is due to
+# some issues with the implementation, the nn architecture, or it is simply the case
+# with flow matching (compositional flow matching hasn't been tested yet elsewhere).
 @pytest.mark.slow
 @pytest.mark.parametrize(
     "iid_method, num_trial",
