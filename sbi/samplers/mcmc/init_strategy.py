@@ -109,6 +109,6 @@ def resample_given_potential_fn(
         probs[torch.isinf(probs)] = 0.0
         probs /= probs.sum()
 
-        idxs = torch.multinomial(probs, 1, replacement=False)
+        idxs = torch.multinomial(probs, 1, replacement=False).cpu()
         # Return transformed sample.
         return transform(init_param_candidates[idxs, :])  # type: ignore

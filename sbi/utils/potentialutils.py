@@ -42,7 +42,9 @@ def transformed_potential(
     log_abs_det = theta_transform.log_abs_det_jacobian(theta, transformed_theta)
 
     posterior_potential = potential_fn(theta, track_gradients=track_gradients)
-    posterior_potential_transformed = posterior_potential - log_abs_det
+    posterior_potential_transformed = posterior_potential.to(device) - log_abs_det.to(
+        device
+    )
     return posterior_potential_transformed
 
 

@@ -103,6 +103,8 @@ class VIPosterior(NeuralPosterior):
 
         # Especially the prior may be on another device -> move it...
         self._device = device
+        self.theta_transform = theta_transform
+        self.x_shape = x_shape
         self.potential_fn.device = device
         move_all_tensor_to_device(self.potential_fn, device)
 
@@ -137,6 +139,33 @@ class VIPosterior(NeuralPosterior):
             "It provides Variational inference to .sample() from the posterior and "
             "can evaluate the _normalized_ posterior density with .log_prob()."
         )
+
+    def to(self, device: Union[str, torch.device]) -> None:
+        """
+        Move potential_fn, _prior and x_o to device, and change the device attribute.
+
+        Reinstanciates the posterior and re sets the default x.
+
+        Args:
+            device: The device to move the posterior to.
+        """
+        self.device = device
+        self.potential_fn.to(device)
+        self._prior.to(device)
+        if self._x is not None:
+            x_o = self._x.to(device)
+        self.theta_transform = mcmc_transform(self._prior, device=device)
+        super().__init__(
+            self.potential_fn, self.theta_transform, device, x_shape=self.x_shape
+        )
+        # super().__init__ erase the self._x, so we need to set it again
+        if self._x is not None:
+            self.set_default_x(x_o)
+
+        if self.theta_transform is None:
+            self.link_transform = mcmc_transform(self._prior).inv
+        else:
+            self.link_transform = self.theta_transform.inv
 
     @property
     def q(self) -> Distribution:
