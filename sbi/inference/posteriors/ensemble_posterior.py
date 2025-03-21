@@ -11,7 +11,7 @@ from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.inference.potentials.posterior_based_potential import PosteriorBasedPotential
 from sbi.sbi_types import Shape, TorchTransform
-from sbi.utils.sbiutils import gradient_ascent
+from sbi.utils.sbiutils import gradient_ascent, mcmc_transform
 from sbi.utils.torchutils import ensure_theta_batched
 from sbi.utils.user_input_checks import process_x
 
@@ -53,6 +53,7 @@ class EnsemblePosterior(NeuralPosterior):
         theta_transform: If passed, this transformation will be applied during the
                 optimization performed when obtaining the map. It does not affect the
                 `.sample()` and `.log_prob()` methods.
+        device: device to host the posterior distribution.
     """
 
     def __init__(
@@ -60,6 +61,7 @@ class EnsemblePosterior(NeuralPosterior):
         posteriors: List,
         weights: Optional[Union[List[float], Tensor]] = None,
         theta_transform: Optional[TorchTransform] = None,
+        device: Optional[Union[str, torch.device]] = None,
     ):
         r"""
         Args:
@@ -77,11 +79,34 @@ class EnsemblePosterior(NeuralPosterior):
         self.theta_transform = theta_transform
         # Take first prior as reference
         self.prior = posteriors[0].potential_fn.prior
+        self.device = device
 
-        device = self.ensure_same_device(posteriors)
+        if self.device is None:
+            self.device = self.ensure_same_device(posteriors)
 
+        self._build_potential_fns()
+
+    def to(self, device: Union[str, torch.device]) -> None:
+        """Moves each posterior to device.
+
+        Prior and weights are also moved to
+        the specified device.
+
+        Args:
+            device: The device to move the ensemble posterior to.
+        """
+        self.device = device
+        self._device = device
+        for i in range(len(self.posteriors)):
+            self.posteriors[i].to(device)
+        self.prior.to(device)
+        self.theta_transform = mcmc_transform(self.prior, device=device)
+        self._weights.to(device)
+        self._build_potential_fns()
+
+    def _build_potential_fns(self):
         potential_fns = []
-        for posterior in posteriors:
+        for posterior in self.posteriors:
             potential = posterior.potential_fn
             potential_fns.append(potential)
             # make sure all prior are the same
@@ -94,8 +119,8 @@ class EnsemblePosterior(NeuralPosterior):
 
         super().__init__(
             potential_fn=potential_fn,
-            theta_transform=theta_transform,
-            device=device,
+            theta_transform=self.theta_transform,
+            device=self.device,
         )
 
     def ensure_same_device(self, posteriors: List) -> str:
@@ -418,6 +443,23 @@ class EnsemblePotential(BasePotential):
         self._weights = weights
         self.potential_fns = potential_fns
         super().__init__(prior, x_o, device)
+
+    def to(self, device):
+        """
+        Moves the ensemble potentials, the prior, the weights and x_o to
+
+        the specified device.
+
+        Args:
+            device: The device to move the ensemble potential to.
+        """
+        self.device = device
+        for i in range(len(self.potential_fns)):
+            self.potential_fns[i].to(device)
+        self._weights = self._weights.to(device)
+        self.prior.to(device)
+        if self._x_o:
+            self._x_o = self._x_o.to(device)
 
     def allow_iid_x(self) -> bool:
         # in case there is different kinds of posteriors, this will produce an error
