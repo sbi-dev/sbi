@@ -2,7 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, Literal, Optional, Union
 
 from torch import nn
 
@@ -461,7 +461,7 @@ def posterior_score_nn(
 
 
 def marginal_nn(
-    model: str,
+    model: Literal["bpf", "maf", "naf", "ncsf", "nsf", "sospf", "unaf"],
     z_score_x: Optional[str] = "independent",
     hidden_features: int = 50,
     num_transforms: int = 5,
@@ -515,6 +515,6 @@ def marginal_nn(
     )
 
     def build_fn(batch_x):
-        return build_zuko_unconditional_flow(which_nf=model, batch_x=batch_x)
+        return build_zuko_unconditional_flow(which_nf=model.upper(), batch_x=batch_x)
 
     return build_fn
