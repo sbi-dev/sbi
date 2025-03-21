@@ -143,12 +143,13 @@ def test_c2st_npe_on_linearGaussian(num_dim: int, prior_str: str):
         assert ((map_ - ones(num_dim)) ** 2).sum() < 0.5
 
 
-# @pytest.mark.slow
+@pytest.mark.slow
+@pytest.mark.parametrize("npe_method", [NPE_B, NPE_C])
 @pytest.mark.parametrize(
     "density_estimator",
     ["made", "mdn", "maf", "maf_rqs", "nsf", "zuko_maf", "zuko_nsf"],
 )
-def test_density_estimators_on_linearGaussian(density_estimator):
+def test_density_estimators_on_linearGaussian(npe_method: type, density_estimator):
     """Test NPE B/C with different density estimators on linear Gaussian example."""
 
     theta_dim = 4
@@ -174,7 +175,7 @@ def test_density_estimators_on_linearGaussian(density_estimator):
     def simulator(theta):
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    inference = NPE_B(prior, density_estimator=density_estimator)
+    inference = npe_method(prior, density_estimator=density_estimator)
 
     theta = prior.sample((num_simulations,))
     x = simulator(theta)
@@ -254,7 +255,7 @@ def test_c2st_npe_on_linearGaussian_different_dims(density_estimator="maf"):
 
 
 # Test multi-round NPE.
-# @pytest.mark.slow
+@pytest.mark.slow
 @pytest.mark.parametrize(
     "method_str",
     (
@@ -379,7 +380,7 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str):
 
 
 # Testing rejection and mcmc sampling methods.
-# @pytest.mark.slow
+@pytest.mark.slow
 @pytest.mark.parametrize(
     "sample_with, mcmc_method, prior_str",
     (
@@ -488,7 +489,7 @@ def test_api_force_first_round_loss(
         proposal = posterior
 
 
-# @pytest.mark.slow
+@pytest.mark.slow
 @pytest.mark.mcmc
 def test_sample_conditional(mcmc_params_accurate: dict):
     """
@@ -709,7 +710,7 @@ def test_example_posterior(npe_method: type):
     assert posterior is not None
 
 
-# @pytest.mark.slow
+@pytest.mark.slow
 def test_multiround_mog_training():
     "Test whether multi-round training with MDNs is stable. See #669."
 
