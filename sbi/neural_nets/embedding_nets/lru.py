@@ -27,7 +27,7 @@ class LRUEmbedding(nn.Module):
         state_dim: int = 20,
         hidden_dim: int = 40,
         num_blocks: int = 2,
-        r_min=0.0,
+        r_min : float=0.0,
         r_max=1.0,
         phase_max=2 * np.pi,
         bidirectional: bool = True,
