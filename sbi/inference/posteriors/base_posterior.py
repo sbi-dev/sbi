@@ -194,8 +194,8 @@ class NeuralPosterior:
             raise ValueError
 
         return gradient_ascent(
-            potential_fn=self.potential_fn.to("cpu"),
-            inits=inits.cpu(),
+            potential_fn=self.potential_fn,
+            inits=inits,
             theta_transform=self.theta_transform,
             num_iter=num_iter,
             num_to_optimize=num_to_optimize,
