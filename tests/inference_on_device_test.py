@@ -15,7 +15,9 @@ from torch.distributions import MultivariateNormal
 
 from sbi import utils as utils
 from sbi.inference import (
+    ABC,
     NLE,
+    NPE,
     NPE_A,
     NPE_C,
     NRE_A,
@@ -25,9 +27,16 @@ from sbi.inference import (
     likelihood_estimator_based_potential,
     ratio_estimator_based_potential,
 )
+from sbi.inference.posteriors.ensemble_posterior import (
+    EnsemblePotential,
+)
 from sbi.inference.posteriors.importance_posterior import ImportanceSamplingPosterior
 from sbi.inference.posteriors.mcmc_posterior import MCMCPosterior
 from sbi.inference.potentials.base_potential import BasePotential
+from sbi.inference.potentials.likelihood_based_potential import LikelihoodBasedPotential
+from sbi.inference.potentials.posterior_based_potential import PosteriorBasedPotential
+from sbi.inference.potentials.ratio_based_potential import RatioBasedPotential
+from sbi.inference.potentials.score_fn_iid import GaussCorrectedScoreFn
 from sbi.neural_nets.embedding_nets import FCEmbedding
 from sbi.neural_nets.factory import (
     classifier_nn,
@@ -491,7 +500,21 @@ def test_multiround_mdn_training_on_device(method: Union[NPE_A, NPE_C], device: 
 
 @pytest.mark.gpu
 @pytest.mark.parametrize("device", ["cpu", "gpu"])
-def test_conditioned_posterior_on_gpu(device: str, mcmc_params_fast: dict):
+@pytest.mark.parametrize("device_inference", ["cpu", "gpu"])
+def test_conditioned_posterior_on_gpu(
+    device: str, mcmc_params_fast: dict, device_inference: str
+):
+    """Test that training and sampling device can be interchanged
+
+    for comditional posteriors.
+
+    Args:
+        device: device for trainig
+        mcmc_params_fast: dictionary for mcmc posterior
+        device_inference: device for inference
+
+    """
+
     device = process_device(device)
     num_dims = 3
 
@@ -518,7 +541,9 @@ def test_conditioned_posterior_on_gpu(device: str, mcmc_params_fast: dict):
     )
     prior_transform = utils.mcmc_transform(prior, device=device)
 
-    potential_fn, _ = likelihood_estimator_based_potential(estimator, proposal, x_o)
+    potential_fn, prior_transform = likelihood_estimator_based_potential(
+        estimator, proposal, x_o
+    )
     conditioned_potential_fn = potential_fn.condition_on_theta(
         condition_o, dims_global_theta=[0, 1]
     )
@@ -530,6 +555,134 @@ def test_conditioned_posterior_on_gpu(device: str, mcmc_params_fast: dict):
         device=device,
         **mcmc_params_fast,
     ).set_default_x(x_o)
-    samples = conditional_posterior.sample((1,), x=x_o)
+
+    device_inference = process_device(device_inference)
+    conditional_posterior.to(device_inference)
+    samples = conditional_posterior.sample((1,), x=x_o.to(device_inference))
+    assert str(samples.device).strip(":0") == device_inference.strip(":0"), (
+        "Samples are not on the correct device"
+    )
     conditional_posterior.potential_fn(samples)
-    conditional_posterior.map()
+    map_ = conditional_posterior.map()
+    assert str(map_.device).strip(":0") == device_inference.strip(":0"), (
+        "MAP is not on the correct device"
+    )
+
+
+@pytest.mark.gpu
+@pytest.mark.parametrize("device", ["cpu", "gpu"])
+@pytest.mark.parametrize("device_inference", ["cpu", "gpu"])
+def test_direct_posterior_on_gpu(device: str, device_inference: str):
+    """Test that training and sampling device can be interchanged.
+
+    Args:
+        device: device to train the model on.
+        device_inference: device to run the inference on.
+    """
+    device = process_device(device)
+    num_dims = 3
+
+    prior = BoxUniform(
+        low=-torch.ones(num_dims, device=device),
+        high=torch.ones(num_dims, device=device),
+    )
+    x_o = torch.zeros(1, num_dims).to(device)
+
+    inference = NPE()
+    estimator = inference.append_simulations(
+        torch.randn((100, num_dims)), torch.randn((100, num_dims))
+    ).train(max_num_epochs=1)
+    posterior = inference.build_posterior(
+        density_estimator=estimator, prior=prior, sample_with="direct"
+    )
+    posterior.set_default_x(x_o)
+
+    device_inference = process_device(device_inference)
+    posterior.to(device_inference)
+    sample = posterior.sample((1,), x=x_o.to(device_inference))
+    assert str(sample.device).strip(":0") == device_inference.strip(":0"), (
+        "Samples are not on the correct device."
+    )
+
+
+@pytest.mark.gpu
+@pytest.mark.parametrize("device", ["cpu", "gpu"])
+@pytest.mark.parametrize(
+    "potential",
+    [
+        LikelihoodBasedPotential,
+        PosteriorBasedPotential,
+        RatioBasedPotential,
+        EnsemblePotential,
+        GaussCorrectedScoreFn,
+    ],
+)
+def test_to_method_on_potentials(device: str, potential: Union[ABC, BasePotential]):
+    """Test to method on potential"""
+
+    device = process_device(device)
+    prior = BoxUniform(torch.tensor([1.0]), torch.tensor([1.0]))
+    inference = NPE()
+    estimator = inference.append_simulations(
+        torch.randn((100, 3)), torch.randn((100, 2))
+    ).train()
+
+    x_o = torch.tensor([0.1]).to(device)
+    if potential == EnsemblePotential:
+        potential_fn = potential(
+            [
+                RatioBasedPotential(estimator, prior),
+                PosteriorBasedPotential(estimator, prior),
+            ],
+            prior=prior,
+            x_o=x_o,
+            weights=torch.tensor([0.1, 0.9]),
+        )
+    else:
+        potential_fn = potential(estimator, prior)
+    potential_fn.to(device)
+
+    assert str(potential_fn.device).strip(":0") == device.strip(":0"), (
+        "Device attribute of potential_fn is not correct"
+    )
+    if hasattr("potential", "prior"):
+        assert str(potential_fn).strip(":0").prior == device.strip(":0"), (
+            "Device attribute of potential_fn.prior is not vcorrect"
+        )
+
+
+@pytest.mark.gpu
+@pytest.mark.parametrize("device", ["cpu", "gpu"])
+@pytest.mark.parametrize(
+    "sampling_method", ["rejection", "importance", "mcmc", "direct"]
+)
+def test_to_method_on_posteriors(device: str, sampling_method: str):
+    """Test that the .to() method works on posteriors."""
+    device = process_device(device)
+    prior = BoxUniform(torch.tensor([0.0]), torch.tensor([1.0]))
+    inference = NPE()
+    estimator = inference.append_simulations(
+        torch.randn((100, 3)), torch.randn((100, 2))
+    ).train(max_num_epochs=1)
+    x_o = torch.zeros(1, 1).to(device)
+    if sampling_method == "rejection":
+        posterior = inference.build_posterior(
+            density_estimator=estimator,
+            prior=prior,
+            rejection_sampling_parameters={"proposal": prior},
+            sample_with=sampling_method,
+        )
+    else:
+        posterior = inference.build_posterior(
+            density_estimator=estimator, prior=prior, sample_with=sampling_method
+        )
+    posterior.set_default_x(x_o)
+    posterior.to(device)
+    assert (posterior.device).strip(":0") == device.strip(":0"), (
+        ".to() should change the device attribute"
+    )
+
+    for trasnf in posterior.theta_transform._inv.base_transform.parts:
+        assert str(trasnf(torch.tensor([0.0], device=device)).device).strip(
+            ":0"
+        ) == device.strip(":0"), "Prior transform is on the correct device."
