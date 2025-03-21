@@ -1028,16 +1028,17 @@ def build_zuko_flow(
             - `structured`: treat dimensions as related, therefore compute mean and std
             over the entire batch, instead of per-dimension. Should be used when each
             sample is, for example, a time series or an image.
-            - `logit`: Applies logit transformation, if bounds from `x_dist` are given.
+            - `transform_to_unconstrained`: Transforms to
+            an unbound space, if bounds from `x_dist` are given.
         z_score_y: Whether to z-score ys passing into the network, same options as
             z_score_x.
         hidden_features: The number of hidden features in the flow. Defaults to 50.
         num_transforms: The number of transformations in the flow. Defaults to 5.
         embedding_net: The embedding network to use. Defaults to nn.Identity().
-        x_dist: The distribution over x, used to determine the bounds for the logit
-            transformation. x_dist is typically the prior for NPE. For NLE/NRE,
-            it might be some rough bounded distribution over the data provided
-            additionally by the user.
+        x_dist: The distribution over x, used to determine the bounds for the
+        unconstrained transformation. x_dist is typically the prior for NPE.
+        For NLE/NRE, it might be some rough bounded distribution over the
+        data provided additionally by the user.
         **kwargs: Additional keyword arguments to pass to the flow constructor.
 
     Returns:
@@ -1076,18 +1077,22 @@ def build_zuko_flow(
 
         z_score_x_bool, structured_x = z_score_parser(z_score_x)
 
-        # Only x (i.e., prior for NPE) can be logit transformed (not y)
+        # Only x (i.e., prior for NPE) can be transformed to unbound space (not y)
         # when x_dist is provided.
-        if z_score_x == "logit" and x_dist is not None and hasattr(x_dist, "support"):
-            logit_transform = mcmc_transform(x_dist)
+        if (
+            z_score_x == "transform_to_unconstrained"
+            and x_dist is not None
+            and hasattr(x_dist, "support")
+        ):
+            transform_to_unconstrained = mcmc_transform(x_dist)
             transform = (
-                biject_transform_zuko(logit_transform),
+                biject_transform_zuko(transform_to_unconstrained),
                 transform,
             )
-        elif z_score_x == "logit" and x_dist is None:
+        elif z_score_x == "transform_to_unconstrained" and x_dist is None:
             raise ValueError(
-                "Logit transformation requires a distribution provided through `x_dist`"
-                "with supported bounds (see `mcmc_transform`).",
+                "Transformation to unconstrained space requires a distribution"
+                "provided through `x_dist`",
             )
         elif z_score_x_bool:
             transform = (
@@ -1109,16 +1114,20 @@ def build_zuko_flow(
 
         z_score_x_bool, structured_x = z_score_parser(z_score_x)
 
-        if z_score_x == "logit" and x_dist is not None and hasattr(x_dist, "support"):
-            logit_transform = mcmc_transform(x_dist)
+        if (
+            z_score_x == "transform_to_unconstrained"
+            and x_dist is not None
+            and hasattr(x_dist, "support")
+        ):
+            transform_to_unconstrained = mcmc_transform(x_dist)
             transforms = (
-                biject_transform_zuko(logit_transform),
+                biject_transform_zuko(transform_to_unconstrained),
                 *transforms,
             )
-        elif z_score_x == "logit" and x_dist is None:
+        elif z_score_x == "transform_to_unconstrained" and x_dist is None:
             raise ValueError(
-                "Logit transformation requires a distribution provided through `x_dist`"
-                "with supported bounds (see `mcmc_transform`).",
+                "Transformation to unconstrained space requires a distribution"
+                "provided through `x_dist`",
             )
         elif z_score_x_bool:
             transforms = (

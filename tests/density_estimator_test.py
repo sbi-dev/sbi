@@ -8,7 +8,7 @@ from typing import Callable, Tuple
 import pytest
 import torch
 from torch import eye, zeros
-from torch.distributions import MultivariateNormal
+from torch.distributions import HalfNormal, MultivariateNormal
 
 from sbi.neural_nets.embedding_nets import CNNEmbedding
 from sbi.neural_nets.estimators.shape_handling import reshape_to_sample_batch_event
@@ -468,75 +468,61 @@ def test_mixed_density_estimator(
     assert samples.shape == (*sample_shape, batch_dim, *input_event_shape)
 
 
-def test_build_zuko_flow_logit():
+@pytest.mark.parametrize(
+    "distributions",
+    [
+        BoxUniform(low=-2 * torch.ones(5), high=2 * torch.ones(5)),
+        HalfNormal(scale=torch.ones(1) * 2),
+        MultivariateNormal(loc=zeros(5), covariance_matrix=eye(5)),
+    ],
+)
+def test_build_zuko_flow_unconstrained(distributions):
+    # input dimension is 5
     batch_x = torch.randn(10, 5)
     batch_y = torch.randn(10, 3)
-    num_dim = 5
-    x_dist = BoxUniform(
-        low=-2 * torch.ones(num_dim), high=2 * torch.ones(num_dim)
-    )  # Define a bounded distribution
 
     # Test case where x_dist is provided (should not raise an error)
-    try:
-        flow = build_zuko_flow(
-            which_nf="MAF",
-            batch_x=batch_x,
-            batch_y=batch_y,
-            z_score_x="logit",
-            z_score_y="logit",
-            x_dist=x_dist,
-        )
-        assert isinstance(flow, ZukoFlow)
-        print(
-            "Test passed: build_zuko_flow works with logit transformation"
-            "when x_dist is provided."
-        )
-    except Exception as e:
-        raise AssertionError(f"Test failed with exception: {e}") from e
+    flow = build_zuko_flow(
+        which_nf="MAF",
+        batch_x=batch_x,
+        batch_y=batch_y,
+        z_score_x="transform_to_unconstrained",
+        z_score_y="transform_to_unconstrained",
+        x_dist=distributions,
+    )
+    assert isinstance(flow, ZukoFlow)
 
     # Test to cover CNF
-    try:
-        flow = build_zuko_flow(
-            which_nf="CNF",
-            batch_x=batch_x,
-            batch_y=batch_y,
-            z_score_x="logit",
-            z_score_y="logit",
-            x_dist=x_dist,
-        )
-        assert isinstance(flow, ZukoFlow)
-        print(
-            "Test passed: build_zuko_flow works with logit transformation"
-            "when x_dist is provided."
-        )
-    except Exception as e:
-        raise AssertionError(f"Test failed with exception: {e}") from e
+    flow = build_zuko_flow(
+        which_nf="CNF",
+        batch_x=batch_x,
+        batch_y=batch_y,
+        z_score_x="transform_to_unconstrained",
+        z_score_y="transform_to_unconstrained",
+        x_dist=distributions,
+    )
+    assert isinstance(flow, ZukoFlow)
 
     # Test case where x_dist is missing (should raise ValueError)
     with pytest.raises(
         ValueError,
-        match="Logit transformation requires a distribution provided through `x_dist`",
+        match=r".*distribution.*x_dist.*",
     ):
         build_zuko_flow(
             which_nf="MAF",
             batch_x=batch_x,
             batch_y=batch_y,
-            z_score_x="logit",
-            z_score_y="logit",
+            z_score_x="transform_to_unconstrained",
+            z_score_y="transform_to_unconstrained",
             x_dist=None,  # No distribution provided
         )
-        print("Test passed: ValueError raised when x_dist is missing.")
 
-    with pytest.raises(
-        ValueError,
-        match="Logit transformation requires a distribution provided through `x_dist`",
-    ):
+    with pytest.raises(ValueError, match=r".*distribution.*x_dist.*"):
         build_zuko_flow(
             which_nf="CNF",
             batch_x=batch_x,
             batch_y=batch_y,
-            z_score_x="logit",
-            z_score_y="logit",
+            z_score_x="transform_to_unconstrained",
+            z_score_y="transform_to_unconstrained",
             x_dist=None,  # No distribution provided
         )
-        print("Test passed: ValueError raised when x_dist is missing.")
