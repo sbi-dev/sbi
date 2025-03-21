@@ -4,6 +4,8 @@
 # https://github.com/mackelab/labproject/blob/main/labproject/metrics/MMD_torch.py
 
 
+import warnings
+
 import torch
 import torch.nn as nn
 
@@ -116,15 +118,16 @@ def calc_misspecification_mmd(
                 "inference should not be None if mode is 'embedding'."
                 "please provide an sbi inference object"
             )
-        if not hasattr(inference, '_neural_net'):
+        if not hasattr(inference, "_neural_net"):
             raise ValueError(
                 "no neural net found,"
                 "neural_net should not be None when mode is 'embedding'"
             )
         if isinstance(inference._neural_net.embedding_net, nn.modules.linear.Identity):
-            raise Warning(
+            warnings.warn(
                 "The embedding net might be the identity function,"
-                "in that case the MMD is computed in the x-space."
+                "in that case the MMD is computed in the x-space.",
+                stacklevel=2,
             )
         z_obs = inference._neural_net.embedding_net(x_obs).detach()
         z = inference._neural_net.embedding_net(x).detach()
