@@ -145,8 +145,7 @@ class VectorFieldPosterior(NeuralPosterior):
             iid_params: Additional parameters passed to the iid method. See the specific
                 `IIDScoreFunction` child class for details.
             max_sampling_batch_size: Maximum batch size for sampling.
-            sample_with: Deprecated - use `.build_posterior(sample_with=...)` prior to
-                `.sample()`.
+            sample_with: Sampling method to use - 'ode' or 'sde'.
             show_progress_bars: Whether to show a progress bar during sampling.
         """
 
@@ -189,6 +188,10 @@ class VectorFieldPosterior(NeuralPosterior):
                 max_sampling_batch_size=max_sampling_batch_size,
                 proposal_sampling_kwargs=proposal_sampling_kwargs,
             )[0]
+        else:
+            raise ValueError(
+                f"Expected sample_with to be 'ode' or 'sde', but got {sample_with}."
+            )
 
         samples = samples.reshape(
             sample_shape + self.vector_field_estimator.input_shape
