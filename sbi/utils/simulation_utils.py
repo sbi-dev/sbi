@@ -79,7 +79,7 @@ def simulate_for_sbi(
             # The batch size will be an approximation, since np.array_split does
             # not take as argument the size of the batch but their total.
             num_batches = num_simulations // simulation_batch_size
-            batches = np.array_split(theta.numpy(), num_batches, axis=0)
+            batches = np.array_split(theta.cpu().numpy(), num_batches, axis=0)
             batch_seeds = np.random.randint(low=0, high=1_000_000, size=(len(batches),))
 
             # define seeded simulator.

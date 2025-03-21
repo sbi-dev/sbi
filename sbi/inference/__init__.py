@@ -17,7 +17,7 @@ _nle_family = ["NLE"]
 SNPE_A = NPE_A
 SNPE_B = NPE_B
 SNPE = APT = SNPE_C = NPE = NPE_C
-_npe_family = ["NPE_A", "NPE_C"]
+_npe_family = ["NPE_A", "NPE_B", "NPE_C"]
 
 
 SRE = SNRE = SNRE_B = NRE = NRE_B

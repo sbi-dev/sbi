@@ -36,6 +36,7 @@ from sbi.utils.sbiutils import (
 from sbi.utils.torchutils import (
     BoxUniform,
     assert_all_finite,
+    assert_not_nan_or_plus_inf,
     cbrt,
     create_alternating_binary_mask,
     create_mid_split_binary_mask,
