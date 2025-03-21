@@ -470,6 +470,7 @@ def test_scan(
         state_dim=state_dim,
         hidden_dim=hidden_dim,
         num_blocks=1,
+        bidirectional=False,
     )
     x = torch.randn(batch_size, sequence_len, hidden_dim) * 0.1
     init_state = torch.zeros(batch_size, state_dim)
@@ -485,6 +486,7 @@ def test_scan(
         state_dim=state_dim,
         hidden_dim=hidden_dim,
         num_blocks=1,
+        bidirectional=False,
     )
     x = torch.randn(batch_size, sequence_len, hidden_dim) * 0.1
     init_state = torch.randn(batch_size, state_dim)

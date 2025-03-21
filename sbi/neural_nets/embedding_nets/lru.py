@@ -339,8 +339,7 @@ class LRU(nn.Module):
             input: Sequential data of shape (batch_size, sequence_length,
                 input_dim)
             state: Initial hidden complex state of the LRU of shape
-                ((batch_size, sequence_length, state_dim),
-                 (batch_size, sequence_length, state_dim)).
+                (batch_size, state_dim)
         Return:
             Transformed sequential data of shape (batch_size, sequence_length,
                 input_dim)
@@ -395,8 +394,7 @@ class LRU(nn.Module):
             input: Sequential data of shape (batch_size, sequence_length,
                 input_dim)
             state: Initial hidden complex state of the LRU of shape
-                ((batch_size, sequence_length, state_dim),
-                 (batch_size, sequence_length, state_dim)).
+                (batch_size , state_dim).
 
         Return:
             Transformed sequential data of shape (batch_size, sequence_length,
