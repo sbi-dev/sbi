@@ -7,11 +7,16 @@ import pytest
 import torch
 import torch.distributions as dist
 
-from sbi.diagnostics.misspecification import calc_misspecification_mmd
+from sbi.diagnostics.misspecification import (
+    calc_misspecification_mmd,
+    log_prob_hypothesis_test,
+)
 from sbi.inference import NPE
+from sbi.inference.trainers.marginal import MarginalTrainer
 from sbi.neural_nets import posterior_nn
 from sbi.neural_nets.embedding_nets import FCEmbedding
 from sbi.utils.sbiutils import seed_all_backends
+from tests.test_utils import check_c2st
 
 seed = 2025
 
@@ -150,6 +155,84 @@ def test_mmd_x_emedding(D: int, N: int):
         x=x_val,
         mode="embedding",
     )
+    # check p_vals
+    assert p_val_well > 0.05, (
+        f"Expected large p_val for well-specified data, obtained {p_val_well}"
+    )
+    assert p_val_mis < 0.05, (
+        f"Expected small p_val for misspecified data, obtained {p_val_mis}"
+    )
+
+
+@pytest.mark.parametrize("D, N", ((2, 1000),))
+@pytest.mark.slow
+def test_marginal_log_prob_x_space(D: int, N: int):
+    """log prob in x-space on Gaussian data.
+    Args:
+        D: observation and parameter dimension
+        N: number of samples
+    """
+
+    # true prior -- the observation comes from here
+    mean_true = torch.zeros(D)
+    cov_true = torch.eye(D)
+    prior_true = dist.MultivariateNormal(loc=mean_true, covariance_matrix=cov_true)
+
+    # misspecified prior
+    offset = 4
+    prior_mis = dist.MultivariateNormal(
+        loc=mean_true + offset, covariance_matrix=cov_true
+    )
+
+    def simulator(theta):
+        return theta + torch.randn_like(theta)
+
+    # validation set to compute MMD distribution in the
+    # well-specified case
+    # this could just be a subset of the training data
+    num_validations_mmd = 1000
+    theta_val = prior_true.sample((num_validations_mmd,))
+    x_val = simulator(theta_val)
+
+    # generate observations from the well and the misspecified model
+    # do inference given observed data
+    num_observations = 1
+    theta_o = prior_true.sample((num_observations,))
+    x_o = simulator(theta_o)
+    theta_o_mis = prior_mis.sample((num_observations,))
+    x_o_mis = simulator(theta_o_mis)
+
+    # fit the marginal
+    num_training_marginal = 1000
+    theta_train = prior_true.sample((num_training_marginal,))
+    x_train = simulator(theta_train)
+
+    # Instantiate a trainer for the marginal pdf and train it
+    trainer = MarginalTrainer(density_estimator='NSF')
+    print(f"Training marginal q(x) on {x_train.shape[0]} samples...")
+    trainer.append_samples(x_train)
+    est = trainer.train(max_num_epochs=3000)
+
+    # Sample from the approximate marginal pdf estimator q(x)
+    n_samples = 1_000
+    samples = est.sample((n_samples,))
+
+    # Compute and check the C2ST score
+    check_c2st(x_val, samples, 'MarginalEstimator')
+
+    # perform tests for misspecification
+    log_probs_train = est.log_prob(x_train).detach()
+    log_prob_xo = est.log_prob(x_o).detach().item()
+    log_prob_xo_mis = est.log_prob(x_o_mis).detach().item()
+
+    # 1. well specified model
+    p_val_well, reject_H0_well = log_prob_hypothesis_test(log_probs_train, log_prob_xo)
+
+    # 2. misspecified model
+    p_val_mis, reject_H0_mis = log_prob_hypothesis_test(
+        log_probs_train, log_prob_xo_mis
+    )
+
     # check p_vals
     assert p_val_well > 0.05, (
         f"Expected large p_val for well-specified data, obtained {p_val_well}"
