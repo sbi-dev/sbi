@@ -1,7 +1,7 @@
 import functools
 import math
 from abc import ABC, abstractmethod
-from typing import Callable, Optional, Type
+from typing import Callable, Optional, Type, Union
 
 import torch
 from torch import Tensor
@@ -83,6 +83,20 @@ class IIDScoreFunction(ABC):
 
         self.score_estimator = score_estimator.to(device).eval()
         self.prior = prior
+
+    def to(self, device: Union[str, torch.device]) -> None:
+        """
+        It moves score_estimator and prior to the given device.
+
+        It also sets the device attribute to the given device.
+
+        Args:
+            device: Device to move the score_estimator and prior to.
+        """
+        self.device = device
+        self.score_estimator.to(device)
+        if self.prior:
+            self.prior.to(device)
 
     @abstractmethod
     def __call__(
