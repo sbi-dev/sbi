@@ -1,4 +1,7 @@
-from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
+from sbi.neural_nets.estimators.base import (
+    ConditionalDensityEstimator,
+    UnconditionalDensityEstimator,
+)
 from sbi.neural_nets.estimators.categorical_net import (
     CategoricalMADE,
     CategoricalMassEstimator,
