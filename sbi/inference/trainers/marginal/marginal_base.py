@@ -29,7 +29,7 @@ class MarginalTrainer:
         self,
         density_estimator: Union[
             Literal["bpf", "maf", "naf", "ncsf", "nsf", "sospf", "unaf"],
-            Callable[[Tensor], torch.nn.Module],
+            Callable[[Tensor], UnconditionalDensityEstimator],
         ] = "nsf",
         device: str = "cpu",
         summary_writer: Optional[SummaryWriter] = None,
