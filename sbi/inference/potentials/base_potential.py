@@ -2,7 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from abc import ABCMeta, abstractmethod
-from typing import Optional, Protocol
+from typing import Optional, Protocol, Union
 
 import torch
 from torch import Tensor
@@ -114,6 +114,22 @@ class CustomPotentialWrapper(BasePotential):
         super().__init__(prior, x_o, device)
 
         self.potential_fn = potential_fn
+
+    def to(self, device: Union[str, torch.device]) -> None:
+        """
+        Move prior and x_o to the given device.
+
+        It also set the device attribute to the given device.
+
+        Args:
+            device: Device to move the prior and x_o to.
+        """
+        self.device = device
+        if self.prior:
+            self.prior.to(device)
+        if self._x_o:
+            self._x_o = self._x_o.to(device)
+        super().__init__(self.prior, self._x_o, device)
 
     def __call__(self, theta, track_gradients: bool = True):
         """Calls the custom potential function on given theta.
