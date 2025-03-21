@@ -130,7 +130,7 @@ class IIDScoreFunction(ABC):
 
 
 @register_iid_method("fnpe")
-class FNPEScoreFunction(IIDScoreFunction):
+class FactorizedNPEScoreFunction(IIDScoreFunction):
     def __init__(
         self,
         vector_field_estimator: "ConditionalVectorFieldEstimator",
@@ -139,8 +139,8 @@ class FNPEScoreFunction(IIDScoreFunction):
         prior_score_weight: Optional[Callable[[Tensor], Tensor]] = None,
     ) -> None:
         r"""
-        The FNPEScoreFunction implments the "Factorized Neural Posterior Estimation"
-        method for score-based models [1].
+        The FactorizedNPEScoreFunction implments the
+        "Factorized Neural Posterior Estimation"method for score-based models [1].
 
         This method does not apply the necessary corrections for the score function, but
         instead uses a simple weighting of the prior score. This is generally applicable
