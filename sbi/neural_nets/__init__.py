@@ -9,7 +9,13 @@ from sbi.neural_nets.factory import (
 
 
 def __getattr__(name):
-    if name in ["CNNEmbedding", "FCEmbedding", "PermutationInvariantEmbedding"]:
+    if name in [
+        "CNNEmbedding",
+        "FCEmbedding",
+        "PermutationInvariantEmbedding",
+        "ResNetEmbedding1D",
+        "ResNetEmbedding2D",
+    ]:
         raise ImportError(
             "As of sbi v0.23.0, you have to import embedding networks from "
             "`sbi.neural_nets.embedding_nets`. For example, use: "
