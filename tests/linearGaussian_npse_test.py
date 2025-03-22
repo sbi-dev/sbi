@@ -1,7 +1,8 @@
 from typing import List
 
 import pytest
-from torch import eye, ones, zeros
+from torch import eye, ones, softmax, square, zeros
+from torch import sum as torch_sum
 from torch.distributions import MultivariateNormal
 
 from sbi import analysis as analysis
@@ -298,3 +299,74 @@ def test_npse_map():
     map_ = posterior.map(show_progress_bars=True, num_iter=5)
 
     assert ((map_ - gt_posterior.mean) ** 2).sum() < 0.5, "MAP is not close to GT."
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("iid_batch_size", [1, 2])
+def test_score_fn_log_prob(npse_trained_model, prior_type, sde_type, iid_batch_size):
+    '''
+    Tests the log-probability computation of the score-based posterior.
+
+    This test evaluates the ability of the score-based posterior to recover the
+    true posterior with log probabilities as importance weights. It compares whether
+    the effective sample size (ESS) is sufficiently high in comparision to the number
+    of samples drawn from the proposal posterior.
+
+    For more details about ESS refer :
+    https://www.nowozin.net/sebastian/blog/effective-sample-size-in-importance-sampling.html
+
+    Args:
+        iid_batch_size (int): The number of independent and identically distributed(IID)
+        observations in the batch. iid_batch_size=1 corresponds to a single observation.
+
+    Steps:
+        1. Gaussian prior and simulator are assumed to construct true posterior.
+        2. Build a proposal posterior and sample from it from trained model.
+        3. Calculate the ESS with importance weights based on log probabilities.
+
+    Raises:
+        AssertionError: If the ESS is less than half the number of posterior samples,
+        indicating poor recovery of the true posterior.
+    '''
+    if prior_type != "gaussian":
+        pytest.skip("Skipping test for non-gaussian priors")
+    if sde_type == "ve":
+        pytest.xfail("VE is not expected to perform well with log_probs")
+    # Prior Gaussian
+    prior = npse_trained_model["prior"]
+    score_estimator = npse_trained_model["score_estimator"]
+    inference = npse_trained_model["inference"]
+    likelihood_shift = npse_trained_model["likelihood_shift"]
+    likelihood_cov = npse_trained_model["likelihood_cov"]
+    prior_mean = npse_trained_model["prior_mean"]
+    prior_cov = npse_trained_model["prior_cov"]
+    num_dim = npse_trained_model["num_dim"]
+    num_posterior_samples = 1000
+
+    # Ground truth theta
+    theta_o = zeros(num_dim)
+    x_o = linear_gaussian(
+        theta_o.repeat(iid_batch_size, 1),
+        likelihood_shift=likelihood_shift,
+        likelihood_cov=likelihood_cov,
+    )
+    true_posterior = true_posterior_linear_gaussian_mvn_prior(
+        x_o, likelihood_shift, likelihood_cov, prior_mean, prior_cov
+    )
+
+    proposal_posterior = inference.build_posterior(
+        score_estimator=score_estimator, prior=prior
+    )
+
+    proposal_posterior.set_default_x(x_o)
+    proposal_samples = proposal_posterior.sample((num_posterior_samples,))
+    proposal_prob = proposal_posterior.log_prob(proposal_samples)
+    true_prob = true_posterior.log_prob(proposal_samples)
+
+    importance_weights = true_prob - proposal_prob
+    norm_weights = softmax(importance_weights, dim=0)
+    ess = 1 / torch_sum(square(norm_weights))
+    assert ess > num_posterior_samples / 5, (
+        f"Effective sample size : {ess} too low \
+            for number of samples {num_posterior_samples}"
+    )
