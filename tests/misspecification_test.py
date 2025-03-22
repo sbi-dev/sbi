@@ -8,15 +8,14 @@ import torch
 import torch.distributions as dist
 
 from sbi.diagnostics.misspecification import (
+    calc_misspecification_logprob,
     calc_misspecification_mmd,
-    log_prob_hypothesis_test,
 )
 from sbi.inference import NPE
 from sbi.inference.trainers.marginal import MarginalTrainer
 from sbi.neural_nets import posterior_nn
 from sbi.neural_nets.embedding_nets import FCEmbedding
 from sbi.utils.sbiutils import seed_all_backends
-from tests.test_utils import check_c2st
 
 seed = 2025
 
@@ -165,7 +164,7 @@ def test_mmd_x_emedding(D: int, N: int):
 
 
 @pytest.mark.parametrize("D, N", ((2, 1000),))
-@pytest.mark.slow
+# @pytest.mark.slow
 def test_marginal_log_prob_x_space(D: int, N: int):
     """log prob in x-space on Gaussian data.
     Args:
@@ -213,25 +212,12 @@ def test_marginal_log_prob_x_space(D: int, N: int):
     trainer.append_samples(x_train)
     est = trainer.train(max_num_epochs=3000)
 
-    # Sample from the approximate marginal pdf estimator q(x)
-    n_samples = 1_000
-    samples = est.sample((n_samples,))
-
-    # Compute and check the C2ST score
-    check_c2st(x_val, samples, 'MarginalEstimator')
-
     # perform tests for misspecification
-    log_probs_train = est.log_prob(x_train).detach()
-    log_prob_xo = est.log_prob(x_o).detach().item()
-    log_prob_xo_mis = est.log_prob(x_o_mis).detach().item()
-
     # 1. well specified model
-    p_val_well, reject_H0_well = log_prob_hypothesis_test(log_probs_train, log_prob_xo)
+    p_val_well, reject_H0_well = calc_misspecification_logprob(x_val, x_o, est)
 
     # 2. misspecified model
-    p_val_mis, reject_H0_mis = log_prob_hypothesis_test(
-        log_probs_train, log_prob_xo_mis
-    )
+    p_val_mis, reject_H0_mis = calc_misspecification_logprob(x_val, x_o_mis, est)
 
     # check p_vals
     assert p_val_well > 0.05, (

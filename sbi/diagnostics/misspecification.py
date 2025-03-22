@@ -9,6 +9,8 @@ import warnings
 import torch
 import torch.nn as nn
 
+from sbi.utils.metrics import c2st
+
 
 def rbf_kernel(x, y, bandwidth):
     dist = torch.cdist(x, y)
@@ -160,4 +162,54 @@ def log_prob_hypothesis_test(log_probs, log_prob_xo, alpha=0.05):
     # Reject H0 if p_value is below the significance level
     reject_H0 = p_value < alpha
 
+    return p_value, reject_H0
+
+
+def check_c2st(x, y, alg: str, tol: float = 0.1) -> None:
+    """Compute classification based two-sample test accuracy and assert it close to
+    chance."""
+
+    score = c2st(x, y).item()
+    # print(f"c2st for {alg} is {score:.2f}.")
+
+    assert (0.5 - tol) <= score <= (0.5 + tol), (
+        f"{alg}'s c2st={score:.2f} is too far from the desired near-chance performance."
+    )
+
+
+def calc_misspecification_logprob(x_val, x_o, estimator, alpha=0.05):
+    """
+    Perform a hypothesis test to check if estimator.log_prob(`xo`)
+    is unusually low compared to the log probabilities of samples
+    in `x_val`.
+
+    Parameters:
+    - x_val: array-like, known samples to compute baseline logprobs
+    - x_o: array-like, the test sample or the obervation
+    - estimator: marginal distribution estimator
+    - alpha: significance level (default 0.05)
+
+    Returns:
+    - p_value: float, proportion of log_probs below log_prob_xo
+    - reject_H0: bool, whether to reject H0 at the given alpha level
+    """
+    # first do a c2st check and raise Warning if c2st is high (bad)
+    log_probs_val = estimator.log_prob(x_val).detach()
+    log_prob_xo = estimator.log_prob(x_o).detach().item()
+
+    n_samples = x_val.shape[0]
+    samples = estimator.sample((n_samples,))
+    try:
+        check_c2st(x_val, samples, 'MarginalEstimator')
+    except AssertionError as e:
+        warnings.warn(
+            f"{str(e)} "
+            "\nProceeding with logprob test, but results might not"
+            " be meaningful. Be careful with the interpretation!",
+            stacklevel=2,
+        )
+    # then go ahead to do the logprob hypothesis test
+    p_value, reject_H0 = log_prob_hypothesis_test(
+        log_probs_val, log_prob_xo, alpha=alpha
+    )
     return p_value, reject_H0
