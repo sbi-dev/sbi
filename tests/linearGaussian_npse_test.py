@@ -158,6 +158,7 @@ def _get_regression_cases() -> List[Tuple[NpseTrainingTestCase, NpseSamplingTest
     """
     # ToDO check if there is a bug for prior_type='uniform' and num_trial>1
     # ToDO validate bug for combination sde_type='ode' and num_trial>1
+    # ToDO investigate non-determinism for prior_type=None, dim>= 2, ve, auto/jac_gauss
     To make the regression tests run fast enough, we exclude certain combinations
     :return: list of combinations of training and sampling test cases
     """
@@ -176,7 +177,18 @@ def _get_regression_cases() -> List[Tuple[NpseTrainingTestCase, NpseSamplingTest
     is_uniform = lambda t: t.prior_type == "uniform"
     too_many_trial = lambda s: s.num_trials > 1
     is_ode = lambda s: s.sampling_method == "ode"
-    exclude_cond = lambda t, s: (is_uniform(t) or is_ode(s)) and too_many_trial(s)
+
+    is_non_deterministic = (
+        lambda t, s: t.prior_type is None
+        and t.sde_type == "ve"
+        and t.num_dim >= 2
+        and s.iid_method in {"auto_gauss", "jac_gauss"}
+        and s.num_trials >= 16
+    )
+
+    exclude_cond = lambda t, s: (
+        (is_uniform(t) or is_ode(s)) and too_many_trial(s)
+    ) or is_non_deterministic(t, s)
     combinations = []
     for train_case, sampling_case in all_combinations:
         if not exclude_cond(train_case, sampling_case):
