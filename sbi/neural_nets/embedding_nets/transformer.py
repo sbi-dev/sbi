@@ -349,7 +349,7 @@ class RMSNorm(nn.Module):
 
 class MoeBlock(nn.Module):
     # Adapted from https://github.com/huggingface/transformers/blob/main/src/transformers/models/mixtral/modeling_mixtral.py
-
+    # https://arxiv.org/abs/2401.04088
     def __init__(self, config):
         super().__init__()
         """
