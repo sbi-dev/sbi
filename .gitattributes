@@ -1,3 +1,4 @@
 *_gitlfs.* filter=lfs diff=lfs merge=lfs -text
 *.ipynb linguist-documentation
 tests/**/*.npz filter=lfs diff=lfs merge=lfs -text
+.test_durations filter=lfs diff=lfs merge=lfs -text
