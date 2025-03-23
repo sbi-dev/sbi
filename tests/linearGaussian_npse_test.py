@@ -24,7 +24,7 @@ SAMPLING_METHODS = ["sde", "ode"]
 SDE_TYPE = ["vp", "ve", "subvp"]
 
 
-@dataclass
+@dataclass(frozen=True)
 class NpseTrainingTestCase:
     num_dim: int
     prior_type: Optional[str]
@@ -105,7 +105,7 @@ class NpseTrainingTestCase:
         return target_samples
 
 
-@dataclass
+@dataclass(frozen=True)
 class NpseSamplingTestCase:
     iid_method: str
     sampling_method: str
