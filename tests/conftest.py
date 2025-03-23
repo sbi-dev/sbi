@@ -1,9 +1,11 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+import pathlib
 import re
 import shutil
 from pathlib import Path
 from shutil import rmtree
+from typing import Any
 
 import pandas as pd
 import pytest
@@ -71,6 +73,8 @@ def pytest_addoption(parser):
         default=None,
         help="Run mini-benchmark tests with specified mode",
     )
+    parser.addini("datadir", "datadir for pytest-regressions")
+    parser.addini("original_datadir", "original_datadir for pytest-regressions")
 
 
 @pytest.fixture
@@ -242,3 +246,50 @@ def pytest_sessionfinish(session):
         session_results_df.to_csv('./.bm_results/results_all.csv')
     else:
         session_results_df.to_csv('./.bm_results/results_%s.csv' % suffix)
+
+
+def _get_test_based_data_dir(request: Any, ini_defined_path: str):
+    """
+    Constructs a directory path for storing test-specific data.
+
+    Args:
+        request (Any): The pytest request object, providing access to test metadata.
+        ini_defined_path (str): The name of the pytest.ini configuration key defining
+            the base directory.
+
+    Returns:
+        pathlib.Path: The computed path where test data should be stored.
+    """
+    config = request.config
+    root_path = config.rootpath.resolve()
+
+    # Get the test root directory from pytest.ini (typically "tests/")
+    test_root = (root_path / pathlib.Path(config.getini('testpaths')[0])).resolve()
+
+    # Get the base directory for regression data (e.g., "tests/__regressions__")
+    regression_root = (
+        root_path / pathlib.Path(config.getini(ini_defined_path))
+    ).resolve()
+
+    # Get the test file's relative path within the test root directory
+    test_file_relative_path = pathlib.Path(request.node.fspath).relative_to(test_root)
+
+    # Extract the base test function name (handles parameterized tests correctly)
+    test_function_name = request.node.originalname
+
+    # Construct the test-specific data directory path
+    function_data_dir = (
+        regression_root / test_file_relative_path.with_suffix("") / test_function_name
+    )
+
+    return function_data_dir
+
+
+@pytest.fixture
+def datadir(request) -> pathlib.Path:
+    return _get_test_based_data_dir(request, "datadir")
+
+
+@pytest.fixture
+def original_datadir(request) -> pathlib.Path:
+    return _get_test_based_data_dir(request, "original_datadir")

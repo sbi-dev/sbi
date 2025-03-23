@@ -148,6 +148,8 @@ markers = [
     "benchmark: marks test that are soley for benchmarking purposes"
 ]
 xfail_strict = true
+datadir = "tests/__regressions__"
+original_datadir = "tests/__regressions__"
 
 # Pyright configuration
 [tool.pyright]
