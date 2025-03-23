@@ -1,3 +1,6 @@
+# This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+
 import math
 from typing import Optional, Tuple
 
@@ -5,21 +8,39 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-ACT2FN = {
-    "relu": F.relu,
-    "gelu": F.gelu,
-}
-
 
 class PositionalEncoder(nn.Module):
-    def __init__(self, embedding_dim: int, power: Optional[float] = 10e4):
+    def __init__(self, head_dim: int, base: Optional[float] = 10e4):
+        """
+        Position encoding as described by Vaswani et. al.
+        https://arxiv.org/abs/1706.03762
+        Args:
+            head_dim (int): dimensionality of the key/query vectors
+            base (float, *optional*): base used to create the positional encodings
+        """
         super().__init__()
-        self.power = power
-        self.embedding_dim = embedding_dim
-        div_term = self.power ** (torch.arange(0, embedding_dim, 2) / embedding_dim)
+
+        self.base = base
+        self.head_dim = head_dim
+        if self.head_dim % 2 != 0:
+            raise ValueError(f"`head_dim`:{self.head_dim} must be even")
+
+        div_term = self.base ** (torch.arange(0, head_dim, 2) / head_dim)
         self.register_buffer("div_term", tensor=div_term, persistent=False)
 
-    def forward(self, x, position_ids: Optional[torch.Tensor] = None):
+    def forward(
+        self, x: torch.FloatTensor, position_ids: Optional[torch.Tensor] = None
+    ):
+        """
+        Args:
+            x (torch.FloatTensor): query/key  of shape `(bsz, num_heads, seq_len,
+            head_dim)`
+            position_ids (torch.tensor, *optional*): specify the position ids, by
+            default constructs 0-sequence_length
+        Returns:
+            `(torch.Tensor)` query/key tensors with standard additive positional
+            encoding
+        """
         seq_length = x.shape[-2]
         if position_ids is None:
             position_ids = torch.arange(0, seq_length, 1).to(x)
@@ -33,41 +54,67 @@ class PositionalEncoder(nn.Module):
         return x + pe
 
 
-class DummyEncoder(nn.Module):
+class IdentityEncoder(nn.Module):
     def __init__(self, **kwargs):
         super().__init__()
 
-    def forward(self, x, **kwargs):
+    def forward(self, x: torch.FloatTensor, **kwargs):
+        """
+        No transformation of the input is applied.
+        Args:
+            x `(torch.FloatTensor)`
+        Return
+            `(torch.FloatTensor)`
+        """
         return x
 
 
 class RotaryEncoder(nn.Module):
-    def __init__(self, embedding_dim: int, power: Optional[float] = 10e4):
+    def __init__(self, head_dim: int, base: Optional[float] = 10e4):
+        """
+        Rotary position encoding as described by Su et. al.
+        https://arxiv.org/abs/2104.09864
+        Args:
+            head_dim (int): feature dimension of the key/query vector
+            base (float): base to be used to create the positional encodings
+        """
         super().__init__()
-        self.power = power
-        self.embedding_dim = embedding_dim
-        div_term = self.power ** (
-            torch.arange(0, embedding_dim, 2) / embedding_dim
-        ).repeat(2)
+
+        self.base = base
+        self.head_dim = head_dim
+        if self.head_dim % 2 != 0:
+            raise ValueError(f"`head_dim`:{self.head_dim} must be even")
+        div_term = self.base ** (torch.arange(0, head_dim, 2) / head_dim).repeat(2)
         self.register_buffer("div_term", tensor=div_term, persistent=False)
 
-    def rotate_half(self, x):
-        """Rotates half the hidden dims of the input."""
+    def rotate_half(self, x: torch.FloatTensor):
+        """
+        Rotates half the hidden dims of the input.
+        Args:
+            x (torch.FloatTensor): query/key tensors of shape `(bsz, num_heads,
+            seq_len, head_dim)`
+        Returns
+            `(torch.Tensor)` query/key rotated tensors
+        """
         x1 = x[..., : x.shape[-1] // 2]
         x2 = x[..., x.shape[-1] // 2 :]
         return torch.cat((-x2, x1), dim=-1)
 
-    def forward(self, x, position_ids: Optional[torch.Tensor] = None) -> torch.Tensor:
-        """Applies Rotary Position Embedding to the query and key tensors.
+    def forward(
+        self, x: torch.Tensor, position_ids: Optional[torch.Tensor] = None
+    ) -> torch.Tensor:
+        """Applies Rotary Position Encoding to the query and key tensors.
 
         Args:
-            x (`torch.Tensor`): query/key tensor
+            x (`torch.Tensor`): query/key tensor of shape `(bsz, num_heads, seq_len,
+            head_dim)`
             position_ids (`torch.Tensor`, *optional*):
-                specify the position ids
+                specify the position ids, by default constructs 0-seq_len
         Returns:
             `(torch.Tensor)` comprising the query/key tensors rotated using the
-            Rotary Position Embedding.
+            Rotary Position Encoding.
         """
+
         seq_length = x.shape[-2]
 
         if position_ids is None:
@@ -80,26 +127,30 @@ class RotaryEncoder(nn.Module):
         return x_embed
 
 
-POSITION_EMB = {
-    "positional": PositionalEncoder,
-    "rotary": RotaryEncoder,
-    "none": DummyEncoder,
-}
-
-
 class FullAttention(nn.Module):
     # Adapted from https://github.com/huggingface/transformers/main/src/transformers/models/phi3/modeling_phi3.py
-    """Multi-headed attention from 'Attention Is All You Need' paper"""
 
-    def __init__(self, config, layer_idx: Optional[int] = None):
+    def __init__(self, config):
+        """Multi-headed attention from 'Attention Is All You Need' paper"""
+
         super().__init__()
         self.config = config
-        self.layer_idx = layer_idx
-        self.hidden_size = config["hidden_size"]
-        self.head_dim = config.get(
-            "head_dim", config["hidden_size"] // config["num_attention_heads"]
-        )
+        self.feature_space_dim = config["feature_space_dim"]
+        head_dim = config["head_dim"]
+        if head_dim is None:
+            if (config["feature_space_dim"] % config["num_attention_heads"]) != 0:
+                raise ValueError(
+                    "If not providing head_dim, ensure `feature_space_dim` is "
+                    "divisible by `num_attention_heads`"
+                )
+            head_dim = config["feature_space_dim"] // config["num_attention_heads"]
+
+        self.head_dim = head_dim
         self.num_heads = config["num_attention_heads"]
+        if (config["num_attention_heads"] % config["num_key_value_heads"]) != 0:
+            raise ValueError(
+                "`num_attention_heads` must be divisible by `num_key_value_heads`"
+            )
         self.num_key_value_groups = (
             config["num_attention_heads"] // config["num_key_value_heads"]
         )
@@ -112,21 +163,46 @@ class FullAttention(nn.Module):
         )
         self.o_proj = nn.Linear(
             config["num_attention_heads"] * self.head_dim,
-            config["hidden_size"],
+            config["feature_space_dim"],
             bias=False,
         )
-        self.qkv_proj = nn.Linear(config["hidden_size"], op_size, bias=False)
-        self.pos_emb = POSITION_EMB[config.get("pos_emb", "rotary")](
-            embedding_dim=self.head_dim, power=config.get("pos_emb_power", 10e4)
+        # This single layer performs the query, key and value projections
+        # The output is then spit into key_states, query_states, and value_states
+        # with the corresponding dimensions
+        self.qkv_proj = nn.Linear(config["feature_space_dim"], op_size, bias=False)
+        pos_emb = {
+            "positional": PositionalEncoder,
+            "rotary": RotaryEncoder,
+            "none": IdentityEncoder,
+        }
+        self.pos_emb = pos_emb[config["pos_emb"]](
+            head_dim=self.head_dim, base=config["pos_emb_base"]
         )
 
     def forward(
         self,
-        hidden_states: torch.Tensor,
+        hidden_states: torch.FloatTensor,
         attention_mask: Optional[torch.Tensor] = None,
-        position_ids: Optional[torch.LongTensor] = None,
+        position_ids: Optional[torch.Tensor] = None,
         output_attentions: bool = False,
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+        """Computes the attention
+        Args:
+            hidden_states (`torch.FloatTensor`): query/key tensor of shape `(bsz,
+            seq_len, feature_space_dim)`
+            position_ids (`torch.Tensor`, *optional*): specify the position ids, by
+            default constructs 0-sequence_length
+            attention_mask (`torch.Tensor`) : Attention mask of shape `(batch_size,
+            sequence_length, feature_space_dim)`
+            output_attentions (bool) : return the attention weights, cannot be used
+            within the NPE/NRE/NLE pipelines,
+            use it for analyzing the embedding modules
+        Returns:
+            `(torch.Tensor, torch.Tensor)` or `(torch.Tensor)` attention output and
+            optionally the attention weights
+
+        """
+
         bsz, q_len, _ = hidden_states.size()
 
         qkv = self.qkv_proj(hidden_states)
@@ -185,7 +261,7 @@ class FullAttention(nn.Module):
             )
 
         attn_output = attn_output.transpose(1, 2).contiguous()
-        attn_output = attn_output.reshape(bsz, q_len, self.hidden_size)
+        attn_output = attn_output.reshape(bsz, q_len, self.feature_space_dim)
         attn_output = self.o_proj(attn_output)
 
         if not output_attentions:
@@ -196,77 +272,122 @@ class FullAttention(nn.Module):
 
 class MLP(nn.Module):
     # Adapted from https://github.com/huggingface/transformers/main/src/transformers/models/phi3/modeling_phi3.py
-    """
-    Feed-forward layer which can be replace by a custom implementation
-    """
 
     def __init__(self, config):
+        """
+        Feed-forward layer which can be replaced by a custom implementation
+        f(x):
+            R^{feature_space_dim} -> R^{intermediate_size}
+            R^{intermediate_size} -> R^{feature_space_dim}
+        """
         super().__init__()
 
         self.config = config
         self.gate_up_proj = nn.Linear(
-            config["hidden_size"], 2 * config["intermediate_size"], bias=False
+            config["feature_space_dim"], 2 * config["intermediate_size"], bias=False
         )
         self.down_proj = nn.Linear(
-            config["intermediate_size"], config["hidden_size"], bias=False
+            config["intermediate_size"], config["feature_space_dim"], bias=False
         )
+        if config["mlp_activation"] == "gelu":
+            self.activation_fn = F.gelu
+        elif config["mlp_activation"] == "relu":
+            self.activation_fn = F.relu
+        else:
+            ValueError(
+                "Unsupported activation function, currently supported: `gelu, relu`"
+            )
 
-        self.activation_fn = ACT2FN[config["mlp_activation"]]
-
-    def forward(self, x: torch.FloatTensor) -> torch.FloatTensor:
-        up_states = self.gate_up_proj(x)
-        gate, up_states = up_states.chunk(2, dim=-1)
-        up_states = up_states * self.activation_fn(gate)
+    def forward(self, hidden_states: torch.FloatTensor) -> torch.FloatTensor:
+        """
+        Args:
+            hidden_states (torch.FloatTensor): output from the attention layer of
+            shape `(batch_size, sequence_length, feature_space_dim)`
+        Returns:
+            `(torch.FloatTensor)`
+        """
+        up_states = self.gate_up_proj(
+            hidden_states
+        )  # projection of hidden_states to 2*intermediate_size
+        gate, up_states = up_states.chunk(
+            2, dim=-1
+        )  # split the resulting vector in two (intermediate_size,intermediate_size)
+        up_states = up_states * self.activation_fn(
+            gate
+        )  # use one of the splits as input to the activation function and the other
+        # to scale it
 
         return self.down_proj(up_states)
 
 
-# Copied from https://github.com/huggingface/transformers/main/src/transformers/models/phi3/modeling_phi3.py
+# Copied from https://github.com/huggingface/transformers/blob/main/src/transformers/models/phi3/modeling_phi3.py
 class RMSNorm(nn.Module):
-    def __init__(self, hidden_size, eps=1e-6):
+    def __init__(self, feature_space_dim, eps: float):
         """
         RMSNorm is equivalent to T5LayerNorm
+        Variant of layer normalization https://arxiv.org/abs/1607.06450
         """
         super().__init__()
-        self.weight = nn.Parameter(torch.ones(hidden_size))
+        self.weight = nn.Parameter(torch.ones(feature_space_dim))
         self.variance_epsilon = eps
 
-    def forward(self, x):
-        input_dtype = x.dtype
-        x = x.to(torch.float32)
-        variance = x.pow(2).mean(-1, keepdim=True)
-        x = x * torch.rsqrt(variance + self.variance_epsilon)
-        return self.weight * x.to(input_dtype)
-
-    def extra_repr(self):
-        return f"{tuple(self.weight.shape)}, eps={self.variance_epsilon}"
+    def forward(self, hidden_states: torch.FloatTensor):
+        """
+        Args:
+            hidden_states (torch.FloatTensor): input of shape `(batch_size,
+            sequence_length, feature_space_dim)`
+            RMS normalization with per dimension scaling (self.weigth)
+        Returns:
+            `(torch.FloatTensor)`
+        """
+        input_dtype = hidden_states.dtype
+        hidden_states = hidden_states.to(torch.float32)
+        variance = hidden_states.pow(2).mean(-1, keepdim=True)
+        hidden_states = hidden_states * torch.rsqrt(variance + self.variance_epsilon)
+        return self.weight * hidden_states.to(input_dtype)
 
 
 class MoeBlock(nn.Module):
     # Adapted from https://github.com/huggingface/transformers/blob/main/src/transformers/models/mixtral/modeling_mixtral.py
-    """
-    This implementation is
-    strictly equivalent to standard MoE with full capacity (no
-    dropped tokens).
-    """
 
     def __init__(self, config):
         super().__init__()
-        self.hidden_dim = config["hidden_size"]
+        """
+        Mixture of experts implementation with full capacity (no dropped tokens).
+        `num_local_experts` : specifies the total number of experts available
+        `num_experts_per_tok`: number of experts each token is assigned to
+        `router_jitter_noise` : noise to be added at training time before routing
+        the tokens to experts
+        """
+        self.hidden_dim = config["feature_space_dim"]
         self.ffn_dim = config["intermediate_size"]
         self.num_experts = config["num_local_experts"]
-        self.top_k = config["num_experts_per_tok"]
+        self.top_k = config[
+            "num_experts_per_tok"
+        ]  # Each token is assigned independently to experts
+        if self.top_k > self.num_experts:
+            raise ValueError(
+                "Each token cannot be assigned to more that num_local_experts"
+            )
 
-        # gating
+        # gating function to determine the experts to be used for each token
         self.gate = nn.Linear(self.hidden_dim, self.num_experts, bias=False)
 
+        # experts can be replaced by a custom implementation of feed forward layer
         self.experts = nn.ModuleList([MLP(config) for _ in range(self.num_experts)])
 
         # Jitter parameters
-        self.jitter_noise = config.get("router_jitter_noise", 0.0)
+        self.jitter_noise = config["router_jitter_noise"]
 
-    def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
-        """ """
+    def forward(self, hidden_states: torch.FloatTensor) -> torch.Tensor:
+        """
+        Args:
+            `hidden_states` : input of shape `(batch_size, sequence_length,
+            hidden_dim)`
+        Returns:
+            `final_hidden_states` : output of shape `(batch_size, sequence_length,
+            hidden_dim)`
+        """
         batch_size, sequence_length, hidden_dim = hidden_states.shape
         if self.training and self.jitter_noise > 0:
             hidden_states *= torch.empty_like(hidden_states).uniform_(
@@ -322,28 +443,31 @@ class MoeBlock(nn.Module):
 
 
 class TransformerBlock(nn.Module):
-    def __init__(self, config, layer_idx: int):
+    def __init__(self, config):
         super().__init__()
-        self.hidden_size = config["hidden_size"]
+        self.feature_space_dim = config["feature_space_dim"]
 
-        self.self_attn = FullAttention(config=config, layer_idx=layer_idx)
-
-        self.ffn = FFN[config.get("ffn", "mlp")](config)
+        self.self_attn = FullAttention(config=config)
+        ffn = {
+            "mlp": MLP,
+            "moe": MoeBlock,
+        }
+        self.ffn = ffn[config["ffn"]](config)
         self.input_layernorm = RMSNorm(
-            config["hidden_size"], eps=config.get("rms_norm_eps", 1e-05)
+            config["feature_space_dim"], eps=config["rms_norm_eps"]
         )
         self.post_attention_layernorm = RMSNorm(
-            config["hidden_size"], eps=config.get("rms_norm_eps", 1e-05)
+            config["feature_space_dim"], eps=config["rms_norm_eps"]
         )
 
     def forward(
         self,
-        hidden_states: torch.Tensor,
+        hidden_states: torch.FloatTensor,
         attention_mask: Optional[torch.Tensor] = None,
         position_ids: Optional[torch.LongTensor] = None,
         output_attentions: Optional[bool] = False,
         **kwargs,
-    ) -> Tuple[torch.FloatTensor, Optional[torch.FloatTensor]]:
+    ) -> Tuple[torch.FloatTensor, Optional[torch.Tensor]]:
         """
         Args:
             hidden_states (`torch.FloatTensor`): input to the layer of shape `(batch,
@@ -383,25 +507,200 @@ class TransformerBlock(nn.Module):
         return outputs
 
 
-FFN = {
-    "mlp": MLP,
-    "moe": MoeBlock,
-}
+class ViTEmbeddings(nn.Module):
+    # Adapted from https://github.com/huggingface/transformers/blob/main/src/transformers/models/vit/modeling_vit.py
+    """
+    This class turns `pixel_values` of shape `(batch_size, num_channels,
+    height, width)` into the initial `hidden_states` (patch embeddings)
+    of shape `(batch_size, seq_length, feature_space_dim)` to be consumed by a
+    Transformer.
+    """
+
+    def __init__(self, config):
+        super().__init__()
+        """
+        image_size (int) is the expected size of the square image
+        patch_size (int) is the expected size of the square patch
+        """
+        image_size, patch_size = config["image_size"], config["patch_size"]
+        num_channels, feature_space_dim = (
+            config["num_channels"],
+            config["feature_space_dim"],
+        )
+        num_patches = (image_size // patch_size) ** 2
+
+        self.image_size = image_size
+        self.patch_size = patch_size
+        self.num_channels = num_channels
+        self.position_embeddings = nn.Parameter(
+            torch.randn(1, num_patches + 1, config["feature_space_dim"])
+        )
+        self.projection = nn.Conv2d(
+            num_channels, feature_space_dim, kernel_size=patch_size, stride=patch_size
+        )
+        self.cls_token = nn.Parameter(torch.randn(1, 1, config["feature_space_dim"]))
+        self.dropout = nn.Dropout(config["vit_dropout"])
+
+    def interpolate_pos_encoding(
+        self, embeddings: torch.Tensor, height: int, width: int
+    ) -> torch.Tensor:
+        """
+        This method allows to interpolate the pre-trained position encodings,
+        to be able to use the model on higher resolution images.
+        Args:
+            embeddings (torch.FloatTensor): embedding patches generated after
+            applying the CNN filters on the input image
+            height (int): height of the input image
+            width (int): width of the input image
+        """
+        # Adapted from:
+        # https://github.com/facebookresearch/dino/blob/de9ee3df6cf39fac952ab558447af1fa1365362a/vision_transformer.py
+        # https://github.com/facebookresearch/dinov2/blob/e1277af2ba9496fbadf7aec6eba56e8d882d1e35/dinov2/models/vision_transformer.py
+
+        num_positions = self.position_embeddings.shape[1] - 1
+
+        class_pos_embed = self.position_embeddings[:, :1]
+        patch_pos_embed = self.position_embeddings[:, 1:]
+
+        dim = embeddings.shape[-1]
+
+        new_height = height // self.patch_size
+        new_width = width // self.patch_size
+
+        sqrt_num_positions = int(num_positions**0.5)
+        patch_pos_embed = patch_pos_embed.reshape(
+            1, sqrt_num_positions, sqrt_num_positions, dim
+        )
+        patch_pos_embed = patch_pos_embed.permute(0, 3, 1, 2)
+
+        patch_pos_embed = nn.functional.interpolate(
+            patch_pos_embed,
+            size=(new_height, new_width),
+            mode="bicubic",
+            align_corners=False,
+        )
+
+        patch_pos_embed = patch_pos_embed.permute(0, 2, 3, 1).view(1, -1, dim)
+
+        return torch.cat((class_pos_embed, patch_pos_embed), dim=1)
+
+    def forward(self, pixel_values: torch.Tensor) -> torch.Tensor:
+        """
+        Images of shape `(batch_size, num_channels, height, width)`
+        Return input_embeddings of shape `(batch_size, seq_length, feature_space_dim)`
+        to be consumed by a Transformer.
+        """
+        batch_size, num_channels, height, width = pixel_values.shape
+        if num_channels != self.num_channels:
+            raise ValueError(
+                "Make sure that the channel dimension of the pixel values "
+                "match with the one set in the configuration."
+                f" Expected {self.num_channels} but got {num_channels}."
+            )
+
+        embeddings = self.projection(pixel_values).flatten(2).transpose(1, 2)
+
+        cls_tokens = self.cls_token.expand(batch_size, -1, -1)
+        embeddings = torch.cat((cls_tokens, embeddings), dim=1)
+
+        embeddings = embeddings + self.interpolate_pos_encoding(
+            embeddings, height, width
+        )
+
+        embeddings = self.dropout(embeddings)
+
+        return embeddings
 
 
 class TransformerEmbedding(nn.Module):
     def __init__(self, config):
         super().__init__()
+        """
+        Main class for constructing a tranformer embedding
+        Basic configuration parameters:
+            pos_emb (string): position encoding to be used, currently available:
+            {"rotary", "positional", "none"}
+            pos_emb_base (float): base used to construct the positinal encoding
+            rms_norm_eps (float): noise added to the rms variance computation
+            ffn (string): feedforward layer after used after computing the attention:
+            {"mlp", "moe"}
+            mlp_activation (string): activation function to be used within the ffn
+            layer
+            is_causal (bool): specifies whether causal mask should be created
+            vit (bool): specifies the whether a convolutional layer should be used for
+            processing images, inspired by the vision transformer
+            num_hidden_layer (int): number of transformer blocks
+            num_attention_heads (int): number of attention heads
+            num_key_value_heads (int): number of key/value heads
+            feature_space_dim (int): dimension of the feature vectors
+            intermediate_size (int): hidden size of the feedforward layer
+            head_dim (int): dimension key/query vectors
+            attention_dropout (float): value for the dropout of the attention layer
+
+        MoE:
+            router_jitter_noise (float): noise added before routing the input vectors
+            to the experts
+            num_local_experts (int): total number of experts
+            num_experts_per_tok (int): number of experts each token is assigned to
+
+        ViT
+            feature_space_dim (int): dimension of the feature vectors after
+            preprocessing the images
+            image_size (int): dimension of the squared image used to created
+            the positional encoders
+            a rectagular image can be used at training/inference time by
+            resampling the encoders
+            patch_size (int): size of the square patches used to create the
+            positional encoders
+            num_channels (int): number of channels of the input image
+            vit_dropout (float): value for the droput of the attention layer
+        """
+        self.config = {
+            "pos_emb": "rotary",
+            "pos_emb_base": 10e4,
+            "rms_norm_eps": 1e-05,
+            "router_jitter_noise": 0.0,
+            "vit_dropout": 0.5,
+            "mlp_activation": "gelu",
+            "is_causal": True,
+            "vit": False,
+            "num_hidden_layers": 4,
+            "num_attention_heads": 12,
+            "num_key_value_heads": 12,
+            "intermediate_size": 256,
+            "ffn": "mlp",
+            "head_dim": None,
+            "attention_dropout": 0.5,
+        }
+
+        self.config.update(config)
+
+        self.preprocess = (
+            ViTEmbeddings(self.config) if self.config["vit"] else IdentityEncoder()
+        )
 
         self.layers = nn.ModuleList([
-            TransformerBlock(config, layer_idx)
-            for layer_idx in range(config["num_hidden_layers"])
+            TransformerBlock(self.config)
+            for _ in range(self.config["num_hidden_layers"])
         ])
-        self.is_causal = config["is_causal"]
+        self.is_causal = self.config["is_causal"] and not self.config["vit"]
 
         self.norm = RMSNorm(
-            config["hidden_size"], eps=config.get("rms_norm_eps", 1e-05)
+            self.config["feature_space_dim"], eps=self.config["rms_norm_eps"]
         )
+        final_emb_dimension = self.config.get(
+            "final_emb_dimension", self.config["feature_space_dim"] // 2
+        )
+        if not config["vit"] and final_emb_dimension > self.config["feature_space_dim"]:
+            raise ValueError(
+                "The final embedding dimension should be equal or smaller than "
+                "the input dimension"
+            )
+        self.aggregator = nn.Linear(
+            self.config["feature_space_dim"],
+            final_emb_dimension,
+        )
+        self.causal_mask_cache_ = (None, None, None)
 
     def causal_mask(
         self,
@@ -418,10 +717,14 @@ class TransformerEmbedding(nn.Module):
             fill_value=min_dtype,
             dtype=dtype,
             device=device,
-        )
+        )  # square causal mask filed with min_dtype
         if sequence_length != 1:
-            causal_mask = torch.triu(causal_mask, diagonal=1)
-        causal_mask = causal_mask[None, None, :, :].expand(batch_size, 1, -1, -1)
+            causal_mask = torch.triu(
+                causal_mask, diagonal=1
+            )  # zero out lower triangular matrix
+        causal_mask = causal_mask[None, None, :, :].expand(
+            batch_size, 1, -1, -1
+        )  # causal mask
         if attention_mask is not None:
             causal_mask = (
                 causal_mask.clone()
@@ -429,7 +732,7 @@ class TransformerEmbedding(nn.Module):
             mask_length = attention_mask.shape[-1]
             padding_mask = (
                 causal_mask[:, :, :, :mask_length] + attention_mask[:, None, None, :]
-            )
+            )  # use attention mask to mask padding tokens
             padding_mask = padding_mask == 0
             causal_mask[:, :, :, :mask_length] = causal_mask[
                 :, :, :, :mask_length
@@ -438,40 +741,64 @@ class TransformerEmbedding(nn.Module):
 
     def forward(
         self,
-        input_embeddings: torch.Tensor,
+        input: torch.Tensor,
         attention_mask: Optional[torch.tensor] = None,
         output_attentions: Optional[bool] = False,
         output_hidden_states: Optional[bool] = False,
         position_ids: Optional[torch.LongTensor] = None,
+        cache_attention_mask: Optional[bool] = True,
         **kwargs,
     ) -> Tuple[torch.Tensor, Optional[Tuple[torch.Tensor, torch.Tensor]]]:
         """
         Args:
-            hidden_states (`torch.FloatTensor`): input to the layer of shape `(batch,
-            seq_len, embed_dim)`
+            input (`torch.FloatTensor`): input of shape `(batch, seq_len,
+            feature_space_dim)`
+            or `(batch, num_channels, height, width)` if using ViT
             attention_mask (`torch.FloatTensor`, *optional*):
                 attention mask of size `(batch_size, sequence_length)`
             output_attentions (`bool`, *optional*):
                 Whether or not to return the attention tensors
+            cache_attention_mask (`bool`, *optional*):
+                Whether or not to cache the expanded attention mask, useful if using
+                multiple batched with identical input shapes
             kwargs (`dict`, *optional*):
                 Arbitrary kwargs
         """
+
+        input = self.preprocess(input)
         if self.is_causal:
-            dtype, device = input_embeddings.dtype, input_embeddings.device
-            attention_mask = self.causal_mask(
-                sequence_length=input_embeddings.shape[1],
-                dtype=input_embeddings.dtype,
-                device=device,
-                batch_size=input_embeddings.shape[0],
-                min_dtype=torch.finfo(dtype).min,
-            )
+            dtype, device = input.dtype, input.device
+
+            cached_attn_mask, cached_mask, cached_shape = self.causal_mask_cache_
+            if (
+                cache_attention_mask
+                and input.shape == cached_shape
+                and cached_attn_mask == attention_mask
+            ):
+                attention_mask = cached_mask
+            else:
+                cache = (
+                    (attention_mask.clone(),) if attention_mask is not None else (None,)
+                )
+                attention_mask = self.causal_mask(
+                    sequence_length=input.shape[1],
+                    attention_mask=attention_mask,
+                    dtype=input.dtype,
+                    device=device,
+                    batch_size=input.shape[0],
+                    min_dtype=torch.finfo(dtype).min,
+                )
+                cache += (attention_mask,)
+                cache += (input.shape,)
+                if cache_attention_mask:
+                    self.causal_mask_cache_ = cache
         else:
             attention_mask = None
 
         # decoder layers
         all_hidden_states = () if output_hidden_states else None
         all_self_attns = () if output_attentions else None
-        hidden_states = input_embeddings
+        hidden_states = input
         for decoder_layer in self.layers:
             if output_hidden_states:
                 all_hidden_states += (hidden_states,)
@@ -492,6 +819,9 @@ class TransformerEmbedding(nn.Module):
             all_hidden_states += (hidden_states,)
 
         if output_attentions or output_hidden_states:
-            return hidden_states[:, -1, :], (all_hidden_states, all_self_attns)
+            return self.aggregator(hidden_states[:, -1, :]), (
+                all_hidden_states,
+                all_self_attns,
+            )
 
-        return hidden_states[:, -1, :]
+        return self.aggregator(hidden_states[:, -1, :])
