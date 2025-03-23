@@ -83,7 +83,6 @@ dev = [
     "pytest-harvest",
     "pytest-split",
     "torchtestcase",
-    "syrupy",
     "pytest-regressions",
     "pytest-timeout"
 ]
