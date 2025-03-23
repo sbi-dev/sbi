@@ -181,8 +181,8 @@ class LRUBlock(nn.Module):
         """
         y = self.input_norm(input)
         y = self.lru(y)
-        y = self.dropout(y)
         y = self.nonlinearity(y)
+        y = self.dropout(y)
         # apply state mixing gate as in Smith, Warrington & Linderman, 2023
         y = y * self.sigmoid(self.state_mixing_gate(y))
         y = self.dropout(y)
