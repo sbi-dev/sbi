@@ -18,7 +18,8 @@ class LRUEmbedding(nn.Module):
     dropout, nonlinearities, state mixing, and a skip connection.
 
     See also:
-        A. Orvieto et al. 2023, https://arxiv.org/pdf/2303.06349
+        Orvieto et al. 2023, https://arxiv.org/abs/2303.06349
+        Smith, Warrington & Linderman, 2023, https://arxiv.org/abs/2208.04933
     """
 
     def __init__(
@@ -35,7 +36,7 @@ class LRUEmbedding(nn.Module):
         mode: str = "loop",
         dropout: float = 0.0,
         apply_input_normalization: bool = False,
-        aggregate_fcn: [str, Callable] = "last_step",
+        aggregate_fcn: [str, Callable] = "mean",
     ):
         """
         Args:
@@ -161,9 +162,9 @@ class LRUBlock(nn.Module):
             mode=mode,
         )
         self.dropout = nn.Dropout(dropout)
-        self.nonlinearity = nn.SiLU()  # could also use different one here
-        self.state_mixing_pre_glu = nn.Linear(hidden_dim, hidden_dim * 2)
-        self.glu = nn.GLU(dim=-1)
+        self.nonlinearity = nn.GELU()  # could also use different one here
+        self.state_mixing_gate = nn.Linear(hidden_dim, hidden_dim)
+        self.sigmoid = nn.Sigmoid()
 
     def forward(self, input: Tensor) -> Tensor:
         """Forward pass through an LRU block, which also contains input
@@ -180,10 +181,10 @@ class LRUBlock(nn.Module):
         """
         y = self.input_norm(input)
         y = self.lru(y)
-        y = self.nonlinearity(y)
         y = self.dropout(y)
-        y = self.state_mixing_pre_glu(y)  # doubles num dimensions
-        y = self.glu(y)  # halves num dimensions
+        y = self.nonlinearity(y)
+        # apply state mixing gate as in Smith, Warrington & Linderman, 2023
+        y = y * self.sigmoid(self.state_mixing_gate(y))
         y = self.dropout(y)
         y = y + input  # skip connection
         return y
@@ -248,7 +249,7 @@ class LRU(nn.Module):
 
         # Sample two independent random variables to initialize lambda between
         # two rings (r_min, r_max) on the complex plane.
-        # See Lambda 3.2 in the paper.
+        # See section 3.2 in Orvieto et al., 2023
         r_unit_sample = torch.rand(size=(state_dim,))
         r_init = r_unit_sample * (r_max**2 - r_min**2) + r_min**2
         self.log_nu = nn.Parameter(torch.log(-0.5 * torch.log(r_init)))
