@@ -247,7 +247,7 @@ def _test_helper_embedding_net(prior, xo, simulator, net):
         embedding_net=net,
     )
 
-    num_simulations = 50
+    num_simulations = 1000
     theta = prior.sample(torch.Size((num_simulations,)))
     x = simulator(theta)
 

@@ -101,7 +101,7 @@ class RotaryEncoder(nn.Module):
         return torch.cat((-x2, x1), dim=-1)
 
     def forward(
-        self, x: torch.Tensor, position_ids: Optional[torch.Tensor] = None
+        self, x: torch.FloatTensor, position_ids: Optional[torch.Tensor] = None
     ) -> torch.Tensor:
         """Applies Rotary Position Encoding to the query and key tensors.
 
@@ -426,16 +426,18 @@ class MoeBlock(nn.Module):
             # Index the correct hidden states and compute the expert hidden state for
             # the current expert. We need to make sure to multiply the output hidden
             # states by `routing_weights` on the corresponding tokens (top-1 and top-2)
-            current_state = hidden_states[None, top_x].reshape(-1, hidden_dim)
-            current_hidden_states = (
-                expert_layer(current_state) * routing_weights[top_x, idx, None]
-            )
+            if top_x.numel() > 0:
+                # Only proceed if there are tokens assigned to this expert
+                current_state = hidden_states[None, top_x].reshape(-1, hidden_dim)
+                current_hidden_states = (
+                    expert_layer(current_state) * routing_weights[top_x, idx, None]
+                )
 
-            # However `index_add_` only support torch tensors for indexing so we'll use
-            # the `top_x` tensor here.
-            final_hidden_states.index_add_(
-                0, top_x, current_hidden_states.to(hidden_states.dtype)
-            )
+                # However `index_add_` only support torch tensors for indexing so
+                # we'll use the `top_x` tensor here.
+                final_hidden_states.index_add_(
+                    0, top_x, current_hidden_states.to(hidden_states.dtype)
+                )
         final_hidden_states = final_hidden_states.reshape(
             batch_size, sequence_length, hidden_dim
         )
@@ -445,6 +447,10 @@ class MoeBlock(nn.Module):
 class TransformerBlock(nn.Module):
     def __init__(self, config):
         super().__init__()
+        """
+        Transformer block containing an attention and feed-forward layer
+        It also contains 2 learnable layer-norms
+        """
         self.feature_space_dim = config["feature_space_dim"]
 
         self.self_attn = FullAttention(config=config)
@@ -584,7 +590,7 @@ class ViTEmbeddings(nn.Module):
 
         return torch.cat((class_pos_embed, patch_pos_embed), dim=1)
 
-    def forward(self, pixel_values: torch.Tensor) -> torch.Tensor:
+    def forward(self, pixel_values: torch.FloatTensor) -> torch.Tensor:
         """
         Images of shape `(batch_size, num_channels, height, width)`
         Return input_embeddings of shape `(batch_size, seq_length, feature_space_dim)`
@@ -741,7 +747,7 @@ class TransformerEmbedding(nn.Module):
 
     def forward(
         self,
-        input: torch.Tensor,
+        input: torch.FloatTensor,
         attention_mask: Optional[torch.tensor] = None,
         output_attentions: Optional[bool] = False,
         output_hidden_states: Optional[bool] = False,
