@@ -1,12 +1,36 @@
+# This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+
+"""
+Base classes for ODE solvers.
+"""
+
 from abc import abstractmethod
-from typing import Any, Callable, Dict
+from typing import Any, Dict, Protocol
 
 import torch.nn as nn
 from torch import Tensor
 from torch.distributions import Distribution
 from zuko.lazy import LazyDistribution
 
-NeuralODEFuncType = Callable[[Tensor, Tensor, Tensor], Tensor]
+
+class NeuralODEFunc(Protocol):
+    """Protocol for the function to be integrated by the NeuralODE."""
+
+    def __call__(self, input: Tensor, condition: Tensor, times: Tensor) -> Tensor:
+        r"""
+        Callable that takes in the current state, time, and condition and returns the
+        derivative of the state.
+
+        Args:
+            input: The current state :math:`\theta_t`.
+            condition: The condition :math:`x_o`.
+            times: The time :math:`t`.
+
+        Returns:
+            The derivative of the state.
+        """
+        ...
 
 
 class NeuralODE(LazyDistribution):
@@ -22,7 +46,7 @@ class NeuralODE(LazyDistribution):
 
     def __init__(
         self,
-        f: NeuralODEFuncType,
+        f: NeuralODEFunc,
         net: nn.Module,
         mean_base: Tensor,
         std_base: Tensor,
@@ -34,11 +58,11 @@ class NeuralODE(LazyDistribution):
         Initialize the NeuralODE class.
 
         Args:
-            f: The function to be integrated.
-                Must accept three arguments in the order:
-                    - input (Tensor): The input state tensor :math:`\theta_t`
-                    - condition (Tensor): The conditioning tensor :math:`x_o`
-                    - time (Tensor): The time parameter tensor :math:`t`
+            f: The function to be integrated that implements the `NeuralODEFunc`
+                protocol. Must accept three arguments in the order:
+                - input (Tensor): The input state tensor :math:`\theta_t`
+                - condition (Tensor): The conditioning tensor :math:`x_o`
+                - times (Tensor): The time parameter tensor :math:`t`
             net: The neural network that is used by the function :math:`f`.
                 This is never called explicitly by the NeuralODE class,
                 but is used to track the parameters of the neural network.

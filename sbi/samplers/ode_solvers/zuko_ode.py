@@ -1,3 +1,6 @@
+# This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+
 """
 Zuko ODE solver.
 """
@@ -8,13 +11,13 @@ from torch.distributions import Distribution
 from zuko.distributions import DiagNormal, NormalizingFlow
 from zuko.transforms import FreeFormJacobianTransform
 
-from sbi.samplers.ode_solvers.base import NeuralODE, NeuralODEFuncType
+from sbi.samplers.ode_solvers.base import NeuralODE, NeuralODEFunc
 
 
 class ZukoNeuralODE(NeuralODE):
     def __init__(
         self,
-        f: NeuralODEFuncType,
+        f: NeuralODEFunc,
         net: nn.Module,
         mean_base: Tensor,
         std_base: Tensor,
@@ -34,11 +37,11 @@ class ZukoNeuralODE(NeuralODE):
            https://arxiv.org/abs/1810.01367
 
         Args:
-            f: The function to be integrated.
-                Must accept three arguments in the order:
-                    - input (Tensor): The input state tensor :math:`\theta_t`
-                    - condition (Tensor): The conditioning tensor :math:`x_o`
-                    - time (Tensor): The time parameter tensor :math:`t`
+            f: The function to be integrated that implements the `NeuralODEFunc`
+                protocol. Must accept three arguments in the order:
+                - input (Tensor): The input state tensor :math:`\theta_t`
+                - condition (Tensor): The conditioning tensor :math:`x_o`
+                - times (Tensor): The time parameter tensor :math:`t`
             net: The neural network that is used by the function :math:`f`.
                 This is never called explicitly by the NeuralODE class,
                 but is used to track the parameters of the neural network.
