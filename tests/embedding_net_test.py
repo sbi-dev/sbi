@@ -184,14 +184,13 @@ def test_1d_and_2d_cnn_embedding_net(input_shape, num_channels):
     posterior.potential(s)
 
 
-@pytest.mark.parametrize("n_points", (32, 16))
+@pytest.mark.parametrize("input_shape", [(3, 30), (2, 3, 30)])
 @pytest.mark.parametrize("modes", (4, 8))
-@pytest.mark.parametrize("in_channels", (1, 2))
 @pytest.mark.parametrize("conv_channels", (8, 5))
 @pytest.mark.parametrize("num_layers", (2, 3))
-def test_spectral_conf_embedding(
-    n_points, modes, in_channels, conv_channels, num_layers
-):
+def test_spectral_conf_embedding(input_shape, modes, conv_channels, num_layers):
+    n_points = input_shape[-1]
+    in_channels = input_shape[-2]
     estimator_provider = posterior_nn(
         "mdn",
         embedding_net=SpectralConvEmbedding(
@@ -202,13 +201,20 @@ def test_spectral_conf_embedding(
         ),
     )
 
-    num_dim = in_channels * n_points
+    def simulator(theta, input_shape=input_shape):
+        x = torch.rand_like(theta) + theta
+        return repeat_to_match_shape(x, input_shape)
 
-    def simulator(theta):
-        return torch.rand_like(theta) + theta
+    def repeat_to_match_shape(x, input_shape):
+        batch_size = x.shape[0]  # First dimension is batch
+        target_shape = (batch_size, *input_shape)
+        x_expanded = x.view(batch_size, *([1] * (len(input_shape) - 1)), -1)
+        return x_expanded.expand(target_shape)
 
-    xo = torch.ones(num_dim)
-    prior = MultivariateNormal(torch.zeros(num_dim), torch.eye(num_dim))
+    xo = torch.ones((1, n_points))
+    xo = repeat_to_match_shape(xo, input_shape)
+
+    prior = MultivariateNormal(torch.zeros(n_points), torch.eye(n_points))
 
     num_simulations = 1000
     theta = prior.sample(torch.Size((num_simulations,)))
