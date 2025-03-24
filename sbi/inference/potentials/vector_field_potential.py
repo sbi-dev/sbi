@@ -86,7 +86,8 @@ class VectorFieldBasedPotential(BasePotential):
             iid_params: Parameters for the iid method, for arguments see
                 `IIDScoreFunction`.
             device: The device on which to evaluate the potential.
-            neural_ode_backend: The backend to use for the neural ODE.
+            neural_ode_backend: The backend to use for the neural ODE. Currently,
+                only "zuko" is supported.
             neural_ode_kwargs: Additional keyword arguments for the neural ODE.
         """
         self.vector_field_estimator = vector_field_estimator
