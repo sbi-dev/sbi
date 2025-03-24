@@ -124,7 +124,7 @@ class VectorFieldInference(NeuralInference):
                 much VRAM can set to 'cpu' to store data on system memory instead.
 
         Returns:
-            NeuralInference object (returned so that this function is chainable).
+            VectorFieldInference object (returned so that this function is chainable).
         """
         assert proposal is None, (
             "Multi-round NPSE is not yet implemented. Please use single-round NPSE."
@@ -188,8 +188,14 @@ class VectorFieldInference(NeuralInference):
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[dict] = None,
     ) -> ConditionalVectorFieldEstimator:
-        r"""Returns a score estimator that approximates the score
-        $\nabla_\theta \log p(\theta|x)$. The denoising score matching loss has a high
+        r"""Returns a vector field estimator that approximates the posterior
+        $p(\theta|x)$ through a continuous transformation from the base distribution
+        to the target posterior.
+
+        NOTE: This method is common for both score-based methods (NPSE) and flow
+        matching methods (FMPE).
+
+        The denoising score matching loss has a high
         variance, which makes it more difficult to detect converegence. To reduce this
         variance, we evaluate the validation loss at a fixed set of times. We also use
         the exponential moving average of the training and validation losses, as opposed
@@ -231,7 +237,7 @@ class VectorFieldInference(NeuralInference):
                 and validation dataloaders (like, e.g., a collate_fn)
 
         Returns:
-            Score estimator that approximates the posterior score.
+            Vector field estimator that approximates the posterior.
         """
         # Load data from most recent round.
         self._round = max(self._data_round_index)
@@ -453,7 +459,7 @@ class VectorFieldInference(NeuralInference):
         sample_with: str = "sde",
         **kwargs,
     ) -> VectorFieldPosterior:
-        r"""Build posterior from the score estimator.
+        r"""Build posterior from the vector field estimator.
 
         For NPSE, the posterior distribution that is returned here implements the
         following functionality over the raw neural density estimator:
@@ -462,13 +468,14 @@ class VectorFieldInference(NeuralInference):
         - reject samples that lie outside of the prior bounds.
 
         Args:
-            vector_field_estimator: The score estimator that the posterior is based on.
-                If `None`, use the latest neural score estimator that was trained.
+            vector_field_estimator: The vector field estimator that the posterior
+                is based on. If `None`, use the latest vector field estimator that was
+                trained.
             prior: Prior distribution.
             sample_with: Method to use for sampling from the posterior. Can be one of
-                'sde' (default) or 'ode'. The 'sde' method uses the score to
-                do a Langevin diffusion step, while the 'ode' method uses the score to
-                define a probabilistic ODE and solves it with a numerical ODE solver.
+                'sde' (default) or 'ode'. The 'sde' method uses the vector field to
+                do a Langevin diffusion step, while the 'ode' solves a probabilistic ODE
+                with a numerical ODE solver.
             **kwargs: Additional keyword arguments passed to
                 `VectorFieldBasedPotential`.
 
@@ -476,9 +483,10 @@ class VectorFieldInference(NeuralInference):
             Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods.
         """
         if prior is None:
+            cls_name = self.__class__.__name__
             assert self._prior is not None, (
                 "You did not pass a prior. You have to pass the prior either at "
-                "initialization `inference = NPSE(prior)` or to "
+                f"initialization `inference = {cls_name}(prior)` or to "
                 "`.build_posterior(prior=prior)`."
             )
             prior = self._prior
@@ -491,8 +499,8 @@ class VectorFieldInference(NeuralInference):
             device = self._device
         # Otherwise, infer it from the device of the net parameters.
         else:
-            # TODO: Add protocol for checking if the score estimator has forward and
-            # loss methods with the correct signature.
+            # TODO: Add protocol for checking if the vector field estimator has forward
+            # and loss methods with the correct signature.
             device = str(next(vector_field_estimator.parameters()).device)
 
         posterior = VectorFieldPosterior(
@@ -528,8 +536,8 @@ class VectorFieldInference(NeuralInference):
         times: Optional[Tensor] = None,
         force_first_round_loss: bool = False,
     ) -> Tensor:
-        """Return loss from score estimator. Currently only single-round NPSE
-         is implemented, i.e., no proposal correction is applied for later rounds.
+        """Return loss from vector field estimator. Currently only single-round training
+        is implemented, i.e., no proposal correction is applied for later rounds.
 
         The loss is the negative log prob. Irrespective of the round or SNPE method
         (A, B, or C), it can be weighted with a calibration kernel.

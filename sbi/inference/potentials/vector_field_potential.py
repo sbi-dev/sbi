@@ -30,7 +30,8 @@ def vector_field_estimator_based_potential(
     enable_transform: bool = True,
     **kwargs,
 ) -> Tuple["VectorFieldBasedPotential", TorchTransform]:
-    r"""Returns the potential function gradient for score estimators.
+    r"""
+    Returns the potential function gradient for vector field estimators.
 
     Args:
         vector_field_estimator: The neural network modelling the vector field.
@@ -68,10 +69,16 @@ class VectorFieldBasedPotential(BasePotential):
         neural_ode_backend: str = "zuko",
         neural_ode_kwargs: Optional[Dict[str, Any]] = None,
     ):
-        r"""Returns the score function for score-based methods.
+        r"""
+        Potential class for vector field estimators. Implements the potential function
+        via the probability flow ODE and the gradient via the score estimator. If
+        the vector field estimator does not define the score (SCORE_DEFINED = False),
+        the gradient is not available and an error is raised.
+
+        Note that the potential function is not defined for the iid setting yet.
 
         Args:
-            vector_field_estimator: The neural network modelling the score.
+            vector_field_estimator: The neural network modelling the vector field.
             prior: The prior distribution.
             x_o: The observed data at which to evaluate the posterior.
             iid_method: Which method to use for computing the score in the iid setting.
@@ -112,7 +119,7 @@ class VectorFieldBasedPotential(BasePotential):
         """
         Set the observed data and whether it is IID.
 
-        Rebuids the continuous normalizing flow if the observed data is set.
+        Rebuilds the continuous normalizing flow if the observed data is set.
 
         Args:
             x_o: The observed data.
@@ -136,7 +143,8 @@ class VectorFieldBasedPotential(BasePotential):
         theta: Tensor,
         track_gradients: bool = False,
     ) -> Tensor:
-        """Return the potential (posterior log prob) via probability flow ODE.
+        """
+        Return the potential (posterior log prob) via probability flow ODE.
 
         Args:
             theta: The parameters at which to evaluate the potential.
@@ -145,7 +153,7 @@ class VectorFieldBasedPotential(BasePotential):
         Returns:
             The potential function, i.e., the log probability of the posterior.
         """
-
+        # TODO: incorporate iid setting. See issue #1450 and PR #1508
         if self.x_is_iid:
             if (
                 self.vector_field_estimator.MARGINALS_DEFINED
@@ -201,6 +209,9 @@ class VectorFieldBasedPotential(BasePotential):
 
         Returns:
             The gradient of the potential function.
+
+        Raises:
+            ValueError: If the score is not defined for this vector field estimator.
         """
         if not self.vector_field_estimator.SCORE_DEFINED:
             raise ValueError(

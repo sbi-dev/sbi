@@ -30,19 +30,21 @@ from sbi.utils.torchutils import ensure_theta_batched
 
 
 class VectorFieldPosterior(NeuralPosterior):
-    r"""Posterior $p(\theta|x_o)$ with `log_prob()` and `sample()` methods. It samples
-    from the diffusion model given the score_estimator and rejects samples that lie
-    outside of the prior bounds.
+    r"""
+    Posterior $p(\theta|x_o)$ with `log_prob()` and `sample()` methods. It samples
+    from the vector field model - typically a score-based or a flow matching model -
+    given the vector_field_estimator and rejects samples that lie outside of the prior
+    bounds.
 
-    The posterior is defined by a score estimator and a prior. The score estimator
-    provides the gradient of the log-posterior with respect to the parameters. The prior
-    is used to reject samples that lie outside of the prior bounds.
-
-    Sampling is done by running a diffusion process with a predictor and optionally a
-    corrector.
+    The posterior is defined by a vector field estimator and a prior. The vector field
+    estimator defines a continuous transformation from a base distribution to the
+    approximated posterior distribution. Sampling is done by running either
+    an ordinary differential equation (ODE) or a stochastic differential equation
+    (SDE) defined by the vector field estimator with the starting points sampled from
+    the base distribution.
 
     Log probabilities are obtained by calling the potential function, which in turn uses
-    zuko probabilistic ODEs to compute the log-probability.
+    ODE to compute the log-probability.
     """
 
     def __init__(
@@ -58,7 +60,7 @@ class VectorFieldPosterior(NeuralPosterior):
         """
         Args:
             prior: Prior distribution with `.log_prob()` and `.sample()`.
-            vector_field_estimator: The trained neural score estimator.
+            vector_field_estimator: The trained vector field estimator.
             max_sampling_batch_size: Batchsize of samples being drawn from
                 the proposal at every iteration.
             device: Training device, e.g., "cpu", "cuda" or "cuda:0". If None,
@@ -98,7 +100,7 @@ class VectorFieldPosterior(NeuralPosterior):
         ], f"sample_with must be 'ode' or 'sde', but is {self.sample_with}."
         self.max_sampling_batch_size = max_sampling_batch_size
 
-        self._purpose = """It samples from the diffusion model given the \
+        self._purpose = """It samples from the vector field model given the \
             vector_field_estimator."""
 
     def sample(
@@ -121,16 +123,18 @@ class VectorFieldPosterior(NeuralPosterior):
 
         Args:
             sample_shape: Shape of the samples to be drawn.
-            predictor: The predictor for the diffusion-based sampler. Can be a string or
+            predictor: The predictor for the vector field sampler. Can be a string or
                 a custom predictor following the API in `sbi.samplers.score.predictors`.
                 Currently, only `euler_maruyama` is implemented.
-            corrector: The corrector for the diffusion-based sampler. Either of
+            corrector: The corrector for the vector field sampler. Either of
                 [None].
             predictor_params: Additional parameters passed to predictor.
             corrector_params: Additional parameters passed to corrector.
             steps: Number of steps to take for the Euler-Maruyama method.
-            ts: Time points at which to evaluate the diffusion process. If None, a
-                linear grid between t_max and t_min is used.
+                If `sample_with` is "ode", this is ignored.
+            ts: Time points at which to evaluate the vector field process. If None, a
+                linear grid between t_max and t_min is used. If `sample_with` is "ode",
+                this is ignored.
             iid_method: Which method to use for computing the score in the iid setting.
                 We currently support "fnpe", "gauss", "auto_gauss", "jac_gauss". The
                 fnpe method is simple and generally applicable. However, it can become
@@ -141,11 +145,15 @@ class VectorFieldPosterior(NeuralPosterior):
                 however requires estimating some hyperparamters, which is done in a
                 systematic way in the "auto_gauss" (initial overhead) and "jac_gauss"
                 (iterative jacobian computations are expensive). We default to
-                "auto_gauss" for these reasons.
+                "auto_gauss" for these reasons. Note that in order to use the iid
+                method, the vector field estimator must support it and have
+                SCORE_DEFINED and MARGINALS_DEFINED class attributes set to True.
             iid_params: Additional parameters passed to the iid method. See the specific
                 `IIDScoreFunction` child class for details.
             max_sampling_batch_size: Maximum batch size for sampling.
-            sample_with: Sampling method to use - 'ode' or 'sde'.
+            sample_with: Sampling method to use - 'ode' or 'sde'. Note that in order to
+                use the 'sde' sampling method, the vector field estimator must support
+                it and have the SCORE_DEFINED class attribute set to True.
             show_progress_bars: Whether to show a progress bar during sampling.
         """
 
@@ -211,6 +219,7 @@ class VectorFieldPosterior(NeuralPosterior):
         show_progress_bars: bool = True,
     ) -> Tensor:
         r"""Return samples from posterior distribution $p(\theta|x)$.
+        Note that this method can be unsupported for some vector field estimators.
 
         Args:
             sample_shape: Shape of the samples to be drawn.
@@ -228,6 +237,11 @@ class VectorFieldPosterior(NeuralPosterior):
             show_progress_bars: Whether to show a progress bar during sampling.
         """
 
+        if not self.vector_field_estimator.SCORE_DEFINED:
+            raise ValueError(
+                "The vector field estimator does not support the 'sde' sampling method."
+            )
+
         num_samples = torch.Size(sample_shape).numel()
 
         max_sampling_batch_size = (
@@ -236,7 +250,7 @@ class VectorFieldPosterior(NeuralPosterior):
             else max_sampling_batch_size
         )
 
-        # TODO: the time schedule should be provided by the vector field estimator.
+        # TODO: he time schedule should be provided by the estimator, see issue #1437
         if ts is None:
             t_max = self.vector_field_estimator.t_max
             t_min = self.vector_field_estimator.t_min
@@ -270,22 +284,26 @@ class VectorFieldPosterior(NeuralPosterior):
     def sample_via_ode(
         self,
         sample_shape: Shape = torch.Size(),
+        **kwargs,
     ) -> Tensor:
-        r"""Return samples from posterior distribution with probability flow ODE.
+        r"""
+        Return samples from posterior distribution with probability flow ODE.
 
-        This build the probability flow ODE and then samples from the corresponding
-        flow. This is implemented via the zuko library.
+        This builds the probability flow ODE and then samples from the corresponding
+        flow.
 
         Args:
-            x: Condition.
             sample_shape: The shape of the samples to be returned.
+            **kwargs: Additional keyword arguments for the ODE solver that
+                depend on the used ODE backend.
 
         Returns:
-            Samples.
+            Samples from the approximated posterior distribution
+                :math:`\theta \sim p(\theta|x)`.
         """
         num_samples = torch.Size(sample_shape).numel()
 
-        samples = self.potential_fn.neural_ode(self.potential_fn.x_o).sample(
+        samples = self.potential_fn.neural_ode(self.potential_fn.x_o, **kwargs).sample(
             torch.Size((num_samples,))
         )
 
