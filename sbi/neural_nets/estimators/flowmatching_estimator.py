@@ -269,9 +269,8 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         Returns:
             Drift function at a given time.
         """
-        # TODO: derive taking into account the noise sigma_min added to the vector field
-        return -input / torch.maximum(1 - times, torch.tensor(1e-6))
         # analytical f(t) does not depend on noise_scale and is undefined at t = 1.
+        return -input / torch.maximum(1 - times, torch.tensor(1e-6).to(input))
 
     def diffusion_fn(self, input: Tensor, times: Tensor) -> Tensor:
         r"""Diffusion function for the flow matching estimator.
