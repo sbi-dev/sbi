@@ -275,17 +275,6 @@ def test_c2st(npse_trained_model, sampling_test_case: NpseSamplingTestCase):
         f"-{test_case.num_dim}D-{sampling_test_case.sampling_method}",
         tol=0.05 * min(sampling_test_case.num_trials, 8),
     )
-    if test_case.prior_type == "gaussian":
-        gt_posterior = true_posterior_linear_gaussian_mvn_prior(
-            x_o,
-            test_case.likelihood_shift,
-            test_case.likelihood_cov,
-            test_case.prior_mean,
-            test_case.prior_cov,
-        )
-
-        map_ = posterior.map(show_progress_bars=True, num_iter=5)
-        assert ((map_ - gt_posterior.mean) ** 2).sum() < 0.5, "MAP is not close to GT."
 
 
 @pytest.mark.slow
@@ -308,6 +297,29 @@ def test_kld_gaussian(npse_trained_model):
     )
     max_dkl = 0.15
     assert dkl < max_dkl, f"D-KL={dkl} is more than 2std above the average performance."
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize(
+    "npse_trained_model", training_test_cases_gaussian, indirect=True, ids=str
+)
+def test_npse_map(npse_trained_model):
+    inference, score_estimator, test_case = npse_trained_model
+    x_o = zeros(1, test_case.num_dim)
+    gt_posterior = true_posterior_linear_gaussian_mvn_prior(
+        x_o,
+        test_case.likelihood_shift,
+        test_case.likelihood_cov,
+        test_case.prior_mean,
+        test_case.prior_cov,
+    )
+
+    map_ = (
+        inference.build_posterior()
+        .set_default_x(x_o)
+        .map(show_progress_bars=True, num_iter=5)
+    )
+    assert ((map_ - gt_posterior.mean) ** 2).sum() < 0.5, "MAP is not close to GT."
 
 
 @pytest.mark.parametrize(
