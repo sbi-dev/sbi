@@ -1,7 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Dict, Optional, Union
+from typing import Dict, Literal, Optional, Union
 
 import torch
 from torch import Tensor
@@ -113,7 +113,7 @@ class VectorFieldPosterior(NeuralPosterior):
         corrector_params: Optional[Dict] = None,
         steps: int = 500,
         ts: Optional[Tensor] = None,
-        iid_method: str = "auto_gauss",
+        iid_method: Literal["fnpe", "gauss", "auto_gauss", "jac_gauss"] = "auto_gauss",
         iid_params: Optional[Dict] = None,
         max_sampling_batch_size: int = 10_000,
         sample_with: Optional[str] = None,

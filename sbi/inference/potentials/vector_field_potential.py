@@ -1,7 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Literal, Optional, Tuple
 
 import torch
 from torch import Tensor
@@ -63,7 +63,7 @@ class VectorFieldBasedPotential(BasePotential):
         vector_field_estimator: ConditionalVectorFieldEstimator,
         prior: Optional[Distribution],
         x_o: Optional[Tensor] = None,
-        iid_method: str = "auto_gauss",
+        iid_method: Literal["fnpe", "gauss", "auto_gauss", "jac_gauss"] = "auto_gauss",
         iid_params: Optional[Dict[str, Any]] = None,
         device: str = "cpu",
         neural_ode_backend: str = "zuko",
@@ -112,7 +112,7 @@ class VectorFieldBasedPotential(BasePotential):
         self,
         x_o: Optional[Tensor],
         x_is_iid: Optional[bool] = False,
-        iid_method: str = "auto_gauss",
+        iid_method: Literal["fnpe", "gauss", "auto_gauss", "jac_gauss"] = "auto_gauss",
         iid_params: Optional[Dict[str, Any]] = None,
         **ode_kwargs,
     ):
