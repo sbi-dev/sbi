@@ -9,7 +9,7 @@ import warnings
 import torch
 import torch.nn as nn
 
-from sbi.utils.metrics import c2st
+from sbi.utils.metrics import check_c2st
 
 
 def rbf_kernel(x, y, bandwidth):
@@ -142,7 +142,7 @@ def calc_misspecification_mmd(
     return p_val, (mmds_baseline, mmd)
 
 
-def log_prob_hypothesis_test(log_probs, log_prob_xo, alpha=0.05):
+def _log_prob_hypothesis_test(log_probs, log_prob_xo, alpha=0.05):
     """
     Perform a hypothesis test to check if log_prob_xo is unusually low
     compared to the given log probabilities from the distribution.
@@ -165,23 +165,13 @@ def log_prob_hypothesis_test(log_probs, log_prob_xo, alpha=0.05):
     return p_value, reject_H0
 
 
-def check_c2st(x, y, alg: str, tol: float = 0.1) -> None:
-    """Compute classification based two-sample test accuracy and assert it close to
-    chance."""
-
-    score = c2st(x, y).item()
-    # print(f"c2st for {alg} is {score:.2f}.")
-
-    assert (0.5 - tol) <= score <= (0.5 + tol), (
-        f"{alg}'s c2st={score:.2f} is too far from the desired near-chance performance."
-    )
-
-
 def calc_misspecification_logprob(x_val, x_o, estimator, alpha=0.05):
     """
     Perform a hypothesis test to check if estimator.log_prob(`xo`)
     is unusually low compared to the log probabilities of samples
-    in `x_val`.
+    in `x_val`. First it performs a c2st check of the `estimator`
+    using `x_val`, and warns the user if c2st is poor as test
+    results might not be meaningful.
 
     Parameters:
     - x_val: array-like, known samples to compute baseline logprobs
@@ -209,7 +199,7 @@ def calc_misspecification_logprob(x_val, x_o, estimator, alpha=0.05):
             stacklevel=2,
         )
     # then go ahead to do the logprob hypothesis test
-    p_value, reject_H0 = log_prob_hypothesis_test(
+    p_value, reject_H0 = _log_prob_hypothesis_test(
         log_probs_val, log_prob_xo, alpha=alpha
     )
     return p_value, reject_H0
