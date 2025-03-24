@@ -134,8 +134,9 @@ class VectorFieldInference(NeuralInference, ABC):
             theta: Parameter sets.
             x: Simulation outputs.
             proposal: The distribution that the parameters $\theta$ were sampled from.
-                Pass `None` if the parameters were sampled from the prior. If not
-                `None`, it will trigger a different loss-function.
+                Pass `None` if the parameters were sampled from the prior. Multi-round
+                training is not yet implemented, so anything other than `None` will
+                raise an error.
             exclude_invalid_x: Whether invalid simulations are discarded during
                 training. For single-round training, it is fine to discard invalid
                 simulations, but for multi-round sequential (atomic) training,
