@@ -254,12 +254,43 @@ class SpectralConvEmbedding(nn.Module):
         """Network forward pass.
 
         Args:
-            x: 2D input tensor (batch_size, channels * n_points) for equi-spaced data or
-            3D tensor (batch_size, 2, channels * n_points) for non-equispaced data,
+            x: 2D input tensor (batch_size, in_channels, n_points) for equi-spaced data
+            or 3D tensor (batch_size, 2, in_channels, n_points) for non-equispaced data,
             where we additionally pass the point positions in the second dimension,
             repeating the same point positions for each channel.
             For non-equispaced data, the positions have to be normalized with
             physical domain length.
+
+        Exemplary code:
+
+        # Example for equispaced grid data with batch size of 256, 3 channels and
+        # sequence length of 500
+        data_equispaced = torch.rand(256, 3, 500)
+        embedding_net = SpectralConvEmbedding(modes=15, in_channels=3,
+            out_channels=1, conv_channels=5, num_layers=4)
+        neural_posterior = posterior_nn(model="nsf", embedding_net=embedding_net)
+        inference = SNPE(prior=sbi_prior, density_estimator=neural_posterior)
+        _ = inference.append_simulations(theta, data_equispaced)
+
+        # Example for non-equispaced data with batch size of 256, 3 channels and
+        # sequence length of 500
+        irregular_positions = torch.rand(500) # non-equally spaced positions in [0;1]
+        irregular_positions, indices = torch.sort(irregular_positions, 0)
+        irregular_positions = irregular_positions.repeat(256, 3, 1)
+
+        random_data = torch.rand(256, 3, 500)
+
+        data_nonequispaced = torch.zeros(256, 2, 3, 500)
+        data_nonequispaced[:, 0, :, :] = random_data
+        data_nonequispaced[:, 1, :, :] = irregular_positions
+
+        embedding_net = SpectralConvEmbedding(modes=15, in_channels=3, out_channels=1,
+            conv_channels=5, num_layers=4)
+        neural_posterior = posterior_nn(model="nsf", embedding_net=embedding_net)
+        inference = SNPE(prior=sbi_prior, density_estimator=neural_posterior)
+        _ = inference.append_simulations(theta, data_nonequispaced)
+
+
 
         Returns:
             Network output (batch_size, out_channels * 2 * modes).
