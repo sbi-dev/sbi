@@ -2,9 +2,9 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import time
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from copy import deepcopy
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, Optional, Protocol, Union
 
 import torch
 from torch import Tensor, ones
@@ -34,11 +34,30 @@ from sbi.utils.sbiutils import ImproperEmpirical, mask_sims_from_prior
 from sbi.utils.torchutils import assert_all_finite
 
 
-class VectorFieldInference(NeuralInference):
+class VectorFieldEstimatorBuilder(Protocol):
+    """Protocol for building a vector field estimator from data."""
+
+    def __call__(self, theta: Tensor, x: Tensor) -> ConditionalVectorFieldEstimator:
+        """Build a vector field estimator from theta and x, which mainly
+        inform the shape of the input and the condition to the neural network.
+        Generally, it can also be used to z-score the data, but not in the case
+        of vector field estimators.
+
+        Args:
+            theta: Parameter sets.
+            x: Simulation outputs.
+
+        Returns:
+            Vector field estimator.
+        """
+        ...
+
+
+class VectorFieldInference(NeuralInference, ABC):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
-        vector_field_estimator: Union[str, Callable] = "mlp",
+        vector_field_estimator_builder: Union[str, VectorFieldEstimatorBuilder] = "mlp",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
@@ -54,15 +73,18 @@ class VectorFieldInference(NeuralInference):
 
         Args:
             prior: Prior distribution.
-            vector_field_estimator: Neural network architecture for the score estimator.
-                Can be a string (e.g. 'mlp' or 'ada_mlp') or a callable that returns a
-                neural network.
+            vector_field_estimator_builder: Neural network architecture for the
+                vector field estimator. Can be a string (e.g. 'mlp' or 'ada_mlp') or a
+                callable that implements the `VectorFieldEstimatorBuilder` protocol
+                with `__call__` that receives `theta` and `x` and returns a
+                `ConditionalVectorFieldEstimator`.
             device: Device to run the training on.
             logging_level: Logging level for the training. Can be an integer or a
                 string.
             summary_writer: Tensorboard summary writer.
             show_progress_bars: Whether to show progress bars during training.
-            kwargs: Additional keyword arguments.
+            kwargs: Additional keyword arguments passed to the default builder if
+                `vector_field_estimator_builder` is a string.
         """
 
         super().__init__(
@@ -78,18 +100,18 @@ class VectorFieldInference(NeuralInference):
         # `_build_neural_net`. It will be called in the first round and receive
         # thetas and xs as inputs, so that they can be used for shape inference and
         # potentially for z-scoring.
-        check_estimator_arg(vector_field_estimator)
-        if isinstance(vector_field_estimator, str):
+        check_estimator_arg(vector_field_estimator_builder)
+        if isinstance(vector_field_estimator_builder, str):
             self._build_neural_net = self._build_default_nn_fn(
-                vector_field_estimator=vector_field_estimator, **kwargs
+                vector_field_estimator_builder=vector_field_estimator_builder, **kwargs
             )
         else:
-            self._build_neural_net = vector_field_estimator
+            self._build_neural_net = vector_field_estimator_builder
 
         self._proposal_roundwise = []
 
     @abstractmethod
-    def _build_default_nn_fn(self, **kwargs) -> Callable:
+    def _build_default_nn_fn(self, **kwargs) -> VectorFieldEstimatorBuilder:
         pass
 
     def append_simulations(
@@ -115,10 +137,11 @@ class VectorFieldInference(NeuralInference):
                 Pass `None` if the parameters were sampled from the prior. If not
                 `None`, it will trigger a different loss-function.
             exclude_invalid_x: Whether invalid simulations are discarded during
-                training. For single-round SNPE, it is fine to discard invalid
-                simulations, but for multi-round SNPE (atomic), discarding invalid
-                simulations gives systematically wrong results. If `None`, it will
-                be `True` in the first round and `False` in later rounds.
+                training. For single-round training, it is fine to discard invalid
+                simulations, but for multi-round sequential (atomic) training,
+                discarding invalid simulations gives systematically wrong results. If
+                `None`, it will be `True` in the first round and `False` in later
+                rounds. Note that multi-round training is not yet implemented.
             data_device: Where to store the data, default is on the same device where
                 the training is happening. If training a large dataset on a GPU with not
                 much VRAM can set to 'cpu' to store data on system memory instead.
@@ -126,8 +149,10 @@ class VectorFieldInference(NeuralInference):
         Returns:
             VectorFieldInference object (returned so that this function is chainable).
         """
+        inference_name = self.__class__.__name__
         assert proposal is None, (
-            "Multi-round NPSE is not yet implemented. Please use single-round NPSE."
+            f"Multi-round {inference_name} is not yet implemented. "
+            f"Please use single-round {inference_name}."
         )
         current_round = 0
 
@@ -151,7 +176,12 @@ class VectorFieldInference(NeuralInference):
         # Check for problematic z-scoring
         warn_if_zscoring_changes_data(x)
 
-        npe_msg_on_invalid_x(num_nans, num_infs, exclude_invalid_x, "Single-round NPE")
+        npe_msg_on_invalid_x(
+            num_nans,
+            num_infs,
+            exclude_invalid_x,
+            algorithm=f"Single-round {inference_name}",
+        )
 
         self._data_round_index.append(current_round)
         prior_masks = mask_sims_from_prior(int(current_round > 0), theta.size(0))
@@ -499,12 +529,10 @@ class VectorFieldInference(NeuralInference):
             device = self._device
         # Otherwise, infer it from the device of the net parameters.
         else:
-            # TODO: Add protocol for checking if the vector field estimator has forward
-            # and loss methods with the correct signature.
             device = str(next(vector_field_estimator.parameters()).device)
 
         posterior = VectorFieldPosterior(
-            vector_field_estimator,  # type: ignore
+            vector_field_estimator,
             prior,
             device=device,
             sample_with=sample_with,
@@ -524,7 +552,8 @@ class VectorFieldInference(NeuralInference):
         masks: Tensor,
         proposal: Optional[Any],
     ) -> Tensor:
-        raise NotImplementedError("Multi-round NPSE is not yet implemented.")
+        cls_name = self.__class__.__name__
+        raise NotImplementedError(f"Multi-round {cls_name} is not yet implemented.")
 
     def _loss(
         self,
@@ -536,25 +565,35 @@ class VectorFieldInference(NeuralInference):
         times: Optional[Tensor] = None,
         force_first_round_loss: bool = False,
     ) -> Tensor:
-        """Return loss from vector field estimator. Currently only single-round training
-        is implemented, i.e., no proposal correction is applied for later rounds.
+        r"""Return loss from vector field estimator. Currently only single-round
+        training is implemented, i.e., no proposal correction is applied for later
+        rounds.
 
-        The loss is the negative log prob. Irrespective of the round or SNPE method
-        (A, B, or C), it can be weighted with a calibration kernel.
+        The loss can be weighted with a calibration kernel.
+
+        Args:
+            theta: Parameter sets :math:`\theta`.
+            x: Simulation outputs :math:`x`.
+            masks: Prior masks. Ignored for now.
+            proposal: Proposal distribution. Ignored for now.
+            calibration_kernel: Calibration kernel.
+            times: Times :math:`t`.
+            force_first_round_loss: If `True`, ignore the correction for using a
+                proposal distribution different from the prior. Since the
+                correction is not implemented yet, `False` will raise an error
+                on any round other than the first one.
 
         Returns:
-            Calibration kernel-weighted negative log prob.
-            force_first_round_loss: If `True`, train with maximum likelihood,
-                i.e., potentially ignoring the correction for using a proposal
-                distribution different from the prior.
+            Calibration kernel-weighted loss implemented by the vector field estimator.
         """
+        cls_name = self.__class__.__name__
         if self._round == 0 or force_first_round_loss:
             # First round loss.
-            loss = self._neural_net.loss(theta, x, times)
+            loss = self._neural_net.loss(theta, x, times=times)
         else:
             raise NotImplementedError(
-                "Multi-round NPSE with arbitrary proposals is not implemented"
+                f"Multi-round {cls_name} with arbitrary proposals is not implemented"
             )
 
-        assert_all_finite(loss, "NPSE loss")
+        assert_all_finite(loss, f"{cls_name} loss")
         return calibration_kernel(x) * loss

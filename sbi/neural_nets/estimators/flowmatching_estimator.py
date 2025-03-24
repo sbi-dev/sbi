@@ -194,7 +194,7 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
             (self.forward(theta_t, condition, times) - vector_field) ** 2, dim=-1
         )
 
-    def ode_fn(self, input: Tensor, condition: Tensor, t: Tensor) -> Tensor:
+    def ode_fn(self, input: Tensor, condition: Tensor, times: Tensor) -> Tensor:
         r"""
         ODE flow function :math:`v(\theta_t, t, x_o)` of the vector field estimator.
 
@@ -211,13 +211,13 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         Args:
             input: :math:`\theta_t`.
             condition: Conditioning variable :math:`x_o`.
-            t: Time :math:`t`.
+            times: Time :math:`t`.
 
         Returns:
             Estimated vector field :math:`v(\theta_t, t; x_o)`.
             The shape is the same as the input.
         """
-        return self.forward(input, condition, t)
+        return self.forward(input, condition, times)
 
     def score(self, input: Tensor, condition: Tensor, t: Tensor) -> Tensor:
         r"""Score function of the vector field estimator.
