@@ -59,9 +59,9 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         input_shape: torch.Size,
         condition_shape: torch.Size,
         embedding_net: Optional[nn.Module] = None,
-        num_freqs: int = 3,  # This is ignored!
+        num_freqs: int = 3,  # This is ignored and will be removed in PR #1501
         noise_scale: float = 1e-3,
-        zscore_transform_input=None,  # This is ignored!
+        zscore_transform_input=None,  # This is ignored and will be removed in PR #1501
         **kwargs,
     ) -> None:
         r"""Creates a vector field estimator for Flow Matching.
@@ -83,9 +83,8 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
             net=net, input_shape=input_shape, condition_shape=condition_shape
         )
 
-        self.num_freqs = num_freqs
+        self.num_freqs = num_freqs  # This will be removed in PR #1501
         self.noise_scale = noise_scale
-        # Identity transform for z-scoring the input
         self._embedding_net = (
             embedding_net if embedding_net is not None else nn.Identity()
         )
@@ -358,6 +357,7 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
             std_t = std_t.unsqueeze(-1)
         return std_t
 
+    # this method will be removed in PR #1501
     def _get_temporal_t_shape_fix(self, t: Tensor) -> Tensor:
         """
         This is a hack that allows us to use

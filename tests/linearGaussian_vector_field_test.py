@@ -209,7 +209,8 @@ def test_c2st_vector_field_on_linearGaussian_different_dims(vector_field_type):
     )
 
 
-# TODO: This should be unified with NPSE when the network builders are unified.
+# TODO: This should be unified with NPSE when the network builders are unified
+# in PR #1501
 @pytest.mark.parametrize("model", ["mlp", "resnet"])
 def test_fmpe_with_different_models(model):
     """Test fmpe with different vector field estimators on linear Gaussian."""
@@ -349,9 +350,8 @@ def test_vector_field_sde_ode_sampling_equivalence(vector_field_trained_model):
 
 
 # TODO: Currently, c2st is too high for FMPE (e.g., > 3 number of observations),
-# so some tests are skipped so far. It is unclear at the moment whether this is due to
-# some issues with the implementation, the nn architecture, or it is simply the case
-# with flow matching (compositional flow matching hasn't been tested yet elsewhere).
+# so some tests are skipped so far. This seems to be an issue with the
+# neural network architecture and can be addressed in PR #1501
 @pytest.mark.slow
 @pytest.mark.parametrize(
     "iid_method, num_trial",
@@ -381,6 +381,7 @@ def test_vector_field_iid_inference(
     prior_cov = vector_field_trained_model["prior_cov"]
     num_dim = vector_field_trained_model["num_dim"]
 
+    # TODO: This can be removed when PR #1501 is merged
     if vector_field_type == "fmpe" and (
         iid_method not in ["gauss", "fnpe"] or num_trial > 3 or prior_type != "gaussian"
     ):
