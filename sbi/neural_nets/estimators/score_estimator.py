@@ -28,10 +28,23 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
     where mean_t(t) and std_t(t) are the conditional mean and standard deviation at a
     given time t, respectively.
 
-    Relevant literature:
-    - Score-based generative modeling through SDE: https://arxiv.org/abs/2011.13456
-    - Denoising diffusion probabilistic models: https://arxiv.org/abs/2006.11239
-    - Noise conditional score networks: https://arxiv.org/abs/1907.05600
+    References
+    ----------
+    .. [1] Song, Y., Sohl-Dickstein, J., Kingma, D. P., Kumar, A., Ermon, S.,
+           & Poole, B. (2020).
+           "Score-based generative modeling through stochastic differential equations"
+           *Advances in Neural Information Processing Systems*
+           https://arxiv.org/abs/2011.13456
+
+    .. [2] Ho, J., Jain, A., & Abbeel, P. (2020).
+           "Denoising diffusion probabilistic models"
+           *Advances in Neural Information Processing Systems, 33, 6840-6851*
+           https://arxiv.org/abs/2006.11239
+
+    .. [3] Song, Y., & Ermon, S. (2019).
+           "Generative modeling by estimating gradients of the data distribution"
+           *Advances in Neural Information Processing Systems, 32*
+           https://arxiv.org/abs/1907.05600
 
     NOTE: This will follow the "noise matching" approach, we could also train a
     "denoising" network aiming to predict the original input given the noised input. We
@@ -365,8 +378,10 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         else:
             raise ValueError(f"Weight function {weight_fn} not recognized.")
 
-    def ode_fn(self, input: Tensor, condition: Tensor, t: Tensor) -> Tensor:
+    def ode_fn(self, input: Tensor, condition: Tensor, times: Tensor) -> Tensor:
         """ODE flow function of the score estimator.
+
+        For reference, see Equation 13 in [1]_.
 
         Args:
             input: variable whose distribution is estimated.
@@ -376,9 +391,9 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         Returns:
             ODE flow function value at a given time.
         """
-        score = self.forward(input=input, condition=condition, time=t)
-        f = self.drift_fn(input, t)
-        g = self.diffusion_fn(input, t)
+        score = self.score(input=input, condition=condition, t=times)
+        f = self.drift_fn(input, times)
+        g = self.diffusion_fn(input, times)
         v = f - 0.5 * g**2 * score
         return v
 
