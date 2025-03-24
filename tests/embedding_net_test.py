@@ -208,19 +208,19 @@ def test_spectral_conf_embedding(
         return torch.rand_like(theta) + theta
 
     xo = torch.ones(num_dim)
-    
     prior = MultivariateNormal(torch.zeros(num_dim), torch.eye(num_dim))
 
     num_simulations = 1000
     theta = prior.sample(torch.Size((num_simulations,)))
     x = simulator(theta)
-    
+
     trainer = NPE(prior=prior, density_estimator=estimator_provider)
     trainer.append_simulations(theta, x).train(max_num_epochs=2)
     posterior = trainer.build_posterior().set_default_x(xo)
 
     s = posterior.sample((10,))
     posterior.potential(s)
+
 
 @pytest.mark.parametrize("input_shape", [(32,), (64,)])
 @pytest.mark.parametrize("num_channels", (1, 2, 3))
