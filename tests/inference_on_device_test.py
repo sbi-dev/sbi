@@ -6,6 +6,7 @@ from __future__ import annotations
 import sys
 from typing import Tuple, Union
 
+import pymc
 import pytest
 import torch
 import torch.distributions.transforms as torch_tf
@@ -76,10 +77,10 @@ pytestmark = pytest.mark.skipif(
             "nuts_pymc",
             marks=(
                 pytest.mark.mcmc,
-                pytest.mark.xfail(
-                    condition=sys.version_info >= (3, 10),
-                    reason="Fails with pymc>=5.20.1 and python>=3.10",
-                    raises=TypeError,
+                pytest.mark.skipif(
+                    condition=sys.version_info >= (3, 10)
+                    and pymc.__version__ >= "5.20.1",
+                    reason="Inconsistent behaviour with pymc>=5.20.1 and python>=3.10",
                 ),
             ),
         ),
@@ -443,12 +444,15 @@ def test_vi_on_gpu(num_dim: int, q: str, vi_method: str, sampling_method: str):
         ("gpu", None),
         ("cpu", "cpu"),
         ("gpu", "gpu"),
+        (torch.device("cpu"), torch.device("cpu")),
         pytest.param("gpu", "cpu", marks=pytest.mark.xfail),
         pytest.param("cpu", "gpu", marks=pytest.mark.xfail),
     ],
 )
 def test_boxuniform_device_handling(arg_device, device):
-    """Test mismatch between device passed via low / high and device kwarg."""
+    """Test mismatch between device passed via low / high and device kwarg.
+
+    Also tests torch.device as argument of process_device."""
 
     arg_device = process_device(arg_device)
     device = process_device(device)
