@@ -137,8 +137,9 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
     def loss(
         self, input: Tensor, condition: Tensor, times: Optional[Tensor] = None, **kwargs
     ) -> Tensor:
-        r"""Return the loss for training the density estimator. More precisely,
-        we compute the conditional flow matching loss with naive optimal
+        r"""Return the loss for training the density estimator.
+
+        More precisely, we compute the conditional flow matching loss with naive optimal
         trajectories as described in the original paper [1]_:
 
         .. math::
