@@ -423,11 +423,11 @@ class NPE_C(PosteriorEstimator):
         # Evaluate the proposal. MDNs do not have functionality to run the embedding_net
         # and then get the mixture_components (**without** calling log_prob()). Hence,
         # we call them separately here.
-        encoded_x = proposal.posterior_estimator.net._embedding_net(proposal.default_x)
+        encoded_x = proposal.posterior_estimator.net._embedding_net(proposal.default_x)  # type: ignore
         dist = (
             proposal.posterior_estimator.net._distribution
         )  # defined to avoid ugly black formatting.
-        logits_p, m_p, prec_p, _, _ = dist.get_mixture_components(encoded_x)
+        logits_p, m_p, prec_p, _, _ = dist.get_mixture_components(encoded_x)  # type: ignore
         norm_logits_p = logits_p - torch.logsumexp(logits_p, dim=-1, keepdim=True)
 
         # Evaluate the density estimator.
@@ -545,7 +545,7 @@ class NPE_C(PosteriorEstimator):
 
         precisions_pp = precisions_p_rep + precisions_d_rep
         if isinstance(self._maybe_z_scored_prior, MultivariateNormal):
-            precisions_pp -= self._maybe_z_scored_prior.precision_matrix
+            precisions_pp -= self._maybe_z_scored_prior.precision_matrix  # type: ignore
 
         covariances_pp = torch.inverse(precisions_pp)
 
