@@ -229,6 +229,10 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
             \nabla_{\theta_t} \log p(\theta_t | x_o) =
             (- (1 - t) v(\theta_t, t; x_o) - \theta_0 ) / t
 
+        Taking into account the noise scale :math:`\sigma_{min}`, the score function is
+        :math:`\nabla_{\theta_t} \log p(\theta_t | x_o) =
+            (- (1 - t) v(\theta_t, t; x_o) - \theta_0 ) / (t + \sigma_{min})`.
+
         Args:
             input: variable whose distribution is estimated.
             condition: Conditioning variable.
@@ -237,9 +241,8 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         Returns:
             Score function of the vector field estimator.
         """
-        # TODO: derive taking into account the noise sigma_min added to the vector field
         v = self(input, condition, t)
-        score = (-(1 - t) * v - input) / torch.maximum(t, torch.tensor(1e-6))
+        score = (-(1 - t) * v - input) / (t + self.noise_scale)
         return score
 
     def drift_fn(self, input: Tensor, times: Tensor) -> Tensor:
@@ -268,6 +271,7 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         """
         # TODO: derive taking into account the noise sigma_min added to the vector field
         return -input / torch.maximum(1 - times, torch.tensor(1e-6))
+        # analytical f(t) does not depend on noise_scale and is undefined at t = 1.
 
     def diffusion_fn(self, input: Tensor, times: Tensor) -> Tensor:
         r"""Diffusion function for the flow matching estimator.
@@ -277,6 +281,13 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         .. math::
             \g(t) = \sqrt{2t / (1 - t)}
 
+        Taking into account the noise scale :math:`\sigma_{min}`, the diffusion
+        function becomes:
+
+        .. math::
+            \g(t) = \sqrt{2(t + \sigma_{min}) / (1 - t)}
+
+
         Args:
             input: Parameters :math:`\theta_t`.
             times: SDE time variable in [0,1].
@@ -284,8 +295,12 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         Returns:
             Diffusion function at a given time.
         """
-        # TODO: derive taking into account the noise sigma_min added to the vector field
-        return torch.sqrt(2 * times / torch.maximum(1 - times, torch.tensor(1e-6)))
+        # analytical g(t) is undefined at t = 1.
+        return torch.sqrt(
+            2
+            * (times + self.noise_scale)
+            / torch.maximum(1 - times, torch.tensor(1e-6).to(times))
+        )
 
     def mean_t_fn(self, times: Tensor) -> Tensor:
         r"""Linear coefficient of the perturbation kernel expectation
@@ -308,7 +323,6 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         Returns:
             Mean function at a given time.
         """
-        # TODO: derive taking into account the noise sigma_min added to the vector field
         mean_t = 1 - times
         for _ in range(len(self.input_shape)):
             mean_t = mean_t.unsqueeze(-1)
@@ -325,14 +339,22 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
             \mu_t(t) = (1 - t) \cdot \theta_0 + t \cdot \mu_{base}
             \sigma_t(t) = t \cdot \sigma_{base}
 
+        Taking into account the noise scale :math:`\sigma_{min}`, the standard deviation
+        becomes:
+
+        .. math::
+            \sigma_t(t) = (t + \sigma_{min}) \cdot \sigma_{base}
+
+        Note that in the current implementation, the base distribution is Gaussian with
+        zero mean and unit variance.
+
         Args:
             times: SDE time variable in [0,1].
 
         Returns:
             Standard deviation at a given time.
         """
-        # TODO: derive taking into account the noise sigma_min added to the vector field
-        std_t = times * self.std_base.flatten()[0]
+        std_t = times + self.noise_scale
         for _ in range(len(self.input_shape)):
             std_t = std_t.unsqueeze(-1)
         return std_t
