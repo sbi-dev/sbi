@@ -199,7 +199,7 @@ def test_density_estimator_log_prob_shapes_with_embedding(
 @pytest.mark.parametrize("density_estimator_build_fn", model_builders)
 @pytest.mark.parametrize("sample_shape", ((), (1,), (2, 3)))
 @pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
-@pytest.mark.parametrize("condition_event_shape", ((1,), (7,)))
+@pytest.mark.parametrize("condition_event_shape", ((1,), (2,)))
 @pytest.mark.parametrize("batch_dim", (1, 10))
 def test_density_estimator_sample_shapes(
     density_estimator_build_fn,
