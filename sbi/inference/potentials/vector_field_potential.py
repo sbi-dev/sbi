@@ -10,12 +10,12 @@ from zuko.distributions import NormalizingFlow
 
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.inference.potentials.score_fn_iid import get_iid_method
+from sbi.neural_nets.estimators import (
+    ConditionalVectorFieldEstimator,
+)
 from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
     reshape_to_sample_batch_event,
-)
-from sbi.neural_nets.estimators.vector_field_estimator import (
-    ConditionalVectorFieldEstimator,
 )
 from sbi.samplers.ode_solvers import build_neural_ode
 from sbi.sbi_types import TorchTransform

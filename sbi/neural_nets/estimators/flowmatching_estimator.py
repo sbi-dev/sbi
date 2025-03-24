@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 
-from sbi.neural_nets.estimators.vector_field_estimator import (
+from sbi.neural_nets.estimators.base import (
     ConditionalVectorFieldEstimator,
 )
 

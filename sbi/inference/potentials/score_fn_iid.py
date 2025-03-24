@@ -7,7 +7,7 @@ import torch
 from torch import Tensor
 from torch.distributions import Distribution
 
-from sbi.neural_nets.estimators.vector_field_estimator import (
+from sbi.neural_nets.estimators import (
     ConditionalVectorFieldEstimator,
 )
 from sbi.utils.score_utils import (

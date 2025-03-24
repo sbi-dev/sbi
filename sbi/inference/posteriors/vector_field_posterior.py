@@ -13,11 +13,11 @@ from sbi.inference.potentials.vector_field_potential import (
     VectorFieldBasedPotential,
     vector_field_estimator_based_potential,
 )
+from sbi.neural_nets.estimators.base import (
+    ConditionalVectorFieldEstimator,
+)
 from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
-)
-from sbi.neural_nets.estimators.vector_field_estimator import (
-    ConditionalVectorFieldEstimator,
 )
 from sbi.samplers.rejection import rejection
 from sbi.samplers.score.correctors import Corrector

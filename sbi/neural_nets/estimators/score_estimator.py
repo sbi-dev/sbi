@@ -8,7 +8,7 @@ from typing import Callable, Optional, Union
 import torch
 from torch import Tensor, nn
 
-from sbi.neural_nets.estimators.vector_field_estimator import (
+from sbi.neural_nets.estimators.base import (
     ConditionalVectorFieldEstimator,
 )
 

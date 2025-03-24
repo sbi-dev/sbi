@@ -19,7 +19,7 @@ from sbi.inference.posteriors import (
     DirectPosterior,
 )
 from sbi.inference.posteriors.vector_field_posterior import VectorFieldPosterior
-from sbi.neural_nets.estimators.vector_field_estimator import (
+from sbi.neural_nets.estimators import (
     ConditionalVectorFieldEstimator,
 )
 from sbi.utils import (

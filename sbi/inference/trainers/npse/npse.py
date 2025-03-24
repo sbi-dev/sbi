@@ -9,6 +9,7 @@ from torch.utils.tensorboard.writer import SummaryWriter
 from sbi.inference.posteriors.vector_field_posterior import VectorFieldPosterior
 from sbi.inference.trainers.npse.vector_field_inference import VectorFieldInference
 from sbi.neural_nets.estimators.vector_field_estimator import (
+from sbi.neural_nets.estimators import (
     ConditionalVectorFieldEstimator,
 )
 from sbi.neural_nets.factory import posterior_score_nn
