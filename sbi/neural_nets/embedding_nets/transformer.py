@@ -758,8 +758,6 @@ class TransformerEmbedding(nn.Module):
         self,
         input: torch.Tensor,
         attention_mask: Optional[torch.tensor] = None,
-        output_attentions: Optional[bool] = False,
-        output_hidden_states: Optional[bool] = False,
         position_ids: Optional[torch.LongTensor] = None,
         cache_attention_mask: Optional[bool] = True,
         **kwargs,
@@ -811,32 +809,16 @@ class TransformerEmbedding(nn.Module):
             attention_mask = None
 
         # decoder layers
-        all_hidden_states = () if output_hidden_states else (None,)
-        all_self_attns = () if output_attentions else (None,)
         hidden_states = input
         for decoder_layer in self.layers:
-            if output_hidden_states:
-                all_hidden_states += (hidden_states,)
-
             layer_outputs = decoder_layer(
                 hidden_states,
                 attention_mask=attention_mask,
                 position_ids=position_ids,
-                output_attentions=output_attentions,
             )
 
             hidden_states = layer_outputs[0]
-            if output_attentions:
-                all_self_attns += (layer_outputs[1],)
 
         hidden_states = self.norm(hidden_states)
-        if output_hidden_states:
-            all_hidden_states += (hidden_states,)
-
-        if output_attentions or output_hidden_states:
-            return self.aggregator(hidden_states[:, -1, :]), (
-                all_hidden_states,
-                all_self_attns,
-            )
 
         return self.aggregator(hidden_states[:, -1, :])
