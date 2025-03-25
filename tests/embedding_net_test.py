@@ -310,7 +310,6 @@ def test_npe_with_with_iid_embedding_varying_num_trials(trial_factor=50):
             )
 
 
-
 @pytest.mark.parametrize("input_shape", [(32, 32), (32, 64), (111, 111)])
 @pytest.mark.parametrize("num_channels", (1, 2, 3))
 @pytest.mark.parametrize("change_c_mode", ["conv", "zeros"])
@@ -397,6 +396,8 @@ def test_1d_ResNet_fc_embedding_net(input_shape, n_blocks, c_internal, c_hidden_
 
     s = posterior.sample((10,))
     posterior.potential(s)
+
+
 @pytest.mark.parametrize(
     "bidirectional", [True, False], ids=["one-directional", "bi-directional"]
 )
