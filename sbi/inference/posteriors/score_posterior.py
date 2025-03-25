@@ -14,9 +14,7 @@ from sbi.inference.potentials.score_based_potential import (
     score_estimator_based_potential,
 )
 from sbi.neural_nets.estimators.score_estimator import ConditionalScoreEstimator
-from sbi.neural_nets.estimators.shape_handling import (
-    reshape_to_batch_event,
-)
+from sbi.neural_nets.estimators.shape_handling import reshape_to_batch_event
 from sbi.samplers.rejection import rejection
 from sbi.samplers.score.correctors import Corrector
 from sbi.samplers.score.diffuser import Diffuser
@@ -223,11 +221,8 @@ class ScorePosterior(NeuralPosterior):
 
         num_samples = torch.Size(sample_shape).numel()
 
-        max_sampling_batch_size = (
-            self.max_sampling_batch_size
-            if max_sampling_batch_size is None
-            else max_sampling_batch_size
-        )
+        if max_sampling_batch_size is None:
+            max_sampling_batch_size = self.max_sampling_batch_size
 
         if ts is None:
             t_max = self.score_estimator.t_max
@@ -312,8 +307,15 @@ class ScorePosterior(NeuralPosterior):
             `(len(θ),)`-shaped log posterior probability $\log p(\theta|x)$ for θ in the
             support of the prior, -∞ (corresponding to 0 probability) outside.
         """
+        x = self._x_else_default_x(x)
+        x = reshape_to_batch_event(x, self.score_estimator.condition_shape)
+        is_iid = x.shape[0] > 1
         self.potential_fn.set_x(
-            self._x_else_default_x(x), atol=atol, rtol=rtol, exact=exact
+            self._x_else_default_x(x),
+            x_is_iid=is_iid,
+            atol=atol,
+            rtol=rtol,
+            exact=exact,
         )
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
