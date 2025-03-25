@@ -2,6 +2,7 @@ from sbi.neural_nets.factory import (
     classifier_nn,
     flowmatching_nn,
     likelihood_nn,
+    marginal_nn,
     posterior_nn,
     posterior_score_nn,
 )
@@ -14,6 +15,10 @@ def __getattr__(name):
         "PermutationInvariantEmbedding",
         "ResNetEmbedding1D",
         "ResNetEmbedding2D",
+        "CausalCNNEmbedding",
+        "CNNEmbedding",
+        "FCEmbedding",
+        "PermutationInvariantEmbedding",
     ]:
         raise ImportError(
             "As of sbi v0.23.0, you have to import embedding networks from "
@@ -30,4 +35,6 @@ def __getattr__(name):
         return posterior_nn
     elif name == "posterior_score_nn":
         return posterior_score_nn
+    elif name == "marginal_nn":
+        return marginal_nn
     raise AttributeError(f"Module '{__name__}' has no attribute '{name}'")

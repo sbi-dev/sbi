@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import warnings
 from typing import Optional, Union
 
 import torch
@@ -168,6 +169,17 @@ class DirectPosterior(NeuralPosterior):
         num_samples = torch.Size(sample_shape).numel()
         condition_shape = self.posterior_estimator.condition_shape
         x = reshape_to_batch_event(x, event_shape=condition_shape)
+        num_xos = x.shape[0]
+
+        # throw warning if num_x * num_samples is too large
+        if num_xos * num_samples > 2**21:  # 2 million-ish
+            warnings.warn(
+                "Note that for batched sampling, the direct posterior sampling "
+                "generates {num_xos} * {num_samples} = {num_xos * num_samples} "
+                "samples. This can be slow and memory-intensive. Consider "
+                "reducing the number of samples or batch size.",
+                stacklevel=2,
+            )
 
         max_sampling_batch_size = (
             self.max_sampling_batch_size

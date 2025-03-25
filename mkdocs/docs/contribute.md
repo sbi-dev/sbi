@@ -280,7 +280,7 @@ improvements of the documentation, you should first  install the `doc` dependenc
 pip install -e ".[doc]"
 ```
 
-Then, you can build the website locally by executing in the `docs` folder
+Then, you can build the website locally by executing in the `mkdocs` folder
 
 ```bash
 mkdocs serve
