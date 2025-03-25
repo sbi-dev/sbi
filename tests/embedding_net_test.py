@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import math
+import sys
 
 import pytest
 import torch
@@ -601,6 +602,9 @@ def test_scan(
 ):
     """Test the scan forward pass of the LRU layer, should be equal to the loop."""
     # causal
+    # Skip test if Python version >= 3.13 since torch.compiler is not supported
+    if sys.version_info >= (3, 13):
+        pytest.xfail("torch.compiler not supported on Python >= 3.13")
     torch.compiler.reset()
     embedding = LRUEmbedding(
         input_dim=input_dim,
