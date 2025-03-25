@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import math
+import sys
 
 import pytest
 import torch
@@ -400,7 +401,21 @@ def test_1d_ResNet_fc_embedding_net(input_shape, n_blocks, c_internal, c_hidden_
 @pytest.mark.parametrize(
     "bidirectional", [True, False], ids=["one-directional", "bi-directional"]
 )
-@pytest.mark.parametrize("mode", ["loop", "scan"], ids=["loop", "scan"])
+@pytest.mark.parametrize(
+    "mode",
+    [
+        "loop",
+        pytest.param(
+            "scan",
+            marks=pytest.mark.xfail(
+                condition=sys.version_info >= (3, 13),
+                reason="torch.compiler is not yet supported on Python >= 3.13",
+                strict=True,
+            ),
+        ),
+    ],
+    ids=["loop", "scan"],
+)
 def test_lru_isolated(
     bidirectional: bool,
     mode: str,
@@ -434,7 +449,21 @@ def test_lru_isolated(
 @pytest.mark.parametrize(
     "bidirectional", [True, False], ids=["one-directional", "bi-directional"]
 )
-@pytest.mark.parametrize("mode", ["loop", "scan"], ids=["loop", "scan"])
+@pytest.mark.parametrize(
+    "mode",
+    [
+        "loop",
+        pytest.param(
+            "scan",
+            marks=pytest.mark.xfail(
+                condition=sys.version_info >= (3, 13),
+                reason="torch.compiler is not yet supported on Python >= 3.13",
+                strict=True,
+            ),
+        ),
+    ],
+    ids=["loop", "scan"],
+)
 @pytest.mark.parametrize(
     "apply_input_normalization",
     [True, False],
@@ -454,6 +483,7 @@ def test_lru_block_isolated(
     sequence_len: int = 50,
 ):
     """Run some random data through an LRUBlock."""
+
     lru_block = LRUBlock(
         hidden_dim=hidden_dim,
         state_dim=state_dim,
@@ -477,7 +507,21 @@ def test_lru_block_isolated(
 @pytest.mark.parametrize(
     "bidirectional", [True, False], ids=["one-directional", "bi-directional"]
 )
-@pytest.mark.parametrize("mode", ["loop", "scan"], ids=["loop", "scan"])
+@pytest.mark.parametrize(
+    "mode",
+    [
+        "loop",
+        pytest.param(
+            "scan",
+            marks=pytest.mark.xfail(
+                condition=sys.version_info >= (3, 13),
+                reason="torch.compiler is not yet supported on Python >= 3.13",
+                strict=True,
+            ),
+        ),
+    ],
+    ids=["loop", "scan"],
+)
 @pytest.mark.parametrize(
     "aggregate_fcn", ["last_step", "mean"], ids=["last-step", "mean"]
 )
@@ -591,6 +635,11 @@ def test_lru_pipeline(embedding_feat_dim: int = 17):
     assert samples.shape == (10, 2)
 
 
+@pytest.mark.xfail(
+    condition=sys.version_info >= (3, 13),
+    reason="torch.compiler is not yet supported on Python >= 3.13",
+    strict=True,
+)
 def test_scan(
     input_dim: int = 3,
     output_dim: int = 3,
