@@ -414,6 +414,10 @@ def test_lru_isolated(
     sequence_len: int = 50,
 ):
     """Run some random data trough an LRU layer."""
+
+    if sys.version_info >= (3, 13) and mode == "scan":
+        pytest.xfail("torch.compiler is not yet supported on Python >= 3.13")
+
     lru = LRU(
         input_dim=input_dim,
         state_dim=state_dim,
@@ -455,6 +459,10 @@ def test_lru_block_isolated(
     sequence_len: int = 50,
 ):
     """Run some random data through an LRUBlock."""
+
+    if sys.version_info >= (3, 13) and mode == "scan":
+        pytest.xfail("torch.compiler is not yet supported on Python >= 3.13")
+
     lru_block = LRUBlock(
         hidden_dim=hidden_dim,
         state_dim=state_dim,
@@ -499,6 +507,9 @@ def test_lru_embedding_net_isolated(
     sequence_len: int = 50,
 ):
     """Run some random data trough an LRUEmbedding network."""
+    if sys.version_info >= (3, 13) and mode == "scan":
+        pytest.xfail("torch.compiler is not yet supported on Python >= 3.13")
+
     embedding_net = LRUEmbedding(
         input_dim=input_dim,  # = observation_dim
         output_dim=output_dim,
@@ -592,6 +603,10 @@ def test_lru_pipeline(embedding_feat_dim: int = 17):
     assert samples.shape == (10, 2)
 
 
+@pytest.mark.xfail(
+    condition=sys.version_info >= (3, 13),
+    reason="torch.compiler is not yet supported on Python >= 3.13",
+)
 def test_scan(
     input_dim: int = 3,
     output_dim: int = 3,
@@ -601,10 +616,6 @@ def test_scan(
     sequence_len: int = 3,
 ):
     """Test the scan forward pass of the LRU layer, should be equal to the loop."""
-    # Skip test if Python version >= 3.13 since torch.compiler is not supported
-    if sys.version_info >= (3, 13):
-        pytest.xfail("torch.compiler is not yet supported on Python >= 3.13")
-
     # causal
     torch.compiler.reset()
     embedding = LRUEmbedding(
