@@ -756,7 +756,7 @@ class TransformerEmbedding(nn.Module):
 
     def forward(
         self,
-        input: torch.FloatTensor,
+        input: torch.Tensor,
         attention_mask: Optional[torch.tensor] = None,
         output_attentions: Optional[bool] = False,
         output_hidden_states: Optional[bool] = False,
@@ -766,10 +766,10 @@ class TransformerEmbedding(nn.Module):
     ) -> Tuple[torch.Tensor, Optional[Tuple[torch.Tensor, torch.Tensor]]]:
         """
         Args:
-            input (`torch.FloatTensor`): input of shape `(batch, seq_len,
+            input (`torch.Tensor`): input of shape `(batch, seq_len,
             feature_space_dim)`
             or `(batch, num_channels, height, width)` if using ViT
-            attention_mask (`torch.FloatTensor`, *optional*):
+            attention_mask (`torch.Tensor`, *optional*):
                 attention mask of size `(batch_size, sequence_length)`
             output_attentions (`bool`, *optional*):
                 Whether or not to return the attention tensors
