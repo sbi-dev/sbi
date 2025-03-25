@@ -140,7 +140,7 @@ def test_c2st_vector_field_on_linearGaussian(
         )
 
 
-@pytest.mark.parametrize("vector_field_type", ["npse", "fmpe"])
+@pytest.mark.parametrize("vector_field_type", [NPSE, FMPE])
 def test_c2st_vector_field_on_linearGaussian_different_dims(vector_field_type):
     """Test NPE on linear Gaussian with different theta and x dimensionality."""
 
@@ -178,12 +178,7 @@ def test_c2st_vector_field_on_linearGaussian_different_dims(vector_field_type):
         )
 
     # Test whether prior can be `None`.
-    if vector_field_type == "npse":
-        inference = NPSE(prior=None)
-    elif vector_field_type == "fmpe":
-        inference = FMPE(prior=None)
-    else:
-        raise ValueError(f"Invalid vector field type: {vector_field_type}")
+    inference = vector_field_type(prior=None)
 
     theta = prior.sample((num_simulations,))
     x = simulator(theta)
@@ -206,7 +201,7 @@ def test_c2st_vector_field_on_linearGaussian_different_dims(vector_field_type):
     check_c2st(
         samples,
         target_samples,
-        alg=f"{vector_field_type}_different_dims_and_resume_training",
+        alg=f"{vector_field_type.__name__}_different_dims_and_resume_training",
     )
 
 

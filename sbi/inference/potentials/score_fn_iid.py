@@ -7,9 +7,7 @@ import torch
 from torch import Tensor
 from torch.distributions import Distribution
 
-from sbi.neural_nets.estimators import (
-    ConditionalVectorFieldEstimator,
-)
+from sbi.neural_nets.estimators import ConditionalVectorFieldEstimator
 from sbi.utils.score_utils import (
     add_diag_or_dense,
     denoise,
@@ -60,7 +58,7 @@ def register_iid_method(name: str) -> Callable:
 class IIDScoreFunction(ABC):
     def __init__(
         self,
-        vector_field_estimator: "ConditionalVectorFieldEstimator",
+        vector_field_estimator: ConditionalVectorFieldEstimator,
         prior: Distribution,
         device: str = "cpu",
     ) -> None:
@@ -133,7 +131,7 @@ class IIDScoreFunction(ABC):
 class FactorizedNPEScoreFunction(IIDScoreFunction):
     def __init__(
         self,
-        vector_field_estimator: "ConditionalVectorFieldEstimator",
+        vector_field_estimator: ConditionalVectorFieldEstimator,
         prior: Distribution,
         device: str = "cpu",
         prior_score_weight: Optional[Callable[[Tensor], Tensor]] = None,
@@ -238,7 +236,7 @@ class FactorizedNPEScoreFunction(IIDScoreFunction):
 class BaseGaussCorrectedScoreFunction(IIDScoreFunction):
     def __init__(
         self,
-        vector_field_estimator: "ConditionalVectorFieldEstimator",
+        vector_field_estimator: ConditionalVectorFieldEstimator,
         prior: Distribution,
         ensure_lam_psd: bool = True,
         lam_psd_nugget: float = 0.01,
@@ -464,7 +462,7 @@ class BaseGaussCorrectedScoreFunction(IIDScoreFunction):
 class GaussCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
     def __init__(
         self,
-        vector_field_estimator: "ConditionalVectorFieldEstimator",
+        vector_field_estimator: ConditionalVectorFieldEstimator,
         prior: Distribution,
         posterior_precision: Optional[Tensor] = None,
         scale_from_prior_precision: float = 2.0,
@@ -547,7 +545,7 @@ class GaussCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
 class AutoGaussCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
     def __init__(
         self,
-        vector_field_estimator: "ConditionalVectorFieldEstimator",
+        vector_field_estimator: ConditionalVectorFieldEstimator,
         prior: Distribution,
         enable_lam_psd: bool = True,
         lam_psd_nugget: float = 0.01,
@@ -603,7 +601,7 @@ class AutoGaussCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
     @functools.lru_cache()
     def estimate_posterior_precision(
         cls,
-        vector_field_estimator: "ConditionalVectorFieldEstimator",
+        vector_field_estimator: ConditionalVectorFieldEstimator,
         prior: Distribution,
         conditions: Tensor,
         precision_est_only_diag: bool = False,

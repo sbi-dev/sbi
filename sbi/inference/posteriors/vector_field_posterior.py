@@ -13,9 +13,7 @@ from sbi.inference.potentials.vector_field_potential import (
     VectorFieldBasedPotential,
     vector_field_estimator_based_potential,
 )
-from sbi.neural_nets.estimators.base import (
-    ConditionalVectorFieldEstimator,
-)
+from sbi.neural_nets.estimators.base import ConditionalVectorFieldEstimator
 from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
 )
@@ -44,7 +42,7 @@ class VectorFieldPosterior(NeuralPosterior):
     the base distribution.
 
     Log probabilities are obtained by calling the potential function, which in turn uses
-    ODE to compute the log-probability.
+    the ODE to compute the log-probability.
     """
 
     def __init__(
@@ -253,7 +251,7 @@ class VectorFieldPosterior(NeuralPosterior):
             else max_sampling_batch_size
         )
 
-        # TODO: he time schedule should be provided by the estimator, see issue #1437
+        # TODO: the time schedule should be provided by the estimator, see issue #1437
         if ts is None:
             t_max = self.vector_field_estimator.t_max
             t_min = self.vector_field_estimator.t_min

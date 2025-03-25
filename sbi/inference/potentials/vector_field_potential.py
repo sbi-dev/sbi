@@ -10,9 +10,7 @@ from zuko.distributions import NormalizingFlow
 
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.inference.potentials.score_fn_iid import get_iid_method
-from sbi.neural_nets.estimators import (
-    ConditionalVectorFieldEstimator,
-)
+from sbi.neural_nets.estimators import ConditionalVectorFieldEstimator
 from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
     reshape_to_sample_batch_event,
@@ -305,12 +303,12 @@ class CallableDifferentiablePotentialFunction:
     only supports static methods, and so it can't be given the potential class directly.
     """
 
-    def __init__(self, posterior_vector_field_potential):
-        self.posterior_vector_field_potential = posterior_vector_field_potential
+    def __init__(self, vector_field_based_potential: VectorFieldBasedPotential):
+        self.vector_field_based_potential = vector_field_based_potential
 
     def __call__(self, input):
         return DifferentiablePotentialFunction.apply(
             input,
-            self.posterior_vector_field_potential.__call__,
-            self.posterior_vector_field_potential.gradient,
+            self.vector_field_based_potential.__call__,
+            self.vector_field_based_potential.gradient,
         )

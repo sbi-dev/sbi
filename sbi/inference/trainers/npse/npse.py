@@ -11,9 +11,7 @@ from sbi.inference.trainers.npse.vector_field_inference import (
     VectorFieldEstimatorBuilder,
     VectorFieldInference,
 )
-from sbi.neural_nets.estimators import (
-    ConditionalVectorFieldEstimator,
-)
+from sbi.neural_nets.estimators import ConditionalVectorFieldEstimator
 from sbi.neural_nets.factory import posterior_score_nn
 
 

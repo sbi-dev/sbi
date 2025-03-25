@@ -5,9 +5,7 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 
-from sbi.neural_nets.estimators.base import (
-    ConditionalVectorFieldEstimator,
-)
+from sbi.neural_nets.estimators.base import ConditionalVectorFieldEstimator
 
 
 # abstract class to ensure forward signature for flow matching networks
