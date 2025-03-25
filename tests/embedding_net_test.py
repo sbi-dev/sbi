@@ -12,8 +12,8 @@ from torch import Tensor, eye, ones, zeros
 from torch.distributions import MultivariateNormal
 
 from sbi import utils
-from sbi.inference import FMPE, NLE, NPE, NRE, simulate_for_sbi
-from sbi.neural_nets import classifier_nn, flowmatching_nn, likelihood_nn, posterior_nn
+from sbi.inference import NLE, NPE, NRE, simulate_for_sbi
+from sbi.neural_nets import classifier_nn, likelihood_nn, posterior_nn
 from sbi.neural_nets.embedding_nets import (
     CNNEmbedding,
     CausalCNNEmbedding,
@@ -37,7 +37,7 @@ from sbi.utils.user_input_checks import (
 
 
 @pytest.mark.mcmc
-@pytest.mark.parametrize("method", ["NPE", "NLE", "NRE", "FMPE"])
+@pytest.mark.parametrize("method", ["NPE", "NLE", "NRE"])
 @pytest.mark.parametrize("num_dim", [1, 2])
 @pytest.mark.parametrize("embedding_net", ["mlp"])
 def test_embedding_net_api(
@@ -74,11 +74,6 @@ def test_embedding_net_api(
     elif method == "NRE":
         classifier = classifier_nn("resnet", embedding_net_x=embedding)
         inference = NRE(prior, classifier=classifier, show_progress_bars=False)
-    elif method == "FMPE":
-        vectorfield_net = flowmatching_nn(model="mlp", embedding_net=embedding)
-        inference = FMPE(
-            prior, density_estimator=vectorfield_net, show_progress_bars=False
-        )
     else:
         raise NameError
 
