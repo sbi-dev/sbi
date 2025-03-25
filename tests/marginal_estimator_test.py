@@ -13,8 +13,8 @@ from torch.distributions import (
 )
 
 from sbi.inference.trainers.marginal import MarginalTrainer
+from sbi.utils.metrics import check_c2st
 from sbi.utils.torchutils import process_device
-from tests.test_utils import check_c2st
 
 
 @pytest.mark.parametrize(

@@ -5,23 +5,27 @@
 
 
 import warnings
+from typing import Optional
 
 import torch
 import torch.nn as nn
+from torch import Tensor
 
+from sbi.inference.trainers.npe.npe_base import PosteriorEstimator
+from sbi.neural_nets.estimators import UnconditionalDensityEstimator
 from sbi.utils.metrics import check_c2st
 
 
-def rbf_kernel(x, y, bandwidth):
+def rbf_kernel(x: Tensor, y: Tensor, bandwidth: float):
     dist = torch.cdist(x, y)
     return torch.exp(-(dist**2) / (2.0 * bandwidth**2))
 
 
-def median_heuristic(x, y):
+def median_heuristic(x: Tensor, y: Tensor):
     return torch.median(torch.cdist(x, y)).item()
 
 
-def compute_rbf_mmd(x, y, bandwidth=1.0, mode="biased"):
+def compute_rbf_mmd(x: Tensor, y: Tensor, bandwidth: float = 1.0, mode: str = "biased"):
     x_kernel = rbf_kernel(x, x, bandwidth)
     y_kernel = rbf_kernel(y, y, bandwidth)
     xy_kernel = rbf_kernel(x, y, bandwidth)
@@ -38,7 +42,7 @@ def compute_rbf_mmd(x, y, bandwidth=1.0, mode="biased"):
     return mmd
 
 
-def compute_rbf_mmd_median_heuristic(x, y, mode="biased"):
+def compute_rbf_mmd_median_heuristic(x: Tensor, y: Tensor, mode: str = "biased"):
     """median heuristic for bandwidth parameter as described in
     Large sample analysis of the median heuristic, Garreau et al, 2018
     (https://arxiv.org/abs/1707.07269)
@@ -47,7 +51,13 @@ def compute_rbf_mmd_median_heuristic(x, y, mode="biased"):
     return compute_rbf_mmd(x, y, bandwidth, mode)
 
 
-def calculate_baseline_mmd(n_obs, y, n_shuffle=1_000, max_samples=1_000, mode="biased"):
+def calculate_baseline_mmd(
+    n_obs: int,
+    y: Tensor,
+    n_shuffle: int = 1_000,
+    max_samples: int = 1_000,
+    mode: str = "biased",
+):
     """calculates the MMD between two sets of synthetic data.
        needed to compute the distribution of mmds under the null hypothesis
        that synthetic and observed samples come from the same distribution.
@@ -72,7 +82,11 @@ def calculate_baseline_mmd(n_obs, y, n_shuffle=1_000, max_samples=1_000, mode="b
 
 
 def calculate_p_misspecification(
-    x_obs, x, n_shuffle=1_000, max_samples=1_000, mode="biased"
+    x_obs: Tensor,
+    x: Tensor,
+    n_shuffle: int = 1_000,
+    max_samples: int = 1_000,
+    mode: str = "biased",
 ):
     """calculate the p-value of the misspecification test.
     x_obs: observed data
@@ -90,13 +104,13 @@ def calculate_p_misspecification(
 
 
 def calc_misspecification_mmd(
-    x_obs,
-    x,
-    inference=None,
-    mode="x_space",
-    n_shuffle=1_000,
-    max_samples=1_000,
-    mmd_mode="biased",
+    x_obs: Tensor,
+    x: Tensor,
+    inference: Optional[PosteriorEstimator] = None,
+    mode: str = "x_space",
+    n_shuffle: int = 1_000,
+    max_samples: int = 1_000,
+    mmd_mode: str = "biased",
 ):
     """misspecification test based on MMD in data- or embedding space.
     x_obs: observed data
@@ -142,7 +156,9 @@ def calc_misspecification_mmd(
     return p_val, (mmds_baseline, mmd)
 
 
-def _log_prob_hypothesis_test(log_probs, log_prob_xo, alpha=0.05):
+def _log_prob_hypothesis_test(
+    log_probs: Tensor, log_prob_xo: float, alpha: float = 0.05
+):
     """
     Perform a hypothesis test to check if log_prob_xo is unusually low
     compared to the given log probabilities from the distribution.
@@ -165,7 +181,12 @@ def _log_prob_hypothesis_test(log_probs, log_prob_xo, alpha=0.05):
     return p_value, reject_H0
 
 
-def calc_misspecification_logprob(x_val, x_o, estimator, alpha=0.05):
+def calc_misspecification_logprob(
+    x_val: Tensor,
+    x_o: Tensor,
+    estimator: UnconditionalDensityEstimator,
+    alpha: float = 0.05,
+):
     """
     Perform a hypothesis test to check if estimator.log_prob(`xo`)
     is unusually low compared to the log probabilities of samples
