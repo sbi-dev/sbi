@@ -11,8 +11,8 @@ from sbi.simulators.linear_gaussian import (
     samples_true_posterior_linear_gaussian_uniform_prior,
     true_posterior_linear_gaussian_mvn_prior,
 )
+from sbi.utils.metrics import check_c2st
 from sbi.utils.torchutils import BoxUniform
-from tests.test_utils import check_c2st
 
 
 @pytest.mark.slow

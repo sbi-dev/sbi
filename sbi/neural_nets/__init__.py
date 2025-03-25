@@ -10,6 +10,11 @@ from sbi.neural_nets.factory import (
 
 def __getattr__(name):
     if name in [
+        "CNNEmbedding",
+        "FCEmbedding",
+        "PermutationInvariantEmbedding",
+        "ResNetEmbedding1D",
+        "ResNetEmbedding2D",
         "CausalCNNEmbedding",
         "CNNEmbedding",
         "FCEmbedding",

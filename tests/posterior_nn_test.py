@@ -25,7 +25,7 @@ from sbi.simulators.linear_gaussian import (
     true_posterior_linear_gaussian_mvn_prior,
 )
 from sbi.utils.diagnostics_utils import get_posterior_samples_on_batch
-from tests.test_utils import check_c2st
+from sbi.utils.metrics import check_c2st
 
 
 @pytest.mark.parametrize("snpe_method", [NPE_A, NPE_C])
