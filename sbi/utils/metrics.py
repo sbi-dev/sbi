@@ -123,7 +123,6 @@ def c2st(
     return torch.from_numpy(scores).mean()
 
 
-# previously it was in test_utils, now to use it is diagnostics/misspecification
 def check_c2st(x: Tensor, y: Tensor, alg: str, tol: float = 0.1) -> None:
     """Compute classification based two-sample test accuracy and assert it close to
     chance."""
