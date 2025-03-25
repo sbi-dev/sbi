@@ -123,6 +123,17 @@ def c2st(
     return torch.from_numpy(scores).mean()
 
 
+def check_c2st(x: Tensor, y: Tensor, alg: str, tol: float = 0.1) -> None:
+    """Compute classification based two-sample test accuracy and assert it close to
+    chance."""
+
+    score = c2st(x, y).item()
+
+    assert (0.5 - tol) <= score <= (0.5 + tol), (
+        f"{alg}'s c2st={score:.2f} is too far from the desired near-chance performance."
+    )
+
+
 def unbiased_mmd_squared(x: Tensor, y: Tensor, scale: Optional[float] = None):
     """Unbiased approximation of the squared maximum-mean discrepancy (MMD) [1].
     The sample-based MMD relies on kernel evaluations between x_i and y_i. This

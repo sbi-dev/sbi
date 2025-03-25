@@ -13,7 +13,8 @@ from sbi.simulators.linear_gaussian import (
     linear_gaussian,
     true_posterior_linear_gaussian_mvn_prior,
 )
-from tests.test_utils import check_c2st, get_dkl_gaussian_prior
+from sbi.utils.metrics import check_c2st
+from tests.test_utils import get_dkl_gaussian_prior
 
 
 def test_import_before_deprecation():

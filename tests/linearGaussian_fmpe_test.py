@@ -27,10 +27,10 @@ from sbi.simulators.linear_gaussian import (
     samples_true_posterior_linear_gaussian_uniform_prior,
     true_posterior_linear_gaussian_mvn_prior,
 )
+from sbi.utils.metrics import check_c2st
 from sbi.utils.user_input_checks import process_simulator
 
 from .test_utils import (
-    check_c2st,
     get_dkl_gaussian_prior,
     get_normalization_uniform_prior,
     get_prob_outside_uniform_prior,
