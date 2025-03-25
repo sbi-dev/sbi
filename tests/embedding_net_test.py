@@ -175,6 +175,86 @@ def test_1d_and_2d_cnn_embedding_net(input_shape, num_channels):
     posterior.potential(s)
 
 
+@pytest.mark.slow
+def test_npe_with_with_iid_embedding_varying_num_trials(trial_factor=50):
+    """Test inference accuracy with embeddings for varying number of trials.
+
+    Test c2st accuracy and permutation invariance for up to 20 trials.
+    """
+    num_dim = 2
+    max_num_trials = 20
+    prior = torch.distributions.MultivariateNormal(
+        torch.zeros(num_dim), torch.eye(num_dim)
+    )
+
+    # Scale number of training samples with num_trials.
+    num_thetas = 5000 + trial_factor * max_num_trials
+
+    theta = prior.sample(sample_shape=torch.Size((num_thetas,)))
+    num_trials = torch.randint(1, max_num_trials, size=(num_thetas,))
+
+    # simulate iid x, pad smaller number of trials with nans.
+    x = ones(num_thetas, max_num_trials, 2) * float("nan")
+
+    for i in range(num_thetas):
+        th = theta[i].repeat(num_trials[i], 1)
+        x[i, : num_trials[i]] = torch.randn_like(th) + th
+
+    # build embedding net
+    output_dim = 5
+    single_trial_net = FCEmbedding(input_dim=num_dim, output_dim=output_dim)
+    embedding_net = PermutationInvariantEmbedding(
+        single_trial_net,
+        trial_net_output_dim=output_dim,
+        output_dim=output_dim,
+        aggregation_fn="sum",
+    )
+
+    # test embedding net
+    assert embedding_net(x[:3]).shape == (3, output_dim)
+
+    density_estimator = posterior_nn(
+        model="mdn",
+        embedding_net=embedding_net,
+        z_score_x="none",  # turn off z-scoring because of NaN encodings.
+        z_score_theta="independent",
+    )
+    inference = NPE(prior, density_estimator=density_estimator)
+
+    # do not exclude invalid x, as we padded with nans.
+    _ = inference.append_simulations(theta, x, exclude_invalid_x=False).train(
+        training_batch_size=100
+    )
+    posterior = inference.build_posterior()
+
+    num_samples = 1000
+    # test different number of trials
+    num_test_trials = torch.linspace(1, max_num_trials, 5, dtype=torch.int)
+    for num_trials in num_test_trials:
+        # x_o must have the same number of trials as x, thus we pad with nans.
+        x_o = ones(1, max_num_trials, num_dim) * float("nan")
+        x_o[:, :num_trials] = 0.0
+
+        # get reference samples from true posterior
+        reference_samples = true_posterior_linear_gaussian_mvn_prior(
+            x_o[0, :num_trials, :],  # omit nans
+            likelihood_shift=torch.zeros(num_dim),
+            likelihood_cov=torch.eye(num_dim),
+            prior_cov=prior.covariance_matrix,
+            prior_mean=prior.loc,
+        ).sample((num_samples,))
+
+        # test inference accuracy and permutation invariance
+        num_repeats = 2
+        for _ in range(num_repeats):
+            trial_permutet_x_o = x_o[:, torch.randperm(x_o.shape[1]), :]
+            samples = posterior.sample((num_samples,), x=trial_permutet_x_o)
+            check_c2st(
+                samples, reference_samples, alg=f"iid-NPE with {num_trials} trials"
+            )
+
+
+
 @pytest.mark.parametrize("input_shape", [(32, 32), (32, 64), (111, 111)])
 @pytest.mark.parametrize("num_channels", (1, 2, 3))
 @pytest.mark.parametrize("change_c_mode", ["conv", "zeros"])
@@ -261,82 +341,3 @@ def test_1d_ResNet_fc_embedding_net(input_shape, n_blocks, c_internal, c_hidden_
 
     s = posterior.sample((10,))
     posterior.potential(s)
-
-
-@pytest.mark.slow
-def test_npe_with_with_iid_embedding_varying_num_trials(trial_factor=50):
-    """Test inference accuracy with embeddings for varying number of trials.
-
-    Test c2st accuracy and permutation invariance for up to 20 trials.
-    """
-    num_dim = 2
-    max_num_trials = 20
-    prior = torch.distributions.MultivariateNormal(
-        torch.zeros(num_dim), torch.eye(num_dim)
-    )
-
-    # Scale number of training samples with num_trials.
-    num_thetas = 5000 + trial_factor * max_num_trials
-
-    theta = prior.sample(sample_shape=torch.Size((num_thetas,)))
-    num_trials = torch.randint(1, max_num_trials, size=(num_thetas,))
-
-    # simulate iid x, pad smaller number of trials with nans.
-    x = ones(num_thetas, max_num_trials, 2) * float("nan")
-
-    for i in range(num_thetas):
-        th = theta[i].repeat(num_trials[i], 1)
-        x[i, : num_trials[i]] = torch.randn_like(th) + th
-
-    # build embedding net
-    output_dim = 5
-    single_trial_net = FCEmbedding(input_dim=num_dim, output_dim=output_dim)
-    embedding_net = PermutationInvariantEmbedding(
-        single_trial_net,
-        trial_net_output_dim=output_dim,
-        output_dim=output_dim,
-        aggregation_fn="sum",
-    )
-
-    # test embedding net
-    assert embedding_net(x[:3]).shape == (3, output_dim)
-
-    density_estimator = posterior_nn(
-        model="mdn",
-        embedding_net=embedding_net,
-        z_score_x="none",  # turn off z-scoring because of NaN encodings.
-        z_score_theta="independent",
-    )
-    inference = NPE(prior, density_estimator=density_estimator)
-
-    # do not exclude invalid x, as we padded with nans.
-    _ = inference.append_simulations(theta, x, exclude_invalid_x=False).train(
-        training_batch_size=100
-    )
-    posterior = inference.build_posterior()
-
-    num_samples = 1000
-    # test different number of trials
-    num_test_trials = torch.linspace(1, max_num_trials, 5, dtype=torch.int)
-    for num_trials in num_test_trials:
-        # x_o must have the same number of trials as x, thus we pad with nans.
-        x_o = ones(1, max_num_trials, num_dim) * float("nan")
-        x_o[:, :num_trials] = 0.0
-
-        # get reference samples from true posterior
-        reference_samples = true_posterior_linear_gaussian_mvn_prior(
-            x_o[0, :num_trials, :],  # omit nans
-            likelihood_shift=torch.zeros(num_dim),
-            likelihood_cov=torch.eye(num_dim),
-            prior_cov=prior.covariance_matrix,
-            prior_mean=prior.loc,
-        ).sample((num_samples,))
-
-        # test inference accuracy and permutation invariance
-        num_repeats = 2
-        for _ in range(num_repeats):
-            trial_permutet_x_o = x_o[:, torch.randperm(x_o.shape[1]), :]
-            samples = posterior.sample((num_samples,), x=trial_permutet_x_o)
-            check_c2st(
-                samples, reference_samples, alg=f"iid-NPE with {num_trials} trials"
-            )
