@@ -408,6 +408,7 @@ def test_1d_ResNet_fc_embedding_net(input_shape, n_blocks, c_internal, c_hidden_
         pytest.param(
             "scan",
             marks=pytest.mark.xfail(
+                condition=sys.version_info >= (3, 13),
                 reason="torch.compiler is not yet supported on Python >= 3.13",
                 strict=True,
             ),
@@ -455,6 +456,7 @@ def test_lru_isolated(
         pytest.param(
             "scan",
             marks=pytest.mark.xfail(
+                condition=sys.version_info >= (3, 13),
                 reason="torch.compiler is not yet supported on Python >= 3.13",
                 strict=True,
             ),
@@ -512,6 +514,7 @@ def test_lru_block_isolated(
         pytest.param(
             "scan",
             marks=pytest.mark.xfail(
+                condition=sys.version_info >= (3, 13),
                 reason="torch.compiler is not yet supported on Python >= 3.13",
                 strict=True,
             ),
