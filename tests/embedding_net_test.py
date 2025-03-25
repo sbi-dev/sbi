@@ -19,9 +19,9 @@ from sbi.neural_nets.embedding_nets import (
     FCEmbedding,
     LRUEmbedding,
     PermutationInvariantEmbedding,
-    SpectralConvEmbedding,
     ResNetEmbedding1D,
     ResNetEmbedding2D,
+    SpectralConvEmbedding,
 )
 from sbi.neural_nets.embedding_nets.lru import LRU, LRUBlock
 from sbi.simulators.linear_gaussian import (
