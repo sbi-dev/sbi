@@ -9,6 +9,7 @@ from torch import eye, ones, zeros
 from torch.distributions import Independent, MultivariateNormal, Uniform
 
 from sbi.inference import (
+    FMPE,
     NLE_A,
     NPE_A,
     NPE_C,
@@ -24,7 +25,7 @@ from sbi.simulators.linear_gaussian import (
     true_posterior_linear_gaussian_mvn_prior,
 )
 from sbi.utils.diagnostics_utils import get_posterior_samples_on_batch
-from tests.test_utils import check_c2st
+from sbi.utils.metrics import check_c2st
 
 
 @pytest.mark.parametrize("snpe_method", [NPE_A, NPE_C])
@@ -151,7 +152,7 @@ def test_batched_sample_log_prob_with_different_x(
 
 
 @pytest.mark.mcmc
-@pytest.mark.parametrize("snlre_method", [NLE_A, NRE_A, NRE_B, NRE_C, NPE_C])
+@pytest.mark.parametrize("snlre_method", [NRE_C])  # it's independent of the method
 @pytest.mark.parametrize("x_o_batch_dim", (0, 1, 2))
 @pytest.mark.parametrize("init_strategy", ["proposal", "resample"])
 @pytest.mark.parametrize(
@@ -179,7 +180,7 @@ def test_batched_mcmc_sample_log_prob_with_different_x(
     inference = snlre_method(prior=prior)
     theta = prior.sample((num_simulations,))
     x = simulator(theta)
-    inference.append_simulations(theta, x).train(max_num_epochs=2)
+    inference.append_simulations(theta, x).train(max_num_epochs=1)
 
     x_o = ones(num_dim) if x_o_batch_dim == 0 else ones(x_o_batch_dim, num_dim)
 
@@ -240,7 +241,7 @@ def test_batched_mcmc_sample_log_prob_with_different_x(
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize("npse_method", [NPSE])
+@pytest.mark.parametrize("vector_field_method", [NPSE, FMPE])
 @pytest.mark.parametrize("x_o_batch_dim", (0, 1, 2))
 @pytest.mark.parametrize("sampling_method", ["sde", "ode"])
 @pytest.mark.parametrize(
@@ -251,7 +252,7 @@ def test_batched_mcmc_sample_log_prob_with_different_x(
     ),
 )
 def test_batched_score_sample_with_different_x(
-    npse_method: type,
+    vector_field_method: type,
     x_o_batch_dim: bool,
     sampling_method: str,
     sample_shape: torch.Size,
@@ -262,7 +263,7 @@ def test_batched_score_sample_with_different_x(
     prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
     simulator = diagonal_linear_gaussian
 
-    inference = npse_method(prior=prior)
+    inference = vector_field_method(prior=prior)
     theta = prior.sample((num_simulations,))
     x = simulator(theta)
     inference.append_simulations(theta, x).train(max_num_epochs=2)
@@ -285,14 +286,14 @@ def test_batched_score_sample_with_different_x(
     # test only for 1 sample_shape case to avoid repeating this test.
     if x_o_batch_dim > 1 and sample_shape == (5,):
         assert samples.shape[1] == x_o_batch_dim, "Batch dimension wrong"
-        inference = npse_method(prior=prior)
+        inference = vector_field_method(prior=prior)
         _ = inference.append_simulations(theta, x).train()
         posterior = inference.build_posterior(sample_with=sampling_method)
 
         x_o = torch.stack([0.5 * ones(num_dim), -0.5 * ones(num_dim)], dim=0)
         # test with multiple chains to test whether correct chains are
         # concatenated.
-        sample_shape = (1000,)  # use enough samples for accuracy comparison
+        sample_shape = torch.Size([1000])  # use enough samples for accuracy comparison
         samples = posterior.sample_batched(sample_shape, x_o)
 
         samples_separate1 = posterior.sample(sample_shape, x_o[0])

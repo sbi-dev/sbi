@@ -128,7 +128,8 @@ class RotaryEncoder(nn.Module):
 
 
 class FullAttention(nn.Module):
-    # Adapted from https://github.com/huggingface/transformers/main/src/transformers/models/phi3/modeling_phi3.py
+    # Adapted from https://github.com/huggingface/transformers/main/src/transformers/
+    # models/phi3/modeling_phi3.py
 
     def __init__(self, config):
         """Multi-headed attention from 'Attention Is All You Need' paper"""
@@ -244,9 +245,9 @@ class FullAttention(nn.Module):
             attn_weights += causal_mask
 
         # upcast attention to fp32
-        attn_weights = nn.functional.softmax(
-            attn_weights, dim=-1, dtype=torch.float32
-        ).to(value_states.dtype)
+        attn_weights = nn.functional.softmax(attn_weights, dim=-1).to(
+            value_states.dtype
+        )
         attn_weights = nn.functional.dropout(
             attn_weights, p=self.attention_dropout, training=self.training
         )
@@ -271,7 +272,8 @@ class FullAttention(nn.Module):
 
 
 class MLP(nn.Module):
-    # Adapted from https://github.com/huggingface/transformers/main/src/transformers/models/phi3/modeling_phi3.py
+    # Adapted from https://github.com/huggingface/transformers/main/src/
+    # transformers/models/phi3/modeling_phi3.py
 
     def __init__(self, config):
         """
@@ -320,7 +322,8 @@ class MLP(nn.Module):
         return self.down_proj(up_states)
 
 
-# Copied from https://github.com/huggingface/transformers/blob/main/src/transformers/models/phi3/modeling_phi3.py
+# Copied from https://github.com/huggingface/transformers/blob/main/src/
+# transformers/models/phi3/modeling_phi3.py
 class RMSNorm(nn.Module):
     def __init__(self, feature_space_dim, eps: float):
         """
@@ -340,15 +343,15 @@ class RMSNorm(nn.Module):
         Returns:
             `(torch.FloatTensor)`
         """
-        input_dtype = hidden_states.dtype
-        hidden_states = hidden_states.to(torch.float32)
+
         variance = hidden_states.pow(2).mean(-1, keepdim=True)
         hidden_states = hidden_states * torch.rsqrt(variance + self.variance_epsilon)
-        return self.weight * hidden_states.to(input_dtype)
+        return self.weight * hidden_states
 
 
 class MoeBlock(nn.Module):
-    # Adapted from https://github.com/huggingface/transformers/blob/main/src/transformers/models/mixtral/modeling_mixtral.py
+    # Adapted from https://github.com/huggingface/transformers/blob/main/src/
+    # transformers/models/mixtral/modeling_mixtral.py
     # https://arxiv.org/abs/2401.04088
     def __init__(self, config):
         super().__init__()
@@ -514,7 +517,8 @@ class TransformerBlock(nn.Module):
 
 
 class ViTEmbeddings(nn.Module):
-    # Adapted from https://github.com/huggingface/transformers/blob/main/src/transformers/models/vit/modeling_vit.py
+    # Adapted from https://github.com/huggingface/transformers/blob/main/src/
+    # transformers/models/vit/modeling_vit.py
     """
     This class turns `pixel_values` of shape `(batch_size, num_channels,
     height, width)` into the initial `hidden_states` (patch embeddings)
@@ -560,8 +564,11 @@ class ViTEmbeddings(nn.Module):
             width (int): width of the input image
         """
         # Adapted from:
-        # https://github.com/facebookresearch/dino/blob/de9ee3df6cf39fac952ab558447af1fa1365362a/vision_transformer.py
-        # https://github.com/facebookresearch/dinov2/blob/e1277af2ba9496fbadf7aec6eba56e8d882d1e35/dinov2/models/vision_transformer.py
+        # https://github.com/facebookresearch/dino/blob/de9ee3df6cf39fac95
+        # 2ab558447af1fa1365362a/vision_transformer.py
+
+        # https://github.com/facebookresearch/dinov2/blob/e1277af2ba9496fb
+        # adf7aec6eba56e8d882d1e35/dinov2/models/vision_transformer.py
 
         num_positions = self.position_embeddings.shape[1] - 1
 

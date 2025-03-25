@@ -19,7 +19,7 @@ from sbi.inference.potentials.base_potential import BasePotential
 from sbi.samplers.vi.vi_pyro_flows import get_default_flows, get_flow_builder
 from sbi.simulators.linear_gaussian import true_posterior_linear_gaussian_mvn_prior
 from sbi.utils import MultipleIndependent
-from tests.test_utils import check_c2st
+from sbi.utils.metrics import check_c2st
 
 # Tests should be run for all default flows
 FLOWS = get_default_flows()

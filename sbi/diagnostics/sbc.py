@@ -10,7 +10,7 @@ from torch import Tensor, ones, zeros
 from torch.distributions import Uniform
 from tqdm.auto import tqdm
 
-from sbi.inference import DirectPosterior, ScorePosterior
+from sbi.inference import DirectPosterior, VectorFieldPosterior
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.posteriors.vi_posterior import VIPosterior
 from sbi.utils.diagnostics_utils import (
@@ -186,7 +186,9 @@ def get_nltp(thetas: Tensor, xs: Tensor, posterior: NeuralPosterior) -> Tensor:
         nltp: negative log probs of true parameters under approximate posteriors.
     """
     nltp = torch.zeros(thetas.shape[0])
-    unnormalized_log_prob = not isinstance(posterior, (DirectPosterior, ScorePosterior))
+    unnormalized_log_prob = not isinstance(
+        posterior, (DirectPosterior, VectorFieldPosterior)
+    )
 
     for idx, (tho, xo) in enumerate(zip(thetas, xs, strict=False)):
         # Log prob of true params under posterior.

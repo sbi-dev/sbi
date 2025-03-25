@@ -19,7 +19,7 @@ from sbi.simulators.linear_gaussian import (
     linear_gaussian,
     true_posterior_linear_gaussian_mvn_prior,
 )
-from tests.test_utils import check_c2st
+from sbi.utils.metrics import check_c2st
 
 
 @pytest.mark.parametrize(
