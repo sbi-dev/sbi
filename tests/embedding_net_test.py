@@ -401,7 +401,20 @@ def test_1d_ResNet_fc_embedding_net(input_shape, n_blocks, c_internal, c_hidden_
 @pytest.mark.parametrize(
     "bidirectional", [True, False], ids=["one-directional", "bi-directional"]
 )
-@pytest.mark.parametrize("mode", ["loop", "scan"], ids=["loop", "scan"])
+@pytest.mark.parametrize(
+    "mode",
+    [
+        "loop",
+        pytest.param(
+            "scan",
+            marks=pytest.mark.xfail(
+                reason="torch.compiler is not yet supported on Python >= 3.13",
+                strict=True,
+            ),
+        ),
+    ],
+    ids=["loop", "scan"],
+)
 def test_lru_isolated(
     bidirectional: bool,
     mode: str,
@@ -414,10 +427,6 @@ def test_lru_isolated(
     sequence_len: int = 50,
 ):
     """Run some random data trough an LRU layer."""
-
-    if sys.version_info >= (3, 13) and mode == "scan":
-        pytest.xfail("torch.compiler is not yet supported on Python >= 3.13")
-
     lru = LRU(
         input_dim=input_dim,
         state_dim=state_dim,
@@ -439,7 +448,20 @@ def test_lru_isolated(
 @pytest.mark.parametrize(
     "bidirectional", [True, False], ids=["one-directional", "bi-directional"]
 )
-@pytest.mark.parametrize("mode", ["loop", "scan"], ids=["loop", "scan"])
+@pytest.mark.parametrize(
+    "mode",
+    [
+        "loop",
+        pytest.param(
+            "scan",
+            marks=pytest.mark.xfail(
+                reason="torch.compiler is not yet supported on Python >= 3.13",
+                strict=True,
+            ),
+        ),
+    ],
+    ids=["loop", "scan"],
+)
 @pytest.mark.parametrize(
     "apply_input_normalization",
     [True, False],
@@ -459,9 +481,6 @@ def test_lru_block_isolated(
     sequence_len: int = 50,
 ):
     """Run some random data through an LRUBlock."""
-
-    if sys.version_info >= (3, 13) and mode == "scan":
-        pytest.xfail("torch.compiler is not yet supported on Python >= 3.13")
 
     lru_block = LRUBlock(
         hidden_dim=hidden_dim,
@@ -486,7 +505,20 @@ def test_lru_block_isolated(
 @pytest.mark.parametrize(
     "bidirectional", [True, False], ids=["one-directional", "bi-directional"]
 )
-@pytest.mark.parametrize("mode", ["loop", "scan"], ids=["loop", "scan"])
+@pytest.mark.parametrize(
+    "mode",
+    [
+        "loop",
+        pytest.param(
+            "scan",
+            marks=pytest.mark.xfail(
+                reason="torch.compiler is not yet supported on Python >= 3.13",
+                strict=True,
+            ),
+        ),
+    ],
+    ids=["loop", "scan"],
+)
 @pytest.mark.parametrize(
     "aggregate_fcn", ["last_step", "mean"], ids=["last-step", "mean"]
 )
@@ -507,9 +539,6 @@ def test_lru_embedding_net_isolated(
     sequence_len: int = 50,
 ):
     """Run some random data trough an LRUEmbedding network."""
-    if sys.version_info >= (3, 13) and mode == "scan":
-        pytest.xfail("torch.compiler is not yet supported on Python >= 3.13")
-
     embedding_net = LRUEmbedding(
         input_dim=input_dim,  # = observation_dim
         output_dim=output_dim,
@@ -606,6 +635,7 @@ def test_lru_pipeline(embedding_feat_dim: int = 17):
 @pytest.mark.xfail(
     condition=sys.version_info >= (3, 13),
     reason="torch.compiler is not yet supported on Python >= 3.13",
+    strict=True,
 )
 def test_scan(
     input_dim: int = 3,
