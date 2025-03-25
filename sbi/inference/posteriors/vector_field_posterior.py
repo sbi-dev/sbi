@@ -219,7 +219,10 @@ class VectorFieldPosterior(NeuralPosterior):
         show_progress_bars: bool = True,
     ) -> Tensor:
         r"""Return samples from posterior distribution $p(\theta|x)$.
-        Note that this method can be unsupported for some vector field estimators.
+
+        NOTE: this method can be unsupported for some vector field estimators, e.g.,
+        if the vector field estimator was trained with a custom flow matching routine
+        for which the corresponding score is not defined.
 
         Args:
             sample_shape: Shape of the samples to be drawn.
