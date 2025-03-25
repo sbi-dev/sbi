@@ -26,9 +26,10 @@ from sbi.simulators.linear_gaussian import (
     true_posterior_linear_gaussian_mvn_prior,
 )
 from sbi.utils import BoxUniform
+from sbi.utils.metrics import check_c2st
 from sbi.utils.user_input_checks import process_simulator
 
-from .test_utils import check_c2st, get_dkl_gaussian_prior
+from .test_utils import get_dkl_gaussian_prior
 
 # ------------------------------------------------------------------------------
 # ------------------------------- FAST TESTS -----------------------------------
