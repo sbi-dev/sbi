@@ -334,7 +334,7 @@ class RMSNorm(nn.Module):
         self.weight = nn.Parameter(torch.ones(feature_space_dim))
         self.variance_epsilon = eps
 
-    def forward(self, hidden_states: torch.FloatTensor):
+    def forward(self, hidden_states: torch.Tensor):
         """
         Args:
             hidden_states (torch.FloatTensor): input of shape `(batch_size,
@@ -382,7 +382,7 @@ class MoeBlock(nn.Module):
         # Jitter parameters
         self.jitter_noise = config["router_jitter_noise"]
 
-    def forward(self, hidden_states: torch.FloatTensor) -> torch.Tensor:
+    def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
         """
         Args:
             `hidden_states` : input of shape `(batch_size, sequence_length,
@@ -471,7 +471,7 @@ class TransformerBlock(nn.Module):
 
     def forward(
         self,
-        hidden_states: torch.FloatTensor,
+        hidden_states: torch.Tensor,
         attention_mask: Optional[torch.Tensor] = None,
         position_ids: Optional[torch.LongTensor] = None,
         output_attentions: Optional[bool] = False,
@@ -479,9 +479,9 @@ class TransformerBlock(nn.Module):
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         """
         Args:
-            hidden_states (`torch.FloatTensor`): input to the layer of shape `(batch,
+            hidden_states (`torch.Tensor`): input to the layer of shape `(batch,
             seq_len, embed_dim)`
-            attention_mask (`torch.FloatTensor`, *optional*):
+            attention_mask (`torch.Tensor`, *optional*):
                 attention mask of size `(batch_size, sequence_length)`
             output_attentions (`bool`, *optional*):
                 Whether or not to return the attention tensors
@@ -512,6 +512,8 @@ class TransformerBlock(nn.Module):
 
         if output_attentions:
             outputs += (self_attn_weights,)
+        else:
+            outputs += (None,)
 
         return outputs
 
@@ -809,8 +811,8 @@ class TransformerEmbedding(nn.Module):
             attention_mask = None
 
         # decoder layers
-        all_hidden_states = () if output_hidden_states else None
-        all_self_attns = () if output_attentions else None
+        all_hidden_states = () if output_hidden_states else (None,)
+        all_self_attns = () if output_attentions else (None,)
         hidden_states = input
         for decoder_layer in self.layers:
             if output_hidden_states:
