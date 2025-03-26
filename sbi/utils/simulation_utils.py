@@ -27,7 +27,7 @@ def simulate_for_sbi(
     seed: Optional[int] = None,
     show_progress_bar: bool = True,
 ) -> Tuple[Tensor, Tensor]:
-    r"""Returns ($\theta, x$) pairs obtained from sampling the proposal and simulating.
+    r"""Returns pairs :math:`(\theta, x)` by sampling proposal and running simulations.
 
     This function performs two steps:
 

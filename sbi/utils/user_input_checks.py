@@ -44,7 +44,7 @@ def process_prior(
     NOTE: If the prior argument is a sequence of PyTorch distributions, they will be
     interpreted as independent prior dimensions wrapped in a `MultipleIndependent`
     pytorch Distribution. In case the elements are not PyTorch distributions, make sure
-    to use process_prior on each element in the list beforehand. See FAQ 7 for details.
+    to use process_prior on each element in the list beforehand.
 
     NOTE: returns a tuple (processed_prior, num_params, whether_prior_returns_numpy).
     The last two entries in the tuple can be passed on to `process_simulator` to prepare

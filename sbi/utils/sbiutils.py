@@ -676,7 +676,7 @@ def mcmc_transform(
 
     It does two things:
     1) When the prior support is bounded, it transforms the parameters into unbounded
-        space.
+    space.
     2) It z-scores the parameters such that MCMC is performed in a z-scored space.
 
     Args:

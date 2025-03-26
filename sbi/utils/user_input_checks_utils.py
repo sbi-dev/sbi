@@ -204,15 +204,19 @@ class MultipleIndependent(Distribution):
     """Wrap a sequence of PyTorch distributions into a joint PyTorch distribution.
 
     Every element of the sequence is treated as independent from the other elements.
-    Single elements can be multivariate with dependent dimensions, e.g.,:
-        - [
+    Single elements can be multivariate with dependent dimensions.
+
+    Example:
+
+    ::
+
+        import torch
+        from torch.distributions import Gamma, Beta, MultivariateNormal
+        prior = MultipleIndependent([
             Gamma(torch.zeros(1), torch.ones(1)),
             Beta(torch.zeros(1), torch.ones(1)),
-            MVG(torch.ones(2), torch.tensor([[1, .1], [.1, 1.]]))
-        ]
-        - [
-            Uniform(torch.zeros(1), torch.ones(1)),
-            Uniform(torch.ones(1), 2.0 * torch.ones(1))]
+            MultivariateNormal(torch.ones(2), torch.tensor([[1, .1], [.1, 1.]]))
+        ])
     """
 
     def __init__(
@@ -249,6 +253,7 @@ class MultipleIndependent(Distribution):
 
     @property
     def arg_constraints(self) -> Dict[str, constraints.Constraint]:
+        """Return argument constraints."""
         return self.custom_arg_constraints
 
     def _check_distributions(self, dists):
@@ -370,8 +375,8 @@ class MultipleIndependent(Distribution):
         )
 
     def to(self, device: Union[str, torch.device]) -> None:
-        """
-        Move the distribution to the specified device.
+        """Move the distribution to the specified device.
+
         If the distribution has the `to` method, it is used. Otherwise, the
         parameters of the distribution are moved to the specified device.
 

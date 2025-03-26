@@ -9,3 +9,13 @@ from sbi.neural_nets.embedding_nets.resnet import (
     ResNetEmbedding1D,
     ResNetEmbedding2D,
 )
+
+__all__ = [
+    "CausalCNNEmbedding",
+    "CNNEmbedding",
+    "FCEmbedding",
+    "LRUEmbedding",
+    "PermutationInvariantEmbedding",
+    "ResNetEmbedding1D",
+    "ResNetEmbedding2D",
+]
