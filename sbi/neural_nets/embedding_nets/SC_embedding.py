@@ -199,7 +199,7 @@ class SpectralConvEmbedding(nn.Module):
     def __init__(
         self,
         in_channels: int,
-        modes: int = 20,
+        modes: int = 10,
         out_channels: int = 1,
         conv_channels: int = 5,
         num_layers: int = 3,
@@ -298,18 +298,18 @@ class SpectralConvEmbedding(nn.Module):
         batch_size = x.shape[0]
 
         # Check dimension of input data and reshape it
-        if x.ndim == 2:
-            x = x.reshape(batch_size, self.in_channels, -1).permute(0, 2, 1)
+        if x.ndim == 3:
+            x = x.permute(0, 2, 1)  # (batch, n_points, in_channels)
             point_positions = None
 
-        elif x.ndim == 3:
-            x = x.reshape(batch_size, 2, self.in_channels, -1)
+        elif x.ndim == 4:
             point_positions = x[:, 1, 0, :]
             x = x[:, 0, :, :].permute(0, 2, 1)
 
         else:
             raise ValueError(
-                'Input tensor should be 2D or 3D.',
+                'Input tensor should be 3D (batch_size, channels, n_points) '
+                'or 4D (batch_size, 2, channels, n_points). ',
                 f'The tensor that was passed has shape {x.shape}.',
             )
 

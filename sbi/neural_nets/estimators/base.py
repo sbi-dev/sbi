@@ -117,7 +117,7 @@ class ConditionalEstimator(nn.Module, ABC):
 
 
 class ConditionalDensityEstimator(ConditionalEstimator):
-    r"""Base class for density estimators.
+    r"""Base class for conditional density estimators.
 
     The density estimator class is a wrapper around neural networks that allows to
     evaluate the `log_prob`, `sample`, and provide the `loss` of $\theta,x$ pairs. Here
@@ -262,3 +262,145 @@ class ConditionalVectorFieldEstimator(ConditionalEstimator):
         Raises:
             NotImplementedError: This method should be implemented by sub-classes.
         """
+
+
+class UnconditionalEstimator(nn.Module, ABC):
+    r"""Base class for unconditional estimators that estimate properties of
+    distributions without conditioning on an input.
+
+    For example, this can be:
+    - A density estimator of the pdf $p(x)$.
+    - A vector field estimator e.g. $\nabla_x \log p(x)$.
+
+    Subclasses of UnconditionalEstimator should implement the ``loss(input)``
+    method to be compatible with sbi's training procedures.
+    """
+
+    def __init__(self, input_shape: Tuple) -> None:
+        r"""Construct an unconditional estimator given shapes.
+
+        Args:
+            input_shape: Event shape of the input at which the density is being
+                evaluated (and which is also the event_shape of samples).
+        """
+        super().__init__()
+        self._input_shape = torch.Size(input_shape)
+
+    @property
+    def input_shape(self) -> torch.Size:
+        r"""Return the input shape."""
+        return self._input_shape
+
+    @abstractmethod
+    def loss(self, input: Tensor, **kwargs) -> Tensor:
+        r"""Return the loss for training the estimator.
+
+        Args:
+            input: Inputs to evaluate the loss on of shape
+                `(batch_dim, *input_event_shape)`.
+
+        Returns:
+            Loss of shape (batch_dim,)
+        """
+        pass
+
+    def _check_input_shape(self, input: Tensor):
+        r"""This method checks whether the input has the correct shape.
+
+        Args:
+            input: Inputs to evaluate the log probability on of shape
+                    `(sample_dim_input, batch_dim_input, *event_shape_input)`.
+
+        Raises:
+            ValueError: If the input has a dimensionality that does not match
+                        the expected input dimensionality.
+            ValueError: If the shape of the input does not match the expected
+                        input dimensionality.
+        """
+        input_shape = input.shape
+        exp_input_shape = self.input_shape
+        if len(input_shape) < len(exp_input_shape):
+            raise ValueError(
+                "Dimensionality of input is too small and does not match the "
+                f"expected dimensionality {len(exp_input_shape)}. It should "
+                f"be compatible with the provided input_shape {exp_input_shape}."
+            )
+        else:
+            input_shape = input.shape[-len(self.input_shape) :]
+            if input_shape != exp_input_shape:
+                raise ValueError(
+                    f"Shape of input {input_shape} does not match the "
+                    f"expected input dimensionality {exp_input_shape}, as "
+                    "provided by input_shape. Please reshape it accordingly."
+                )
+
+
+class UnconditionalDensityEstimator(UnconditionalEstimator):
+    r"""Base class for unconditional density estimators.
+
+    The density estimator class is a wrapper around neural networks that allows to
+    evaluate the `log_prob`, `sample`, and provide the `loss` on $x$ values.
+
+    Note:
+        We assume that the input to the density estimator is a tensor of shape
+        (sample_dim, batch_dim, *input_shape), where input_shape is the dimensionality
+        of the input.
+
+    """
+
+    def __init__(self, net: nn.Module, input_shape: torch.Size) -> None:
+        r"""Base class for density estimators.
+
+        Args:
+            net: Neural network or any parameterized model that is used to estimate the
+                probability density of the input.
+            input_shape: Event shape of the input at which the density is being
+                evaluated (and which is also the event_shape of samples).
+        """
+        super().__init__(input_shape)
+        self.net = net
+
+    def log_prob(self, x: Tensor) -> Tensor:
+        r"""Return the log probabilities of the inputs
+
+        Args:
+            x: Inputs to evaluate the log probability on of shape
+                `(sample_dim_input, batch_dim_input, *event_shape_input)`.
+
+        Returns:
+            Sample-wise log probabilities.
+        """
+
+        self._neural_net.eval()
+        return self._neural_net.log_prob(x)
+
+    def sample(self, sample_shape: torch.Size()) -> Tensor:
+        r"""Return samples from the density estimator.
+
+        Args:
+            sample_shape: Shape of the samples to return.
+
+        Returns:
+            Samples of shape (*sample_shape, batch_dim, *event_shape_input).
+        """
+
+        return self._neural_net.sample(sample_shape)
+
+    def sample_and_log_prob(self, sample_shape: torch.Size) -> Tuple[Tensor, Tensor]:
+        r"""Return samples and their density from the density estimator.
+
+        Args:
+            sample_shape: Shape of the samples to return.
+
+        Returns:
+            Samples and associated log probabilities.
+
+        Note:
+            For some density estimators, computing log_probs for samples is
+            more efficient than computing them separately. This method should
+            then be overwritten to provide a more efficient implementation.
+        """
+
+        samples = self.sample(sample_shape)
+        log_probs = self.log_prob(samples)
+        return samples, log_probs
