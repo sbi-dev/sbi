@@ -116,13 +116,13 @@ class VectorFieldPosterior(NeuralPosterior):
             self.prior.to(device)
         else:
             raise ValueError("""Prior has no attribute to(device).""")
-        if hasattr(self.score_estimator, "to"):
-            self.score_estimator.to(device)
+        if hasattr(self.vector_field_estimator, "to"):
+            self.vector_field_estimator.to(device)
         else:
             raise ValueError("""Posterior estimator has no attribute to(device).""")
 
         potential_fn, theta_transform = posterior_estimator_based_potential(
-            self.score_estimator,
+            self.vector_field_estimator,
             self.prior,
             x_o=None,
             enable_transform=self.enable_transform,
