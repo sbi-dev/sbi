@@ -8,9 +8,6 @@ from torch import Tensor
 from torch.distributions import Distribution
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
-from sbi.inference.potentials.posterior_based_potential import (
-    posterior_estimator_based_potential,
-)
 from sbi.inference.potentials.vector_field_potential import (
     CallableDifferentiablePotentialFunction,
     VectorFieldBasedPotential,
@@ -113,7 +110,7 @@ class VectorFieldPosterior(NeuralPosterior):
         """
         self.device = device
         if hasattr(self.prior, "to"):
-            self.prior.to(device)
+            self.prior.to(device)  # type: ignore
         else:
             raise ValueError("""Prior has no attribute to(device).""")
         if hasattr(self.vector_field_estimator, "to"):
@@ -121,7 +118,7 @@ class VectorFieldPosterior(NeuralPosterior):
         else:
             raise ValueError("""Posterior estimator has no attribute to(device).""")
 
-        potential_fn, theta_transform = posterior_estimator_based_potential(
+        potential_fn, theta_transform = vector_field_estimator_based_potential(
             self.vector_field_estimator,
             self.prior,
             x_o=None,

@@ -117,9 +117,9 @@ class VectorFieldBasedPotential(BasePotential):
         """
 
         self.device = device
-        self.score_estimator.to(device)
+        self.vector_field_estimator.to(device)
         if self.prior:
-            self.prior.to(device)
+            self.prior.to(device)  # type: ignore
         if self._x_o is not None:
             self._x_o = self._x_o.to(device)
 

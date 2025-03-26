@@ -82,7 +82,7 @@ class RejectionPosterior(NeuralPosterior):
             device: The device to move the posterior to.
         """
         self.device = device
-        self.potential_fn.to(device)
+        self.potential_fn.to(device)  # type: ignore
         self.proposal.to(device)
         x_o = None
         if hasattr(self, "_x") and (self._x is not None):

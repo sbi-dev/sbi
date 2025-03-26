@@ -428,7 +428,7 @@ class EnsemblePotential(BasePotential):
         self,
         potential_fns: List,
         weights: Tensor,
-        prior: Distribution,  # type: ignore
+        prior: Distribution,
         x_o: Optional[Tensor],
         device: Union[str, torch.device] = "cpu",
     ):
@@ -457,7 +457,7 @@ class EnsemblePotential(BasePotential):
         for i in range(len(self.potential_fns)):
             self.potential_fns[i].to(device)
         self._weights = self._weights.to(device)
-        self.prior.to(device)
+        self.prior.to(device)  # type: ignore
         if self._x_o is not None:
             self._x_o = self._x_o.to(device)
 

@@ -116,9 +116,9 @@ class IIDScoreFunction(ABC):
             device: Device to move the score_estimator and prior to.
         """
         self.device = device
-        self.score_estimator.to(device)
+        self.vector_field_estimator.to(device)
         if self.prior:
-            self.prior.to(device)
+            self.prior.to(device)  # type: ignore
 
     @abstractmethod
     def __call__(

@@ -96,7 +96,7 @@ class PosteriorBasedPotential(BasePotential):
         self.device = device
         self.posterior_estimator.to(device)
         if self.prior is not None:
-            self.prior.to(device)
+            self.prior.to(device)  # type: ignore
         if self._x_o is not None:
             self._x_o = self._x_o.to(device)
 

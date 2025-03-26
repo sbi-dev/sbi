@@ -44,7 +44,7 @@ class DirectPosterior(NeuralPosterior):
     def __init__(
         self,
         posterior_estimator: ConditionalDensityEstimator,
-        prior: Distribution,  # type: ignore
+        prior: Distribution,
         max_sampling_batch_size: int = 10_000,
         device: Optional[Union[str, torch.device]] = None,
         x_shape: Optional[torch.Size] = None,
@@ -104,7 +104,7 @@ class DirectPosterior(NeuralPosterior):
         """
         self.device = device
         if hasattr(self.prior, "to"):
-            self.prior.to(device)
+            self.prior.to(device)  # type: ignore
         else:
             raise ValueError("""Prior has no attribute to(device).""")
         if hasattr(self.posterior_estimator, "to"):

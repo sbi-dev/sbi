@@ -151,8 +151,8 @@ class VIPosterior(NeuralPosterior):
             device: The device to move the posterior to.
         """
         self.device = device
-        self.potential_fn.to(device)
-        self._prior.to(device)
+        self.potential_fn.to(device)  # type: ignore
+        self._prior.to(device)  # type: ignore
         if self._x is not None:
             x_o = self._x.to(device)
         self.theta_transform = mcmc_transform(self._prior, device=device)
