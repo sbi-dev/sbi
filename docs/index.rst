@@ -48,7 +48,7 @@ Overview
 
 To get started, install the ``sbi`` package with:
 
-.. code-block:: console
+.. code-block:: bash
 
    python -m pip install sbi
 
@@ -74,7 +74,7 @@ Then, check out our material:
       :link: sbi
       :link-type: doc
 
-      Practical recipes for common tasks.
+      Full documentation of modules and functions.
 
 
 Motivation and approach
