@@ -6304,6 +6304,8 @@ a numerical ODE solver.</p>
               Bases: <code><span title="sbi.inference.trainers.npse.vector_field_inference.VectorFieldInference">VectorFieldInference</span></code></p>
 
 
+        <p>Neural Posterior Score Estimation as in Geffner et al. and Sharrock et al.</p>
+
 
 
 
@@ -6413,7 +6415,11 @@ a numerical ODE solver.</p>
 <span class="normal">116</span>
 <span class="normal">117</span>
 <span class="normal">118</span>
-<span class="normal">119</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NPSE</span><span class="p">(</span><span class="n">VectorFieldInference</span><span class="p">):</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NPSE</span><span class="p">(</span><span class="n">VectorFieldInference</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Neural Posterior Score Estimation as in Geffner et al. and Sharrock et al.&quot;&quot;&quot;</span>
+
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -6710,9 +6716,7 @@ string.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/trainers/npse/npse.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">19</span>
-<span class="normal">20</span>
-<span class="normal">21</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">21</span>
 <span class="normal">22</span>
 <span class="normal">23</span>
 <span class="normal">24</span>
@@ -6763,7 +6767,9 @@ string.</p>
 <span class="normal">69</span>
 <span class="normal">70</span>
 <span class="normal">71</span>
-<span class="normal">72</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">72</span>
+<span class="normal">73</span>
+<span class="normal">74</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">score_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">VectorFieldEstimatorBuilder</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;mlp&quot;</span><span class="p">,</span>
@@ -6953,9 +6959,7 @@ probabilistic ODE with a numerical ODE solver.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/trainers/npse/npse.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 80</span>
-<span class="normal"> 81</span>
-<span class="normal"> 82</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 82</span>
 <span class="normal"> 83</span>
 <span class="normal"> 84</span>
 <span class="normal"> 85</span>
@@ -6992,7 +6996,9 @@ probabilistic ODE with a numerical ODE solver.</p>
 <span class="normal">116</span>
 <span class="normal">117</span>
 <span class="normal">118</span>
-<span class="normal">119</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_posterior</span><span class="p">(</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_posterior</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">vector_field_estimator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">ConditionalVectorFieldEstimator</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>

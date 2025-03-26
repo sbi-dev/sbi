@@ -542,9 +542,9 @@
 <span class="n">x</span> <span class="o">=</span> <span class="n">simulate</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
 
 <span class="n">inference</span> <span class="o">=</span> <span class="n">NPE</span><span class="p">(</span><span class="n">prior</span><span class="p">)</span>
-<span class="n">density_estimator</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
-<span class="n">posterior_estimator</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">(</span><span class="n">density_estimator</span><span class="p">)</span>
-<span class="n">posterior_theta</span> <span class="o">=</span> <span class="n">posterior_estimator</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">100</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_o</span><span class="p">)</span>
+<span class="n">posterior_net</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
+<span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">()</span>
+<span class="n">posterior_theta</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">100</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_o</span><span class="p">)</span>
 <span class="n">pairplot</span><span class="p">(</span><span class="n">posterior_theta</span><span class="p">)</span>
 </code></pre></div>
 <p>The overall goal of simulation-based inference is to algorithmically identify parameters which are consistent with data and prior knowledge. To do so, <code>sbi</code> uses Bayesian inference:</p>
@@ -615,9 +615,9 @@ x.shape torch.Size([2000, 3])
 <blockquote>
 <p>For NPE, you can also use the <code>density_estimator</code> as posterior. The <code>DirectPosterior</code> (which is returned by <code>build_posterior</code>) only adds convenience functions (e.g., MAP) and it automatically rejects posterior samples which are outside of the prior bounds.</p>
 </blockquote>
-<div class="highlight"><pre><span></span><code><span class="n">posterior_estimator</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">(</span><span class="n">density_estimator</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">()</span>
 
-<span class="nb">print</span><span class="p">(</span><span class="n">posterior_estimator</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">posterior</span><span class="p">)</span>
 </code></pre></div>
 <div class="codehilite"><pre><span></span><code>Posterior p(θ|x) of type DirectPosterior. It samples the posterior network and rejects samples that
             lie outside of the prior bounds.
@@ -629,7 +629,7 @@ x.shape torch.Size([2000, 3])
 </code></pre></div>
 <p>The <code>posterior_estimator</code> can then be used to sample parameters <span class="arithmatex">\(\theta\)</span> from the posterior via <code>.sample()</code>, i.e., parameters that are likely given the observation <span class="arithmatex">\(x\)</span>. We can also get log-probabilities under the posterior via <code>.log_prob()</code>. </p>
 <p>For example, given the observation <span class="arithmatex">\(x_{obs}\)</span>, we can sample from the posterior <span class="arithmatex">\(p(\theta|x_{obs})\)</span> as follows:</p>
-<div class="highlight"><pre><span></span><code><span class="n">samples</span> <span class="o">=</span> <span class="n">posterior_estimator</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">10000</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_obs</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><span class="n">samples</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">10000</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_obs</span><span class="p">)</span>
 </code></pre></div>
 <div class="codehilite"><pre><span></span><code>Drawing 10000 posterior samples for 1 observations:   0%|          | 0/10000 [00:00&lt;?, ?it/s]
 </code></pre></div>
@@ -656,7 +656,7 @@ of methods that diagnose potential issues (more detail <a href="">here</a>). For
 we will show only a brief heuristic check: We check whether posterior samples, when simulated,
 match the observed data. Such tests are called <em>Posterior Predictive Checks (PPC)</em>. Let&rsquo;s
 simulate posterior samples:</p>
-<div class="highlight"><pre><span></span><code><span class="n">theta_posterior</span> <span class="o">=</span> <span class="n">posterior_estimator</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">10000</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_obs</span><span class="p">)</span>  <span class="c1"># Sample from posterior.</span>
+<div class="highlight"><pre><span></span><code><span class="n">theta_posterior</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">10000</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_obs</span><span class="p">)</span>  <span class="c1"># Sample from posterior.</span>
 <span class="n">x_predictive</span> <span class="o">=</span> <span class="n">simulator</span><span class="p">(</span><span class="n">theta_posterior</span><span class="p">)</span>  <span class="c1"># Simulate data from posterior.</span>
 </code></pre></div>
 <p>And we can check whether posterior samples roughly match the observation:</p>

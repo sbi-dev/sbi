@@ -585,9 +585,9 @@
 <span class="n">x</span> <span class="o">=</span> <span class="n">simulate</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
 
 <span class="c1"># Train neural network.</span>
-<span class="n">inference</span> <span class="o">=</span> <span class="n">NPE</span><span class="p">(</span><span class="n">prior</span><span class="p">,</span> <span class="n">density_estimator</span><span class="o">=</span><span class="n">density_estimator</span><span class="p">)</span>
+<span class="n">inference</span> <span class="o">=</span> <span class="n">NPE</span><span class="p">(</span><span class="n">prior</span><span class="p">)</span>
 <span class="n">posterior_net</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
-<span class="n">posterior_estimator</span> <span class="o">=</span> <span class="n">DirectPosterior</span><span class="p">(</span><span class="n">posterior_net</span><span class="p">,</span> <span class="n">prior</span><span class="p">)</span>
+<span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">()</span>
 
 <span class="c1"># Diagnostics with SBC.</span>
 <span class="n">thetas</span> <span class="o">=</span> <span class="n">prior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_sbc_samples</span><span class="p">,))</span>
@@ -736,10 +736,10 @@ x.shape torch.Size([10000, 4])
 <p>We now want to set up a neural network for this example. For this example, we will use Neural Posterior Estimation (NPE) with a neural spline flow (<code>nsf</code>) as density estimator. See <a href="">here</a> for the collection of neural networks and <a href="">here</a> for a guide on which methods to choose.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference</span><span class="w"> </span><span class="kn">import</span> <span class="n">NPE</span>
 
-<span class="n">trainer</span> <span class="o">=</span> <span class="n">NPE</span><span class="p">(</span><span class="n">density_estimator</span><span class="o">=</span><span class="s2">&quot;nsf&quot;</span><span class="p">)</span>
+<span class="n">inference</span> <span class="o">=</span> <span class="n">NPE</span><span class="p">(</span><span class="n">density_estimator</span><span class="o">=</span><span class="s2">&quot;nsf&quot;</span><span class="p">)</span>
 </code></pre></div>
 <p>We then train the network on our simulations:</p>
-<div class="highlight"><pre><span></span><code><span class="n">posterior_net</span> <span class="o">=</span> <span class="n">trainer</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
+<div class="highlight"><pre><span></span><code><span class="n">posterior_net</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
 </code></pre></div>
 <div class="codehilite"><pre><span></span><code> Neural network successfully converged after 251 epochs.
 </code></pre></div>
@@ -748,7 +748,7 @@ x.shape torch.Size([10000, 4])
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.analysis</span><span class="w"> </span><span class="kn">import</span> <span class="n">plot_summary</span>
 
 <span class="n">_</span> <span class="o">=</span> <span class="n">plot_summary</span><span class="p">(</span>
-    <span class="n">trainer</span><span class="p">,</span>
+    <span class="n">inference</span><span class="p">,</span>
     <span class="n">tags</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;training_loss&quot;</span><span class="p">,</span> <span class="s2">&quot;validation_loss&quot;</span><span class="p">],</span>
     <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span>
 <span class="p">)</span>
@@ -761,18 +761,16 @@ Valid tags are: [&#39;best_validation_loss&#39;, &#39;epoch_durations_sec&#39;, 
 
 <p><img alt="png" src="../01_Bayesian_workflow_files/01_Bayesian_workflow_31_1.png" /></p>
 <p>In this case, the validation loss seems to still be going down, so it might be worth setting a higher value for <code>.train(stop_after_epochs=30)</code> (default value is 20). This parameter sets how many epochs must pass for without the validation loss reaching a new minimum. For this example, we will not retrain.</p>
-<p>After training, we can build the <code>posterior_estimator</code>:</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference</span><span class="w"> </span><span class="kn">import</span> <span class="n">DirectPosterior</span>
-
-<span class="n">posterior_estimator</span> <span class="o">=</span> <span class="n">DirectPosterior</span><span class="p">(</span><span class="n">posterior_net</span><span class="p">,</span> <span class="n">prior</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="n">posterior_estimator</span><span class="p">)</span>
+<p>After training, we can build the <code>posterior</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">()</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">posterior</span><span class="p">)</span>
 </code></pre></div>
 <div class="codehilite"><pre><span></span><code>Posterior p(θ|x) of type DirectPosterior. It samples the posterior network and rejects samples that
             lie outside of the prior bounds.
 </code></pre></div>
 
 <blockquote>
-<p>For NPE, the <code>posterior_estimator</code> and the <code>posterior_net</code> are almost identical. The <code>posterior_estimator</code> merely includes convenience functionality. For example, it automatically rejects samples outside of the prior support, or it can compute the maximum-a-posteriori estimate with <code>.map()</code></p>
+<p>For NPE, the <code>posterior</code> and the <code>posterior_net</code> are almost identical. The <code>posterior_estimator</code> merely includes convenience functionality. For example, it automatically rejects samples outside of the prior support, or it can compute the maximum-a-posteriori estimate with <code>.map()</code></p>
 </blockquote>
 <h2 id="inferring-the-posterior">Inferring the posterior<a class="headerlink" href="#inferring-the-posterior" title="Permanent link">&para;</a></h2>
 <p>Let&rsquo;s aim to infer the posterior given our observation:</p>
@@ -782,7 +780,7 @@ Valid tags are: [&#39;best_validation_loss&#39;, &#39;epoch_durations_sec&#39;, 
 </code></pre></div>
 
 <p>We can sample from the NPE-posterior:</p>
-<div class="highlight"><pre><span></span><code><span class="n">samples</span> <span class="o">=</span> <span class="n">posterior_estimator</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">1_000</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_obs</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><span class="n">samples</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">1_000</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_obs</span><span class="p">)</span>
 </code></pre></div>
 <div class="codehilite"><pre><span></span><code>Drawing 1000 posterior samples for 1 observations:   0%|          | 0/1000 [00:00&lt;?, ?it/s]
 
@@ -820,7 +818,7 @@ X = torch.linalg.solve_triangular(A, B). (Triggered internally at /Users/runner/
 of methods that diagnose potential issues (more detail <a href="">here</a>). In this tutorial, we will perform <em>posterior predictive checks</em> (PPC) and we will perform <em>simulation-based calibration</em> (SBC).</p>
 <h3 id="posterior-predictive-checks">Posterior predictive checks<a class="headerlink" href="#posterior-predictive-checks" title="Permanent link">&para;</a></h3>
 <p>Let&rsquo;s first perform posterior predictive checks. For these, we simulate posterior samples and compare them to the observation.</p>
-<div class="highlight"><pre><span></span><code><span class="n">posterior_samples</span> <span class="o">=</span> <span class="n">posterior_estimator</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">10</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_obs</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><span class="n">posterior_samples</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">10</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_obs</span><span class="p">)</span>
 <span class="n">posterior_predictives</span> <span class="o">=</span> <span class="n">parallel_simulate</span><span class="p">(</span><span class="n">posterior_samples</span><span class="p">)</span>
 
 <span class="n">posterior_predictive_summary_stats</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">as_tensor</span><span class="p">(</span>
@@ -863,8 +861,8 @@ of methods that diagnose potential issues (more detail <a href="">here</a>). In 
 <span class="n">ranks</span><span class="p">,</span> <span class="n">dap_samples</span> <span class="o">=</span> <span class="n">run_sbc</span><span class="p">(</span>
     <span class="n">prior_samples</span><span class="p">,</span>
     <span class="n">prior_predictive_summary_stats</span><span class="p">,</span>
-    <span class="n">posterior_estimator</span><span class="p">,</span>
-    <span class="n">reduce_fns</span><span class="o">=</span><span class="n">posterior_estimator</span><span class="o">.</span><span class="n">log_prob</span><span class="p">,</span>
+    <span class="n">posterior</span><span class="p">,</span>
+    <span class="n">reduce_fns</span><span class="o">=</span><span class="n">posterior</span><span class="o">.</span><span class="n">log_prob</span><span class="p">,</span>
     <span class="n">num_posterior_samples</span><span class="o">=</span><span class="n">num_posterior_samples</span><span class="p">,</span>
     <span class="n">use_batched_sampling</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>  <span class="c1"># `True` can give speed-ups, but can cause memory issues.</span>
 <span class="p">)</span>
