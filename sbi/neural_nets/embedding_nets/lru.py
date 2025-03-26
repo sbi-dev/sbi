@@ -5,7 +5,7 @@ from typing import Callable, Optional, Tuple
 import numpy as np
 import torch
 from torch import Tensor, nn
-from torch._higher_order_ops.associative_scan import associative_scan
+from torch._higher_order_ops.associative_scan import associative_scan  # type: ignore
 
 
 class LRUEmbedding(nn.Module):

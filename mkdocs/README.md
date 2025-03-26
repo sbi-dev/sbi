@@ -19,6 +19,8 @@ locally, follow these steps:
 
     ```bash
     jupyter nbconvert --to markdown ../docs/tutorials/*.ipynb --output-dir docs/tutorials/
+    jupyter nbconvert --to markdown ../docs/advanced_tutorials/*.ipynb --output-dir docs/tutorials/
+    jupyter nbconvert --to markdown ../docs/how_to_guide/09_sampler_interface.ipynb --output-dir docs/tutorials/
     mkdocs serve
     ```
 

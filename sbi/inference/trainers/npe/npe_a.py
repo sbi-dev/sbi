@@ -27,6 +27,8 @@ from sbi.utils.torchutils import BoxUniform, assert_all_finite, atleast_2d
 
 
 class NPE_A(PosteriorEstimator):
+    r"""Neural Posterior Estimation algorithm as in Papamakarios et al. (2016)."""
+
     def __init__(
         self,
         prior: Optional[Distribution] = None,
@@ -39,9 +41,9 @@ class NPE_A(PosteriorEstimator):
     ):
         r"""NPE-A [1].
 
-        [1] _Fast epsilon-free Inference of Simulation Models with Bayesian Conditional
-            Density Estimation_, Papamakarios et al., NeurIPS 2016,
-            https://arxiv.org/abs/1605.06376.
+        [1] *Fast epsilon-free Inference of Simulation Models with Bayesian
+        Conditional Density Estimation*, Papamakarios et al., NeurIPS 2016.
+        https://arxiv.org/abs/1605.06376
 
         Like all NPE methods, this method trains a deep neural density estimator to
         directly approximate the posterior. Also like all other NPE methods, in the

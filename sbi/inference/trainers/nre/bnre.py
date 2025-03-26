@@ -14,6 +14,8 @@ from sbi.utils.torchutils import assert_all_finite
 
 
 class BNRE(NRE_A):
+    r"""Balanced neural ratio estimation (BNRE) as in Delaunoy et al. (2022)."""
+
     def __init__(
         self,
         prior: Optional[Distribution] = None,

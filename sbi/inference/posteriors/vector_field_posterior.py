@@ -28,11 +28,11 @@ from sbi.utils.torchutils import ensure_theta_batched
 
 
 class VectorFieldPosterior(NeuralPosterior):
-    r"""
-    Posterior $p(\theta|x_o)$ with `log_prob()` and `sample()` methods. It samples
-    from the vector field model - typically a score-based or a flow matching model -
-    given the vector_field_estimator and rejects samples that lie outside of the prior
-    bounds.
+    r"""Posterior based on flow- or score-matching estimators.
+
+    This posterior samples from the vector field model - typically a score-based or a
+    flow matching model - given the `vector_field_estimator` and rejects samples that
+    lie outside of the prior bounds.
 
     The posterior is defined by a vector field estimator and a prior. The vector field
     estimator defines a continuous transformation from a base distribution to the

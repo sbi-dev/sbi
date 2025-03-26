@@ -15,6 +15,8 @@ from sbi.utils.sbiutils import del_entries
 
 
 class NPE_B(PosteriorEstimator):
+    """Neural Posterior Estimation algorithm (NPE-B) as in Lueckmann et al. (2017)."""
+
     def __init__(
         self,
         prior: Optional[Distribution] = None,
@@ -26,9 +28,9 @@ class NPE_B(PosteriorEstimator):
     ):
         r"""NPE-B [1].
 
-        [1] _Flexible statistical inference for mechanistic models of neural dynamics_,
-            Lueckmann, Gonçalves et al., NeurIPS 2017,
-            https://arxiv.org/abs/1711.01861.
+        [1] *Flexible statistical inference for mechanistic models of neural
+        dynamics*, Lueckmann, Gonçalves et al., NeurIPS 2017. https://arxiv.org/abs/171
+
 
         Like all NPE methods, this method trains a deep neural density estimator to
         directly approximate the posterior. Also like all other NPE methods, in the

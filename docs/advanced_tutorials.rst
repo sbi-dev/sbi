@@ -4,50 +4,24 @@
 Advanced tutorials
 ==================
 
-.. toctree::
-   :maxdepth: 2
-
-Advanced
---------
-
-.. toctree::
-   :maxdepth: 1
-
-   tutorials/02_multiround_inference.ipynb
-   tutorials/09_sampler_interface.ipynb
-   tutorials/03_density_estimators.ipynb
-   tutorials/04_embedding_networks.ipynb
-   tutorials/12_iid_data_and_permutation_invariant_embeddings.ipynb
-   tutorials/06_restriction_estimator.ipynb
-   tutorials/08_crafting_summary_statistics.ipynb
-   tutorials/15_importance_sampled_posteriors.ipynb
-
-Diagnostics
------------
+Our advanced tutorials provide a detailed explanation of different methods. These
+tutorials are meant as further reading for power-users (or users who are particularly
+interested in a particular feature of `sbi`), but they should not be required to
+successfully run `sbi`. If you are looking for brief answers to specific questions,
+check our `how-to guide <https://sbi.readthedocs.io/en/latest/how_to_guide.html>`_.
 
 .. toctree::
    :maxdepth: 1
 
-   tutorials/10_diagnostics_posterior_predictive_checks.ipynb
-   tutorials/11_diagnostics_simulation_based_calibration.ipynb
-   tutorials/13_diagnostics_lc2st.ipynb
-   tutorials/14_mcmc_diagnostics_with_arviz.ipynb
-
-Analysis
---------
-
-.. toctree::
-   :maxdepth: 1
-
-   tutorials/05_conditional_distributions.ipynb
-   tutorials/07_sensitivity_analysis.ipynb
-   tutorials/17_plotting_functionality.ipynb
-
-Examples
---------
-
-.. toctree::
-   :maxdepth: 1
-
-   tutorials/Example_00_HodgkinHuxleyModel.ipynb
-   tutorials/Example_01_DecisionMakingModel.ipynb
+   advanced_tutorials/06_restriction_estimator.ipynb
+   advanced_tutorials/10_diagnostics_posterior_predictive_checks.ipynb
+   advanced_tutorials/11_diagnostics_simulation_based_calibration.ipynb
+   advanced_tutorials/12_iid_data_and_permutation_invariant_embeddings.ipynb
+   advanced_tutorials/18_training_interface.ipynb
+   advanced_tutorials/19_flowmatching_and_scorematching.ipynb
+   advanced_tutorials/20_score_based_methods_new_features.ipynb
+   advanced_tutorials/21_diagnostics_misspecification_checks.ipynb
+   advanced_tutorials/15_importance_sampled_posteriors.ipynb
+   advanced_tutorials/14_mcmc_diagnostics_with_arviz.ipynb
+   advanced_tutorials/17_plotting_functionality.ipynb
+   advanced_tutorials/07_sensitivity_analysis.ipynb

@@ -20,7 +20,7 @@
       filters: [ "!^_", "^__", "!^__class__" ]
       inherited_members: true
 
-::: sbi.inference.posteriors.score_posterior.ScorePosterior
+::: sbi.inference.posteriors.vector_field_posterior.VectorFieldPosterior
     selection:
       filters: [ "!^_", "^__", "!^__class__" ]
       inherited_members: true
