@@ -4,14 +4,14 @@
    contain the root `toctree` directive.
 
 
-Welcome to `sbi`!
+Welcome to ``sbi``!
 ===================
 
 ``sbi`` is a Python package for simulation-based inference, designed to meet the needs of
 both researchers and practitioners. Whether you need fine-grained control or an
-easy-to-use interface, `sbi` has you covered.
+easy-to-use interface, ``sbi`` has you covered.
 
-With `sbi`, you can perform parameter inference using Bayesian inference: Given a
+With ``sbi``, you can perform parameter inference using Bayesian inference: Given a
 simulator that models a real-world process, SBI estimates the full posterior
 distribution over the simulator's parameters based on observed data. This distribution
 indicates the most likely parameter values while additionally quantifying uncertainty
@@ -46,7 +46,7 @@ interface:
 Overview
 --------
 
-To get started, install the `sbi` package with:
+To get started, install the ``sbi`` package with:
 
 .. code-block:: console
 
@@ -56,11 +56,25 @@ for more advanced install options, see our `Install Guide <https://sbi.readthedo
 
 Then, check out our material:
 
--  `Tutorials and Examples <https://sbi.readthedocs.io/en/latest/tutorials.html>`_
+.. grid:: 3
 
--  `How-to guide <https://sbi.readthedocs.io/en/latest/how_to_guide.html>`_
+   .. grid-item-card:: 🧠 Tutorials
+      :link: tutorials
+      :link-type: doc
 
--  `Reference API <https://sbi.readthedocs.io/en/latest/sbi.html>`_
+      Step-by-step introductions.
+
+   .. grid-item-card:: 🛠 How-To Guides
+      :link: how_to_guide
+      :link-type: doc
+
+      Practical recipes for common tasks.
+
+   .. grid-item-card:: 📚 API Reference
+      :link: sbi
+      :link-type: doc
+
+      Practical recipes for common tasks.
 
 
 Motivation and approach
@@ -80,7 +94,7 @@ In the case of simulators, a key quantity required for statistical inference, th
 likelihood of observed data given parameters, :math:`\mathcal{L}(\theta) = p(x_o|\theta)`, is
 typically intractable, rendering conventional statistical approaches inapplicable.
 
-`sbi` implements powerful machine-learning methods that address this problem. Roughly,
+``sbi`` implements powerful machine-learning methods that address this problem. Roughly,
 these algorithms can be categorized as:
 
 - Neural Posterior Estimation (amortized `NPE` and sequential `SNPE`),
@@ -232,6 +246,7 @@ Diagnostics
    tutorials
    examples
    how_to_guide
+   advanced_tutorials
 
 
 .. toctree::
@@ -241,7 +256,6 @@ Diagnostics
 
    sbi
    faq
-   advanced_tutorials
    contributor_guide
    changelog
    credits

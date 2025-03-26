@@ -64,6 +64,7 @@ doc = [
     "sphinx-autobuild",
     "sphinx_autodoc_typehints",
     "sphinx-math-dollar",
+    "sphinx-design",
     "myst-nb",
     "jupytext",
     "sphinx-book-theme",
