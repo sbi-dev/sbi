@@ -21,7 +21,8 @@ from sbi.utils.user_input_checks import process_x
 
 
 class NeuralPosterior:
-    r"""Posterior $p(\theta|x)$ with `log_prob()` and `sample()` methods.<br/><br/>
+    r"""Posterior :math:`p(\theta|x)` with `log_prob()` and `sample()` methods.
+
     All inference methods in sbi train a neural network which is then used to obtain
     the posterior distribution. The `NeuralPosterior` class wraps the trained network
     such that one can directly evaluate the (unnormalized) log probability and draw

@@ -39,7 +39,8 @@ from sbi.utils.torchutils import ensure_theta_batched, tensor2numpy
 
 
 class MCMCPosterior(NeuralPosterior):
-    r"""Provides MCMC to sample from the posterior.<br/><br/>
+    r"""Provides MCMC to sample from the posterior.
+
     SNLE or SNRE train neural networks to approximate the likelihood(-ratios).
     `MCMCPosterior` allows to sample from the posterior with MCMC.
     """

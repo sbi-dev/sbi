@@ -10,3 +10,13 @@ from sbi.neural_nets.embedding_nets.resnet import (
     ResNetEmbedding2D,
 )
 from sbi.neural_nets.embedding_nets.transformer import TransformerEmbedding
+
+__all__ = [
+    "CausalCNNEmbedding",
+    "CNNEmbedding",
+    "FCEmbedding",
+    "LRUEmbedding",
+    "PermutationInvariantEmbedding",
+    "ResNetEmbedding1D",
+    "ResNetEmbedding2D",
+]

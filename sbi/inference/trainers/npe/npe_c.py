@@ -29,6 +29,8 @@ from sbi.utils.torchutils import BoxUniform, assert_all_finite
 
 
 class NPE_C(PosteriorEstimator):
+    """Neural Posterior Estimation algorithm (NPE-C) as in Greenberg et al. (2019)."""
+
     def __init__(
         self,
         prior: Optional[Distribution] = None,
@@ -40,8 +42,8 @@ class NPE_C(PosteriorEstimator):
     ):
         r"""NPE-C / APT [1].
 
-        [1] _Automatic Posterior Transformation for Likelihood-free Inference_,
-            Greenberg et al., ICML 2019, https://arxiv.org/abs/1905.07488.
+        [1] *Automatic Posterior Transformation for Likelihood-free Inference*,
+        Greenberg et al., ICML 2019, https://arxiv.org/abs/1905.07488.
 
         Like all NPE methods, this method trains a deep neural density estimator to
         directly approximate the posterior. Also like all other NPE methods, in the
@@ -58,13 +60,13 @@ class NPE_C(PosteriorEstimator):
         or the atomic version is used.
 
         In this codebase, we will automatically switch to the non-atomic loss if the
-        following criteria are fulfilled:<br/>
+        following criteria are fulfilled:
         - proposal is a `DirectPosterior` with density_estimator `mdn`, as built
-            with `sbi.neural_nets.posterior_nn()`.<br/>
+        with `sbi.neural_nets.posterior_nn()`.
         - the density estimator is a `mdn`, as built with
-            `sbi.neural_nets.posterior_nn()`.<br/>
+        `sbi.neural_nets.posterior_nn()`.
         - `isinstance(prior, MultivariateNormal)` (from `torch.distributions`) or
-            `isinstance(prior, sbi.utils.BoxUniform)`
+        `isinstance(prior, sbi.utils.BoxUniform)`
 
         Note that custom implementations of any of these densities (or estimators) will
         not trigger the non-atomic loss, and the algorithm will fall back onto using

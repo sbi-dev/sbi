@@ -243,7 +243,6 @@ def accept_reject_sample(
         Accepted samples of shape `(sample_dim, batch_dim, *event_shape)`, and
         acceptance rates for each observation.
     """
-
     if kwargs:
         logging.warn(
             f"You passed arguments to `rejection_sampling_parameters` that "

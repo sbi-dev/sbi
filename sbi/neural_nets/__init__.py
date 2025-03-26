@@ -38,3 +38,13 @@ def __getattr__(name):
     elif name == "marginal_nn":
         return marginal_nn
     raise AttributeError(f"Module '{__name__}' has no attribute '{name}'")
+
+
+__all__ = [
+    "classifier_nn",
+    "flowmatching_nn",
+    "likelihood_nn",
+    "marginal_nn",
+    "posterior_nn",
+    "posterior_score_nn",
+]

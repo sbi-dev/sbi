@@ -28,8 +28,7 @@ def vector_field_estimator_based_potential(
     enable_transform: bool = True,
     **kwargs,
 ) -> Tuple["VectorFieldBasedPotential", TorchTransform]:
-    r"""
-    Returns the potential function gradient for vector field estimators.
+    r"""Returns the potential function gradient for vector field estimators.
 
     Args:
         vector_field_estimator: The neural network modelling the vector field.

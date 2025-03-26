@@ -15,7 +15,8 @@ from sbi.utils.torchutils import ensure_theta_batched
 
 
 class ImportanceSamplingPosterior(NeuralPosterior):
-    r"""Provides importance sampling to sample from the posterior.<br/><br/>
+    r"""Provides importance sampling to sample from the posterior.
+
     SNLE or SNRE train neural networks to approximate the likelihood(-ratios).
     `ImportanceSamplingPosterior` allows to estimate the posterior log-probability by
     estimating the normlalization constant with importance sampling. It also allows to
