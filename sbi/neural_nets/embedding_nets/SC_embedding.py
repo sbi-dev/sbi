@@ -8,6 +8,7 @@
 #
 # Lingsch et al. (2024) Beyond Regular Grids: Fourier-Based Neural Operators
 # on Arbitrary Domains
+# (https://arxiv.org/pdf/2305.19663)
 
 # Li et al. (2021) Fourier Neural Operator for Parametric Partial Differential Equations
 # (https://openreview.net/pdf?id=c8P9NQVtmnO)
@@ -15,7 +16,7 @@
 # and partially adapted from the following repository:
 # https://github.com/camlab-ethz/FUSE
 
-from typing import Optional
+from typing import Optional, Tuple
 
 import numpy as np
 import torch
@@ -31,6 +32,9 @@ class VFT:
     Forward Fourier transform X of data x with X = V*x.
     The inverse Fourier transform can then be computed by x = V_inv*X with
     V_inv = transpose(conjugate(V)).
+
+    Adapted from: Lingsch et al. (2024) Beyond Regular Grids: Fourier-Based
+    Neural Operators on Arbitrary Domains
 
     Args:
         batch_size: Training batch size
@@ -68,7 +72,7 @@ class VFT:
         # V_fwd: (batch, modes, points) V_inf: (batch, points, modes)
         self.V_fwd, self.V_inv = self.make_matrix()
 
-    def make_matrix(self):
+    def make_matrix(self) -> Tuple[Tensor, Tensor]:
         """Create matrix operators V and V_inf for forward and backward
         Fourier transformation on arbitrary grids
         """
@@ -80,7 +84,7 @@ class VFT:
 
         return forward_mat, inverse_mat
 
-    def forward(self, data, norm='forward'):
+    def forward(self, data: Tensor, norm: str = 'forward') -> Tensor:
         """Perform forward Fourier transformation
         Args:
             data: Input data with shape (batch_size, n_points, conv_channel)
@@ -94,7 +98,7 @@ class VFT:
 
         return data_fwd
 
-    def inverse(self, data, norm='backward'):
+    def inverse(self, data: Tensor, norm: str = 'backward') -> Tensor:
         """Perform inverse Fourier transformation
         Args:
             data: Input data with shape (batch_size, modes, conv_channel)
@@ -112,6 +116,11 @@ class SpectralConv1d_SMM(nn.Module):
     """
     A 1D spectral convolutional layer using the Fourier transform.
     This layer applies a learned complex multiplication in the frequency domain.
+
+    Adapted from:
+    - Lingsch et al. (2024) FUSE: Fast Unified Simulation and Estimation for PDEs
+    - Li et al. (2021) Fourier Neural Operator for Parametric Partial Differential
+                        Equations
 
     Args:
         in_channels: Number of input channels.
@@ -133,34 +142,34 @@ class SpectralConv1d_SMM(nn.Module):
             * torch.rand(in_channels, out_channels, self.modes, dtype=torch.cfloat)
         )
 
-    def compl_mul1d(self, input, weights):
+    def compl_mul1d(self, input: Tensor, weights: Tensor) -> Tensor:
         """
         Performs complex multiplication in the Fourier domain.
 
         Args:
-            input: Input tensor of shape (batch, in_channel, modes).
-            weights: Weight tensor of shape (in_channel, out_channel, modes).
+            input: Input tensor of shape (batch, in_channels, modes).
+            weights: Weight tensor of shape (in_channels, out_channels, modes).
 
         Returns:
-            torch.Tensor: Output tensor of shape (batch, out_channel, modes).
+            torch.Tensor: Output tensor of shape (batch, out_channels, modes).
         """
 
         return torch.einsum("bix,iox->box", input, weights)
 
-    def forward(self, x, transform):
+    def forward(self, x: Tensor, transform: VFT) -> Tensor:
         """
         Forward pass of the spectral convolution layer.
 
         Args:
-            x: Input tensor of shape (batch, n_points, channels).
+            x: Input tensor of shape (batch, n_points, in_channels).
             transform: Fourier transform operator with forward and inverse methods.
 
         Returns:
             The real part of the transformed output tensor
-            with shape (batch, points, conv_channels).
+            with shape (batch, points, out_channels).
         """
         # Compute Fourier coefficients
-        x_ft = transform.forward(x.cfloat(), norm='forward')
+        x_ft = transform.forward(x.to(torch.complex64), norm='forward')
         x_ft = x_ft.permute(0, 2, 1)
         out_ft = self.compl_mul1d(x_ft, self.weights1)
         x_ft = out_ft.permute(0, 2, 1)
@@ -170,21 +179,20 @@ class SpectralConv1d_SMM(nn.Module):
 
         return x.real
 
-    def last_layer(self, x, transform):
+    def last_layer(self, x: Tensor, transform: VFT) -> Tensor:
         """
         Last convolutional layer returning Fourier coefficients to be used as embedding
 
         Args:
-            x: Input tensor of shape (batch, points, channels).
+            x: Input tensor of shape (batch, points, in_channels).
             transform: Fourier transform operator with forward and inverse methods.
 
         Returns:
-            Transformed output tensor of shape (batch, 2*modes, conv_channels).
+            Transformed output tensor of shape (batch, 2*modes, out_channels).
         """
 
-        # Compute Fourier coeffcients up to factor of e^(- something constant)
-        x_ft = transform.forward(x.cfloat(), norm='forward')
-
+        # Compute Fourier coeffcients
+        x_ft = transform.forward(x.to(torch.complex64), norm='forward')
         x_ft = x_ft.permute(0, 2, 1)
         x_ft = self.compl_mul1d(x_ft, self.weights1)  # (batch, conv_channels, modes)
         x_ft = x_ft.permute(0, 2, 1)  # (batch, modes, conv_channels)
@@ -208,6 +216,9 @@ class SpectralConvEmbedding(nn.Module):
         in Fourier space for 1D input data (that can have multiple channels).
         It uses a series of spectral convolution layers and pointwise
         convolution layers to transform the input tensor.
+
+        Adapted from: Lingsch et al. (2024) Beyond Regular Grids: Fourier-Based
+        Neural Operators on Arbitrary Domains
 
         Args:
             in_channels: Number of channels in the input data.
@@ -254,8 +265,8 @@ class SpectralConvEmbedding(nn.Module):
         """Network forward pass.
 
         Args:
-            x: 2D input tensor (batch_size, in_channels, n_points) for equi-spaced data
-            or 3D tensor (batch_size, 2, in_channels, n_points) for non-equispaced data,
+            x: 3D input tensor (batch_size, in_channels, n_points) for equi-spaced data
+            or 4D tensor (batch_size, 2, in_channels, n_points) for non-equispaced data,
             where we additionally pass the point positions in the second dimension,
             repeating the same point positions for each channel.
             For non-equispaced data, the positions have to be normalized with
@@ -289,8 +300,6 @@ class SpectralConvEmbedding(nn.Module):
         neural_posterior = posterior_nn(model="nsf", embedding_net=embedding_net)
         inference = SNPE(prior=sbi_prior, density_estimator=neural_posterior)
         _ = inference.append_simulations(theta, data_nonequispaced)
-
-
 
         Returns:
             Network output (batch_size, out_channels * 2 * modes).
