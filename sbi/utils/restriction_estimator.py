@@ -615,14 +615,13 @@ class RestrictedPrior(Distribution):
         sample_with: str = "rejection",
         device: str = "cpu",
     ) -> None:
-        r"""
-        Initialize the simulation informed prior.
+        r"""Initialize the simulation-informed prior.
 
         References:
-        - Deistler et al. (2022): "Energy-efficient network activity from disparate
-          circuit parameters"
-        - Deistler et al. (2022): "Truncated proposals for scalable and hassle-free
-          simulation-based inference"
+        - Deistler et al. (2022): *Energy-efficient network activity from disparate
+        circuit parameters*
+        - Deistler et al. (2022): *Truncated proposals for scalable and hassle-free
+        simulation-based inference*
 
         Args:
             prior: Prior distribution, will be used as proposal distribution whose

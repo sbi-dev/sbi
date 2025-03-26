@@ -30,11 +30,11 @@ from sbi.simulators.linear_gaussian import (
     true_posterior_linear_gaussian_mvn_prior,
 )
 from sbi.utils import RestrictedPrior, get_density_thresholder
+from sbi.utils.metrics import check_c2st
 from sbi.utils.user_input_checks import process_prior, process_simulator
 
 from .sbiutils_test import conditional_of_mvn
 from .test_utils import (
-    check_c2st,
     get_dkl_gaussian_prior,
     get_normalization_uniform_prior,
     get_prob_outside_uniform_prior,

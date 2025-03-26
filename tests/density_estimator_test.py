@@ -199,7 +199,7 @@ def test_density_estimator_log_prob_shapes_with_embedding(
 @pytest.mark.parametrize("density_estimator_build_fn", model_builders)
 @pytest.mark.parametrize("sample_shape", ((), (1,), (2, 3)))
 @pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
-@pytest.mark.parametrize("condition_event_shape", ((1,), (7,)))
+@pytest.mark.parametrize("condition_event_shape", ((1,), (2,)))
 @pytest.mark.parametrize("batch_dim", (1, 10))
 def test_density_estimator_sample_shapes(
     density_estimator_build_fn,
@@ -253,13 +253,12 @@ def test_correctness_of_density_estimator_log_prob(
     [
         build_nsf,
         build_zuko_nsf,
-        build_mlp_flowmatcher,
-    ],  # just test nflows, zuko and flowmatching
+    ],  # just test nflows and zuko
 )
 @pytest.mark.parametrize(
     "input_event_shape", ((1,), pytest.param((2,), marks=pytest.mark.slow))
 )
-@pytest.mark.parametrize("condition_event_shape", ((1,), (2,)))
+@pytest.mark.parametrize("condition_event_shape", ((1,), (7,)))
 @pytest.mark.parametrize("sample_shape", ((1000,), (500, 2)))
 def test_correctness_of_batched_vs_seperate_sample_and_log_prob(
     density_estimator_build_fn: Callable,

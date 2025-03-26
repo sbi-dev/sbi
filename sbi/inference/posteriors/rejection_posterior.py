@@ -17,7 +17,8 @@ from sbi.utils.torchutils import ensure_theta_batched
 
 
 class RejectionPosterior(NeuralPosterior):
-    r"""Provides rejection sampling to sample from the posterior.<br/><br/>
+    r"""Provides rejection sampling to sample from the posterior.
+
     SNLE or SNRE train neural networks to approximate the likelihood(-ratios).
     `RejectionPosterior` allows to sample from the posterior with rejection sampling.
     """

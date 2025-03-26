@@ -12,9 +12,9 @@ from sbi.inference.posteriors.vi_posterior import VIPosterior
 from sbi.neural_nets import posterior_nn
 from sbi.neural_nets.embedding_nets import FCEmbedding
 from sbi.utils import BoxUniform
+from sbi.utils.metrics import check_c2st
 from sbi.utils.torchutils import process_device
 from sbi.utils.user_input_checks_utils import MultipleIndependent
-from tests.test_utils import check_c2st
 
 
 # toy simulator for continuous data with mixed parameters

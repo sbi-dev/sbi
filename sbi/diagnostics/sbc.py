@@ -10,7 +10,7 @@ from torch import Tensor, ones, zeros
 from torch.distributions import Uniform
 from tqdm.auto import tqdm
 
-from sbi.inference import DirectPosterior, ScorePosterior
+from sbi.inference import DirectPosterior, VectorFieldPosterior
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.posteriors.vi_posterior import VIPosterior
 from sbi.utils.diagnostics_utils import (
@@ -31,13 +31,13 @@ def run_sbc(
     use_batched_sampling: bool = True,
     **kwargs,
 ):
-    """Run simulation-based calibration (SBC) (parallelized across sbc runs).
+    """Run simulation-based calibration (SBC) or expected coverage.
 
     Note: This function implements two versions of coverage diagnostics:
-     - setting reduce_fns = "marginals" performs SBC as proposed in Talts et
-       al., https://arxiv.org/abs/1804.06788.
+    - setting reduce_fns = "marginals" performs SBC as proposed in Talts et
+    al., https://arxiv.org/abs/1804.06788.
     - setting reduce_fns = posterior.log_prob performs sample-based expected
-      coverage as proposed in Deistler et al., https://arxiv.org/abs/2210.04815.
+    coverage as proposed in Deistler et al., https://arxiv.org/abs/2210.04815.
 
     Args:
         thetas: ground-truth parameters for sbc, simulated from the prior.
@@ -186,7 +186,9 @@ def get_nltp(thetas: Tensor, xs: Tensor, posterior: NeuralPosterior) -> Tensor:
         nltp: negative log probs of true parameters under approximate posteriors.
     """
     nltp = torch.zeros(thetas.shape[0])
-    unnormalized_log_prob = not isinstance(posterior, (DirectPosterior, ScorePosterior))
+    unnormalized_log_prob = not isinstance(
+        posterior, (DirectPosterior, VectorFieldPosterior)
+    )
 
     for idx, (tho, xo) in enumerate(zip(thetas, xs, strict=False)):
         # Log prob of true params under posterior.
@@ -222,12 +224,12 @@ def check_sbc(
         num_posterior_samples: number of posterior samples used for sbc ranking.
         num_c2st_repetitions: number of times c2st is repeated to estimate robustness.
 
-    Returns (all in a dictionary):
-        ks_pvals: p-values of the Kolmogorov-Smirnov test of uniformity,
-            one for each dim_parameters.
-        c2st_ranks: C2ST accuracy of between ranks and uniform baseline,
-            one for each dim_parameters.
-        c2st_dap: C2ST accuracy between prior and dap samples, single value.
+    Returns:
+        - ks_pvals: p-values of the Kolmogorov-Smirnov test of uniformity,
+        one for each dim_parameters.
+        - c2st_ranks: C2ST accuracy of between ranks and uniform baseline,
+        one for each dim_parameters.
+        - c2st_dap: C2ST accuracy between prior and dap samples, single value.
     """
     if ranks.shape[0] < 100:
         warnings.warn(

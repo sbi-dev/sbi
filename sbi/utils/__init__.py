@@ -66,8 +66,22 @@ from sbi.utils.user_input_checks import (
     check_estimator_arg,
     check_prior,
     process_prior,
+    process_simulator,
     process_x,
     test_posterior_net_for_multi_d_x,
     validate_theta_and_x,
 )
 from sbi.utils.user_input_checks_utils import MultipleIndependent
+
+
+__all__ = [
+    "process_prior",
+    "process_simulator",
+    "BoxUniform",
+    "MultipleIndependent",
+    "RestrictedPrior",
+    "RestrictionEstimator",
+    "get_density_thresholder",
+    "transformed_potential",
+    "mcmc_transform",
+]

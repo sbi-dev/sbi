@@ -58,6 +58,8 @@ Then, check out our material:
 
 -  `Tutorials and Examples <https://sbi.readthedocs.io/en/latest/tutorials.html>`_
 
+-  `How-to guide <https://sbi.readthedocs.io/en/latest/how_to_guide.html>`_
+
 -  `Reference API <https://sbi.readthedocs.io/en/latest/sbi.html>`_
 
 
@@ -227,21 +229,19 @@ Diagnostics
    :caption: Getting started
 
    installation
-
-.. toctree::
-   :hidden:
-   :maxdepth: 1
-
    tutorials
-   faq
+   examples
+   how_to_guide
+
 
 .. toctree::
    :hidden:
    :maxdepth: 2
    :caption: More guides/resources
 
-   advanced_tutorials
    sbi
+   faq
+   advanced_tutorials
    contributor_guide
    changelog
    credits

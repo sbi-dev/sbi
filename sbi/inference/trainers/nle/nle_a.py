@@ -11,6 +11,8 @@ from sbi.utils.sbiutils import del_entries
 
 
 class NLE_A(LikelihoodEstimator):
+    """Neural Likelihood Estimation algorithm (NLE) as in Papamakarios et al. (2019)."""
+
     def __init__(
         self,
         prior: Optional[Distribution] = None,
@@ -23,7 +25,7 @@ class NLE_A(LikelihoodEstimator):
         r"""Neural Likelihood Estimation [1].
 
         [1] Sequential Neural Likelihood: Fast Likelihood-free Inference with
-        Autoregressive Flows_, Papamakarios et al., AISTATS 2019,
+        Autoregressive Flows, Papamakarios et al., AISTATS 2019,
         https://arxiv.org/abs/1805.07226
 
         Args:
