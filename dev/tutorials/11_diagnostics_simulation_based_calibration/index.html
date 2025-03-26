@@ -474,10 +474,9 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="In a nutshell">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
+</li>
+      
+        <li class="md-nav__item">
   <a href="#key-ideas-behind-sbc" class="md-nav__link">
     <span class="md-ellipsis">
       Key ideas behind SBC
@@ -485,18 +484,13 @@
   </a>
   
 </li>
-        
-          <li class="md-nav__item">
+      
+        <li class="md-nav__item">
   <a href="#what-can-sbc-diagnose" class="md-nav__link">
     <span class="md-ellipsis">
       What can SBC diagnose?
     </span>
   </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -563,7 +557,49 @@
         <li class="md-nav__item">
   <a href="#multi-dimensional-sbc" class="md-nav__link">
     <span class="md-ellipsis">
-      multi dimensional SBC
+      Multi dimensional SBC
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#when-things-go-haywire" class="md-nav__link">
+    <span class="md-ellipsis">
+      When things go haywire
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="When things go haywire">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#a-shifted-posterior-mean" class="md-nav__link">
+    <span class="md-ellipsis">
+      A shifted posterior mean
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a-dispersed-posterior" class="md-nav__link">
+    <span class="md-ellipsis">
+      A dispersed posterior
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#posterior-calibration-with-tarp-lemos-et-al-2023" class="md-nav__link">
+    <span class="md-ellipsis">
+      Posterior calibration with TARP (Lemos et al. 2023)
     </span>
   </a>
   
@@ -608,7 +644,7 @@ this technique with sbi.</p>
 <li>we perform inference given each observation <code>x_o_i</code>.</li>
 </ol>
 <p>This produces a separate posterior <span class="arithmatex">\(p_i(\theta | x_{o,i})\)</span> for each of <code>x_o_i</code>. The key step for SBC is to generate a set of posterior samples <span class="arithmatex">\(\{\theta\}_i\)</span> from each posterior. We call this <code>theta_i_s</code>, referring to <code>s</code> samples from posterior <span class="arithmatex">\(p_i(\theta | x_{o,i})\)</span>). Next, we rank the corresponding <code>theta_o_i</code> under this set of samples. A rank is computed by counting how many samples <code>theta_i_s</code> fall below their corresponding <code>theta_o_i</code> value (see section 4.1 in Talts et al.). These ranks are then used to perform the SBC check itself.</p>
-<h3 id="key-ideas-behind-sbc">Key ideas behind SBC<a class="headerlink" href="#key-ideas-behind-sbc" title="Permanent link">&para;</a></h3>
+<h2 id="key-ideas-behind-sbc">Key ideas behind SBC<a class="headerlink" href="#key-ideas-behind-sbc" title="Permanent link">&para;</a></h2>
 <p>The core idea behind SBC is two fold:</p>
 <ul>
 <li>
@@ -619,7 +655,7 @@ this technique with sbi.</p>
 <p>samples from the data averaged posterior (ensemble of randomly chosen posterior samples given multiple distinct observations <code>x_o</code>) are distributed according to the prior</p>
 </li>
 </ul>
-<h3 id="what-can-sbc-diagnose">What can SBC diagnose?<a class="headerlink" href="#what-can-sbc-diagnose" title="Permanent link">&para;</a></h3>
+<h2 id="what-can-sbc-diagnose">What can SBC diagnose?<a class="headerlink" href="#what-can-sbc-diagnose" title="Permanent link">&para;</a></h2>
 <p><strong>SBC can inform us whether we are not wrong.</strong> However, it cannot tell us whether we are right, i.e., SBC checks a necessary condition. For example, imagine you run SBC using the prior as a posterior. The ranks would be perfectly uniform. But the inference would be wrong as this scenario would only occur if the posterior is uninformative.</p>
 <p><strong>Posterior Predictive Checks can be seen as the complementary sufficient check</strong> for the posterior (only as a methaphor, no theoretical guarantees here). Using the prior as a posterior and then doing predictive checks would clearly show that inference failed.</p>
 <p>To summarize, SBC can:</p>
@@ -641,6 +677,9 @@ this technique with sbi.</p>
 <span class="c1"># Set random seed</span>
 <span class="n">_</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="mi">42</span><span class="p">)</span>
 </code></pre></div>
+<div class="codehilite"><pre><span></span><code>WARNING (pytensor.tensor.blas): Using NumPy C-API based implementation for BLAS functions.
+</code></pre></div>
+
 <div class="highlight"><pre><span></span><code><span class="n">num_dim</span> <span class="o">=</span> <span class="mi">2</span>
 <span class="n">num_simulations</span> <span class="o">=</span> <span class="mi">10_000</span>
 
@@ -689,7 +728,7 @@ x    : [[3.9267206 1.6138272]]
 <span class="c1"># append simulations and run training.</span>
 <span class="n">inferer</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">(</span><span class="n">training_batch_size</span><span class="o">=</span><span class="mi">200</span><span class="p">);</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 93 epochs.
+<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 75 epochs.
 </code></pre></div>
 
 <div class="highlight"><pre><span></span><code><span class="n">posterior</span> <span class="o">=</span> <span class="n">inferer</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">()</span>
@@ -698,6 +737,17 @@ x    : [[3.9267206 1.6138272]]
 <span class="c1"># Generate predictive samples by simulating from posterior samples.</span>
 <span class="n">posterior_predictive_samples</span> <span class="o">=</span> <span class="n">simulator</span><span class="p">(</span><span class="n">posterior_samples</span><span class="p">)</span>
 </code></pre></div>
+<div class="codehilite"><pre><span></span><code>Drawing 10000 posterior samples for 1 observations:   0%|          | 0/10000 [00:00&lt;?, ?it/s]
+
+
+/Users/michaeldeistler/anaconda3/envs/sbi/lib/python3.12/site-packages/nflows/transforms/lu.py:80: UserWarning: torch.triangular_solve is deprecated in favor of torch.linalg.solve_triangularand will be removed in a future PyTorch release.
+torch.linalg.solve_triangular has its arguments reversed and does not return a copy of one of the inputs.
+X = torch.triangular_solve(B, A).solution
+should be replaced with
+X = torch.linalg.solve_triangular(A, B). (Triggered internally at /Users/runner/work/pytorch/pytorch/pytorch/aten/src/ATen/native/BatchLinearAlgebra.cpp:2190.)
+  outputs, _ = torch.triangular_solve(
+</code></pre></div>
+
 <div class="highlight"><pre><span></span><code><span class="c1"># let&#39;s do some posterior predictive checks to see if the</span>
 <span class="c1"># posterior predictive samples cluster aournd the observation `x_o`.</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">sbi.analysis</span><span class="w"> </span><span class="kn">import</span> <span class="n">pairplot</span>
@@ -728,9 +778,21 @@ x    : [[3.9267206 1.6138272]]
 <span class="n">num_posterior_samples</span> <span class="o">=</span> <span class="mi">1_000</span>
 <span class="n">num_workers</span> <span class="o">=</span> <span class="mi">1</span>
 <span class="n">ranks</span><span class="p">,</span> <span class="n">dap_samples</span> <span class="o">=</span> <span class="n">run_sbc</span><span class="p">(</span>
-    <span class="n">thetas</span><span class="p">,</span> <span class="n">xs</span><span class="p">,</span> <span class="n">posterior</span><span class="p">,</span> <span class="n">num_posterior_samples</span><span class="o">=</span><span class="n">num_posterior_samples</span><span class="p">,</span> <span class="n">num_workers</span><span class="o">=</span><span class="n">num_workers</span>
+    <span class="n">thetas</span><span class="p">,</span>
+    <span class="n">xs</span><span class="p">,</span>
+    <span class="n">posterior</span><span class="p">,</span>
+    <span class="n">num_posterior_samples</span><span class="o">=</span><span class="n">num_posterior_samples</span><span class="p">,</span>
+    <span class="n">num_workers</span><span class="o">=</span><span class="n">num_workers</span><span class="p">,</span>
+    <span class="n">use_sample_batched</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>  <span class="c1"># True can give a speed-up, but might cause memory issues.</span>
 <span class="p">)</span>
 </code></pre></div>
+<div class="codehilite"><pre><span></span><code>Drawing 1000 posterior samples for 200 observations:   0%|          | 0/1000 [00:00&lt;?, ?it/s]
+
+
+
+Calculating ranks for 200 sbc samples.:   0%|          | 0/200 [00:00&lt;?, ?it/s]
+</code></pre></div>
+
 <p><code>sbi</code> establishes two methods to do simulation-based calibration:</p>
 <ul>
 <li>metrics to compare the sbc ranks with a uniform distribution</li>
@@ -751,7 +813,7 @@ x    : [[3.9267206 1.6138272]]
 </code></pre></div>
 <div class="codehilite"><pre><span></span><code>kolmogorov-smirnov p-values
 
-    check_stats[&#39;ks_pvals&#39;] = [0.1561183 0.9964161]
+    check_stats[&#39;ks_pvals&#39;] = [0.23924501 0.13716705]
 </code></pre></div>
 
 <p>The Kolmogorov-Smirnov (KS test, see also <a href="https://en.wikipedia.org/wiki/Kolmogorov%E2%80%93Smirnov_test#Two-sample_Kolmogorov%E2%80%93Smirnov_test">here</a>) as used by <code>check_sbc</code> provides p-values <code>pvals</code> on the null hypothesis that the samples from <code>ranks</code> are drawn from a uniform distribution (in other words <code>H_0: PDF(ranks) == PDF(uniform)</code>). We are provided two values as our problem is two-dimensional - one p-value for each dimension.</p>
@@ -762,14 +824,14 @@ Therefore, the values we see here should ideally be much larger than <code>0.05<
 <span class="p">)</span>
 </code></pre></div>
 <div class="codehilite"><pre><span></span><code>c2st accuracies 
-check_stats[&#39;c2st_ranks&#39;] = [0.57  0.485]
+check_stats[&#39;c2st_ranks&#39;] = [0.515 0.51 ]
 </code></pre></div>
 
 <p>The second tier of metrics comparing <code>ranks</code> with a uniform distributions is a <code>c2st</code> test (see <a href="http://arxiv.org/abs/1610.06545">here</a> for details). This is a nonparametric two sample test based on training a classifier to differentiate two ensembles. Here, these two ensembles are the observed <code>ranks</code> and samples from a uniform distribution. The values reported are the accuracies from n-fold cross-validation. If you see values around <code>0.5</code>, the classifier was unable to differentiate both ensembles, i.e. <code>ranks</code> are very uniform. If the values are high towards <code>1</code>, this matches the case where <code>ranks</code> is very unlike a uniform distribution.</p>
 <h3 id="data-averaged-posterior-dap-versus-prior">Data averaged posterior (DAP) versus prior<a class="headerlink" href="#data-averaged-posterior-dap-versus-prior" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;- c2st accuracies check_stats[&#39;c2st_dap&#39;] = </span><span class="si">{</span><span class="n">check_stats</span><span class="p">[</span><span class="s1">&#39;c2st_dap&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>- c2st accuracies check_stats[&#39;c2st_dap&#39;] = [0.5125 0.4775]
+<div class="codehilite"><pre><span></span><code>- c2st accuracies check_stats[&#39;c2st_dap&#39;] = [0.51 0.43]
 </code></pre></div>
 
 <p>The last metric reported is again based on <code>c2st</code> computed per dimension of <code>theta</code>. If you see values around <code>0.5</code>, the <code>c2st</code> classifier was unable to differentiate both ensembles for each dimension of <code>theta</code>, i.e. <code>dap</code> are much like (if not identical to) the prior. If the values are very high towards <code>1</code>, this represents the case where <code>dap</code> is very unlike the prior distribution.</p>
@@ -788,7 +850,7 @@ check_stats[&#39;c2st_ranks&#39;] = [0.57  0.485]
 </code></pre></div>
 <p><img alt="png" src="../11_diagnostics_simulation_based_calibration_files/11_diagnostics_simulation_based_calibration_30_0.png" /></p>
 <p>The above provides a visual representation of the cumulative density function (CDF) of <code>ranks</code> (blue and orange for each dimension of <code>theta</code>) with respect to the 95% confidence interval of a uniform distribution (grey).</p>
-<h2 id="multi-dimensional-sbc">multi dimensional SBC<a class="headerlink" href="#multi-dimensional-sbc" title="Permanent link">&para;</a></h2>
+<h2 id="multi-dimensional-sbc">Multi dimensional SBC<a class="headerlink" href="#multi-dimensional-sbc" title="Permanent link">&para;</a></h2>
 <p>So far, we have performed the SBC checks for each dimension of our parameters <span class="arithmatex">\(\theta\)</span> separately. SBI offers a way to perform this check for all dimensions at once.</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># use reduce_fns in order to map the test statistic to only one dimension</span>
 <span class="n">ranks</span><span class="p">,</span> <span class="n">dap_samples</span> <span class="o">=</span> <span class="n">run_sbc</span><span class="p">(</span>
@@ -807,9 +869,9 @@ check_stats[&#39;c2st_ranks&#39;] = [0.57  0.485]
 <p>In the code above, we depart from the default behavior of <code>run_sbc</code>. The standard behavior of <code>run_sbc</code> is to calculate the SBC ranks of parameters <span class="arithmatex">\(\theta\)</span> by comparing the marginal values of the predicted parameter <span class="arithmatex">\(\theta_i\)</span> to the reference value <span class="arithmatex">\(\theta_o\)</span>, i.e. we are ranking each parameter only within its marginal dimension <code>idx</code> which evaluates <code>theta_i[idx] &lt; theta_o[idx]</code> to perform sbc ranking.  </p>
 <p>The <code>reduce_fns</code> parameter of <code>run_sbc</code> allows users to specify a <code>Callable</code> which is invoked on the tuple <code>(theta,x)</code> before the sbc ranking is performed. As an example, we specify <code>reduce_fns=posterior.log_prob</code> here to rank according to the log probability of theta (given x) under the posterior. This results in the ranking being performed across all dimensions of <code>theta</code> at once (instead of each marginal dimension separately) by <em>reducing</em> <code>theta</code> to the log probabilities under the posterior. Internally, <code>run_sbc</code> would then evaluate <code>posterior.log_prob(theta_i, x_o) &lt; posterior.log_prob(theta_o, x_o)</code> to perform the ranking.</p>
 <p>Note: The results of <code>check_sbc</code> using ranking <code>posterior.log_prob</code> values from above produce the same conclusion as those using the marginals from further above. <code>ks_pvals</code> is above <code>0.05</code> again and <code>c2st_ranks</code> is about <code>0.5</code> again.</p>
-<h1 id="when-things-go-haywire">When things go haywire<a class="headerlink" href="#when-things-go-haywire" title="Permanent link">&para;</a></h1>
+<h2 id="when-things-go-haywire">When things go haywire<a class="headerlink" href="#when-things-go-haywire" title="Permanent link">&para;</a></h2>
 <p>Next, we would like to explore some pathologies visible in sbc plots which can hint at our estimated posterior being somewhat wrong or completely off.</p>
-<h2 id="a-shifted-posterior-mean">A shifted posterior mean<a class="headerlink" href="#a-shifted-posterior-mean" title="Permanent link">&para;</a></h2>
+<h3 id="a-shifted-posterior-mean">A shifted posterior mean<a class="headerlink" href="#a-shifted-posterior-mean" title="Permanent link">&para;</a></h3>
 <p>In this scenario, we emulate the situation that our posterior estimates incorrectly with a constant shift. We reuse our trained NPE posterior from above and wrap it so that all samples returned expose a constant shift by <code>+0.1</code>.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">utils_13_diagnosis_sbc</span><span class="w"> </span><span class="kn">import</span> <span class="n">BiasedPosterior</span>
 
@@ -849,7 +911,7 @@ check_stats[&#39;c2st_ranks&#39;] = [0.57  0.485]
 <li>a <strong>rank-skewed rank distribution</strong> shows a systematic <strong>overestimation of the posterior mean</strong><br />
   (we shifted the posterior by <code>-0.1</code>)</li>
 </ul>
-<h2 id="a-dispersed-posterior">A dispersed posterior<a class="headerlink" href="#a-dispersed-posterior" title="Permanent link">&para;</a></h2>
+<h3 id="a-dispersed-posterior">A dispersed posterior<a class="headerlink" href="#a-dispersed-posterior" title="Permanent link">&para;</a></h3>
 <p>In this scenario we emulate the situation if our posterior estimates incorrectly with a dispersion, i.e. the posterior is too wide or too thin. We reuse our trained NPE posterior from above and wrap it so that all samples return a dispersion by 100% more wide (<code>dispersion=2.0</code>), i.e. the variance is overestimated by a factor of 2.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">utils_13_diagnosis_sbc</span><span class="w"> </span><span class="kn">import</span> <span class="n">DispersedPosterior</span>
 
@@ -913,20 +975,23 @@ and check, whether they correspond to the given <span class="arithmatex">\(\alph
     <span class="n">num_posterior_samples</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>
 <span class="p">)</span>
 </code></pre></div>
+<div class="codehilite"><pre><span></span><code>Drawing 1000 posterior samples for 200 observations:   0%|          | 0/1000 [00:00&lt;?, ?it/s]
+</code></pre></div>
+
 <div class="highlight"><pre><span></span><code><span class="c1"># Similar to SBC, we can check then check whether the distribution of ecp is close to</span>
 <span class="c1"># that of alpha.</span>
 <span class="n">atc</span><span class="p">,</span> <span class="n">ks_pval</span> <span class="o">=</span> <span class="n">check_tarp</span><span class="p">(</span><span class="n">ecp</span><span class="p">,</span> <span class="n">alpha</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="n">atc</span><span class="p">,</span> <span class="s2">&quot;Should be close to 0&quot;</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="n">ks_pval</span><span class="p">,</span> <span class="s2">&quot;Should be larger than 0.05&quot;</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>-0.7949994206428528 Should be close to 0
-0.999115261755522 Should be larger than 0.05
+<div class="codehilite"><pre><span></span><code>0.03500041365623474 Should be close to 0
+0.9999999953860058 Should be larger than 0.05
 </code></pre></div>
 
 <div class="highlight"><pre><span></span><code><span class="c1"># Or, we can perform a visual check.</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">sbi.analysis.plot</span><span class="w"> </span><span class="kn">import</span> <span class="n">plot_tarp</span>
 
-<span class="n">plot_tarp</span><span class="p">(</span><span class="n">ecp</span><span class="p">,</span> <span class="n">alpha</span><span class="p">);</span>
+<span class="n">plot_tarp</span><span class="p">(</span><span class="n">ecp</span><span class="p">,</span> <span class="n">alpha</span><span class="p">)</span>
 </code></pre></div>
 <p><img alt="png" src="../11_diagnostics_simulation_based_calibration_files/11_diagnostics_simulation_based_calibration_60_0.png" /></p>
 <p>In contrast to SBC (Talts et al.) and coverage based highest posterior density regions

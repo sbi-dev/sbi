@@ -18,7 +18,7 @@
     
     
       
-        <title>17 plotting functionality - sbi</title>
+        <title>Plotting functionality - sbi</title>
       
     
     
@@ -119,7 +119,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              17 plotting functionality
+              Plotting functionality
             
           </span>
         </div>
@@ -458,6 +458,8 @@
   
   
   
+    
+  
   
     <label class="md-nav__title" for="__toc">
       <span class="md-nav__icon md-icon"></span>
@@ -466,23 +468,14 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#plotting-functionality" class="md-nav__link">
-    <span class="md-ellipsis">
-      Plotting functionality
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Plotting functionality">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
   <a href="#customisation" class="md-nav__link">
     <span class="md-ellipsis">
       Customisation
     </span>
   </a>
   
-</li>
+    <nav class="md-nav" aria-label="Customisation">
+      <ul class="md-nav__list">
         
           <li class="md-nav__item">
   <a href="#compare-two-sets-of-samples" class="md-nav__link">
@@ -562,9 +555,7 @@
   
 
 
-  <h1>17 plotting functionality</h1>
-
-<h2 id="plotting-functionality">Plotting functionality<a class="headerlink" href="#plotting-functionality" title="Permanent link">&para;</a></h2>
+<h1 id="plotting-functionality">Plotting functionality<a class="headerlink" href="#plotting-functionality" title="Permanent link">&para;</a></h1>
 <p>Here we will have a look at the different options for finetuning <code>pairplots</code> and <code>marginal_plots</code>.</p>
 <p>Lets first draw some samples from the posterior used in a previous tutorial.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
@@ -581,7 +572,7 @@
 <span class="p">)</span>
 </code></pre></div>
 <p><img alt="png" src="../17_plotting_functionality_files/17_plotting_functionality_4_0.png" /></p>
-<h3 id="customisation">Customisation<a class="headerlink" href="#customisation" title="Permanent link">&para;</a></h3>
+<h2 id="customisation">Customisation<a class="headerlink" href="#customisation" title="Permanent link">&para;</a></h2>
 <p>The pairplots are split into three regions, the diagonal (<code>diag</code>) and the upper and lower off-diagonal regions(<code>upper</code> and <code>lower</code>). We can pass separate arguments (e.g. <code>hist</code>, <code>kde</code>, <code>scatter</code>) for each region, as well as corresponding style keywords in a dictionary (by using e.g. <code>upper_kwargs</code>). For overall figure stylisation one can use <code>fig_kwargs</code>.</p>
 <p>To get a closer look at the potential options, have a look at the <code>_get_default_fig_kwargs</code>, <code>_get_default_diag_kwargs</code> and <code>_get_default_offdiag_kwargs</code> functions in <a href="https://github.com/sbi-dev/sbi/blob/961-pairplot/sbi/analysis/plot.py">analysis/plot.py</a>.</p>
 <p>As illustrated below, we can directly use any <code>matplotlib</code> keywords (such as <code>cmap</code> for images) by passing them in the <code>mpl_kwargs</code> entry of <code>upper_kwargs</code> or <code>diag_kwargs</code>.</p>

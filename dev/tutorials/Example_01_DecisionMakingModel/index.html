@@ -538,6 +538,15 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#obtain-ground-truth-posterior-via-mcmc" class="md-nav__link">
+    <span class="md-ellipsis">
+      Obtain ground truth posterior via MCMC
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#train-mnle-including-experimental-conditions" class="md-nav__link">
     <span class="md-ellipsis">
       Train MNLE including experimental conditions
@@ -830,7 +839,7 @@ Thus, to make MNLE work with experimental conditions, we need to include them in
 <span class="n">theta_and_conditions_o</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">((</span><span class="n">theta_o</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="n">num_trials</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="n">conditions</span><span class="p">),</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
 <span class="n">x_o</span> <span class="o">=</span> <span class="n">sim_wrapper</span><span class="p">(</span><span class="n">theta_and_conditions_o</span><span class="p">)</span>
 </code></pre></div>
-<h4 id="obtain-ground-truth-posterior-via-mcmc">Obtain ground truth posterior via MCMC<a class="headerlink" href="#obtain-ground-truth-posterior-via-mcmc" title="Permanent link">&para;</a></h4>
+<h3 id="obtain-ground-truth-posterior-via-mcmc">Obtain ground truth posterior via MCMC<a class="headerlink" href="#obtain-ground-truth-posterior-via-mcmc" title="Permanent link">&para;</a></h3>
 <p>We obtain a ground-truth posterior via MCMC by using the analytical Binomial-Gamma
 likelihood as before. </p>
 <p>For that, we first the define the actual prior, i.e., the distribution over the

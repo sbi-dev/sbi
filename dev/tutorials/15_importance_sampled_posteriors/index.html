@@ -461,6 +461,62 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#theory" class="md-nav__link">
+    <span class="md-ellipsis">
+      Theory
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Theory">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#importance-weights" class="md-nav__link">
+    <span class="md-ellipsis">
+      Importance weights
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#implementation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Implementation
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Implementation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#importance-sampling-with-the-sbi-toolbox" class="md-nav__link">
+    <span class="md-ellipsis">
+      Importance sampling with the SBI toolbox
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -479,7 +535,7 @@
 
 
 <h1 id="refining-posterior-estimates-with-importance-sampling">Refining posterior estimates with importance sampling<a class="headerlink" href="#refining-posterior-estimates-with-importance-sampling" title="Permanent link">&para;</a></h1>
-<h1 id="theory">Theory<a class="headerlink" href="#theory" title="Permanent link">&para;</a></h1>
+<h2 id="theory">Theory<a class="headerlink" href="#theory" title="Permanent link">&para;</a></h2>
 <p>SBI estimates the posterior <span class="arithmatex">\(p(\theta|x) = {p(\theta)p(x|\theta)}/{p(x)}\)</span> based on samples from the prior <span class="arithmatex">\(\theta\sim p(\theta)\)</span> and the likelihood <span class="arithmatex">\(x\sim p(x|\theta)\)</span>. Sometimes, we can do both, <em>sample</em> and <em>evaluate</em> the prior and likelihood. In this case, we can combine the <em>simulation-based</em> estimate <span class="arithmatex">\(q(\theta|x)\)</span> with <em>likelihood-based</em> importance sampling, and thereby generate an asymptotically exact estimate for <span class="arithmatex">\(p(\theta|x)\)</span>.</p>
 <h3 id="importance-weights">Importance weights<a class="headerlink" href="#importance-weights" title="Permanent link">&para;</a></h3>
 <p>The main idea is to interpret <span class="arithmatex">\(q(\theta|x)\)</span> as a proposal distribution and generate proposal samples <span class="arithmatex">\(\theta_i\sim q(\theta|x)\)</span>, and then augment each sample with an importance weight <span class="arithmatex">\(w_i = p(\theta_i|x) / q(\theta_i|x)\)</span>. The definition of the importance weights is motivated from Monte Carlo estimates for the random variable <span class="arithmatex">\(f(\theta)\)</span>, </p>
@@ -497,7 +553,7 @@
 \approx \sum_{\theta_i\sim q(\theta_i|x)} w_i\cdot f(\theta_i).
 \]</div>
 <p>Instead of sampling <span class="arithmatex">\(\theta_i\sim p(\theta_i|x)\)</span>, we can thus sample <span class="arithmatex">\(\theta_i\sim q(\theta_i|x)\)</span> and attach a corresponding importance weight <span class="arithmatex">\(w_i\)</span> to each sample. Intuitively, the importance weights downweight samples where <span class="arithmatex">\(q(\theta|x)\)</span> overestimates <span class="arithmatex">\(p(\theta|x)\)</span> and upweight samples where <span class="arithmatex">\(p(\theta|x)\)</span> underestimates <span class="arithmatex">\(q(\theta|x)\)</span>.</p>
-<h1 id="implementation">Implementation<a class="headerlink" href="#implementation" title="Permanent link">&para;</a></h1>
+<h2 id="implementation">Implementation<a class="headerlink" href="#implementation" title="Permanent link">&para;</a></h2>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch</span><span class="w"> </span><span class="kn">import</span> <span class="n">eye</span><span class="p">,</span> <span class="n">ones</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch.distributions</span><span class="w"> </span><span class="kn">import</span> <span class="n">MultivariateNormal</span>

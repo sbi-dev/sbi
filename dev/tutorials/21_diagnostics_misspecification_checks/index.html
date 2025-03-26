@@ -478,6 +478,24 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#define-the-ground-truth-and-misspecified-priors" class="md-nav__link">
+    <span class="md-ellipsis">
+      Define the ground-truth and misspecified priors
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#create-the-training-dataset-for-the-npe-ie-theta-x-pairs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Create the training dataset for the NPE, i.e., \((\theta, x)\) pairs
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#a-detecting-misspecification-in-the-embedding-space" class="md-nav__link">
     <span class="md-ellipsis">
       a) Detecting misspecification in the embedding space
@@ -490,6 +508,75 @@
   <a href="#b-detecting-misspecification-with-the-marginal-distribution-px" class="md-nav__link">
     <span class="md-ellipsis">
       b) Detecting misspecification with the marginal distribution \(p(x)\)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#misspecification-on-hodgkin-huxley-model-tutorial" class="md-nav__link">
+    <span class="md-ellipsis">
+      Misspecification on Hodgkin-Huxley model: tutorial
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Misspecification on Hodgkin-Huxley model: tutorial">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#2-hodgkin-huxley-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      2. Hodgkin-Huxley Model
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#prior-over-model-parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      Prior over model parameters
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a-misspecification-on-raw-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      a) Misspecification on raw data
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b-misspecification-based-on-summary-statistics" class="md-nav__link">
+    <span class="md-ellipsis">
+      b) Misspecification based on summary statistics
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#c-misspecification-in-the-embedding-space" class="md-nav__link">
+    <span class="md-ellipsis">
+      c) Misspecification in the embedding space
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#d-detecting-misspecification-with-a-marginal-density-estimator" class="md-nav__link">
+    <span class="md-ellipsis">
+      d) Detecting misspecification with a marginal density estimator
     </span>
   </a>
   
@@ -557,6 +644,9 @@ There could be a mismatch on multiple levels: a wrongly specified likelihood mod
 <span class="n">seed</span> <span class="o">=</span> <span class="mi">2025</span>
 <span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
 </code></pre></div>
+<div class="codehilite"><pre><span></span><code>&lt;torch._C.Generator at 0x10d9acf70&gt;
+</code></pre></div>
+
 <div class="highlight"><pre><span></span><code><span class="c1"># remove top and right axis from plots</span>
 <span class="n">mpl</span><span class="o">.</span><span class="n">rcParams</span><span class="p">[</span><span class="s2">&quot;axes.spines.right&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span>
 <span class="n">mpl</span><span class="o">.</span><span class="n">rcParams</span><span class="p">[</span><span class="s2">&quot;axes.spines.top&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span>
@@ -565,7 +655,7 @@ There could be a mismatch on multiple levels: a wrongly specified likelihood mod
 <p>In this example, we work with the following simulator: the prior <span class="arithmatex">\(\theta \sim \mathcal{N}(0, I_d)\)</span>, and the observations <span class="arithmatex">\(x|\theta \sim \mathcal{N}(\theta, I_d)\)</span>, where <span class="arithmatex">\(d\)</span> is the dimensionality of the problem. For the purposes of this example, we would assume the observations, i.e., <span class="arithmatex">\(x_o\)</span> would come from the (true) data generating process above.</p>
 <p>Now we demonstrate a concrete example of model misspecification scenario in SBI. We assume our posterior inference network (e.g., NPE) would be fitted on <span class="arithmatex">\((\theta, x)\)</span> pairs where the <span class="arithmatex">\(\theta\)</span> values are sampled from <span class="arithmatex">\(\mathcal{N}(\mu, I_d)\)</span> (instead of <span class="arithmatex">\(\mathcal{N}(0, I_d)\)</span>, i.e., with some offset mean <span class="arithmatex">\(\mu\)</span>), and the corresponding observations <span class="arithmatex">\(x\)</span> were generated using the simulator as above. We refer to this manifestation of model misspecification as <strong>prior misspecification</strong>, and demonstrate how we can identify this using (one or many) observations <span class="arithmatex">\(x_o\)</span> during test time, following the maximum mean discrepancy (MMD) based approach outlined in [1]. </p>
 <p>The core idea of the method is to compute a distribution of MMD values among the synthetic simulations (<span class="arithmatex">\(x\)</span>) the model was trained on, and perform an out-of-distribution/p-value check for the MMD between the synthetic simulations and the <span class="arithmatex">\(x_o\)</span>. Since we will often encounter only one observation <span class="arithmatex">\(x_o\)</span> during inference, we would make use of the biased version of sample-based MMD recommended in [2].</p>
-<h4 id="define-the-ground-truth-and-misspecified-priors">Define the ground-truth and misspecified priors<a class="headerlink" href="#define-the-ground-truth-and-misspecified-priors" title="Permanent link">&para;</a></h4>
+<h3 id="define-the-ground-truth-and-misspecified-priors">Define the ground-truth and misspecified priors<a class="headerlink" href="#define-the-ground-truth-and-misspecified-priors" title="Permanent link">&para;</a></h3>
 <p>The &ldquo;ground-truth&rdquo; prior simply means the <span class="arithmatex">\(x_{obs}\)</span> will come from this prior distribution through the simulator.
 The misspecified prior: the NPE will be trained on <span class="arithmatex">\((\theta, x)\)</span> pairs coming from this prior. Note that the simulator code is same in both cases.</p>
 <div class="highlight"><pre><span></span><code><span class="n">dim</span> <span class="o">=</span> <span class="mi">2</span>  <span class="c1"># observation dimension</span>
@@ -592,7 +682,7 @@ The misspecified prior: the NPE will be trained on <span class="arithmatex">\((\
 <span class="k">def</span><span class="w"> </span><span class="nf">simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">):</span>
     <span class="k">return</span> <span class="n">theta</span> <span class="o">+</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn_like</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
 </code></pre></div>
-<h4 id="create-the-training-dataset-for-the-npe-ie-theta-x-pairs">Create the training dataset for the NPE, i.e., <span class="arithmatex">\((\theta, x)\)</span> pairs<a class="headerlink" href="#create-the-training-dataset-for-the-npe-ie-theta-x-pairs" title="Permanent link">&para;</a></h4>
+<h3 id="create-the-training-dataset-for-the-npe-ie-theta-x-pairs">Create the training dataset for the NPE, i.e., <span class="arithmatex">\((\theta, x)\)</span> pairs<a class="headerlink" href="#create-the-training-dataset-for-the-npe-ie-theta-x-pairs" title="Permanent link">&para;</a></h3>
 <p>As we will see later, we can only train one NPE on the well-specified dataset, and simulate the other scenarios exploiting the symmetry present in our setting.
 We will also generate a validation dataset, to compute many <em>self</em> MMDs or the distribution of MMDs which will be utilised later for the actual misspecification check.</p>
 <div class="highlight"><pre><span></span><code><span class="n">num_simulations</span> <span class="o">=</span> <span class="mi">1000</span>
@@ -673,6 +763,7 @@ but here we choose to pass a validation set
 <span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s2">&quot;Count&quot;</span><span class="p">)</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s2">&quot;MMD&quot;</span><span class="p">)</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">savefig</span><span class="p">(</span><span class="s2">&quot;mmd_misspec.png&quot;</span><span class="p">,</span> <span class="n">dpi</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">bbox_inches</span><span class="o">=</span><span class="s2">&quot;tight&quot;</span><span class="p">)</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
 </code></pre></div>
 <div class="codehilite"><pre><span></span><code>p-val: 0.501000
@@ -756,7 +847,7 @@ P-value: 0.0000
 Do we reject H0 for the misspecified obs x_o_miss? True
 </code></pre></div>
 
-<h1 id="misspecification-on-hodgkin-huxley-model-tutorial">Misspecification on Hodgkin-Huxley model: tutorial<a class="headerlink" href="#misspecification-on-hodgkin-huxley-model-tutorial" title="Permanent link">&para;</a></h1>
+<h2 id="misspecification-on-hodgkin-huxley-model-tutorial">Misspecification on Hodgkin-Huxley model: tutorial<a class="headerlink" href="#misspecification-on-hodgkin-huxley-model-tutorial" title="Permanent link">&para;</a></h2>
 <p>In this tutorial, we will check model misspecification on a <a href="https://en.wikipedia.org/wiki/Hodgkin%E2%80%93Huxley_model">Hodgkin-Huxley
 model</a> from
 neuroscience (Hodgkin and Huxley, 1952). </p>
@@ -797,7 +888,7 @@ neuroscience (Hodgkin and Huxley, 1952). </p>
 <span class="n">mpl</span><span class="o">.</span><span class="n">rcParams</span><span class="p">[</span><span class="s2">&quot;axes.spines.right&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span>
 <span class="n">mpl</span><span class="o">.</span><span class="n">rcParams</span><span class="p">[</span><span class="s2">&quot;axes.spines.top&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span>
 </code></pre></div>
-<h2 id="2-hodgkin-huxley-model">2. Hodgkin-Huxley Model<a class="headerlink" href="#2-hodgkin-huxley-model" title="Permanent link">&para;</a></h2>
+<h3 id="2-hodgkin-huxley-model">2. Hodgkin-Huxley Model<a class="headerlink" href="#2-hodgkin-huxley-model" title="Permanent link">&para;</a></h3>
 <p>Let us assume we current-clamped a neuron and recorded the following voltage trace:</p>
 <p><img src="https://raw.githubusercontent.com/mackelab/delfi/master/docs/docs/tutorials/observed_voltage_trace.png" width="480">
 <br></p>

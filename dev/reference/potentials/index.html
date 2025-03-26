@@ -495,9 +495,9 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#sbi.inference.potentials.score_based_potential.score_estimator_based_potential" class="md-nav__link">
+  <a href="#sbi.inference.potentials.vector_field_potential.vector_field_estimator_based_potential" class="md-nav__link">
     <span class="md-ellipsis">
-      <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;score_estimator_based_potential
+      <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;vector_field_estimator_based_potential
     </span>
   </a>
   
@@ -748,7 +748,7 @@ When False, an identity transform will be returned for <code>theta_transform</co
 
     <div class="doc doc-contents first">
 
-        <p>Returns potential <span class="arithmatex">\(\log(p(x_o|\theta)p(\theta))\)</span> for likelihood-based methods.</p>
+        <p>Returns potential :math:<code>\log(p(x_o|\theta)p(\theta))</code> for likelihood estimator.</p>
 <p>It also returns a transformation that can be used to transform the potential into
 unconstrained space.</p>
 
@@ -906,7 +906,7 @@ unconstrained space.</p>
     <span class="n">x_o</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">],</span>
     <span class="n">enable_transform</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Callable</span><span class="p">,</span> <span class="n">TorchTransform</span><span class="p">]:</span>
-<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Returns potential $\log(p(x_o|\theta)p(\theta))$ for likelihood-based methods.</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Returns potential :math:`\log(p(x_o|\theta)p(\theta))` for likelihood estimator.</span>
 
 <span class="sd">    It also returns a transformation that can be used to transform the potential into</span>
 <span class="sd">    unconstrained space.</span>
@@ -1140,15 +1140,15 @@ When False, an identity transform will be returned for <code>theta_transform</co
 <div class="doc doc-object doc-function">
 
 
-<h2 id="sbi.inference.potentials.score_based_potential.score_estimator_based_potential" class="doc doc-heading">
-            <code class=" language-python"><span class="n">score_estimator_based_potential</span><span class="p">(</span><span class="n">score_estimator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">x_o</span><span class="p">,</span> <span class="n">enable_transform</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></code>
+<h2 id="sbi.inference.potentials.vector_field_potential.vector_field_estimator_based_potential" class="doc doc-heading">
+            <code class=" language-python"><span class="n">vector_field_estimator_based_potential</span><span class="p">(</span><span class="n">vector_field_estimator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">x_o</span><span class="p">,</span> <span class="n">enable_transform</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
 
-<a href="#sbi.inference.potentials.score_based_potential.score_estimator_based_potential" class="headerlink" title="Permanent link">&para;</a></h2>
+<a href="#sbi.inference.potentials.vector_field_potential.vector_field_estimator_based_potential" class="headerlink" title="Permanent link">&para;</a></h2>
 
 
     <div class="doc doc-contents first">
 
-        <p>Returns the potential function gradient for score estimators.</p>
+        <p>Returns the potential function gradient for vector field estimators.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -1164,14 +1164,14 @@ When False, an identity transform will be returned for <code>theta_transform</co
       <tbody>
           <tr class="doc-section-item">
             <td>
-                <code>score_estimator</code>
+                <code>vector_field_estimator</code>
             </td>
             <td>
-                  <code><span title="sbi.neural_nets.estimators.score_estimator.ConditionalScoreEstimator">ConditionalScoreEstimator</span></code>
+                  <code><span title="sbi.neural_nets.estimators.ConditionalVectorFieldEstimator">ConditionalVectorFieldEstimator</span></code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The neural network modelling the score.</p>
+                <p>The neural network modelling the vector field.</p>
               </div>
             </td>
             <td>
@@ -1203,7 +1203,7 @@ When False, an identity transform will be returned for <code>theta_transform</co
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The observed data at which to evaluate the score.</p>
+                <p>The observed data at which to evaluate the vector field.</p>
               </div>
             </td>
             <td>
@@ -1226,12 +1226,28 @@ When False, an identity transform will be returned for <code>theta_transform</co
                   <code>True</code>
             </td>
           </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>**kwargs</code>
+            </td>
+            <td>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Additional keyword arguments passed to
+<code>VectorFieldBasedPotential</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>{}</code>
+            </td>
+          </tr>
       </tbody>
     </table>
 
 
             <details class="quote">
-              <summary>Source code in <code>sbi/inference/potentials/score_based_potential.py</code></summary>
+              <summary>Source code in <code>sbi/inference/potentials/vector_field_potential.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">24</span>
 <span class="normal">25</span>
 <span class="normal">26</span>
@@ -1259,24 +1275,30 @@ When False, an identity transform will be returned for <code>theta_transform</co
 <span class="normal">48</span>
 <span class="normal">49</span>
 <span class="normal">50</span>
-<span class="normal">51</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">score_estimator_based_potential</span><span class="p">(</span>
-    <span class="n">score_estimator</span><span class="p">:</span> <span class="n">ConditionalScoreEstimator</span><span class="p">,</span>
+<span class="normal">51</span>
+<span class="normal">52</span>
+<span class="normal">53</span>
+<span class="normal">54</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">vector_field_estimator_based_potential</span><span class="p">(</span>
+    <span class="n">vector_field_estimator</span><span class="p">:</span> <span class="n">ConditionalVectorFieldEstimator</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">],</span>
     <span class="n">x_o</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">],</span>
     <span class="n">enable_transform</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
-<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="s2">&quot;PosteriorScoreBasedPotential&quot;</span><span class="p">,</span> <span class="n">TorchTransform</span><span class="p">]:</span>
-<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Returns the potential function gradient for score estimators.</span>
+    <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="s2">&quot;VectorFieldBasedPotential&quot;</span><span class="p">,</span> <span class="n">TorchTransform</span><span class="p">]:</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Returns the potential function gradient for vector field estimators.</span>
 
 <span class="sd">    Args:</span>
-<span class="sd">        score_estimator: The neural network modelling the score.</span>
+<span class="sd">        vector_field_estimator: The neural network modelling the vector field.</span>
 <span class="sd">        prior: The prior distribution.</span>
-<span class="sd">        x_o: The observed data at which to evaluate the score.</span>
+<span class="sd">        x_o: The observed data at which to evaluate the vector field.</span>
 <span class="sd">        enable_transform: Whether to enable transforms. Not supported yet.</span>
+<span class="sd">        **kwargs: Additional keyword arguments passed to</span>
+<span class="sd">            `VectorFieldBasedPotential`.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">device</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="nb">next</span><span class="p">(</span><span class="n">score_estimator</span><span class="o">.</span><span class="n">parameters</span><span class="p">())</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+    <span class="n">device</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="nb">next</span><span class="p">(</span><span class="n">vector_field_estimator</span><span class="o">.</span><span class="n">parameters</span><span class="p">())</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
 
-    <span class="n">potential_fn</span> <span class="o">=</span> <span class="n">PosteriorScoreBasedPotential</span><span class="p">(</span>
-        <span class="n">score_estimator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">x_o</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span>
+    <span class="n">potential_fn</span> <span class="o">=</span> <span class="n">VectorFieldBasedPotential</span><span class="p">(</span>
+        <span class="n">vector_field_estimator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">x_o</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span>
     <span class="p">)</span>
 
     <span class="k">if</span> <span class="n">prior</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>

@@ -18,7 +18,7 @@
     
     
       
-        <title>Sampling algorithms in sbi - sbi</title>
+        <title>How to choose sampling algorithms - sbi</title>
       
     
     
@@ -80,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#sampling-algorithms-in-sbi" class="md-skip">
+        <a href="#how-to-choose-sampling-algorithms" class="md-skip">
           Skip to content
         </a>
       
@@ -119,7 +119,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Sampling algorithms in sbi
+              How to choose sampling algorithms
             
           </span>
         </div>
@@ -461,6 +461,59 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#explicit-recommendations" class="md-nav__link">
+    <span class="md-ellipsis">
+      Explicit recommendations
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      Overview
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#main-syntax" class="md-nav__link">
+    <span class="md-ellipsis">
+      Main syntax
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#further-explanation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Further explanation
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#on-the-usage-of-npe" class="md-nav__link">
+    <span class="md-ellipsis">
+      On the usage of NPE
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -478,7 +531,7 @@
   
 
 
-<h1 id="sampling-algorithms-in-sbi">Sampling algorithms in <code>sbi</code><a class="headerlink" href="#sampling-algorithms-in-sbi" title="Permanent link">&para;</a></h1>
+<h1 id="how-to-choose-sampling-algorithms">How to choose sampling algorithms<a class="headerlink" href="#how-to-choose-sampling-algorithms" title="Permanent link">&para;</a></h1>
 <p><code>sbi</code> implements three methods: NPE, NLE, and NRE. When using NPE, the trained neural network directly approximates the posterior. Thus, sampling from the posterior can be done by sampling from the trained neural network. The neural networks trained in NLE and NRE approximate the likelihood(-ratio). Thus, in order to draw samples from the posterior, one has to perform additional sampling steps, e.g. Markov-chain Monte-Carlo (MCMC). In <code>sbi</code>, the implemented samplers are:</p>
 <ul>
 <li>
@@ -494,47 +547,27 @@
 <p>Importance sampling (IS)</p>
 </li>
 </ul>
-<p>Below, we will demonstrate how these samplers can be used in <code>sbi</code>. First, we train the neural network as always:</p>
-<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
-
-<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference</span><span class="w"> </span><span class="kn">import</span> <span class="n">NLE</span>
-
-<span class="c1"># dummy Gaussian simulator for demonstration</span>
-<span class="n">num_dim</span> <span class="o">=</span> <span class="mi">2</span>
-<span class="n">prior</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">distributions</span><span class="o">.</span><span class="n">MultivariateNormal</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">num_dim</span><span class="p">),</span> <span class="n">torch</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="n">num_dim</span><span class="p">))</span>
-<span class="n">theta</span> <span class="o">=</span> <span class="n">prior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">1000</span><span class="p">,))</span>
-<span class="n">x</span> <span class="o">=</span> <span class="n">theta</span> <span class="o">+</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">1000</span><span class="p">,</span> <span class="n">num_dim</span><span class="p">))</span>
-<span class="n">x_o</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="n">num_dim</span><span class="p">))</span>
-
-<span class="n">inference</span> <span class="o">=</span> <span class="n">NLE</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
-<span class="n">likelihood_estimator</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
-</code></pre></div>
-<p>Neural network successfully converged after 104 epochs.</p>
-<p>And then we pass the options for which sampling method to use to the <code>build_posterior()</code> method:</p>
-<div class="highlight"><pre><span></span><code><span class="c1"># Sampling with MCMC</span>
-<span class="n">sampling_algorithm</span> <span class="o">=</span> <span class="s2">&quot;mcmc&quot;</span>
-<span class="n">mcmc_method</span> <span class="o">=</span> <span class="s2">&quot;slice_np&quot;</span>  <span class="c1"># or nuts, or hmc</span>
-<span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">(</span><span class="n">sample_with</span><span class="o">=</span><span class="n">sampling_algorithm</span><span class="p">,</span>
-                                      <span class="n">mcmc_method</span><span class="o">=</span><span class="n">mcmc_method</span><span class="p">)</span>
-
-<span class="c1"># Sampling with variational inference</span>
-<span class="n">sampling_algorithm</span> <span class="o">=</span> <span class="s2">&quot;vi&quot;</span>
-<span class="n">vi_method</span> <span class="o">=</span> <span class="s2">&quot;rKL&quot;</span>  <span class="c1"># or fKL</span>
-<span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">(</span><span class="n">sample_with</span><span class="o">=</span><span class="n">sampling_algorithm</span><span class="p">,</span>
-                                      <span class="n">vi_method</span><span class="o">=</span><span class="n">vi_method</span><span class="p">)</span>
-<span class="c1"># Unlike other methods, vi needs a training step for every observation.</span>
-<span class="n">posterior</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">set_default_x</span><span class="p">(</span><span class="n">x_o</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
-
-<span class="c1"># Sampling with rejection sampling</span>
-<span class="n">sampling_algorithm</span> <span class="o">=</span> <span class="s2">&quot;rejection&quot;</span>
-<span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">(</span><span class="n">sample_with</span><span class="o">=</span><span class="n">sampling_algorithm</span><span class="p">)</span>
-</code></pre></div>
-<h1 id="more-flexibility-in-adjusting-the-sampler">More flexibility in adjusting the sampler<a class="headerlink" href="#more-flexibility-in-adjusting-the-sampler" title="Permanent link">&para;</a></h1>
-<p>With the above syntax, you can easily try out different sampling algorithms. However, in many cases, you might want to customize your sampler. Below, we demonstrate how you can change hyperparameters of the samplers (e.g. number of warm-up steps of MCMC) or how you can write your own sampler from scratch.</p>
-<h2 id="main-syntax-for-nle-and-nre">Main syntax (for NLE and NRE)<a class="headerlink" href="#main-syntax-for-nle-and-nre" title="Permanent link">&para;</a></h2>
-<p>As above, we begin by training the neural network as always:</p>
-<p>Then, for full flexibility on using the sampler, we do not use the <code>.build_posterior()</code> method, but instead we explicitly define the potential function and the sampling algorithm (see below for explanation):</p>
+<p>Which sampler should you choose? And how can you do this in the <code>sbi</code> toolbox?</p>
+<h2 id="explicit-recommendations">Explicit recommendations<a class="headerlink" href="#explicit-recommendations" title="Permanent link">&para;</a></h2>
+<p>For NPE:
+-  use the <code>DirectPosterior</code>. If you have a likelihood available, you can refine the posterior with importance sampling (see tutorial <a href="">here</a>)</p>
+<p>For NLE or NRE:
+- If you have very few parameters (&lt;3), use <code>RejectionPosterior</code> or <code>MCMCPosterior</code>
+- If you have a medium number of parameters (3-10), use <code>MCMCPosterior</code>
+- If you have many parameters (&gt;10) and the <code>MCMCPosterior</code> is too slow, use the <code>VIPosterior</code>. Optionally combine the <code>VIPosterior</code> with an <code>ImportanceSamplingPosterior</code> to improve its accuracy.</p>
+<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
+<ul>
+<li><code>MCMCPosterior</code>: very accurate, but can be slow if you have many parameters.  </li>
+<li><code>VIPosterior</code>: can be much faster if you have many parameter. May be inaccurate.  </li>
+<li><code>RejectionPosterior</code>: accurate and fast, but only for very few parameters (typically less than 3). </li>
+<li><code>ImportanceSamplingPosterior</code>: typically inaccurate, but can be very useful to improve the accuracy of a <code>VIPosterior</code> (see above).</li>
+</ul>
+<h2 id="main-syntax">Main syntax<a class="headerlink" href="#main-syntax" title="Permanent link">&para;</a></h2>
+<p>Below, we show how you can use these different sampling algorithms in the <code>sbi</code> toolbox. We begin with the <code>MCMCPosterior</code>:</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference</span><span class="w"> </span><span class="kn">import</span> <span class="n">MCMCPosterior</span><span class="p">,</span> <span class="n">likelihood_estimator_based_potential</span>
+
+<span class="n">trainer</span> <span class="o">=</span> <span class="n">NLE</span><span class="p">()</span>
+<span class="n">likelihood_estimator</span> <span class="o">=</span> <span class="n">trainer</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
 
 <span class="n">potential_fn</span><span class="p">,</span> <span class="n">parameter_transform</span> <span class="o">=</span> <span class="n">likelihood_estimator_based_potential</span><span class="p">(</span>
     <span class="n">likelihood_estimator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">x_o</span>
@@ -555,19 +588,23 @@
     <span class="n">potential_fn</span><span class="p">,</span> <span class="n">proposal</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span> <span class="n">theta_transform</span><span class="o">=</span><span class="n">parameter_transform</span>
 <span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>Converged with loss: 3.11
-Quality Score: -0.029    Good: Smaller than 0.5  Bad: Larger than 1.0            NOTE: Less sensitive to mode collapse.
-</code></pre></div>
+<p>Finally, it is also possible to improve the accuracy of a <code>VIPosterior</code> with importance sampling:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference</span><span class="w"> </span><span class="kn">import</span> <span class="n">ImportanceSamplingPosterior</span><span class="p">,</span> <span class="n">VIPosterior</span>
 
+<span class="n">vi_posterior</span> <span class="o">=</span> <span class="n">VIPosterior</span><span class="p">(</span>
+    <span class="n">potential_fn</span><span class="p">,</span> <span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span> <span class="n">theta_transform</span><span class="o">=</span><span class="n">parameter_transform</span>
+<span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
+<span class="n">refined_posterior</span> <span class="o">=</span> <span class="n">ImportancerSamplingPosterior</span><span class="p">(</span>
+    <span class="n">potential_fn</span><span class="p">,</span> <span class="n">vi_posterior</span><span class="p">,</span> <span class="n">oversampling_factor</span><span class="o">=</span><span class="mi">32</span>
+<span class="p">)</span>
+<span class="n">samples</span> <span class="o">=</span> <span class="n">refined_posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">1000</span><span class="p">,))</span>
+</code></pre></div>
 <p>At this point, you could also plug the <code>potential_fn</code> into any sampler of your choice and not rely on any of the in-built <code>sbi</code>-samplers.</p>
 <h2 id="further-explanation">Further explanation<a class="headerlink" href="#further-explanation" title="Permanent link">&para;</a></h2>
-<p>The first lines are the same as for the flexible interface:</p>
+<p>The first lines are the same as always:
 <div class="highlight"><pre><span></span><code><span class="n">inference</span> <span class="o">=</span> <span class="n">NLE</span><span class="p">()</span>
 <span class="n">likelihood_estimator</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
-</code></pre></div>
-<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 72 epochs.
-</code></pre></div>
-
+</code></pre></div></p>
 <p>Next, we obtain the potential function. A potential function is a function of the parameter <span class="arithmatex">\(f(\theta)\)</span>. The posterior is proportional to the product of likelihood and prior: <span class="arithmatex">\(p(\theta | x_o) \propto p(x_o | \theta)p(\theta)\)</span>. The potential function is the logarithm of the right-hand side of this equation: <span class="arithmatex">\(f(\theta) = \log(p(x_o | \theta)p(\theta))\)</span></p>
 <div class="highlight"><pre><span></span><code><span class="n">potential_fn</span><span class="p">,</span> <span class="n">parameter_transform</span> <span class="o">=</span> <span class="n">likelihood_estimator_based_potential</span><span class="p">(</span>
     <span class="n">likelihood_estimator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">x_o</span>
@@ -584,16 +621,13 @@ Quality Score: -0.029    Good: Smaller than 0.5  Bad: Larger than 1.0           
 <span class="n">theta_original</span> <span class="o">=</span> <span class="n">parameter_transform</span><span class="o">.</span><span class="n">inv</span><span class="p">(</span><span class="n">theta_tf</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="n">theta_original</span><span class="p">)</span>  <span class="c1"># -&gt; tensor([[0.0]])</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>tensor([[0., 0.]])
-</code></pre></div>
-
 <p>After having obtained the <code>potential_fn</code>, we can sample from the posterior with MCMC or rejection sampling:</p>
 <div class="highlight"><pre><span></span><code><span class="n">posterior</span> <span class="o">=</span> <span class="n">MCMCPosterior</span><span class="p">(</span>
     <span class="n">potential_fn</span><span class="p">,</span> <span class="n">proposal</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span> <span class="n">theta_transform</span><span class="o">=</span><span class="n">parameter_transform</span>
 <span class="p">)</span>
 <span class="n">posterior</span> <span class="o">=</span> <span class="n">RejectionPosterior</span><span class="p">(</span><span class="n">potential_fn</span><span class="p">,</span> <span class="n">proposal</span><span class="o">=</span><span class="n">prior</span><span class="p">)</span>
 </code></pre></div>
-<h2 id="main-syntax-for-npe">Main syntax for NPE<a class="headerlink" href="#main-syntax-for-npe" title="Permanent link">&para;</a></h2>
+<h2 id="on-the-usage-of-npe">On the usage of NPE<a class="headerlink" href="#on-the-usage-of-npe" title="Permanent link">&para;</a></h2>
 <p>NPE usually does not require MCMC or rejection sampling (if you still need it, you can use the same syntax as above with the <code>posterior_estimator_based_potential</code> function). Instead, NPE samples from the neural network. If the support of the prior is bounded, some samples can lie outside of the support of the prior. The <code>DirectPosterior</code> class automatically rejects these samples:</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference</span><span class="w"> </span><span class="kn">import</span> <span class="n">NPE</span><span class="p">,</span> <span class="n">DirectPosterior</span>
 
@@ -601,8 +635,6 @@ Quality Score: -0.029    Good: Smaller than 0.5  Bad: Larger than 1.0           
 <span class="n">posterior_estimator</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
 
 <span class="n">posterior</span> <span class="o">=</span> <span class="n">DirectPosterior</span><span class="p">(</span><span class="n">posterior_estimator</span><span class="p">,</span> <span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">)</span>
-</code></pre></div>
-<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 98 epochs.
 </code></pre></div>
 
 

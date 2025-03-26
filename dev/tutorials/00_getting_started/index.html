@@ -468,27 +468,27 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#parameter-inference-in-a-linear-gaussian-example" class="md-nav__link">
+  <a href="#defining-the-simulator-and-prior" class="md-nav__link">
     <span class="md-ellipsis">
-      Parameter inference in a linear Gaussian example
+      Defining the simulator and prior
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#visualisations-of-the-inferred-posterior-for-a-new-observation" class="md-nav__link">
+  <a href="#inferring-the-posterior" class="md-nav__link">
     <span class="md-ellipsis">
-      Visualisations of the inferred posterior for a new observation
+      Inferring the posterior
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#assessing-the-posterior-for-the-known-theta-x-pair" class="md-nav__link">
+  <a href="#visualizing-the-posterior" class="md-nav__link">
     <span class="md-ellipsis">
-      Assessing the posterior for the known (\(\theta, x\)) - pair
+      Visualizing the posterior
     </span>
   </a>
   
@@ -532,75 +532,63 @@
 
 
 <h1 id="getting-started-with-sbi">Getting started with <code>sbi</code><a class="headerlink" href="#getting-started-with-sbi" title="Permanent link">&para;</a></h1>
-<p>Note, you can find the original version of this notebook at <a href="https://github.com/sbi-dev/sbi/blob/main/docs/tutorials/00_getting_started.ipynb">/docs/tutorials/00_getting_started.ipynb</a> in the <code>sbi</code> repository.</p>
-<p><code>sbi</code> provides a simple interface to run state-of-the-art algorithms for simulation-based inference.</p>
-<p><strong>The overall goal of simulation-based inference is to algorithmically identify model parameters which are consistent with data.</strong></p>
-<p>In this tutorial we demonstrate how to get started with the <code>sbi</code> toolbox and how to perform parameter inference on a simple model.</p>
-<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
-
+<p>In this tutorial, you will learn the basics of the <code>sbi</code> toolbox. Here is a code-snippet that you will learn to understand:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference</span><span class="w"> </span><span class="kn">import</span> <span class="n">NPE</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">sbi.analysis</span><span class="w"> </span><span class="kn">import</span> <span class="n">pairplot</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference</span><span class="w"> </span><span class="kn">import</span> <span class="n">NPE</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">BoxUniform</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.utils.user_input_checks</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
-    <span class="n">check_sbi_inputs</span><span class="p">,</span>
-    <span class="n">process_prior</span><span class="p">,</span>
-    <span class="n">process_simulator</span><span class="p">,</span>
-<span class="p">)</span>
-</code></pre></div>
-<h2 id="parameter-inference-in-a-linear-gaussian-example">Parameter inference in a linear Gaussian example<a class="headerlink" href="#parameter-inference-in-a-linear-gaussian-example" title="Permanent link">&para;</a></h2>
-<p>Each of the implemented inference methods takes three inputs:<br />
-1. observational data (or summary statistics thereof) - <em>the observations</em><br />
-2. a candidate (mechanistic) model - <em>the simulator</em><br />
-3. prior knowledge or constraints on model parameters - <em>the prior</em></p>
-<p>If you are new to simulation-based inference, please first read the information on the <a href="https://sbi.readthedocs.io/en/latest/index.html">homepage of the website</a> to familiarise with the motivation and relevant terms.</p>
-<p>For this illustrative example we consider a model <em>simulator</em> that takes in 3 parameters (<span class="arithmatex">\(\theta\)</span>). For simplicity, the <em>simulator</em> outputs simulations of the same dimensionality and adds 1.0 and some Gaussian noise to the parameter set. </p>
-<blockquote>
-<p>Note: This is where you instead would use your specific  <em>simulator</em> with its parameters.</p>
-</blockquote>
-<p>For the 3-dimensional parameter space we consider a uniform <em>prior</em> between [-2,2].</p>
-<blockquote>
-<p>Note: This is where you would incorporate prior knowlegde about the parameters you want to infer, e.g., ranges known from literature. </p>
-</blockquote>
-<div class="highlight"><pre><span></span><code><span class="n">num_dim</span> <span class="o">=</span> <span class="mi">3</span>
 
-<span class="k">def</span><span class="w"> </span><span class="nf">simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">):</span>
-    <span class="c1"># linear gaussian</span>
-    <span class="k">return</span> <span class="n">theta</span> <span class="o">+</span> <span class="mf">1.0</span> <span class="o">+</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn_like</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span> <span class="o">*</span> <span class="mf">0.1</span>
 
-<span class="n">prior</span> <span class="o">=</span> <span class="n">BoxUniform</span><span class="p">(</span><span class="n">low</span><span class="o">=-</span><span class="mi">2</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">num_dim</span><span class="p">),</span> <span class="n">high</span><span class="o">=</span><span class="mi">2</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">num_dim</span><span class="p">))</span>
+<span class="n">num_simulations</span> <span class="o">=</span> <span class="mi">1000</span>
+<span class="n">theta</span> <span class="o">=</span> <span class="n">prior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_simulations</span><span class="p">,))</span>
+<span class="n">x</span> <span class="o">=</span> <span class="n">simulate</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
+
+<span class="n">inference</span> <span class="o">=</span> <span class="n">NPE</span><span class="p">(</span><span class="n">prior</span><span class="p">)</span>
+<span class="n">density_estimator</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
+<span class="n">posterior_estimator</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">(</span><span class="n">density_estimator</span><span class="p">)</span>
+<span class="n">posterior_theta</span> <span class="o">=</span> <span class="n">posterior_estimator</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">100</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_o</span><span class="p">)</span>
+<span class="n">pairplot</span><span class="p">(</span><span class="n">posterior_theta</span><span class="p">)</span>
 </code></pre></div>
-<p>Here, we are using this simple toy simulator. In practice, the simulator can be anything
-that takes parameters and returns simulated data. The data simulation process is
+<p>The overall goal of simulation-based inference is to algorithmically identify parameters which are consistent with data and prior knowledge. To do so, <code>sbi</code> uses Bayesian inference:</p>
+<div class="arithmatex">\[
+p(\theta | x_o) \propto p(x_o | \theta) p(\theta)
+\]</div>
+<p>The <em>prior</em> <span class="arithmatex">\(p(\theta)\)</span> is a probability distribution which constraint model parameters. The likelihood <span class="arithmatex">\(p(x_o | \theta)\)</span> is implemented by a <em>simulator</em>. It takes parameters as input and returns simulation outputs <span class="arithmatex">\(x\)</span>. The <code>sbi</code> toolbox uses the prior and the simulator to compute the posterior <span class="arithmatex">\(p(\theta | x)\)</span>, which captures parameters that are consistent with <em>observations</em> <span class="arithmatex">\(x_o\)</span>.</p>
+<p>Let&rsquo;s see how <code>sbi</code> achieves this!</p>
+<h2 id="defining-the-simulator-and-prior">Defining the simulator and prior<a class="headerlink" href="#defining-the-simulator-and-prior" title="Permanent link">&para;</a></h2>
+<p>As an illustrative example, we consider a <em>simulator</em> that takes in 3 parameters (<span class="arithmatex">\(\theta\)</span>). For simplicity, the <em>simulator</em> outputs simulations of the same dimensionality and adds 1.0 and some Gaussian noise to the parameter set. </p>
+<blockquote>
+<p>Note: Here, we are using this simple toy simulator. In practice, the simulator can be
+anything that takes parameters and returns simulated data. The data simulation process is
 decoupled from the algorithms implemented in the <code>sbi</code> package. That is, you can
 simulate your data beforehand, e.g., on a cluster or using a different programming
 language or environment. All that <code>sbi</code> needs is a <code>Tensor</code> of parameters <code>theta</code> and
-corresponding simulated data <code>x</code>. And, of course, observed data <code>x_o</code>. </p>
-<p>However, <code>sbi</code> also offers a function to run your simulations in parallel. To that end,
-we have to ensure that your <em>simulator</em> and <em>prior</em> adhere to the requirements of <code>sbi</code>
-such as returning <code>torch.Tensor</code>s in a standardised shape. </p>
-<p>You can do so with the <code>process_simulator()</code> and <code>process_prior()</code> functions, which
-prepare them appropriately. Finally, you can call <code>check_sbi_input()</code> to make sure they
-are consistent which each other.</p>
-<div class="highlight"><pre><span></span><code><span class="c1"># Check prior, return PyTorch prior.</span>
-<span class="n">prior</span><span class="p">,</span> <span class="n">num_parameters</span><span class="p">,</span> <span class="n">prior_returns_numpy</span> <span class="o">=</span> <span class="n">process_prior</span><span class="p">(</span><span class="n">prior</span><span class="p">)</span>
-
-<span class="c1"># Check simulator, returns PyTorch simulator able to simulate batches.</span>
-<span class="n">simulator</span> <span class="o">=</span> <span class="n">process_simulator</span><span class="p">(</span><span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">prior_returns_numpy</span><span class="p">)</span>
-
-<span class="c1"># Consistency check after making ready for sbi.</span>
-<span class="n">check_sbi_inputs</span><span class="p">(</span><span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">)</span>
-</code></pre></div>
-<p>Next, we instantiate the inference object. In this example, we will use neural perform posterior estimation (NPE):</p>
-<blockquote>
-<p>Note: In <code>sbi</code> version 0.23.0, we renamed all inference classes from, e.g., <code>SNPE</code>, to <code>NPE</code> (i.e., we removed the <code>S</code> prefix). The functionality of the classes remains the same. The <code>NPE</code> class handles both the amortized (as shown in this tutorial) and sequential (as shown <a href="https://sbi.readthedocs.io/en/latest/tutorials/02_multiround_inference.html">here</a>) versions of neural posterior estimation. An alias for <code>SNPE</code> still exists for backwards compatibility.</p>
-<p>Note: This is where you could specify an alternative inference object such as NRE for ratio estimation or NLE for likelihood estimation. Here, you can see <a href="https://sbi.readthedocs.io/en/latest/tutorials/16_implemented_methods.html">all implemented methods</a>.</p>
+corresponding simulated data <code>x</code>.</p>
 </blockquote>
-<div class="highlight"><pre><span></span><code><span class="n">inference</span> <span class="o">=</span> <span class="n">NPE</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+
+<span class="n">_</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+
+<span class="n">num_dim</span> <span class="o">=</span> <span class="mi">3</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">):</span>
+    <span class="c1"># Linear Gaussian.</span>
+    <span class="k">return</span> <span class="n">theta</span> <span class="o">+</span> <span class="mf">1.0</span> <span class="o">+</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn_like</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span> <span class="o">*</span> <span class="mf">0.1</span>
 </code></pre></div>
-<p>Next, we need simulations, or more specifically, pairs of parameters <span class="arithmatex">\(\theta\)</span> which we sample from the <em>prior</em> and corresponding simulations <span class="arithmatex">\(x = \mathrm{simulator} (\theta)\)</span>. The <code>sbi</code> helper function called <code>simulate_for_sbi</code> allows to parallelize your code with <code>joblib</code>.</p>
+<p>For the 3-dimensional parameter space we consider a uniform <em>prior</em> between [-2,2].</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">BoxUniform</span>
+
+<span class="n">prior</span> <span class="o">=</span> <span class="n">BoxUniform</span><span class="p">(</span><span class="n">low</span><span class="o">=-</span><span class="mi">2</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">num_dim</span><span class="p">),</span> <span class="n">high</span><span class="o">=</span><span class="mi">2</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">num_dim</span><span class="p">))</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>WARNING (pytensor.tensor.blas): Using NumPy C-API based implementation for BLAS functions.
+</code></pre></div>
+
+<p>The <code>sbi</code> toolbox uses neural networks to learn the relationship between parameters and data. In this exampmle, we will use neural perform posterior estimation (NPE). To run NPE, we first instatiate a trainer, which we call <code>inference</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference</span><span class="w"> </span><span class="kn">import</span> <span class="n">NPE</span>
+
+<span class="n">inference</span> <span class="o">=</span> <span class="n">NPE</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">)</span>
+</code></pre></div>
 <blockquote>
-<p>Note: If you already have your own parameters, simulation pairs which were generated elsewhere (e.g., on a compute cluster), you would add them here.  </p>
+<p>You can find all implemented methods <a href="https://sbi.readthedocs.io/en/latest/tutorials/16_implemented_methods.html">here</a>. You can also implement the training loop youself, see <a href="">here</a>.</p>
 </blockquote>
+<p>The neural networks in <code>sbi</code> are trained on simulations, or more specifically, pairs of parameters <span class="arithmatex">\(\theta\)</span> which we sample from the <em>prior</em> and corresponding simulations <span class="arithmatex">\(x = \mathrm{simulator} (\theta)\)</span>. Let&rsquo;s generate such a dataset:</p>
 <div class="highlight"><pre><span></span><code><span class="n">num_simulations</span> <span class="o">=</span> <span class="mi">2000</span>
 <span class="n">theta</span> <span class="o">=</span> <span class="n">prior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_simulations</span><span class="p">,))</span>
 <span class="n">x</span> <span class="o">=</span> <span class="n">simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
@@ -611,105 +599,77 @@ are consistent which each other.</p>
 x.shape torch.Size([2000, 3])
 </code></pre></div>
 
+<blockquote>
+<p>If you already have your own parameters, simulation pairs which were generated elsewhere (e.g., on a compute cluster), you would add them here. The <code>sbi</code> helper function called <code>simulate_for_sbi</code> allows to parallelize your code with <code>joblib</code>.</p>
+</blockquote>
 <p>We then pass the simulated data to the inference object. Both <code>theta</code> and <code>x</code> should be a <code>torch.Tensor</code> of type <code>float32</code>.</p>
 <div class="highlight"><pre><span></span><code><span class="n">inference</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
 </code></pre></div>
-<p>Next, we train the <em>neural density estimator</em> to learn the association between the simulated data (or data features) and the underlying parameters:</p>
+<p>Next, we train the neural network to learn the association between the simulated data and the underlying parameters:</p>
 <div class="highlight"><pre><span></span><code><span class="n">density_estimator</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 255 epochs.
+<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 62 epochs.
 </code></pre></div>
 
-<p>Finally, we use this <em>density estimator</em> to build the posterior distribution <span class="arithmatex">\(p(\theta|x)\)</span>, i.e., the distributions over paramters <span class="arithmatex">\(\theta\)</span> given observation <span class="arithmatex">\(x\)</span>. </p>
-<p>The <code>posterior</code> can then be used to (among other features which go beyond the scope of this introductory tutorial) sample parameters <span class="arithmatex">\(\theta\)</span> from the posterior via <code>.sample()</code>, i.e., parameters that are likely given the observation <span class="arithmatex">\(x\)</span>. </p>
-<p>We can also get log-probabilities under the posterior via <code>.log_prob()</code>, i.e., we can evaluate the likelihood of parameters <span class="arithmatex">\(\theta\)</span> given the observation <span class="arithmatex">\(x\)</span>. </p>
-<div class="highlight"><pre><span></span><code><span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">(</span><span class="n">density_estimator</span><span class="p">)</span>
+<p>Finally, we use this <em>density estimator</em> to build an estimator for the posterior distribution.</p>
+<blockquote>
+<p>For NPE, you can also use the <code>density_estimator</code> as posterior. The <code>DirectPosterior</code> (which is returned by <code>build_posterior</code>) only adds convenience functions (e.g., MAP) and it automatically rejects posterior samples which are outside of the prior bounds.</p>
+</blockquote>
+<div class="highlight"><pre><span></span><code><span class="n">posterior_estimator</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">(</span><span class="n">density_estimator</span><span class="p">)</span>
 
-<span class="nb">print</span><span class="p">(</span><span class="n">posterior</span><span class="p">)</span> <span class="c1"># prints how the posterior was trained</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">posterior_estimator</span><span class="p">)</span>
 </code></pre></div>
 <div class="codehilite"><pre><span></span><code>Posterior p(θ|x) of type DirectPosterior. It samples the posterior network and rejects samples that
             lie outside of the prior bounds.
 </code></pre></div>
 
-<h2 id="visualisations-of-the-inferred-posterior-for-a-new-observation">Visualisations of the inferred posterior for a new observation<a class="headerlink" href="#visualisations-of-the-inferred-posterior-for-a-new-observation" title="Permanent link">&para;</a></h2>
+<h2 id="inferring-the-posterior">Inferring the posterior<a class="headerlink" href="#inferring-the-posterior" title="Permanent link">&para;</a></h2>
 <p>Let&rsquo;s say we have made some observation <span class="arithmatex">\(x_{obs}\)</span> for which we now want to infer the posterior:</p>
-<blockquote>
-<p>Note: this is where your experimental observation would come in. For real observations, of course, you would not have access to the ground truth <span class="arithmatex">\(\theta\)</span>. </p>
-</blockquote>
-<div class="highlight"><pre><span></span><code><span class="n">theta_true</span> <span class="o">=</span> <span class="n">prior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">1</span><span class="p">,))</span>
-<span class="c1"># generate our observation</span>
-<span class="n">x_obs</span> <span class="o">=</span> <span class="n">simulator</span><span class="p">(</span><span class="n">theta_true</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><span class="n">x_obs</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">as_tensor</span><span class="p">([</span><span class="mf">0.8</span><span class="p">,</span> <span class="mf">0.6</span><span class="p">,</span> <span class="mf">0.4</span><span class="p">])</span>
 </code></pre></div>
-<p>Given this observation, we can sample from the posterior <span class="arithmatex">\(p(\theta|x_{obs})\)</span> and
-visualise the posterior. Visualizing a three-dimensional distributions is challenging.
-Therefore, we use <code>sbi</code>&rsquo;s <code>pairplot</code> function that generates a upper triangular grid of
-plots, showing the univariate marginals on the diagnonal and every combination of
-pairwise marginals for the three parameters on the upper offdiagonal:</p>
-<div class="highlight"><pre><span></span><code><span class="n">samples</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">10000</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_obs</span><span class="p">)</span>
-<span class="n">_</span> <span class="o">=</span> <span class="n">pairplot</span><span class="p">(</span><span class="n">samples</span><span class="p">,</span>
-             <span class="n">limits</span><span class="o">=</span><span class="p">[[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">]],</span>
-             <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span> <span class="mi">6</span><span class="p">),</span>
-             <span class="n">labels</span><span class="o">=</span><span class="p">[</span><span class="sa">r</span><span class="s2">&quot;$\theta_1$&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;$\theta_2$&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;$\theta_3$&quot;</span><span class="p">])</span>
+<p>The <code>posterior_estimator</code> can then be used to sample parameters <span class="arithmatex">\(\theta\)</span> from the posterior via <code>.sample()</code>, i.e., parameters that are likely given the observation <span class="arithmatex">\(x\)</span>. We can also get log-probabilities under the posterior via <code>.log_prob()</code>. </p>
+<p>For example, given the observation <span class="arithmatex">\(x_{obs}\)</span>, we can sample from the posterior <span class="arithmatex">\(p(\theta|x_{obs})\)</span> as follows:</p>
+<div class="highlight"><pre><span></span><code><span class="n">samples</span> <span class="o">=</span> <span class="n">posterior_estimator</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">10000</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_obs</span><span class="p">)</span>
 </code></pre></div>
-<p><img alt="png" src="../00_getting_started_files/00_getting_started_25_0.png" /></p>
-<h2 id="assessing-the-posterior-for-the-known-theta-x-pair">Assessing the posterior for the known (<span class="arithmatex">\(\theta, x\)</span>) - pair<a class="headerlink" href="#assessing-the-posterior-for-the-known-theta-x-pair" title="Permanent link">&para;</a></h2>
-<p>For this special case, we have access to the ground-truth parameters that generated the
-observation. We can thus assess if the inferred distributions over the parameters match
-the parameters <span class="arithmatex">\(\theta_{true}\)</span> we used to generate our test observation <span class="arithmatex">\(x_{obs}\)</span>.</p>
-<p>Note that in general, the inferred posterior distribution is not neccessarily centered
-on the underlying &ldquo;ground-truth&rdquo; parameters <span class="arithmatex">\(\theta\)</span> because there is noise in simulator
-and limited data. However, it should lie &ldquo;within&rdquo; the posterior.</p>
-<div class="highlight"><pre><span></span><code><span class="n">samples</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">10000</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_obs</span><span class="p">)</span>
-<span class="n">pairplot</span><span class="p">(</span><span class="n">samples</span><span class="p">,</span>
-         <span class="n">points</span><span class="o">=</span><span class="n">theta_true</span><span class="p">,</span>
-         <span class="n">limits</span><span class="o">=</span><span class="p">[[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">]],</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span> <span class="mi">6</span><span class="p">),</span>
-         <span class="n">labels</span><span class="o">=</span><span class="p">[</span><span class="sa">r</span><span class="s2">&quot;$\theta_1$&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;$\theta_2$&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;$\theta_3$&quot;</span><span class="p">]);</span>
+<div class="codehilite"><pre><span></span><code>Drawing 10000 posterior samples for 1 observations:   0%|          | 0/10000 [00:00&lt;?, ?it/s]
+</code></pre></div>
+
+<p>Note that we can infer the posterior distribution for any observation <span class="arithmatex">\(x_{obs}\)</span> without having to run new simulations and without having to re-train. This property of <code>sbi</code> algorithms is called <em>amortization</em>.</p>
+<h2 id="visualizing-the-posterior">Visualizing the posterior<a class="headerlink" href="#visualizing-the-posterior" title="Permanent link">&para;</a></h2>
+<p>We can then visualize these posterior samples. The <code>pairplot</code> function visualizes all
+univariate marginals on the diagnonal and every combination of
+pairwise marginals on the upper offdiagonal:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.analysis</span><span class="w"> </span><span class="kn">import</span> <span class="n">pairplot</span>
+
+<span class="n">_</span> <span class="o">=</span> <span class="n">pairplot</span><span class="p">(</span>
+    <span class="n">samples</span><span class="p">,</span>
+    <span class="n">limits</span><span class="o">=</span><span class="p">[[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">]],</span>
+    <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mi">5</span><span class="p">),</span>
+    <span class="n">labels</span><span class="o">=</span><span class="p">[</span><span class="sa">r</span><span class="s2">&quot;$\theta_1$&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;$\theta_2$&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;$\theta_3$&quot;</span><span class="p">]</span>
+<span class="p">)</span>
 </code></pre></div>
 <p><img alt="png" src="../00_getting_started_files/00_getting_started_28_0.png" /></p>
 <h2 id="assessing-the-predictive-performance-of-the-posterior">Assessing the predictive performance of the posterior<a class="headerlink" href="#assessing-the-predictive-performance-of-the-posterior" title="Permanent link">&para;</a></h2>
-<p>Another way to assess the quality of the posterior is checking whether parameters
-sampled from the posterior <span class="arithmatex">\(p(\theta \mid x_{obs})\)</span> can reproduce the observation
-<span class="arithmatex">\(x_{obs}\)</span> when we simulate data with them. This <em>posterior predictive distribution</em>
-should contain on the <span class="arithmatex">\(x_{obs}\)</span>. We can again use the <code>pairplot</code> function to
-visualize it. </p>
-<p>As you can see below, in this Gaussian toy example, the posterior predictive
-distribution is nicely centered on the data it was conditioned on.</p>
-<div class="highlight"><pre><span></span><code><span class="n">theta_posterior</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">10000</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_obs</span><span class="p">)</span>  <span class="c1"># sample from posterior</span>
-<span class="n">x_predictive</span> <span class="o">=</span> <span class="n">simulator</span><span class="p">(</span><span class="n">theta_posterior</span><span class="p">)</span>  <span class="c1"># simulate data from posterior</span>
-<span class="n">pairplot</span><span class="p">(</span><span class="n">x_predictive</span><span class="p">,</span>
-         <span class="n">points</span><span class="o">=</span><span class="n">x_obs</span><span class="p">,</span>  <span class="c1"># plot with x_obs as a point</span>
-         <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span> <span class="mi">6</span><span class="p">),</span>
-         <span class="n">labels</span><span class="o">=</span><span class="p">[</span><span class="sa">r</span><span class="s2">&quot;$x_1$&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;$x_2$&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;$x_3$&quot;</span><span class="p">]);</span>
+<p>Congrats, you have just performed Bayesian inference with the <code>sbi</code> toolbox!</p>
+<p>But, how do we know that the posterior is correct? The <code>sbi</code> toolbox implements a wide range
+of methods that diagnose potential issues (more detail <a href="">here</a>). For this tutorial,
+we will show only a brief heuristic check: We check whether posterior samples, when simulated,
+match the observed data. Such tests are called <em>Posterior Predictive Checks (PPC)</em>. Let&rsquo;s
+simulate posterior samples:</p>
+<div class="highlight"><pre><span></span><code><span class="n">theta_posterior</span> <span class="o">=</span> <span class="n">posterior_estimator</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">10000</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_obs</span><span class="p">)</span>  <span class="c1"># Sample from posterior.</span>
+<span class="n">x_predictive</span> <span class="o">=</span> <span class="n">simulator</span><span class="p">(</span><span class="n">theta_posterior</span><span class="p">)</span>  <span class="c1"># Simulate data from posterior.</span>
 </code></pre></div>
-<p><img alt="png" src="../00_getting_started_files/00_getting_started_30_0.png" /></p>
-<p>Finally, we can also compare the probabilities of different parameters under the
-posterior. The log-probability should ideally indicate that the true parameters, given
-the corresponding observation, are more likely than a different set of randomly chosen
-parameters from the prior distribution. </p>
-<p>Relative to the obtained log-probabilities, we can investigate the range of
-log-probabilities of the parameters sampled from the posterior.</p>
-<div class="highlight"><pre><span></span><code><span class="c1"># first sample an alternative parameter set from the prior</span>
-<span class="n">theta_diff</span> <span class="o">=</span> <span class="n">prior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">1</span><span class="p">,))</span>
+<p>And we can check whether posterior samples roughly match the observation:</p>
+<div class="highlight"><pre><span></span><code><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Posterior predictives: &quot;</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">x_predictive</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">))</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Observation: &quot;</span><span class="p">,</span> <span class="n">x_obs</span><span class="p">)</span>
 </code></pre></div>
-<div class="highlight"><pre><span></span><code><span class="n">log_probability_true_theta</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">log_prob</span><span class="p">(</span><span class="n">theta_true</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="n">x_obs</span><span class="p">)</span>
-<span class="n">log_probability_diff_theta</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">log_prob</span><span class="p">(</span><span class="n">theta_diff</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="n">x_obs</span><span class="p">)</span>
-<span class="n">log_probability_samples</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">log_prob</span><span class="p">(</span><span class="n">samples</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="n">x_obs</span><span class="p">)</span>
-
-<span class="nb">print</span><span class="p">(</span> <span class="sa">r</span><span class="s1">&#39;high for true theta :&#39;</span><span class="p">,</span> <span class="n">log_probability_true_theta</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span> <span class="sa">r</span><span class="s1">&#39;low for different theta :&#39;</span><span class="p">,</span> <span class="n">log_probability_diff_theta</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span> <span class="sa">r</span><span class="s1">&#39;range of posterior samples: min:&#39;</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="n">log_probability_samples</span><span class="p">),</span><span class="s1">&#39; max :&#39;</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">log_probability_samples</span><span class="p">))</span>
-</code></pre></div>
-<div class="codehilite"><pre><span></span><code>high for true theta : tensor([3.4911])
-low for different theta : tensor([-351.0345])
-range of posterior samples: min: tensor(-8.8757)  max : tensor(3.9791)
+<div class="codehilite"><pre><span></span><code>Posterior predictives:  tensor([0.8128, 0.6147, 0.4083])
+Observation:  tensor([0.8000, 0.6000, 0.4000])
 </code></pre></div>
 
+<p>Indeed, the posterior predictives are roughly centered around the observation. For any real-world application, we strongly recommend additional checks as described in <a href="">this tutorial</a>.</p>
 <h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
-<p>To learn more about the capabilities of <code>sbi</code>, you can head over to the tutorial
-<a href="https://sbi.readthedocs.io/en/latest/tutorials/01_gaussian_amortized.html">01_gaussian_amortized</a>, for inferring parameters for multiple
-observations without retraining.</p>
-<p>Alternatively, for an example with an <strong>actual</strong> simulator, you can read our example
-for a scientific simulator from neuroscience under <a href="https://sbi.readthedocs.io/en/latest/tutorials/Example_00_HodgkinHuxleyModel.html">Example_00_HodgkinHuxleyModel</a>.</p>
+<p>This tutorial provided a brief overview of the capabilities of the <code>sbi</code> toolbox. Next, we recommend that you check out the tutorial on the <a href="">full Bayesian workflow with <code>sbi</code></a>. Alternatively, you can check our <a href="">how-to guide</a> for brief tutorials on specific features, or you can read our <a href="">API reference</a>, which provides a complete list of all features in the <code>sbi</code> toolbox.</p>
 
 
 
