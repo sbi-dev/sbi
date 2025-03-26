@@ -24,14 +24,14 @@ class RejectionPosterior(NeuralPosterior):
 
     def __init__(
         self,
-        potential_fn: Union[Callable, BasePotential],
+        potential_fn: Union[Callable, BasePotential],  # type: ignore
         proposal: Any,
         theta_transform: Optional[TorchTransform] = None,
         max_sampling_batch_size: int = 10_000,
         num_samples_to_find_max: int = 10_000,
         num_iter_to_find_max: int = 100,
         m: float = 1.2,
-        device: Optional[str] = None,
+        device: Optional[Union[str, torch.device]] = None,
         x_shape: Optional[torch.Size] = None,
     ):
         """

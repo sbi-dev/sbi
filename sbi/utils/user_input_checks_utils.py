@@ -137,7 +137,7 @@ class PytorchReturnTypeWrapper(Distribution):
 
     def __init__(
         self,
-        prior: Distribution,
+        prior: Distribution,  # type: ignore
         return_type: Optional[torch.dtype] = float32,
         batch_shape=torch.Size(),
         event_shape=torch.Size(),

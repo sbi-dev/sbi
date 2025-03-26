@@ -59,8 +59,8 @@ class IIDScoreFunction(ABC):
     def __init__(
         self,
         score_estimator: "ConditionalScoreEstimator",
-        prior: Distribution,
-        device: str = "cpu",
+        prior: Distribution,  # type: ignore
+        device: Union[str, torch.device] = "cpu",
     ) -> None:
         r"""
         This is a abstract base class wrapper for score estimators.
@@ -125,7 +125,7 @@ class FNPEScoreFunction(IIDScoreFunction):
         self,
         score_estimator: "ConditionalScoreEstimator",
         prior: Distribution,
-        device: str = "cpu",
+        device: Union[str, torch.device] = "cpu",
         prior_score_weight: Optional[Callable[[Tensor], Tensor]] = None,
     ) -> None:
         r"""
@@ -232,7 +232,7 @@ class BaseGaussCorrectedScoreFunction(IIDScoreFunction):
         prior: Distribution,
         ensure_lam_psd: bool = True,
         lam_psd_nugget: float = 0.01,
-        device: str = "cpu",
+        device: Union[str, torch.device] = "cpu",
     ) -> None:
         r"""Base class for Gauss-corrected score function as proposed in [1].
 
@@ -458,7 +458,7 @@ class GaussCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
         scale_from_prior_precision: float = 2.0,
         enable_lam_psd: bool = False,
         lam_psd_nugget: float = 0.01,
-        device: str = "cpu",
+        device: Union[str, torch.device] = "cpu",
     ) -> None:
         r"""
         This extends the BaseGaussCorrectedScoreFunction to provide a simple method to
@@ -542,7 +542,7 @@ class AutoGaussCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
         precision_est_only_diag: bool = False,
         precision_est_budget: Optional[int] = None,
         precision_initial_sampler_steps: int = 100,
-        device: str = "cpu",
+        device: Union[str, torch.device] = "cpu",
     ) -> None:
         r"""
         This method extends the by estimating the posterior precision using

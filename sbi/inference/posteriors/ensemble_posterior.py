@@ -428,9 +428,9 @@ class EnsemblePotential(BasePotential):
         self,
         potential_fns: List,
         weights: Tensor,
-        prior: Distribution,
+        prior: Distribution,  # type: ignore
         x_o: Optional[Tensor],
-        device: str = "cpu",
+        device: Union[str, torch.device] = "cpu",
     ):
         r"""
         Args:

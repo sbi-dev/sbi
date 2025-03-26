@@ -32,7 +32,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         method: str = "sir",
         oversampling_factor: int = 32,
         max_sampling_batch_size: int = 10_000,
-        device: Optional[str] = None,
+        device: Optional[Union[str, torch.device]] = None,
         x_shape: Optional[torch.Size] = None,
     ):
         """

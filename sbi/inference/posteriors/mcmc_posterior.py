@@ -58,7 +58,7 @@ class MCMCPosterior(NeuralPosterior):
         init_strategy_num_candidates: Optional[int] = None,
         num_workers: int = 1,
         mp_context: str = "spawn",
-        device: Optional[str] = None,
+        device: Optional[Union[str, torch.device]] = None,
         x_shape: Optional[torch.Size] = None,
     ):
         """

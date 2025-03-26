@@ -50,9 +50,9 @@ class RatioBasedPotential(BasePotential):
     def __init__(
         self,
         ratio_estimator: nn.Module,
-        prior: Distribution,
+        prior: Distribution,  # type: ignore
         x_o: Optional[Tensor] = None,
-        device: str = "cpu",
+        device: Union[str, torch.device] = "cpu",
     ):
         r"""Returns the potential for ratio-based methods.
 

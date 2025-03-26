@@ -62,9 +62,9 @@ class PosteriorBasedPotential(BasePotential):
     def __init__(
         self,
         posterior_estimator: ConditionalDensityEstimator,
-        prior: Distribution,
+        prior: Distribution,  # type: ignore
         x_o: Optional[Tensor] = None,
-        device: str = "cpu",
+        device: Union[str, torch.device] = "cpu",
     ):
         r"""Returns the potential for posterior-based methods.
 

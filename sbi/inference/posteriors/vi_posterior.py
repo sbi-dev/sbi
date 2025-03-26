@@ -49,12 +49,12 @@ class VIPosterior(NeuralPosterior):
 
     def __init__(
         self,
-        potential_fn: Union[Callable, BasePotential],
-        prior: Optional[TorchDistribution] = None,
+        potential_fn: Union[Callable, BasePotential],  # type: ignore
+        prior: Optional[TorchDistribution] = None,  # type: ignore
         q: Union[str, PyroTransformedDistribution, "VIPosterior", Callable] = "maf",
         theta_transform: Optional[TorchTransform] = None,
         vi_method: str = "rKL",
-        device: str = "cpu",
+        device: Union[str, torch.device] = "cpu",
         x_shape: Optional[torch.Size] = None,
         parameters: Iterable = [],
         modules: Iterable = [],

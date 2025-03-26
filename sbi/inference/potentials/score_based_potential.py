@@ -55,11 +55,11 @@ class PosteriorScoreBasedPotential(BasePotential):
     def __init__(
         self,
         score_estimator: ConditionalScoreEstimator,
-        prior: Optional[Distribution],
+        prior: Optional[Distribution],  # type: ignore
         x_o: Optional[Tensor] = None,
         iid_method: str = "auto_gauss",
         iid_params: Optional[Dict[str, Any]] = None,
-        device: str = "cpu",
+        device: Union[str, torch.device] = "cpu",
     ):
         r"""Returns the score function for score-based methods.
 

@@ -16,7 +16,7 @@ class BasePotential(metaclass=ABCMeta):
         self,
         prior: Optional[Distribution],
         x_o: Optional[Tensor] = None,
-        device: str = "cpu",
+        device: Union[str, torch.device] = "cpu",
     ):
         """Initialize potential function.
 
@@ -95,10 +95,10 @@ class CustomPotentialWrapper(BasePotential):
 
     def __init__(
         self,
-        potential_fn: CustomPotential,
-        prior: Optional[Distribution],
+        potential_fn: CustomPotential,  # type: ignore
+        prior: Optional[Distribution],  # type: ignore
         x_o: Optional[Tensor] = None,
-        device: str = "cpu",
+        device: Union[str, torch.device] = "cpu",
     ):
         """Wraps a callable potential function.
 

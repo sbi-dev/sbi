@@ -41,9 +41,9 @@ class DirectPosterior(NeuralPosterior):
     def __init__(
         self,
         posterior_estimator: ConditionalDensityEstimator,
-        prior: Distribution,
+        prior: Distribution,  # type: ignore
         max_sampling_batch_size: int = 10_000,
-        device: Optional[str] = None,
+        device: Optional[Union[str, torch.device]] = None,
         x_shape: Optional[torch.Size] = None,
         enable_transform: bool = True,
     ):

@@ -49,9 +49,9 @@ class ScorePosterior(NeuralPosterior):
     def __init__(
         self,
         score_estimator: ConditionalScoreEstimator,
-        prior: Distribution,
+        prior: Distribution,  # type: ignore
         max_sampling_batch_size: int = 10_000,
-        device: Optional[str] = None,
+        device: Optional[Union[str, torch.device]] = None,
         enable_transform: bool = True,
         sample_with: str = "sde",
     ):

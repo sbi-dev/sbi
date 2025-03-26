@@ -23,7 +23,7 @@ from sbi.utils.sbiutils import mcmc_transform
 
 def likelihood_estimator_based_potential(
     likelihood_estimator: ConditionalDensityEstimator,
-    prior: Distribution,
+    prior: Distribution,  # type: ignore
     x_o: Optional[Tensor],
     enable_transform: bool = True,
 ) -> Tuple[Callable, TorchTransform]:

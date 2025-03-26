@@ -665,7 +665,7 @@ def mcmc_transform(
     prior: Distribution,
     num_prior_samples_for_zscoring: int = 1000,
     enable_transform: bool = True,
-    device: str = "cpu",
+    device: Union[str, torch.device] = "cpu",
     **kwargs,
 ) -> TorchTransform:
     """
