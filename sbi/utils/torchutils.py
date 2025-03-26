@@ -274,6 +274,8 @@ def gaussian_kde_log_eval(samples, query):
 
 
 class BoxUniform(Independent):
+    """Uniform distribution in multiple dimensions."""
+
     def __init__(
         self,
         low: Union[Tensor, Array],

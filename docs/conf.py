@@ -33,6 +33,7 @@ extensions = [
     "sphinx.ext.intersphinx",
     "sphinx.ext.viewcode",
     "sphinx_math_dollar",
+    "sphinx_design",
     "sphinx.ext.mathjax",
     "myst_nb",
 ]
@@ -82,6 +83,8 @@ html_theme_options = {
     "toc_title": "Navigation",
     "show_navbar_depth": 1,
     "show_toc_level": 3,
+    "pygment_light_style": "default",
+    "pygment_dark_style": "github-dark",  # All styles: https://pygments.org/styles/
 }
 
 # Add any paths that contain custom static files (such as style sheets) here,
