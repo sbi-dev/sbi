@@ -486,11 +486,7 @@ class OneDimPriorWrapper(Distribution):
     those batched 1D distributions to get rid of their batch dimension in `.log_prob()`.
     """
 
-    def __init__(
-        self,
-        prior: Distribution,
-        validate_args=None,
-    ) -> None:
+    def __init__(self, prior: Distribution, validate_args=None) -> None:
         super().__init__(
             batch_shape=prior.batch_shape,
             event_shape=prior.event_shape,
@@ -499,6 +495,21 @@ class OneDimPriorWrapper(Distribution):
             ),
         )
         self.prior = prior
+        self.device = None
+
+    def to(self, device: Union[str, torch.device]) -> None:
+        """
+        Move the distribution to the specified device.
+
+        Moves the distribution parameters to the specific device
+        and updates the device attribute.
+
+        Args:
+            device: device to move the distribution to.
+        """
+        params = get_distribution_parameters(self.prior, device)
+        self.prior = type(self.prior)(**params)
+        self.device = device
 
     def sample(self, *args, **kwargs) -> Tensor:
         return self.prior.sample(*args, **kwargs)
