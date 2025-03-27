@@ -159,7 +159,7 @@ class MCMCPosterior(NeuralPosterior):
     def to(self, device: Union[str, torch.device]) -> None:
         """Moves potential_fn, proposal, x_o and theta_transform to the
 
-        speficied device. Reinstanciates the posterior and resets the default x_o.
+        specified device. Reinstantiates the posterior and resets the default x_o.
 
         Args:
             device: Device to move the posterior to.
@@ -179,7 +179,7 @@ class MCMCPosterior(NeuralPosterior):
             device=device,
             x_shape=self.x_shape,
         )
-        # super().__init__ erase the self._x, so we need to set it again
+        # super().__init__ erases the self._x, so we need to set it again
         if x_o is not None:
             self.set_default_x(x_o)
         self.potential_ = self._prepare_potential(self.method)

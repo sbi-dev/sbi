@@ -9,7 +9,7 @@ import torch
 from torch import Tensor
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
-from sbi.inference.potentials.base_potential import BasePotential
+from sbi.inference.potentials.base_potential import BasePotential, CustomPotential
 from sbi.samplers.rejection.rejection import rejection_sample
 from sbi.sbi_types import Shape, TorchTransform
 from sbi.utils import mcmc_transform
@@ -25,7 +25,7 @@ class RejectionPosterior(NeuralPosterior):
 
     def __init__(
         self,
-        potential_fn: Union[Callable, BasePotential],  # type: ignore
+        potential_fn: Union[BasePotential, CustomPotential],
         proposal: Any,
         theta_transform: Optional[TorchTransform] = None,
         max_sampling_batch_size: int = 10_000,
@@ -76,7 +76,7 @@ class RejectionPosterior(NeuralPosterior):
         """
         Move potential fucntion, proposal and x_o to the device.
 
-        This method reinstanciate the posterior and resets the default x_o
+        This method reinstantiates the posterior and resets the default x_o
 
         Args:
             device: The device to move the posterior to.
@@ -95,7 +95,7 @@ class RejectionPosterior(NeuralPosterior):
             device=device,
             x_shape=self.x_shape,
         )
-        # super().__init__ erase the self._x, so we need to set it again
+        # super().__init__ erases the self._x, so we need to set it again
         if x_o is not None:
             self.set_default_x(x_o)
 

@@ -108,9 +108,9 @@ class VectorFieldBasedPotential(BasePotential):
 
     def to(self, device: Union[str, torch.device]) -> None:
         """
-        Move score_estimator, prior and x_o to the given device.
+        Moves score_estimator, prior and x_o to the given device.
 
-        It also set the device attribute to the given device.
+        It also sets the device attribute to the given device.
 
         Args:
             device: Device to move the score_estimator, prior and x_o to.

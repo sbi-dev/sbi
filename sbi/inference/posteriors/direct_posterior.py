@@ -128,7 +128,7 @@ class DirectPosterior(NeuralPosterior):
             device=device,
             x_shape=self.x_shape,
         )
-        # super().__init__ erase the self._x, so we need to set it again
+        # super().__init__ erases the self._x, so we need to set it again
         if x_o is not None:
             self.set_default_x(x_o)
 

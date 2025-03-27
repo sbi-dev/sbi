@@ -50,7 +50,7 @@ class VIPosterior(NeuralPosterior):
 
     def __init__(
         self,
-        potential_fn: Union[Callable, BasePotential],  # type: ignore
+        potential_fn: Union[BasePotential, CustomPotential],
         prior: Optional[TorchDistribution] = None,  # type: ignore
         q: Union[str, PyroTransformedDistribution, "VIPosterior", Callable] = "maf",
         theta_transform: Optional[TorchTransform] = None,
@@ -145,7 +145,7 @@ class VIPosterior(NeuralPosterior):
         """
         Move potential_fn, _prior and x_o to device, and change the device attribute.
 
-        Reinstanciates the posterior and re sets the default x.
+        Reinstantiates the posterior and re sets the default x.
 
         Args:
             device: The device to move the posterior to.
@@ -159,7 +159,7 @@ class VIPosterior(NeuralPosterior):
         super().__init__(
             self.potential_fn, self.theta_transform, device, x_shape=self.x_shape
         )
-        # super().__init__ erase the self._x, so we need to set it again
+        # super().__init__ erases the self._x, so we need to set it again
         if self._x is not None:
             self.set_default_x(x_o)
 

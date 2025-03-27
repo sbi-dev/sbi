@@ -108,7 +108,7 @@ class IIDScoreFunction(ABC):
 
     def to(self, device: Union[str, torch.device]) -> None:
         """
-        It moves score_estimator and prior to the given device.
+        Moves score_estimator and prior to the given device.
 
         It also sets the device attribute to the given device.
 

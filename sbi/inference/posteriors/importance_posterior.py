@@ -78,11 +78,11 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         )
         self.x_shape = x_shape
 
-    def to(self, device):
+    def to(self, device: Union[str, torch.device]) -> None:
         """
         Move the potential, the proposal and x_o to a new device.
 
-        It also reinstansiates the posterior with the new device.
+        It also reinstantiates the posterior with the new device.
 
         Args:
             device: Device on which to move the posterior to.
@@ -101,7 +101,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
             device=device,
             x_shape=self.x_shape,
         )
-        # super().__init__ erase the self._x, so we need to set it again
+        # super().__init__ erases the self._x, so we need to set it again
         if x_o is not None:
             self.set_default_x(x_o)
 

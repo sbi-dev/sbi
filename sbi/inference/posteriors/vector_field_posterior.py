@@ -103,8 +103,8 @@ class VectorFieldPosterior(NeuralPosterior):
         self._purpose = """It samples from the vector field model given the \
             vector_field_estimator."""
 
-    def to(self, device):
-        r"""Move posterior to device,
+    def to(self, device: Union[str, torch.device]) -> None:
+        """Move posterior to device.
 
         Args:
             device: device where to move the posterior to.
@@ -133,7 +133,7 @@ class VectorFieldPosterior(NeuralPosterior):
             theta_transform=theta_transform,
             device=device,
         )
-        # super().__init__ erase the self._x, so we need to set it again
+        # super().__init__ erases the self._x, so we need to set it again
         if x_o is not None:
             self.set_default_x(x_o)
 

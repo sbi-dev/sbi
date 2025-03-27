@@ -444,7 +444,7 @@ class EnsemblePotential(BasePotential):
         self.potential_fns = potential_fns
         super().__init__(prior, x_o, device)
 
-    def to(self, device):
+    def to(self, device: Union[str, torch.device]) -> None:
         """
         Moves the ensemble potentials, the prior, the weights and x_o to
 

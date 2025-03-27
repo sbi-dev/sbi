@@ -626,7 +626,7 @@ def test_to_method_on_potentials(device: str, potential: Union[ABC, BasePotentia
     inference = NPE()
     estimator = inference.append_simulations(
         torch.randn((100, 3)), torch.randn((100, 2))
-    ).train()
+    ).train(max_num_epochs=1)
 
     x_o = torch.tensor([0.1]).to(device)
     if potential == EnsemblePotential:
@@ -712,7 +712,7 @@ def test_VectorFieldPosterior(
     inference = inference_method(score_estimator="mlp", prior=prior)
     density_estimator = inference.append_simulations(
         torch.randn((100, 3)), torch.randn((100, 2))
-    ).train()
+    ).train(max_num_epochs=1)
     posterior = inference.build_posterior(density_estimator, prior)
     posterior.to(device)
     assert posterior.device == device, (
