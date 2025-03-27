@@ -91,6 +91,7 @@ class VectorFieldPosterior(NeuralPosterior):
         self.prior = prior
         self.enable_transform = enable_transform
         self.vector_field_estimator = vector_field_estimator
+        self.device = device
 
         self.sample_with = sample_with
         assert self.sample_with in [
