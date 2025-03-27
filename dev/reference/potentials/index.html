@@ -902,7 +902,7 @@ unconstrained space.</p>
 <span class="normal">55</span>
 <span class="normal">56</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">likelihood_estimator_based_potential</span><span class="p">(</span>
     <span class="n">likelihood_estimator</span><span class="p">:</span> <span class="n">ConditionalDensityEstimator</span><span class="p">,</span>
-    <span class="n">prior</span><span class="p">:</span> <span class="n">Distribution</span><span class="p">,</span>
+    <span class="n">prior</span><span class="p">:</span> <span class="n">Distribution</span><span class="p">,</span>  <span class="c1"># type: ignore</span>
     <span class="n">x_o</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">],</span>
     <span class="n">enable_transform</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Callable</span><span class="p">,</span> <span class="n">TorchTransform</span><span class="p">]:</span>
