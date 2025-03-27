@@ -715,7 +715,9 @@ def test_VectorFieldPosterior(
     ).train()
     posterior = inference.build_posterior(density_estimator, prior)
     posterior.to(device)
-    assert posterior.device == device, f"ScorePosterior is not in device {device}."
+    assert posterior.device == device, (
+        f"VectorFieldPosterior is not in device {device}."
+    )
 
     x_o = torch.ones(2).to(device)
     samples = posterior.sample((2,), x=x_o, iid_method=iid_method)
