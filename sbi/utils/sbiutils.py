@@ -921,6 +921,7 @@ def gradient_ascent(
         theta_transform = theta_transform
 
     init_probs = potential_fn(inits).detach()
+    inits = inits.to(init_probs.device)
 
     # Pick the `num_to_optimize` best init locations.
     sort_indices = torch.argsort(init_probs, dim=0)
