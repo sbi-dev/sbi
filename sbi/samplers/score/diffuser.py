@@ -143,7 +143,7 @@ class Diffuser:
         Returns:
             Tensor: Samples from the distribution(s).
         """
-        samples = self.initialize(num_samples)
+        samples = self.initialize(num_samples).to(ts.device)
         pbar = tqdm(
             range(1, ts.numel()),
             disable=not show_progress_bars,

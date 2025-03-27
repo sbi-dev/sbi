@@ -112,9 +112,9 @@ class EulerMaruyama(Predictor):
     def predict(self, theta: Tensor, t1: Tensor, t0: Tensor):
         dt = t1 - t0
         dt_sqrt = torch.sqrt(dt)
-        f = self.drift(theta, t1)
-        g = self.diffusion(theta, t1)
-        score = self.potential_fn.gradient(theta, t1)
+        f = self.drift(theta, t1).to(dt.device)
+        g = self.diffusion(theta, t1).to(dt.device)
+        score = self.potential_fn.gradient(theta, t1).to(dt.device)
         f_backward = f - (1 + self.eta**2) / 2 * g**2 * score
         g_backward = self.eta * g
         return theta - f_backward * dt + g_backward * torch.randn_like(theta) * dt_sqrt
