@@ -520,7 +520,7 @@ flows, and diffusion models. Some of the density estimators are implemented as p
 <code>sbi</code>, for others we rely on other packages like
 <a href="https://github.com/bayesiains/nflows/"><code>nflows</code></a> (via <code>pyknos</code>) or <a href="https://github.com/probabilists/zuko"><code>zuko</code></a>. </p>
 <p>For all options, check the API reference
-<a href="https://sbi.readthedocs.io/en/latest/reference/sbi.models.html">here</a>.</p>
+<a href="https://sbi.readthedocs.io/en/latest/sbi.html#neural-nets">here</a>.</p>
 <h2 id="changing-the-type-of-density-estimator">Changing the type of density estimator<a class="headerlink" href="#changing-the-type-of-density-estimator" title="Permanent link">&para;</a></h2>
 <p>One option is using one of the preconfigured density estimators by passing a string in
 the <code>density_estimator</code> keyword argument to the inference object (<code>NPE</code> or <code>NLE</code>), e.g.,
@@ -554,17 +554,16 @@ recommend using <code>zuko</code>, e.g., by passing <code>zuko_maf</code> or <co
 </code></pre></div>
 <p>It is also possible to pass an <code>embedding_net</code> to <code>posterior_nn()</code> to automatically
 learn summary statistics from high-dimensional simulation outputs. You can find a more
-detailed tutorial on this in <a href="https://sbi.readthedocs.io/en/latest/tutorials/04_embedding_networks.html">04_embedding_networks</a>.</p>
+detailed tutorial on this in <a href="https://sbi.readthedocs.io/en/latest/how_to_guide/04_embedding_networks.html">04_embedding_networks</a>.</p>
 <h2 id="building-new-density-estimators-from-scratch">Building new density estimators from scratch<a class="headerlink" href="#building-new-density-estimators-from-scratch" title="Permanent link">&para;</a></h2>
 <p>Finally, it is also possible to implement your own density estimator from scratch, e.g., including embedding nets to preprocess data, or to a density estimator architecture of your choice.</p>
 <p>For this, the <code>density_estimator</code> argument needs to be a function that takes <code>theta</code> and <code>x</code> batches as arguments to then construct the density estimator after the first set of simulations was generated. Our factory functions in <code>sbi/neural_nets/factory.py</code> return such a function.</p>
-<p>The returned <code>density_estimator</code> object needs to be a subclass of <a href="https://sbi-dev.github.io/sbi/reference/#sbi.neural_nets.density_estimators.DensityEstimator"><code>DensityEstimator</code></a>, which requires to implement three methods:</p>
+<p>The returned <code>density_estimator</code> object needs to be a subclass of <a href="https://github.com/sbi-dev/sbi/blob/1928f018fa08bb0c5309a34d8e95b9f2916b20a5/sbi/neural_nets/estimators/base.py#L11"><code>DensityEstimator</code></a>, which requires to implement three methods:</p>
 <ul>
 <li><code>log_prob(input, condition, **kwargs)</code>: Return the log probabilities of the inputs given a condition or multiple i.e. batched conditions.</li>
 <li><code>loss(input, condition, **kwargs)</code>: Return the loss for training the density estimator.</li>
 <li><code>sample(sample_shape, condition, **kwargs)</code>: Return samples from the density estimator.</li>
 </ul>
-<p>See more information on the <a href="https://sbi.readthedocs.io/en/latest/sbi.html">Reference API page</a>.</p>
 
 
 

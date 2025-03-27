@@ -586,7 +586,7 @@ corresponding simulated data <code>x</code>.</p>
 <span class="n">inference</span> <span class="o">=</span> <span class="n">NPE</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">)</span>
 </code></pre></div>
 <blockquote>
-<p>You can find all implemented methods <a href="https://sbi.readthedocs.io/en/latest/tutorials/16_implemented_methods.html">here</a>. You can also implement the training loop youself, see <a href="">here</a>.</p>
+<p>You can find all implemented methods <a href="https://sbi.readthedocs.io/en/latest/tutorials/16_implemented_methods.html">here</a>. You can also implement the training loop youself, see <a href="https://sbi.readthedocs.io/en/latest/advanced_tutorials/18_training_interface.html">here</a>.</p>
 </blockquote>
 <p>The neural networks in <code>sbi</code> are trained on simulations, or more specifically, pairs of parameters <span class="arithmatex">\(\theta\)</span> which we sample from the <em>prior</em> and corresponding simulations <span class="arithmatex">\(x = \mathrm{simulator} (\theta)\)</span>. Let&rsquo;s generate such a dataset:</p>
 <div class="highlight"><pre><span></span><code><span class="n">num_simulations</span> <span class="o">=</span> <span class="mi">2000</span>
@@ -652,7 +652,7 @@ pairwise marginals on the upper offdiagonal:</p>
 <h2 id="assessing-the-predictive-performance-of-the-posterior">Assessing the predictive performance of the posterior<a class="headerlink" href="#assessing-the-predictive-performance-of-the-posterior" title="Permanent link">&para;</a></h2>
 <p>Congrats, you have just performed Bayesian inference with the <code>sbi</code> toolbox!</p>
 <p>But, how do we know that the posterior is correct? The <code>sbi</code> toolbox implements a wide range
-of methods that diagnose potential issues (more detail <a href="">here</a>). For this tutorial,
+of methods that diagnose potential issues (more detail <a href="https://sbi.readthedocs.io/en/latest/how_to_guide/14_choose_diagnostic_tool.html">here</a>). For this tutorial,
 we will show only a brief heuristic check: We check whether posterior samples, when simulated,
 match the observed data. Such tests are called <em>Posterior Predictive Checks (PPC)</em>. Let&rsquo;s
 simulate posterior samples:</p>
@@ -667,9 +667,9 @@ simulate posterior samples:</p>
 Observation:  tensor([0.8000, 0.6000, 0.4000])
 </code></pre></div>
 
-<p>Indeed, the posterior predictives are roughly centered around the observation. For any real-world application, we strongly recommend additional checks as described in <a href="">this tutorial</a>.</p>
+<p>Indeed, the posterior predictives are roughly centered around the observation. For any real-world application, we strongly recommend additional checks as described in <a href="https://sbi.readthedocs.io/en/latest/how_to_guide/14_choose_diagnostic_tool.html">this how-to guide</a>.</p>
 <h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
-<p>This tutorial provided a brief overview of the capabilities of the <code>sbi</code> toolbox. Next, we recommend that you check out the tutorial on the <a href="">full Bayesian workflow with <code>sbi</code></a>. Alternatively, you can check our <a href="">how-to guide</a> for brief tutorials on specific features, or you can read our <a href="">API reference</a>, which provides a complete list of all features in the <code>sbi</code> toolbox.</p>
+<p>This tutorial provided a brief overview of the capabilities of the <code>sbi</code> toolbox. Next, we recommend that you check out the tutorial on the <a href="https://sbi.readthedocs.io/en/latest/tutorials/01_Bayesian_workflow.html">full Bayesian workflow with <code>sbi</code></a>. Alternatively, you can check our <a href="https://sbi.readthedocs.io/en/latest/how_to_guide.html">how-to guide</a> for brief tutorials on specific features, or you can read our <a href="https://sbi.readthedocs.io/en/latest/sbi.html">API reference</a>, which provides a complete list of all features in the <code>sbi</code> toolbox.</p>
 
 
 

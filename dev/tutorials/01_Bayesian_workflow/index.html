@@ -733,7 +733,7 @@ x.shape torch.Size([10000, 4])
 - First, the simulations (blue histogram) roughly cover the observation (orange line). This is a good sign. If the observation is far outside of the simulations, <code>sbi</code> will likely fail. Change your prior or simulator.
 - Second, there are no extreme outliers in the simulation data. Remember that we will train a neural network on simulated data. If there are extreme outliers, this might lead to poor neural network convergence. For NPE, outliers can be safely ignored (i.e. removed from the dataset).  </p>
 <h2 id="setting-up-the-neural-network">Setting up the neural network<a class="headerlink" href="#setting-up-the-neural-network" title="Permanent link">&para;</a></h2>
-<p>We now want to set up a neural network for this example. For this example, we will use Neural Posterior Estimation (NPE) with a neural spline flow (<code>nsf</code>) as density estimator. See <a href="">here</a> for the collection of neural networks and <a href="">here</a> for a guide on which methods to choose.</p>
+<p>We now want to set up a neural network for this example. For this example, we will use Neural Posterior Estimation (NPE) with a neural spline flow (<code>nsf</code>) as density estimator. See <a href="https://sbi.readthedocs.io/en/latest/sbi.html#neural-nets">here</a> for the collection of neural networks and <a href="https://sbi.readthedocs.io/en/latest/how_to_guide/03_choose_neural_net.html">here</a> for a guide on which methods to choose.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference</span><span class="w"> </span><span class="kn">import</span> <span class="n">NPE</span>
 
 <span class="n">inference</span> <span class="o">=</span> <span class="n">NPE</span><span class="p">(</span><span class="n">density_estimator</span><span class="o">=</span><span class="s2">&quot;nsf&quot;</span><span class="p">)</span>
@@ -754,7 +754,7 @@ x.shape torch.Size([10000, 4])
 <span class="p">)</span>
 <span class="c1"># All training logs are available in `trainer.summary`.</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>For an interactive, detailed view of the summary, launch tensorboard  with &#39;tensorboard --logdir=/Users/michaeldeistler/Documents/phd/sbi/docs/tutorials/sbi-logs/NPE_C/2025-03-21T16_59_34.788971&#39; from a terminal on your machine, visit http://127.0.0.1:6006 afterwards. Requires port forwarding if tensorboard runs on a remote machine, as e.g. https://stackoverflow.com/a/42445070/7770835 explains.
+<div class="codehilite"><pre><span></span><code>For an interactive, detailed view of the summary, launch tensorboard  with &#39;tensorboard --logdir=/Users/michaeldeistler/Documents/phd/sbi/docs/tutorials/sbi-logs/NPE_C/2025-03-27T08_04_09.315358&#39; from a terminal on your machine, visit http://127.0.0.1:6006 afterwards. Requires port forwarding if tensorboard runs on a remote machine, as e.g. https://stackoverflow.com/a/42445070/7770835 explains.
 
 Valid tags are: [&#39;best_validation_loss&#39;, &#39;epoch_durations_sec&#39;, &#39;epochs_trained&#39;, &#39;training_loss&#39;, &#39;validation_loss&#39;].
 </code></pre></div>
@@ -785,15 +785,11 @@ Valid tags are: [&#39;best_validation_loss&#39;, &#39;epoch_durations_sec&#39;, 
 <div class="codehilite"><pre><span></span><code>Drawing 1000 posterior samples for 1 observations:   0%|          | 0/1000 [00:00&lt;?, ?it/s]
 
 
-
-Drawing 1000 posterior samples for 1 observations:   0%|          | 0/1000 [00:00&lt;?, ?it/s]
-
-
 /Users/michaeldeistler/anaconda3/envs/sbi/lib/python3.12/site-packages/nflows/transforms/lu.py:80: UserWarning: torch.triangular_solve is deprecated in favor of torch.linalg.solve_triangularand will be removed in a future PyTorch release.
 torch.linalg.solve_triangular has its arguments reversed and does not return a copy of one of the inputs.
 X = torch.triangular_solve(B, A).solution
 should be replaced with
-X = torch.linalg.solve_triangular(A, B). (Triggered internally at /Users/runner/work/pytorch/pytorch/pytorch/aten/src/ATen/native/BatchLinearAlgebra.cpp:2190.)
+X = torch.linalg.solve_triangular(A, B). (Triggered internally at /Users/runner/work/pytorch/pytorch/pytorch/aten/src/ATen/native/BatchLinearAlgebra.cpp:2196.)
   outputs, _ = torch.triangular_solve(
 </code></pre></div>
 
@@ -815,7 +811,7 @@ X = torch.linalg.solve_triangular(A, B). (Triggered internally at /Users/runner/
 <p><img alt="png" src="../01_Bayesian_workflow_files/01_Bayesian_workflow_43_0.png" /></p>
 <h2 id="diagnosing-potential-issues-in-the-posterior">Diagnosing potential issues in the posterior<a class="headerlink" href="#diagnosing-potential-issues-in-the-posterior" title="Permanent link">&para;</a></h2>
 <p>How do we know that the posterior is correct? The <code>sbi</code> toolbox implements a wide range
-of methods that diagnose potential issues (more detail <a href="">here</a>). In this tutorial, we will perform <em>posterior predictive checks</em> (PPC) and we will perform <em>simulation-based calibration</em> (SBC).</p>
+of methods that diagnose potential issues (more detail in <a href="https://sbi.readthedocs.io/en/latest/how_to_guide/14_choose_diagnostic_tool.html">this how-to guide</a>). In this tutorial, we will perform <em>posterior predictive checks</em> (PPC) and we will perform <em>simulation-based calibration</em> (SBC).</p>
 <h3 id="posterior-predictive-checks">Posterior predictive checks<a class="headerlink" href="#posterior-predictive-checks" title="Permanent link">&para;</a></h3>
 <p>Let&rsquo;s first perform posterior predictive checks. For these, we simulate posterior samples and compare them to the observation.</p>
 <div class="highlight"><pre><span></span><code><span class="n">posterior_samples</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">10</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_obs</span><span class="p">)</span>
@@ -840,7 +836,7 @@ of methods that diagnose potential issues (more detail <a href="">here</a>). In 
 <span class="n">_</span> <span class="o">=</span> <span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">&quot;Population&quot;</span><span class="p">)</span>
 </code></pre></div>
 <p><img alt="png" src="../01_Bayesian_workflow_files/01_Bayesian_workflow_48_0.png" /></p>
-<p>As you can see, the posterior predictives (light blue and light orange) look similar to the observation (blue and orange). They do not look exactly the same, but this is expected: we only used the maximum and mean of the two traces as summary statistic. If you want a closer fit, define more summary statistics, or <a href="">use the full time series with an embedding network</a>.</p>
+<p>As you can see, the posterior predictives (light blue and light orange) look similar to the observation (blue and orange). They do not look exactly the same, but this is expected: we only used the maximum and mean of the two traces as summary statistic. If you want a closer fit, define more summary statistics, or <a href="https://sbi.readthedocs.io/en/latest/how_to_guide/04_embedding_networks.html">use the full time series with an embedding network</a>.</p>
 <h3 id="simulation-based-calibration">Simulation-based calibration<a class="headerlink" href="#simulation-based-calibration" title="Permanent link">&para;</a></h3>
 <p>Posterior-predictive checks are an ad-hoc heuristic for assessing posterior quality. Simulation-based calibration (SBC) provides a <em>quantitative</em> assessment of posterior quality. It allows you to check, for every parameter, whether the parameter is estimated as (on average) to low, to high, and whether it has too low or two high uncertainty. To run SBC, you first have to generate more simulations based on prior samples:</p>
 <div class="highlight"><pre><span></span><code><span class="n">num_sbc_samples</span> <span class="o">=</span> <span class="mi">200</span>  <span class="c1"># choose a number of sbc runs, should be ~100s</span>
@@ -862,12 +858,12 @@ of methods that diagnose potential issues (more detail <a href="">here</a>). In 
     <span class="n">prior_samples</span><span class="p">,</span>
     <span class="n">prior_predictive_summary_stats</span><span class="p">,</span>
     <span class="n">posterior</span><span class="p">,</span>
-    <span class="n">reduce_fns</span><span class="o">=</span><span class="n">posterior</span><span class="o">.</span><span class="n">log_prob</span><span class="p">,</span>
+    <span class="n">reduce_fns</span><span class="o">=</span><span class="k">lambda</span> <span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="o">-</span><span class="n">posterior</span><span class="o">.</span><span class="n">log_prob</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">),</span>
     <span class="n">num_posterior_samples</span><span class="o">=</span><span class="n">num_posterior_samples</span><span class="p">,</span>
     <span class="n">use_batched_sampling</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>  <span class="c1"># `True` can give speed-ups, but can cause memory issues.</span>
 <span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>Sampling 200 times (1000,) posterior samples.: 100%|█████████████████████████████████████████████████████████████████████████████████████████████████| 200/200 [00:02&lt;00:00, 99.86it/s]
+<div class="codehilite"><pre><span></span><code>Sampling 200 times (1000,) posterior samples.: 100%|████████████████████| 200/200 [00:01&lt;00:00, 122.30it/s]
 
 
 
@@ -889,9 +885,9 @@ Calculating ranks for 200 sbc samples.:   0%|          | 0/200 [00:00&lt;?, ?it/
 <span class="p">)</span>
 </code></pre></div>
 <p><img alt="png" src="../01_Bayesian_workflow_files/01_Bayesian_workflow_57_0.png" /></p>
-<p>The gray are marks the region which is still sufficiently uniform (meaning that we cannot reject the null hypothesis that the samples are uniform). In this case, all ranks (in red) are within this gray band. This is a good sign, but it is only a necessary&mdash;but not a sufficient&mdash;condition for the posterior to be correct. To this end, <code>sbi</code> implements a wide range of diagnostic methods, which are described <a href="">here</a>.</p>
+<p>The gray are marks the region which is still sufficiently uniform (meaning that we cannot reject the null hypothesis that the samples are uniform). In this case, all ranks (in red) are within this gray band. This is a good sign, but it is only a necessary&mdash;but not a sufficient&mdash;condition for the posterior to be correct. To this end, <code>sbi</code> implements a wide range of diagnostic methods, which are described <a href="https://sbi.readthedocs.io/en/latest/how_to_guide/14_choose_diagnostic_tool.html">here</a>.</p>
 <h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
-<p>Next, we recommend that you check our <a href="">how-to guide</a> for brief tutorials on specific features. You can read our <a href="">API reference</a>, which provides a complete list of all features in the <code>sbi</code> toolbox.</p>
+<p>Next, we recommend that you check our <a href="https://sbi.readthedocs.io/en/latest/how_to_guide.html">how-to guide</a> for brief tutorials on specific features, our <a href="https://sbi.readthedocs.io/en/latest/advanced_tutorials.html">advanced tutorials</a> for detailed explanations, or our <a href="https://sbi.readthedocs.io/en/latest/sbi.html">API reference</a>, which provides a complete list of all features in the <code>sbi</code> toolbox.</p>
 
 
 
