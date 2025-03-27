@@ -308,6 +308,9 @@ class BoxUniform(Independent):
 
         ::
 
+            import torch
+            from sbi.utils.torchutils import BoxUniform
+
             # Define lower bounds
             low = torch.tensor([0.0, 0.0, 0.0])
 
