@@ -121,8 +121,8 @@ class CustomPriorWrapper(Distribution):
             NotImplementedError.
         """
         raise NotImplementedError(
-            "This class is not supported on the GPU. Use on cpu or use \
-            any of `PytorchReturnTypeWrapper`, `BoxUniform`, or `MultipleIndependent`."
+            "This class is not supported on the GPU. Use on cpu or use "
+            "any of `PytorchReturnTypeWrapper`, `BoxUniform`, or `MultipleIndependent`."
         )
 
     @property
