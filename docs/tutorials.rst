@@ -7,8 +7,7 @@ Before running the notebooks, follow our instructions to
 `install sbi <https://sbi.readthedocs.io/en/latest/installation.html>`_.
 Alternatively, you can also open a `codespace on
 GitHub <https://codespaces.new/sbi-dev/sbi>`_ and work through the tutorials in
-the browser. The numbers of the notebooks are not informative of the order,
-please follow this structure depending on which group you identify with.
+the browser.
 
 Once you have familiarised yourself with the methods and identified how to apply
 ``sbi`` to your use case, you can check out our
