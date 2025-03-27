@@ -508,7 +508,7 @@ def test_conditioned_posterior_on_gpu(
 ):
     """Test that training and sampling device can be interchanged
 
-    for comditional posteriors.
+    for conditional posteriors.
 
     Args:
         device: device for trainig
