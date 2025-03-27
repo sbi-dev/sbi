@@ -8,13 +8,13 @@
       
       
       
-        <link rel="canonical" href="https://sbi-dev.github.io/sbi/dev/faq/">
+        <link rel="canonical" href="https://sbi-dev.github.io/sbi/dev/tutorials/">
       
       
-        <link rel="prev" href="../reference/">
+        <link rel="prev" href="..">
       
       
-        <link rel="next" href="../contribute/">
+        <link rel="next" href="../reference/">
       
       
       <link rel="icon" href="../assets/images/favicon.png">
@@ -22,7 +22,7 @@
     
     
       
-        <title>FAQ - sbi</title>
+        <title>Tutorials and Examples - sbi</title>
       
     
     
@@ -84,7 +84,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#frequently-asked-questions" class="md-skip">
+        <a href="#tutorials-for-using-the-sbi-toolbox" class="md-skip">
           Skip to content
         </a>
       
@@ -123,7 +123,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              FAQ
+              Tutorials and Examples
             
           </span>
         </div>
@@ -257,10 +257,31 @@
       
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../tutorials/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    Tutorials and Examples
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   <span class="md-ellipsis">
@@ -270,6 +291,71 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#introduction" class="md-nav__link">
+    <span class="md-ellipsis">
+      Introduction
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#advanced" class="md-nav__link">
+    <span class="md-ellipsis">
+      Advanced
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#diagnostics" class="md-nav__link">
+    <span class="md-ellipsis">
+      Diagnostics
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#analysis" class="md-nav__link">
+    <span class="md-ellipsis">
+      Analysis
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      Examples
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -299,19 +385,10 @@
       
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../faq/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -321,7 +398,6 @@
   
 
       </a>
-      
     </li>
   
 
@@ -475,6 +551,59 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#introduction" class="md-nav__link">
+    <span class="md-ellipsis">
+      Introduction
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#advanced" class="md-nav__link">
+    <span class="md-ellipsis">
+      Advanced
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#diagnostics" class="md-nav__link">
+    <span class="md-ellipsis">
+      Diagnostics
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#analysis" class="md-nav__link">
+    <span class="md-ellipsis">
+      Analysis
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      Examples
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -492,19 +621,60 @@
   
 
 
-<h1 id="frequently-asked-questions">Frequently asked questions<a class="headerlink" href="#frequently-asked-questions" title="Permanent link">&para;</a></h1>
-<ol>
-<li><a href="question_01_leakage/">What should I do when my &lsquo;posterior samples are outside of the prior support&rsquo; in SNPE?</a></li>
-<li><a href="question_02_nans/">Can the algorithms deal with invalid data, e.g., NaN or inf?</a></li>
-<li><a href="question_03_pickling_error/">When using multiple workers, I get a pickling error. Can I still use multiprocessing?</a></li>
-<li><a href="question_04_gpu/">Can I use the GPU for training the density estimator?</a></li>
-<li><a href="question_05_pickling/">How should I save and load objects in <code>sbi</code>?</a></li>
-<li><a href="question_06_resume_training/">Can I stop neural network training and resume it later?</a></li>
-<li><a href="question_07_custom_prior/">How can I use a prior that is not defined in PyTorch?</a></li>
-</ol>
-<p>See also <a href="https://github.com/sbi-dev/sbi/discussions">discussion page</a> and <a href="https://github.com/sbi-dev/sbi/issues">issue
-tracker</a> on the <code>sbi</code> GitHub repository for
-recent questions and problems.</p>
+<h1 id="tutorials-for-using-the-sbi-toolbox">Tutorials for using the <code>sbi</code> toolbox<a class="headerlink" href="#tutorials-for-using-the-sbi-toolbox" title="Permanent link">&para;</a></h1>
+<p>Before running the notebooks, follow our instructions to <a href="../install/">install
+sbi</a>. Alternatively, you can also open a <a href="https://codespaces.new/sbi-dev/sbi">codespace on
+GitHub</a> and work through the tutorials in
+the browser. The numbers of the notebooks are not informative of the order,
+please follow this structure depending on which group you identify with.</p>
+<p>Once you have familiarised yourself with the methods and identified how to apply
+SBI to your use case, ensure you work through the <strong>Diagnostics</strong> tutorials
+linked below, to identify failure cases and assess the quality of your
+inference.</p>
+<h2 id="introduction">Introduction<a class="headerlink" href="#introduction" title="Permanent link">&para;</a></h2>
+<div class="grid cards">
+<ul>
+<li><a href="00_getting_started/">Getting started</a></li>
+<li><a href="01_Bayesian_workflow/">Bayesian workflow</a></li>
+<li><a href="16_implemented_methods/">Implemented algorithms</a></li>
+</ul>
+</div>
+<h2 id="advanced">Advanced<a class="headerlink" href="#advanced" title="Permanent link">&para;</a></h2>
+<div class="grid cards">
+<ul>
+<li><a href="02_multiround_inference/">Multi-round inference</a></li>
+<li><a href="09_sampler_interface/">Sampling algorithms in sbi</a></li>
+<li><a href="03_density_estimators/">Custom density estimators</a></li>
+<li><a href="04_embedding_networks/">Embedding nets for observations</a></li>
+<li><a href="12_iid_data_and_permutation_invariant_embeddings/">SBI with trial-based data</a></li>
+<li><a href="06_restriction_estimator/">Handling invalid simulations</a></li>
+<li><a href="15_importance_sampled_posteriors/">Importance sampling posteriors</a></li>
+</ul>
+</div>
+<h2 id="diagnostics">Diagnostics<a class="headerlink" href="#diagnostics" title="Permanent link">&para;</a></h2>
+<div class="grid cards">
+<ul>
+<li><a href="10_diagnostics_posterior_predictive_checks/">Posterior predictive checks</a></li>
+<li><a href="11_diagnostics_simulation_based_calibration/">Simulation-based calibration</a></li>
+<li><a href="13_diagnostics_lc2st/">Local-C2ST coverage checks</a></li>
+<li><a href="14_mcmc_diagnostics_with_arviz/">Density plots and MCMC diagnostics with ArviZ</a></li>
+</ul>
+</div>
+<h2 id="analysis">Analysis<a class="headerlink" href="#analysis" title="Permanent link">&para;</a></h2>
+<div class="grid cards">
+<ul>
+<li><a href="05_conditional_distributions/">Conditional distributions</a></li>
+<li><a href="07_sensitivity_analysis/">Posterior sensitivity analysis</a></li>
+<li><a href="17_plotting_functionality/">Plotting functionality</a></li>
+</ul>
+</div>
+<h2 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">&para;</a></h2>
+<div class="grid cards">
+<ul>
+<li><a href="Example_00_HodgkinHuxleyModel/">Hodgkin-Huxley model</a></li>
+<li><a href="Example_01_DecisionMakingModel/">Decision-making model</a></li>
+</ul>
+</div>
 
 
 
