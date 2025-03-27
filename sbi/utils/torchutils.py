@@ -302,6 +302,26 @@ class BoxUniform(Independent):
                 reinterpret as event dims.
             device: device of the prior, inferred from low arg, defaults to "cpu",
                 should match the training device when used in SBI.
+
+        Example:
+        --------
+
+        ::
+
+            # Define lower bounds
+            low = torch.tensor([0.0, 0.0, 0.0])
+
+            # Define upper bounds
+            high = torch.tensor([1.0, 1.0, 1.0])
+
+            box_uniform = BoxUniform(low, high)
+
+            # Sample from the box_uniform
+            N_samples = 100
+            sample = box_uniform.sample((N_samples,))
+
+            # Evaluate the log probability of the sample
+            log_prob = box_uniform.log_prob(sample)
         """
 
         # Type checks.
@@ -342,6 +362,15 @@ class BoxUniform(Independent):
 
         Args:
             device: Target device (e.g., "cpu", "cuda", "mps").
+
+        Example:
+        --------
+
+        ::
+
+            device = "cuda"
+            prior = BoxUniform(low=torch.zeros(2), high=torch.ones(2))
+            prior.to(device) #inplace
         """
         # Update the device attribute
         self.device = device
