@@ -67,6 +67,8 @@ def get_new_cnn_output_size(
 
 
 class CNNEmbedding(nn.Module):
+    """Convolutional embedding network (1D or 2D convolutions)."""
+
     def __init__(
         self,
         input_shape: Tuple,
@@ -80,6 +82,7 @@ class CNNEmbedding(nn.Module):
         pool_kernel_size: int = 2,
     ):
         """Convolutional embedding network.
+
         First two layers are convolutional, followed by fully connected layers.
 
         Automatically infers whether to apply 1D or 2D convolution depending on

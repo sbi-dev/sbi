@@ -7,13 +7,16 @@ Before running the notebooks, follow our instructions to
 `install sbi <https://sbi.readthedocs.io/en/latest/installation.html>`_.
 Alternatively, you can also open a `codespace on
 GitHub <https://codespaces.new/sbi-dev/sbi>`_ and work through the tutorials in
-the browser. The numbers of the notebooks are not informative of the order,
-please follow this structure depending on which group you identify with.
+the browser.
 
 Once you have familiarised yourself with the methods and identified how to apply
-SBI to your use case, you can check out our [how-to guide]() for brief answers to
-specific questions and our [advanced tutorials]() for longer explanations of particular
-features.
+``sbi`` to your use case, you can check out our
+`how-to guide <https://sbi.readthedocs.io/en/latest/how_to_guide.html>`_
+for brief answers to specific questions, our
+`advanced tutorials <https://sbi.readthedocs.io/en/latest/advanced_tutorials.html>`_
+for longer explanations of particular features, and our
+`API reference <https://sbi.readthedocs.io/en/latest/sbi.html>`_
+for documentation of all features.
 
 
 .. toctree::

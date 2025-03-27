@@ -1,11 +1,9 @@
 (contributing)=
 # How to contribute
 
-!!! important
-
-    By participating in the `sbi` community, all members are expected to comply with
-    our [Code of Conduct](code_of_conduct.md). This ensures a positive and inclusive
-    environment for everyone involved.
+  By participating in the `sbi` community, all members are expected to comply with
+  our [Code of Conduct](code_of_conduct.md). This ensures a positive and inclusive
+  environment for everyone involved.
 
 ## User experiences, bugs, and feature requests
 
@@ -29,15 +27,14 @@ To give credit to contributors, we consider adding contributors who repeatedly
 and substantially contributed to `sbi` to the list of authors of the package at
 the end of every year. Additionally, we mention all contributors in the releases.
 
-!!! note
-    To avoid doing duplicated work, we strongly suggest that you go take
-    a look at our current [open issues](https://github.com/sbi-dev/sbi/issues) and
-    [pull requests](https://github.com/sbi-dev/sbi/pulls) to see if someone else is
-    already doing it. Also, in case you're planning to work on something that has not
-    yet been proposed by others (e.g. adding a new feature, adding a new example),
-    it is preferable to first open a new issue explaining what you intend to
-    propose and then working on your pull request after getting some feedback from
-    others.
+> To avoid doing duplicated work, we strongly suggest that you go take
+a look at our current [open issues](https://github.com/sbi-dev/sbi/issues) and
+[pull requests](https://github.com/sbi-dev/sbi/pulls) to see if someone else is
+already doing it. Also, in case you're planning to work on something that has not
+yet been proposed by others (e.g. adding a new feature, adding a new example),
+it is preferable to first open a new issue explaining what you intend to
+propose and then working on your pull request after getting some feedback from
+others.
 
 ### Contribution workflow
 
@@ -163,13 +160,12 @@ instructions to create a pull request from your fork.
 This will send a notification to `sbi` maintainers and trigger reviews and comments
 regarding your contribution.
 
-!!! note
-    It is often helpful to keep your local feature branch synchronized
-    with the latest changes of the main `sbi` repository:
-    ```
-    git fetch upstream
-    git merge upstream/main
-    ```
+> It is often helpful to keep your local feature branch synchronized
+with the latest changes of the main `sbi` repository:
+```
+git fetch upstream
+git merge upstream/main
+```
 
 ### Style conventions and testing
 
@@ -213,7 +209,7 @@ If any of these fail, try reproducing and solving the error locally:
   using `pre-commit run --all-files`. `ruff` tends to give informative error messages
   that help you fix the problem. Note that pre-commit only detects problems with `ruff`
   linting and formatting, but does not fix them. You can fix them either by running
-  `ruff check . --fix(linting)`, followed by `ruff format . --fix(formatting)`, or by
+  `ruff check . --fix` (linting), followed by `ruff format .` (formatting), or by
   hand.
 - **`pyright`**: Run it locally using `pyright sbi/` and ensure you are using
 the same
@@ -235,7 +231,9 @@ fails (xfailed).
 As SBI is a fundamentally data-driven approach, we are not only interested in whether
 the modifications to the codebase "pass the tests" but also in whether they improve or
 at least do not deteriorate the performance of the package for inference. To this end,
-we have a set of *mini-sbibm* tests (a minimal version of the sbi benchmarking package [`sbibm`](https://github.com/sbi-benchmark/sbibm)) that are intended for developers to run locally.
+we have a set of *mini-sbibm* tests (a minimal version of the sbi benchmarking package
+[`sbibm`](https://github.com/sbi-benchmark/sbibm)) that are intended for developers to
+run locally.
 
 These tests differ from the regular tests in that they always pass (provided there
 are no errors) but output performance metrics that can be compared, e.g., to the
@@ -244,7 +242,7 @@ is available via `pytest` through custom flags. To run the mini-sbibm tests, you
 the following command:
 
 ```bash
-    pytest --bm
+pytest --bm
 ```
 
 This will run all the mini-sbibm tests on all methods with default parameters and output
@@ -252,14 +250,14 @@ the performance metrics nicely formatted to the console. If you have multiple CP
 available, you can run the tests in parallel using the `-n auto` flag:
 
 ```bash
-    pytest --bm -n auto
+pytest --bm -n auto
 ```
 
 What if you are currently working on a specific method and you want to run the
 mini-sbibm tests only for this class of methods? You can use the `--bm-mode` flag:
 
 ```bash
-    pytest --bm --bm-mode nspe
+pytest --bm --bm-mode nspe
 ```
 
 This will run the mini-sbibm tests only for methods of the `nspe` class, but with a
@@ -294,7 +292,9 @@ If you updated the tutorials or examples, you need to convert them to markdown f
 
 ```bash
 cd docs
-jupyter nbconvert --to markdown ../tutorials/*.ipynb --output-dir docs/tutorials/
+jupyter nbconvert --to markdown ../docs/tutorials/*.ipynb --output-dir docs/tutorials/
+jupyter nbconvert --to markdown ../docs/advanced_tutorials/*.ipynb --output-dir docs/tutorials/
+jupyter nbconvert --to markdown ../docs/how_to_guide/09_sampler_interface.ipynb --output-dir docs/tutorials/
 mkdocs serve
 ```
 
