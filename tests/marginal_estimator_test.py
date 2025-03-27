@@ -56,4 +56,4 @@ def test_marginal_estimator(
     if len(x_test.shape) == 1:
         x_test = x_test.unsqueeze(1)
 
-    check_c2st(x_test, samples, f'MarginalEstimator-{model}')
+    check_c2st(x_test, samples.cpu(), f'MarginalEstimator-{model}')
