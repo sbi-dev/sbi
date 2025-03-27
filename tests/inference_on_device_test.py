@@ -16,6 +16,7 @@ from torch.distributions import MultivariateNormal
 from sbi import utils as utils
 from sbi.inference import (
     ABC,
+    FMPE,
     NLE,
     NPE,
     NPE_A,
@@ -37,7 +38,7 @@ from sbi.inference.potentials.base_potential import BasePotential
 from sbi.inference.potentials.likelihood_based_potential import LikelihoodBasedPotential
 from sbi.inference.potentials.posterior_based_potential import PosteriorBasedPotential
 from sbi.inference.potentials.ratio_based_potential import RatioBasedPotential
-from sbi.inference.potentials.score_fn_iid import GaussCorrectedScoreFn
+from sbi.inference.trainers.npse.vector_field_inference import VectorFieldInference
 from sbi.neural_nets.embedding_nets import FCEmbedding
 from sbi.neural_nets.factory import (
     classifier_nn,
@@ -560,12 +561,12 @@ def test_conditioned_posterior_on_gpu(
     device_inference = process_device(device_inference)
     conditional_posterior.to(device_inference)
     samples = conditional_posterior.sample((1,), x=x_o.to(device_inference))
-    assert str(samples.device).strip(":0") == device_inference.strip(":0"), (
+    assert str(samples.device).split(":")[0] == device_inference.split(":")[0], (
         "Samples are not on the correct device"
     )
     conditional_posterior.potential_fn(samples)
     map_ = conditional_posterior.map()
-    assert str(map_.device).strip(":0") == device_inference.strip(":0"), (
+    assert str(map_.device).split(":")[0] == device_inference.split(":")[0], (
         "MAP is not on the correct device"
     )
 
@@ -601,7 +602,7 @@ def test_direct_posterior_on_gpu(device: str, device_inference: str):
     device_inference = process_device(device_inference)
     posterior.to(device_inference)
     sample = posterior.sample((1,), x=x_o.to(device_inference))
-    assert str(sample.device).strip(":0") == device_inference.strip(":0"), (
+    assert str(sample.device).split(":")[0] == device_inference.split(":")[0], (
         "Samples are not on the correct device."
     )
 
@@ -615,7 +616,6 @@ def test_direct_posterior_on_gpu(device: str, device_inference: str):
         PosteriorBasedPotential,
         RatioBasedPotential,
         EnsemblePotential,
-        GaussCorrectedScoreFn,
     ],
 )
 def test_to_method_on_potentials(device: str, potential: Union[ABC, BasePotential]):
@@ -643,11 +643,11 @@ def test_to_method_on_potentials(device: str, potential: Union[ABC, BasePotentia
         potential_fn = potential(estimator, prior)
     potential_fn.to(device)
 
-    assert str(potential_fn.device).strip(":0") == device.strip(":0"), (
+    assert str(potential_fn.device).split(":")[0] == device.split(":")[0], (
         "Device attribute of potential_fn is not correct"
     )
     if hasattr("potential", "prior"):
-        assert str(potential_fn).strip(":0").prior == device.strip(":0"), (
+        assert str(potential_fn).split(":")[0].prior == device.split(":")[0], (
             "Device attribute of potential_fn.prior is not vcorrect"
         )
 
@@ -681,33 +681,44 @@ def test_to_method_on_posteriors(device: str, sampling_method: str):
     posterior.set_default_x(x_o)
     posterior.to(device)
 
-    assert (posterior.device).strip(":0") == device.strip(":0"), (
+    assert (posterior.device).split(":")[0] == device.split(":")[0], (
         ".to() should change the device attribute"
     )
     sample_device = posterior.sample((10,), x=x_o)
-    assert sample_device.device.type == device.strip(":0"), (
+    assert sample_device.device.type == device.split(":")[0], (
         f"sample was not correctly moved to {device}."
     )
     log_probs = posterior.log_prob(sample_device)
-    assert log_probs.device.type == device.strip(":0"), (
+    assert log_probs.device.type == device.split(":")[0], (
         f"log_prob was not correctly moved to {device}."
     )
 
     for trasnf in posterior.theta_transform._inv.base_transform.parts:
-        assert str(trasnf(torch.tensor([0.0], device=device)).device).strip(
-            ":0"
-        ) == device.strip(":0"), "Prior transform is on the correct device."
+        assert (
+            str(trasnf(torch.tensor([0.0], device=device)).device).strip(":0")
+            == device.split(":")[0]
+        ), "Prior transform is on the correct device."
 
 
 @pytest.mark.gpu
 @pytest.mark.parametrize("device", ["cpu", "gpu"])
-def test_ScorePosterior(device: str):
+@pytest.mark.parametrize("iid_method", ["fnpe", "gauss", "auto_gauss", "jac_gauss"])
+@pytest.mark.parametrize("estimator", [FMPE, NPSE])
+def test_VectorFieldPosterior(
+    device: str, iid_method: str, estimator: VectorFieldInference
+):
     device = process_device(device)
-    prior = BoxUniform(torch.tensor([0, 1]), torch.tensor([1, 2]), device="cpu")
-    inference = NPSE(score_estimator="mlp", prior=prior)
+    prior = BoxUniform(torch.zeros(3), torch.ones(3), device="cpu")
+    inference = estimator(score_estimator="mlp", prior=prior)
     density_estimator = inference.append_simulations(
         torch.randn((100, 3)), torch.randn((100, 2))
     ).train()
     posterior = inference.build_posterior(density_estimator, prior)
     posterior.to(device)
     assert posterior.device == device, f"ScorePosterior is not in device {device}."
+
+    x_o = torch.ones(2).to(device)
+    samples = posterior.sample((2,), x=x_o, iid_method=iid_method)
+    assert samples.device.type == device.split(":")[0], (
+        f"Samples are not on device {device}."
+    )
