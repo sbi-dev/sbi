@@ -293,7 +293,7 @@ class VectorFieldPosterior(NeuralPosterior):
             t_max = self.vector_field_estimator.t_max
             t_min = self.vector_field_estimator.t_min
             ts = torch.linspace(t_max, t_min, steps)
-        ts.to(self.device)
+        ts = ts.to(self.device)
 
         diffuser = Diffuser(
             self.potential_fn,

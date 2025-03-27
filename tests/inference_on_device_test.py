@@ -703,13 +703,13 @@ def test_to_method_on_posteriors(device: str, sampling_method: str):
 @pytest.mark.gpu
 @pytest.mark.parametrize("device", ["cpu", "gpu"])
 @pytest.mark.parametrize("iid_method", ["fnpe", "gauss", "auto_gauss", "jac_gauss"])
-@pytest.mark.parametrize("estimator", [FMPE, NPSE])
+@pytest.mark.parametrize("inference_method", [FMPE, NPSE])
 def test_VectorFieldPosterior(
-    device: str, iid_method: str, estimator: VectorFieldInference
+    device: str, iid_method: str, inference_method: VectorFieldInference
 ):
     device = process_device(device)
     prior = BoxUniform(torch.zeros(3), torch.ones(3), device="cpu")
-    inference = estimator(score_estimator="mlp", prior=prior)
+    inference = inference_method(score_estimator="mlp", prior=prior)
     density_estimator = inference.append_simulations(
         torch.randn((100, 3)), torch.randn((100, 2))
     ).train()
