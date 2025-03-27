@@ -2,7 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from functools import partial
-from typing import Any, Callable, Optional, Union
+from typing import Any, Optional, Union
 from warnings import warn
 
 import torch
@@ -38,7 +38,7 @@ class RejectionPosterior(NeuralPosterior):
         """
         Args:
             potential_fn: The potential function from which to draw samples. Must be a
-                `BasePotential` or a `Callable` which takes `theta` and `x_o` as inputs.
+                `BasePotential` or a `CustomPotential`.
             proposal: The proposal distribution.
             theta_transform: Transformation that is applied to parameters. Is not used
                 during but only when calling `.map()`.

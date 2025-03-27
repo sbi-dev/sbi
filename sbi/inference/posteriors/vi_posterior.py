@@ -12,7 +12,7 @@ from torch.distributions import Distribution
 from tqdm.auto import tqdm
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
-from sbi.inference.potentials.base_potential import BasePotential
+from sbi.inference.potentials.base_potential import BasePotential, CustomPotential
 from sbi.samplers.vi.vi_divergence_optimizers import get_VI_method
 from sbi.samplers.vi.vi_pyro_flows import get_flow_builder
 from sbi.samplers.vi.vi_quality_control import get_quality_metric
@@ -63,7 +63,7 @@ class VIPosterior(NeuralPosterior):
         """
         Args:
             potential_fn: The potential function from which to draw samples. Must be a
-                `BasePotential` or a `Callable` which takes `theta` and `x_o` as inputs.
+                `BasePotential` or a `CustomPotential`.
             prior: This is the prior distribution. Note that this is only
                 used to check/construct the variational distribution or within some
                 quality metrics. Please make sure that this matches with the prior
