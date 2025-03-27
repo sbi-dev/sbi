@@ -150,7 +150,9 @@ class CategoricalMADE(MADE):
         # for i = 1, ..., num_variables:
         #   x_i ~ Categorical(logits=f_i(x_1, ..., x_{i-1}, c))
         with torch.no_grad():
-            samples = torch.randn(num_samples, batch_dim, self.num_variables)
+            samples = torch.randn(
+                num_samples, batch_dim, self.num_variables, device=context.device
+            )
             for i in range(self.num_variables):
                 outputs = self.forward(samples, context)
                 outputs = outputs.reshape(*samples.shape, self.num_categories)
