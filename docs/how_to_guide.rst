@@ -5,8 +5,8 @@ How-to guide
 ============
 
 The `how-to guide` provides brief answers to specific questions. For each of the steps
-in the `sbi` workflow, it also provides a guide on how to choose among the options
-in the `sbi` toolbox (e.g., how to choose the inference method?).
+in the ``sbi`` workflow, it also provides a guide on how to choose among the options
+in the ``sbi`` toolbox (e.g., how to choose the inference method?).
 
 .. toctree::
    :maxdepth: 1

@@ -97,6 +97,8 @@ def construct_simple_fc_net(
 
 
 class ResNetEmbedding2D(nn.Module):
+    """Residual neural network mapping image-like data to a fixed sized vector."""
+
     def __init__(
         self,
         c_in: int,
@@ -111,8 +113,7 @@ class ResNetEmbedding2D(nn.Module):
         construct_mapping_kwargs: Optional[Dict] = None,
         residual_block_kwargs: Optional[Dict] = None,
     ) -> None:
-        """
-        Residual neural network mapping image-like data to a fixed sized vector.
+        """Residual neural network mapping image-like data to a fixed sized vector.
 
         This network consists of a stacked set of residual blocks. The output of
         a block is given by the input to the block plus the transformed input,
@@ -288,6 +289,8 @@ class ResNetEmbedding2D(nn.Module):
 
 
 class ResNetEmbedding1D(nn.Module):
+    """Residual neural network mapping vector-like data to a fixed-size vector."""
+
     def __init__(
         self,
         c_in: int,
@@ -300,8 +303,7 @@ class ResNetEmbedding1D(nn.Module):
         c_hidden_final: int = 1000,
         activation: Type[nn.Module] = nn.ReLU,
     ) -> None:
-        """
-        Residual neural network mapping vector-like data to a fixed-size vector.
+        """Residual neural network mapping vector-like data to a fixed-size vector.
 
         This network consists of a stacked set of residual blocks. The output of
         a block is given by the input to the block plus the transformed input,

@@ -16,6 +16,8 @@ from sbi.neural_nets.factory import posterior_score_nn
 
 
 class NPSE(VectorFieldInference):
+    """Neural Posterior Score Estimation as in Geffner et al. and Sharrock et al."""
+
     def __init__(
         self,
         prior: Optional[Distribution] = None,

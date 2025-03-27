@@ -64,6 +64,8 @@ def build_input_layer(
 
 
 class RestrictionEstimator:
+    """Classifier to estimate regions of the prior that give good simulation results."""
+
     def __init__(
         self,
         prior: Distribution,
@@ -607,6 +609,8 @@ class AcceptRejectFunction:
 
 
 class RestrictedPrior(Distribution):
+    """Distribution that restricts the prior distribution to a smaller region."""
+
     def __init__(
         self,
         prior: Distribution,
