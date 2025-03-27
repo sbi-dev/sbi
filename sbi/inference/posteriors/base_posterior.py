@@ -33,7 +33,7 @@ class NeuralPosterior:
         self,
         potential_fn: Union[BasePotential, CustomPotential],
         theta_transform: Optional[TorchTransform] = None,
-        device: Optional[str] = None,
+        device: Optional[Union[str, torch.device]] = None,
         x_shape: Optional[torch.Size] = None,
     ):
         """
