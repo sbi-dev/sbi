@@ -720,7 +720,9 @@ def test_to_method_on_posteriors(device: str, sampling_method: str):
 @pytest.mark.parametrize(
     "iid_method", ["fnpe", "gauss", "auto_gauss", "jac_gauss", None]
 )
-def test_VectorFieldPosterior_device_handling(device: str, device_inference: str, iid_method: str):
+def test_VectorFieldPosterior_device_handling(
+    device: str, device_inference: str, iid_method: str
+):
     """Test VectorFieldPosterior on different devices training and inference devices.
 
     Args:
