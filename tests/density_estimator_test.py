@@ -247,6 +247,7 @@ def test_correctness_of_density_estimator_log_prob(
     assert torch.allclose(log_probs[0, :], log_probs[1, :], rtol=1e-4)
 
 
+@pytest.mark.parametrize("density_estimator_build_fn", model_builders)
 @pytest.mark.parametrize(
     "density_estimator_build_fn",
     [
