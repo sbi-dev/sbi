@@ -97,6 +97,9 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         """
         super().__init__(net, input_shape, condition_shape, t_min, t_max)
 
+        """
+        super().__init__(net, input_shape, condition_shape, t_min, t_max)
+
         # Set lambdas (variance weights) function.
         self._set_weight_fn(weight_fn)
 

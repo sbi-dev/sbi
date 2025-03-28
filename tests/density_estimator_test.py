@@ -236,6 +236,13 @@ def test_correctness_of_density_estimator_log_prob(
 
 @pytest.mark.parametrize("density_estimator_build_fn", model_builders)
 @pytest.mark.parametrize(
+    "density_estimator_build_fn",
+    [
+        build_nsf,
+        build_zuko_nsf,
+    ],  # just test nflows and zuko
+)
+@pytest.mark.parametrize(
     "input_event_shape", ((1,), pytest.param((2,), marks=pytest.mark.slow))
 )
 @pytest.mark.parametrize("condition_event_shape", ((1,), (7,)))

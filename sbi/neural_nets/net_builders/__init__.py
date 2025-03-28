@@ -19,6 +19,16 @@ from sbi.neural_nets.net_builders.flow import (
     build_zuko_sospf,
     build_zuko_unaf,
 )
+<<<<<<< HEAD
+=======
+from sbi.neural_nets.net_builders.mdn import build_mdn
+from sbi.neural_nets.net_builders.mixed_nets import build_mnle, build_mnpe
+from sbi.neural_nets.net_builders.vector_field_nets import (
+    build_mlp_vector_field,
+    build_transformer_cross_attn_vector_field,
+    build_transformer_vector_field,
+)
+>>>>>>> 1b3668c6b8f29b922d3f381dcb822a2441b7219b
 from sbi.neural_nets.net_builders.mdn import build_mdn
 from sbi.neural_nets.net_builders.mixed_nets import build_mnle, build_mnpe
 from sbi.neural_nets.net_builders.vector_field_nets import (
