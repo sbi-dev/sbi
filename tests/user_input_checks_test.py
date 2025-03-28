@@ -178,6 +178,10 @@ def test_reinterpreted_batch_dim_prior():
                 UserNumpyUniform(zeros(3), ones(3), return_numpy=False),
                 Uniform(zeros(1), ones(1)),
             ],  # combination of multiple independent custom priors
+            marks=pytest.mark.xfail(
+                reason="custom priors cannot be used in MultipleIndependent priors "
+                "(unless they support .to)."
+            ),
         ),
     ),
 )
@@ -389,11 +393,11 @@ def test_inference_with_user_sbi_problems(
             [Uniform(0, 1), Beta(1, 2)], marks=pytest.mark.xfail
         ),  # scalar dists.
         [Uniform(zeros(1), ones(1)), Uniform(zeros(1), ones(1))],
-        (
+        [
             Gamma(ones(1), ones(1)),
             Uniform(zeros(1), ones(1)),
             Beta(ones(1), 2 * ones(1)),
-        ),
+        ],
         [MultivariateNormal(zeros(3), eye(3)), Gamma(ones(1), ones(1))],
     ],
 )

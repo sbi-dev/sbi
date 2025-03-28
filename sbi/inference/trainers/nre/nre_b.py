@@ -14,6 +14,8 @@ from sbi.utils.torchutils import assert_all_finite
 
 
 class NRE_B(RatioEstimator):
+    """Neural Ratio Estimation  algorithm (NRE-B) as in Durkan et al. (2020)."""
+
     def __init__(
         self,
         prior: Optional[Distribution] = None,
@@ -25,7 +27,7 @@ class NRE_B(RatioEstimator):
     ):
         r"""SRE[1], here known as NRE_B.
 
-        [1] _On Contrastive Learning for Likelihood-free Inference_, Durkan et al.,
+        [1] *On Contrastive Learning for Likelihood-free Inference*, Durkan et al.,
             ICML 2020, https://arxiv.org/pdf/2002.03712
 
         Args:

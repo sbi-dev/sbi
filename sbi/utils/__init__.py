@@ -3,6 +3,7 @@ from sbi.utils.analysis_utils import get_1d_marginal_peaks_from_kde
 from sbi.utils.io import get_data_root, get_log_root, get_project_root
 from sbi.utils.kde import KDEWrapper, get_kde
 from sbi.utils.potentialutils import pyro_potential_wrapper, transformed_potential
+from sbi.utils.pyroutils import to_pyro_distribution
 from sbi.utils.restriction_estimator import (
     RestrictedPrior,
     RestrictionEstimator,
@@ -36,6 +37,7 @@ from sbi.utils.sbiutils import (
 from sbi.utils.torchutils import (
     BoxUniform,
     assert_all_finite,
+    assert_not_nan_or_plus_inf,
     cbrt,
     create_alternating_binary_mask,
     create_mid_split_binary_mask,
@@ -64,8 +66,22 @@ from sbi.utils.user_input_checks import (
     check_estimator_arg,
     check_prior,
     process_prior,
+    process_simulator,
     process_x,
     test_posterior_net_for_multi_d_x,
     validate_theta_and_x,
 )
 from sbi.utils.user_input_checks_utils import MultipleIndependent
+
+
+__all__ = [
+    "process_prior",
+    "process_simulator",
+    "BoxUniform",
+    "MultipleIndependent",
+    "RestrictedPrior",
+    "RestrictionEstimator",
+    "get_density_thresholder",
+    "transformed_potential",
+    "mcmc_transform",
+]

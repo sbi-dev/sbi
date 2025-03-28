@@ -100,6 +100,8 @@ def build_input_output_layer(
 
 
 class ActiveSubspace:
+    """Identify the active subspace of the posterior for sensitivity analyses."""
+
     def __init__(self, posterior: Any):
         """Identify the active subspace for sensitivity analyses.
 

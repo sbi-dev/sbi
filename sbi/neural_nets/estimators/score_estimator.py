@@ -26,15 +26,38 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
     where mean_t(t) and std_t(t) are the conditional mean and standard deviation at a
     given time t, respectively.
 
-    Relevant literature:
-    - Score-based generative modeling through SDE: https://arxiv.org/abs/2011.13456
-    - Denoising diffusion probabilistic models: https://arxiv.org/abs/2006.11239
-    - Noise conditional score networks: https://arxiv.org/abs/1907.05600
+    References
+    ----------
+    .. [1] Song, Y., Sohl-Dickstein, J., Kingma, D. P., Kumar, A., Ermon, S.,
+           & Poole, B. (2020).
+           "Score-based generative modeling through stochastic differential equations"
+           *Advances in Neural Information Processing Systems*
+           https://arxiv.org/abs/2011.13456
+
+    .. [2] Ho, J., Jain, A., & Abbeel, P. (2020).
+           "Denoising diffusion probabilistic models"
+           *Advances in Neural Information Processing Systems, 33, 6840-6851*
+           https://arxiv.org/abs/2006.11239
+
+    .. [3] Song, Y., & Ermon, S. (2019).
+           "Generative modeling by estimating gradients of the data distribution"
+           *Advances in Neural Information Processing Systems, 32*
+           https://arxiv.org/abs/1907.05600
 
     NOTE: This will follow the "noise matching" approach, we could also train a
     "denoising" network aiming to predict the original input given the noised input. We
     can still approx. the score by Tweedie's formula, but training might be easier.
     """
+
+    # Whether the score is defined for this estimator.
+    # Required for gradient-based methods.
+    SCORE_DEFINED: bool = True
+    # Whether the SDE functions - score, drift and diffusion -
+    #  are defined for this estimator.
+    SDE_DEFINED: bool = True
+    # Whether the marginals are defined for this estimator.
+    # Required for iid methods.
+    MARGINALS_DEFINED: bool = True
 
     def __init__(
         self,
@@ -48,10 +71,13 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         t_min: float = 1e-3,
         t_max: float = 1.0,
     ) -> None:
-        r"""Score estimator class that estimates the conditional score function, i.e.,
+        r"""Score estimator class that estimates the
+        conditional score function, i.e.,
         gradient of the density p(xt|x0).
 
         Args:
+            net: Score estimator neural network with call signature:
+                input, condition, and time (in [0,1]).
             net: Score estimator neural network with call signature: input, condition,
                 and time (in [0,1])].
             input_shape: Shape of the input, e.g., the parameters.
@@ -63,22 +89,16 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
                 - "identity": constant weights (1.),
                 - "max_likelihood": weights proportional to the diffusion function, or
                 - a custom function that returns a Callable.
-            mean_0: Starting mean of the target distribution.
-            std_0: Starting standard deviation of the target distribution.
-            t_min: Minimum time for diffusion (0 can be numerically unstable).
-            t_max: Maximum time for diffusion.
-        """
-        super().__init__(net, input_shape, condition_shape)
+            mean_0: Approximate mean of the target distribution.
+            std_0: Approximate standard deviation of the target distribution.
+            t_min: Minimum time value.
+            t_max: Maximum time value.
 
-        # store embedding network
-        self._embedding_net = embedding_net
+        """
+        super().__init__(net, input_shape, condition_shape, t_min, t_max)
 
         # Set lambdas (variance weights) function.
         self._set_weight_fn(weight_fn)
-
-        # Min time for diffusion (0 can be numerically unstable).
-        self.t_min = t_min
-        self.t_max = t_max
 
         # Starting mean and std of the target distribution (otherwise assumes 0,1).
         # This will be used to precondition the score network to improve training.
@@ -91,10 +111,10 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         self.register_buffer("std_0", std_0.clone().detach())
 
         # We estimate the mean and std of the source distribution at time t_max.
-        mean_t = self.approx_marginal_mean(torch.tensor([t_max]))
-        std_t = self.approx_marginal_std(torch.tensor([t_max]))
-        self.register_buffer("mean_t", mean_t)
-        self.register_buffer("std_t", std_t)
+        mean_base = self.approx_marginal_mean(torch.tensor([t_max])).flatten()[0]
+        std_base = self.approx_marginal_std(torch.tensor([t_max])).flatten()[0]
+        self._mean_base.fill_(mean_base)
+        self._std_base.fill_(std_base)
 
     @property
     def embedding_net(self):
@@ -102,7 +122,8 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         return self._embedding_net
 
     def forward(self, input: Tensor, condition: Tensor, time: Tensor) -> Tensor:
-        r"""Forward pass of the score estimator network to compute the conditional score
+        r"""Forward pass of the score estimator
+        network to compute the conditional score
         at a given time.
 
         Args:
@@ -179,6 +200,19 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
             output_score = output_score.reshape(original_input_shape)
 
         return output_score
+
+    def score(self, input: Tensor, condition: Tensor, t: Tensor) -> Tensor:
+        """Score function of the score estimator.
+
+        Args:
+            input: variable whose distribution is estimated.
+            condition: Conditioning variable.
+            t: Time.
+
+        Returns:
+            Score function value.
+        """
+        return self(input=input, condition=condition, time=t)
 
     def loss(
         self,
@@ -411,6 +445,25 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
             self.weight_fn = weight_fn
         else:
             raise ValueError(f"Weight function {weight_fn} not recognized.")
+
+    def ode_fn(self, input: Tensor, condition: Tensor, times: Tensor) -> Tensor:
+        """ODE flow function of the score estimator.
+
+        For reference, see Equation 13 in [1]_.
+
+        Args:
+            input: variable whose distribution is estimated.
+            condition: Conditioning variable.
+            t: Time.
+
+        Returns:
+            ODE flow function value at a given time.
+        """
+        score = self.score(input=input, condition=condition, t=times)
+        f = self.drift_fn(input, times)
+        g = self.diffusion_fn(input, times)
+        v = f - 0.5 * g**2 * score
+        return v
 
 
 class VPScoreEstimator(ConditionalScoreEstimator):

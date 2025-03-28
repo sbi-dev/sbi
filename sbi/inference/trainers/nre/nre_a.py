@@ -14,6 +14,8 @@ from sbi.utils.torchutils import assert_all_finite
 
 
 class NRE_A(RatioEstimator):
+    """Neural Ratio Estimation algorithm (NRE-A) as in Hermans et al. (2020)."""
+
     def __init__(
         self,
         prior: Optional[Distribution] = None,
@@ -25,7 +27,7 @@ class NRE_A(RatioEstimator):
     ):
         r"""AALR[1], here known as NRE_A.
 
-        [1] _Likelihood-free MCMC with Amortized Approximate Likelihood Ratios_, Hermans
+        [1] *Likelihood-free MCMC with Amortized Approximate Likelihood Ratios*, Hermans
             et al., ICML 2020, https://arxiv.org/abs/1903.04057
 
         Args:

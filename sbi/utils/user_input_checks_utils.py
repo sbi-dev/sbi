@@ -2,11 +2,41 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import warnings
-from typing import Dict, Optional, Sequence
+from typing import Dict, Optional, Sequence, Union
 
 import torch
 from torch import Tensor, float32
-from torch.distributions import Distribution, constraints
+from torch.distributions import (
+    Bernoulli,
+    Binomial,
+    Categorical,
+    Distribution,
+    Multinomial,
+    MultivariateNormal,
+    constraints,
+)
+
+from sbi.utils.torchutils import process_device
+
+
+def get_distribution_parameters(
+    dist: Distribution, device: Union[str, torch.device]
+) -> Dict:
+    """Used to get the tensors of the parameters in torch distributions.
+
+    Returns the tensors relocated to device.
+    """
+    params = {param: getattr(dist, param).to(device) for param in dist.arg_constraints}
+    # MultivariateNormal calculates precision matrix from covariance, and stores it in
+    # the arg_constraints. When reinstantiating, we must provide only one of them.
+    if isinstance(dist, MultivariateNormal):
+        params["precision_matrix"] = None
+        params["scale_tril"] = None
+    # MultivariateNormal calculates logits from probabilities, and stores it in the
+    # arg_constraints. When reinstantiating, we must provide only one of them.
+    elif isinstance(dist, (Binomial, Bernoulli, Categorical, Multinomial)):
+        params["logits"] = None
+    return params
 
 
 class CustomPriorWrapper(Distribution):
@@ -83,6 +113,18 @@ class CustomPriorWrapper(Distribution):
                 stacklevel=2,
             )
 
+    def to(self, device: Union[str, torch.device]) -> None:
+        """
+        Move the distribution to the specified device. Not implemented for this class.
+
+        Raises:
+            NotImplementedError.
+        """
+        raise NotImplementedError(
+            "This class is not supported on the GPU. Use on cpu or use "
+            "any of `PytorchReturnTypeWrapper`, `BoxUniform`, or `MultipleIndependent`."
+        )
+
     @property
     def mean(self):
         return torch.as_tensor(
@@ -103,7 +145,7 @@ class PytorchReturnTypeWrapper(Distribution):
 
     def __init__(
         self,
-        prior: Distribution,
+        prior: Distribution,  # type: ignore
         return_type: Optional[torch.dtype] = float32,
         batch_shape=torch.Size(),
         event_shape=torch.Size(),
@@ -118,6 +160,7 @@ class PytorchReturnTypeWrapper(Distribution):
         )
 
         self.prior = prior
+        self.device = None
         self.return_type = return_type
 
     def log_prob(self, value) -> Tensor:
@@ -150,20 +193,38 @@ class PytorchReturnTypeWrapper(Distribution):
     def support(self):
         return self.prior.support
 
+    def to(self, device: Union[str, torch.device]) -> None:
+        """
+        Move the distribution to the specified device.
+
+        Moves the distribution parameters to the specific device
+        and updates the device attribute.
+
+        Args:
+            device: device to move the distribution to.
+        """
+        params = get_distribution_parameters(self.prior, device)
+        self.prior = type(self.prior)(**params)
+        self.device = device
+
 
 class MultipleIndependent(Distribution):
     """Wrap a sequence of PyTorch distributions into a joint PyTorch distribution.
 
     Every element of the sequence is treated as independent from the other elements.
-    Single elements can be multivariate with dependent dimensions, e.g.,:
-        - [
+    Single elements can be multivariate with dependent dimensions.
+
+    Example:
+
+    ::
+
+        import torch
+        from torch.distributions import Gamma, Beta, MultivariateNormal
+        prior = MultipleIndependent([
             Gamma(torch.zeros(1), torch.ones(1)),
             Beta(torch.zeros(1), torch.ones(1)),
-            MVG(torch.ones(2), torch.tensor([[1, .1], [.1, 1.]]))
-        ]
-        - [
-            Uniform(torch.zeros(1), torch.ones(1)),
-            Uniform(torch.ones(1), 2.0 * torch.ones(1))]
+            MultivariateNormal(torch.ones(2), torch.tensor([[1, .1], [.1, 1.]]))
+        ])
     """
 
     def __init__(
@@ -171,12 +232,15 @@ class MultipleIndependent(Distribution):
         dists: Sequence[Distribution],
         validate_args=None,
         arg_constraints: Optional[Dict[str, constraints.Constraint]] = None,
+        device: Optional[str] = None,
     ):
         self._check_distributions(dists)
         if validate_args is not None:
             [d.set_default_validate_args(validate_args) for d in dists]
 
         self.dists = dists
+        self.device = process_device(device or "cpu")
+        self.to(self.device)
         # numel() instead of event_shape because for all dists both is possible,
         # event_shape=[1] or batch_shape=[1]
         self.dims_per_dist = [d.sample().numel() for d in self.dists]
@@ -195,6 +259,7 @@ class MultipleIndependent(Distribution):
 
     @property
     def arg_constraints(self) -> Dict[str, constraints.Constraint]:
+        """Return argument constraints."""
         return self.custom_arg_constraints
 
     def _check_distributions(self, dists):
@@ -315,6 +380,24 @@ class MultipleIndependent(Distribution):
             reinterpreted_batch_ndims=1,
         )
 
+    def to(self, device: Union[str, torch.device]) -> None:
+        """Move the distribution to the specified device.
+
+        If the distribution has the `to` method, it is used. Otherwise, the
+        parameters of the distribution are moved to the specified device.
+
+        Args:
+            device: device to move the distribution to.
+        """
+        for i in range(len(self.dists)):
+            # ignoring because it is related to torch and not sbi
+            if hasattr(self.dists[i], "to"):
+                self.dists[i].to(device)  # type: ignore
+            else:
+                params = get_distribution_parameters(self.dists[i], device)
+                self.dists[i] = type(self.dists[i])(**params)  # type: ignore
+        self.device = device
+
 
 def build_support(
     lower_bound: Optional[Tensor] = None, upper_bound: Optional[Tensor] = None
@@ -403,11 +486,7 @@ class OneDimPriorWrapper(Distribution):
     those batched 1D distributions to get rid of their batch dimension in `.log_prob()`.
     """
 
-    def __init__(
-        self,
-        prior: Distribution,
-        validate_args=None,
-    ) -> None:
+    def __init__(self, prior: Distribution, validate_args=None) -> None:
         super().__init__(
             batch_shape=prior.batch_shape,
             event_shape=prior.event_shape,
@@ -416,6 +495,21 @@ class OneDimPriorWrapper(Distribution):
             ),
         )
         self.prior = prior
+        self.device = None
+
+    def to(self, device: Union[str, torch.device]) -> None:
+        """
+        Move the distribution to the specified device.
+
+        Moves the distribution parameters to the specific device
+        and updates the device attribute.
+
+        Args:
+            device: device to move the distribution to.
+        """
+        params = get_distribution_parameters(self.prior, device)
+        self.prior = type(self.prior)(**params)
+        self.device = device
 
     def sample(self, *args, **kwargs) -> Tensor:
         return self.prior.sample(*args, **kwargs)
