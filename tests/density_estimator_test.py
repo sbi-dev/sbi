@@ -51,8 +51,7 @@ model_builders = [
 ]
 
 # TODO Test new
-diffusion_builders = [
-]
+diffusion_builders = []
 
 
 def get_batch_input(nsamples: int, input_dims: int) -> torch.Tensor:
