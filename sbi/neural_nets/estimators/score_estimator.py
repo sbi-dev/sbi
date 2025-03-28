@@ -94,8 +94,8 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         """
         super().__init__(net, input_shape, condition_shape, t_min, t_max)
 
-        # store embedding network
-        self._embedding_net = embedding_net
+        """
+        super().__init__(net, input_shape, condition_shape, t_min, t_max)
 
         # Set lambdas (variance weights) function.
         self._set_weight_fn(weight_fn)
