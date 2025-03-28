@@ -76,6 +76,8 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         gradient of the density p(xt|x0).
 
         Args:
+            net: Score estimator neural network with call signature:
+                input, condition, and time (in [0,1]).
             net: Score estimator neural network with call signature: input, condition,
                 and time (in [0,1])].
             input_shape: Shape of the input, e.g., the parameters.
@@ -87,15 +89,13 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
                 - "identity": constant weights (1.),
                 - "max_likelihood": weights proportional to the diffusion function, or
                 - a custom function that returns a Callable.
-            mean_0: Starting mean of the target distribution.
-            std_0: Starting standard deviation of the target distribution.
-            t_min: Minimum time for diffusion (0 can be numerically unstable).
-            t_max: Maximum time for diffusion.
+            mean_0: Approximate mean of the target distribution.
+            std_0: Approximate standard deviation of the target distribution.
+            t_min: Minimum time value.
+            t_max: Maximum time value.
+
         """
         super().__init__(net, input_shape, condition_shape, t_min, t_max)
-
-        # store embedding network
-        self._embedding_net = embedding_net
 
         # Set lambdas (variance weights) function.
         self._set_weight_fn(weight_fn)
@@ -115,11 +115,6 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         std_base = self.approx_marginal_std(torch.tensor([t_max])).flatten()[0]
         self._mean_base.fill_(mean_base)
         self._std_base.fill_(std_base)
-
-    @property
-    def embedding_net(self):
-        """Return the embedding network."""
-        return self._embedding_net
 
     @property
     def embedding_net(self):

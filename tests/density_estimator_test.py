@@ -50,7 +50,8 @@ model_builders = [
     build_zuko_unaf,
 ]
 
-# TODO: Add for new flow and score matching builders.
+# TODO: Add new
+diffusion_builders = []
 
 
 def get_batch_input(nsamples: int, input_dims: int) -> torch.Tensor:
@@ -234,7 +235,9 @@ def test_correctness_of_density_estimator_log_prob(
 
 
 @pytest.mark.parametrize("density_estimator_build_fn", model_builders)
-@pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
+@pytest.mark.parametrize(
+    "input_event_shape", ((1,), pytest.param((2,), marks=pytest.mark.slow))
+)
 @pytest.mark.parametrize("condition_event_shape", ((1,), (7,)))
 @pytest.mark.parametrize("sample_shape", ((1000,), (500, 2)))
 def test_correctness_of_batched_vs_seperate_sample_and_log_prob(

@@ -20,7 +20,7 @@ from sbi.neural_nets.net_builders.flow import (
     build_zuko_unaf,
 )
 from sbi.neural_nets.net_builders.mdn import build_mdn
-from sbi.neural_nets.net_builders.mnle import build_mnle
+from sbi.neural_nets.net_builders.mixed_nets import build_mnle, build_mnpe
 from sbi.neural_nets.net_builders.vector_field_nets import (
     build_mlp_vector_field,
     build_transformer_cross_attn_vector_field,

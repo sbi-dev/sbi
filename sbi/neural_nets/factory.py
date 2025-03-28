@@ -2,7 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 
-from typing import Any, Callable, Optional, Sequence, Union
+from typing import Any, Callable, Literal, Optional, Sequence, Union
 
 from torch import nn
 
@@ -28,7 +28,7 @@ from sbi.neural_nets.net_builders.flow import (
     build_zuko_unconditional_flow,
 )
 from sbi.neural_nets.net_builders.mdn import build_mdn
-from sbi.neural_nets.net_builders.mnle import build_mnle
+from sbi.neural_nets.net_builders.mixed_nets import build_mnle, build_mnpe
 from sbi.neural_nets.net_builders.vector_field_nets import (
     build_mlp_vector_field,
     build_transformer_cross_attn_vector_field,
@@ -527,5 +527,65 @@ def posterior_score_nn(
             sde_type=sde_type,
             **kwargs,
         )
+
+    return build_fn
+
+
+def marginal_nn(
+    model: Literal["bpf", "maf", "naf", "ncsf", "nsf", "sospf", "unaf"],
+    z_score_x: Optional[str] = "independent",
+    hidden_features: int = 50,
+    num_transforms: int = 5,
+    num_bins: int = 10,
+    num_components: int = 10,
+    **kwargs: Any,
+) -> Callable:
+    r"""
+    Returns a function that builds a density estimator for learning the marginal.
+
+    Args:
+        model: The type of density estimator that will be created. One of [`mdn`,
+            `made`, `maf`, `maf_rqs`, `nsf`].
+        z_score_x: Whether to z-score samples $x$ before passing them into
+            the network, can take one of the following:
+            - `none`, or None: do not z-score.
+            - `independent`: z-score each dimension independently.
+            - `structured`: treat dimensions as related, therefore compute mean and std
+            over the entire batch, instead of per-dimension. Should be used when each
+            sample is, for example, a time series or an image.
+        hidden_features: Number of hidden features.
+        num_transforms: Number of transforms when a flow is used. Only relevant if
+            density estimator is a normalizing flow (i.e. currently either a `maf` or a
+            `nsf`). Ignored if density estimator is a `mdn` or `made`.
+        num_bins: Number of bins used for the splines in `nsf`. Ignored if density
+            estimator not `nsf`.
+        num_components: Number of mixture components for a mixture of Gaussians.
+            Ignored if density estimator is not an mdn.
+        kwargs: additional custom arguments passed to downstream build functions.
+    """
+
+    kwargs = dict(
+        zip(
+            (
+                "z_score_x",
+                "hidden_features",
+                "num_transforms",
+                "num_bins",
+                "num_components",
+            ),
+            (
+                z_score_x,
+                hidden_features,
+                num_transforms,
+                num_bins,
+                num_components,
+            ),
+            strict=False,
+        ),
+        **kwargs,
+    )
+
+    def build_fn(batch_x):
+        return build_zuko_unconditional_flow(which_nf=model.upper(), batch_x=batch_x)
 
     return build_fn
