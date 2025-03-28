@@ -623,7 +623,7 @@ def test_direct_posterior_on_gpu(device: str, device_inference: str):
     ],
 )
 def test_to_method_on_potentials(device: str, potential: Union[ABC, BasePotential]):
-    """Test to method on potential.
+    """Test .to() method on potential.
 
     Args:
         device: device where to move the model.
@@ -668,7 +668,7 @@ def test_to_method_on_potentials(device: str, potential: Union[ABC, BasePotentia
     "sampling_method", ["rejection", "importance", "mcmc", "direct"]
 )
 def test_to_method_on_posteriors(device: str, sampling_method: str):
-    """Test that the .to() method works on posteriors.
+    """Test .to() method on posteriors.
 
     Args:
         device: device to train and sample the model on.
@@ -720,9 +720,8 @@ def test_to_method_on_posteriors(device: str, sampling_method: str):
 @pytest.mark.parametrize(
     "iid_method", ["fnpe", "gauss", "auto_gauss", "jac_gauss", None]
 )
-def test_VectorFieldPosterior(device: str, device_inference: str, iid_method: str):
-    """Test that VectorFieldPosterior works on different devices,
-    both for training as well as on inference.
+def test_VectorFieldPosterior_device_handling(device: str, device_inference: str, iid_method: str):
+    """Test VectorFieldPosterior on different devices training and inference devices.
 
     Args:
         device: device to train the model on.
