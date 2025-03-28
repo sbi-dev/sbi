@@ -9,7 +9,6 @@ import pytest
 import torch
 
 from sbi.neural_nets.embedding_nets import CNNEmbedding
-from sbi.neural_nets.net_builders import build_score_estimator
 
 
 @pytest.mark.parametrize("sde_type", ["vp", "ve", "subvp"])
