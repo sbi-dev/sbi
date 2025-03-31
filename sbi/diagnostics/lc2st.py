@@ -111,7 +111,7 @@ class LC2ST:
         self.num_ensemble = num_ensemble
 
         # initialize classifier
-        if "mlp" in classifier.lower():
+        if classifier.lower() == "mlp":
             ndim = thetas.shape[-1]
             self.clf_class = MLPClassifier
             if clf_kwargs is None:
@@ -123,19 +123,17 @@ class LC2ST:
                     "early_stopping": True,
                     "n_iter_no_change": 50,
                 }
-        elif "random_forest" in classifier.lower():
+        elif classifier.lower() == "random_forest":
             self.clf_class = RandomForestClassifier
             if clf_kwargs is None:
                 self.clf_kwargs = {}
-        elif "custom":
+        else:
             if clf_class is None or clf_kwargs is None:
                 raise ValueError(
                     "Please provide a valid sklearn classifier class and kwargs."
                 )
             self.clf_class = clf_class
             self.clf_kwargs = clf_kwargs
-        else:
-            raise NotImplementedError
 
         # initialize classifiers, will be set after training
         self.trained_clfs = None
