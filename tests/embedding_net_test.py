@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import math
-import sys
 
 import pytest
 import torch
@@ -403,8 +402,8 @@ def test_1d_ResNet_fc_embedding_net(input_shape, n_blocks, c_internal, c_hidden_
         pytest.param(
             "scan",
             marks=pytest.mark.xfail(
-                condition=sys.version_info >= (3, 13),
-                reason="torch.compiler is not yet supported on Python >= 3.13",
+                condition=tuple(map(int, torch.__version__.split('.')[:2])) >= (2, 5),
+                reason="PyTorch's associative_scan only exists for torch >= 2.5",
                 strict=True,
             ),
         ),
@@ -451,8 +450,8 @@ def test_lru_isolated(
         pytest.param(
             "scan",
             marks=pytest.mark.xfail(
-                condition=sys.version_info >= (3, 13),
-                reason="torch.compiler is not yet supported on Python >= 3.13",
+                condition=tuple(map(int, torch.__version__.split('.')[:2])) >= (2, 5),
+                reason="PyTorch's associative_scan only exists for torch >= 2.5",
                 strict=True,
             ),
         ),
@@ -509,8 +508,8 @@ def test_lru_block_isolated(
         pytest.param(
             "scan",
             marks=pytest.mark.xfail(
-                condition=sys.version_info >= (3, 13),
-                reason="torch.compiler is not yet supported on Python >= 3.13",
+                condition=tuple(map(int, torch.__version__.split('.')[:2])) >= (2, 5),
+                reason="PyTorch's associative_scan only exists for torch >= 2.5",
                 strict=True,
             ),
         ),
@@ -631,8 +630,8 @@ def test_lru_pipeline(embedding_feat_dim: int = 17):
 
 
 @pytest.mark.xfail(
-    condition=sys.version_info >= (3, 13),
-    reason="torch.compiler is not yet supported on Python >= 3.13",
+    condition=tuple(map(int, torch.__version__.split('.')[:2])) >= (2, 5),
+    reason="PyTorch's associative_scan only exists for torch >= 2.5",
     strict=True,
 )
 def test_scan(
