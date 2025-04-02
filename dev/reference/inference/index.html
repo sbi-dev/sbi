@@ -16146,14 +16146,8 @@ proposal.</p>
     <div class="doc doc-contents first">
 
         <p>Return PyTorch distribution-like prior from user-provided prior.</p>
-<p>NOTE: If the prior argument is a sequence of PyTorch distributions, they will be
-interpreted as independent prior dimensions wrapped in a <code>MultipleIndependent</code>
-pytorch Distribution. In case the elements are not PyTorch distributions, make sure
-to use process_prior on each element in the list beforehand.</p>
-<p>NOTE: returns a tuple (processed_prior, num_params, whether_prior_returns_numpy).
-The last two entries in the tuple can be passed on to <code>process_simulator</code> to prepare
-the simulator as well. For example, it will take care of casting parameters to numpy
-or adding a batch dimension to the simulator output, if needed.</p>
+<p>NOTE: If the prior argument is a sequence of PyTorch distributions,     they will be interpreted as independent prior dimensions wrapped in a     :class:<code>MultipleIndependent</code> PyTorch Distribution. In case the elements     are not PyTorch distributions, make sure to use :func:<code>process_prior</code>     on each element in the list beforehand.</p>
+<p>NOTE: Returns a tuple <code>(processed_prior, num_params,         whether_prior_returns_numpy)</code>. The last two entries in the tuple        can be passed on to <code>process_simulator</code> to prepare the simulator. For         example, it ensures parameters are cast to numpy or adds a batch         dimension to the simulator output, if needed.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -16172,12 +16166,11 @@ or adding a batch dimension to the simulator output, if needed.</p>
                 <code>prior</code>
             </td>
             <td>
-                  <code><span title="typing.Union">Union</span>[<span title="typing.Sequence">Sequence</span>[<span title="torch.distributions.Distribution">Distribution</span>], <span title="torch.distributions.Distribution">Distribution</span>, <span title="scipy.stats._distn_infrastructure.rv_frozen">rv_frozen</span>, <span title="scipy.stats._multivariate.multi_rv_frozen">multi_rv_frozen</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Prior object with <code>.sample()</code> and <code>.log_prob()</code> as provided by the user,
-or a sequence of such objects.</p>
+                <p>class:<code>~torch.distributions.distribution.Distribution</code>             or Sequence[:class:<code>~torch.distributions.distribution.Distribution</code>]):
+Prior object with <code>.sample()</code> and <code>.log_prob()</code>, or a sequence                 of such objects.</p>
               </div>
             </td>
             <td>
@@ -16189,15 +16182,13 @@ or a sequence of such objects.</p>
                 <code>custom_prior_wrapper_kwargs</code>
             </td>
             <td>
-                  <code><span title="typing.Optional">Optional</span>[<span title="typing.Dict">Dict</span>]</code>
+                  <code><span title="dict">dict</span></code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>kwargs to be passed to the class that wraps a
-custom prior into a pytorch Distribution, e.g., for passing bounds for a
-prior with bounded support (lower_bound, upper_bound), or argument
-constraints.
-(arg_constraints), see pytorch.distributions.Distribution for more info.</p>
+                <p>Additional arguments passed to the wrapper class that processes the prior
+into a PyTorch Distribution, such as bounds (<code>lower_bound</code>, <code>upper_bound</code>)
+or argument constraints (<code>arg_constraints</code>).</p>
               </div>
             </td>
             <td>
@@ -16223,7 +16214,7 @@ constraints.
             </td>
             <td>
               <div class="doc-md-description">
-                <p>If prior objects lacks <code>.sample()</code> or <code>.log_prob()</code>.</p>
+                <p>If prior objects lack <code>.sample()</code> or <code>.log_prob()</code>.</p>
               </div>
             </td>
           </tr>
@@ -16235,137 +16226,163 @@ constraints.
     <table>
       <thead>
         <tr>
-<th>Name</th>          <th>Type</th>
+          <th>Type</th>
           <th>Description</th>
         </tr>
       </thead>
       <tbody>
           <tr class="doc-section-item">
-<td><code>prior</code></td>            <td>
-                  <code><span title="torch.distributions.Distribution">Distribution</span></code>
+            <td>
+                  <code><span title="typing.Tuple">Tuple</span>[<span title="torch.distributions.Distribution">Distribution</span>, <span title="int">int</span>, <span title="bool">bool</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Prior that emits samples and evaluates log prob as PyTorch Tensors.</p>
-              </div>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-<td><code>theta_numel</code></td>            <td>
-                  <code><span title="int">int</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Number of parameters - elements in a single sample from the prior.</p>
-              </div>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-<td><code>prior_returns_numpy</code></td>            <td>
-                  <code><span title="bool">bool</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Whether the return type of the prior was a Numpy array.</p>
+                <p>Tuple[torch.distributions.Distribution, int, bool]:
+- <code>prior</code>: A PyTorch-compatible prior.
+- <code>theta_numel</code>: Dimensionality of a single sample from the prior.
+- <code>prior_returns_numpy</code>: Whether the prior originally returned NumPy arrays.</p>
               </div>
             </td>
           </tr>
       </tbody>
     </table>
+        <h4 id="sbi.utils.user_input_checks.process_prior--example">Example:<a class="headerlink" href="#sbi.utils.user_input_checks.process_prior--example" title="Permanent link">&para;</a></h4>
+<p>::</p>
+<div class="codehilite"><pre><span></span><code>import torch
+from torch.distributions import Uniform
+from sbi.utils.user_input_checks import process_prior
+
+prior = Uniform(torch.zeros(1), torch.ones(1))
+prior, theta_numel, prior_returns_numpy = process_prior(prior)
+</code></pre></div>
 
 
             <details class="quote">
               <summary>Source code in <code>sbi/utils/user_input_checks.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">38</span>
-<span class="normal">39</span>
-<span class="normal">40</span>
-<span class="normal">41</span>
-<span class="normal">42</span>
-<span class="normal">43</span>
-<span class="normal">44</span>
-<span class="normal">45</span>
-<span class="normal">46</span>
-<span class="normal">47</span>
-<span class="normal">48</span>
-<span class="normal">49</span>
-<span class="normal">50</span>
-<span class="normal">51</span>
-<span class="normal">52</span>
-<span class="normal">53</span>
-<span class="normal">54</span>
-<span class="normal">55</span>
-<span class="normal">56</span>
-<span class="normal">57</span>
-<span class="normal">58</span>
-<span class="normal">59</span>
-<span class="normal">60</span>
-<span class="normal">61</span>
-<span class="normal">62</span>
-<span class="normal">63</span>
-<span class="normal">64</span>
-<span class="normal">65</span>
-<span class="normal">66</span>
-<span class="normal">67</span>
-<span class="normal">68</span>
-<span class="normal">69</span>
-<span class="normal">70</span>
-<span class="normal">71</span>
-<span class="normal">72</span>
-<span class="normal">73</span>
-<span class="normal">74</span>
-<span class="normal">75</span>
-<span class="normal">76</span>
-<span class="normal">77</span>
-<span class="normal">78</span>
-<span class="normal">79</span>
-<span class="normal">80</span>
-<span class="normal">81</span>
-<span class="normal">82</span>
-<span class="normal">83</span>
-<span class="normal">84</span>
-<span class="normal">85</span>
-<span class="normal">86</span>
-<span class="normal">87</span>
-<span class="normal">88</span>
-<span class="normal">89</span>
-<span class="normal">90</span>
-<span class="normal">91</span>
-<span class="normal">92</span>
-<span class="normal">93</span>
-<span class="normal">94</span>
-<span class="normal">95</span>
-<span class="normal">96</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">process_prior</span><span class="p">(</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 38</span>
+<span class="normal"> 39</span>
+<span class="normal"> 40</span>
+<span class="normal"> 41</span>
+<span class="normal"> 42</span>
+<span class="normal"> 43</span>
+<span class="normal"> 44</span>
+<span class="normal"> 45</span>
+<span class="normal"> 46</span>
+<span class="normal"> 47</span>
+<span class="normal"> 48</span>
+<span class="normal"> 49</span>
+<span class="normal"> 50</span>
+<span class="normal"> 51</span>
+<span class="normal"> 52</span>
+<span class="normal"> 53</span>
+<span class="normal"> 54</span>
+<span class="normal"> 55</span>
+<span class="normal"> 56</span>
+<span class="normal"> 57</span>
+<span class="normal"> 58</span>
+<span class="normal"> 59</span>
+<span class="normal"> 60</span>
+<span class="normal"> 61</span>
+<span class="normal"> 62</span>
+<span class="normal"> 63</span>
+<span class="normal"> 64</span>
+<span class="normal"> 65</span>
+<span class="normal"> 66</span>
+<span class="normal"> 67</span>
+<span class="normal"> 68</span>
+<span class="normal"> 69</span>
+<span class="normal"> 70</span>
+<span class="normal"> 71</span>
+<span class="normal"> 72</span>
+<span class="normal"> 73</span>
+<span class="normal"> 74</span>
+<span class="normal"> 75</span>
+<span class="normal"> 76</span>
+<span class="normal"> 77</span>
+<span class="normal"> 78</span>
+<span class="normal"> 79</span>
+<span class="normal"> 80</span>
+<span class="normal"> 81</span>
+<span class="normal"> 82</span>
+<span class="normal"> 83</span>
+<span class="normal"> 84</span>
+<span class="normal"> 85</span>
+<span class="normal"> 86</span>
+<span class="normal"> 87</span>
+<span class="normal"> 88</span>
+<span class="normal"> 89</span>
+<span class="normal"> 90</span>
+<span class="normal"> 91</span>
+<span class="normal"> 92</span>
+<span class="normal"> 93</span>
+<span class="normal"> 94</span>
+<span class="normal"> 95</span>
+<span class="normal"> 96</span>
+<span class="normal"> 97</span>
+<span class="normal"> 98</span>
+<span class="normal"> 99</span>
+<span class="normal">100</span>
+<span class="normal">101</span>
+<span class="normal">102</span>
+<span class="normal">103</span>
+<span class="normal">104</span>
+<span class="normal">105</span>
+<span class="normal">106</span>
+<span class="normal">107</span>
+<span class="normal">108</span>
+<span class="normal">109</span>
+<span class="normal">110</span>
+<span class="normal">111</span>
+<span class="normal">112</span>
+<span class="normal">113</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">process_prior</span><span class="p">(</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">Distribution</span><span class="p">],</span> <span class="n">Distribution</span><span class="p">,</span> <span class="n">rv_frozen</span><span class="p">,</span> <span class="n">multi_rv_frozen</span><span class="p">],</span>
     <span class="n">custom_prior_wrapper_kwargs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Distribution</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">bool</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return PyTorch distribution-like prior from user-provided prior.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Return PyTorch distribution-like prior from user-provided prior.</span>
 
-<span class="sd">    NOTE: If the prior argument is a sequence of PyTorch distributions, they will be</span>
-<span class="sd">    interpreted as independent prior dimensions wrapped in a `MultipleIndependent`</span>
-<span class="sd">    pytorch Distribution. In case the elements are not PyTorch distributions, make sure</span>
-<span class="sd">    to use process_prior on each element in the list beforehand.</span>
+<span class="sd">    NOTE: If the prior argument is a sequence of PyTorch distributions, \</span>
+<span class="sd">    they will be interpreted as independent prior dimensions wrapped in a \</span>
+<span class="sd">    :class:`MultipleIndependent` PyTorch Distribution. In case the elements \</span>
+<span class="sd">    are not PyTorch distributions, make sure to use :func:`process_prior` \</span>
+<span class="sd">    on each element in the list beforehand.</span>
 
-<span class="sd">    NOTE: returns a tuple (processed_prior, num_params, whether_prior_returns_numpy).</span>
-<span class="sd">    The last two entries in the tuple can be passed on to `process_simulator` to prepare</span>
-<span class="sd">    the simulator as well. For example, it will take care of casting parameters to numpy</span>
-<span class="sd">    or adding a batch dimension to the simulator output, if needed.</span>
+<span class="sd">    NOTE: Returns a tuple `(processed_prior, num_params, \</span>
+<span class="sd">        whether_prior_returns_numpy)`. The last two entries in the tuple\</span>
+<span class="sd">        can be passed on to `process_simulator` to prepare the simulator. For \</span>
+<span class="sd">        example, it ensures parameters are cast to numpy or adds a batch \</span>
+<span class="sd">        dimension to the simulator output, if needed.</span>
 
 <span class="sd">    Args:</span>
-<span class="sd">        prior: Prior object with `.sample()` and `.log_prob()` as provided by the user,</span>
-<span class="sd">            or a sequence of such objects.</span>
-<span class="sd">        custom_prior_wrapper_kwargs: kwargs to be passed to the class that wraps a</span>
-<span class="sd">            custom prior into a pytorch Distribution, e.g., for passing bounds for a</span>
-<span class="sd">            prior with bounded support (lower_bound, upper_bound), or argument</span>
-<span class="sd">            constraints.</span>
-<span class="sd">            (arg_constraints), see pytorch.distributions.Distribution for more info.</span>
+<span class="sd">        prior (:class:`~torch.distributions.distribution.Distribution` \</span>
+<span class="sd">            or Sequence[:class:`~torch.distributions.distribution.Distribution`]):</span>
+<span class="sd">            Prior object with `.sample()` and `.log_prob()`, or a sequence \</span>
+<span class="sd">                of such objects.</span>
+<span class="sd">        custom_prior_wrapper_kwargs (dict, optional):</span>
+<span class="sd">            Additional arguments passed to the wrapper class that processes the prior</span>
+<span class="sd">            into a PyTorch Distribution, such as bounds (`lower_bound`, `upper_bound`)</span>
+<span class="sd">            or argument constraints (`arg_constraints`).</span>
 
 <span class="sd">    Raises:</span>
-<span class="sd">        AttributeError: If prior objects lacks `.sample()` or `.log_prob()`.</span>
+<span class="sd">        AttributeError: If prior objects lack `.sample()` or `.log_prob()`.</span>
 
 <span class="sd">    Returns:</span>
-<span class="sd">        prior: Prior that emits samples and evaluates log prob as PyTorch Tensors.</span>
-<span class="sd">        theta_numel: Number of parameters - elements in a single sample from the prior.</span>
-<span class="sd">        prior_returns_numpy: Whether the return type of the prior was a Numpy array.</span>
+<span class="sd">        Tuple[torch.distributions.Distribution, int, bool]:</span>
+<span class="sd">            - `prior`: A PyTorch-compatible prior.</span>
+<span class="sd">            - `theta_numel`: Dimensionality of a single sample from the prior.</span>
+<span class="sd">            - `prior_returns_numpy`: Whether the prior originally returned NumPy arrays.</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">    --------</span>
+
+<span class="sd">    ::</span>
+
+<span class="sd">        import torch</span>
+<span class="sd">        from torch.distributions import Uniform</span>
+<span class="sd">        from sbi.utils.user_input_checks import process_prior</span>
+
+<span class="sd">        prior = Uniform(torch.zeros(1), torch.ones(1))</span>
+<span class="sd">        prior, theta_numel, prior_returns_numpy = process_prior(prior)</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="c1"># If prior is a sequence, assume independent components and check as PyTorch prior.</span>
@@ -16449,7 +16466,7 @@ constraints.
             </td>
             <td>
               <div class="doc-md-description">
-                <p>prior as pytorch distribution or processed with <code>process_prior</code>.</p>
+                <p>prior as pytorch distribution or processed with :func:<code>process_prior</code>.</p>
               </div>
             </td>
             <td>
@@ -16487,40 +16504,34 @@ from <code>process_prior</code>.</p>
       </thead>
       <tbody>
           <tr class="doc-section-item">
-<td><code>simulator</code></td>            <td>
+<td><code>Callable</code></td>            <td>
                   <code><span title="typing.Callable">Callable</span></code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>processed simulator that returns <code>torch.Tensor</code> can handle batches
-of parameters.</p>
+                <p>simulator: processed simulator that returns :class:<code>torch.Tensor</code>                 and can handle batches of parameters.</p>
               </div>
             </td>
           </tr>
       </tbody>
     </table>
+        <h4 id="sbi.utils.user_input_checks.process_simulator--example">Example:<a class="headerlink" href="#sbi.utils.user_input_checks.process_simulator--example" title="Permanent link">&para;</a></h4>
+<p>::</p>
+<div class="codehilite"><pre><span></span><code>import torch
+from sbi.utils.user_input_checks import process_simulator
+from torch.distributions import Uniform
+from sbi.utils.user_input_checks import process_prior
+
+prior = Uniform(torch.zeros(1), torch.ones(1))
+prior, theta_numel, prior_returns_numpy = process_prior(prior)
+simulator = lambda theta: theta + 1
+simulator = process_simulator(simulator, prior, prior_returns_numpy)
+</code></pre></div>
 
 
             <details class="quote">
               <summary>Source code in <code>sbi/utils/user_input_checks.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">451</span>
-<span class="normal">452</span>
-<span class="normal">453</span>
-<span class="normal">454</span>
-<span class="normal">455</span>
-<span class="normal">456</span>
-<span class="normal">457</span>
-<span class="normal">458</span>
-<span class="normal">459</span>
-<span class="normal">460</span>
-<span class="normal">461</span>
-<span class="normal">462</span>
-<span class="normal">463</span>
-<span class="normal">464</span>
-<span class="normal">465</span>
-<span class="normal">466</span>
-<span class="normal">467</span>
-<span class="normal">468</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">468</span>
 <span class="normal">469</span>
 <span class="normal">470</span>
 <span class="normal">471</span>
@@ -16529,7 +16540,43 @@ of parameters.</p>
 <span class="normal">474</span>
 <span class="normal">475</span>
 <span class="normal">476</span>
-<span class="normal">477</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">process_simulator</span><span class="p">(</span>
+<span class="normal">477</span>
+<span class="normal">478</span>
+<span class="normal">479</span>
+<span class="normal">480</span>
+<span class="normal">481</span>
+<span class="normal">482</span>
+<span class="normal">483</span>
+<span class="normal">484</span>
+<span class="normal">485</span>
+<span class="normal">486</span>
+<span class="normal">487</span>
+<span class="normal">488</span>
+<span class="normal">489</span>
+<span class="normal">490</span>
+<span class="normal">491</span>
+<span class="normal">492</span>
+<span class="normal">493</span>
+<span class="normal">494</span>
+<span class="normal">495</span>
+<span class="normal">496</span>
+<span class="normal">497</span>
+<span class="normal">498</span>
+<span class="normal">499</span>
+<span class="normal">500</span>
+<span class="normal">501</span>
+<span class="normal">502</span>
+<span class="normal">503</span>
+<span class="normal">504</span>
+<span class="normal">505</span>
+<span class="normal">506</span>
+<span class="normal">507</span>
+<span class="normal">508</span>
+<span class="normal">509</span>
+<span class="normal">510</span>
+<span class="normal">511</span>
+<span class="normal">512</span>
+<span class="normal">513</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">process_simulator</span><span class="p">(</span>
     <span class="n">user_simulator</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Distribution</span><span class="p">,</span>
     <span class="n">is_numpy_simulator</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
@@ -16537,14 +16584,33 @@ of parameters.</p>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Returns a simulator that meets the requirements for usage in sbi.</span>
 
 <span class="sd">    Args:</span>
-<span class="sd">        user_simulator: simulator provided by the user, possibly written in numpy.</span>
-<span class="sd">        prior: prior as pytorch distribution or processed with `process_prior`.</span>
-<span class="sd">        is_numpy_simulator: whether the simulator needs theta in numpy types, returned</span>
+<span class="sd">        user_simulator (Callable):</span>
+<span class="sd">            simulator provided by the user, possibly written in numpy.</span>
+<span class="sd">        prior (torch.distributions.Distribution):</span>
+<span class="sd">            prior as pytorch distribution or processed with :func:`process_prior`.</span>
+<span class="sd">        is_numpy_simulator (bool):</span>
+<span class="sd">            whether the simulator needs theta in numpy types, returned</span>
 <span class="sd">            from `process_prior`.</span>
 
 <span class="sd">    Returns:</span>
-<span class="sd">        simulator: processed simulator that returns `torch.Tensor` can handle batches</span>
-<span class="sd">            of parameters.</span>
+<span class="sd">        Callable:</span>
+<span class="sd">            simulator: processed simulator that returns :class:`torch.Tensor` \</span>
+<span class="sd">                and can handle batches of parameters.</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">    --------</span>
+
+<span class="sd">    ::</span>
+
+<span class="sd">        import torch</span>
+<span class="sd">        from sbi.utils.user_input_checks import process_simulator</span>
+<span class="sd">        from torch.distributions import Uniform</span>
+<span class="sd">        from sbi.utils.user_input_checks import process_prior</span>
+
+<span class="sd">        prior = Uniform(torch.zeros(1), torch.ones(1))</span>
+<span class="sd">        prior, theta_numel, prior_returns_numpy = process_prior(prior)</span>
+<span class="sd">        simulator = lambda theta: theta + 1</span>
+<span class="sd">        simulator = process_simulator(simulator, prior, prior_returns_numpy)</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">user_simulator</span><span class="p">,</span> <span class="n">Callable</span><span class="p">),</span> <span class="s2">&quot;Simulator must be a function.&quot;</span>
