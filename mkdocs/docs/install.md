@@ -32,6 +32,30 @@ and to install into a particular conda environment with [`conda`](https://docs.c
 conda install --channel conda-forge sbi
 ```
 
+If [`uv`](http://docs.astral.sh/uv/) is installed on the system, an environment for installing `sbi` can be created as follows:
+
+```bash
+uv venv -p 3.10
+```
+
+Then activate the virtual enviroment by running:
+
+- For `macOS` or `Linux` users
+  ```bash
+  source .venv/bin/activate
+  ```
+
+- For `Windows` users
+  ```bash
+  .venv\Scripts\activate
+  ```
+
+To install `sbi` run
+
+```bash
+uv add sbi
+```
+
 To test the installation, drop into a Python prompt and run
 
 ```python

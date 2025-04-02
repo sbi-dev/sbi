@@ -72,6 +72,23 @@ development on `sbi` as per:
 conda create -n sbi_dev python=3.10
 conda activate sbi_dev
 ```
+If you are using [`uv`](http://docs.astral.sh/uv/), set up a virtual environment by running:
+
+```bash
+uv venv
+```
+
+Then activate the virtual enviroment by running:
+
+- For `macOS` or `Linux` users
+  ```bash
+  source .venv/bin/activate
+  ```
+
+- For `Windows` users
+  ```bash
+  .venv\Scripts\activate
+  ```
 
 **Step 5**: Install `sbi` in editable mode with
 
@@ -86,6 +103,12 @@ to the `sbi` source code will be reflected the next time you open a Python inter
 and `import sbi` (the `-e` flag of pip stands for an “editable” installation,
 and the `dev` flag installs development and testing dependencies). This requires
 at least Python 3.8.
+
+If you are using [`uv`](http://docs.astral.sh/uv/) you can install the development dependencies using:
+
+```bash
+uv sync --extra dev
+```
 
 **Step 6**: Add the upstream remote. This saves a reference to the main `sbi`
 repository, which you can use to keep your repository synchronized with the latest
@@ -109,6 +132,11 @@ upstream        git@github.com:sbi-dev/sbi.git (push)
 
 ```bash
 pip install pre-commit
+pre-commit install
+```
+
+If you are using [`uv`](http://docs.astral.sh/uv/) install `pre-commit` using:
+```bash
 pre-commit install
 ```
 
@@ -274,10 +302,16 @@ test suite in `tests/test_bm.py`.
 Most of the documentation for `sbi` is written in markdown and the website is generated
 using `mkdocs` with `mkdocstrings` and `mike`. The tutorials and examples are converted
 from jupyter notebooks into markdown files to be shown on the website. To work on
-improvements of the documentation, you should first  install the `doc` dependencies:
+improvements of the documentation, you should first install the `doc` dependencies:
 
 ```bash
 pip install -e ".[doc]"
+```
+
+If you are using [`uv`](http://docs.astral.sh/uv/) you can install the `doc` dependencies using:
+
+```bash
+uv sync --all-extras
 ```
 
 Then, you can build the website locally by executing in the `mkdocs` folder
