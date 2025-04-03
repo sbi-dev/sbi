@@ -89,27 +89,28 @@ class VFT:
         Args:
             data: Input data with shape (batch_size, n_points, conv_channel)
         """
-
-        data_fwd = torch.bmm(self.V_fwd, data)  # (batch, modes, conv_channels)
         if norm == 'forward':
-            data_fwd /= self.number_points
+            data_fwd = torch.bmm(self.V_fwd, data) / self.number_points
         elif norm == 'ortho':
-            data_fwd /= np.sqrt(self.number_points)
+            data_fwd = torch.bmm(self.V_fwd, data) / np.sqrt(self.number_points)
+        elif norm == 'backward':
+            data_fwd = torch.bmm(self.V_fwd, data)
 
-        return data_fwd
+        return data_fwd  # (batch, modes, conv_channels)
 
-    def inverse(self, data: Tensor, norm: str = 'backward') -> Tensor:
+    def inverse(self, data: Tensor, norm: str = 'forward') -> Tensor:
         """Perform inverse Fourier transformation
         Args:
             data: Input data with shape (batch_size, modes, conv_channel)
         """
-        data_inv = torch.bmm(self.V_inv, data)  # (batch, n_points, conv_channels)
         if norm == 'backward':
-            data_inv /= self.number_points
+            data_inv = torch.bmm(self.V_inv, data) / self.number_points
         elif norm == 'ortho':
-            data_inv /= np.sqrt(self.number_points)
+            data_inv = torch.bmm(self.V_inv, data) / np.sqrt(self.number_points)
+        elif norm == 'forward':
+            data_inv = torch.bmm(self.V_inv, data)
 
-        return data_inv
+        return data_inv  # (batch, n_points, conv_channels)
 
 
 class SpectralConv1d_SMM(nn.Module):
@@ -175,7 +176,7 @@ class SpectralConv1d_SMM(nn.Module):
         x_ft = out_ft.permute(0, 2, 1)
 
         # Return to physical space
-        x = transform.inverse(x_ft, norm='backward')
+        x = transform.inverse(x_ft, norm='forward')
 
         return x.real
 
