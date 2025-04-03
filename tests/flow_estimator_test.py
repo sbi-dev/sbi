@@ -8,6 +8,7 @@ from typing import Tuple
 import pytest
 import torch
 
+from sbi.neural_nets.embedding_nets import CNNEmbedding
 from sbi.neural_nets.net_builders import build_flow_matching_estimator
 
 
@@ -96,7 +97,10 @@ def _build_flow_estimator_and_tensors(
     input_sample_dim: int = 1,
     **kwargs,
 ):
-    """Helper function for all tests that deal with shapes of flow matching estimators."""
+    """Helper function for all tests that deal with shapes of flow matching
+    estimators.
+
+    """
 
     # Use discrete thetas such that categorical density estimators can also use them.
     building_thetas = torch.randint(

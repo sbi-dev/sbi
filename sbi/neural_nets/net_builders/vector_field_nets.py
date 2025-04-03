@@ -6,7 +6,6 @@ from typing import Callable, Optional, Sequence, Union
 
 import torch
 import torch.nn as nn
-import zuko
 from torch import Tensor
 
 from sbi.neural_nets.estimators.flowmatching_estimator import FlowMatchingEstimator
@@ -19,7 +18,6 @@ from sbi.neural_nets.estimators.score_estimator import (
 from sbi.utils.nn_utils import get_numel
 from sbi.utils.sbiutils import (
     standardizing_net,
-    z_score_parser,
     z_standardization,
 )
 from sbi.utils.user_input_checks import check_data_device
@@ -857,7 +855,8 @@ def build_flow_matching_estimator(
         batch_x: Batch of xs, used to infer dimensionality.
         batch_y: Batch of ys, used to infer dimensionality.
         embedding_net: Embedding network for batch_y.
-        hidden_features: Number of hidden features in each layer (for MLP) or dimension of hidden features (for transformer).
+        hidden_features: Number of hidden features in each layer (for MLP) or dimension
+        of hidden features (for transformer).
         time_embedding_dim: Number of dimensions for time embedding.
         num_layers: Number of layers in the network (for MLP).
         num_blocks: Number of transformer blocks (for transformer).
@@ -885,7 +884,9 @@ def build_flow_matching_estimator(
         )
     elif net == "transformer":
         # For transformer, hidden_features must be an int
-        hidden_dim = hidden_features if isinstance(hidden_features, int) else hidden_features[0]
+        hidden_dim = (
+            hidden_features if isinstance(hidden_features, int) else hidden_features[0]
+        )
         vectorfield_net = build_transformer_network(
             batch_x=batch_x,
             batch_y=batch_y,
@@ -909,7 +910,7 @@ def build_flow_matching_estimator(
         input_shape=batch_x[0].shape,
         condition_shape=batch_y[0].shape,
         embedding_net=embedding_net,
-        time_embedding_dim=time_embedding_dim, # TODO: Remove?
+        time_embedding_dim=time_embedding_dim,  # TODO: Remove?
     )
 
 
@@ -934,12 +935,14 @@ def build_score_matching_estimator(
     Args:
         batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring.
         batch_y: Batch of ys, used to infer dimensionality and (optional) z-scoring.
-        vectorfield_net: The vector field network to use. If None, a new network will be built.
+        vectorfield_net: The vector field network to use. If None, a new network will
+            be built.
         z_score_x: Whether to z-score xs passing into the network.
         z_score_y: Whether to z-score ys passing into the network.
         embedding_net: Embedding network for batch_y.
         sde_type: SDE type for score estimator, one of "vp", "subvp", or "ve".
-        hidden_features: Number of hidden features in each layer (for MLP) or dimension of hidden features (for transformer).
+        hidden_features: Number of hidden features in each layer (for MLP) or dimension
+            of hidden features (for transformer).
         num_layers: Number of layers in the network (for MLP).
         num_blocks: Number of transformer blocks (for transformer).
         num_heads: Number of attention heads per block (for transformer).
@@ -956,18 +959,20 @@ def build_score_matching_estimator(
 
     # Build network if not provided
     if net == "mlp":
-            vectorfield_net = build_mlp_network(
-                batch_x=batch_x,
-                batch_y=batch_y,
-                hidden_features=hidden_features,
-                num_layers=num_layers,
-                time_embedding_dim=time_embedding_dim,
-                embedding_net=embedding_net,
-                **kwargs,
-                )
+        vectorfield_net = build_mlp_network(
+            batch_x=batch_x,
+            batch_y=batch_y,
+            hidden_features=hidden_features,
+            num_layers=num_layers,
+            time_embedding_dim=time_embedding_dim,
+            embedding_net=embedding_net,
+            **kwargs,
+        )
     elif net == "transformer":
         # For transformer, hidden_features must be an int
-        hidden_dim = hidden_features if isinstance(hidden_features, int) else hidden_features[0]
+        hidden_dim = (
+            hidden_features if isinstance(hidden_features, int) else hidden_features[0]
+        )
         vectorfield_net = build_transformer_network(
             batch_x=batch_x,
             batch_y=batch_y,

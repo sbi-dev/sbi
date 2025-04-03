@@ -8,7 +8,9 @@ from typing import Tuple
 import pytest
 import torch
 
+from sbi.neural_nets.embedding_nets import CNNEmbedding
 from sbi.neural_nets.net_builders import build_score_matching_estimator
+
 
 @pytest.mark.parametrize("sde_type", ["vp", "ve", "subvp"])
 @pytest.mark.parametrize("input_sample_dim", (1, 2))

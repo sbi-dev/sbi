@@ -32,8 +32,6 @@ from sbi.neural_nets.net_builders.mixed_nets import build_mnle, build_mnpe
 from sbi.neural_nets.net_builders.vector_field_nets import (
     build_flow_matching_estimator,
     build_score_matching_estimator,
-    build_mlp_network,
-    build_transformer_network,
 )
 from sbi.utils.nn_utils import check_net_device
 
@@ -475,6 +473,7 @@ def posterior_score_nn(
     Returns:
         Constructor function for NPSE.
     """
+
     def build_fn(batch_theta, batch_x):
         # Build the score matching estimator
         return build_score_matching_estimator(
@@ -529,6 +528,7 @@ def posterior_flow_nn(
     Returns:
         Constructor function for FMPE.
     """
+
     def build_fn(batch_theta, batch_x):
         # Build the flow matching estimator
         return build_flow_matching_estimator(

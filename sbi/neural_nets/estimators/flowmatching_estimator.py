@@ -105,7 +105,8 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         """
         # For some reason, during batch sampling with multiple samples,
         # input gets a sample dimension at the beginning
-        # (e.g., shape becomes [num_samples, batch_size, dim] rather than [batch_size, dim])
+        # (e.g., shape becomes [num_samples, batch_size, dim] rather than
+        # [batch_size, dim])
         has_sample_dim = (len(input.shape) > len(self.input_shape) + 1) or (
             len(condition.shape) > len(self.condition_shape) + 1
         )
