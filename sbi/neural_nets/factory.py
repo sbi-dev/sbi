@@ -30,9 +30,10 @@ from sbi.neural_nets.net_builders.flow import (
 from sbi.neural_nets.net_builders.mdn import build_mdn
 from sbi.neural_nets.net_builders.mixed_nets import build_mnle, build_mnpe
 from sbi.neural_nets.net_builders.vector_field_nets import (
-    build_mlp_vector_field,
-    build_transformer_cross_attn_vector_field,
-    build_transformer_vector_field,
+    build_flow_matching_estimator,
+    build_score_matching_estimator,
+    build_mlp_network,
+    build_transformer_network,
 )
 from sbi.utils.nn_utils import check_net_device
 
@@ -53,9 +54,6 @@ model_builders = {
     "zuko_unaf": build_zuko_unaf,
     "zuko_gf": build_zuko_gf,
     "zuko_bpf": build_zuko_bpf,
-    "mlp_vector_field": build_mlp_vector_field,
-    "transformer_vector_field": build_transformer_vector_field,
-    "transformer_cross_attn_vector_field": build_transformer_cross_attn_vector_field,
 }
 
 embedding_net_warn_msg = """The passed embedding net will be moved to cpu for
@@ -437,7 +435,7 @@ def posterior_nn(
 
 def posterior_score_nn(
     sde_type: str,
-    score_net_type: Union[str, nn.Module] = "mlp",
+    net: Union[str, nn.Module] = "mlp",
     z_score_theta: Optional[str] = None,
     z_score_x: Optional[str] = None,
     t_embedding_dim: int = 16,
@@ -454,7 +452,7 @@ def posterior_score_nn(
             - 'subvp': Sub-variance preserving.
             - 've': Variance exploding.
             Defaults to 'vp'.
-        score_net_type: Type of regression network. One of:
+        net: Type of regression network. One of:
             - 'mlp': Fully connected feed-forward network.
             - 'transformer': Transformer network.
             - 'transformer_cross_attention': Transformer with cross-attention.
@@ -477,54 +475,71 @@ def posterior_score_nn(
     Returns:
         Constructor function for NPSE.
     """
-    # Calculate num_freqs based on t_embedding_dim
-    # For sinusoidal embeddings, num_freqs should be half of t_embedding_dim
-    # Handle odd t_embedding_dim by rounding up
-    num_freqs = (
-        t_embedding_dim // 2 if t_embedding_dim % 2 == 0 else (t_embedding_dim + 1) // 2
-    )
-
-    # Map model name to the appropriate vector field model if it's a string
-    if isinstance(score_net_type, str):
-        if score_net_type == "mlp":
-            model_name = "mlp_vector_field"
-        elif score_net_type == "transformer":
-            model_name = "transformer_vector_field"
-        elif score_net_type == "transformer_cross_attention":
-            model_name = "transformer_with_cross_attention_vector_field"
-        elif score_net_type in [
-            "mlp_vector_field",
-            "transformer_vector_field",
-            "transformer_with_cross_attention_vector_field",
-        ]:
-            model_name = score_net_type
-        else:
-            raise NotImplementedError(f"Model {score_net_type} is not implemented")
-    else:
-        # If it's a custom nn.Module, we would need to handle it differently
-        # For now, we'll just raise an error
-        raise ValueError(
-            "Custom nn.Module models are not yet supported in posterior_score_nn"
-        )
-
-    # Instead of returning a partial function, create a new build function
-    # that doesn't rely on the original model parameter
     def build_fn(batch_theta, batch_x):
-        if model_name not in model_builders:
-            raise NotImplementedError(f"Model {model_name} is not implemented")
-
-        return model_builders[model_name](
+        # Build the score matching estimator
+        return build_score_matching_estimator(
             batch_x=batch_theta,
             batch_y=batch_x,
-            estimator_type="score",
             z_score_x=z_score_theta,
             z_score_y=z_score_x,
-            hidden_features=hidden_features,
-            num_freqs=num_freqs,  # Properly calculated from t_embedding_dim
-            embedding_net=check_net_device(
-                embedding_net, "cpu", embedding_net_warn_msg
-            ),
+            embedding_net=embedding_net,
             sde_type=sde_type,
+            hidden_features=hidden_features,
+            time_embedding_dim=t_embedding_dim,
+            net=net,
+            **kwargs,
+        )
+
+    return build_fn
+
+
+def posterior_flow_nn(
+    net: Union[str, nn.Module] = "mlp",
+    z_score_theta: Optional[str] = None,
+    z_score_x: Optional[str] = None,
+    t_embedding_dim: int = 16,
+    hidden_features: int = 64,
+    embedding_net: nn.Module = nn.Identity(),
+    **kwargs: Any,
+) -> Callable:
+    """Build util function that builds a FlowMatchingEstimator object for flow-based
+    posteriors.
+
+    Args:
+        net: Type of regression network. One of:
+            - 'mlp': Fully connected feed-forward network.
+            - 'transformer': Transformer network.
+            - 'transformer_cross_attention': Transformer with cross-attention.
+            -  nn.Module: Custom network
+            Defaults to 'mlp'.
+        z_score_theta: Whether to z-score thetas passing into the network, can be one
+            of:
+            - `none`, or None: do not z-score.
+            - `independent`: z-score each dimension independently.
+            - `structured`: treat dimensions as related, therefore compute mean and std
+            over the entire batch, instead of per-dimension. Should be used when each
+            sample is, for example, a time series or an image.
+        z_score_x: Whether to z-score xs passing into the network, same options as
+            z_score_theta.
+        t_embedding_dim: Embedding dimension of diffusion time. Defaults to 16.
+        hidden_features: Number of hidden units per layer. Defaults to 50.
+        embedding_net: Embedding network for x (conditioning variable). Defaults to
+            nn.Identity().
+
+    Returns:
+        Constructor function for FMPE.
+    """
+    def build_fn(batch_theta, batch_x):
+        # Build the flow matching estimator
+        return build_flow_matching_estimator(
+            batch_x=batch_theta,
+            batch_y=batch_x,
+            z_score_x=z_score_theta,
+            z_score_y=z_score_x,
+            embedding_net=embedding_net,
+            hidden_features=hidden_features,
+            time_embedding_dim=t_embedding_dim,
+            net=net,
             **kwargs,
         )
 
