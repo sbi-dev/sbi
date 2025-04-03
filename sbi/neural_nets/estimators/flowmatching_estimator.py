@@ -91,21 +91,41 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
     def embedding_net(self):
         return self._embedding_net
 
-    def forward(self, input: Tensor, condition: Tensor, t: Tensor) -> Tensor:
+    def forward(self, input: Tensor, condition: Tensor, time: Tensor) -> Tensor:
         """
         Forward pass of the FlowMatchingEstimator.
 
         Args:
             input: The input tensor.
             condition: The condition tensor.
-            t: The time tensor.
+            time: The time tensor.
 
         Returns:
             The estimated vector field.
         """
-        # temporal fix that will be removed when the nn builders are updated
-        t = self._get_temporal_t_shape_fix(t)
+        # For some reason, during batch sampling with multiple samples,
+        # input gets a sample dimension at the beginning
+        # (e.g., shape becomes [num_samples, batch_size, dim] rather than [batch_size, dim])
+        has_sample_dim = (len(input.shape) > len(self.input_shape) + 1) or (
+            len(condition.shape) > len(self.condition_shape) + 1
+        )
 
+        # Save original shapes for reshaping at the end
+        original_input_shape = input.shape
+        original_condition_shape = condition.shape
+        original_time_shape = time.shape
+
+        if has_sample_dim:
+            # Reshape to merge sample and batch dimensions
+            input = input.reshape(-1, *self.input_shape)
+            if len(original_condition_shape) > 1:  # Ensure condition is not empty
+                condition = condition.reshape(-1, *self.condition_shape)
+
+            # Time might be a scalar or have batch dimension, handle accordingly
+            if len(original_time_shape) > 0:
+                time = time.reshape(-1)
+
+        # Continue with standard processing (broadcast shapes etc.)
         batch_shape = torch.broadcast_shapes(
             input.shape[: -len(self.input_shape)],
             condition.shape[: -len(self.condition_shape)],
@@ -113,23 +133,18 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
 
         input = torch.broadcast_to(input, batch_shape + self.input_shape)
         condition = torch.broadcast_to(condition, batch_shape + self.condition_shape)
-        t = torch.broadcast_to(t, batch_shape + t.shape[1:])
+        time = torch.broadcast_to(time, batch_shape)
 
-        # the network expects 2D input, so we flatten the input if necessary
-        # and remember the original shape
-        target_shape = input.shape
-        input = input.reshape(-1, input.shape[-1])
-        condition = condition.reshape(-1, condition.shape[-1])
-        t = t.reshape(-1, t.shape[-1])
-
-        # embed the input and condition
-        embedded_condition = self._embedding_net(condition)
+        # embed the conditioning variable
+        condition_emb = self._embedding_net(condition)
 
         # call the network to get the estimated vector field
-        v = self.net(theta=input, x=embedded_condition, t=t)
+        v = self.net(input, condition_emb, time)
 
-        # reshape to the original shape
-        v = v.reshape(*target_shape)
+        # If we had a sample dimension, reshape back to original shape
+        if has_sample_dim:
+            v = v.reshape(original_input_shape)
+
         return v
 
     def loss(
@@ -181,7 +196,6 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         times_ = times[..., None]
 
         # sample from probability path at time t
-        # TODO: Change to notation from Lipman et al. or Tong et al.
         theta_1 = torch.randn_like(input)
         theta_t = (1 - times_) * input + (times_ + self.noise_scale) * theta_1
 
