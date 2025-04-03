@@ -359,6 +359,7 @@ def test_vector_field_sde_ode_sampling_equivalence(vector_field_trained_model):
             marks=pytest.mark.xfail(
                 raises=AssertionError,
                 reason="c2st too high, has to be fixed in PR #1501 or #1544",
+                strict=True,
             ),
         ),
         pytest.param("gauss", 3, id="gauss-6trials"),
