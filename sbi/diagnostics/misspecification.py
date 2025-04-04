@@ -209,7 +209,7 @@ def calc_misspecification_logprob(
     log_prob_xo = estimator.log_prob(x_o).detach().item()
 
     n_samples = x_val.shape[0]
-    samples = estimator.sample((n_samples,))
+    samples = estimator.sample(torch.Size((n_samples,)))
     try:
         check_c2st(x_val, samples, 'MarginalEstimator')
     except AssertionError as e:
