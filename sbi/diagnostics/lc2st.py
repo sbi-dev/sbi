@@ -1,11 +1,11 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
 
 import numpy as np
 import torch
-from sklearn.base import BaseEstimator, clone
+from sklearn.base import BaseEstimator, ClassifierMixin, clone
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import KFold
 from sklearn.neural_network import MLPClassifier
@@ -24,7 +24,7 @@ class LC2ST:
         seed: int = 1,
         num_folds: int = 1,
         num_ensemble: int = 1,
-        classifier: str = "mlp",
+        classifier: Union[str, Type[ClassifierMixin]] = MLPClassifier,
         z_score: bool = False,
         clf_class: Optional[Any] = None,
         clf_kwargs: Optional[Dict[str, Any]] = None,
@@ -71,8 +71,9 @@ class LC2ST:
             num_ensemble: Number of classifiers for ensembling, defaults to 1.
                 This is useful to reduce variance coming from the classifier.
             z_score: Whether to z-score to normalize the data, defaults to False.
-            classifier: Classification architecture to use,
-                possible values: "random_forest" or "mlp", defaults to "mlp".
+            classifier: Classification architecture to use, can be one of the following:
+                    - "random_forest" or "mlp", defaults to "mlp" or
+                    - A classifier class (e.g., RandomForestClassifier, MLPClassifier)
             clf_class: Custom sklearn classifier class, defaults to None.
             clf_kwargs: Custom kwargs for the sklearn classifier, defaults to None.
             num_trials_null: Number of trials to estimate the null distribution,
@@ -111,7 +112,9 @@ class LC2ST:
         self.num_ensemble = num_ensemble
 
         # initialize classifier
-        if "mlp" in classifier.lower():
+        if (
+            isinstance(classifier, str) and classifier.lower() == "mlp"
+        ) or classifier == MLPClassifier:
             ndim = thetas.shape[-1]
             self.clf_class = MLPClassifier
             if clf_kwargs is None:
@@ -123,19 +126,19 @@ class LC2ST:
                     "early_stopping": True,
                     "n_iter_no_change": 50,
                 }
-        elif "random_forest" in classifier.lower():
+        elif (
+            isinstance(classifier, str) and classifier.lower() == "random_forest"
+        ) or classifier == RandomForestClassifier:
             self.clf_class = RandomForestClassifier
             if clf_kwargs is None:
                 self.clf_kwargs = {}
-        elif "custom":
+        else:
             if clf_class is None or clf_kwargs is None:
                 raise ValueError(
                     "Please provide a valid sklearn classifier class and kwargs."
                 )
             self.clf_class = clf_class
             self.clf_kwargs = clf_kwargs
-        else:
-            raise NotImplementedError
 
         # initialize classifiers, will be set after training
         self.trained_clfs = None
