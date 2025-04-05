@@ -30,9 +30,9 @@ transform_types = Optional[
 
 # Define alias types because otherwise, the documentation by mkdocs became very long and
 # made the website look ugly.
-TensorboardSummaryWriter = NewType("Writer", SummaryWriter)
+TensorboardSummaryWriter = NewType("TensorboardSummaryWriter", SummaryWriter)
 # TorchTransform = NewType("torch Transform", Transform)
-TorchModule = NewType("Module", Module)
+TorchModule = NewType("TorchModule", Module)
 TorchDistribution = NewType("torch Distribution", Distribution)
 # See PEP 613 for the reason why we need to use TypeAlias here.
 TorchTransform: TypeAlias = Transform
