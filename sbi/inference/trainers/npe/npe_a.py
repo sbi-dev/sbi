@@ -13,7 +13,10 @@ from torch import Tensor
 from torch.distributions import Distribution, MultivariateNormal
 
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
-from sbi.inference.trainers.npe.npe_base import PosteriorEstimator
+from sbi.inference.trainers.npe.npe_base import (
+    DensityEstimatorBuilder,
+    PosteriorEstimator,
+)
 from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
 from sbi.sbi_types import TensorboardSummaryWriter, TorchModule
 from sbi.utils import torchutils
@@ -32,7 +35,7 @@ class NPE_A(PosteriorEstimator):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
-        density_estimator: Union[str, Callable] = "mdn_snpe_a",
+        density_estimator: Union[str, DensityEstimatorBuilder] = "mdn_snpe_a",
         num_components: int = 10,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",

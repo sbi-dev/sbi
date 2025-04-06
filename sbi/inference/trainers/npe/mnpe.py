@@ -1,7 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Any, Callable, Dict, Optional, Union
+from typing import Any, Dict, Optional, Union
 
 from torch.distributions import Distribution
 
@@ -12,6 +12,7 @@ from sbi.inference.posteriors import (
     RejectionPosterior,
     VIPosterior,
 )
+from sbi.inference.trainers.npe.npe_base import DensityEstimatorBuilder
 from sbi.inference.trainers.npe.npe_c import NPE_C
 from sbi.neural_nets.estimators import MixedDensityEstimator
 from sbi.sbi_types import TensorboardSummaryWriter
@@ -22,7 +23,7 @@ class MNPE(NPE_C):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
-        density_estimator: Union[str, Callable] = "mnpe",
+        density_estimator: Union[str, DensityEstimatorBuilder] = "mnpe",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[TensorboardSummaryWriter] = None,
