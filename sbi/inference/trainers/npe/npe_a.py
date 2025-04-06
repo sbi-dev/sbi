@@ -231,7 +231,7 @@ class NPE_A(PosteriorEstimator):
 
     def correct_for_proposal(
         self,
-        density_estimator: Optional[TorchModule] = None,
+        density_estimator: Optional[torch.nn.Module] = None,
     ) -> "NPE_A_MDN":
         r"""Build mixture of Gaussians that approximates the posterior.
 
