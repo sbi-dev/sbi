@@ -219,8 +219,9 @@ how to run each of these methods
 We welcome any feedback on how `sbi` is working for your inference problems (see
 [Discussions](https://github.com/sbi-dev/sbi/discussions)) and are happy to receive bug
 reports, pull requests, and other feedback (see
-[contribute](https://sbi-dev.github.io/sbi/latest/contribute/)). We wish to maintain a positive
-community; please read our [Code of Conduct](CODE_OF_CONDUCT.md).
+[contribute](https://sbi-dev.github.io/sbi/latest/contribute/)). We wish to maintain a
+positive and respectful community; please read our [Code of
+Conduct](CODE_OF_CONDUCT.md).
 
 ## Acknowledgments
 
