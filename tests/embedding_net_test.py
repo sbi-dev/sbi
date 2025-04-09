@@ -438,6 +438,7 @@ def test_1d_ResNet_fc_embedding_net(input_shape, n_blocks, c_internal, c_hidden_
     s = posterior.sample((10,))
     posterior.potential(s)
 
+
 @pytest.mark.parametrize(
     "mode",
     [
