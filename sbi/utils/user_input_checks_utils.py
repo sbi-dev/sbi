@@ -209,31 +209,43 @@ class PytorchReturnTypeWrapper(Distribution):
 
 
 class MultipleIndependent(Distribution):
-    """Wrap a sequence of PyTorch distributions into a joint PyTorch distribution.
-
-    Every element of the sequence is treated as independent from the other elements.
-    Single elements can be multivariate with dependent dimensions.
-
-    Example:
-
-    ::
-
-        import torch
-        from torch.distributions import Gamma, Beta, MultivariateNormal
-        prior = MultipleIndependent([
-            Gamma(torch.zeros(1), torch.ones(1)),
-            Beta(torch.zeros(1), torch.ones(1)),
-            MultivariateNormal(torch.ones(2), torch.tensor([[1, .1], [.1, 1.]]))
-        ])
-    """
+    """Wrap a sequence of PyTorch distributions into a joint PyTorch distribution."""
 
     def __init__(
         self,
         dists: Sequence[Distribution],
-        validate_args=None,
+        validate_args: Optional[bool] = None,
         arg_constraints: Optional[Dict[str, constraints.Constraint]] = None,
         device: Optional[str] = None,
     ):
+        """Joint distribution of multiple independent :class:`torch.distributions`.
+
+        Every element of the sequence is treated as independent from the \
+        other elements. Single elements can be multivariate with dependent dimensions.
+
+        Args:
+            dists: Sequence of PyTorch distributions.
+            validate_args (Optional): If True, the distribution checks its parameters.
+            arg_constraints (Optional): Dictionary of constraints for the parameters \
+                of the distribution.
+            device (Optional): Device to move the distribution to. If None, \
+                the distribution is moved to the CPU.
+
+        Example:
+        --------
+
+        ::
+
+            import torch
+            from torch.distributions import Gamma, Beta, MultivariateNormal
+            from sbi.utils.user_input_checks_utils import MultipleIndependent
+
+            prior = MultipleIndependent([
+                Gamma(torch.zeros(1), torch.ones(1)),
+                Beta(torch.zeros(1), torch.ones(1)),
+                MultivariateNormal(torch.ones(2), torch.tensor([[1, .1], [.1, 1.]]))
+            ])
+        """
         self._check_distributions(dists)
         if validate_args is not None:
             [d.set_default_validate_args(validate_args) for d in dists]
@@ -280,9 +292,9 @@ class MultipleIndependent(Distribution):
         )
         assert isinstance(
             dist, Distribution
-        ), """priors passed to MultipleIndependent must be PyTorch distributions. Make
-            sure to process custom priors individually using process_prior before
-            passing them in a list to process_prior."""
+        ), """priors passed to MultipleIndependent must be PyTorch distributions. Make \
+            sure to process custom priors individually using :func:`process_prior` \
+            before passing them in a list to :func:`process_prior`."""
         # Make sure batch shape is smaller or equal to 1.
         assert dist.batch_shape in (
             torch.Size([1]),
