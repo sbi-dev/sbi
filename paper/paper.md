@@ -1,5 +1,5 @@
 ---
-title: '`sbi` reloaded: a toolkit for simulation-based inference workflows'
+title: 'sbi reloaded: a toolkit for simulation-based inference workflows'
 tags:
   - Python
   - PyTorch
