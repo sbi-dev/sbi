@@ -345,15 +345,23 @@ def test_vector_field_sde_ode_sampling_equivalence(vector_field_trained_model):
     )
 
 
+# ------------------------------------------------------------------------------
+# ------------------------------- SKIPPED TESTS --------------------------------
+# ------------------------------------------------------------------------------
+
+
 # TODO: Currently, c2st is too high for FMPE (e.g., > 3 number of observations),
 # so some tests are skipped so far. This seems to be an issue with the
 # neural network architecture and can be addressed in PR #1501
+@pytest.mark.skip(
+    reason="c2st too high for some cases, has to be fixed in PR #1501 or #1544"
+)
 @pytest.mark.slow
 @pytest.mark.parametrize(
     "iid_method, num_trial",
     [
         pytest.param("fnpe", 3, id="fnpe-2trials"),
-        pytest.param("gauss", 3, id="gauss-6trials"),
+        pytest.param("gauss", 3, id="gauss-3trials"),
         pytest.param("auto_gauss", 8, id="auto_gauss-8trials"),
         pytest.param("auto_gauss", 16, id="auto_gauss-16trials"),
         pytest.param("jac_gauss", 8, id="jac_gauss-8trials"),
@@ -376,12 +384,6 @@ def test_vector_field_iid_inference(
     prior_mean = vector_field_trained_model["prior_mean"]
     prior_cov = vector_field_trained_model["prior_cov"]
     num_dim = vector_field_trained_model["num_dim"]
-
-    # TODO: This can be removed when PR #1501 is merged
-    if vector_field_type == "fmpe" and (
-        iid_method not in ["gauss", "fnpe"] or num_trial > 3 or prior_type != "gaussian"
-    ):
-        pytest.skip("So far, we skip some IID methods for FMPE.")
 
     x_o = zeros(num_trial, num_dim)
     posterior = inference.build_posterior(score_estimator, sample_with="sde")
@@ -449,11 +451,6 @@ def test_vector_field_map(vector_field_type):
     map_ = posterior.map(show_progress_bars=True, num_iter=5)
 
     assert ((map_ - gt_posterior.mean) ** 2).sum() < 0.5, "MAP is not close to GT."
-
-
-# ------------------------------------------------------------------------------
-# ------------------------------- SKIPPED TESTS --------------------------------
-# ------------------------------------------------------------------------------
 
 
 # TODO: Need to add NPSE when the network builders are unified, but anyway

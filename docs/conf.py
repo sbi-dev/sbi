@@ -40,6 +40,7 @@ extensions = [
 
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
+    "torch": ("https://pytorch.org/docs/stable/", None),
 }
 
 source_suffix = {'.rst': 'restructuredtext', '.myst': 'myst-nb', '.ipynb': 'myst-nb'}
