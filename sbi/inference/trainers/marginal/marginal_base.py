@@ -78,7 +78,9 @@ class MarginalTrainer:
             self._build_neural_net = marginal_nn(model=density_estimator)
         elif isinstance(density_estimator, str):
             check_estimator_arg(density_estimator)
-            self._build_neural_net = marginal_nn(model=ZukoFlowType(density_estimator))
+            self._build_neural_net = marginal_nn(
+                model=ZukoFlowType(density_estimator.lower())
+            )
         elif callable(density_estimator):
             check_estimator_arg(density_estimator)
             self._build_neural_net = density_estimator
