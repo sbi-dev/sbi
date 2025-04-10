@@ -5,7 +5,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
 
 import numpy as np
 import torch
-from sklearn.base import BaseEstimator, ClassifierMixin, clone
+from sklearn.base import BaseEstimator, clone
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import KFold
 from sklearn.neural_network import MLPClassifier
@@ -24,7 +24,7 @@ class LC2ST:
         seed: int = 1,
         num_folds: int = 1,
         num_ensemble: int = 1,
-        classifier: Union[str, Type[ClassifierMixin]] = MLPClassifier,
+        classifier: Union[str, Type[BaseEstimator]] = MLPClassifier,
         z_score: bool = False,
         classifier_kwargs: Optional[Dict[str, Any]] = None,
         num_trials_null: int = 100,
@@ -122,8 +122,8 @@ class LC2ST:
                     'Expected "mlp", "random_forest", '
                     'or a valid scikit-learn classifier class.'
                 )
-        assert issubclass(classifier, ClassifierMixin), (
-            "classifier must be a subclass of sklearn's ClassifierMixin"
+        assert issubclass(classifier, BaseEstimator), (
+            "classifier must be a subclass of sklearn's BaseEstimator"
         )
         self.clf_class = classifier
 
