@@ -26,8 +26,7 @@ class LC2ST:
         num_ensemble: int = 1,
         classifier: Union[str, Type[ClassifierMixin]] = MLPClassifier,
         z_score: bool = False,
-        clf_class: Optional[Any] = None,
-        clf_kwargs: Optional[Dict[str, Any]] = None,
+        classifier_kwargs: Optional[Dict[str, Any]] = None,
         num_trials_null: int = 100,
         permutation: bool = True,
     ) -> None:
@@ -74,8 +73,8 @@ class LC2ST:
             classifier: Classification architecture to use, can be one of the following:
                     - "random_forest" or "mlp", defaults to "mlp" or
                     - A classifier class (e.g., RandomForestClassifier, MLPClassifier)
-            clf_class: Custom sklearn classifier class, defaults to None.
-            clf_kwargs: Custom kwargs for the sklearn classifier, defaults to None.
+            classifier_kwargs: Custom kwargs for the sklearn classifier,
+                defaults to None.
             num_trials_null: Number of trials to estimate the null distribution,
                 defaults to 100.
             permutation: Whether to use the permutation method for the null hypothesis,
@@ -112,12 +111,26 @@ class LC2ST:
         self.num_ensemble = num_ensemble
 
         # initialize classifier
-        if (
-            isinstance(classifier, str) and classifier.lower() == "mlp"
-        ) or classifier == MLPClassifier:
-            ndim = thetas.shape[-1]
-            self.clf_class = MLPClassifier
-            if clf_kwargs is None:
+        if isinstance(classifier, str):
+            if classifier.lower() == 'mlp':
+                classifier = MLPClassifier
+            elif classifier.lower() == 'random_forest':
+                classifier = RandomForestClassifier
+            else:
+                raise ValueError(
+                    f'Invalid classifier: "{classifier}".'
+                    'Expected "mlp", "random_forest", '
+                    'or a valid scikit-learn classifier class.'
+                )
+        assert issubclass(classifier, ClassifierMixin), (
+            "classifier must be a subclass of sklearn's ClassifierMixin"
+        )
+        self.clf_class = classifier
+
+        self.clf_kwargs = classifier_kwargs
+        if self.clf_kwargs is None:
+            if self.clf_class == MLPClassifier:
+                ndim = thetas.shape[-1]
                 self.clf_kwargs = {
                     "activation": "relu",
                     "hidden_layer_sizes": (10 * ndim, 10 * ndim),
@@ -126,19 +139,8 @@ class LC2ST:
                     "early_stopping": True,
                     "n_iter_no_change": 50,
                 }
-        elif (
-            isinstance(classifier, str) and classifier.lower() == "random_forest"
-        ) or classifier == RandomForestClassifier:
-            self.clf_class = RandomForestClassifier
-            if clf_kwargs is None:
+            else:
                 self.clf_kwargs = {}
-        else:
-            if clf_class is None or clf_kwargs is None:
-                raise ValueError(
-                    "Please provide a valid sklearn classifier class and kwargs."
-                )
-            self.clf_class = clf_class
-            self.clf_kwargs = clf_kwargs
 
         # initialize classifiers, will be set after training
         self.trained_clfs = None
