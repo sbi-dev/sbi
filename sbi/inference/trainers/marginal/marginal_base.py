@@ -19,17 +19,17 @@ from sbi.neural_nets.estimators import UnconditionalDensityEstimator
 from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
 )
-from sbi.neural_nets.factory import DensityEstimator, marginal_nn
+from sbi.neural_nets.factory import ZukoFlowType, marginal_nn
 from sbi.utils import check_estimator_arg, get_log_root
 from sbi.utils.torchutils import assert_all_finite, process_device
+
+DensityEstimatorType = Union[ZukoFlowType, str, Callable[[Tensor], Any]]
 
 
 class MarginalTrainer:
     def __init__(
         self,
-        density_estimator: Union[
-            DensityEstimator, Callable[[Tensor], Any]
-        ] = DensityEstimator.NSF,
+        density_estimator: DensityEstimatorType = ZukoFlowType.NSF,
         device: str = "cpu",
         summary_writer: Optional[SummaryWriter] = None,
         show_progress_bars: bool = True,
@@ -73,18 +73,19 @@ class MarginalTrainer:
             epoch_durations_sec=[],
         )
 
-        if isinstance(density_estimator, DensityEstimator):
-            check_estimator_arg(density_estimator.value)  # Extract string value
+        if isinstance(density_estimator, ZukoFlowType):
+            check_estimator_arg(density_estimator.value)
             self._build_neural_net = marginal_nn(model=density_estimator)
+        elif isinstance(density_estimator, str):
+            check_estimator_arg(density_estimator)
+            self._build_neural_net = marginal_nn(model=ZukoFlowType(density_estimator))
         elif callable(density_estimator):
-            check_estimator_arg(density_estimator)  # callable is still valid
+            check_estimator_arg(density_estimator)
             self._build_neural_net = density_estimator
         else:
             raise ValueError(
-                (
-                    "density_estimator must be either a DensityEstimator or a "
-                    "Callable[[Tensor], Any]."
-                )
+                "density_estimator must be either a DensityEstimator, str, or a "
+                "Callable[[Tensor], Any]."
             )
 
     def get_dataloaders(

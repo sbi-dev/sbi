@@ -60,8 +60,8 @@ model_builders = {
 
 
 # TODO: currently only used for marginal_nn, adapt to use for all
-class DensityEstimator(Enum):
-    """Enumeration of density estimator types."""
+class ZukoFlowType(Enum):
+    """Enumeration of Zuko flow types."""
 
     BPF = "bpf"
     MAF = "maf"
@@ -476,7 +476,7 @@ def posterior_score_nn(
 
 
 def marginal_nn(
-    model: DensityEstimator,
+    model: ZukoFlowType,
     z_score_x: Optional[str] = "independent",
     hidden_features: int = 50,
     num_transforms: int = 5,
