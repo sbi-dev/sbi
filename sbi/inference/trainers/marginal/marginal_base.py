@@ -5,7 +5,7 @@ import time
 from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
-from typing import Callable, Literal, Optional, Tuple, Union
+from typing import Any, Callable, Optional, Tuple, Union
 
 import torch
 from torch import Tensor
@@ -19,7 +19,7 @@ from sbi.neural_nets.estimators import UnconditionalDensityEstimator
 from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
 )
-from sbi.neural_nets.factory import marginal_nn
+from sbi.neural_nets.factory import DensityEstimator, marginal_nn
 from sbi.utils import check_estimator_arg, get_log_root
 from sbi.utils.torchutils import assert_all_finite, process_device
 
@@ -28,9 +28,8 @@ class MarginalTrainer:
     def __init__(
         self,
         density_estimator: Union[
-            Literal["bpf", "maf", "naf", "ncsf", "nsf", "sospf", "unaf"],
-            Callable[[Tensor], UnconditionalDensityEstimator],
-        ] = "nsf",
+            DensityEstimator, Callable[[Tensor], Any]
+        ] = DensityEstimator.NSF,
         device: str = "cpu",
         summary_writer: Optional[SummaryWriter] = None,
         show_progress_bars: bool = True,
@@ -74,11 +73,19 @@ class MarginalTrainer:
             epoch_durations_sec=[],
         )
 
-        check_estimator_arg(density_estimator)
-        if isinstance(density_estimator, str):
+        if isinstance(density_estimator, DensityEstimator):
+            check_estimator_arg(density_estimator.value)  # Extract string value
             self._build_neural_net = marginal_nn(model=density_estimator)
-        else:
+        elif callable(density_estimator):
+            check_estimator_arg(density_estimator)  # callable is still valid
             self._build_neural_net = density_estimator
+        else:
+            raise ValueError(
+                (
+                    "density_estimator must be either a DensityEstimator or a "
+                    "Callable[[Tensor], Any]."
+                )
+            )
 
     def get_dataloaders(
         self,
