@@ -2,9 +2,10 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 
-from typing import Any, Callable, Literal, Optional, Union
+from enum import Enum
+from typing import Any, Callable, Optional, Union
 
-from torch import nn
+from torch import Tensor, nn
 
 from sbi.neural_nets.net_builders.classifier import (
     build_linear_classifier,
@@ -56,6 +57,20 @@ model_builders = {
     "mlp_flowmatcher": build_mlp_flowmatcher,
     "resnet_flowmatcher": build_resnet_flowmatcher,
 }
+
+
+# TODO: currently only used for marginal_nn, adapt to use for all
+class ZukoFlowType(Enum):
+    """Enumeration of Zuko flow types."""
+
+    BPF = "bpf"
+    MAF = "maf"
+    NAF = "naf"
+    NCSF = "ncsf"
+    NSF = "nsf"
+    SOSPF = "sospf"
+    UNAF = "unaf"
+
 
 embedding_net_warn_msg = """The passed embedding net will be moved to cpu for
                         constructing the net building function."""
@@ -461,7 +476,7 @@ def posterior_score_nn(
 
 
 def marginal_nn(
-    model: Literal["bpf", "maf", "naf", "ncsf", "nsf", "sospf", "unaf"],
+    model: ZukoFlowType,
     z_score_x: Optional[str] = "independent",
     hidden_features: int = 50,
     num_transforms: int = 5,
@@ -473,23 +488,13 @@ def marginal_nn(
     Returns a function that builds a density estimator for learning the marginal.
 
     Args:
-        model: The type of density estimator that will be created. One of [`mdn`,
-            `made`, `maf`, `maf_rqs`, `nsf`].
+        model: The type of density estimator that will be created.
         z_score_x: Whether to z-score samples $x$ before passing them into
-            the network, can take one of the following:
-            - `none`, or None: do not z-score.
-            - `independent`: z-score each dimension independently.
-            - `structured`: treat dimensions as related, therefore compute mean and std
-            over the entire batch, instead of per-dimension. Should be used when each
-            sample is, for example, a time series or an image.
+            the network.
         hidden_features: Number of hidden features.
-        num_transforms: Number of transforms when a flow is used. Only relevant if
-            density estimator is a normalizing flow (i.e. currently either a `maf` or a
-            `nsf`). Ignored if density estimator is a `mdn` or `made`.
-        num_bins: Number of bins used for the splines in `nsf`. Ignored if density
-            estimator not `nsf`.
+        num_transforms: Number of transforms when a flow is used.
+        num_bins: Number of bins used for the splines in `nsf`.
         num_components: Number of mixture components for a mixture of Gaussians.
-            Ignored if density estimator is not an mdn.
         kwargs: additional custom arguments passed to downstream build functions.
     """
 
@@ -514,7 +519,9 @@ def marginal_nn(
         **kwargs,
     )
 
-    def build_fn(batch_x):
-        return build_zuko_unconditional_flow(which_nf=model.upper(), batch_x=batch_x)
+    def build_fn(batch_x: Tensor) -> Any:
+        return build_zuko_unconditional_flow(
+            which_nf=model.value.upper(), batch_x=batch_x, **kwargs
+        )
 
     return build_fn
