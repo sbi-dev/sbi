@@ -134,6 +134,8 @@ def WaveNetSRLikeAggregator(
 
 
 class CausalCNNEmbedding(nn.Module):
+    """Embedding network that uses 1D causal convolutions."""
+
     def __init__(
         self,
         input_shape: Tuple,
@@ -147,7 +149,7 @@ class CausalCNNEmbedding(nn.Module):
         aggregator: Optional[nn.Module] = None,
         output_dim: int = 20,
     ):
-        """Embedding network that uses 1D causal convolutions
+        """Intitialize embedding network that uses 1D causal convolutions.
 
         This is a simplified version of the architecture introduced for
         the speech recognition task in the WaveNet paper (van den Oord, et al. (2016))

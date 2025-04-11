@@ -553,7 +553,7 @@ class UnconditionalDensityEstimator(UnconditionalEstimator):
         self._neural_net.eval()
         return self._neural_net.log_prob(x)
 
-    def sample(self, sample_shape: torch.Size()) -> Tensor:
+    def sample(self, sample_shape: torch.Size) -> Tensor:
         r"""Return samples from the density estimator.
 
         Args:

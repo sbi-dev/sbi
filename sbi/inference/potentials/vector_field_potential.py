@@ -1,7 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Any, Dict, Literal, Optional, Tuple
+from typing import Any, Dict, Literal, Optional, Tuple, Union
 
 import torch
 from torch import Tensor
@@ -58,11 +58,11 @@ class VectorFieldBasedPotential(BasePotential):
     def __init__(
         self,
         vector_field_estimator: ConditionalVectorFieldEstimator,
-        prior: Optional[Distribution],
+        prior: Optional[Distribution],  # type: ignore
         x_o: Optional[Tensor] = None,
         iid_method: Literal["fnpe", "gauss", "auto_gauss", "jac_gauss"] = "auto_gauss",
         iid_params: Optional[Dict[str, Any]] = None,
-        device: str = "cpu",
+        device: Union[str, torch.device] = "cpu",
         neural_ode_backend: str = "zuko",
         neural_ode_kwargs: Optional[Dict[str, Any]] = None,
     ):
@@ -105,6 +105,23 @@ class VectorFieldBasedPotential(BasePotential):
         )
 
         super().__init__(prior, x_o, device=device)
+
+    def to(self, device: Union[str, torch.device]) -> None:
+        """
+        Moves score_estimator, prior and x_o to the given device.
+
+        It also sets the device attribute to the given device.
+
+        Args:
+            device: Device to move the score_estimator, prior and x_o to.
+        """
+
+        self.device = device
+        self.vector_field_estimator.to(device)
+        if self.prior:
+            self.prior.to(device)  # type: ignore
+        if self._x_o is not None:
+            self._x_o = self._x_o.to(device)
 
     def set_x(
         self,

@@ -92,6 +92,30 @@ and to install into a particular conda environment with [`conda`](https://docs.c
 conda install --channel conda-forge sbi
 ```
 
+If [`uv`](http://docs.astral.sh/uv/) is installed on the system, an environment for installing `sbi` can be created as follows:
+
+```bash
+uv venv -p 3.10
+```
+
+Then activate the virtual enviroment by running:
+
+- For `macOS` or `Linux` users
+  ```bash
+  source .venv/bin/activate
+  ```
+
+- For `Windows` users
+  ```bash
+  .venv\Scripts\activate
+  ```
+
+To install `sbi` run
+
+```bash
+uv add sbi
+```
+
 ### Test the installation
 
 Open a Python prompt and run
@@ -195,8 +219,9 @@ how to run each of these methods
 We welcome any feedback on how `sbi` is working for your inference problems (see
 [Discussions](https://github.com/sbi-dev/sbi/discussions)) and are happy to receive bug
 reports, pull requests, and other feedback (see
-[contribute](https://sbi-dev.github.io/sbi/latest/contribute/)). We wish to maintain a positive
-community; please read our [Code of Conduct](CODE_OF_CONDUCT.md).
+[contribute](https://sbi-dev.github.io/sbi/latest/contribute/)). We wish to maintain a
+positive and respectful community; please read our [Code of
+Conduct](CODE_OF_CONDUCT.md).
 
 ## Acknowledgments
 

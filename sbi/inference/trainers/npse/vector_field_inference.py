@@ -585,6 +585,10 @@ class VectorFieldInference(NeuralInference, ABC):
         Returns:
             Calibration kernel-weighted loss implemented by the vector field estimator.
         """
+
+        if times is not None:
+            times = times.to(self._device)
+
         cls_name = self.__class__.__name__
         if self._round == 0 or force_first_round_loss:
             # First round loss.

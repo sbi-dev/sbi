@@ -1,7 +1,7 @@
 import functools
 import math
 from abc import ABC, abstractmethod
-from typing import Callable, Optional, Type
+from typing import Callable, Optional, Type, Union
 
 import torch
 from torch import Tensor
@@ -59,8 +59,8 @@ class IIDScoreFunction(ABC):
     def __init__(
         self,
         vector_field_estimator: ConditionalVectorFieldEstimator,
-        prior: Distribution,
-        device: str = "cpu",
+        prior: Distribution,  # type: ignore
+        device: Union[str, torch.device] = "cpu",
     ) -> None:
         r"""
         This is a abstract base class wrapper for score estimators.
@@ -106,6 +106,20 @@ class IIDScoreFunction(ABC):
         self.vector_field_estimator = vector_field_estimator.to(device).eval()
         self.prior = prior
 
+    def to(self, device: Union[str, torch.device]) -> None:
+        """
+        Moves score_estimator and prior to the given device.
+
+        It also sets the device attribute to the given device.
+
+        Args:
+            device: Device to move the score_estimator and prior to.
+        """
+        self.device = device
+        self.vector_field_estimator.to(device)
+        if self.prior:
+            self.prior.to(device)  # type: ignore
+
     @abstractmethod
     def __call__(
         self,
@@ -133,7 +147,7 @@ class FactorizedNPEScoreFunction(IIDScoreFunction):
         self,
         vector_field_estimator: ConditionalVectorFieldEstimator,
         prior: Distribution,
-        device: str = "cpu",
+        device: Union[str, torch.device] = "cpu",
         prior_score_weight: Optional[Callable[[Tensor], Tensor]] = None,
     ) -> None:
         r"""
@@ -240,7 +254,7 @@ class BaseGaussCorrectedScoreFunction(IIDScoreFunction):
         prior: Distribution,
         ensure_lam_psd: bool = True,
         lam_psd_nugget: float = 0.01,
-        device: str = "cpu",
+        device: Union[str, torch.device] = "cpu",
     ) -> None:
         r"""Base class for Gauss-corrected score function as proposed in [1].
 
@@ -468,7 +482,7 @@ class GaussCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
         scale_from_prior_precision: float = 2.0,
         enable_lam_psd: bool = False,
         lam_psd_nugget: float = 0.01,
-        device: str = "cpu",
+        device: Union[str, torch.device] = "cpu",
     ) -> None:
         r"""
         This extends the BaseGaussCorrectedScoreFunction to provide a simple method to
@@ -552,7 +566,7 @@ class AutoGaussCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
         precision_est_only_diag: bool = False,
         precision_est_budget: Optional[int] = None,
         precision_initial_sampler_steps: int = 100,
-        device: str = "cpu",
+        device: Union[str, torch.device] = "cpu",
     ) -> None:
         r"""
         This method extends the by estimating the posterior precision using

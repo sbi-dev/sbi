@@ -48,9 +48,9 @@ class VectorFieldPosterior(NeuralPosterior):
     def __init__(
         self,
         vector_field_estimator: ConditionalVectorFieldEstimator,
-        prior: Distribution,
+        prior: Distribution,  # type: ignore
         max_sampling_batch_size: int = 10_000,
-        device: Optional[str] = None,
+        device: Optional[Union[str, torch.device]] = None,
         enable_transform: bool = True,
         sample_with: str = "sde",
         **kwargs,
@@ -89,7 +89,9 @@ class VectorFieldPosterior(NeuralPosterior):
         self.potential_fn: VectorFieldBasedPotential = potential_fn
 
         self.prior = prior
+        self.enable_transform = enable_transform
         self.vector_field_estimator = vector_field_estimator
+        self.device = device
 
         self.sample_with = sample_with
         assert self.sample_with in [
@@ -100,6 +102,42 @@ class VectorFieldPosterior(NeuralPosterior):
 
         self._purpose = """It samples from the vector field model given the \
             vector_field_estimator."""
+
+    def to(self, device: Union[str, torch.device]) -> None:
+        """Move posterior to device.
+
+        Args:
+            device: device where to move the posterior to.
+        """
+        self.device = device
+        if hasattr(self.prior, "to"):
+            self.prior.to(device)  # type: ignore
+        else:
+            raise ValueError("""Prior has no attribute to(device).""")
+        if hasattr(self.vector_field_estimator, "to"):
+            self.vector_field_estimator.to(device)
+        else:
+            raise ValueError("""Posterior estimator has no attribute to(device).""")
+
+        potential_fn, theta_transform = vector_field_estimator_based_potential(
+            self.vector_field_estimator,
+            self.prior,
+            x_o=None,
+            enable_transform=self.enable_transform,
+        )
+        x_o = None
+        if hasattr(self, "_x") and (self._x is not None):
+            x_o = self._x.to(device)
+        super().__init__(
+            potential_fn=potential_fn,
+            theta_transform=theta_transform,
+            device=device,
+        )
+        # super().__init__ erases the self._x, so we need to set it again
+        if x_o is not None:
+            self.set_default_x(x_o)
+
+        self.potential_fn: VectorFieldBasedPotential = potential_fn
 
     def sample(
         self,
@@ -256,6 +294,7 @@ class VectorFieldPosterior(NeuralPosterior):
             t_max = self.vector_field_estimator.t_max
             t_min = self.vector_field_estimator.t_min
             ts = torch.linspace(t_max, t_min, steps)
+        ts = ts.to(self.device)
 
         diffuser = Diffuser(
             self.potential_fn,

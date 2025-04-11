@@ -22,6 +22,7 @@ from sbi.neural_nets.embedding_nets import (
     PermutationInvariantEmbedding,
     ResNetEmbedding1D,
     ResNetEmbedding2D,
+    SpectralConvEmbedding,
     TransformerEmbedding,
 )
 from sbi.neural_nets.embedding_nets.lru import LRU, LRUBlock
@@ -181,6 +182,50 @@ def test_1d_and_2d_cnn_embedding_net(input_shape, num_channels):
     posterior.potential(s)
 
 
+@pytest.mark.parametrize("input_shape", [(3, 30), (2, 3, 30)])
+@pytest.mark.parametrize("modes", (4, 8))
+@pytest.mark.parametrize("conv_channels", (8, 5))
+@pytest.mark.parametrize("num_layers", (2, 3))
+def test_spectral_conf_embedding(input_shape, modes, conv_channels, num_layers):
+    n_points = input_shape[-1]
+    in_channels = input_shape[-2]
+    estimator_provider = posterior_nn(
+        "mdn",
+        embedding_net=SpectralConvEmbedding(
+            modes=modes,
+            in_channels=in_channels,
+            conv_channels=conv_channels,
+            num_layers=num_layers,
+        ),
+    )
+
+    def simulator(theta, input_shape=input_shape):
+        x = torch.rand_like(theta) + theta
+        return repeat_to_match_shape(x, input_shape)
+
+    def repeat_to_match_shape(x, input_shape):
+        batch_size = x.shape[0]  # First dimension is batch
+        target_shape = (batch_size, *input_shape)
+        x_expanded = x.view(batch_size, *([1] * (len(input_shape) - 1)), -1)
+        return x_expanded.expand(target_shape)
+
+    xo = torch.ones((1, n_points))
+    xo = repeat_to_match_shape(xo, input_shape)
+
+    prior = MultivariateNormal(torch.zeros(n_points), torch.eye(n_points))
+
+    num_simulations = 1000
+    theta = prior.sample(torch.Size((num_simulations,)))
+    x = simulator(theta)
+
+    trainer = NPE(prior=prior, density_estimator=estimator_provider)
+    trainer.append_simulations(theta, x).train(max_num_epochs=2)
+    posterior = trainer.build_posterior().set_default_x(xo)
+
+    s = posterior.sample((10,))
+    posterior.potential(s)
+
+
 BASE_CONFIG = {
     "pos_emb_base": 10e4,
     "rms_norm_eps": 1e-05,
@@ -317,6 +362,7 @@ def test_1d_causal_cnn_embedding_net(input_shape, num_channels):
     num_simulations = 1000
     theta = prior.sample(torch.Size((num_simulations,)))
     x = simulator(theta)
+
     if num_channels > 1:
         x = x.unsqueeze(1).repeat(
             1, num_channels, *[1 for _ in range(len(input_shape))]

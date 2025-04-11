@@ -12,7 +12,7 @@ from torch.distributions import Distribution
 from tqdm.auto import tqdm
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
-from sbi.inference.potentials.base_potential import BasePotential
+from sbi.inference.potentials.base_potential import BasePotential, CustomPotential
 from sbi.samplers.vi.vi_divergence_optimizers import get_VI_method
 from sbi.samplers.vi.vi_pyro_flows import get_flow_builder
 from sbi.samplers.vi.vi_quality_control import get_quality_metric
@@ -50,12 +50,12 @@ class VIPosterior(NeuralPosterior):
 
     def __init__(
         self,
-        potential_fn: Union[Callable, BasePotential],
-        prior: Optional[TorchDistribution] = None,
+        potential_fn: Union[BasePotential, CustomPotential],
+        prior: Optional[TorchDistribution] = None,  # type: ignore
         q: Union[str, PyroTransformedDistribution, "VIPosterior", Callable] = "maf",
         theta_transform: Optional[TorchTransform] = None,
         vi_method: str = "rKL",
-        device: str = "cpu",
+        device: Union[str, torch.device] = "cpu",
         x_shape: Optional[torch.Size] = None,
         parameters: Iterable = [],
         modules: Iterable = [],
@@ -63,7 +63,7 @@ class VIPosterior(NeuralPosterior):
         """
         Args:
             potential_fn: The potential function from which to draw samples. Must be a
-                `BasePotential` or a `Callable` which takes `theta` and `x_o` as inputs.
+                `BasePotential` or a `CustomPotential`.
             prior: This is the prior distribution. Note that this is only
                 used to check/construct the variational distribution or within some
                 quality metrics. Please make sure that this matches with the prior
@@ -104,6 +104,8 @@ class VIPosterior(NeuralPosterior):
 
         # Especially the prior may be on another device -> move it...
         self._device = device
+        self.theta_transform = theta_transform
+        self.x_shape = x_shape
         self.potential_fn.device = device
         move_all_tensor_to_device(self.potential_fn, device)
 
@@ -138,6 +140,33 @@ class VIPosterior(NeuralPosterior):
             "It provides Variational inference to .sample() from the posterior and "
             "can evaluate the _normalized_ posterior density with .log_prob()."
         )
+
+    def to(self, device: Union[str, torch.device]) -> None:
+        """
+        Move potential_fn, _prior and x_o to device, and change the device attribute.
+
+        Reinstantiates the posterior and re sets the default x.
+
+        Args:
+            device: The device to move the posterior to.
+        """
+        self.device = device
+        self.potential_fn.to(device)  # type: ignore
+        self._prior.to(device)  # type: ignore
+        if self._x is not None:
+            x_o = self._x.to(device)
+        self.theta_transform = mcmc_transform(self._prior, device=device)
+        super().__init__(
+            self.potential_fn, self.theta_transform, device, x_shape=self.x_shape
+        )
+        # super().__init__ erases the self._x, so we need to set it again
+        if self._x is not None:
+            self.set_default_x(x_o)
+
+        if self.theta_transform is None:
+            self.link_transform = mcmc_transform(self._prior).inv
+        else:
+            self.link_transform = self.theta_transform.inv
 
     @property
     def q(self) -> Distribution:
