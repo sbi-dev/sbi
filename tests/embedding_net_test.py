@@ -454,6 +454,9 @@ def test_1d_ResNet_fc_embedding_net(input_shape, n_blocks, c_internal, c_hidden_
     ],
     ids=["loop", "scan"],
 )
+@pytest.mark.parametrize(
+    "bidirectional", [True, False], ids=["one-directional", "bi-directional"]
+)
 def test_lru_isolated(
     bidirectional: bool,
     mode: str,
