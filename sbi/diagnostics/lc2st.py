@@ -138,7 +138,7 @@ class LC2ST:
                 "early_stopping": True,
                 "n_iter_no_change": 50,
             }
-        else:
+        elif self.clf_kwargs is None:
             self.clf_kwargs: Dict[str, Any] = {}
 
         # initialize classifiers, will be set after training
