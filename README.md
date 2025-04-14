@@ -246,7 +246,7 @@ Institute for Europe, and by NumFOCUS.
 The `sbi` package has grown and improved significantly since its initial release, with
 contributions from a large and diverse community. To reflect these developments and the
 expanded functionality, we published an [updated JOSS
-paper](https://joss.theoj.org/papers/10.21105/joss.07754). We encourage you to cite this
+paper](https://doi.org/10.21105/joss.07754). We encourage you to cite this
 newer version as the primary reference:
 
 ```latex
@@ -265,7 +265,8 @@ newer version as the primary reference:
 ```
 
 This updated paper, with its expanded author list, reflects the broader community
-contributions and the package's enhanced capabilities in releases 0.23.0 and later.
+contributions and the package's enhanced capabilities in releases
+[0.23.0](https://github.com/sbi-dev/sbi/releases/tag/v0.23.3) and later.
 
 If you are using a version of `sbi` prior to 0.23.0, please cite the original sbi
 software paper:
