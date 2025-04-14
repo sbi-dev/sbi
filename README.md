@@ -245,8 +245,9 @@ Institute for Europe, and by NumFOCUS.
 
 The `sbi` package has grown and improved significantly since its initial release, with
 contributions from a large and diverse community. To reflect these developments and the
-expanded functionality, we published an updated JOSS paper. We encourage you to cite
-this newer version as the primary reference:
+expanded functionality, we published an [updated JOSS
+paper](https://joss.theoj.org/papers/10.21105/joss.07754). We encourage you to cite this
+newer version as the primary reference:
 
 ```latex
 @article{BoeltsDeistler_sbi_2025,
@@ -264,11 +265,10 @@ this newer version as the primary reference:
 ```
 
 This updated paper, with its expanded author list, reflects the broader community
-contributions and the package's enhanced capabilities.
+contributions and the package's enhanced capabilities in releases 0.23.0 and later.
 
-If your usage of `sbi` is limited to the core functionalities introduced in the initial
-release (e.g., basic SNPE without advanced features like calibration or the sampling
-interface), you may alternatively cite the old `sbi` software paper:
+If you are using a version of `sbi` prior to 0.23.0, please cite the original sbi
+software paper:
 
 ```latex
 @article{tejero-cantero2020sbi,
