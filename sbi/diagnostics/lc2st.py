@@ -123,23 +123,24 @@ class LC2ST:
                     'or a valid scikit-learn classifier class.'
                 )
         assert issubclass(classifier, BaseEstimator), (
-            "classifier must be a subclass of sklearn's BaseEstimator"
+            "classier must either be a string or a subclass of BaseEstimator."
         )
         self.clf_class = classifier
 
         # for MLPClassifier, set default parameters
-        if self.clf_kwargs is None and self.clf_class == MLPClassifier:
-            ndim = thetas.shape[-1]
-            self.clf_kwargs = {
-                "activation": "relu",
-                "hidden_layer_sizes": (10 * ndim, 10 * ndim),
-                "max_iter": 1000,
-                "solver": "adam",
-                "early_stopping": True,
-                "n_iter_no_change": 50,
-            }
-        elif self.clf_kwargs is None:
-            self.clf_kwargs: Dict[str, Any] = {}
+        if classifier_kwargs is None:
+            if self.clf_class == MLPClassifier:
+                ndim = thetas.shape[-1]
+                self.clf_kwargs = {
+                    "activation": "relu",
+                    "hidden_layer_sizes": (10 * ndim, 10 * ndim),
+                    "max_iter": 1000,
+                    "solver": "adam",
+                    "early_stopping": True,
+                    "n_iter_no_change": 50,
+                }
+            else:
+                self.clf_kwargs: Dict[str, Any] = {}
 
         # initialize classifiers, will be set after training
         self.trained_clfs = None
