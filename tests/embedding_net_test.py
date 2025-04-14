@@ -510,6 +510,7 @@ def test_lru_isolated(
     [True, False],
     ids=["input-normalization", "no-input-normalization"],
 )
+@pytest.mark.slow
 def test_lru_block_isolated(
     bidirectional: bool,
     mode: str,
