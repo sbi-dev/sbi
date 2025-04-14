@@ -251,7 +251,7 @@ this newer version as the primary reference:
 ```latex
 @article{BoeltsDeistler_sbi_2025,
   doi = {10.21105/joss.07754},
-  url = {[https://doi.org/10.21105/joss.07754](https://doi.org/10.21105/joss.07754)},
+  url = {https://doi.org/10.21105/joss.07754},
   year = {2025},
   publisher = {The Open Journal},
   volume = {10},
@@ -266,14 +266,14 @@ this newer version as the primary reference:
 This updated paper, with its expanded author list, reflects the broader community
 contributions and the package's enhanced capabilities.
 
-If your usage of sbi is limited to the core functionalities introduced in the original
+If your usage of `sbi` is limited to the core functionalities introduced in the initial
 release (e.g., basic SNPE without advanced features like calibration or the sampling
-interface), you may alternatively cite the initial sbi software paper:
+interface), you may alternatively cite the old `sbi` software paper:
 
 ```latex
 @article{tejero-cantero2020sbi,
   doi = {10.21105/joss.02505},
-  url = {[https://doi.org/10.21105/joss.02505](https://doi.org/10.21105/joss.02505)},
+  url = {https://doi.org/10.21105/joss.02505},
   year = {2020},
   publisher = {The Open Journal},
   volume = {5},
