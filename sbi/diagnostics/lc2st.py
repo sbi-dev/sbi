@@ -127,20 +127,19 @@ class LC2ST:
         )
         self.clf_class = classifier
 
-        self.clf_kwargs = classifier_kwargs
-        if self.clf_kwargs is None:
-            if self.clf_class == MLPClassifier:
-                ndim = thetas.shape[-1]
-                self.clf_kwargs = {
-                    "activation": "relu",
-                    "hidden_layer_sizes": (10 * ndim, 10 * ndim),
-                    "max_iter": 1000,
-                    "solver": "adam",
-                    "early_stopping": True,
-                    "n_iter_no_change": 50,
-                }
-            else:
-                self.clf_kwargs = {}
+        # for MLPClassifier, set default parameters
+        if self.clf_kwargs is None and self.clf_class == MLPClassifier:
+            ndim = thetas.shape[-1]
+            self.clf_kwargs = {
+                "activation": "relu",
+                "hidden_layer_sizes": (10 * ndim, 10 * ndim),
+                "max_iter": 1000,
+                "solver": "adam",
+                "early_stopping": True,
+                "n_iter_no_change": 50,
+            }
+        else:
+            self.clf_kwargs: Dict[str, Any] = {}
 
         # initialize classifiers, will be set after training
         self.trained_clfs = None
@@ -269,7 +268,7 @@ class LC2ST:
         if seed is not None:
             if "random_state" in self.clf_kwargs:
                 print("WARNING: changing the random state of the classifier.")
-            self.clf_kwargs["random_state"] = seed  # type: ignore
+            self.clf_kwargs["random_state"] = seed
 
         # train the classifier
         trained_clfs = self._train(
