@@ -458,6 +458,7 @@ def test_1d_ResNet_fc_embedding_net(input_shape, n_blocks, c_internal, c_hidden_
     "bidirectional", [True, False], ids=["one-directional", "bi-directional"]
 )
 @pytest.mark.slow
+@pytest.mark.filterwarnings("ignore:Torchinductor")
 def test_lru_isolated(
     bidirectional: bool,
     mode: str,
@@ -512,6 +513,7 @@ def test_lru_isolated(
     ids=["input-normalization", "no-input-normalization"],
 )
 @pytest.mark.slow
+@pytest.mark.filterwarnings("ignore:Torchinductor")
 def test_lru_block_isolated(
     bidirectional: bool,
     mode: str,
@@ -569,6 +571,7 @@ def test_lru_block_isolated(
     "aggregate_fcn", ["last_step", "mean"], ids=["last-step", "mean"]
 )
 @pytest.mark.slow
+@pytest.mark.filterwarnings("ignore:Torchinductor")
 def test_lru_embedding_net_isolated(
     bidirectional: bool,
     mode: str,
