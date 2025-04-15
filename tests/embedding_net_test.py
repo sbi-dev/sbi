@@ -446,7 +446,7 @@ def test_1d_ResNet_fc_embedding_net(input_shape, n_blocks, c_internal, c_hidden_
         pytest.param(
             "scan",
             marks=pytest.mark.xfail(
-                condition=tuple(map(int, torch.__version__.split('.')[:2])) >= (2, 5),
+                condition=tuple(map(int, torch.__version__.split('.')[:2])) < (2, 5),
                 reason="PyTorch's associative_scan only exists for torch >= 2.5",
                 strict=True,
             ),
@@ -498,7 +498,7 @@ def test_lru_isolated(
         pytest.param(
             "scan",
             marks=pytest.mark.xfail(
-                condition=tuple(map(int, torch.__version__.split('.')[:2])) >= (2, 5),
+                condition=tuple(map(int, torch.__version__.split('.')[:2])) < (2, 5),
                 reason="PyTorch's associative_scan only exists for torch >= 2.5",
                 strict=True,
             ),
@@ -557,7 +557,7 @@ def test_lru_block_isolated(
         pytest.param(
             "scan",
             marks=pytest.mark.xfail(
-                condition=tuple(map(int, torch.__version__.split('.')[:2])) >= (2, 5),
+                condition=tuple(map(int, torch.__version__.split('.')[:2])) < (2, 5),
                 reason="PyTorch's associative_scan only exists for torch >= 2.5",
                 strict=True,
             ),
@@ -680,10 +680,11 @@ def test_lru_pipeline(embedding_feat_dim: int = 17):
 
 
 @pytest.mark.xfail(
-    condition=tuple(map(int, torch.__version__.split('.')[:2])) >= (2, 5),
+    condition=tuple(map(int, torch.__version__.split('.')[:2])) < (2, 5),
     reason="PyTorch's associative_scan only exists for torch >= 2.5",
     strict=True,
 )
+@pytest.mark.filterwarnings("ignore:Torchinductor")
 def test_scan(
     input_dim: int = 3,
     output_dim: int = 3,
