@@ -4,7 +4,7 @@
 [![Tests](https://github.com/sbi-dev/sbi/actions/workflows/ci.yml/badge.svg)](https://github.com/sbi-dev/sbi/actions)
 [![codecov](https://codecov.io/gh/sbi-dev/sbi/branch/main/graph/badge.svg)](https://codecov.io/gh/sbi-dev/sbi)
 [![GitHub license](https://img.shields.io/github/license/sbi-dev/sbi)](https://github.com/sbi-dev/sbi/blob/master/LICENSE.txt)
-[![DOI](https://joss.theoj.org/papers/10.21105/joss.02505/status.svg)](https://doi.org/10.21105/joss.02505)
+[![DOI](https://joss.theoj.org/papers/10.21105/joss.07754/status.svg)](https://doi.org/10.21105/joss.07754)
 [![NumFOCUS affiliated](https://camo.githubusercontent.com/a0f197cee66ccd8ed498cf64e9f3f384c78a072fe1e65bada8d3015356ac7599/68747470733a2f2f696d672e736869656c64732e696f2f62616467652f4e756d464f4355532d616666696c696174656425323070726f6a6563742d6f72616e67652e7376673f7374796c653d666c617426636f6c6f72413d45313532334426636f6c6f72423d303037443841)](https://numfocus.org/sponsored-projects/affiliated-projects)
 
 ## `sbi`: Simulation-Based Inference
@@ -116,7 +116,7 @@ To install `sbi` run
 uv add sbi
 ```
 
-### Test the installation
+### Testing the installation
 
 Open a Python prompt and run
 
@@ -219,8 +219,9 @@ how to run each of these methods
 We welcome any feedback on how `sbi` is working for your inference problems (see
 [Discussions](https://github.com/sbi-dev/sbi/discussions)) and are happy to receive bug
 reports, pull requests, and other feedback (see
-[contribute](https://sbi-dev.github.io/sbi/latest/contribute/)). We wish to maintain a positive
-community; please read our [Code of Conduct](CODE_OF_CONDUCT.md).
+[contribute](https://sbi-dev.github.io/sbi/latest/contribute/)). We wish to maintain a
+positive and respectful community; please read our [Code of
+Conduct](CODE_OF_CONDUCT.md).
 
 ## Acknowledgments
 
@@ -242,9 +243,33 @@ Institute for Europe, and by NumFOCUS.
 
 ## Citation
 
-If you use `sbi` consider citing the [sbi software
-paper](https://doi.org/10.21105/joss.02505), in addition to the original research
-articles describing the specific sbi-algorithm(s) you are using.
+The `sbi` package has grown and improved significantly since its initial release, with
+contributions from a large and diverse community. To reflect these developments and the
+expanded functionality, we published an [updated JOSS
+paper](https://doi.org/10.21105/joss.07754). We encourage you to cite this
+newer version as the primary reference:
+
+```latex
+@article{BoeltsDeistler_sbi_2025,
+  doi = {10.21105/joss.07754},
+  url = {https://doi.org/10.21105/joss.07754},
+  year = {2025},
+  publisher = {The Open Journal},
+  volume = {10},
+  number = {108},
+  pages = {7754},
+  author = {Jan Boelts and Michael Deistler and Manuel Gloeckler and Álvaro Tejero-Cantero and Jan-Matthis Lueckmann and Guy Moss and Peter Steinbach and Thomas Moreau and Fabio Muratore and Julia Linhart and Conor Durkan and Julius Vetter and Benjamin Kurt Miller and Maternus Herold and Abolfazl Ziaeemehr and Matthijs Pals and Theo Gruner and Sebastian Bischoff and Nastya Krouglova and Richard Gao and Janne K. Lappalainen and Bálint Mucsányi and Felix Pei and Auguste Schulz and Zinovia Stefanidi and Pedro Rodrigues and Cornelius Schröder and Faried Abu Zaid and Jonas Beck and Jaivardhan Kapoor and David S. Greenberg and Pedro J. Gonçalves and Jakob H. Macke},
+  title = {sbi reloaded: a toolkit for simulation-based inference workflows},
+  journal = {Journal of Open Source Software}
+}
+```
+
+This updated paper, with its expanded author list, reflects the broader community
+contributions and the package's enhanced capabilities in releases
+[0.23.0](https://github.com/sbi-dev/sbi/releases/tag/v0.23.3) and later.
+
+If you are using a version of `sbi` prior to 0.23.0, please cite the original sbi
+software paper:
 
 ```latex
 @article{tejero-cantero2020sbi,
@@ -261,7 +286,9 @@ articles describing the specific sbi-algorithm(s) you are using.
 }
 ```
 
-The above citation refers to the original version of the `sbi` project and has a
-persistent DOI. Additionally, new releases of `sbi` are citable via
-[Zenodo](https://zenodo.org/record/3993098), where we create a new DOI for every
-release.
+Regardless of which software paper you cite, please also remember to cite the original
+research articles describing the specific sbi-algorithm(s) you are using.
+
+Specific releases of `sbi` are also citable via
+[Zenodo](https://zenodo.org/records/15034786), where we generate a new software DOI for
+each release.
