@@ -247,6 +247,7 @@ Diagnostics
    examples
    how_to_guide
    advanced_tutorials
+   applications
 
 
 .. toctree::
