@@ -1,14 +1,17 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Any, Callable, Optional, Union
+from typing import Any, Optional, Union
 
 import torch
 from torch import Tensor
 from torch.distributions import Distribution
 
 import sbi.utils as utils
-from sbi.inference.trainers.npe.npe_base import PosteriorEstimator
+from sbi.inference.trainers.npe.npe_base import (
+    DensityEstimatorBuilder,
+    PosteriorEstimator,
+)
 from sbi.neural_nets.estimators.shape_handling import reshape_to_sample_batch_event
 from sbi.sbi_types import TensorboardSummaryWriter
 from sbi.utils.sbiutils import del_entries
@@ -20,7 +23,7 @@ class NPE_B(PosteriorEstimator):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
-        density_estimator: Union[str, Callable] = "maf",
+        density_estimator: Union[str, DensityEstimatorBuilder] = "maf",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[TensorboardSummaryWriter] = None,
