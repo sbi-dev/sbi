@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import math
-import sys
 
 import pytest
 import torch
@@ -355,6 +354,7 @@ def test_npe_with_with_iid_embedding_varying_num_trials(trial_factor=50):
 @pytest.mark.parametrize("num_channels", (1, 2, 3))
 @pytest.mark.parametrize("change_c_mode", ["conv", "zeros"])
 @pytest.mark.parametrize("n_stages", [1, 3, 4])
+@pytest.mark.slow
 def test_2d_ResNet_cnn_embedding_net(
     input_shape, num_channels, change_c_mode, n_stages
 ):
@@ -440,23 +440,25 @@ def test_1d_ResNet_fc_embedding_net(input_shape, n_blocks, c_internal, c_hidden_
 
 
 @pytest.mark.parametrize(
-    "bidirectional", [True, False], ids=["one-directional", "bi-directional"]
-)
-@pytest.mark.parametrize(
     "mode",
     [
         "loop",
         pytest.param(
             "scan",
             marks=pytest.mark.xfail(
-                condition=sys.version_info >= (3, 13),
-                reason="torch.compiler is not yet supported on Python >= 3.13",
+                condition=tuple(map(int, torch.__version__.split('.')[:2])) < (2, 5),
+                reason="PyTorch's associative_scan only exists for torch >= 2.5",
                 strict=True,
             ),
         ),
     ],
     ids=["loop", "scan"],
 )
+@pytest.mark.parametrize(
+    "bidirectional", [True, False], ids=["one-directional", "bi-directional"]
+)
+@pytest.mark.slow
+@pytest.mark.filterwarnings("ignore:Torchinductor")
 def test_lru_isolated(
     bidirectional: bool,
     mode: str,
@@ -497,8 +499,8 @@ def test_lru_isolated(
         pytest.param(
             "scan",
             marks=pytest.mark.xfail(
-                condition=sys.version_info >= (3, 13),
-                reason="torch.compiler is not yet supported on Python >= 3.13",
+                condition=tuple(map(int, torch.__version__.split('.')[:2])) < (2, 5),
+                reason="PyTorch's associative_scan only exists for torch >= 2.5",
                 strict=True,
             ),
         ),
@@ -510,6 +512,8 @@ def test_lru_isolated(
     [True, False],
     ids=["input-normalization", "no-input-normalization"],
 )
+@pytest.mark.slow
+@pytest.mark.filterwarnings("ignore:Torchinductor")
 def test_lru_block_isolated(
     bidirectional: bool,
     mode: str,
@@ -555,8 +559,8 @@ def test_lru_block_isolated(
         pytest.param(
             "scan",
             marks=pytest.mark.xfail(
-                condition=sys.version_info >= (3, 13),
-                reason="torch.compiler is not yet supported on Python >= 3.13",
+                condition=tuple(map(int, torch.__version__.split('.')[:2])) < (2, 5),
+                reason="PyTorch's associative_scan only exists for torch >= 2.5",
                 strict=True,
             ),
         ),
@@ -566,6 +570,8 @@ def test_lru_block_isolated(
 @pytest.mark.parametrize(
     "aggregate_fcn", ["last_step", "mean"], ids=["last-step", "mean"]
 )
+@pytest.mark.slow
+@pytest.mark.filterwarnings("ignore:Torchinductor")
 def test_lru_embedding_net_isolated(
     bidirectional: bool,
     mode: str,
@@ -677,10 +683,11 @@ def test_lru_pipeline(embedding_feat_dim: int = 17):
 
 
 @pytest.mark.xfail(
-    condition=sys.version_info >= (3, 13),
-    reason="torch.compiler is not yet supported on Python >= 3.13",
+    condition=tuple(map(int, torch.__version__.split('.')[:2])) < (2, 5),
+    reason="PyTorch's associative_scan only exists for torch >= 2.5",
     strict=True,
 )
+@pytest.mark.filterwarnings("ignore:Torchinductor")
 def test_scan(
     input_dim: int = 3,
     output_dim: int = 3,
