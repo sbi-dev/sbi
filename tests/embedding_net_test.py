@@ -22,6 +22,7 @@ from sbi.neural_nets.embedding_nets import (
     ResNetEmbedding1D,
     ResNetEmbedding2D,
     SpectralConvEmbedding,
+    TransformerEmbedding,
 )
 from sbi.neural_nets.embedding_nets.lru import LRU, LRUBlock
 from sbi.simulators.linear_gaussian import (
@@ -211,6 +212,109 @@ def test_spectral_conf_embedding(input_shape, modes, conv_channels, num_layers):
     xo = repeat_to_match_shape(xo, input_shape)
 
     prior = MultivariateNormal(torch.zeros(n_points), torch.eye(n_points))
+
+    num_simulations = 1000
+    theta = prior.sample(torch.Size((num_simulations,)))
+    x = simulator(theta)
+
+    trainer = NPE(prior=prior, density_estimator=estimator_provider)
+    trainer.append_simulations(theta, x).train(max_num_epochs=2)
+    posterior = trainer.build_posterior().set_default_x(xo)
+
+    s = posterior.sample((10,))
+    posterior.potential(s)
+
+
+BASE_CONFIG = {
+    "pos_emb_base": 10e4,
+    "rms_norm_eps": 1e-05,
+    "mlp_activation": "gelu",
+    "is_causal": True,
+    "vit": False,
+    "num_hidden_layers": 4,
+    "num_attention_heads": 6,
+    "num_key_value_heads": 6,
+    "intermediate_size": 64,
+    "ffn": "mlp",
+    "head_dim": None,
+    "feature_space_dim": 12 * 2,
+    "attention_dropout": 0.5,
+}
+
+
+@pytest.mark.parametrize(
+    "config",
+    [
+        {**BASE_CONFIG, "pos_emb": "rotary"},
+        {**BASE_CONFIG, "pos_emb": "none"},
+        {**BASE_CONFIG, "pos_emb": "positional"},
+        {
+            **BASE_CONFIG,
+            "pos_emb": "positional",
+            "ffn": "moe",
+            "num_local_experts": 4,
+            "num_experts_per_tok": 1,
+        },
+    ],
+)
+@pytest.mark.parametrize("seq_length", (24, 13, 5))
+def test_transformer_embedding(config, seq_length):
+    net = TransformerEmbedding(config=config)
+
+    def simulator(theta):
+        x = MultivariateNormal(
+            loc=theta, covariance_matrix=0.5 * torch.eye(config["feature_space_dim"])
+        )
+        return x.sample().unsqueeze(1).repeat(1, seq_length, 1)
+
+    xo = torch.ones(1, seq_length, config["feature_space_dim"])
+
+    prior = MultivariateNormal(
+        torch.zeros(config["feature_space_dim"]), torch.eye(config["feature_space_dim"])
+    )
+
+    _test_helper_embedding_net(prior, xo, simulator, net)
+
+
+@pytest.mark.parametrize(
+    "config",
+    (
+        {
+            **BASE_CONFIG,
+            "vit": True,
+            "image_size": 32,
+            "patch_size": 8,
+            "num_channels": 3,
+        },
+    ),
+)
+@pytest.mark.parametrize("img_shape", ((3, 32, 24), (3, 64, 64)))
+def test_transformer_vitembedding(config, img_shape):
+    net = TransformerEmbedding(config=config)
+
+    def simulator(theta):
+        x = MultivariateNormal(
+            loc=theta, covariance_matrix=0.5 * torch.eye(img_shape[0])
+        )
+        return (
+            x.sample()
+            .unsqueeze(-1)
+            .unsqueeze(-1)
+            .repeat(1, 1, img_shape[1], img_shape[2])
+        )
+
+    xo = torch.ones(1, img_shape[0], img_shape[1], img_shape[2])
+
+    prior = MultivariateNormal(torch.zeros(img_shape[0]), torch.eye(img_shape[0]))
+
+    _test_helper_embedding_net(prior, xo, simulator, net)
+
+
+def _test_helper_embedding_net(prior, xo, simulator, net):
+    estimator_provider = posterior_nn(
+        "mdn",
+        embedding_net=net,
+    )
 
     num_simulations = 1000
     theta = prior.sample(torch.Size((num_simulations,)))
