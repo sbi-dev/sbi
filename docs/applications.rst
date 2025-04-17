@@ -31,5 +31,5 @@ Contributing
 
 The data comes from a curated list of SBI papers.
 
-You can submit new applications through our 
+You can submit new applications through our
 `submission form <https://docs.google.com/forms/d/e/1FAIpQLSeu7Er272IKAnTxBX6osqcbrdvG2ny-aIybv6FDIFLLe8SSoA/viewform>`_.
