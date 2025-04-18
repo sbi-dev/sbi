@@ -3,6 +3,9 @@
 
 from __future__ import annotations
 
+import sys
+
+import pymc
 import pytest
 from torch import eye, ones, zeros
 from torch.distributions import MultivariateNormal
@@ -28,8 +31,8 @@ from sbi.simulators.linear_gaussian import (
     samples_true_posterior_linear_gaussian_uniform_prior,
     true_posterior_linear_gaussian_mvn_prior,
 )
+from sbi.utils.metrics import check_c2st
 from tests.test_utils import (
-    check_c2st,
     get_dkl_gaussian_prior,
     get_prob_outside_uniform_prior,
 )
@@ -317,7 +320,18 @@ def test_c2st_multi_round_snr_on_linearGaussian_vi(
         pytest.param("slice_np", "uniform", marks=pytest.mark.mcmc),
         pytest.param("slice_np_vectorized", "gaussian", marks=pytest.mark.mcmc),
         pytest.param("slice_np_vectorized", "uniform", marks=pytest.mark.mcmc),
-        pytest.param("nuts_pymc", "gaussian", marks=pytest.mark.mcmc),
+        pytest.param(
+            "nuts_pymc",
+            "gaussian",
+            marks=(
+                pytest.mark.mcmc,
+                pytest.mark.skipif(
+                    condition=sys.version_info >= (3, 10)
+                    and pymc.__version__ >= "5.20.1",
+                    reason="Inconsistent behaviour with pymc>=5.20.1 and python>=3.10",
+                ),
+            ),
+        ),
         pytest.param("nuts_pyro", "uniform", marks=pytest.mark.mcmc),
         pytest.param("hmc_pyro", "gaussian", marks=pytest.mark.mcmc),
         ("rejection", "uniform"),

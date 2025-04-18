@@ -2,41 +2,43 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from functools import partial
-from typing import Any, Callable, Optional, Union
+from typing import Any, Optional, Union
 from warnings import warn
 
 import torch
 from torch import Tensor
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
-from sbi.inference.potentials.base_potential import BasePotential
+from sbi.inference.potentials.base_potential import BasePotential, CustomPotential
 from sbi.samplers.rejection.rejection import rejection_sample
 from sbi.sbi_types import Shape, TorchTransform
+from sbi.utils import mcmc_transform
 from sbi.utils.torchutils import ensure_theta_batched
 
 
 class RejectionPosterior(NeuralPosterior):
-    r"""Provides rejection sampling to sample from the posterior.<br/><br/>
+    r"""Provides rejection sampling to sample from the posterior.
+
     SNLE or SNRE train neural networks to approximate the likelihood(-ratios).
     `RejectionPosterior` allows to sample from the posterior with rejection sampling.
     """
 
     def __init__(
         self,
-        potential_fn: Union[Callable, BasePotential],
+        potential_fn: Union[BasePotential, CustomPotential],
         proposal: Any,
         theta_transform: Optional[TorchTransform] = None,
         max_sampling_batch_size: int = 10_000,
         num_samples_to_find_max: int = 10_000,
         num_iter_to_find_max: int = 100,
         m: float = 1.2,
-        device: Optional[str] = None,
+        device: Optional[Union[str, torch.device]] = None,
         x_shape: Optional[torch.Size] = None,
     ):
         """
         Args:
             potential_fn: The potential function from which to draw samples. Must be a
-                `BasePotential` or a `Callable` which takes `theta` and `x_o` as inputs.
+                `BasePotential` or a `CustomPotential`.
             proposal: The proposal distribution.
             theta_transform: Transformation that is applied to parameters. Is not used
                 during but only when calling `.map()`.
@@ -63,11 +65,39 @@ class RejectionPosterior(NeuralPosterior):
         self.num_samples_to_find_max = num_samples_to_find_max
         self.num_iter_to_find_max = num_iter_to_find_max
         self.m = m
+        self.x_shape = x_shape
 
         self._purpose = (
             "It provides rejection sampling to .sample() from the posterior and "
             "can evaluate the _unnormalized_ posterior density with .log_prob()."
         )
+
+    def to(self, device: Union[str, torch.device]) -> None:
+        """
+        Move potential fucntion, proposal and x_o to the device.
+
+        This method reinstantiates the posterior and resets the default x_o
+
+        Args:
+            device: The device to move the posterior to.
+        """
+        self.device = device
+        self.potential_fn.to(device)  # type: ignore
+        self.proposal.to(device)
+        x_o = None
+        if hasattr(self, "_x") and (self._x is not None):
+            x_o = self._x.to(device)
+
+        self.theta_transform = mcmc_transform(self.proposal, device=device)
+        super().__init__(
+            self.potential_fn,
+            theta_transform=self.theta_transform,
+            device=device,
+            x_shape=self.x_shape,
+        )
+        # super().__init__ erases the self._x, so we need to set it again
+        if x_o is not None:
+            self.set_default_x(x_o)
 
     def log_prob(
         self, theta: Tensor, x: Optional[Tensor] = None, track_gradients: bool = False

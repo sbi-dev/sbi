@@ -14,6 +14,8 @@ from sbi.utils.torchutils import assert_all_finite
 
 
 class NRE_C(RatioEstimator):
+    r"""Neural Ratio Estimation (NRE-C) algorithm."""
+
     def __init__(
         self,
         prior: Optional[Distribution] = None,
@@ -23,23 +25,23 @@ class NRE_C(RatioEstimator):
         summary_writer: Optional[TensorboardSummaryWriter] = None,
         show_progress_bars: bool = True,
     ):
-        r"""NRE-C[1] is a generalization of the non-sequential (amortized) versions of
-        NRE_A and NRE_B. We call the algorithm NRE_C within `sbi`.
+        r"""NRE-C [1] is a generalization of amortized versions of NRE_A and NRE_B.
 
         NRE-C:
-        (1) like NRE_B, features a "multiclass" loss function where several marginally
-            drawn parameter-data pairs are contrasted against a jointly drawn pair.
-        (2) like AALR/NRE_A, i.e., the non-sequential version of NRE_A, it encourages
-            the approximate ratio $p(\theta,x)/p(\theta)p(x)$, accessed through
-            `.potential()` within `sbi`, to be exact at optimum. This addresses the
-            issue that NRE_B estimates this ratio only up to an arbitrary function
-            (normalizing constant) of the data $x$.
+        (1) Like NRE_B, features a "multiclass" loss function where several marginally
+        drawn parameter-data pairs are contrasted against a jointly drawn pair.
+
+        (2) Like AALR/NRE_A (i.e., the non-sequential version of NRE_A), it encourages
+        the approximate ratio :math:`p(\theta,x)/p(\theta)p(x)`, accessed through
+        `.potential()` within `sbi`, to be exact at optimum. This addresses the
+        issue that NRE_B estimates this ratio only up to an arbitrary function
+        (normalizing constant) of the data :math:`x`.
 
         Just like for all ratio estimation algorithms, the sequential version of NRE_C
-        will be estimated only up to a function (normalizing constant) of the data $x$
-        in rounds after the first.
+        will be estimated only up to a function (normalizing constant) of the data
+        :math:`x` in rounds after the first.
 
-        [1] _Contrastive Neural Ratio Estimation_, Benajmin Kurt Miller, et. al.,
+        [1] *Contrastive Neural Ratio Estimation*, Benajmin Kurt Miller, et. al.,
             NeurIPS 2022, https://arxiv.org/abs/2210.06170
 
         Args:

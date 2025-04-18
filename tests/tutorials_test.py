@@ -17,7 +17,7 @@ def list_notebooks(directory: str) -> list:
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize("notebook_path", list_notebooks("tutorials/"))
+@pytest.mark.parametrize("notebook_path", list_notebooks("docs/tutorials/"))
 def test_tutorials(notebook_path):
     """Test that all notebooks in the tutorials directory can be executed."""
     with open(notebook_path) as f:

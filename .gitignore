@@ -2,11 +2,13 @@
 .sbi_env/
 *sbi-logs/
 /docs/site/*
+/docs/reference/_autosummary/*
 
 # Development files and python cache
 /*.pyc
 /*.egg
 /*.egg-info
+.venv
 
 # Notebook checkpoints
 .ipynb_checkpoints

@@ -2,9 +2,10 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 
+from enum import Enum
 from typing import Any, Callable, Optional, Union
 
-from torch import nn
+from torch import Tensor, nn
 
 from sbi.neural_nets.net_builders.classifier import (
     build_linear_classifier,
@@ -25,13 +26,14 @@ from sbi.neural_nets.net_builders.flow import (
     build_zuko_nsf,
     build_zuko_sospf,
     build_zuko_unaf,
+    build_zuko_unconditional_flow,
 )
 from sbi.neural_nets.net_builders.flowmatching_nets import (
     build_mlp_flowmatcher,
     build_resnet_flowmatcher,
 )
 from sbi.neural_nets.net_builders.mdn import build_mdn
-from sbi.neural_nets.net_builders.mnle import build_mnle
+from sbi.neural_nets.net_builders.mixed_nets import build_mnle, build_mnpe
 from sbi.neural_nets.net_builders.score_nets import build_score_estimator
 from sbi.utils.nn_utils import check_net_device
 
@@ -42,6 +44,7 @@ model_builders = {
     "maf_rqs": build_maf_rqs,
     "nsf": build_nsf,
     "mnle": build_mnle,
+    "mnpe": build_mnpe,
     "zuko_nice": build_zuko_nice,
     "zuko_maf": build_zuko_maf,
     "zuko_nsf": build_zuko_nsf,
@@ -54,6 +57,20 @@ model_builders = {
     "mlp_flowmatcher": build_mlp_flowmatcher,
     "resnet_flowmatcher": build_resnet_flowmatcher,
 }
+
+
+# TODO: currently only used for marginal_nn, adapt to use for all
+class ZukoFlowType(Enum):
+    """Enumeration of Zuko flow types."""
+
+    BPF = "bpf"
+    MAF = "maf"
+    NAF = "naf"
+    NCSF = "ncsf"
+    NSF = "nsf"
+    SOSPF = "sospf"
+    UNAF = "unaf"
+
 
 embedding_net_warn_msg = """The passed embedding net will be moved to cpu for
                         constructing the net building function."""
@@ -454,5 +471,57 @@ def posterior_score_nn(
             Callable: a ScoreEstimator object.
         """
         return build_score_estimator(batch_x=batch_theta, batch_y=batch_x, **kwargs)
+
+    return build_fn
+
+
+def marginal_nn(
+    model: ZukoFlowType,
+    z_score_x: Optional[str] = "independent",
+    hidden_features: int = 50,
+    num_transforms: int = 5,
+    num_bins: int = 10,
+    num_components: int = 10,
+    **kwargs: Any,
+) -> Callable:
+    r"""
+    Returns a function that builds a density estimator for learning the marginal.
+
+    Args:
+        model: The type of density estimator that will be created.
+        z_score_x: Whether to z-score samples $x$ before passing them into
+            the network.
+        hidden_features: Number of hidden features.
+        num_transforms: Number of transforms when a flow is used.
+        num_bins: Number of bins used for the splines in `nsf`.
+        num_components: Number of mixture components for a mixture of Gaussians.
+        kwargs: additional custom arguments passed to downstream build functions.
+    """
+
+    kwargs = dict(
+        zip(
+            (
+                "z_score_x",
+                "hidden_features",
+                "num_transforms",
+                "num_bins",
+                "num_components",
+            ),
+            (
+                z_score_x,
+                hidden_features,
+                num_transforms,
+                num_bins,
+                num_components,
+            ),
+            strict=False,
+        ),
+        **kwargs,
+    )
+
+    def build_fn(batch_x: Tensor) -> Any:
+        return build_zuko_unconditional_flow(
+            which_nf=model.value.upper(), batch_x=batch_x, **kwargs
+        )
 
     return build_fn

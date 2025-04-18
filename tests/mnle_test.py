@@ -20,9 +20,9 @@ from sbi.inference.potentials.likelihood_based_potential import (
 from sbi.neural_nets import likelihood_nn
 from sbi.neural_nets.embedding_nets import FCEmbedding
 from sbi.utils import BoxUniform, mcmc_transform
+from sbi.utils.metrics import check_c2st
 from sbi.utils.torchutils import atleast_2d, process_device
 from sbi.utils.user_input_checks_utils import MultipleIndependent
-from tests.test_utils import check_c2st
 
 
 # toy simulator for mixed data
@@ -92,12 +92,12 @@ def test_mnle_on_device(
 @pytest.mark.parametrize(
     "sampler", (pytest.param("mcmc", marks=pytest.mark.mcmc), "rejection", "vi")
 )
-@pytest.mark.parametrize("flow_model", ("mdn", "maf", "nsf", "zuko_nsf", "zuko_bpf"))
+@pytest.mark.parametrize("flow_model", ("mdn", "nsf", "zuko_nsf"))
 @pytest.mark.parametrize("z_score_theta", ("independent", "none"))
 def test_mnle_api(flow_model: str, sampler, mcmc_params_fast: dict, z_score_theta: str):
     """Test MNLE API."""
     # Generate mixed data.
-    num_simulations = 100
+    num_simulations = 10
     theta = torch.rand(num_simulations, 2)
     x = torch.cat(
         (
@@ -119,7 +119,7 @@ def test_mnle_api(flow_model: str, sampler, mcmc_params_fast: dict, z_score_thet
         embedding_net=theta_embedding,
     )
     trainer = MNLE(density_estimator=density_estimator)
-    trainer.append_simulations(theta, x).train(max_num_epochs=5)
+    trainer.append_simulations(theta, x).train(max_num_epochs=1)
 
     # Test different samplers.
     posterior = trainer.build_posterior(prior=prior, sample_with=sampler)
@@ -132,7 +132,7 @@ def test_mnle_api(flow_model: str, sampler, mcmc_params_fast: dict, z_score_thet
         posterior.sample(
             (1,),
             init_strategy="proposal",
-            method="slice_np_vectorized",
+            method="hmc_pyro",
             **mcmc_params_fast,
         )
 

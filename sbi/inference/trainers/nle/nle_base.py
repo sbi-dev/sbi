@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import warnings
 from abc import ABC
 from copy import deepcopy
 from typing import Any, Callable, Dict, Optional, Union
@@ -94,11 +95,11 @@ class LikelihoodEstimator(NeuralInference, ABC):
             theta: Parameter sets.
             x: Simulation outputs.
             exclude_invalid_x: Whether invalid simulations are discarded during
-                training. If `False`, SNLE raises an error when invalid simulations are
+                training. If `False`, NLE raises an error when invalid simulations are
                 found. If `True`, invalid simulations are discarded and training
                 can proceed, but this gives systematically wrong results.
             from_round: Which round the data stemmed from. Round 0 means from the prior.
-                With default settings, this is not used at all for `SNLE`. Only when
+                With default settings, this is not used at all for `NLE`. Only when
                 the user later on requests `.train(discard_prior_samples=True)`, we
                 use these indices to find which training data stemmed from the prior.
             data_device: Where to store the data, default is on the same device where
@@ -108,6 +109,11 @@ class LikelihoodEstimator(NeuralInference, ABC):
             NeuralInference object (returned so that this function is chainable).
         """
 
+        if exclude_invalid_x:
+            warnings.warn(
+                "NLE gives systematically wrong results when exclude_invalid_x=True.",
+                stacklevel=2,
+            )
         # pyright false positive, will be fixed with pyright 1.1.310
         return super().append_simulations(  # type: ignore
             theta=theta,
@@ -302,6 +308,8 @@ class LikelihoodEstimator(NeuralInference, ABC):
             vi_parameters: Additional kwargs passed to `VIPosterior`.
             rejection_sampling_parameters: Additional kwargs passed to
                 `RejectionPosterior`.
+            importance_sampling_parameters: Additional kwargs passed to
+                `ImportanceSamplingPosterior`.
 
         Returns:
             Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods
