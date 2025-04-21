@@ -102,6 +102,8 @@ class LikelihoodEstimator(NeuralInference, ABC):
                 With default settings, this is not used at all for `NLE`. Only when
                 the user later on requests `.train(discard_prior_samples=True)`, we
                 use these indices to find which training data stemmed from the prior.
+            algorithm: Which algorithm is used. This is used to give a more informative
+                warning or error message when invalid simulations are found.
             data_device: Where to store the data, default is on the same device where
                 the training is happening. If training a large dataset on a GPU with not
                 much VRAM can set to 'cpu' to store data on system memory instead.
@@ -141,6 +143,16 @@ class LikelihoodEstimator(NeuralInference, ABC):
         r"""Train the density estimator to learn the distribution $p(x|\theta)$.
 
         Args:
+            training_batch_size: Training batch size.
+            learning_rate: Learning rate for Adam optimizer.
+            validation_fraction: The fraction of data to use for validation.
+            stop_after_epochs: The number of epochs to wait for improvement on the
+                validation set before terminating training.
+            max_num_epochs: Maximum number of epochs to run. If reached, we stop
+                training even when the validation loss is still decreasing. Otherwise,
+                we train until validation loss increases (see also `stop_after_epochs`).
+            clip_max_norm: Value at which to clip the total gradient norm in order to
+                prevent exploding gradients. Use None for no clipping.
             resume_training: Can be used in case training time is limited, e.g. on a
                 cluster. If `True`, the split between train and validation set, the
                 optimizer, the number of epochs, and the best validation log-prob will
