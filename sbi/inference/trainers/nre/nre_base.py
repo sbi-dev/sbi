@@ -112,6 +112,8 @@ class RatioEstimator(NeuralInference, ABC):
                 With default settings, this is not used at all for `NRE`. Only when
                 the user later on requests `.train(discard_prior_samples=True)`, we
                 use these indices to find which training data stemmed from the prior.
+            algorithm: Which algorithm is used. This is used to give a more informative
+                warning or error message when invalid simulations are found.
             data_device: Where to store the data, default is on the same device where
                 the training is happening. If training a large dataset on a GPU with not
                 much VRAM can set to 'cpu' to store data on system memory instead.
@@ -153,8 +155,16 @@ class RatioEstimator(NeuralInference, ABC):
 
         Args:
             num_atoms: Number of atoms to use for classification.
-            exclude_invalid_x: Whether to exclude simulation outputs `x=NaN` or `x=±∞`
-                during training. Expect errors, silent or explicit, when `False`.
+            training_batch_size: Training batch size.
+            learning_rate: Learning rate for Adam optimizer.
+            validation_fraction: The fraction of data to use for validation.
+            stop_after_epochs: The number of epochs to wait for improvement on the
+                validation set before terminating training.
+            max_num_epochs: Maximum number of epochs to run. If reached, we stop
+                training even when the validation loss is still decreasing. Otherwise,
+                we train until validation loss increases (see also `stop_after_epochs`).
+            clip_max_norm: Value at which to clip the total gradient norm in order to
+                prevent exploding gradients. Use None for no clipping.
             resume_training: Can be used in case training time is limited, e.g. on a
                 cluster. If `True`, the split between train and validation set, the
                 optimizer, the number of epochs, and the best validation log-prob will
@@ -164,6 +174,8 @@ class RatioEstimator(NeuralInference, ABC):
                 samples.
             retrain_from_scratch: Whether to retrain the conditional density
                 estimator for the posterior from scratch each round.
+            show_train_summary: Whether to print the number of epochs and validation
+                loss after the training.
             dataloader_kwargs: Additional or updated kwargs to be passed to the training
                 and validation dataloaders (like, e.g., a collate_fn).
             loss_kwargs: Additional or updated kwargs to be passed to the self._loss fn.
