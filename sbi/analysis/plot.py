@@ -1920,7 +1920,7 @@ def pp_plot(
     """Probability - Probability (P-P) plot for hypothesis tests
     to assess the validity of one (or several) estimator(s).
 
-    See [here](https://en.wikipedia.org/wiki/P%E2%80%93P_plot) for more details.
+    See `here <https://en.wikipedia.org/wiki/P%E2%80%93P_plot>`_ for more details.
 
     Args:
         scores: test scores estimated on observed data and evaluated on the test set,

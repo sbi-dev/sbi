@@ -18,9 +18,7 @@ from sbi.neural_nets.estimators import ConditionalVectorFieldEstimator
 
 
 class FMPE(VectorFieldInference):
-    """
-    Implements the Flow Matching Posterior Estimator (FMPE) for sbi.
-    """
+    """Flow Matching Posterior Estimation (FMPE)."""
 
     def __init__(
         self,

@@ -16,6 +16,38 @@ from sbi.utils.diagnostics_utils import remove_nans_and_infs_in_x
 
 
 class LC2ST:
+    r"""L-C2ST: Local Classifier Two-Sample Test.
+
+    Implementation based on the official code from [1] and the exisiting C2ST
+    metric [2], using scikit-learn classifiers.
+
+    L-C2ST tests the local consistency of a posterior estimator :math:`q` with
+    respect to the true posterior :math:`p`, at a fixed observation :math:`x_o`,
+    i.e., whether the following null hypothesis holds:
+
+    :math:`H_0(x_o) := q(\theta \mid x_o) = p(\theta \mid x_o)`.
+
+    L-C2ST proceeds as follows:
+
+    1. It first trains a classifier to distinguish between samples from two joint
+       distributions :math:`[\theta_p, x_p]` and :math:`[\theta_q, x_q]`, and
+       evaluates the L-C2ST statistic at a given observation :math:`x_o`.
+
+    2. The L-C2ST statistic is the mean squared error between the predicted
+       probabilities of being in p (class 0) and a Dirac at 0.5, which corresponds to
+       the chance level of the classifier, unable to distinguish between p and q.
+
+    - If ``num_ensemble>1``, the average prediction over all classifiers is used.
+    - If ``num_folds>1`` the average statistic over all cv-folds is used.
+
+    To evaluate the test, steps 1 and 2 are performed over multiple trials under the
+    null hypothesis (H0). If the null distribution is not known, it is estimated
+    using the permutation method, i.e. by training the classifier on the permuted
+    data. The statistics obtained under (H0) is then compared to the one obtained
+    on observed data to compute the p-value, used to decide whether to reject (H0)
+    or not.
+    """
+
     def __init__(
         self,
         thetas: Tensor,
@@ -30,32 +62,7 @@ class LC2ST:
         num_trials_null: int = 100,
         permutation: bool = True,
     ) -> None:
-        """
-        L-C2ST: Local Classifier Two-Sample Test
-        -----------------------------------------
-        Implementation based on the official code from [1] and the exisiting C2ST
-        metric [2], using scikit-learn classifiers.
-
-        L-C2ST tests the local consistency of a posterior estimator q w.r.t. to the true
-        posterior p, at fixed observation `x_o`, i.e. whether the following null
-        hypothesis holds: $H_0(x_o) := q(\theta | x_o) = p(\theta | x_o)$.
-
-        1. Trains a classifier to distinguish between samples from two joint
-        distributions [theta_p, x_p] and [theta_q, x_q] and evaluates the L-C2ST
-        statistic at a given observation `x_o`.
-        2. The L-C2ST statistic is the mean squared error between the predicted
-        probabilities of being in p (class 0) and a Dirac at 0.5, which corresponds to
-        the chance level of the classifier, unable to distinguish between p and q.
-        - If `num_ensemble`>1, the average prediction over all classifiers is used.
-        - If `num_folds`>1 the average statistic over all cv-folds is used.
-
-        To evaluate the test, steps 1 and 2 are performed over multiple trials under the
-        null hypothesis (H0). If the null distribution is not known, it is estimated
-        using the permutation method, i.e. by training the classifier on the permuted
-        data. The statistics obtained under (H0) is then compared to the one obtained
-        on observed data to compute the p-value, used to decide whether to reject (H0)
-        or not.
-
+        """Initialize L-C2ST.
 
         Args:
             thetas: Samples from the prior, of shape (sample_size, dim).
@@ -219,7 +226,8 @@ class LC2ST:
         trained_clfs: List[Any],
         return_probs: bool = False,
     ) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
-        """Computes the L-C2ST scores given the trained classifiers:
+        """Computes the L-C2ST scores given the trained classifiers.
+
         Mean squared error (MSE) between 0.5 and the predicted probabilities
         of being in class 0 over the dataset (`theta_o`, `x_o`).
 
@@ -259,6 +267,7 @@ class LC2ST:
         self, seed: Optional[int] = None, verbosity: int = 1
     ) -> Union[None, List[Any]]:
         """Trains the classifier on the observed data.
+
         Saves the trained classifier(s) as a list of length `num_folds`.
 
         Args:
@@ -282,7 +291,8 @@ class LC2ST:
         theta_o: Tensor,
         x_o: Tensor,
     ) -> float:
-        """Computes the L-C2ST statistics for the observed data:
+        """Computes the L-C2ST statistics for the observed data.
+
         Mean over all cv-scores.
 
         Args:
@@ -481,21 +491,22 @@ class LC2ST_NF(LC2ST):
         trained_clfs_null: Optional[Dict[str, List[Any]]] = None,
         **kwargs: Any,
     ) -> None:
-        """
-        L-C2ST for Normalizing Flows.
+        r"""L-C2ST for Normalizing Flows.
 
         LC2ST_NF is a subclass of LC2ST that performs the test in the space of the
         base distribution of a normalizing flow. It uses the inverse transform of the
-        normalizing flow $T_\\phi^{-1}$ to map the samples from the prior and the
+        normalizing flow $T_\phi^{-1}$ to map the samples from the prior and the
         posterior to the base distribution space. Following Theorem 4, Eq. 17 from [1],
         the new null hypothesis for a Gaussian base distribution is:
 
-            $H_0(x_o) := p(T_\\phi^{-1}(\theta ; x_o) | x_o) = N(0, I_m)$.
+        :math:`H_0(x_o) := p(T_\phi^{-1}(\theta ; x_o) \mid x_o) = \mathcal{N}(0,`
+        :math:`I_m)`.
 
-        This is because a sample from the NF is a sample from the base distribution
-        pushed through the flow:
+        This is because a sample from the normalizing flow is a sample from the base
+        distribution pushed through the flow:
 
-            $z = T_\\phi^{-1}(\\theta) \\sim N(0, I_m) \\iff theta = T_\\phi(z)$.
+        :math:`z = T_\phi^{-1}(\theta) \sim \mathcal{N}(0, I_m) \iff`
+        :math:`\theta = T_\phi(z)`.
 
         This defines the two classes P and Q for the L-C2ST test, one of which is
         the Gaussion distribution that can be easily be sampled from and is independent
@@ -503,12 +514,12 @@ class LC2ST_NF(LC2ST):
 
         Important features are:
         - no `theta_o` is passed to the evaluation functions (e.g. `get_scores`),
-            as the base distribution is known, samples are drawn at initialization.
+          as the base distribution is known, samples are drawn at initialization.
         - no permutation method is used, as the null distribution is known,
-            samples are drawn during `train_under_null_hypothesis`.
+          samples are drawn during `train_under_null_hypothesis`.
         - the classifiers can be pre-trained under the null and `trained_clfs_null`
-            passed as an argument at initialization. They do not depend on the
-            observed data (i.e. `posterior_samples` and `xs`).
+          passed as an argument at initialization. They do not depend on the
+          observed data (i.e. `posterior_samples` and `xs`).
 
         Args:
             thetas: Samples from the prior, of shape (sample_size, dim).

@@ -14,7 +14,11 @@ from sbi.utils.torchutils import assert_all_finite
 
 
 class NRE_A(RatioEstimator):
-    """Neural Ratio Estimation algorithm (NRE-A) as in Hermans et al. (2020)."""
+    """AALR, here known as Neural Ratio Estimation algorithm (NRE-A) [1].
+
+    [1] *Likelihood-free MCMC with Amortized Approximate Likelihood Ratios*, Hermans
+        et al., ICML 2020, https://arxiv.org/abs/1903.04057
+    """
 
     def __init__(
         self,
@@ -25,10 +29,7 @@ class NRE_A(RatioEstimator):
         summary_writer: Optional[TensorboardSummaryWriter] = None,
         show_progress_bars: bool = True,
     ):
-        r"""AALR[1], here known as NRE_A.
-
-        [1] *Likelihood-free MCMC with Amortized Approximate Likelihood Ratios*, Hermans
-            et al., ICML 2020, https://arxiv.org/abs/1903.04057
+        r"""Initialize NRE_A.
 
         Args:
             prior: A probability distribution that expresses prior knowledge about the
