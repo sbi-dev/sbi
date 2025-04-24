@@ -1023,7 +1023,19 @@
               Bases: <code><span title="sbi.inference.trainers.npe.npe_base.PosteriorEstimator">PosteriorEstimator</span></code></p>
 
 
-        <p>Neural Posterior Estimation algorithm as in Papamakarios et al. (2016).</p>
+        <p>Neural Posterior Estimation algorithm as in Papamakarios et al. (2016) [1].</p>
+<p>[1] <em>Fast epsilon-free Inference of Simulation Models with Bayesian
+    Conditional Density Estimation</em>, Papamakarios et al., NeurIPS 2016.
+    <a href="https://arxiv.org/abs/1605.06376">https://arxiv.org/abs/1605.06376</a></p>
+<p>Like all NPE methods, this method trains a deep neural density estimator to
+directly approximate the posterior. Also like all other NPE methods, in the
+first round, this density estimator is trained with a maximum-likelihood loss.</p>
+<p>This class implements NPE-A. NPE-A trains across multiple rounds with a
+maximum-likelihood-loss. This will make training converge to the proposal
+posterior instead of the true posterior. To correct for this, SNPE-A applies a
+post-hoc correction after training. This correction has to be performed
+analytically. Thus, NPE-A is limited to Gaussian distributions for all but the
+last round. In the last round, NPE-A can use a Mixture of Gaussians.</p>
 
 
 
@@ -1379,7 +1391,22 @@
 <span class="normal">372</span>
 <span class="normal">373</span>
 <span class="normal">374</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NPE_A</span><span class="p">(</span><span class="n">PosteriorEstimator</span><span class="p">):</span>
-<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Neural Posterior Estimation algorithm as in Papamakarios et al. (2016).&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Neural Posterior Estimation algorithm as in Papamakarios et al. (2016) [1].</span>
+
+<span class="sd">    [1] *Fast epsilon-free Inference of Simulation Models with Bayesian</span>
+<span class="sd">        Conditional Density Estimation*, Papamakarios et al., NeurIPS 2016.</span>
+<span class="sd">        https://arxiv.org/abs/1605.06376</span>
+
+<span class="sd">    Like all NPE methods, this method trains a deep neural density estimator to</span>
+<span class="sd">    directly approximate the posterior. Also like all other NPE methods, in the</span>
+<span class="sd">    first round, this density estimator is trained with a maximum-likelihood loss.</span>
+
+<span class="sd">    This class implements NPE-A. NPE-A trains across multiple rounds with a</span>
+<span class="sd">    maximum-likelihood-loss. This will make training converge to the proposal</span>
+<span class="sd">    posterior instead of the true posterior. To correct for this, SNPE-A applies a</span>
+<span class="sd">    post-hoc correction after training. This correction has to be performed</span>
+<span class="sd">    analytically. Thus, NPE-A is limited to Gaussian distributions for all but the</span>
+<span class="sd">    last round. In the last round, NPE-A can use a Mixture of Gaussians.&quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -1391,22 +1418,7 @@
         <span class="n">summary_writer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TensorboardSummaryWriter</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">show_progress_bars</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
     <span class="p">):</span>
-<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;NPE-A [1].</span>
-
-<span class="sd">        [1] *Fast epsilon-free Inference of Simulation Models with Bayesian</span>
-<span class="sd">        Conditional Density Estimation*, Papamakarios et al., NeurIPS 2016.</span>
-<span class="sd">        https://arxiv.org/abs/1605.06376</span>
-
-<span class="sd">        Like all NPE methods, this method trains a deep neural density estimator to</span>
-<span class="sd">        directly approximate the posterior. Also like all other NPE methods, in the</span>
-<span class="sd">        first round, this density estimator is trained with a maximum-likelihood loss.</span>
-
-<span class="sd">        This class implements NPE-A. NPE-A trains across multiple rounds with a</span>
-<span class="sd">        maximum-likelihood-loss. This will make training converge to the proposal</span>
-<span class="sd">        posterior instead of the true posterior. To correct for this, SNPE-A applies a</span>
-<span class="sd">        post-hoc correction after training. This correction has to be performed</span>
-<span class="sd">        analytically. Thus, NPE-A is limited to Gaussian distributions for all but the</span>
-<span class="sd">        last round. In the last round, NPE-A can use a Mixture of Gaussians.</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Initialize NPE-A [1].</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            prior: A probability distribution that expresses prior knowledge about the</span>
@@ -1750,19 +1762,7 @@
 
     <div class="doc doc-contents ">
 
-        <p>NPE-A [1].</p>
-<p>[1] <em>Fast epsilon-free Inference of Simulation Models with Bayesian
-Conditional Density Estimation</em>, Papamakarios et al., NeurIPS 2016.
-<a href="https://arxiv.org/abs/1605.06376">https://arxiv.org/abs/1605.06376</a></p>
-<p>Like all NPE methods, this method trains a deep neural density estimator to
-directly approximate the posterior. Also like all other NPE methods, in the
-first round, this density estimator is trained with a maximum-likelihood loss.</p>
-<p>This class implements NPE-A. NPE-A trains across multiple rounds with a
-maximum-likelihood-loss. This will make training converge to the proposal
-posterior instead of the true posterior. To correct for this, SNPE-A applies a
-post-hoc correction after training. This correction has to be performed
-analytically. Thus, NPE-A is limited to Gaussian distributions for all but the
-last round. In the last round, NPE-A can use a Mixture of Gaussians.</p>
+        <p>Initialize NPE-A [1].</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -1913,22 +1913,7 @@ file location (default is <code>&lt;current working directory&gt;/logs</code>.)<
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/trainers/npe/npe_a.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 32</span>
-<span class="normal"> 33</span>
-<span class="normal"> 34</span>
-<span class="normal"> 35</span>
-<span class="normal"> 36</span>
-<span class="normal"> 37</span>
-<span class="normal"> 38</span>
-<span class="normal"> 39</span>
-<span class="normal"> 40</span>
-<span class="normal"> 41</span>
-<span class="normal"> 42</span>
-<span class="normal"> 43</span>
-<span class="normal"> 44</span>
-<span class="normal"> 45</span>
-<span class="normal"> 46</span>
-<span class="normal"> 47</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 47</span>
 <span class="normal"> 48</span>
 <span class="normal"> 49</span>
 <span class="normal"> 50</span>
@@ -1998,22 +1983,7 @@ file location (default is <code>&lt;current working directory&gt;/logs</code>.)<
     <span class="n">summary_writer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TensorboardSummaryWriter</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">show_progress_bars</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
 <span class="p">):</span>
-<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;NPE-A [1].</span>
-
-<span class="sd">    [1] *Fast epsilon-free Inference of Simulation Models with Bayesian</span>
-<span class="sd">    Conditional Density Estimation*, Papamakarios et al., NeurIPS 2016.</span>
-<span class="sd">    https://arxiv.org/abs/1605.06376</span>
-
-<span class="sd">    Like all NPE methods, this method trains a deep neural density estimator to</span>
-<span class="sd">    directly approximate the posterior. Also like all other NPE methods, in the</span>
-<span class="sd">    first round, this density estimator is trained with a maximum-likelihood loss.</span>
-
-<span class="sd">    This class implements NPE-A. NPE-A trains across multiple rounds with a</span>
-<span class="sd">    maximum-likelihood-loss. This will make training converge to the proposal</span>
-<span class="sd">    posterior instead of the true posterior. To correct for this, SNPE-A applies a</span>
-<span class="sd">    post-hoc correction after training. This correction has to be performed</span>
-<span class="sd">    analytically. Thus, NPE-A is limited to Gaussian distributions for all but the</span>
-<span class="sd">    last round. In the last round, NPE-A can use a Mixture of Gaussians.</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Initialize NPE-A [1].</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        prior: A probability distribution that expresses prior knowledge about the</span>
@@ -2994,7 +2964,16 @@ on the number of mixture components.</p>
               Bases: <code><span title="sbi.inference.trainers.npe.npe_base.PosteriorEstimator">PosteriorEstimator</span></code></p>
 
 
-        <p>Neural Posterior Estimation algorithm (NPE-B) as in Lueckmann et al. (2017).</p>
+        <p>Neural Posterior Estimation algorithm (NPE-B) as in Lueckmann et al. (2017) [1].</p>
+<p>[1] <em>Flexible statistical inference for mechanistic models of neural
+    dynamics</em>, Lueckmann, Gonçalves et al., NeurIPS 2017. <a href="https://arxiv.org/abs/171">https://arxiv.org/abs/171</a></p>
+<p>Like all NPE methods, this method trains a deep neural density estimator to
+directly approximate the posterior. Also like all other NPE methods, in the
+first round, this density estimator is trained with a maximum-likelihood loss.</p>
+<p>This class implements NPE-B. NPE-B trains across multiple rounds with a
+an importance-weighted log-loss. Unlike NPE-A the loss will make training
+directly converge to the true posterior.
+Thus, SNPE-B is not limited to Gaussian proposal.</p>
 
 
 
@@ -3122,7 +3101,20 @@ on the number of mixture components.</p>
 <span class="normal">132</span>
 <span class="normal">133</span>
 <span class="normal">134</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NPE_B</span><span class="p">(</span><span class="n">PosteriorEstimator</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Neural Posterior Estimation algorithm (NPE-B) as in Lueckmann et al. (2017).&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Neural Posterior Estimation algorithm (NPE-B) as in Lueckmann et al. (2017) [1].</span>
+
+<span class="sd">    [1] *Flexible statistical inference for mechanistic models of neural</span>
+<span class="sd">        dynamics*, Lueckmann, Gonçalves et al., NeurIPS 2017. https://arxiv.org/abs/171</span>
+
+<span class="sd">    Like all NPE methods, this method trains a deep neural density estimator to</span>
+<span class="sd">    directly approximate the posterior. Also like all other NPE methods, in the</span>
+<span class="sd">    first round, this density estimator is trained with a maximum-likelihood loss.</span>
+
+<span class="sd">    This class implements NPE-B. NPE-B trains across multiple rounds with a</span>
+<span class="sd">    an importance-weighted log-loss. Unlike NPE-A the loss will make training</span>
+<span class="sd">    directly converge to the true posterior.</span>
+<span class="sd">    Thus, SNPE-B is not limited to Gaussian proposal.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -3133,20 +3125,7 @@ on the number of mixture components.</p>
         <span class="n">summary_writer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TensorboardSummaryWriter</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">show_progress_bars</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
     <span class="p">):</span>
-<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;NPE-B [1].</span>
-
-<span class="sd">        [1] *Flexible statistical inference for mechanistic models of neural</span>
-<span class="sd">        dynamics*, Lueckmann, Gonçalves et al., NeurIPS 2017. https://arxiv.org/abs/171</span>
-
-
-<span class="sd">        Like all NPE methods, this method trains a deep neural density estimator to</span>
-<span class="sd">        directly approximate the posterior. Also like all other NPE methods, in the</span>
-<span class="sd">        first round, this density estimator is trained with a maximum-likelihood loss.</span>
-
-<span class="sd">        This class implements NPE-B. NPE-B trains across multiple rounds with a</span>
-<span class="sd">        an importance-weighted log-loss. Unlike NPE-A the loss will make training</span>
-<span class="sd">        directly converge to the true posterior.</span>
-<span class="sd">        Thus, SNPE-B is not limited to Gaussian proposal.</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Initialize NPE-B.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            prior: A probability distribution that expresses prior knowledge about the</span>
@@ -3265,16 +3244,7 @@ on the number of mixture components.</p>
 
     <div class="doc doc-contents ">
 
-        <p>NPE-B [1].</p>
-<p>[1] <em>Flexible statistical inference for mechanistic models of neural
-dynamics</em>, Lueckmann, Gonçalves et al., NeurIPS 2017. <a href="https://arxiv.org/abs/171">https://arxiv.org/abs/171</a></p>
-<p>Like all NPE methods, this method trains a deep neural density estimator to
-directly approximate the posterior. Also like all other NPE methods, in the
-first round, this density estimator is trained with a maximum-likelihood loss.</p>
-<p>This class implements NPE-B. NPE-B trains across multiple rounds with a
-an importance-weighted log-loss. Unlike NPE-A the loss will make training
-directly converge to the true posterior.
-Thus, SNPE-B is not limited to Gaussian proposal.</p>
+        <p>Initialize NPE-B.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -3400,20 +3370,7 @@ file location (default is <code>&lt;current working directory&gt;/logs</code>.)<
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/trainers/npe/npe_b.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">20</span>
-<span class="normal">21</span>
-<span class="normal">22</span>
-<span class="normal">23</span>
-<span class="normal">24</span>
-<span class="normal">25</span>
-<span class="normal">26</span>
-<span class="normal">27</span>
-<span class="normal">28</span>
-<span class="normal">29</span>
-<span class="normal">30</span>
-<span class="normal">31</span>
-<span class="normal">32</span>
-<span class="normal">33</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">33</span>
 <span class="normal">34</span>
 <span class="normal">35</span>
 <span class="normal">36</span>
@@ -3453,20 +3410,7 @@ file location (default is <code>&lt;current working directory&gt;/logs</code>.)<
     <span class="n">summary_writer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TensorboardSummaryWriter</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">show_progress_bars</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
 <span class="p">):</span>
-<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;NPE-B [1].</span>
-
-<span class="sd">    [1] *Flexible statistical inference for mechanistic models of neural</span>
-<span class="sd">    dynamics*, Lueckmann, Gonçalves et al., NeurIPS 2017. https://arxiv.org/abs/171</span>
-
-
-<span class="sd">    Like all NPE methods, this method trains a deep neural density estimator to</span>
-<span class="sd">    directly approximate the posterior. Also like all other NPE methods, in the</span>
-<span class="sd">    first round, this density estimator is trained with a maximum-likelihood loss.</span>
-
-<span class="sd">    This class implements NPE-B. NPE-B trains across multiple rounds with a</span>
-<span class="sd">    an importance-weighted log-loss. Unlike NPE-A the loss will make training</span>
-<span class="sd">    directly converge to the true posterior.</span>
-<span class="sd">    Thus, SNPE-B is not limited to Gaussian proposal.</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Initialize NPE-B.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        prior: A probability distribution that expresses prior knowledge about the</span>
@@ -3519,7 +3463,34 @@ file location (default is <code>&lt;current working directory&gt;/logs</code>.)<
               Bases: <code><span title="sbi.inference.trainers.npe.npe_base.PosteriorEstimator">PosteriorEstimator</span></code></p>
 
 
-        <p>Neural Posterior Estimation algorithm (NPE-C) as in Greenberg et al. (2019).</p>
+        <p>Neural Posterior Estimation algorithm (NPE-C) as in Greenberg et al. (2019). [1]</p>
+<p>[1] <em>Automatic Posterior Transformation for Likelihood-free Inference</em>,
+    Greenberg et al., ICML 2019, <a href="https://arxiv.org/abs/1905.07488">https://arxiv.org/abs/1905.07488</a>.</p>
+<p>Like all NPE methods, this method trains a deep neural density estimator to
+directly approximate the posterior. Also like all other NPE methods, in the
+first round, this density estimator is trained with a maximum-likelihood loss.</p>
+<p>For the sequential mode in which the density estimator is trained across rounds,
+this class implements two loss variants of NPE-C: the non-atomic and the atomic
+version. The atomic loss of NPE-C can be used for any density estimator,
+i.e. also for normalizing flows. However, it suffers from leakage issues. On
+the other hand, the non-atomic loss can only be used only if the proposal
+distribution is a mixture of Gaussians, the density estimator is a mixture of
+Gaussians, and the prior is either Gaussian or Uniform. It does not suffer from
+leakage issues. At the beginning of each round, we print whether the non-atomic
+or the atomic version is used.</p>
+<p>In this codebase, we will automatically switch to the non-atomic loss if the
+following criteria are fulfilled:</p>
+<ul>
+<li>proposal is a <code>DirectPosterior</code> with density_estimator <code>mdn</code>, as built with
+  <code>sbi.neural_nets.posterior_nn()</code>.</li>
+<li>the density estimator is a <code>mdn</code>, as built with
+  <code>sbi.neural_nets.posterior_nn()</code>.</li>
+<li><code>isinstance(prior, MultivariateNormal)</code> (from <code>torch.distributions</code>) or
+  <code>isinstance(prior, sbi.utils.BoxUniform)</code></li>
+</ul>
+<p>Note that custom implementations of any of these densities (or estimators) will
+not trigger the non-atomic loss, and the algorithm will fall back onto using
+the atomic loss.</p>
 
 
 
@@ -4170,8 +4141,43 @@ file location (default is <code>&lt;current working directory&gt;/logs</code>.)<
 <span class="normal">669</span>
 <span class="normal">670</span>
 <span class="normal">671</span>
-<span class="normal">672</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NPE_C</span><span class="p">(</span><span class="n">PosteriorEstimator</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Neural Posterior Estimation algorithm (NPE-C) as in Greenberg et al. (2019).&quot;&quot;&quot;</span>
+<span class="normal">672</span>
+<span class="normal">673</span>
+<span class="normal">674</span>
+<span class="normal">675</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NPE_C</span><span class="p">(</span><span class="n">PosteriorEstimator</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Neural Posterior Estimation algorithm (NPE-C) as in Greenberg et al. (2019). [1]</span>
+
+<span class="sd">    [1] *Automatic Posterior Transformation for Likelihood-free Inference*,</span>
+<span class="sd">        Greenberg et al., ICML 2019, https://arxiv.org/abs/1905.07488.</span>
+
+<span class="sd">    Like all NPE methods, this method trains a deep neural density estimator to</span>
+<span class="sd">    directly approximate the posterior. Also like all other NPE methods, in the</span>
+<span class="sd">    first round, this density estimator is trained with a maximum-likelihood loss.</span>
+
+<span class="sd">    For the sequential mode in which the density estimator is trained across rounds,</span>
+<span class="sd">    this class implements two loss variants of NPE-C: the non-atomic and the atomic</span>
+<span class="sd">    version. The atomic loss of NPE-C can be used for any density estimator,</span>
+<span class="sd">    i.e. also for normalizing flows. However, it suffers from leakage issues. On</span>
+<span class="sd">    the other hand, the non-atomic loss can only be used only if the proposal</span>
+<span class="sd">    distribution is a mixture of Gaussians, the density estimator is a mixture of</span>
+<span class="sd">    Gaussians, and the prior is either Gaussian or Uniform. It does not suffer from</span>
+<span class="sd">    leakage issues. At the beginning of each round, we print whether the non-atomic</span>
+<span class="sd">    or the atomic version is used.</span>
+
+<span class="sd">    In this codebase, we will automatically switch to the non-atomic loss if the</span>
+<span class="sd">    following criteria are fulfilled:</span>
+
+<span class="sd">    - proposal is a `DirectPosterior` with density_estimator `mdn`, as built with</span>
+<span class="sd">      `sbi.neural_nets.posterior_nn()`.</span>
+<span class="sd">    - the density estimator is a `mdn`, as built with</span>
+<span class="sd">      `sbi.neural_nets.posterior_nn()`.</span>
+<span class="sd">    - `isinstance(prior, MultivariateNormal)` (from `torch.distributions`) or</span>
+<span class="sd">      ``isinstance(prior, sbi.utils.BoxUniform)``</span>
+
+<span class="sd">    Note that custom implementations of any of these densities (or estimators) will</span>
+<span class="sd">    not trigger the non-atomic loss, and the algorithm will fall back onto using</span>
+<span class="sd">    the atomic loss.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -4182,37 +4188,7 @@ file location (default is <code>&lt;current working directory&gt;/logs</code>.)<
         <span class="n">summary_writer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TensorboardSummaryWriter</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">show_progress_bars</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
     <span class="p">):</span>
-<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;NPE-C / APT [1].</span>
-
-<span class="sd">        [1] *Automatic Posterior Transformation for Likelihood-free Inference*,</span>
-<span class="sd">        Greenberg et al., ICML 2019, https://arxiv.org/abs/1905.07488.</span>
-
-<span class="sd">        Like all NPE methods, this method trains a deep neural density estimator to</span>
-<span class="sd">        directly approximate the posterior. Also like all other NPE methods, in the</span>
-<span class="sd">        first round, this density estimator is trained with a maximum-likelihood loss.</span>
-
-<span class="sd">        For the sequential mode in which the density estimator is trained across rounds,</span>
-<span class="sd">        this class implements two loss variants of NPE-C: the non-atomic and the atomic</span>
-<span class="sd">        version. The atomic loss of NPE-C can be used for any density estimator,</span>
-<span class="sd">        i.e. also for normalizing flows. However, it suffers from leakage issues. On</span>
-<span class="sd">        the other hand, the non-atomic loss can only be used only if the proposal</span>
-<span class="sd">        distribution is a mixture of Gaussians, the density estimator is a mixture of</span>
-<span class="sd">        Gaussians, and the prior is either Gaussian or Uniform. It does not suffer from</span>
-<span class="sd">        leakage issues. At the beginning of each round, we print whether the non-atomic</span>
-<span class="sd">        or the atomic version is used.</span>
-
-<span class="sd">        In this codebase, we will automatically switch to the non-atomic loss if the</span>
-<span class="sd">        following criteria are fulfilled:</span>
-<span class="sd">        - proposal is a `DirectPosterior` with density_estimator `mdn`, as built</span>
-<span class="sd">        with `sbi.neural_nets.posterior_nn()`.</span>
-<span class="sd">        - the density estimator is a `mdn`, as built with</span>
-<span class="sd">        `sbi.neural_nets.posterior_nn()`.</span>
-<span class="sd">        - `isinstance(prior, MultivariateNormal)` (from `torch.distributions`) or</span>
-<span class="sd">        `isinstance(prior, sbi.utils.BoxUniform)`</span>
-
-<span class="sd">        Note that custom implementations of any of these densities (or estimators) will</span>
-<span class="sd">        not trigger the non-atomic loss, and the algorithm will fall back onto using</span>
-<span class="sd">        the atomic loss.</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Initialize NPE-C.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            prior: A probability distribution that expresses prior knowledge about the</span>
@@ -4222,14 +4198,14 @@ file location (default is <code>&lt;current working directory&gt;/logs</code>.)<
 <span class="sd">                that builds a custom neural network can be provided. The function will</span>
 <span class="sd">                be called with the first batch of simulations (theta, x), which can</span>
 <span class="sd">                thus be used for shape inference and potentially for z-scoring. It</span>
-<span class="sd">                needs to return a PyTorch `nn.Module` implementing the density</span>
+<span class="sd">                needs to return a PyTorch ``nn.Module`` implementing the density</span>
 <span class="sd">                estimator. The density estimator needs to provide the methods</span>
-<span class="sd">                `.log_prob` and `.sample()`.</span>
+<span class="sd">                ``.log_prob`` and ``.sample()``.</span>
 <span class="sd">            device: Training device, e.g., &quot;cpu&quot;, &quot;cuda&quot; or &quot;cuda:{0, 1, ...}&quot;.</span>
 <span class="sd">            logging_level: Minimum severity of messages to log. One of the strings</span>
 <span class="sd">                INFO, WARNING, DEBUG, ERROR and CRITICAL.</span>
-<span class="sd">            summary_writer: A tensorboard `SummaryWriter` to control, among others, log</span>
-<span class="sd">                file location (default is `&lt;current working directory&gt;/logs`.)</span>
+<span class="sd">            summary_writer: A tensorboard ``SummaryWriter`` to control, among others,</span>
+<span class="sd">                log file location (default is ``&lt;current working directory&gt;/logs``.)</span>
 <span class="sd">            show_progress_bars: Whether to show a progressbar during training.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
 
@@ -4265,16 +4241,17 @@ file location (default is <code>&lt;current working directory&gt;/logs</code>.)<
 <span class="sd">                validation set before terminating training.</span>
 <span class="sd">            max_num_epochs: Maximum number of epochs to run. If reached, we stop</span>
 <span class="sd">                training even when the validation loss is still decreasing. Otherwise,</span>
-<span class="sd">                we train until validation loss increases (see also `stop_after_epochs`).</span>
+<span class="sd">                we train until validation loss increases (see also</span>
+<span class="sd">                ``stop_after_epochs``).</span>
 <span class="sd">            clip_max_norm: Value at which to clip the total gradient norm in order to</span>
 <span class="sd">                prevent exploding gradients. Use None for no clipping.</span>
 <span class="sd">            calibration_kernel: A function to calibrate the loss with respect to the</span>
-<span class="sd">                simulations `x`. See Lueckmann, Gonçalves et al., NeurIPS 2017.</span>
+<span class="sd">                simulations ``x``. See Lueckmann, Gonçalves et al., NeurIPS 2017.</span>
 <span class="sd">            resume_training: Can be used in case training time is limited, e.g. on a</span>
-<span class="sd">                cluster. If `True`, the split between train and validation set, the</span>
+<span class="sd">                cluster. If ``True``, the split between train and validation set, the</span>
 <span class="sd">                optimizer, the number of epochs, and the best validation log-prob will</span>
-<span class="sd">                be restored from the last time `.train()` was called.</span>
-<span class="sd">            force_first_round_loss: If `True`, train with maximum likelihood,</span>
+<span class="sd">                be restored from the last time ``.train()`` was called.</span>
+<span class="sd">            force_first_round_loss: If ``True``, train with maximum likelihood,</span>
 <span class="sd">                i.e., potentially ignoring the correction for using a proposal</span>
 <span class="sd">                distribution different from the prior.</span>
 <span class="sd">            discard_prior_samples: Whether to discard samples simulated in round 1, i.e.</span>
@@ -4838,32 +4815,7 @@ file location (default is <code>&lt;current working directory&gt;/logs</code>.)<
 
     <div class="doc doc-contents ">
 
-        <p>NPE-C / APT [1].</p>
-<p>[1] <em>Automatic Posterior Transformation for Likelihood-free Inference</em>,
-Greenberg et al., ICML 2019, <a href="https://arxiv.org/abs/1905.07488">https://arxiv.org/abs/1905.07488</a>.</p>
-<p>Like all NPE methods, this method trains a deep neural density estimator to
-directly approximate the posterior. Also like all other NPE methods, in the
-first round, this density estimator is trained with a maximum-likelihood loss.</p>
-<p>For the sequential mode in which the density estimator is trained across rounds,
-this class implements two loss variants of NPE-C: the non-atomic and the atomic
-version. The atomic loss of NPE-C can be used for any density estimator,
-i.e. also for normalizing flows. However, it suffers from leakage issues. On
-the other hand, the non-atomic loss can only be used only if the proposal
-distribution is a mixture of Gaussians, the density estimator is a mixture of
-Gaussians, and the prior is either Gaussian or Uniform. It does not suffer from
-leakage issues. At the beginning of each round, we print whether the non-atomic
-or the atomic version is used.</p>
-<p>In this codebase, we will automatically switch to the non-atomic loss if the
-following criteria are fulfilled:
-- proposal is a <code>DirectPosterior</code> with density_estimator <code>mdn</code>, as built
-with <code>sbi.neural_nets.posterior_nn()</code>.
-- the density estimator is a <code>mdn</code>, as built with
-<code>sbi.neural_nets.posterior_nn()</code>.
-- <code>isinstance(prior, MultivariateNormal)</code> (from <code>torch.distributions</code>) or
-<code>isinstance(prior, sbi.utils.BoxUniform)</code></p>
-<p>Note that custom implementations of any of these densities (or estimators) will
-not trigger the non-atomic loss, and the algorithm will fall back onto using
-the atomic loss.</p>
+        <p>Initialize NPE-C.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -4959,8 +4911,8 @@ INFO, WARNING, DEBUG, ERROR and CRITICAL.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>A tensorboard <code>SummaryWriter</code> to control, among others, log
-file location (default is <code>&lt;current working directory&gt;/logs</code>.)</p>
+                <p>A tensorboard <code>SummaryWriter</code> to control, among others,
+log file location (default is <code>&lt;current working directory&gt;/logs</code>.)</p>
               </div>
             </td>
             <td>
@@ -4989,39 +4941,7 @@ file location (default is <code>&lt;current working directory&gt;/logs</code>.)<
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/trainers/npe/npe_c.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">34</span>
-<span class="normal">35</span>
-<span class="normal">36</span>
-<span class="normal">37</span>
-<span class="normal">38</span>
-<span class="normal">39</span>
-<span class="normal">40</span>
-<span class="normal">41</span>
-<span class="normal">42</span>
-<span class="normal">43</span>
-<span class="normal">44</span>
-<span class="normal">45</span>
-<span class="normal">46</span>
-<span class="normal">47</span>
-<span class="normal">48</span>
-<span class="normal">49</span>
-<span class="normal">50</span>
-<span class="normal">51</span>
-<span class="normal">52</span>
-<span class="normal">53</span>
-<span class="normal">54</span>
-<span class="normal">55</span>
-<span class="normal">56</span>
-<span class="normal">57</span>
-<span class="normal">58</span>
-<span class="normal">59</span>
-<span class="normal">60</span>
-<span class="normal">61</span>
-<span class="normal">62</span>
-<span class="normal">63</span>
-<span class="normal">64</span>
-<span class="normal">65</span>
-<span class="normal">66</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">66</span>
 <span class="normal">67</span>
 <span class="normal">68</span>
 <span class="normal">69</span>
@@ -5050,7 +4970,9 @@ file location (default is <code>&lt;current working directory&gt;/logs</code>.)<
 <span class="normal">92</span>
 <span class="normal">93</span>
 <span class="normal">94</span>
-<span class="normal">95</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">95</span>
+<span class="normal">96</span>
+<span class="normal">97</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;maf&quot;</span><span class="p">,</span>
@@ -5059,37 +4981,7 @@ file location (default is <code>&lt;current working directory&gt;/logs</code>.)<
     <span class="n">summary_writer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TensorboardSummaryWriter</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">show_progress_bars</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
 <span class="p">):</span>
-<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;NPE-C / APT [1].</span>
-
-<span class="sd">    [1] *Automatic Posterior Transformation for Likelihood-free Inference*,</span>
-<span class="sd">    Greenberg et al., ICML 2019, https://arxiv.org/abs/1905.07488.</span>
-
-<span class="sd">    Like all NPE methods, this method trains a deep neural density estimator to</span>
-<span class="sd">    directly approximate the posterior. Also like all other NPE methods, in the</span>
-<span class="sd">    first round, this density estimator is trained with a maximum-likelihood loss.</span>
-
-<span class="sd">    For the sequential mode in which the density estimator is trained across rounds,</span>
-<span class="sd">    this class implements two loss variants of NPE-C: the non-atomic and the atomic</span>
-<span class="sd">    version. The atomic loss of NPE-C can be used for any density estimator,</span>
-<span class="sd">    i.e. also for normalizing flows. However, it suffers from leakage issues. On</span>
-<span class="sd">    the other hand, the non-atomic loss can only be used only if the proposal</span>
-<span class="sd">    distribution is a mixture of Gaussians, the density estimator is a mixture of</span>
-<span class="sd">    Gaussians, and the prior is either Gaussian or Uniform. It does not suffer from</span>
-<span class="sd">    leakage issues. At the beginning of each round, we print whether the non-atomic</span>
-<span class="sd">    or the atomic version is used.</span>
-
-<span class="sd">    In this codebase, we will automatically switch to the non-atomic loss if the</span>
-<span class="sd">    following criteria are fulfilled:</span>
-<span class="sd">    - proposal is a `DirectPosterior` with density_estimator `mdn`, as built</span>
-<span class="sd">    with `sbi.neural_nets.posterior_nn()`.</span>
-<span class="sd">    - the density estimator is a `mdn`, as built with</span>
-<span class="sd">    `sbi.neural_nets.posterior_nn()`.</span>
-<span class="sd">    - `isinstance(prior, MultivariateNormal)` (from `torch.distributions`) or</span>
-<span class="sd">    `isinstance(prior, sbi.utils.BoxUniform)`</span>
-
-<span class="sd">    Note that custom implementations of any of these densities (or estimators) will</span>
-<span class="sd">    not trigger the non-atomic loss, and the algorithm will fall back onto using</span>
-<span class="sd">    the atomic loss.</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Initialize NPE-C.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        prior: A probability distribution that expresses prior knowledge about the</span>
@@ -5099,14 +4991,14 @@ file location (default is <code>&lt;current working directory&gt;/logs</code>.)<
 <span class="sd">            that builds a custom neural network can be provided. The function will</span>
 <span class="sd">            be called with the first batch of simulations (theta, x), which can</span>
 <span class="sd">            thus be used for shape inference and potentially for z-scoring. It</span>
-<span class="sd">            needs to return a PyTorch `nn.Module` implementing the density</span>
+<span class="sd">            needs to return a PyTorch ``nn.Module`` implementing the density</span>
 <span class="sd">            estimator. The density estimator needs to provide the methods</span>
-<span class="sd">            `.log_prob` and `.sample()`.</span>
+<span class="sd">            ``.log_prob`` and ``.sample()``.</span>
 <span class="sd">        device: Training device, e.g., &quot;cpu&quot;, &quot;cuda&quot; or &quot;cuda:{0, 1, ...}&quot;.</span>
 <span class="sd">        logging_level: Minimum severity of messages to log. One of the strings</span>
 <span class="sd">            INFO, WARNING, DEBUG, ERROR and CRITICAL.</span>
-<span class="sd">        summary_writer: A tensorboard `SummaryWriter` to control, among others, log</span>
-<span class="sd">            file location (default is `&lt;current working directory&gt;/logs`.)</span>
+<span class="sd">        summary_writer: A tensorboard ``SummaryWriter`` to control, among others,</span>
+<span class="sd">            log file location (default is ``&lt;current working directory&gt;/logs``.)</span>
 <span class="sd">        show_progress_bars: Whether to show a progressbar during training.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
@@ -5235,7 +5127,8 @@ validation set before terminating training.</p>
               <div class="doc-md-description">
                 <p>Maximum number of epochs to run. If reached, we stop
 training even when the validation loss is still decreasing. Otherwise,
-we train until validation loss increases (see also <code>stop_after_epochs</code>).</p>
+we train until validation loss increases (see also
+<code>stop_after_epochs</code>).</p>
               </div>
             </td>
             <td>
@@ -5430,9 +5323,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/trainers/npe/npe_c.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 97</span>
-<span class="normal"> 98</span>
-<span class="normal"> 99</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 99</span>
 <span class="normal">100</span>
 <span class="normal">101</span>
 <span class="normal">102</span>
@@ -5524,7 +5415,10 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 <span class="normal">188</span>
 <span class="normal">189</span>
 <span class="normal">190</span>
-<span class="normal">191</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
+<span class="normal">191</span>
+<span class="normal">192</span>
+<span class="normal">193</span>
+<span class="normal">194</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">num_atoms</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span>
     <span class="n">training_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">200</span><span class="p">,</span>
@@ -5553,16 +5447,17 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 <span class="sd">            validation set before terminating training.</span>
 <span class="sd">        max_num_epochs: Maximum number of epochs to run. If reached, we stop</span>
 <span class="sd">            training even when the validation loss is still decreasing. Otherwise,</span>
-<span class="sd">            we train until validation loss increases (see also `stop_after_epochs`).</span>
+<span class="sd">            we train until validation loss increases (see also</span>
+<span class="sd">            ``stop_after_epochs``).</span>
 <span class="sd">        clip_max_norm: Value at which to clip the total gradient norm in order to</span>
 <span class="sd">            prevent exploding gradients. Use None for no clipping.</span>
 <span class="sd">        calibration_kernel: A function to calibrate the loss with respect to the</span>
-<span class="sd">            simulations `x`. See Lueckmann, Gonçalves et al., NeurIPS 2017.</span>
+<span class="sd">            simulations ``x``. See Lueckmann, Gonçalves et al., NeurIPS 2017.</span>
 <span class="sd">        resume_training: Can be used in case training time is limited, e.g. on a</span>
-<span class="sd">            cluster. If `True`, the split between train and validation set, the</span>
+<span class="sd">            cluster. If ``True``, the split between train and validation set, the</span>
 <span class="sd">            optimizer, the number of epochs, and the best validation log-prob will</span>
-<span class="sd">            be restored from the last time `.train()` was called.</span>
-<span class="sd">        force_first_round_loss: If `True`, train with maximum likelihood,</span>
+<span class="sd">            be restored from the last time ``.train()`` was called.</span>
+<span class="sd">        force_first_round_loss: If ``True``, train with maximum likelihood,</span>
 <span class="sd">            i.e., potentially ignoring the correction for using a proposal</span>
 <span class="sd">            distribution different from the prior.</span>
 <span class="sd">        discard_prior_samples: Whether to discard samples simulated in round 1, i.e.</span>
@@ -5649,7 +5544,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
               Bases: <code><span title="sbi.inference.trainers.npse.vector_field_inference.VectorFieldInference">VectorFieldInference</span></code></p>
 
 
-        <p>Implements the Flow Matching Posterior Estimator (FMPE) for sbi.</p>
+        <p>Flow Matching Posterior Estimation (FMPE).</p>
 
 
 
@@ -5745,12 +5640,8 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 <span class="normal">103</span>
 <span class="normal">104</span>
 <span class="normal">105</span>
-<span class="normal">106</span>
-<span class="normal">107</span>
-<span class="normal">108</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FMPE</span><span class="p">(</span><span class="n">VectorFieldInference</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Implements the Flow Matching Posterior Estimator (FMPE) for sbi.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="normal">106</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FMPE</span><span class="p">(</span><span class="n">VectorFieldInference</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Flow Matching Posterior Estimation (FMPE).&quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -5998,7 +5889,9 @@ with <code>__call__</code> that receives <code>theta</code> and <code>x</code> a
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/trainers/fmpe/fmpe.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">25</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">23</span>
+<span class="normal">24</span>
+<span class="normal">25</span>
 <span class="normal">26</span>
 <span class="normal">27</span>
 <span class="normal">28</span>
@@ -6031,9 +5924,7 @@ with <code>__call__</code> that receives <code>theta</code> and <code>x</code> a
 <span class="normal">55</span>
 <span class="normal">56</span>
 <span class="normal">57</span>
-<span class="normal">58</span>
-<span class="normal">59</span>
-<span class="normal">60</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">58</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">],</span>
     <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">VectorFieldEstimatorBuilder</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;mlp&quot;</span><span class="p">,</span>
@@ -6206,7 +6097,9 @@ a numerical ODE solver.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/trainers/fmpe/fmpe.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 68</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 66</span>
+<span class="normal"> 67</span>
+<span class="normal"> 68</span>
 <span class="normal"> 69</span>
 <span class="normal"> 70</span>
 <span class="normal"> 71</span>
@@ -6244,9 +6137,7 @@ a numerical ODE solver.</p>
 <span class="normal">103</span>
 <span class="normal">104</span>
 <span class="normal">105</span>
-<span class="normal">106</span>
-<span class="normal">107</span>
-<span class="normal">108</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_posterior</span><span class="p">(</span>
+<span class="normal">106</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_posterior</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">vector_field_estimator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">ConditionalVectorFieldEstimator</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -6318,6 +6209,12 @@ a numerical ODE solver.</p>
 
 
         <p>Neural Posterior Score Estimation as in Geffner et al. and Sharrock et al.</p>
+<p>Instead of performing conditonal <em>density</em> estimation, NPSE methods perform
+conditional <em>score</em> estimation i.e. they estimate the gradient of the log
+density using denoising score matching loss.</p>
+<p>NOTE: NPSE does not support multi-round inference with flexible proposals yet.
+You can try to run multi-round with truncated proposals, but note that this is
+not tested yet.</p>
 
 
 
@@ -6429,9 +6326,16 @@ a numerical ODE solver.</p>
 <span class="normal">117</span>
 <span class="normal">118</span>
 <span class="normal">119</span>
-<span class="normal">120</span>
-<span class="normal">121</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NPSE</span><span class="p">(</span><span class="n">VectorFieldInference</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Neural Posterior Score Estimation as in Geffner et al. and Sharrock et al.&quot;&quot;&quot;</span>
+<span class="normal">120</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NPSE</span><span class="p">(</span><span class="n">VectorFieldInference</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Neural Posterior Score Estimation as in Geffner et al. and Sharrock et al.</span>
+
+<span class="sd">    Instead of performing conditonal *density* estimation, NPSE methods perform</span>
+<span class="sd">    conditional *score* estimation i.e. they estimate the gradient of the log</span>
+<span class="sd">    density using denoising score matching loss.</span>
+
+<span class="sd">    NOTE: NPSE does not support multi-round inference with flexible proposals yet.</span>
+<span class="sd">    You can try to run multi-round with truncated proposals, but note that this is</span>
+<span class="sd">    not tested yet.&quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -6444,16 +6348,7 @@ a numerical ODE solver.</p>
         <span class="n">show_progress_bars</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
         <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
     <span class="p">):</span>
-<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Base class for Neural Posterior Score Estimation methods.</span>
-
-<span class="sd">        Instead of performing conditonal *density* estimation, NPSE methods perform</span>
-<span class="sd">        conditional *score* estimation i.e. they estimate the gradient of the log</span>
-<span class="sd">        density using denoising score matching loss.</span>
-
-<span class="sd">        NOTE: NPSE does not support multi-round inference with flexible proposals yet.</span>
-<span class="sd">        You can try to run multi-round with truncated proposals, but note that this is</span>
-<span class="sd">        not tested yet.</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Initialize Neural Posterior Score Estimation.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            prior: Prior distribution.</span>
@@ -6560,13 +6455,7 @@ a numerical ODE solver.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Base class for Neural Posterior Score Estimation methods.</p>
-<p>Instead of performing conditonal <em>density</em> estimation, NPSE methods perform
-conditional <em>score</em> estimation i.e. they estimate the gradient of the log
-density using denoising score matching loss.</p>
-<p>NOTE: NPSE does not support multi-round inference with flexible proposals yet.
-You can try to run multi-round with truncated proposals, but note that this is
-not tested yet.</p>
+        <p>Initialize Neural Posterior Score Estimation.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -6729,15 +6618,7 @@ string.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/trainers/npse/npse.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">21</span>
-<span class="normal">22</span>
-<span class="normal">23</span>
-<span class="normal">24</span>
-<span class="normal">25</span>
-<span class="normal">26</span>
-<span class="normal">27</span>
-<span class="normal">28</span>
-<span class="normal">29</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">29</span>
 <span class="normal">30</span>
 <span class="normal">31</span>
 <span class="normal">32</span>
@@ -6781,8 +6662,7 @@ string.</p>
 <span class="normal">70</span>
 <span class="normal">71</span>
 <span class="normal">72</span>
-<span class="normal">73</span>
-<span class="normal">74</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">73</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">score_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">VectorFieldEstimatorBuilder</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;mlp&quot;</span><span class="p">,</span>
@@ -6793,16 +6673,7 @@ string.</p>
     <span class="n">show_progress_bars</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
     <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
 <span class="p">):</span>
-<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Base class for Neural Posterior Score Estimation methods.</span>
-
-<span class="sd">    Instead of performing conditonal *density* estimation, NPSE methods perform</span>
-<span class="sd">    conditional *score* estimation i.e. they estimate the gradient of the log</span>
-<span class="sd">    density using denoising score matching loss.</span>
-
-<span class="sd">    NOTE: NPSE does not support multi-round inference with flexible proposals yet.</span>
-<span class="sd">    You can try to run multi-round with truncated proposals, but note that this is</span>
-<span class="sd">    not tested yet.</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Initialize Neural Posterior Score Estimation.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        prior: Prior distribution.</span>
@@ -6972,7 +6843,8 @@ probabilistic ODE with a numerical ODE solver.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/trainers/npse/npse.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 82</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 81</span>
+<span class="normal"> 82</span>
 <span class="normal"> 83</span>
 <span class="normal"> 84</span>
 <span class="normal"> 85</span>
@@ -7010,8 +6882,7 @@ probabilistic ODE with a numerical ODE solver.</p>
 <span class="normal">117</span>
 <span class="normal">118</span>
 <span class="normal">119</span>
-<span class="normal">120</span>
-<span class="normal">121</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_posterior</span><span class="p">(</span>
+<span class="normal">120</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_posterior</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">vector_field_estimator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">ConditionalVectorFieldEstimator</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -7081,7 +6952,10 @@ probabilistic ODE with a numerical ODE solver.</p>
               Bases: <code><span title="sbi.inference.trainers.nle.nle_base.LikelihoodEstimator">LikelihoodEstimator</span></code></p>
 
 
-        <p>Neural Likelihood Estimation algorithm (NLE) as in Papamakarios et al. (2019).</p>
+        <p>Neural Likelihood Estimation (NLE) as in Papamakarios et al. (2019) [1].</p>
+<p>[1] Sequential Neural Likelihood: Fast Likelihood-free Inference with
+    Autoregressive Flows, Papamakarios et al., AISTATS 2019,
+    <a href="https://arxiv.org/abs/1805.07226">https://arxiv.org/abs/1805.07226</a></p>
 
 
 
@@ -7131,8 +7005,14 @@ probabilistic ODE with a numerical ODE solver.</p>
 <span class="normal">50</span>
 <span class="normal">51</span>
 <span class="normal">52</span>
-<span class="normal">53</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NLE_A</span><span class="p">(</span><span class="n">LikelihoodEstimator</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Neural Likelihood Estimation algorithm (NLE) as in Papamakarios et al. (2019).&quot;&quot;&quot;</span>
+<span class="normal">53</span>
+<span class="normal">54</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NLE_A</span><span class="p">(</span><span class="n">LikelihoodEstimator</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Neural Likelihood Estimation (NLE) as in Papamakarios et al. (2019) [1].</span>
+
+<span class="sd">    [1] Sequential Neural Likelihood: Fast Likelihood-free Inference with</span>
+<span class="sd">        Autoregressive Flows, Papamakarios et al., AISTATS 2019,</span>
+<span class="sd">        https://arxiv.org/abs/1805.07226</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -7143,11 +7023,7 @@ probabilistic ODE with a numerical ODE solver.</p>
         <span class="n">summary_writer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TensorboardSummaryWriter</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">show_progress_bars</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
     <span class="p">):</span>
-<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Neural Likelihood Estimation [1].</span>
-
-<span class="sd">        [1] Sequential Neural Likelihood: Fast Likelihood-free Inference with</span>
-<span class="sd">        Autoregressive Flows, Papamakarios et al., AISTATS 2019,</span>
-<span class="sd">        https://arxiv.org/abs/1805.07226</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Initialize Neural Likelihood Estimation.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            prior: A probability distribution that expresses prior knowledge about the</span>
@@ -7198,10 +7074,7 @@ probabilistic ODE with a numerical ODE solver.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Neural Likelihood Estimation [1].</p>
-<p>[1] Sequential Neural Likelihood: Fast Likelihood-free Inference with
-Autoregressive Flows, Papamakarios et al., AISTATS 2019,
-<a href="https://arxiv.org/abs/1805.07226">https://arxiv.org/abs/1805.07226</a></p>
+        <p>Initialize Neural Likelihood Estimation.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -7329,12 +7202,7 @@ sampling.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/trainers/nle/nle_a.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">16</span>
-<span class="normal">17</span>
-<span class="normal">18</span>
-<span class="normal">19</span>
-<span class="normal">20</span>
-<span class="normal">21</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">21</span>
 <span class="normal">22</span>
 <span class="normal">23</span>
 <span class="normal">24</span>
@@ -7366,7 +7234,8 @@ sampling.</p>
 <span class="normal">50</span>
 <span class="normal">51</span>
 <span class="normal">52</span>
-<span class="normal">53</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">53</span>
+<span class="normal">54</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;maf&quot;</span><span class="p">,</span>
@@ -7375,11 +7244,7 @@ sampling.</p>
     <span class="n">summary_writer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TensorboardSummaryWriter</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">show_progress_bars</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
 <span class="p">):</span>
-<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Neural Likelihood Estimation [1].</span>
-
-<span class="sd">    [1] Sequential Neural Likelihood: Fast Likelihood-free Inference with</span>
-<span class="sd">    Autoregressive Flows, Papamakarios et al., AISTATS 2019,</span>
-<span class="sd">    https://arxiv.org/abs/1805.07226</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Initialize Neural Likelihood Estimation.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        prior: A probability distribution that expresses prior knowledge about the</span>
@@ -7434,7 +7299,9 @@ sampling.</p>
               Bases: <code><span title="sbi.inference.trainers.nre.nre_base.RatioEstimator">RatioEstimator</span></code></p>
 
 
-        <p>Neural Ratio Estimation algorithm (NRE-A) as in Hermans et al. (2020).</p>
+        <p>AALR, here known as Neural Ratio Estimation algorithm (NRE-A) [1].</p>
+<p>[1] <em>Likelihood-free MCMC with Amortized Approximate Likelihood Ratios</em>, Hermans
+    et al., ICML 2020, <a href="https://arxiv.org/abs/1903.04057">https://arxiv.org/abs/1903.04057</a></p>
 
 
 
@@ -7560,8 +7427,13 @@ sampling.</p>
 <span class="normal">129</span>
 <span class="normal">130</span>
 <span class="normal">131</span>
-<span class="normal">132</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NRE_A</span><span class="p">(</span><span class="n">RatioEstimator</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Neural Ratio Estimation algorithm (NRE-A) as in Hermans et al. (2020).&quot;&quot;&quot;</span>
+<span class="normal">132</span>
+<span class="normal">133</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NRE_A</span><span class="p">(</span><span class="n">RatioEstimator</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;AALR, here known as Neural Ratio Estimation algorithm (NRE-A) [1].</span>
+
+<span class="sd">    [1] *Likelihood-free MCMC with Amortized Approximate Likelihood Ratios*, Hermans</span>
+<span class="sd">        et al., ICML 2020, https://arxiv.org/abs/1903.04057</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -7572,10 +7444,7 @@ sampling.</p>
         <span class="n">summary_writer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TensorboardSummaryWriter</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">show_progress_bars</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
     <span class="p">):</span>
-<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;AALR[1], here known as NRE_A.</span>
-
-<span class="sd">        [1] *Likelihood-free MCMC with Amortized Approximate Likelihood Ratios*, Hermans</span>
-<span class="sd">            et al., ICML 2020, https://arxiv.org/abs/1903.04057</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Initialize NRE_A.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            prior: A probability distribution that expresses prior knowledge about the</span>
@@ -7703,9 +7572,7 @@ sampling.</p>
 
     <div class="doc doc-contents ">
 
-        <p>AALR[1], here known as NRE_A.</p>
-<p>[1] <em>Likelihood-free MCMC with Amortized Approximate Likelihood Ratios</em>, Hermans
-    et al., ICML 2020, <a href="https://arxiv.org/abs/1903.04057">https://arxiv.org/abs/1903.04057</a></p>
+        <p>Initialize NRE_A.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -7832,11 +7699,7 @@ sampling.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/trainers/nre/nre_a.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">19</span>
-<span class="normal">20</span>
-<span class="normal">21</span>
-<span class="normal">22</span>
-<span class="normal">23</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">23</span>
 <span class="normal">24</span>
 <span class="normal">25</span>
 <span class="normal">26</span>
@@ -7867,7 +7730,8 @@ sampling.</p>
 <span class="normal">51</span>
 <span class="normal">52</span>
 <span class="normal">53</span>
-<span class="normal">54</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">54</span>
+<span class="normal">55</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">classifier</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;resnet&quot;</span><span class="p">,</span>
@@ -7876,10 +7740,7 @@ sampling.</p>
     <span class="n">summary_writer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TensorboardSummaryWriter</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">show_progress_bars</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
 <span class="p">):</span>
-<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;AALR[1], here known as NRE_A.</span>
-
-<span class="sd">    [1] *Likelihood-free MCMC with Amortized Approximate Likelihood Ratios*, Hermans</span>
-<span class="sd">        et al., ICML 2020, https://arxiv.org/abs/1903.04057</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Initialize NRE_A.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        prior: A probability distribution that expresses prior knowledge about the</span>
@@ -8167,8 +8028,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/trainers/nre/nre_a.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 56</span>
-<span class="normal"> 57</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 57</span>
 <span class="normal"> 58</span>
 <span class="normal"> 59</span>
 <span class="normal"> 60</span>
@@ -8217,7 +8077,8 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 <span class="normal">103</span>
 <span class="normal">104</span>
 <span class="normal">105</span>
-<span class="normal">106</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
+<span class="normal">106</span>
+<span class="normal">107</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">training_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">200</span><span class="p">,</span>
     <span class="n">learning_rate</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">5e-4</span><span class="p">,</span>
@@ -8298,7 +8159,9 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
               Bases: <code><span title="sbi.inference.trainers.nre.nre_base.RatioEstimator">RatioEstimator</span></code></p>
 
 
-        <p>Neural Ratio Estimation  algorithm (NRE-B) as in Durkan et al. (2020).</p>
+        <p>SRE, here known as Neural Ratio Estimation algorithm (NRE-B) [1].</p>
+<p>[1] <em>On Contrastive Learning for Likelihood-free Inference</em>, Durkan et al.,
+    ICML 2020, <a href="https://arxiv.org/pdf/2002.03712">https://arxiv.org/pdf/2002.03712</a></p>
 
 
 
@@ -8422,8 +8285,13 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 <span class="normal">127</span>
 <span class="normal">128</span>
 <span class="normal">129</span>
-<span class="normal">130</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NRE_B</span><span class="p">(</span><span class="n">RatioEstimator</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Neural Ratio Estimation  algorithm (NRE-B) as in Durkan et al. (2020).&quot;&quot;&quot;</span>
+<span class="normal">130</span>
+<span class="normal">131</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NRE_B</span><span class="p">(</span><span class="n">RatioEstimator</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;SRE, here known as Neural Ratio Estimation algorithm (NRE-B) [1].</span>
+
+<span class="sd">    [1] *On Contrastive Learning for Likelihood-free Inference*, Durkan et al.,</span>
+<span class="sd">        ICML 2020, https://arxiv.org/pdf/2002.03712</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -8434,10 +8302,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
         <span class="n">summary_writer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TensorboardSummaryWriter</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">show_progress_bars</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
     <span class="p">):</span>
-<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;SRE[1], here known as NRE_B.</span>
-
-<span class="sd">        [1] *On Contrastive Learning for Likelihood-free Inference*, Durkan et al.,</span>
-<span class="sd">            ICML 2020, https://arxiv.org/pdf/2002.03712</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Initialize NRE_B.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            prior: A probability distribution that expresses prior knowledge about the</span>
@@ -8563,9 +8428,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 
     <div class="doc doc-contents ">
 
-        <p>SRE[1], here known as NRE_B.</p>
-<p>[1] <em>On Contrastive Learning for Likelihood-free Inference</em>, Durkan et al.,
-    ICML 2020, <a href="https://arxiv.org/pdf/2002.03712">https://arxiv.org/pdf/2002.03712</a></p>
+        <p>Initialize NRE_B.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -8692,11 +8555,7 @@ sampling.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/trainers/nre/nre_b.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">19</span>
-<span class="normal">20</span>
-<span class="normal">21</span>
-<span class="normal">22</span>
-<span class="normal">23</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">23</span>
 <span class="normal">24</span>
 <span class="normal">25</span>
 <span class="normal">26</span>
@@ -8727,7 +8586,8 @@ sampling.</p>
 <span class="normal">51</span>
 <span class="normal">52</span>
 <span class="normal">53</span>
-<span class="normal">54</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">54</span>
+<span class="normal">55</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">classifier</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;resnet&quot;</span><span class="p">,</span>
@@ -8736,10 +8596,7 @@ sampling.</p>
     <span class="n">summary_writer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TensorboardSummaryWriter</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">show_progress_bars</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
 <span class="p">):</span>
-<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;SRE[1], here known as NRE_B.</span>
-
-<span class="sd">    [1] *On Contrastive Learning for Likelihood-free Inference*, Durkan et al.,</span>
-<span class="sd">        ICML 2020, https://arxiv.org/pdf/2002.03712</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Initialize NRE_B.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        prior: A probability distribution that expresses prior knowledge about the</span>
@@ -9027,8 +8884,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/trainers/nre/nre_b.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 56</span>
-<span class="normal"> 57</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 57</span>
 <span class="normal"> 58</span>
 <span class="normal"> 59</span>
 <span class="normal"> 60</span>
@@ -9074,7 +8930,8 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 <span class="normal">100</span>
 <span class="normal">101</span>
 <span class="normal">102</span>
-<span class="normal">103</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
+<span class="normal">103</span>
+<span class="normal">104</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">num_atoms</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span>
     <span class="n">training_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">200</span><span class="p">,</span>
@@ -9152,7 +9009,20 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
               Bases: <code><span title="sbi.inference.trainers.nre.nre_base.RatioEstimator">RatioEstimator</span></code></p>
 
 
-        <p>Neural Ratio Estimation (NRE-C) algorithm.</p>
+        <p>NRE-C [1] is a generalization of amortized versions of NRE_A and NRE_B.</p>
+<p>NRE-C:
+(1) Like NRE_B, features a &ldquo;multiclass&rdquo; loss function where several marginally
+drawn parameter-data pairs are contrasted against a jointly drawn pair.</p>
+<p>(2) Like AALR/NRE_A (i.e., the non-sequential version of NRE_A), it encourages
+the approximate ratio :math:<code>p(\theta,x)/p(\theta)p(x)</code>, accessed through
+<code>.potential()</code> within <code>sbi</code>, to be exact at optimum. This addresses the
+issue that NRE_B estimates this ratio only up to an arbitrary function
+(normalizing constant) of the data :math:<code>x</code>.</p>
+<p>Just like for all ratio estimation algorithms, the sequential version of NRE_C
+will be estimated only up to a function (normalizing constant) of the data
+:math:<code>x</code> in rounds after the first.</p>
+<p>[1] <em>Contrastive Neural Ratio Estimation</em>, Benajmin Kurt Miller, et. al.,
+    NeurIPS 2022, <a href="https://arxiv.org/abs/2210.06170">https://arxiv.org/abs/2210.06170</a></p>
 
 
 
@@ -9358,8 +9228,27 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 <span class="normal">209</span>
 <span class="normal">210</span>
 <span class="normal">211</span>
-<span class="normal">212</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NRE_C</span><span class="p">(</span><span class="n">RatioEstimator</span><span class="p">):</span>
-<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Neural Ratio Estimation (NRE-C) algorithm.&quot;&quot;&quot;</span>
+<span class="normal">212</span>
+<span class="normal">213</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NRE_C</span><span class="p">(</span><span class="n">RatioEstimator</span><span class="p">):</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;NRE-C [1] is a generalization of amortized versions of NRE_A and NRE_B.</span>
+
+<span class="sd">    NRE-C:</span>
+<span class="sd">    (1) Like NRE_B, features a &quot;multiclass&quot; loss function where several marginally</span>
+<span class="sd">    drawn parameter-data pairs are contrasted against a jointly drawn pair.</span>
+
+<span class="sd">    (2) Like AALR/NRE_A (i.e., the non-sequential version of NRE_A), it encourages</span>
+<span class="sd">    the approximate ratio :math:`p(\theta,x)/p(\theta)p(x)`, accessed through</span>
+<span class="sd">    `.potential()` within `sbi`, to be exact at optimum. This addresses the</span>
+<span class="sd">    issue that NRE_B estimates this ratio only up to an arbitrary function</span>
+<span class="sd">    (normalizing constant) of the data :math:`x`.</span>
+
+<span class="sd">    Just like for all ratio estimation algorithms, the sequential version of NRE_C</span>
+<span class="sd">    will be estimated only up to a function (normalizing constant) of the data</span>
+<span class="sd">    :math:`x` in rounds after the first.</span>
+
+<span class="sd">    [1] *Contrastive Neural Ratio Estimation*, Benajmin Kurt Miller, et. al.,</span>
+<span class="sd">        NeurIPS 2022, https://arxiv.org/abs/2210.06170</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -9370,24 +9259,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
         <span class="n">summary_writer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TensorboardSummaryWriter</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">show_progress_bars</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
     <span class="p">):</span>
-<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;NRE-C [1] is a generalization of amortized versions of NRE_A and NRE_B.</span>
-
-<span class="sd">        NRE-C:</span>
-<span class="sd">        (1) Like NRE_B, features a &quot;multiclass&quot; loss function where several marginally</span>
-<span class="sd">        drawn parameter-data pairs are contrasted against a jointly drawn pair.</span>
-
-<span class="sd">        (2) Like AALR/NRE_A (i.e., the non-sequential version of NRE_A), it encourages</span>
-<span class="sd">        the approximate ratio :math:`p(\theta,x)/p(\theta)p(x)`, accessed through</span>
-<span class="sd">        `.potential()` within `sbi`, to be exact at optimum. This addresses the</span>
-<span class="sd">        issue that NRE_B estimates this ratio only up to an arbitrary function</span>
-<span class="sd">        (normalizing constant) of the data :math:`x`.</span>
-
-<span class="sd">        Just like for all ratio estimation algorithms, the sequential version of NRE_C</span>
-<span class="sd">        will be estimated only up to a function (normalizing constant) of the data</span>
-<span class="sd">        :math:`x` in rounds after the first.</span>
-
-<span class="sd">        [1] *Contrastive Neural Ratio Estimation*, Benajmin Kurt Miller, et. al.,</span>
-<span class="sd">            NeurIPS 2022, https://arxiv.org/abs/2210.06170</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Initialize NRE-C.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            prior: A probability distribution that expresses prior knowledge about the</span>
@@ -9581,20 +9453,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 
     <div class="doc doc-contents ">
 
-        <p>NRE-C [1] is a generalization of amortized versions of NRE_A and NRE_B.</p>
-<p>NRE-C:
-(1) Like NRE_B, features a &ldquo;multiclass&rdquo; loss function where several marginally
-drawn parameter-data pairs are contrasted against a jointly drawn pair.</p>
-<p>(2) Like AALR/NRE_A (i.e., the non-sequential version of NRE_A), it encourages
-the approximate ratio :math:<code>p(\theta,x)/p(\theta)p(x)</code>, accessed through
-<code>.potential()</code> within <code>sbi</code>, to be exact at optimum. This addresses the
-issue that NRE_B estimates this ratio only up to an arbitrary function
-(normalizing constant) of the data :math:<code>x</code>.</p>
-<p>Just like for all ratio estimation algorithms, the sequential version of NRE_C
-will be estimated only up to a function (normalizing constant) of the data
-:math:<code>x</code> in rounds after the first.</p>
-<p>[1] <em>Contrastive Neural Ratio Estimation</em>, Benajmin Kurt Miller, et. al.,
-    NeurIPS 2022, <a href="https://arxiv.org/abs/2210.06170">https://arxiv.org/abs/2210.06170</a></p>
+        <p>Initialize NRE-C.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -9721,25 +9580,7 @@ sampling.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/trainers/nre/nre_c.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">19</span>
-<span class="normal">20</span>
-<span class="normal">21</span>
-<span class="normal">22</span>
-<span class="normal">23</span>
-<span class="normal">24</span>
-<span class="normal">25</span>
-<span class="normal">26</span>
-<span class="normal">27</span>
-<span class="normal">28</span>
-<span class="normal">29</span>
-<span class="normal">30</span>
-<span class="normal">31</span>
-<span class="normal">32</span>
-<span class="normal">33</span>
-<span class="normal">34</span>
-<span class="normal">35</span>
-<span class="normal">36</span>
-<span class="normal">37</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">37</span>
 <span class="normal">38</span>
 <span class="normal">39</span>
 <span class="normal">40</span>
@@ -9770,7 +9611,8 @@ sampling.</p>
 <span class="normal">65</span>
 <span class="normal">66</span>
 <span class="normal">67</span>
-<span class="normal">68</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">68</span>
+<span class="normal">69</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">classifier</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;resnet&quot;</span><span class="p">,</span>
@@ -9779,24 +9621,7 @@ sampling.</p>
     <span class="n">summary_writer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TensorboardSummaryWriter</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">show_progress_bars</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
 <span class="p">):</span>
-<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;NRE-C [1] is a generalization of amortized versions of NRE_A and NRE_B.</span>
-
-<span class="sd">    NRE-C:</span>
-<span class="sd">    (1) Like NRE_B, features a &quot;multiclass&quot; loss function where several marginally</span>
-<span class="sd">    drawn parameter-data pairs are contrasted against a jointly drawn pair.</span>
-
-<span class="sd">    (2) Like AALR/NRE_A (i.e., the non-sequential version of NRE_A), it encourages</span>
-<span class="sd">    the approximate ratio :math:`p(\theta,x)/p(\theta)p(x)`, accessed through</span>
-<span class="sd">    `.potential()` within `sbi`, to be exact at optimum. This addresses the</span>
-<span class="sd">    issue that NRE_B estimates this ratio only up to an arbitrary function</span>
-<span class="sd">    (normalizing constant) of the data :math:`x`.</span>
-
-<span class="sd">    Just like for all ratio estimation algorithms, the sequential version of NRE_C</span>
-<span class="sd">    will be estimated only up to a function (normalizing constant) of the data</span>
-<span class="sd">    :math:`x` in rounds after the first.</span>
-
-<span class="sd">    [1] *Contrastive Neural Ratio Estimation*, Benajmin Kurt Miller, et. al.,</span>
-<span class="sd">        NeurIPS 2022, https://arxiv.org/abs/2210.06170</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Initialize NRE-C.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        prior: A probability distribution that expresses prior knowledge about the</span>
@@ -10123,8 +9948,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/trainers/nre/nre_c.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 70</span>
-<span class="normal"> 71</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 71</span>
 <span class="normal"> 72</span>
 <span class="normal"> 73</span>
 <span class="normal"> 74</span>
@@ -10183,7 +10007,8 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 <span class="normal">127</span>
 <span class="normal">128</span>
 <span class="normal">129</span>
-<span class="normal">130</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
+<span class="normal">130</span>
+<span class="normal">131</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">num_classes</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">5</span><span class="p">,</span>
     <span class="n">gamma</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span>
@@ -10274,7 +10099,13 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
               Bases: <code><a class="autorefs autorefs-internal" title="NRE_A (sbi.inference.trainers.nre.nre_a.NRE_A)" href="#sbi.inference.trainers.nre.nre_a.NRE_A">NRE_A</a></code></p>
 
 
-        <p>Balanced neural ratio estimation (BNRE) as in Delaunoy et al. (2022).</p>
+        <p>Balanced neural ratio estimation (BNRE) as in Delaunoy et al. (2022) [1].</p>
+<p>BNRE is a variation of NRE aiming to produce more conservative posterior
+approximations.</p>
+<p>[1] Delaunoy, A., Hermans, J., Rozet, F., Wehenkel, A., &amp; Louppe, G..
+Towards Reliable Simulation-Based Inference with Balanced Neural Ratio
+Estimation.
+NeurIPS 2022. <a href="https://arxiv.org/abs/2208.13624">https://arxiv.org/abs/2208.13624</a></p>
 
 
 
@@ -10418,8 +10249,18 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 <span class="normal">147</span>
 <span class="normal">148</span>
 <span class="normal">149</span>
-<span class="normal">150</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">BNRE</span><span class="p">(</span><span class="n">NRE_A</span><span class="p">):</span>
-<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Balanced neural ratio estimation (BNRE) as in Delaunoy et al. (2022).&quot;&quot;&quot;</span>
+<span class="normal">150</span>
+<span class="normal">151</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">BNRE</span><span class="p">(</span><span class="n">NRE_A</span><span class="p">):</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Balanced neural ratio estimation (BNRE) as in Delaunoy et al. (2022) [1].</span>
+
+<span class="sd">    BNRE is a variation of NRE aiming to produce more conservative posterior</span>
+<span class="sd">    approximations.</span>
+
+<span class="sd">    [1] Delaunoy, A., Hermans, J., Rozet, F., Wehenkel, A., &amp; Louppe, G..</span>
+<span class="sd">    Towards Reliable Simulation-Based Inference with Balanced Neural Ratio</span>
+<span class="sd">    Estimation.</span>
+<span class="sd">    NeurIPS 2022. https://arxiv.org/abs/2208.13624</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -10430,15 +10271,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
         <span class="n">summary_writer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TensorboardSummaryWriter</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">show_progress_bars</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
     <span class="p">):</span>
-<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Balanced neural ratio estimation (BNRE)[1].</span>
-
-<span class="sd">        BNRE is a variation of NRE aiming to produce more conservative posterior</span>
-<span class="sd">        approximations.</span>
-
-<span class="sd">        [1] Delaunoy, A., Hermans, J., Rozet, F., Wehenkel, A., &amp; Louppe, G..</span>
-<span class="sd">        Towards Reliable Simulation-Based Inference with Balanced Neural Ratio</span>
-<span class="sd">        Estimation.</span>
-<span class="sd">        NeurIPS 2022. https://arxiv.org/abs/2208.13624</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Balanced neural ratio estimation (BNRE).</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            prior: A probability distribution that expresses prior knowledge about the</span>
@@ -10579,13 +10412,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 
     <div class="doc doc-contents ">
 
-        <p>Balanced neural ratio estimation (BNRE)[1].</p>
-<p>BNRE is a variation of NRE aiming to produce more conservative posterior
-approximations.</p>
-<p>[1] Delaunoy, A., Hermans, J., Rozet, F., Wehenkel, A., &amp; Louppe, G..
-Towards Reliable Simulation-Based Inference with Balanced Neural Ratio
-Estimation.
-NeurIPS 2022. <a href="https://arxiv.org/abs/2208.13624">https://arxiv.org/abs/2208.13624</a></p>
+        <p>Balanced neural ratio estimation (BNRE).</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -10712,16 +10539,7 @@ sampling.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/trainers/nre/bnre.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">19</span>
-<span class="normal">20</span>
-<span class="normal">21</span>
-<span class="normal">22</span>
-<span class="normal">23</span>
-<span class="normal">24</span>
-<span class="normal">25</span>
-<span class="normal">26</span>
-<span class="normal">27</span>
-<span class="normal">28</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">28</span>
 <span class="normal">29</span>
 <span class="normal">30</span>
 <span class="normal">31</span>
@@ -10752,7 +10570,8 @@ sampling.</p>
 <span class="normal">56</span>
 <span class="normal">57</span>
 <span class="normal">58</span>
-<span class="normal">59</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">59</span>
+<span class="normal">60</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">classifier</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;resnet&quot;</span><span class="p">,</span>
@@ -10761,15 +10580,7 @@ sampling.</p>
     <span class="n">summary_writer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TensorboardSummaryWriter</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">show_progress_bars</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
 <span class="p">):</span>
-<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Balanced neural ratio estimation (BNRE)[1].</span>
-
-<span class="sd">    BNRE is a variation of NRE aiming to produce more conservative posterior</span>
-<span class="sd">    approximations.</span>
-
-<span class="sd">    [1] Delaunoy, A., Hermans, J., Rozet, F., Wehenkel, A., &amp; Louppe, G..</span>
-<span class="sd">    Towards Reliable Simulation-Based Inference with Balanced Neural Ratio</span>
-<span class="sd">    Estimation.</span>
-<span class="sd">    NeurIPS 2022. https://arxiv.org/abs/2208.13624</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Balanced neural ratio estimation (BNRE).</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        prior: A probability distribution that expresses prior knowledge about the</span>
@@ -10847,8 +10658,7 @@ dataloader_kwargs: Additional or updated kwargs to be passed to the training
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/trainers/nre/bnre.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 61</span>
-<span class="normal"> 62</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 62</span>
 <span class="normal"> 63</span>
 <span class="normal"> 64</span>
 <span class="normal"> 65</span>
@@ -10899,7 +10709,8 @@ dataloader_kwargs: Additional or updated kwargs to be passed to the training
 <span class="normal">110</span>
 <span class="normal">111</span>
 <span class="normal">112</span>
-<span class="normal">113</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
+<span class="normal">113</span>
+<span class="normal">114</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">regularization_strength</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">100.0</span><span class="p">,</span>
     <span class="n">training_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">200</span><span class="p">,</span>

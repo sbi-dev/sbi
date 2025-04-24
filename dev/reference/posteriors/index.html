@@ -15765,16 +15765,19 @@ depend on the used ODE backend.</p>
 
 
         <p>Provides VI (Variational Inference) to sample from the posterior.</p>
-<p>SNLE or SNRE train neural networks to approximate the likelihood(-ratios).
-<code>VIPosterior</code> allows to learn a tractable variational posterior <span class="arithmatex">\(q(\theta)\)</span> which
-approximates the true posterior <span class="arithmatex">\(p(\theta|x_o)\)</span>. After this second training stage,
-we can produce approximate posterior samples, by just sampling from q with no
-additional cost. For additional information see [1] and [2].<br/><br/>
-References:<br/>
-[1] Variational methods for simulation-based inference, Manuel Glöckler, Michael
-Deistler, Jakob Macke, 2022, <a href="https://openreview.net/forum?id=kZ0UYdhqkNY">https://openreview.net/forum?id=kZ0UYdhqkNY</a><br/>
-[2] Sequential Neural Posterior and Likelihood Approximation, Samuel Wiqvist, Jes
-Frellsen, Umberto Picchini, 2021, <a href="https://arxiv.org/abs/2102.06522">https://arxiv.org/abs/2102.06522</a></p>
+<p>SNLE or SNRE train neural networks to approximate the likelihood (or likelihood
+ratios). <code>VIPosterior</code> allows learning a tractable variational posterior
+:math:<code>q(\theta)</code> which approximates the true posterior
+:math:<code>p(\theta|x_o)</code>. After this second training stage, we can produce
+approximate posterior samples by sampling from :math:<code>q</code> at no additional cost.</p>
+<p>For additional information, see [1]_ and [2]_.</p>
+<h4 id="sbi.inference.posteriors.vi_posterior.VIPosterior--references">References<a class="headerlink" href="#sbi.inference.posteriors.vi_posterior.VIPosterior--references" title="Permanent link">&para;</a></h4>
+<p>.. [1] Glöckler, M., Deistler, M., &amp; Macke, J. (2022).
+    Variational methods for simulation-based inference.
+    <a href="https://openreview.net/forum?id=kZ0UYdhqkNY">https://openreview.net/forum?id=kZ0UYdhqkNY</a></p>
+<p>.. [2] Wiqvist, S., Frellsen, J., &amp; Picchini, U. (2021).
+    Sequential Neural Posterior and Likelihood Approximation.
+    <a href="https://arxiv.org/abs/2102.06522">https://arxiv.org/abs/2102.06522</a></p>
 
 
 
@@ -16416,19 +16419,35 @@ Frellsen, Umberto Picchini, 2021, <a href="https://arxiv.org/abs/2102.06522">htt
 <span class="normal">665</span>
 <span class="normal">666</span>
 <span class="normal">667</span>
-<span class="normal">668</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">VIPosterior</span><span class="p">(</span><span class="n">NeuralPosterior</span><span class="p">):</span>
+<span class="normal">668</span>
+<span class="normal">669</span>
+<span class="normal">670</span>
+<span class="normal">671</span>
+<span class="normal">672</span>
+<span class="normal">673</span>
+<span class="normal">674</span>
+<span class="normal">675</span>
+<span class="normal">676</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">VIPosterior</span><span class="p">(</span><span class="n">NeuralPosterior</span><span class="p">):</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Provides VI (Variational Inference) to sample from the posterior.</span>
 
-<span class="sd">    SNLE or SNRE train neural networks to approximate the likelihood(-ratios).</span>
-<span class="sd">    `VIPosterior` allows to learn a tractable variational posterior $q(\theta)$ which</span>
-<span class="sd">    approximates the true posterior $p(\theta|x_o)$. After this second training stage,</span>
-<span class="sd">    we can produce approximate posterior samples, by just sampling from q with no</span>
-<span class="sd">    additional cost. For additional information see [1] and [2].&lt;br/&gt;&lt;br/&gt;</span>
-<span class="sd">    References:&lt;br/&gt;</span>
-<span class="sd">    [1] Variational methods for simulation-based inference, Manuel Glöckler, Michael</span>
-<span class="sd">    Deistler, Jakob Macke, 2022, https://openreview.net/forum?id=kZ0UYdhqkNY&lt;br/&gt;</span>
-<span class="sd">    [2] Sequential Neural Posterior and Likelihood Approximation, Samuel Wiqvist, Jes</span>
-<span class="sd">    Frellsen, Umberto Picchini, 2021, https://arxiv.org/abs/2102.06522</span>
+<span class="sd">    SNLE or SNRE train neural networks to approximate the likelihood (or likelihood</span>
+<span class="sd">    ratios). ``VIPosterior`` allows learning a tractable variational posterior</span>
+<span class="sd">    :math:`q(\theta)` which approximates the true posterior</span>
+<span class="sd">    :math:`p(\theta|x_o)`. After this second training stage, we can produce</span>
+<span class="sd">    approximate posterior samples by sampling from :math:`q` at no additional cost.</span>
+
+<span class="sd">    For additional information, see [1]_ and [2]_.</span>
+
+<span class="sd">    References</span>
+<span class="sd">    ----------</span>
+
+<span class="sd">    .. [1] Glöckler, M., Deistler, M., &amp; Macke, J. (2022).</span>
+<span class="sd">        Variational methods for simulation-based inference.</span>
+<span class="sd">        https://openreview.net/forum?id=kZ0UYdhqkNY</span>
+
+<span class="sd">    .. [2] Wiqvist, S., Frellsen, J., &amp; Picchini, U. (2021).</span>
+<span class="sd">        Sequential Neural Posterior and Likelihood Approximation.</span>
+<span class="sd">        https://arxiv.org/abs/2102.06522</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
@@ -17184,15 +17203,7 @@ incompatible deep copying).</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/vi_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">612</span>
-<span class="normal">613</span>
-<span class="normal">614</span>
-<span class="normal">615</span>
-<span class="normal">616</span>
-<span class="normal">617</span>
-<span class="normal">618</span>
-<span class="normal">619</span>
-<span class="normal">620</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">620</span>
 <span class="normal">621</span>
 <span class="normal">622</span>
 <span class="normal">623</span>
@@ -17208,7 +17219,15 @@ incompatible deep copying).</p>
 <span class="normal">633</span>
 <span class="normal">634</span>
 <span class="normal">635</span>
-<span class="normal">636</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">__deepcopy__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">memo</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;VIPosterior&quot;</span><span class="p">:</span>
+<span class="normal">636</span>
+<span class="normal">637</span>
+<span class="normal">638</span>
+<span class="normal">639</span>
+<span class="normal">640</span>
+<span class="normal">641</span>
+<span class="normal">642</span>
+<span class="normal">643</span>
+<span class="normal">644</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">__deepcopy__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">memo</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;VIPosterior&quot;</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;This method is called when using `copy.deepcopy` on the object.</span>
 
 <span class="sd">    It defines how the object is copied. We need to overwrite this method, since the</span>
@@ -17280,20 +17299,20 @@ due not support pickle protocols (e.g. due to local functions, etc.).</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/vi_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">638</span>
-<span class="normal">639</span>
-<span class="normal">640</span>
-<span class="normal">641</span>
-<span class="normal">642</span>
-<span class="normal">643</span>
-<span class="normal">644</span>
-<span class="normal">645</span>
-<span class="normal">646</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">646</span>
 <span class="normal">647</span>
 <span class="normal">648</span>
 <span class="normal">649</span>
 <span class="normal">650</span>
-<span class="normal">651</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">__getstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">:</span>
+<span class="normal">651</span>
+<span class="normal">652</span>
+<span class="normal">653</span>
+<span class="normal">654</span>
+<span class="normal">655</span>
+<span class="normal">656</span>
+<span class="normal">657</span>
+<span class="normal">658</span>
+<span class="normal">659</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">__getstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;This method is called when pickling the object.</span>
 
 <span class="sd">    It defines what is pickled. We need to overwrite this method, since some parts</span>
@@ -17515,15 +17534,7 @@ attribute.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/vi_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 51</span>
-<span class="normal"> 52</span>
-<span class="normal"> 53</span>
-<span class="normal"> 54</span>
-<span class="normal"> 55</span>
-<span class="normal"> 56</span>
-<span class="normal"> 57</span>
-<span class="normal"> 58</span>
-<span class="normal"> 59</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 59</span>
 <span class="normal"> 60</span>
 <span class="normal"> 61</span>
 <span class="normal"> 62</span>
@@ -17606,7 +17617,15 @@ attribute.</p>
 <span class="normal">139</span>
 <span class="normal">140</span>
 <span class="normal">141</span>
-<span class="normal">142</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">142</span>
+<span class="normal">143</span>
+<span class="normal">144</span>
+<span class="normal">145</span>
+<span class="normal">146</span>
+<span class="normal">147</span>
+<span class="normal">148</span>
+<span class="normal">149</span>
+<span class="normal">150</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">potential_fn</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">BasePotential</span><span class="p">,</span> <span class="n">CustomPotential</span><span class="p">],</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TorchDistribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: ignore</span>
@@ -17753,22 +17772,22 @@ e.g. remains deep copy compatible.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/vi_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">653</span>
-<span class="normal">654</span>
-<span class="normal">655</span>
-<span class="normal">656</span>
-<span class="normal">657</span>
-<span class="normal">658</span>
-<span class="normal">659</span>
-<span class="normal">660</span>
-<span class="normal">661</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">661</span>
 <span class="normal">662</span>
 <span class="normal">663</span>
 <span class="normal">664</span>
 <span class="normal">665</span>
 <span class="normal">666</span>
 <span class="normal">667</span>
-<span class="normal">668</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">__setstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state_dict</span><span class="p">:</span> <span class="n">Dict</span><span class="p">):</span>
+<span class="normal">668</span>
+<span class="normal">669</span>
+<span class="normal">670</span>
+<span class="normal">671</span>
+<span class="normal">672</span>
+<span class="normal">673</span>
+<span class="normal">674</span>
+<span class="normal">675</span>
+<span class="normal">676</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">__setstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state_dict</span><span class="p">:</span> <span class="n">Dict</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;This method is called when unpickling the object.</span>
 
 <span class="sd">    Especially, we need to restore the removed attributes and ensure that the object</span>
@@ -17860,15 +17879,7 @@ prop, prop_prior].</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/vi_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">523</span>
-<span class="normal">524</span>
-<span class="normal">525</span>
-<span class="normal">526</span>
-<span class="normal">527</span>
-<span class="normal">528</span>
-<span class="normal">529</span>
-<span class="normal">530</span>
-<span class="normal">531</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">531</span>
 <span class="normal">532</span>
 <span class="normal">533</span>
 <span class="normal">534</span>
@@ -17879,7 +17890,15 @@ prop, prop_prior].</p>
 <span class="normal">539</span>
 <span class="normal">540</span>
 <span class="normal">541</span>
-<span class="normal">542</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">evaluate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">quality_control_metric</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;psis&quot;</span><span class="p">,</span> <span class="n">N</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="mf">5e4</span><span class="p">))</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="normal">542</span>
+<span class="normal">543</span>
+<span class="normal">544</span>
+<span class="normal">545</span>
+<span class="normal">546</span>
+<span class="normal">547</span>
+<span class="normal">548</span>
+<span class="normal">549</span>
+<span class="normal">550</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">evaluate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">quality_control_metric</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;psis&quot;</span><span class="p">,</span> <span class="n">N</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="mf">5e4</span><span class="p">))</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;This function will evaluate the quality of the variational posterior</span>
 <span class="sd">    distribution. We currently support two different metrics of type `psis`, which</span>
 <span class="sd">    checks the quality based on the tails of importance weights (there should not be</span>
@@ -17993,15 +18012,7 @@ consumption.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/vi_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">342</span>
-<span class="normal">343</span>
-<span class="normal">344</span>
-<span class="normal">345</span>
-<span class="normal">346</span>
-<span class="normal">347</span>
-<span class="normal">348</span>
-<span class="normal">349</span>
-<span class="normal">350</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">350</span>
 <span class="normal">351</span>
 <span class="normal">352</span>
 <span class="normal">353</span>
@@ -18018,7 +18029,15 @@ consumption.</p>
 <span class="normal">364</span>
 <span class="normal">365</span>
 <span class="normal">366</span>
-<span class="normal">367</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">log_prob</span><span class="p">(</span>
+<span class="normal">367</span>
+<span class="normal">368</span>
+<span class="normal">369</span>
+<span class="normal">370</span>
+<span class="normal">371</span>
+<span class="normal">372</span>
+<span class="normal">373</span>
+<span class="normal">374</span>
+<span class="normal">375</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">log_prob</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">theta</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -18286,15 +18305,7 @@ have a cached value.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/vi_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">544</span>
-<span class="normal">545</span>
-<span class="normal">546</span>
-<span class="normal">547</span>
-<span class="normal">548</span>
-<span class="normal">549</span>
-<span class="normal">550</span>
-<span class="normal">551</span>
-<span class="normal">552</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">552</span>
 <span class="normal">553</span>
 <span class="normal">554</span>
 <span class="normal">555</span>
@@ -18352,7 +18363,15 @@ have a cached value.</p>
 <span class="normal">607</span>
 <span class="normal">608</span>
 <span class="normal">609</span>
-<span class="normal">610</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">map</span><span class="p">(</span>
+<span class="normal">610</span>
+<span class="normal">611</span>
+<span class="normal">612</span>
+<span class="normal">613</span>
+<span class="normal">614</span>
+<span class="normal">615</span>
+<span class="normal">616</span>
+<span class="normal">617</span>
+<span class="normal">618</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">map</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TorchTensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">num_iter</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1_000</span><span class="p">,</span>
@@ -18495,15 +18514,7 @@ have a cached value.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/vi_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">306</span>
-<span class="normal">307</span>
-<span class="normal">308</span>
-<span class="normal">309</span>
-<span class="normal">310</span>
-<span class="normal">311</span>
-<span class="normal">312</span>
-<span class="normal">313</span>
-<span class="normal">314</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">314</span>
 <span class="normal">315</span>
 <span class="normal">316</span>
 <span class="normal">317</span>
@@ -18516,7 +18527,15 @@ have a cached value.</p>
 <span class="normal">324</span>
 <span class="normal">325</span>
 <span class="normal">326</span>
-<span class="normal">327</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">sample</span><span class="p">(</span>
+<span class="normal">327</span>
+<span class="normal">328</span>
+<span class="normal">329</span>
+<span class="normal">330</span>
+<span class="normal">331</span>
+<span class="normal">332</span>
+<span class="normal">333</span>
+<span class="normal">334</span>
+<span class="normal">335</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">sample</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">sample_shape</span><span class="p">:</span> <span class="n">Shape</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">(),</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -18641,15 +18660,7 @@ is already a <code>VIPosterior</code>, then the arguments will be copied from it
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/vi_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">206</span>
-<span class="normal">207</span>
-<span class="normal">208</span>
-<span class="normal">209</span>
-<span class="normal">210</span>
-<span class="normal">211</span>
-<span class="normal">212</span>
-<span class="normal">213</span>
-<span class="normal">214</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">214</span>
 <span class="normal">215</span>
 <span class="normal">216</span>
 <span class="normal">217</span>
@@ -18716,7 +18727,15 @@ is already a <code>VIPosterior</code>, then the arguments will be copied from it
 <span class="normal">278</span>
 <span class="normal">279</span>
 <span class="normal">280</span>
-<span class="normal">281</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">set_q</span><span class="p">(</span>
+<span class="normal">281</span>
+<span class="normal">282</span>
+<span class="normal">283</span>
+<span class="normal">284</span>
+<span class="normal">285</span>
+<span class="normal">286</span>
+<span class="normal">287</span>
+<span class="normal">288</span>
+<span class="normal">289</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">set_q</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">q</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">PyroTransformedDistribution</span><span class="p">,</span> <span class="s2">&quot;VIPosterior&quot;</span><span class="p">,</span> <span class="n">Callable</span><span class="p">],</span>
     <span class="n">parameters</span><span class="p">:</span> <span class="n">Iterable</span> <span class="o">=</span> <span class="p">[],</span>
@@ -18868,18 +18887,18 @@ is already a <code>VIPosterior</code>, then the arguments will be copied from it
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/vi_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">293</span>
-<span class="normal">294</span>
-<span class="normal">295</span>
-<span class="normal">296</span>
-<span class="normal">297</span>
-<span class="normal">298</span>
-<span class="normal">299</span>
-<span class="normal">300</span>
-<span class="normal">301</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">301</span>
 <span class="normal">302</span>
 <span class="normal">303</span>
-<span class="normal">304</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">set_vi_method</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">method</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;VIPosterior&quot;</span><span class="p">:</span>
+<span class="normal">304</span>
+<span class="normal">305</span>
+<span class="normal">306</span>
+<span class="normal">307</span>
+<span class="normal">308</span>
+<span class="normal">309</span>
+<span class="normal">310</span>
+<span class="normal">311</span>
+<span class="normal">312</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">set_vi_method</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">method</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;VIPosterior&quot;</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Sets variational inference method.</span>
 
 <span class="sd">    Args:</span>
@@ -18945,15 +18964,7 @@ is already a <code>VIPosterior</code>, then the arguments will be copied from it
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/vi_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">144</span>
-<span class="normal">145</span>
-<span class="normal">146</span>
-<span class="normal">147</span>
-<span class="normal">148</span>
-<span class="normal">149</span>
-<span class="normal">150</span>
-<span class="normal">151</span>
-<span class="normal">152</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">152</span>
 <span class="normal">153</span>
 <span class="normal">154</span>
 <span class="normal">155</span>
@@ -18970,7 +18981,15 @@ is already a <code>VIPosterior</code>, then the arguments will be copied from it
 <span class="normal">166</span>
 <span class="normal">167</span>
 <span class="normal">168</span>
-<span class="normal">169</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">to</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">device</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="normal">169</span>
+<span class="normal">170</span>
+<span class="normal">171</span>
+<span class="normal">172</span>
+<span class="normal">173</span>
+<span class="normal">174</span>
+<span class="normal">175</span>
+<span class="normal">176</span>
+<span class="normal">177</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">to</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">device</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Move potential_fn, _prior and x_o to device, and change the device attribute.</span>
 
@@ -19276,15 +19295,7 @@ weight_transform: Callable applied to importance weights (only for fKL)</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/vi_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">369</span>
-<span class="normal">370</span>
-<span class="normal">371</span>
-<span class="normal">372</span>
-<span class="normal">373</span>
-<span class="normal">374</span>
-<span class="normal">375</span>
-<span class="normal">376</span>
-<span class="normal">377</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">377</span>
 <span class="normal">378</span>
 <span class="normal">379</span>
 <span class="normal">380</span>
@@ -19428,7 +19439,15 @@ weight_transform: Callable applied to importance weights (only for fKL)</p>
 <span class="normal">518</span>
 <span class="normal">519</span>
 <span class="normal">520</span>
-<span class="normal">521</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
+<span class="normal">521</span>
+<span class="normal">522</span>
+<span class="normal">523</span>
+<span class="normal">524</span>
+<span class="normal">525</span>
+<span class="normal">526</span>
+<span class="normal">527</span>
+<span class="normal">528</span>
+<span class="normal">529</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TorchTensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">n_particles</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">256</span><span class="p">,</span>
