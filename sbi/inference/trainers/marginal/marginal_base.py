@@ -27,6 +27,12 @@ DensityEstimatorType = Union[ZukoFlowType, str, Callable[[Tensor], Any]]
 
 
 class MarginalTrainer:
+    """Utility class for training a marginal density estimator.
+
+    The Marginal density estimator can, in principle, be used for many things. In
+    the ``sbi`` toolbox, we usually use it only to detect misspecification (see the
+    how-to guide on the documentation website)."""
+
     def __init__(
         self,
         density_estimator: DensityEstimatorType = ZukoFlowType.NSF,
@@ -34,7 +40,7 @@ class MarginalTrainer:
         summary_writer: Optional[SummaryWriter] = None,
         show_progress_bars: bool = True,
     ):
-        """Utility class for training a marginal estimator method.
+        """Initialize the marginal trainer.
 
         Args:
             density_estimator: Density estimator to use. Can be a string or a callable.

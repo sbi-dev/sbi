@@ -34,10 +34,12 @@ def run_sbc(
     """Run simulation-based calibration (SBC) or expected coverage.
 
     Note: This function implements two versions of coverage diagnostics:
-    - setting reduce_fns = "marginals" performs SBC as proposed in Talts et
-    al., https://arxiv.org/abs/1804.06788.
-    - setting reduce_fns = posterior.log_prob performs sample-based expected
-    coverage as proposed in Deistler et al., https://arxiv.org/abs/2210.04815.
+
+    - Setting ``reduce_fns = "marginals"`` performs SBC as proposed in Talts et al.
+      (see https://arxiv.org/abs/1804.06788).
+    - Setting ``reduce_fns = posterior.log_prob`` performs sample-based expected
+      coverage as proposed in Deistler et al.
+      (see https://arxiv.org/abs/2210.04815).
 
     Args:
         thetas: ground-truth parameters for sbc, simulated from the prior.

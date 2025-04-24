@@ -27,7 +27,22 @@ from sbi.utils.torchutils import BoxUniform, assert_all_finite, atleast_2d
 
 
 class NPE_A(PosteriorEstimator):
-    r"""Neural Posterior Estimation algorithm as in Papamakarios et al. (2016)."""
+    r"""Neural Posterior Estimation algorithm as in Papamakarios et al. (2016) [1].
+
+    [1] *Fast epsilon-free Inference of Simulation Models with Bayesian
+        Conditional Density Estimation*, Papamakarios et al., NeurIPS 2016.
+        https://arxiv.org/abs/1605.06376
+
+    Like all NPE methods, this method trains a deep neural density estimator to
+    directly approximate the posterior. Also like all other NPE methods, in the
+    first round, this density estimator is trained with a maximum-likelihood loss.
+
+    This class implements NPE-A. NPE-A trains across multiple rounds with a
+    maximum-likelihood-loss. This will make training converge to the proposal
+    posterior instead of the true posterior. To correct for this, SNPE-A applies a
+    post-hoc correction after training. This correction has to be performed
+    analytically. Thus, NPE-A is limited to Gaussian distributions for all but the
+    last round. In the last round, NPE-A can use a Mixture of Gaussians."""
 
     def __init__(
         self,
@@ -39,22 +54,7 @@ class NPE_A(PosteriorEstimator):
         summary_writer: Optional[TensorboardSummaryWriter] = None,
         show_progress_bars: bool = True,
     ):
-        r"""NPE-A [1].
-
-        [1] *Fast epsilon-free Inference of Simulation Models with Bayesian
-        Conditional Density Estimation*, Papamakarios et al., NeurIPS 2016.
-        https://arxiv.org/abs/1605.06376
-
-        Like all NPE methods, this method trains a deep neural density estimator to
-        directly approximate the posterior. Also like all other NPE methods, in the
-        first round, this density estimator is trained with a maximum-likelihood loss.
-
-        This class implements NPE-A. NPE-A trains across multiple rounds with a
-        maximum-likelihood-loss. This will make training converge to the proposal
-        posterior instead of the true posterior. To correct for this, SNPE-A applies a
-        post-hoc correction after training. This correction has to be performed
-        analytically. Thus, NPE-A is limited to Gaussian distributions for all but the
-        last round. In the last round, NPE-A can use a Mixture of Gaussians.
+        r"""Initialize NPE-A [1].
 
         Args:
             prior: A probability distribution that expresses prior knowledge about the
