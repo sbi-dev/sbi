@@ -93,16 +93,9 @@ def run_sbc(
     dap_samples = posterior_samples[0, :, :]
     assert dap_samples.shape == (num_sbc_samples, thetas.shape[1]), "Wrong DAP shape."
 
-    # Check if we're using log_prob as reduce_fn and if posterior is VIPosterior
-    is_vipost = isinstance(posterior, VIPosterior)
-
-    # Create wrapper for reduce_fns if using a VIPosterior
-    if is_vipost:
-        # Create a wrapper function that ensures the VIPosterior is trained
-        # before applying the reduce function
-        assert isinstance(posterior, VIPosterior), (
-            "VIPosterior is required for this functionality."
-        )
+    # Create wrapper for reduce_fns if using a VIPosterior that ensures it is trained
+    # before applying the reduce function
+    if isinstance(posterior, VIPosterior):
 
         def make_vipost_wrapper(original_reduce_fn):
             def wrapped_reduce_fn(theta, x):
