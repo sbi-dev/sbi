@@ -16,7 +16,12 @@ SBI application explorer
 About the SBI application explorer
 ----------------------------------
 
-The SBI application explorer shows how SBI is applied across different research fields and data types, in particular with respect to the number of parameters and the number of simulations used. This is to gain a quick overview over existing applications, and the right settings for your own work.
+The SBI application explorer shows how SBI is applied across different research fields
+and data types, in particular with respect to the number of parameters and the number
+of simulations used. This is to gain a quick overview over existing applications, and
+the right settings for your own work. We recommend to explore the applications
+[in fullscreen](https://sbi-applications-explorer.streamlit.app/).
+
 
 Features
 --------
