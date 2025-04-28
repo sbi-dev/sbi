@@ -81,8 +81,10 @@ class RatioEstimator(NeuralInference, ABC):
         check_estimator_arg(classifier)
         if isinstance(classifier, str):
             self._build_neural_net = classifier_nn(model=classifier)
-        else:
+        elif isinstance(classifier, Callable):
             self._build_neural_net = classifier
+        else:
+            self._neural_net = classifier
 
     def append_simulations(
         self,

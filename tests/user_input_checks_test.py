@@ -21,6 +21,7 @@ from torch.distributions import (
 
 from sbi.inference import NPE_A, NPE_C, simulate_for_sbi
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
+from sbi.neural_nets.net_builders import build_maf
 from sbi.simulators import linear_gaussian
 from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
 from sbi.utils import mcmc_transform, within_support
@@ -490,6 +491,7 @@ def test_invalid_inputs():
             ),
         ),
         ("fun"),
+        ("sbi_estimators")
     ],
 )
 def test_passing_custom_density_estimator(arg):
@@ -519,6 +521,9 @@ def test_passing_custom_density_estimator(arg):
     elif arg == "fun":
         # A function returning the nn.Module.
         density_estimator = lambda batch_theta, batch_x: mdn
+    elif arg == "sbi_estimators":
+        # A function returning the nn.Module.
+        density_estimator = build_maf(torch.zeros((2,2)), torch.zeros((2,2)))
     else:
         density_estimator = arg
     prior = MultivariateNormal(torch.zeros(2), torch.eye(2))

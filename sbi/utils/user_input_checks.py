@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import inspect
 import warnings
 from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union, cast
 
@@ -708,13 +709,21 @@ def check_sbi_inputs(simulator: Callable, prior: Distribution) -> None:
         num_samples={num_prior_samples}."""
 
 
-def check_estimator_arg(estimator: Union[str, Callable]) -> None:
+def check_estimator_arg(estimator: Union[str, Any]) -> None:
+    # to avoid the circular import.
+    import sbi.neural_nets.estimators as sbi_estimators
+
+    sbi_estimators = tuple(
+        obj for _, obj in inspect.getmembers(sbi_estimators) if inspect.isclass(obj)
+    )
     """Check (density or ratio) estimator argument passed by the user."""
-    assert isinstance(estimator, str) or (
-        isinstance(estimator, Callable) and not isinstance(estimator, nn.Module)
+    assert (
+        isinstance(estimator, str)
+        or (isinstance(estimator, Callable) and not isinstance(estimator, nn.Module))
+        or (isinstance(estimator, sbi_estimators))
     ), (
-        "The passed density estimator / classifier must be a string or a function "
-        f"returning a nn.Module, but is {type(estimator)}"
+        "The passed density estimator / classifier must be either a string or a "
+        f" function or a type from sbi.neural_nets.estimators but is {type(estimator)}"
     )
 
 
