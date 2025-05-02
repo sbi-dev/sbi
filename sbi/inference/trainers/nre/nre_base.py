@@ -4,7 +4,7 @@
 import warnings
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from typing import Any, Callable, Dict, Optional, Union
+from typing import Any, Dict, Optional, Union
 
 import torch
 from torch import Tensor, eye, nn, ones
@@ -16,7 +16,7 @@ from torch.utils.tensorboard.writer import SummaryWriter
 from sbi.inference.posteriors import MCMCPosterior, RejectionPosterior, VIPosterior
 from sbi.inference.posteriors.importance_posterior import ImportanceSamplingPosterior
 from sbi.inference.potentials import ratio_estimator_based_potential
-from sbi.inference.trainers.base import NeuralInference
+from sbi.inference.trainers.base import NeuralInference, RatioEstimatorBuilder
 from sbi.neural_nets import classifier_nn
 from sbi.utils import (
     check_estimator_arg,
@@ -30,7 +30,7 @@ class RatioEstimator(NeuralInference, ABC):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
-        classifier: Union[str, Callable] = "resnet",
+        classifier: Union[str, RatioEstimatorBuilder] = "resnet",
         device: str = "cpu",
         logging_level: Union[int, str] = "warning",
         summary_writer: Optional[SummaryWriter] = None,
@@ -56,11 +56,11 @@ class RatioEstimator(NeuralInference, ABC):
         Args:
             classifier: Classifier trained to approximate likelihood ratios. If it is
                 a string, use a pre-configured network of the provided type (one of
-                linear, mlp, resnet). Alternatively, a function that builds a custom
-                neural network can be provided. The function will be called with the
-                first batch of simulations (theta, x), which can thus be used for shape
-                inference and potentially for z-scoring. It needs to return a PyTorch
-                `nn.Module` implementing the classifier.
+                linear, mlp, resnet), or a callable that implements the
+                `RatioEstimatorBuilder` protocol. The callable will be called with the
+                first batch of simulations (theta, x), which can thus be used for
+                shape inference and potentially for z-scoring. It returns a
+                `RatioEstimator`.
 
         See docstring of `NeuralInference` class for all other arguments.
         """

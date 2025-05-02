@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Optional, Protocol, Tuple, Union
 from warnings import warn
 
 import torch
@@ -16,6 +16,7 @@ from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
+from sbi.neural_nets.ratio_estimators import RatioEstimator
 from sbi.utils import (
     check_prior,
     get_log_root,
@@ -577,3 +578,20 @@ def check_if_proposal_has_default_x(proposal: Any):
             "x_o for training. Set it with "
             "`posterior.set_default_x(x_o)`."
         )
+
+
+class RatioEstimatorBuilder(Protocol):
+    """Protocol for building a ratio estimator from data."""
+
+    def __call__(self, theta: Tensor, x: Tensor) -> RatioEstimator:
+        """Build a ratio estimator from theta and x, which mainly inform the
+        shape of the input and the condition to the neural network.
+
+        Args:
+            theta: Parameter sets.
+            x: Simulation outputs.
+
+        Returns:
+            Ratio Estimator.
+        """
+        ...

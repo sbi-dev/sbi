@@ -1,12 +1,13 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Any, Callable, Dict, Optional, Union
+from typing import Any, Dict, Optional, Union
 
 import torch
 from torch import Tensor, nn, ones
 from torch.distributions import Distribution
 
+from sbi.inference.trainers.base import RatioEstimatorBuilder
 from sbi.inference.trainers.nre.nre_base import RatioEstimator
 from sbi.sbi_types import TensorboardSummaryWriter
 from sbi.utils.sbiutils import del_entries
@@ -23,7 +24,7 @@ class NRE_A(RatioEstimator):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
-        classifier: Union[str, Callable] = "resnet",
+        classifier: Union[str, RatioEstimatorBuilder] = "resnet",
         device: str = "cpu",
         logging_level: Union[int, str] = "warning",
         summary_writer: Optional[TensorboardSummaryWriter] = None,
@@ -37,11 +38,11 @@ class NRE_A(RatioEstimator):
                 prior must be passed to `.build_posterior()`.
             classifier: Classifier trained to approximate likelihood ratios. If it is
                 a string, use a pre-configured network of the provided type (one of
-                linear, mlp, resnet). Alternatively, a function that builds a custom
-                neural network can be provided. The function will be called with the
-                first batch of simulations (theta, x), which can thus be used for shape
-                inference and potentially for z-scoring. It needs to return a PyTorch
-                `nn.Module` implementing the classifier.
+                linear, mlp, resnet), or a callable that implements the
+                `RatioEstimatorBuilder` protocol. The callable will be called with the
+                first batch of simulations (theta, x), which can thus be used for
+                shape inference and potentially for z-scoring. It returns a
+                `RatioEstimator`.
             device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.
