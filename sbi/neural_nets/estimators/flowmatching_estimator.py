@@ -119,7 +119,7 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         # and remember the original shape
         target_shape = input.shape
         input = input.reshape(-1, input.shape[-1])
-        condition = condition.reshape(-1, *condition.shape)
+        condition = condition.reshape(-1, *self.condition_shape)
         t = t.reshape(-1, t.shape[-1])
 
         # embed the input and condition
