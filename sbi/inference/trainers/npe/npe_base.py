@@ -90,8 +90,10 @@ class PosteriorEstimator(NeuralInference, ABC):
         check_estimator_arg(density_estimator)
         if isinstance(density_estimator, str):
             self._build_neural_net = posterior_nn(model=density_estimator)
-        else:
+        elif isinstance(density_estimator, Callable):
             self._build_neural_net = density_estimator
+        else:
+            self._neural_net = density_estimator
 
         self._proposal_roundwise = []
         self.use_non_atomic_loss = False
