@@ -244,6 +244,9 @@ class LC2ST:
             (probs, scores): Predicted probabilities and L-C2ST scores at `x_o`,
                 each of shape (`num_folds`,).
         """
+        if x_o.shape == self.x_p_mean.shape:
+            x_o = x_o.unsqueeze(0)
+
         # prepare data
         if self.z_score:
             theta_o = (theta_o - self.theta_p_mean) / self.theta_p_std
@@ -721,7 +724,7 @@ def eval_lc2st(
 
     Args:
         theta_p: Samples from p (class 0), of shape (sample_size, dim).
-        x_o: The observation, of shape (, dim_x).
+        x_o: The observation, of shape (1, dim_x).
         clf: Trained classifier.
         return_proba: Whether to return the predicted probabilities of being in P,
             defaults to False.
