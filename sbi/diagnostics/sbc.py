@@ -52,7 +52,7 @@ def run_sbc(
         num_posterior_samples: Number of approximate posterior samples used for ranking.
         reduce_fns: Function used to reduce the parameter space into 1D.
             Simulation-based calibration can be recovered by setting this to the
-            string "marginals". Sample-based expected coverage can be recovered
+            string `"marginals"`. Sample-based expected coverage can be recovered
             by setting it to `posterior.log_prob` (as a Callable).
         num_workers: Number of CPU cores to use in parallel.
         show_progress_bar: Whether to display a progress bar over SBC runs.
@@ -62,15 +62,15 @@ def run_sbc(
         ranks: Ranks of the ground truth parameters under the inferred posterior.
         dap_samples: Samples from the data-averaged posterior.
     """
-    # Remove NaNs and infinities from the input data
+    # Remove NaNs and infinities from the input data.
     thetas, xs = remove_nans_and_infs_in_x(thetas, xs)
 
     num_sbc_samples = thetas.shape[0]
 
-    # Validate input parameters
+    # Validate input parameters.
     _validate_sbc_inputs(thetas, xs, num_sbc_samples, num_posterior_samples)
 
-    # Handle deprecated parameter
+    # Handle deprecated parameter.
     if "sbc_batch_size" in kwargs:
         warnings.warn(
             "`sbc_batch_size` is deprecated and will be removed in future versions."
@@ -79,7 +79,7 @@ def run_sbc(
             stacklevel=2,
         )
 
-    # Get posterior samples, batched or parallelized
+    # Get posterior samples, batched or parallelized.
     posterior_samples = get_posterior_samples_on_batch(
         xs,
         posterior,
@@ -89,16 +89,19 @@ def run_sbc(
         use_batched_sampling=use_batched_sampling,
     )
 
-    # Take a random draw from each posterior to get data-averaged posterior samples
+    # Take a random draw from each posterior to get data-averaged posterior samples.
     dap_samples = posterior_samples[0, :, :]
     assert dap_samples.shape == (num_sbc_samples, thetas.shape[1]), "Wrong DAP shape."
 
     # Create wrapper for reduce_fns if using a VIPosterior that ensures it is trained
-    # before applying the reduce function
+    # before applying the reduce function.
     if isinstance(posterior, VIPosterior):
 
-        def make_vipost_wrapper(original_reduce_fn):
-            def wrapped_reduce_fn(theta, x):
+        def make_vipost_wrapper(original_reduce_fn: Callable) -> Callable:
+            """Returns a wrapped reduce function for VIPosterior."""
+
+            def wrapped_reduce_fn(theta: Tensor, x: Tensor) -> Tensor:
+                """Wrap reduce function to ensure VIPosterior is trained."""
                 # Train the posterior on the current x if needed
                 posterior.set_default_x(x)
                 posterior.train(show_progress_bar=False)
@@ -166,13 +169,13 @@ def _run_sbc(
     """
     num_sbc_samples = thetas.shape[0]
 
-    # Construct reduce functions for SBC or expected coverage
+    # Construct reduce functions for SBC or expected coverage.
     reduce_fns = _prepare_reduce_functions(reduce_fns, thetas.shape[1])
 
-    # Initialize ranks tensor
+    # Initialize ranks tensor.
     ranks = torch.zeros((num_sbc_samples, len(reduce_fns)))
 
-    # Iterate over all SBC samples and calculate ranks
+    # Iterate over all SBC samples and calculate ranks.
     for sbc_idx, (true_theta, x_i) in tqdm(
         enumerate(zip(thetas, xs, strict=False)),
         total=num_sbc_samples,
@@ -211,7 +214,7 @@ def _prepare_reduce_functions(
     Returns:
         List of callable reduction functions.
     """
-    # For SBC, we simply take the marginals for each parameter dimension
+    # For SBC, we simply take the marginals for each parameter dimension.
     if isinstance(reduce_fns, str):
         if reduce_fns != "marginals":
             raise ValueError(
@@ -223,7 +226,6 @@ def _prepare_reduce_functions(
     if isinstance(reduce_fns, Callable):
         return [reduce_fns]
 
-    # Already a list of callables
     return reduce_fns
 
 

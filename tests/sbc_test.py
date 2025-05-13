@@ -312,7 +312,7 @@ def test_sbc_parallelization(num_workers: int, gaussian_setup: Dict):
 
     # Train model
     posterior = train_inference_method(
-        NPE, prior, simulator, num_simulations=num_simulations, max_num_epochs=2
+        NPE, prior, simulator, num_simulations=num_simulations, max_num_epochs=1
     )
 
     # Generate test data
@@ -347,7 +347,7 @@ def test_sbc_batch_sampling(batch_sampling: bool, gaussian_setup: Dict):
 
     # Train model
     posterior = train_inference_method(
-        NPE, prior, simulator, num_simulations=num_simulations, max_num_epochs=2
+        NPE, prior, simulator, num_simulations=num_simulations, max_num_epochs=1
     )
 
     # Generate test data
