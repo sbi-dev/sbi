@@ -40,7 +40,7 @@ jobs:
       run: uv sync --extra dev
 
     - name: Run the fast and the slow CPU tests with coverage
-      run: uv run pytest -v -x -n auto -m "not gpu" --cov=sbi --cov-report=xml tests/
+      run: uv run pytest -v -x -n auto -m "not gpu" --cov=sbi --cov-report=xml --junitxml=junit.xml -o junit_family=legacy tests/
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4-beta
@@ -49,4 +49,10 @@ jobs:
         file: ./coverage.xml
         flags: unittests
         name: codecov-sbi-all-cpu
+        token: ${{ secrets.CODECOV_TOKEN }}
+
+    - name: Upload test results to Codecov
+      if: ${{ !cancelled() }}
+      uses: codecov/test-results-action@v1
+      with:
         token: ${{ secrets.CODECOV_TOKEN }}
