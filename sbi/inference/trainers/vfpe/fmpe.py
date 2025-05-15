@@ -11,7 +11,7 @@ from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi import utils as utils
 from sbi.inference.posteriors.vector_field_posterior import VectorFieldPosterior
-from sbi.inference.trainers.base_vf_inference import (
+from sbi.inference.trainers.vfpe.base_vf_inference import (
     VectorFieldEstimatorBuilder,
     VectorFieldInference,
 )

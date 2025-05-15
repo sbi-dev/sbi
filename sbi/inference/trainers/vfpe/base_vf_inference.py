@@ -335,8 +335,11 @@ class VectorFieldInference(NeuralInference, ABC):
         self._neural_net.to(self._device)
 
         if isinstance(validation_times, int):
+            # NOTE: We add a nugget to t_min as t_min is the boundary of the training
+            # domain and hence can be "unstable" and is not a good choice for
+            # evaluation.
             validation_times = torch.linspace(
-                self._neural_net.t_min + 0.1, self._neural_net.t_max, validation_times
+                self._neural_net.t_min + 0.05, self._neural_net.t_max, validation_times
             )
         assert isinstance(
             validation_times, Tensor
@@ -426,6 +429,8 @@ class VectorFieldInference(NeuralInference, ABC):
                         times_batch, *([1] * (masks_batch.ndim - 1))
                     )
 
+                    # This will repeat the validation times for each batch in the
+                    # validation set.
                     validation_times_rep = validation_times.repeat_interleave(
                         val_batch_size, dim=0
                     )

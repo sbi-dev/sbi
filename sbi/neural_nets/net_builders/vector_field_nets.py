@@ -28,6 +28,7 @@ from sbi.utils.vector_field_utils import VectorFieldNet
 def build_flow_matching_estimator(
     batch_x: Tensor,
     batch_y: Tensor,
+    z_score_y: Optional[str] = None,
     embedding_net: nn.Module = nn.Identity(),
     hidden_features: Union[Sequence[int], int] = 200,
     time_embedding_dim: int = 32,
@@ -60,6 +61,13 @@ def build_flow_matching_estimator(
     # Check inputs and device
     check_data_device(batch_x, batch_y)
 
+    # Z-score setup
+    embedding_net_y = (
+        standardizing_net(batch_y, z_score_y == "structured")
+        if z_score_y
+        else nn.Identity()
+    )
+
     # Build network if not provided
     if net == "mlp":
         vectorfield_net = build_mlp_network(
@@ -68,7 +76,7 @@ def build_flow_matching_estimator(
             hidden_features=hidden_features,
             num_layers=num_layers,
             time_embedding_dim=time_embedding_dim,
-            embedding_net=embedding_net,
+            embedding_net=embedding_net_y,
             **kwargs,
         )
     elif net == "transformer":

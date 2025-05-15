@@ -391,7 +391,7 @@ def posterior_score_nn(
 def posterior_flow_nn(
     net: Union[str, nn.Module] = "mlp",
     z_score_theta: Optional[str] = None,
-    z_score_x: Optional[str] = None,
+    z_score_y: Optional[str] = None,
     t_embedding_dim: int = 16,
     hidden_features: int = 64,
     embedding_net: nn.Module = nn.Identity(),
@@ -425,11 +425,13 @@ def posterior_flow_nn(
         Constructor function for FMPE.
     """
 
+
     def build_fn(batch_theta, batch_x):
         # Build the flow matching estimator
         return build_flow_matching_estimator(
             batch_x=batch_theta,
             batch_y=batch_x,
+            z_score_y=z_score_y,
             embedding_net=embedding_net,
             hidden_features=hidden_features,
             time_embedding_dim=t_embedding_dim,
