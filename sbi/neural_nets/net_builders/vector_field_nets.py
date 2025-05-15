@@ -424,7 +424,8 @@ class GlobalEmbeddingMLP(nn.Module):
             raise RuntimeError(
                 f"Failed to concatenate embeddings with shapes {shapes}"
             ) from e
-
+        print("Cond_emb", cond_emb.shape)
+        print("Input_layer", self.input_layer)
         cond_emb = self.input_layer(cond_emb)
         for mlp_block in self.mlp_blocks:
             cond_emb = mlp_block(cond_emb)
@@ -491,7 +492,7 @@ class VectorFieldMLP(VectorFieldNet):
 
         # Global MLP for time and condition embedding
         self.global_mlp = GlobalEmbeddingMLP(
-            x_emb_dim=condition_emb_dim,
+            x_emb_dim=input_dim,
             cond_emb_dim=condition_emb_dim,
             time_emb_dim=time_emb_dim,
             num_intermediate_layers=num_intermediate_mlp_layers,

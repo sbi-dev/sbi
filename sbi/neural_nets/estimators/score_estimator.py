@@ -61,7 +61,7 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
 
     def __init__(
         self,
-        net: VectorFieldNet,
+        net: Union[VectorFieldNet, nn.Module],
         input_shape: torch.Size,
         condition_shape: torch.Size,
         embedding_net: nn.Module = nn.Identity(),
@@ -134,46 +134,32 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         Returns:
             Score (gradient of the density) at a given time, matches input shape.
         """
-        # For some reason, during batch sampling with multiple samples,
-        # input gets a sample dimension
-        # at the beginning (e.g., shape becomes [num_samples, batch_size, dim]
-        # rather than [batch_size, dim])
-        has_sample_dim = (len(input.shape) > len(self.input_shape) + 1) or (
-            len(condition.shape) > len(self.condition_shape) + 1
-        )
 
-        # Save original shapes for reshaping at the end
-        original_input_shape = input.shape
-        original_condition_shape = condition.shape
-        original_time_shape = time.shape
-
-        if has_sample_dim:
-            # Reshape to merge sample and batch dimensions
-            input = input.reshape(-1, *self.input_shape)
-            if len(original_condition_shape) > 1:  # Ensure condition is not empty
-                condition = condition.reshape(-1, *self.condition_shape)
-
-            # Time might be a scalar or have batch dimension, handle accordingly
-            if len(original_time_shape) > 0:
-                time = time.reshape(-1)
 
         # Continue with standard processing (broadcast shapes etc.)
+        batch_shape_input = input.shape[: -len(self.input_shape)]
+        batch_shape_cond = condition.shape[: -len(self.condition_shape)]
         batch_shape = torch.broadcast_shapes(
-            input.shape[: -len(self.input_shape)],
-            condition.shape[: -len(self.condition_shape)],
+            batch_shape_input,
+            batch_shape_cond,
         )
-
-        input = torch.broadcast_to(input, batch_shape + self.input_shape)
-        condition = torch.broadcast_to(condition, batch_shape + self.condition_shape)
-        time = torch.broadcast_to(time, batch_shape)
 
         # embed the conditioning variable
         condition_emb = self._embedding_net(condition)
+
+        input = torch.broadcast_to(input, batch_shape + self.input_shape)
+        condition_emb = torch.broadcast_to(
+            condition_emb, batch_shape + condition_emb.shape[len(batch_shape_cond) :]
+        )
+        time = torch.broadcast_to(time, batch_shape)
+
+
 
         # Time dependent mean and std of the target distribution to z-score the input
         # and to approximate the score at the end of the diffusion.
         mean = self.approx_marginal_mean(time)
         std = self.approx_marginal_std(time)
+
 
         # As input to the neural net we want to have something that changes proportianl
         # to how the scores change
@@ -186,7 +172,15 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         score_gaussian = (input - mean) / std**2
 
         # Score prediction by the network
+        # NOTE: To simplify, use of external networks, we will flatten the tensors
+        # batch_shape to a single batch dimension.
+        input_enc = input_enc.reshape(-1, *input_enc.shape[len(batch_shape) :])
+        condition_emb = condition_emb.reshape(
+            -1, *condition_emb.shape[len(batch_shape) :]
+        )
+        time_enc = time_enc.reshape(-1)
         score_pred = self.net(input_enc, condition_emb, time_enc)
+        score_pred = score_pred.reshape(*batch_shape, *score_pred.shape[1:])
 
         # Output pre-conditioned score
         # The learnable part will be largly scaled at the beginning of the diffusion
@@ -194,10 +188,6 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         # the diffusion.
         scale = self.mean_t_fn(time) / self.std_fn(time)
         output_score = -scale * score_pred - score_gaussian
-
-        # If we had a sample dimension, reshape back to original shape
-        if has_sample_dim:
-            output_score = output_score.reshape(original_input_shape)
 
         return output_score
 
@@ -471,7 +461,7 @@ class VPScoreEstimator(ConditionalScoreEstimator):
 
     def __init__(
         self,
-        net: VectorFieldNet,
+        net: Union[VectorFieldNet, nn.Module],
         input_shape: torch.Size,
         condition_shape: torch.Size,
         embedding_net: nn.Module = nn.Identity(),
@@ -612,7 +602,7 @@ class SubVPScoreEstimator(ConditionalScoreEstimator):
 
     def __init__(
         self,
-        net: VectorFieldNet,
+        net: Union[VectorFieldNet, nn.Module],
         input_shape: torch.Size,
         condition_shape: torch.Size,
         embedding_net: nn.Module = nn.Identity(),
@@ -769,7 +759,7 @@ class VEScoreEstimator(ConditionalScoreEstimator):
 
     def __init__(
         self,
-        net: VectorFieldNet,
+        net: Union[VectorFieldNet, nn.Module],
         input_shape: torch.Size,
         condition_shape: torch.Size,
         embedding_net: nn.Module = nn.Identity(),

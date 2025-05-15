@@ -127,8 +127,7 @@ def _build_gaussian_score_estimator(
 
     score_estimator = posterior_score_nn(
         sde_type=sde_type,
-        score_net_type="mlp",
-        input_shape=input_event_shape,
+        net=DummyNet(),
         embedding_net=torch.nn.Identity(),
     )(building_thetas, building_xs)
 

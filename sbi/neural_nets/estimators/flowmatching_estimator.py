@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import Optional, Union
 
 import torch
 import torch.nn as nn
@@ -53,7 +53,7 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
 
     def __init__(
         self,
-        net: VectorFieldNet,
+        net: Union[VectorFieldNet, nn.Module],
         input_shape: torch.Size,
         condition_shape: torch.Size,
         embedding_net: Optional[nn.Module] = None,
