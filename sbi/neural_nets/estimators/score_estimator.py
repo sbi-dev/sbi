@@ -116,6 +116,9 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         self.register_buffer("mean_t", mean_t)
         self.register_buffer("std_t", std_t)
 
+        self.t_min = t_min
+        self.t_max = t_max
+
     @property
     def embedding_net(self):
         """Return the embedding network."""
@@ -187,6 +190,7 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         # and the gaussian part (where it should end up) will dominate at the end of
         # the diffusion.
         scale = self.mean_t_fn(time) / self.std_fn(time)
+
         output_score = -scale * score_pred - score_gaussian
 
         return output_score
@@ -238,10 +242,6 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
                 * (self.t_max - self.t_min)
                 + self.t_min
             )
-
-        # Embed conditioning variable
-        condition_emb = self._embedding_net(condition)
-
         # Sample noise.
         eps = torch.randn_like(input)
 
@@ -256,7 +256,7 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         score_target = -eps / std
 
         # Predict score from noised input and diffusion time.
-        score_pred = self.forward(input_noised, condition_emb, times)
+        score_pred = self.forward(input_noised, condition, times)
 
         # Compute weights over time.
         weights = self.weight_fn(times)
@@ -273,7 +273,7 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
 
         if control_variate:
             D = input.shape[-1]
-            score_mean_pred = self.forward(mean, condition_emb, times)
+            score_mean_pred = self.forward(mean, condition, times)
             s = torch.squeeze(std, -1)
 
             # Loss terms that depend on eps
@@ -470,7 +470,7 @@ class VPScoreEstimator(ConditionalScoreEstimator):
         beta_max: float = 10.0,
         mean_0: Union[Tensor, float] = 0.0,
         std_0: Union[Tensor, float] = 1.0,
-        t_min: float = 1e-5,
+        t_min: float = 1e-4,
         t_max: float = 1.0,
     ) -> None:
         self.beta_min = beta_min

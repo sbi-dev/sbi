@@ -2,19 +2,20 @@
 # under the Apache License v2.0, see <https://www.apache.org/licenses/LICENSE-2.0>.
 
 
+from functools import partial
 from typing import Optional, Union
 
+from sbi.neural_nets.estimators.base import ConditionalVectorFieldEstimator
 from torch.distributions import Distribution
 from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi import utils as utils
 from sbi.inference.posteriors.vector_field_posterior import VectorFieldPosterior
-from sbi.inference.trainers.npse.vector_field_inference import (
+from sbi.inference.trainers.base_vf_inference import (
     VectorFieldEstimatorBuilder,
     VectorFieldInference,
 )
-from sbi.neural_nets import flowmatching_nn
-from sbi.neural_nets.estimators import ConditionalVectorFieldEstimator
+from sbi.neural_nets.factory import posterior_flow_nn
 
 
 class FMPE(VectorFieldInference):
@@ -61,7 +62,7 @@ class FMPE(VectorFieldInference):
 
     def _build_default_nn_fn(self, **kwargs) -> VectorFieldEstimatorBuilder:
         model = kwargs.pop("vector_field_estimator_builder", "mlp")
-        return flowmatching_nn(model=model, **kwargs)
+        return posterior_flow_nn(model, **kwargs)
 
     def build_posterior(
         self,

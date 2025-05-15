@@ -223,125 +223,6 @@ def likelihood_nn(
     return build_fn
 
 
-def flowmatching_nn(
-    model: Union[str, nn.Module] = "mlp",
-    z_score_theta: Optional[str] = None,
-    z_score_x: Optional[str] = None,
-    hidden_features: Union[Sequence[int], int] = 64,
-    num_layers: int = 5,
-    num_blocks: int = 5,
-    num_freqs: int = 16,
-    embedding_net: nn.Module = nn.Identity(),
-    global_mlp_ratio: int = 1,
-    num_intermediate_mlp_layers: int = 0,
-    adamlp_ratio: int = 1,
-    time_emb_type: str = "sinusoidal",
-    sinusoidal_max_freq: float = 1000.0,
-    fourier_scale: float = 16.0,
-    activation: Callable = nn.GELU,
-    is_x_emb_seq: bool = False,
-    num_heads: int = 4,
-    mlp_ratio: int = 4,
-    **kwargs: Any,
-) -> Callable:
-    r"""Returns a function that builds a neural net that can act as
-    a vector field estimator for Flow Matching.
-
-    This function will usually be used for Flow Matching. The returned function
-    is to be passed to the inference class when using the flexible interface.
-
-    Args:
-        model: The type of vector field model to create, one of
-            ['mlp', 'transformer', 'transformer_cross_attention'] or
-            ['mlp_vector_field', 'transformer_vector_field',
-            'transformer_with_cross_attention_vector_field'], or a custom nn.Module.
-        z_score_theta: Whether to z-score parameters $\theta$ before passing them into
-            the network, can take one of the following:
-            - `none`, or None: do not z-score.
-            - `independent`: z-score each dimension independently.
-            - `structured`: treat dimensions as related, therefore compute mean and std
-            over the entire batch, instead of per-dimension. Should be used when each
-            sample is, for example, a time series or an image.
-        z_score_x: Whether to z-score simulation outputs $x$ before passing them into
-            the network, same options as z_score_theta.
-        hidden_features: Number of hidden features for network layers.
-        num_layers: Number of layers for MLP networks.
-        num_blocks: Number of blocks for transformer networks.
-        num_freqs: Number of frequencies for time embedding.
-        embedding_net: Optional embedding network for simulation outputs $x$.
-        global_mlp_ratio: Ratio of hidden dim to intermediate dim in global MLP for MLP
-        num_intermediate_mlp_layers: Number of intermediate layers in global MLP for MLP
-        adamlp_ratio: Ratio of hidden dim to intermediate dim in AdaMLPBlock for MLPs.
-        time_emb_type: Type of time embedding, "sinusoidal" or "random_fourier".
-        sinusoidal_max_freq: Max frequency for sinusoidal embeddings.
-        fourier_scale: Scale for random fourier embeddings.
-        activation: Activation function to use.
-        is_x_emb_seq: Whether x embedding is a sequence (only for transformer).
-        num_heads: Number of attention heads in transformer networks.
-        mlp_ratio: Ratio for MLP hidden dimensions in transformer blocks.
-        **kwargs: Additional arguments for the estimator.
-
-    Returns:
-        Neural network builder function for flow matching.
-    """
-    # Map model name to the appropriate vector field model if it's a string
-    if isinstance(model, str):
-        if model == "mlp":
-            model_name = "mlp_vector_field"
-        elif model == "transformer":
-            model_name = "transformer_vector_field"
-        elif model == "transformer_cross_attention":
-            model_name = "transformer_with_cross_attention_vector_field"
-        elif model in [
-            "mlp_vector_field",
-            "transformer_vector_field",
-            "transformer_with_cross_attention_vector_field",
-        ]:
-            model_name = model
-        else:
-            raise NotImplementedError(f"Model {model} is not implemented for FMPE")
-    else:
-        # If it's a custom nn.Module, we would need to handle it differently
-        # For now, we'll just raise an error
-        raise ValueError(
-            "Custom nn.Module models are not yet supported in flowmatching_nn"
-        )
-
-    # Instead of returning a partial function with model fixed, create a new build funct
-    # that directly uses model_name and doesn't rely on the original model parameter
-    def build_fn(batch_theta, batch_x):
-        if model_name not in model_builders:
-            raise NotImplementedError(f"Model {model_name} is not implemented")
-
-        return model_builders[model_name](
-            batch_x=batch_theta,
-            batch_y=batch_x,
-            estimator_type="flowmatching",
-            z_score_x=z_score_theta,
-            z_score_y=z_score_x,
-            hidden_features=hidden_features,
-            num_layers=num_layers,
-            num_blocks=num_blocks,
-            num_heads=num_heads,
-            mlp_ratio=mlp_ratio,
-            num_freqs=num_freqs,
-            embedding_net=check_net_device(
-                embedding_net, "cpu", embedding_net_warn_msg
-            ),
-            global_mlp_ratio=global_mlp_ratio,
-            num_intermediate_mlp_layers=num_intermediate_mlp_layers,
-            adamlp_ratio=adamlp_ratio,
-            time_emb_type=time_emb_type,
-            sinusoidal_max_freq=sinusoidal_max_freq,
-            fourier_scale=fourier_scale,
-            activation=activation,
-            is_x_emb_seq=is_x_emb_seq,
-            **kwargs,
-        )
-
-    return build_fn
-
-
 def posterior_nn(
     model: str,
     z_score_theta: Optional[str] = "independent",
@@ -549,8 +430,6 @@ def posterior_flow_nn(
         return build_flow_matching_estimator(
             batch_x=batch_theta,
             batch_y=batch_x,
-            z_score_x=z_score_theta,
-            z_score_y=z_score_x,
             embedding_net=embedding_net,
             hidden_features=hidden_features,
             time_embedding_dim=t_embedding_dim,

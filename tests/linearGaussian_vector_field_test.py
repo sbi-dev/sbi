@@ -18,7 +18,7 @@ from sbi.inference import (
     simulate_for_sbi,
     vector_field_estimator_based_potential,
 )
-from sbi.neural_nets.factory import flowmatching_nn
+from sbi.neural_nets.factory import posterior_flow_nn
 from sbi.simulators import linear_gaussian
 from sbi.simulators.linear_gaussian import (
     samples_true_posterior_linear_gaussian_mvn_prior_different_dims,
@@ -234,7 +234,7 @@ def test_fmpe_with_different_models(model):
     theta = prior.sample((num_simulations,))
     x = linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    estimator_build_fun = flowmatching_nn(model=model)
+    estimator_build_fun = posterior_flow_nn(model=model)
 
     inference = FMPE(prior, density_estimator=estimator_build_fun)
 

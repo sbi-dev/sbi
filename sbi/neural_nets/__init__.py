@@ -1,6 +1,6 @@
 from sbi.neural_nets.factory import (
     classifier_nn,
-    flowmatching_nn,
+    posterior_flow_nn,
     likelihood_nn,
     marginal_nn,
     posterior_nn,
@@ -27,8 +27,8 @@ def __getattr__(name):
         )
     elif name == "classifier_nn":
         return classifier_nn
-    elif name == "flowmatching_nn":
-        return flowmatching_nn
+    elif name == "posterior_flow_nn":
+        return posterior_flow_nn
     elif name == "likelihood_nn":
         return likelihood_nn
     elif name == "posterior_nn":
@@ -42,9 +42,9 @@ def __getattr__(name):
 
 __all__ = [
     "classifier_nn",
-    "flowmatching_nn",
     "likelihood_nn",
     "marginal_nn",
     "posterior_nn",
     "posterior_score_nn",
+    "posterior_flow_nn",
 ]

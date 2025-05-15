@@ -109,7 +109,7 @@ def build_score_matching_estimator(
     z_score_y: Optional[str] = None,
     embedding_net: nn.Module = nn.Identity(),
     sde_type: str = "vp",  # "vp", "subvp", or "ve"
-    hidden_features: Union[Sequence[int], int] = 64,
+    hidden_features: Union[Sequence[int], int] = 200,
     num_layers: int = 5,
     num_blocks: int = 5,
     num_heads: int = 4,
@@ -334,6 +334,7 @@ class AdaMLPBlock(nn.Module):
         """
 
         shift_, scale_, gate_ = self.ada_ln(cond).chunk(3, dim=-1)
+        gate_ = torch.sigmoid(gate_) # TODO Maybe remove
 
         y = (scale_ + 1) * x + shift_
         y = self.block(y)
@@ -423,8 +424,7 @@ class GlobalEmbeddingMLP(nn.Module):
             raise RuntimeError(
                 f"Failed to concatenate embeddings with shapes {shapes}"
             ) from e
-        print("Cond_emb", cond_emb.shape)
-        print("Input_layer", self.input_layer)
+
         cond_emb = self.input_layer(cond_emb)
         for mlp_block in self.mlp_blocks:
             cond_emb = mlp_block(cond_emb)
@@ -518,7 +518,8 @@ class VectorFieldMLP(VectorFieldNet):
             )
 
         # Output layer
-        self.layers.append(nn.Linear(hidden_features, input_dim))
+        self.layers.append(nn.Linear(hidden_features, input_dim, bias=False))
+        nn.init.zeros_(self.layers[-1].weight)
 
     def forward(self, theta: Tensor, x_emb_cond: Tensor, t: Tensor) -> Tensor:
         """Forward pass through the MLP.
@@ -582,7 +583,7 @@ class DiTBlock(nn.Module):
         )
 
         # initialize last layer to zero
-        self.ada_affine[-1].weight.data *= 0.1
+        self.ada_affine[-1].weight.data.zero_()
         self.ada_affine[-1].bias.data.zero_()
 
         # attention

@@ -209,7 +209,7 @@ class VectorFieldInference(NeuralInference, ABC):
         clip_max_norm: Optional[float] = 5.0,
         calibration_kernel: Optional[Callable] = None,
         ema_loss_decay: float = 0.1,
-        validation_times: Union[Tensor, int] = 20,
+        validation_times: Union[Tensor, int] = 50,
         resume_training: bool = False,
         force_first_round_loss: bool = False,
         discard_prior_samples: bool = False,
@@ -336,7 +336,7 @@ class VectorFieldInference(NeuralInference, ABC):
 
         if isinstance(validation_times, int):
             validation_times = torch.linspace(
-                self._neural_net.t_min, self._neural_net.t_max, validation_times
+                self._neural_net.t_min + 0.1, self._neural_net.t_max, validation_times
             )
         assert isinstance(
             validation_times, Tensor
