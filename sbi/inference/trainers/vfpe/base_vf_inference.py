@@ -204,12 +204,12 @@ class VectorFieldInference(NeuralInference, ABC):
         training_batch_size: int = 200,
         learning_rate: float = 5e-4,
         validation_fraction: float = 0.1,
-        stop_after_epochs: int = 50,
+        stop_after_epochs: int = 20,
         max_num_epochs: int = 500,
         clip_max_norm: Optional[float] = 5.0,
         calibration_kernel: Optional[Callable] = None,
         ema_loss_decay: float = 0.1,
-        validation_times: Union[Tensor, int] = 50,
+        validation_times: Union[Tensor, int] = 10,
         resume_training: bool = False,
         force_first_round_loss: bool = False,
         discard_prior_samples: bool = False,
@@ -337,9 +337,11 @@ class VectorFieldInference(NeuralInference, ABC):
         if isinstance(validation_times, int):
             # NOTE: We add a nugget to t_min as t_min is the boundary of the training
             # domain and hence can be "unstable" and is not a good choice for
-            # evaluation.
+            # evaluation. Same for flow mathching but with t_max
             validation_times = torch.linspace(
-                self._neural_net.t_min + 0.05, self._neural_net.t_max, validation_times
+                self._neural_net.t_min + 0.05,
+                self._neural_net.t_max - 0.05,
+                validation_times,
             )
         assert isinstance(
             validation_times, Tensor
