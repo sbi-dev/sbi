@@ -14,7 +14,16 @@ from sbi.utils.torchutils import assert_all_finite
 
 
 class BNRE(NRE_A):
-    r"""Balanced neural ratio estimation (BNRE) as in Delaunoy et al. (2022)."""
+    r"""Balanced neural ratio estimation (BNRE) as in Delaunoy et al. (2022) [1].
+
+    BNRE is a variation of NRE aiming to produce more conservative posterior
+    approximations.
+
+    [1] Delaunoy, A., Hermans, J., Rozet, F., Wehenkel, A., & Louppe, G..
+    Towards Reliable Simulation-Based Inference with Balanced Neural Ratio
+    Estimation.
+    NeurIPS 2022. https://arxiv.org/abs/2208.13624
+    """
 
     def __init__(
         self,
@@ -25,15 +34,7 @@ class BNRE(NRE_A):
         summary_writer: Optional[TensorboardSummaryWriter] = None,
         show_progress_bars: bool = True,
     ):
-        r"""Balanced neural ratio estimation (BNRE)[1].
-
-        BNRE is a variation of NRE aiming to produce more conservative posterior
-        approximations.
-
-        [1] Delaunoy, A., Hermans, J., Rozet, F., Wehenkel, A., & Louppe, G..
-        Towards Reliable Simulation-Based Inference with Balanced Neural Ratio
-        Estimation.
-        NeurIPS 2022. https://arxiv.org/abs/2208.13624
+        r"""Balanced neural ratio estimation (BNRE).
 
         Args:
             prior: A probability distribution that expresses prior knowledge about the

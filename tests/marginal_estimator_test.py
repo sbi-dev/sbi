@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from typing import Callable, Union
+
 import pytest
 import torch
 from torch.distributions import (
@@ -13,6 +15,7 @@ from torch.distributions import (
 )
 
 from sbi.inference.trainers.marginal import MarginalTrainer
+from sbi.neural_nets.factory import ZukoFlowType, marginal_nn
 from sbi.utils.metrics import check_c2st
 from sbi.utils.torchutils import process_device
 
@@ -31,9 +34,11 @@ from sbi.utils.torchutils import process_device
     ],
 )
 @pytest.mark.parametrize("device", ["cpu", pytest.param("cuda", marks=pytest.mark.gpu)])
+@pytest.mark.parametrize("model", ["nsf", marginal_nn(model=ZukoFlowType.NSF)])
 def test_marginal_estimator(
-    dist: torch.distributions.Distribution, device: str, model: str = 'nsf'
+    dist: torch.distributions.Distribution, device: str, model: Union[str, Callable]
 ):
+    """Test the marginal estimator with various distributions and devices."""
     num_training_samples = 2_000
     num_test_samples = 1_000
     device = process_device(device)
@@ -49,10 +54,10 @@ def test_marginal_estimator(
     est = trainer.train(max_num_epochs=3000)
 
     # Sample from the marginal pdf estimator
-    samples = est.sample((num_test_samples,))
+    samples = est.sample(torch.Size((num_test_samples,)))
 
     # Compute the C2ST score
-    x_test = dist.sample((num_test_samples,))
+    x_test = dist.sample(torch.Size((num_test_samples,)))
     if len(x_test.shape) == 1:
         x_test = x_test.unsqueeze(1)
 

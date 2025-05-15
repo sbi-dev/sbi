@@ -16,7 +16,15 @@ from sbi.neural_nets.factory import posterior_score_nn
 
 
 class NPSE(VectorFieldInference):
-    """Neural Posterior Score Estimation as in Geffner et al. and Sharrock et al."""
+    """Neural Posterior Score Estimation as in Geffner et al. and Sharrock et al.
+
+    Instead of performing conditonal *density* estimation, NPSE methods perform
+    conditional *score* estimation i.e. they estimate the gradient of the log
+    density using denoising score matching loss.
+
+    NOTE: NPSE does not support multi-round inference with flexible proposals yet.
+    You can try to run multi-round with truncated proposals, but note that this is
+    not tested yet."""
 
     def __init__(
         self,
@@ -29,16 +37,7 @@ class NPSE(VectorFieldInference):
         show_progress_bars: bool = True,
         **kwargs,
     ):
-        r"""
-        Base class for Neural Posterior Score Estimation methods.
-
-        Instead of performing conditonal *density* estimation, NPSE methods perform
-        conditional *score* estimation i.e. they estimate the gradient of the log
-        density using denoising score matching loss.
-
-        NOTE: NPSE does not support multi-round inference with flexible proposals yet.
-        You can try to run multi-round with truncated proposals, but note that this is
-        not tested yet.
+        r"""Initialize Neural Posterior Score Estimation.
 
         Args:
             prior: Prior distribution.

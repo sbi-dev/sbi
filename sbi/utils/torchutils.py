@@ -285,23 +285,48 @@ class BoxUniform(Independent):
     ):
         """Multidimensional uniform distribution defined on a box.
 
-        A `Uniform` distribution initialized with e.g. a parameter vector low or high of
-         length 3 will result in a /batch/ dimension of length 3. A log_prob evaluation
-         will then output three numbers, one for each of the independent Uniforms in
-         the batch. Instead, a `BoxUniform` initialized in the same way has three
-         /event/ dimensions, and returns a scalar log_prob corresponding to whether
-         the evaluated point is in the box defined by low and high or outside.
+        A :class:`~torch.distributions.uniform.Uniform` distribution initialized \
+        with e.g. a parameter vector low or high of length 3 will result \
+        in a *batch* dimension of length 3. A log_prob evaluation will then \
+        output three numbers, one for each of the independent Uniforms in the \
+        batch. Instead, a :class:`BoxUniform` initialized in the same way has three \
+        *event* dimensions, and returns a scalar log_prob corresponding to whether \
+        the evaluated point is in the box defined by low and high or outside.
 
-        Refer to torch.distributions.Uniform and torch.distributions.Independent for
-         further documentation.
+        Refer to :class:`~torch.distributions.uniform.Uniform`\
+        and :class:`~torch.distributions.independent.Independent` for \
+        further documentation.
 
         Args:
             low: lower range (inclusive).
             high: upper range (exclusive).
-            reinterpreted_batch_ndims (int): the number of batch dims to
-                reinterpret as event dims.
-            device: device of the prior, inferred from low arg, defaults to "cpu",
-                should match the training device when used in SBI.
+            reinterpreted_batch_ndims (int): the number of batch dims to \
+            reinterpret as event dims.
+            device (Optional): device of the prior, inferred from low arg, \
+            defaults to "cpu", should match the training device when used in SBI.
+
+        Example:
+        --------
+
+        ::
+
+            import torch
+            from sbi.utils.torchutils import BoxUniform
+
+            # Define lower bounds
+            low = torch.tensor([0.0, 0.0, 0.0])
+
+            # Define upper bounds
+            high = torch.tensor([1.0, 1.0, 1.0])
+
+            box_uniform = BoxUniform(low, high)
+
+            # Sample from the box_uniform
+            N_samples = 100
+            sample = box_uniform.sample((N_samples,))
+
+            # Evaluate the log probability of the sample
+            log_prob = box_uniform.log_prob(sample)
         """
 
         # Type checks.
@@ -342,6 +367,15 @@ class BoxUniform(Independent):
 
         Args:
             device: Target device (e.g., "cpu", "cuda", "mps").
+
+        Example:
+        --------
+
+        ::
+
+            device = "cuda"
+            prior = BoxUniform(low=torch.zeros(2), high=torch.ones(2))
+            prior.to(device) #inplace
         """
         # Update the device attribute
         self.device = device

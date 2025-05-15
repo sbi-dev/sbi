@@ -36,16 +36,24 @@ from sbi.utils.torchutils import atleast_2d_float32_tensor, ensure_theta_batched
 class VIPosterior(NeuralPosterior):
     r"""Provides VI (Variational Inference) to sample from the posterior.
 
-    SNLE or SNRE train neural networks to approximate the likelihood(-ratios).
-    `VIPosterior` allows to learn a tractable variational posterior $q(\theta)$ which
-    approximates the true posterior $p(\theta|x_o)$. After this second training stage,
-    we can produce approximate posterior samples, by just sampling from q with no
-    additional cost. For additional information see [1] and [2].<br/><br/>
-    References:<br/>
-    [1] Variational methods for simulation-based inference, Manuel Glöckler, Michael
-    Deistler, Jakob Macke, 2022, https://openreview.net/forum?id=kZ0UYdhqkNY<br/>
-    [2] Sequential Neural Posterior and Likelihood Approximation, Samuel Wiqvist, Jes
-    Frellsen, Umberto Picchini, 2021, https://arxiv.org/abs/2102.06522
+    SNLE or SNRE train neural networks to approximate the likelihood (or likelihood
+    ratios). ``VIPosterior`` allows learning a tractable variational posterior
+    :math:`q(\theta)` which approximates the true posterior
+    :math:`p(\theta|x_o)`. After this second training stage, we can produce
+    approximate posterior samples by sampling from :math:`q` at no additional cost.
+
+    For additional information, see [1]_ and [2]_.
+
+    References
+    ----------
+
+    .. [1] Glöckler, M., Deistler, M., & Macke, J. (2022).
+        Variational methods for simulation-based inference.
+        https://openreview.net/forum?id=kZ0UYdhqkNY
+
+    .. [2] Wiqvist, S., Frellsen, J., & Picchini, U. (2021).
+        Sequential Neural Posterior and Likelihood Approximation.
+        https://arxiv.org/abs/2102.06522
     """
 
     def __init__(

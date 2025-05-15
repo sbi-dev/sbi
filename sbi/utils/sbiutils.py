@@ -284,7 +284,7 @@ def standardizing_net(
         # Compute per-dimension (independent) mean.
         t_mean = torch.mean(batch_t[is_valid_t], dim=0)
 
-    if len(batch_t > 1):
+    if len(batch_t) > 1:
         if structured_dims:
             # Compute std per-sample first.
             sample_std = torch.std(batch_t[is_valid_t], dim=1)

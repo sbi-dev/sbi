@@ -20,29 +20,15 @@ class EnsemblePosterior(NeuralPosterior):
     r"""Wrapper for bundling together different posterior instances into an ensemble.
 
     This class creates a posterior ensemble from a set of N different, already trained
-    posterior estimators $p_{i}(\theta|x_o)$, where $i \in \{i,...,N\}$.
+    posterior estimators :math:`p_{i}(\theta|x_o)`, where :math:`i \in \{1,...,N\}`.
 
-    It can wrap all posterior classes available in sbi and even a mixture of different
-    posteriors, i.e. obtained via SNLE and SNPE at the same time, since it only
-    provides a pass-through to the class-methods of each posterior in the ensemble. The
-    only constraint is, that the individual posteriors have the same prior.
+    It can wrap all posterior classes available in ``sbi`` and even a mixture of
+    different posteriors, i.e. obtained via SNLE and SNPE at the same time, since it
+    only provides a pass-through to the class methods of each posterior in the
+    ensemble. The only constraint is that the individual posteriors have the same
+    prior.
 
-    So far `log_prob()`, `sample()` and `map()` functionality are supported.
-
-    Example:
-
-    ```
-    import torch
-    from joblib import Parallel, delayed
-    from sbi.examples.minimal import simple
-
-    ensemble_size = 10
-    posteriors = Parallel(n_jobs=-1)(delayed(simple)() for i in range(ensemble_size))
-
-    ensemble = EnsemblePosterior(posteriors)
-    ensemble.set_default_x(torch.zeros((3,)))
-    ensemble.sample((1,))
-    ```
+    So far, ``log_prob()``, ``sample()`` and ``map()`` functionality are supported.
 
     Attributes:
         posteriors: List of the posterior estimators making up the ensemble.
@@ -51,9 +37,25 @@ class EnsemblePosterior(NeuralPosterior):
             posterior is weighted with 1/N.
         priors: Prior distributions of all posterior components.
         theta_transform: If passed, this transformation will be applied during the
-                optimization performed when obtaining the map. It does not affect the
-                `.sample()` and `.log_prob()` methods.
+            optimization performed when obtaining the map. It does not affect the
+            .sample() and .log_prob() methods.
         device: device to host the posterior distribution.
+
+    Example:
+    --------
+
+    ::
+
+        import torch
+        from joblib import Parallel, delayed
+        from sbi.examples.minimal import simple
+
+        n_ensembles = 10
+        posteriors = Parallel(n_jobs=-1)(delayed(simple)() for i in range(n_ensembles))
+
+        ensemble = EnsemblePosterior(posteriors)
+        ensemble.set_default_x(torch.zeros((3,)))
+        ensemble.sample((1,))
     """
 
     def __init__(

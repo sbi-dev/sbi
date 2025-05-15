@@ -22,6 +22,8 @@ from sbi.neural_nets.embedding_nets import (
     PermutationInvariantEmbedding,
     ResNetEmbedding1D,
     ResNetEmbedding2D,
+    SpectralConvEmbedding,
+    TransformerEmbedding,
 )
 from sbi.neural_nets.embedding_nets.lru import LRU, LRUBlock
 from sbi.simulators.linear_gaussian import (
@@ -180,6 +182,153 @@ def test_1d_and_2d_cnn_embedding_net(input_shape, num_channels):
     posterior.potential(s)
 
 
+@pytest.mark.parametrize("input_shape", [(3, 30), (2, 3, 30)])
+@pytest.mark.parametrize("modes", (4, 8))
+@pytest.mark.parametrize("conv_channels", (8, 5))
+@pytest.mark.parametrize("num_layers", (2, 3))
+def test_spectral_conf_embedding(input_shape, modes, conv_channels, num_layers):
+    n_points = input_shape[-1]
+    in_channels = input_shape[-2]
+    estimator_provider = posterior_nn(
+        "mdn",
+        embedding_net=SpectralConvEmbedding(
+            modes=modes,
+            in_channels=in_channels,
+            conv_channels=conv_channels,
+            num_layers=num_layers,
+        ),
+    )
+
+    def simulator(theta, input_shape=input_shape):
+        x = torch.rand_like(theta) + theta
+        return repeat_to_match_shape(x, input_shape)
+
+    def repeat_to_match_shape(x, input_shape):
+        batch_size = x.shape[0]  # First dimension is batch
+        target_shape = (batch_size, *input_shape)
+        x_expanded = x.view(batch_size, *([1] * (len(input_shape) - 1)), -1)
+        return x_expanded.expand(target_shape)
+
+    xo = torch.ones((1, n_points))
+    xo = repeat_to_match_shape(xo, input_shape)
+
+    prior = MultivariateNormal(torch.zeros(n_points), torch.eye(n_points))
+
+    num_simulations = 1000
+    theta = prior.sample(torch.Size((num_simulations,)))
+    x = simulator(theta)
+
+    trainer = NPE(prior=prior, density_estimator=estimator_provider)
+    trainer.append_simulations(theta, x).train(max_num_epochs=2)
+    posterior = trainer.build_posterior().set_default_x(xo)
+
+    s = posterior.sample((10,))
+    posterior.potential(s)
+
+
+BASE_CONFIG = {
+    "pos_emb_base": 10e4,
+    "rms_norm_eps": 1e-05,
+    "mlp_activation": "gelu",
+    "is_causal": True,
+    "vit": False,
+    "num_hidden_layers": 4,
+    "num_attention_heads": 6,
+    "num_key_value_heads": 6,
+    "intermediate_size": 64,
+    "ffn": "mlp",
+    "head_dim": None,
+    "feature_space_dim": 12 * 2,
+    "attention_dropout": 0.5,
+}
+
+
+@pytest.mark.parametrize(
+    "config",
+    [
+        {**BASE_CONFIG, "pos_emb": "rotary"},
+        {**BASE_CONFIG, "pos_emb": "none"},
+        {**BASE_CONFIG, "pos_emb": "positional"},
+        {
+            **BASE_CONFIG,
+            "pos_emb": "positional",
+            "ffn": "moe",
+            "num_local_experts": 4,
+            "num_experts_per_tok": 1,
+        },
+    ],
+)
+@pytest.mark.parametrize("seq_length", (24, 13, 5))
+def test_transformer_embedding(config, seq_length):
+    net = TransformerEmbedding(config=config)
+
+    def simulator(theta):
+        x = MultivariateNormal(
+            loc=theta, covariance_matrix=0.5 * torch.eye(config["feature_space_dim"])
+        )
+        return x.sample().unsqueeze(1).repeat(1, seq_length, 1)
+
+    xo = torch.ones(1, seq_length, config["feature_space_dim"])
+
+    prior = MultivariateNormal(
+        torch.zeros(config["feature_space_dim"]), torch.eye(config["feature_space_dim"])
+    )
+
+    _test_helper_embedding_net(prior, xo, simulator, net)
+
+
+@pytest.mark.parametrize(
+    "config",
+    (
+        {
+            **BASE_CONFIG,
+            "vit": True,
+            "image_size": 32,
+            "patch_size": 8,
+            "num_channels": 3,
+        },
+    ),
+)
+@pytest.mark.parametrize("img_shape", ((3, 32, 24), (3, 64, 64)))
+def test_transformer_vitembedding(config, img_shape):
+    net = TransformerEmbedding(config=config)
+
+    def simulator(theta):
+        x = MultivariateNormal(
+            loc=theta, covariance_matrix=0.5 * torch.eye(img_shape[0])
+        )
+        return (
+            x.sample()
+            .unsqueeze(-1)
+            .unsqueeze(-1)
+            .repeat(1, 1, img_shape[1], img_shape[2])
+        )
+
+    xo = torch.ones(1, img_shape[0], img_shape[1], img_shape[2])
+
+    prior = MultivariateNormal(torch.zeros(img_shape[0]), torch.eye(img_shape[0]))
+
+    _test_helper_embedding_net(prior, xo, simulator, net)
+
+
+def _test_helper_embedding_net(prior, xo, simulator, net):
+    estimator_provider = posterior_nn(
+        "mdn",
+        embedding_net=net,
+    )
+
+    num_simulations = 1000
+    theta = prior.sample(torch.Size((num_simulations,)))
+    x = simulator(theta)
+
+    trainer = NPE(prior=prior, density_estimator=estimator_provider)
+    trainer.append_simulations(theta, x).train(max_num_epochs=2)
+    posterior = trainer.build_posterior().set_default_x(xo)
+
+    s = posterior.sample((10,))
+    posterior.potential(s)
+
+
 @pytest.mark.parametrize("input_shape", [(32,), (64,)])
 @pytest.mark.parametrize("num_channels", (1, 2, 3))
 def test_1d_causal_cnn_embedding_net(input_shape, num_channels):
@@ -213,6 +362,7 @@ def test_1d_causal_cnn_embedding_net(input_shape, num_channels):
     num_simulations = 1000
     theta = prior.sample(torch.Size((num_simulations,)))
     x = simulator(theta)
+
     if num_channels > 1:
         x = x.unsqueeze(1).repeat(
             1, num_channels, *[1 for _ in range(len(input_shape))]
@@ -309,6 +459,7 @@ def test_npe_with_with_iid_embedding_varying_num_trials(trial_factor=50):
 @pytest.mark.parametrize("num_channels", (1, 2, 3))
 @pytest.mark.parametrize("change_c_mode", ["conv", "zeros"])
 @pytest.mark.parametrize("n_stages", [1, 3, 4])
+@pytest.mark.slow
 def test_2d_ResNet_cnn_embedding_net(
     input_shape, num_channels, change_c_mode, n_stages
 ):
@@ -394,23 +545,27 @@ def test_1d_ResNet_fc_embedding_net(input_shape, n_blocks, c_internal, c_hidden_
 
 
 @pytest.mark.parametrize(
-    "bidirectional", [True, False], ids=["one-directional", "bi-directional"]
-)
-@pytest.mark.parametrize(
     "mode",
     [
         "loop",
         pytest.param(
             "scan",
             marks=pytest.mark.xfail(
-                condition=sys.version_info >= (3, 13),
-                reason="torch.compiler is not yet supported on Python >= 3.13",
+                condition=tuple(map(int, torch.__version__.split('.')[:2])) < (2, 5)
+                or sys.version_info >= (3, 13),
+                reason="PyTorch's associative_scan only exists for torch >= 2.5 \
+                    and Python < 3.13",
                 strict=True,
             ),
         ),
     ],
     ids=["loop", "scan"],
 )
+@pytest.mark.parametrize(
+    "bidirectional", [True, False], ids=["one-directional", "bi-directional"]
+)
+@pytest.mark.slow
+@pytest.mark.filterwarnings("ignore:Torchinductor")
 def test_lru_isolated(
     bidirectional: bool,
     mode: str,
@@ -451,8 +606,10 @@ def test_lru_isolated(
         pytest.param(
             "scan",
             marks=pytest.mark.xfail(
-                condition=sys.version_info >= (3, 13),
-                reason="torch.compiler is not yet supported on Python >= 3.13",
+                condition=tuple(map(int, torch.__version__.split('.')[:2])) < (2, 5)
+                or sys.version_info >= (3, 13),
+                reason="PyTorch's associative_scan only exists for torch >= 2.5 \
+                    and Python < 3.13",
                 strict=True,
             ),
         ),
@@ -464,6 +621,8 @@ def test_lru_isolated(
     [True, False],
     ids=["input-normalization", "no-input-normalization"],
 )
+@pytest.mark.slow
+@pytest.mark.filterwarnings("ignore:Torchinductor")
 def test_lru_block_isolated(
     bidirectional: bool,
     mode: str,
@@ -509,8 +668,10 @@ def test_lru_block_isolated(
         pytest.param(
             "scan",
             marks=pytest.mark.xfail(
-                condition=sys.version_info >= (3, 13),
-                reason="torch.compiler is not yet supported on Python >= 3.13",
+                condition=tuple(map(int, torch.__version__.split('.')[:2])) < (2, 5)
+                or sys.version_info >= (3, 13),
+                reason="PyTorch's associative_scan only exists for torch >= 2.5 \
+                    and Python < 3.13",
                 strict=True,
             ),
         ),
@@ -520,6 +681,8 @@ def test_lru_block_isolated(
 @pytest.mark.parametrize(
     "aggregate_fcn", ["last_step", "mean"], ids=["last-step", "mean"]
 )
+@pytest.mark.slow
+@pytest.mark.filterwarnings("ignore:Torchinductor")
 def test_lru_embedding_net_isolated(
     bidirectional: bool,
     mode: str,
@@ -631,10 +794,13 @@ def test_lru_pipeline(embedding_feat_dim: int = 17):
 
 
 @pytest.mark.xfail(
-    condition=sys.version_info >= (3, 13),
-    reason="torch.compiler is not yet supported on Python >= 3.13",
+    condition=tuple(map(int, torch.__version__.split('.')[:2])) < (2, 5)
+    or sys.version_info >= (3, 13),
+    reason="PyTorch's associative_scan only exists for torch >= 2.5 \
+        and Python < 3.13",
     strict=True,
 )
+@pytest.mark.filterwarnings("ignore:Torchinductor")
 def test_scan(
     input_dim: int = 3,
     output_dim: int = 3,
