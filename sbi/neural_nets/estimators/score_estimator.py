@@ -138,7 +138,6 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
             Score (gradient of the density) at a given time, matches input shape.
         """
 
-
         # Continue with standard processing (broadcast shapes etc.)
         batch_shape_input = input.shape[: -len(self.input_shape)]
         batch_shape_cond = condition.shape[: -len(self.condition_shape)]
@@ -156,13 +155,10 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         )
         time = torch.broadcast_to(time, batch_shape)
 
-
-
         # Time dependent mean and std of the target distribution to z-score the input
         # and to approximate the score at the end of the diffusion.
         mean = self.approx_marginal_mean(time)
         std = self.approx_marginal_std(time)
-
 
         # As input to the neural net we want to have something that changes proportianl
         # to how the scores change

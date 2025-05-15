@@ -1,8 +1,8 @@
 from sbi.neural_nets.factory import (
     classifier_nn,
-    posterior_flow_nn,
     likelihood_nn,
     marginal_nn,
+    posterior_flow_nn,
     posterior_nn,
     posterior_score_nn,
 )

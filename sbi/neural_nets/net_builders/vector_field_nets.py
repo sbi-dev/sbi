@@ -342,7 +342,7 @@ class AdaMLPBlock(nn.Module):
         """
 
         shift_, scale_, gate_ = self.ada_ln(cond).chunk(3, dim=-1)
-        gate_ = torch.sigmoid(gate_) # TODO Maybe remove
+        gate_ = torch.sigmoid(gate_)  # TODO Maybe remove
 
         y = (scale_ + 1) * x + shift_
         y = self.block(y)

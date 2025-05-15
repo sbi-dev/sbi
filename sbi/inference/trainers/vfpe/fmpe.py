@@ -2,10 +2,8 @@
 # under the Apache License v2.0, see <https://www.apache.org/licenses/LICENSE-2.0>.
 
 
-from functools import partial
 from typing import Optional, Union
 
-from sbi.neural_nets.estimators.base import ConditionalVectorFieldEstimator
 from torch.distributions import Distribution
 from torch.utils.tensorboard.writer import SummaryWriter
 
@@ -15,6 +13,7 @@ from sbi.inference.trainers.vfpe.base_vf_inference import (
     VectorFieldEstimatorBuilder,
     VectorFieldInference,
 )
+from sbi.neural_nets.estimators.base import ConditionalVectorFieldEstimator
 from sbi.neural_nets.factory import posterior_flow_nn
 
 

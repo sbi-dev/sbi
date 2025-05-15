@@ -3,7 +3,7 @@
 
 
 from enum import Enum
-from typing import Any, Callable, Optional, Sequence, Union
+from typing import Any, Callable, Optional, Union
 
 from torch import Tensor, nn
 
@@ -424,7 +424,6 @@ def posterior_flow_nn(
     Returns:
         Constructor function for FMPE.
     """
-
 
     def build_fn(batch_theta, batch_x):
         # Build the flow matching estimator
