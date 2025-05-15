@@ -26,7 +26,7 @@ TRAIN_KWARGS = {}
 # Density estimators to test
 DENSITY_ESTIMATORS = ["mdn", "made", "maf", "nsf", "maf_rqs"]  # "Kinda exhaustive"
 CLASSIFIERS = ["mlp", "resnet"]
-NNS = ["mlp", "resnet"]
+NNS = ["mlp"]
 SCORE_ESTIMATORS = ["mlp", "ada_mlp"]
 
 # Benchmarking method groups i.e. what to run for different --bm-mode
