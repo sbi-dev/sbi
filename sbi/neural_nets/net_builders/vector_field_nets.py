@@ -99,7 +99,6 @@ def build_flow_matching_estimator(
         input_shape=batch_x[0].shape,
         condition_shape=batch_y[0].shape,
         embedding_net=embedding_net,
-        time_embedding_dim=time_embedding_dim,  # TODO: Remove?
     )
 
 
@@ -395,7 +394,7 @@ class GlobalEmbeddingMLP(nn.Module):
             raise ValueError(f"Unknown time embedding type: {time_emb_type}")
 
         if use_x_emb:
-            self.input_layer = nn.Linear(x_emb_dim + time_emb_dim, hidden_dim)
+            self.input_layer = nn.Linear(cond_emb_dim + time_emb_dim, hidden_dim)
         else:
             self.input_layer = nn.Linear(time_emb_dim, hidden_dim)
 
@@ -938,7 +937,7 @@ def build_mlp_network(
     y_numel = get_numel(batch_y, embedding_net=embedding_net)
 
     # Create time embedding dimension
-    time_emb_dim = time_embedding_dim // 2
+    time_emb_dim = time_embedding_dim
 
     # Create the vector field network (MLP)
     if isinstance(hidden_features, int):

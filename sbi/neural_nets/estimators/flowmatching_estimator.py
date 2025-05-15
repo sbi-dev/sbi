@@ -57,9 +57,7 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         input_shape: torch.Size,
         condition_shape: torch.Size,
         embedding_net: Optional[nn.Module] = None,
-        num_freqs: int = 3,  # This is ignored and will be removed in PR #1501
         noise_scale: float = 1e-3,
-        zscore_transform_input=None,  # This is ignored and will be removed in PR #1501
         **kwargs,
     ) -> None:
         r"""Creates a vector field estimator for Flow Matching.
@@ -80,8 +78,6 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         super().__init__(
             net=net, input_shape=input_shape, condition_shape=condition_shape
         )
-
-        self.num_freqs = num_freqs  # This will be removed in PR #1501
         self.noise_scale = noise_scale
         self._embedding_net = (
             embedding_net if embedding_net is not None else nn.Identity()
@@ -92,72 +88,44 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         return self._embedding_net
 
     def forward(self, input: Tensor, condition: Tensor, time: Tensor) -> Tensor:
-        """
-        Forward pass of the FlowMatchingEstimator.
+        """Forward pass of the FlowMatchingEstimator.
 
         Args:
-            input: The input tensor.
-            condition: The condition tensor.
-            time: The time tensor.
+            input: Original data, x0. (input_batch_shape, *input_shape)
+            condition: Conditioning variable. (condition_batch_shape, *condition_shape)
+            time: SDE time variable in [0,1].
 
         Returns:
             The estimated vector field.
         """
-        # For some reason, during batch sampling with multiple samples,
-        # input gets a sample dimension at the beginning
-        # (e.g., shape becomes [num_samples, batch_size, dim] rather than
-        # [batch_size, dim])
-        has_sample_dim = (len(input.shape) > len(self.input_shape) + 1) or (
-            len(condition.shape) > len(self.condition_shape) + 1
-        )
-
-        # Save original shapes for reshaping at the end
-        original_input_shape = input.shape
-        original_condition_shape = condition.shape
-        original_time_shape = time.shape
-
-        if has_sample_dim:
-            # Reshape to merge sample and batch dimensions
-            input = input.reshape(-1, *self.input_shape)
-            if len(original_condition_shape) > 1:  # Ensure condition is not empty
-                condition = condition.reshape(-1, *self.condition_shape)
-
-            # Time might be a scalar or have batch dimension, handle accordingly
-            if len(original_time_shape) > 0:
-                time = time.reshape(-1)
-
         # Continue with standard processing (broadcast shapes etc.)
+        batch_shape_input = input.shape[: -len(self.input_shape)]
+        batch_shape_cond = condition.shape[: -len(self.condition_shape)]
         batch_shape = torch.broadcast_shapes(
-            input.shape[: -len(self.input_shape)],
-            condition.shape[: -len(self.condition_shape)],
-        )
-
-        input = torch.broadcast_to(input, batch_shape + self.input_shape)
-        condition = torch.broadcast_to(condition, batch_shape + self.condition_shape)
-
-        # Handle time broadcasting - ensure time has right shape first
-        if time.ndim == 1:
-            time = time.unsqueeze(-1)
-        time = torch.broadcast_to(time, batch_shape + time.shape[-1:])
-
-        # the network expects 2D input, so we flatten the input if necessary
-        # and remember the original shape
-        # target_shape = input.shape
-        input = input.reshape(-1, input.shape[-1])
-        condition = condition.reshape(-1, *self.condition_shape)
-        time = (
-            time.reshape(-1, 1) if time.ndim <= 2 else time.reshape(-1, time.shape[-1])
+            batch_shape_input,
+            batch_shape_cond,
         )
 
         # embed the conditioning variable
         condition_emb = self._embedding_net(condition)
 
+        input = torch.broadcast_to(input, batch_shape + self.input_shape)
+        condition_emb = torch.broadcast_to(
+            condition_emb, batch_shape + condition_emb.shape[len(batch_shape_cond) :]
+        )
+        time = torch.broadcast_to(time, batch_shape)
+
+        # NOTE: To simplify use of external networks, we will flatten the tensors
+        # batch_shape to a single batch dimension.
+        input = input.reshape(-1, *input.shape[len(batch_shape) :])
+        condition_emb = condition_emb.reshape(
+            -1, *condition_emb.shape[len(batch_shape) :]
+        )
+        time = time.reshape(-1)
+
         # call the network to get the estimated vector field
         v = self.net(input, condition_emb, time)
-
-        # If we had a sample dimension, reshape back to original shape
-        if has_sample_dim:
-            v = v.reshape(original_input_shape)
+        v = v.reshape(*batch_shape + self.input_shape)
 
         return v
 
