@@ -134,14 +134,20 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
 
         input = torch.broadcast_to(input, batch_shape + self.input_shape)
         condition = torch.broadcast_to(condition, batch_shape + self.condition_shape)
-        t = torch.broadcast_to(t, batch_shape + t.shape[1:])
+
+        # Handle time broadcasting - ensure time has right shape first
+        if time.ndim == 1:
+            time = time.unsqueeze(-1)
+        time = torch.broadcast_to(time, batch_shape + time.shape[-1:])
 
         # the network expects 2D input, so we flatten the input if necessary
         # and remember the original shape
         target_shape = input.shape
         input = input.reshape(-1, input.shape[-1])
         condition = condition.reshape(-1, *self.condition_shape)
-        t = t.reshape(-1, t.shape[-1])
+        time = (
+            time.reshape(-1, 1) if time.ndim <= 2 else time.reshape(-1, time.shape[-1])
+        )
 
         # embed the conditioning variable
         condition_emb = self._embedding_net(condition)

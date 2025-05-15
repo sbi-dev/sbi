@@ -23,6 +23,193 @@ from sbi.utils.sbiutils import (
 from sbi.utils.user_input_checks import check_data_device
 from sbi.utils.vector_field_utils import VectorFieldNet
 
+
+# ==================== Building Flow/Score Matching Estimators =========================
+def build_flow_matching_estimator(
+    batch_x: Tensor,
+    batch_y: Tensor,
+    embedding_net: nn.Module = nn.Identity(),
+    hidden_features: Union[Sequence[int], int] = 200,
+    time_embedding_dim: int = 32,
+    num_layers: int = 5,
+    num_blocks: int = 5,
+    num_heads: int = 4,
+    mlp_ratio: int = 4,
+    net: str | nn.Module = "mlp",  # "mlp" or "transformer"
+    **kwargs,
+) -> FlowMatchingEstimator:
+    """Builds a flow matching estimator with the given network.
+
+    Args:
+        batch_x: Batch of xs, used to infer dimensionality.
+        batch_y: Batch of ys, used to infer dimensionality.
+        embedding_net: Embedding network for batch_y.
+        hidden_features: Number of hidden features in each layer (for MLP) or dimension
+        of hidden features (for transformer).
+        time_embedding_dim: Number of dimensions for time embedding.
+        num_layers: Number of layers in the network (for MLP).
+        num_blocks: Number of transformer blocks (for transformer).
+        num_heads: Number of attention heads per block (for transformer).
+        mlp_ratio: Ratio for MLP hidden dimension (for transformer).
+        net: Type of architecture to use, either "mlp" or "transformer".
+        **kwargs: Additional arguments for the network.
+
+    Returns:
+        A flow matching estimator.
+    """
+    # Check inputs and device
+    check_data_device(batch_x, batch_y)
+
+    # Build network if not provided
+    if net == "mlp":
+        vectorfield_net = build_mlp_network(
+            batch_x=batch_x,
+            batch_y=batch_y,
+            hidden_features=hidden_features,
+            num_layers=num_layers,
+            time_embedding_dim=time_embedding_dim,
+            embedding_net=embedding_net,
+            **kwargs,
+        )
+    elif net == "transformer":
+        # For transformer, hidden_features must be an int
+        hidden_dim = (
+            hidden_features if isinstance(hidden_features, int) else hidden_features[0]
+        )
+        vectorfield_net = build_transformer_network(
+            batch_x=batch_x,
+            batch_y=batch_y,
+            hidden_features=hidden_dim,
+            num_blocks=num_blocks,
+            num_heads=num_heads,
+            mlp_ratio=mlp_ratio,
+            time_embedding_dim=time_embedding_dim,
+            embedding_net=embedding_net,
+            **kwargs,
+        )
+    else:
+        if isinstance(net, nn.Module):
+            vectorfield_net = net
+        else:
+            raise ValueError(f"Unknown architecture: {net}")
+
+    # Create the flow matching estimator
+    return FlowMatchingEstimator(
+        net=vectorfield_net,
+        input_shape=batch_x[0].shape,
+        condition_shape=batch_y[0].shape,
+        embedding_net=embedding_net,
+        time_embedding_dim=time_embedding_dim,  # TODO: Remove?
+    )
+
+
+def build_score_matching_estimator(
+    batch_x: Tensor,
+    batch_y: Tensor,
+    z_score_x: Optional[str] = None,
+    z_score_y: Optional[str] = None,
+    embedding_net: nn.Module = nn.Identity(),
+    sde_type: str = "vp",  # "vp", "subvp", or "ve"
+    hidden_features: Union[Sequence[int], int] = 64,
+    num_layers: int = 5,
+    num_blocks: int = 5,
+    num_heads: int = 4,
+    mlp_ratio: int = 4,
+    time_embedding_dim: int = 32,
+    net: str | nn.Module = "mlp",  # "mlp" or "transformer"
+    **kwargs,
+) -> ConditionalScoreEstimator:
+    """Builds a score matching estimator with the given network.
+
+    Args:
+        batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring.
+        batch_y: Batch of ys, used to infer dimensionality and (optional) z-scoring.
+        vectorfield_net: The vector field network to use. If None, a new network will
+            be built.
+        z_score_x: Whether to z-score xs passing into the network.
+        z_score_y: Whether to z-score ys passing into the network.
+        embedding_net: Embedding network for batch_y.
+        sde_type: SDE type for score estimator, one of "vp", "subvp", or "ve".
+        hidden_features: Number of hidden features in each layer (for MLP) or dimension
+            of hidden features (for transformer).
+        num_layers: Number of layers in the network (for MLP).
+        num_blocks: Number of transformer blocks (for transformer).
+        num_heads: Number of attention heads per block (for transformer).
+        mlp_ratio: Ratio for MLP hidden dimension (for transformer).
+        time_embedding_dim: Number of dimensions for time embedding.
+        net: Type of architecture to use, either "mlp" or "transformer".
+        **kwargs: Additional arguments for the network.
+
+    Returns:
+        A score matching estimator.
+    """
+    # Check inputs and device
+    check_data_device(batch_x, batch_y)
+
+    # Build network if not provided
+    if net == "mlp":
+        vectorfield_net = build_mlp_network(
+            batch_x=batch_x,
+            batch_y=batch_y,
+            hidden_features=hidden_features,
+            num_layers=num_layers,
+            time_embedding_dim=time_embedding_dim,
+            embedding_net=embedding_net,
+            **kwargs,
+        )
+    elif net == "transformer":
+        # For transformer, hidden_features must be an int
+        hidden_dim = (
+            hidden_features if isinstance(hidden_features, int) else hidden_features[0]
+        )
+        vectorfield_net = build_transformer_network(
+            batch_x=batch_x,
+            batch_y=batch_y,
+            hidden_features=hidden_dim,
+            num_blocks=num_blocks,
+            num_heads=num_heads,
+            mlp_ratio=mlp_ratio,
+            time_embedding_dim=time_embedding_dim,
+            embedding_net=embedding_net,
+            **kwargs,
+        )
+    else:
+        if isinstance(net, nn.Module):
+            vectorfield_net = net
+        else:
+            raise ValueError(f"Unknown architecture: {net}")
+
+    # Z-score setup
+    mean_0, std_0 = z_standardization(batch_x, z_score_x == "structured")
+
+    # Create input embeddings
+    embedding_net_y = (
+        standardizing_net(batch_y, z_score_y == "structured")
+        if z_score_y
+        else nn.Identity()
+    )
+
+    # Choose the appropriate score estimator based on SDE type
+    if sde_type == "vp":
+        estimator_cls = VPScoreEstimator
+    elif sde_type == "subvp":
+        estimator_cls = SubVPScoreEstimator
+    elif sde_type == "ve":
+        estimator_cls = VEScoreEstimator
+    else:
+        raise ValueError(f"Unknown SDE type: {sde_type}")
+
+    # Create the score estimator
+    return estimator_cls(
+        net=vectorfield_net,
+        input_shape=batch_x[0].shape,
+        condition_shape=batch_y[0].shape,
+        mean_0=mean_0,
+        std_0=std_0,
+        embedding_net=embedding_net_y,
+    )
+
+
 # ======= Time Embedding Shared Components =======
 
 
@@ -231,10 +418,11 @@ class GlobalEmbeddingMLP(nn.Module):
 
         try:
             cond_emb = torch.cat([x_emb, t_emb], dim=-1) if x_emb is not None else t_emb
-        except Exception as e:
-            print("x_emb", (x_emb.shape if x_emb is not None else "None"))
-            print("t_emb", t_emb.shape)
-            raise e
+        except RuntimeError as e:
+            shapes = f"x_emb shape: {x_emb.shape if x_emb is not None else 'None'}, t_emb shape: {t_emb.shape}"
+            raise RuntimeError(
+                f"Failed to concatenate embeddings with shapes {shapes}"
+            ) from e
 
         cond_emb = self.input_layer(cond_emb)
         for mlp_block in self.mlp_blocks:
@@ -428,13 +616,15 @@ class DiTBlock(nn.Module):
             ada_params.chunk(6, dim=-1)
         )
 
-        # unsqueeze to broadcast to sequence dimension
-        attn_scale = attn_scale.unsqueeze(1)
-        attn_shift = attn_shift.unsqueeze(1)
-        attn_gate = attn_gate.unsqueeze(1)
-        mlp_scale = mlp_scale.unsqueeze(1)
-        mlp_shift = mlp_shift.unsqueeze(1)
-        mlp_gate = mlp_gate.unsqueeze(1)
+        batch_size = x.shape[0]
+
+        # Handle reshaping more carefully to preserve batch dimension
+        attn_scale = attn_scale.view(batch_size, 1, -1)
+        attn_shift = attn_shift.view(batch_size, 1, -1)
+        attn_gate = attn_gate.view(batch_size, 1, -1)
+        mlp_scale = mlp_scale.view(batch_size, 1, -1)
+        mlp_shift = mlp_shift.view(batch_size, 1, -1)
+        mlp_gate = mlp_gate.view(batch_size, 1, -1)
 
         # attention with adaptive ln
         x_norm = self.norm1(x)
@@ -675,16 +865,16 @@ class VectorFieldTransformer(VectorFieldNet):
         Returns:
             Vector field evaluation at the provided points
         """
+        batch_size = theta.shape[0]
 
-        h = theta
         # Get condition embedding
         cond_emb = self.global_mlp(
             t, x_emb=x_emb_cond if not self.is_x_emb_seq else None
         )
 
-        # Project input to hidden dimension
-        h = self.input_proj(h.unsqueeze(-1))  # [b, d*h, 1]
-        h = h.view(h.shape[0], self.input_dim, self.hidden_features)  # [b,d,h]
+        # Project input to hidden dimension using a simpler approach
+        h = theta.view(batch_size, self.input_dim, 1)  # [b, d, 1]
+        h = h.expand(-1, -1, self.hidden_features)  # [b, d, h]
 
         # pass through transformer blocks
         for _, block in enumerate(self.blocks):
@@ -710,7 +900,7 @@ def build_mlp_network(
     num_layers: int = 5,
     time_embedding_dim: int = 32,
     embedding_net: nn.Module = nn.Identity(),
-    global_mlp_ratio: int = 1,
+    mlp_ratio: int = 1,
     num_intermediate_mlp_layers: int = 0,
     adamlp_ratio: int = 1,
     activation: Callable = nn.GELU,
@@ -727,7 +917,7 @@ def build_mlp_network(
         num_layers: Number of layers in the network.
         time_embedding_dim: Number of dimensions for time embedding.
         embedding_net: Embedding network for batch_y.
-        global_mlp_ratio: Ratio of hidden dim to intermediate dim in global MLP.
+        mlp_ratio: Ratio of hidden dim to intermediate dim in global MLP.
         num_intermediate_mlp_layers: Number of intermediate layers in global MLP.
         adamlp_ratio: Ratio of hidden dim to intermediate dim in AdaMLPBlock.
         activation: Activation function.
@@ -760,7 +950,7 @@ def build_mlp_network(
         time_emb_dim=time_emb_dim,
         hidden_features=hidden_dim,
         num_layers=num_layers,
-        global_mlp_ratio=global_mlp_ratio,
+        global_mlp_ratio=mlp_ratio,
         num_intermediate_mlp_layers=num_intermediate_mlp_layers,
         adamlp_ratio=adamlp_ratio,
         activation=activation,
@@ -815,7 +1005,7 @@ def build_transformer_network(
     y_numel = get_numel(batch_y, embedding_net=embedding_net)
 
     # Create time embedding dimension
-    time_emb_dim = time_embedding_dim // 2
+    time_emb_dim = time_embedding_dim
 
     # Create the vector field network (Transformer)
     vectorfield_net = VectorFieldTransformer(
@@ -834,188 +1024,3 @@ def build_transformer_network(
     )
 
     return vectorfield_net
-
-
-def build_flow_matching_estimator(
-    batch_x: Tensor,
-    batch_y: Tensor,
-    embedding_net: nn.Module = nn.Identity(),
-    hidden_features: Union[Sequence[int], int] = 200,
-    time_embedding_dim: int = 32,
-    num_layers: int = 5,
-    num_blocks: int = 5,
-    num_heads: int = 4,
-    mlp_ratio: int = 4,
-    net: str | nn.Module = "mlp",  # "mlp" or "transformer"
-    **kwargs,
-) -> FlowMatchingEstimator:
-    """Builds a flow matching estimator with the given network.
-
-    Args:
-        batch_x: Batch of xs, used to infer dimensionality.
-        batch_y: Batch of ys, used to infer dimensionality.
-        embedding_net: Embedding network for batch_y.
-        hidden_features: Number of hidden features in each layer (for MLP) or dimension
-        of hidden features (for transformer).
-        time_embedding_dim: Number of dimensions for time embedding.
-        num_layers: Number of layers in the network (for MLP).
-        num_blocks: Number of transformer blocks (for transformer).
-        num_heads: Number of attention heads per block (for transformer).
-        mlp_ratio: Ratio for MLP hidden dimension (for transformer).
-        net: Type of architecture to use, either "mlp" or "transformer".
-        **kwargs: Additional arguments for the network.
-
-    Returns:
-        A flow matching estimator.
-    """
-    # Check inputs and device
-    check_data_device(batch_x, batch_y)
-
-    # Build network if not provided
-    if net == "mlp":
-        vectorfield_net = build_mlp_network(
-            batch_x=batch_x,
-            batch_y=batch_y,
-            hidden_features=hidden_features,
-            num_layers=num_layers,
-            time_embedding_dim=time_embedding_dim,
-            embedding_net=embedding_net,
-            **kwargs,
-        )
-    elif net == "transformer":
-        # For transformer, hidden_features must be an int
-        hidden_dim = (
-            hidden_features if isinstance(hidden_features, int) else hidden_features[0]
-        )
-        vectorfield_net = build_transformer_network(
-            batch_x=batch_x,
-            batch_y=batch_y,
-            hidden_features=hidden_dim,
-            num_blocks=num_blocks,
-            num_heads=num_heads,
-            mlp_ratio=mlp_ratio,
-            time_embedding_dim=time_embedding_dim,
-            embedding_net=embedding_net,
-            **kwargs,
-        )
-    else:
-        if isinstance(net, nn.Module):
-            vectorfield_net = net
-        else:
-            raise ValueError(f"Unknown architecture: {net}")
-
-    # Create the flow matching estimator
-    return FlowMatchingEstimator(
-        net=vectorfield_net,
-        input_shape=batch_x[0].shape,
-        condition_shape=batch_y[0].shape,
-        embedding_net=embedding_net,
-        time_embedding_dim=time_embedding_dim,  # TODO: Remove?
-    )
-
-
-def build_score_matching_estimator(
-    batch_x: Tensor,
-    batch_y: Tensor,
-    z_score_x: Optional[str] = None,
-    z_score_y: Optional[str] = None,
-    embedding_net: nn.Module = nn.Identity(),
-    sde_type: str = "vp",  # "vp", "subvp", or "ve"
-    hidden_features: Union[Sequence[int], int] = 64,
-    num_layers: int = 5,
-    num_blocks: int = 5,
-    num_heads: int = 4,
-    mlp_ratio: int = 4,
-    time_embedding_dim: int = 32,
-    net: str | nn.Module = "mlp",  # "mlp" or "transformer"
-    **kwargs,
-) -> ConditionalScoreEstimator:
-    """Builds a score matching estimator with the given network.
-
-    Args:
-        batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring.
-        batch_y: Batch of ys, used to infer dimensionality and (optional) z-scoring.
-        vectorfield_net: The vector field network to use. If None, a new network will
-            be built.
-        z_score_x: Whether to z-score xs passing into the network.
-        z_score_y: Whether to z-score ys passing into the network.
-        embedding_net: Embedding network for batch_y.
-        sde_type: SDE type for score estimator, one of "vp", "subvp", or "ve".
-        hidden_features: Number of hidden features in each layer (for MLP) or dimension
-            of hidden features (for transformer).
-        num_layers: Number of layers in the network (for MLP).
-        num_blocks: Number of transformer blocks (for transformer).
-        num_heads: Number of attention heads per block (for transformer).
-        mlp_ratio: Ratio for MLP hidden dimension (for transformer).
-        time_embedding_dim: Number of dimensions for time embedding.
-        net: Type of architecture to use, either "mlp" or "transformer".
-        **kwargs: Additional arguments for the network.
-
-    Returns:
-        A score matching estimator.
-    """
-    # Check inputs and device
-    check_data_device(batch_x, batch_y)
-
-    # Build network if not provided
-    if net == "mlp":
-        vectorfield_net = build_mlp_network(
-            batch_x=batch_x,
-            batch_y=batch_y,
-            hidden_features=hidden_features,
-            num_layers=num_layers,
-            time_embedding_dim=time_embedding_dim,
-            embedding_net=embedding_net,
-            **kwargs,
-        )
-    elif net == "transformer":
-        # For transformer, hidden_features must be an int
-        hidden_dim = (
-            hidden_features if isinstance(hidden_features, int) else hidden_features[0]
-        )
-        vectorfield_net = build_transformer_network(
-            batch_x=batch_x,
-            batch_y=batch_y,
-            hidden_features=hidden_dim,
-            num_blocks=num_blocks,
-            num_heads=num_heads,
-            mlp_ratio=mlp_ratio,
-            time_embedding_dim=time_embedding_dim,
-            embedding_net=embedding_net,
-            **kwargs,
-        )
-    else:
-        if isinstance(net, nn.Module):
-            vectorfield_net = net
-        else:
-            raise ValueError(f"Unknown architecture: {net}")
-
-    # Z-score setup
-    mean_0, std_0 = z_standardization(batch_x, z_score_x == "structured")
-
-    # Create input embeddings
-    embedding_net_y = (
-        standardizing_net(batch_y, z_score_y == "structured")
-        if z_score_y
-        else nn.Identity()
-    )
-
-    # Choose the appropriate score estimator based on SDE type
-    if sde_type == "vp":
-        estimator_cls = VPScoreEstimator
-    elif sde_type == "subvp":
-        estimator_cls = SubVPScoreEstimator
-    elif sde_type == "ve":
-        estimator_cls = VEScoreEstimator
-    else:
-        raise ValueError(f"Unknown SDE type: {sde_type}")
-
-    # Create the score estimator
-    return estimator_cls(
-        net=vectorfield_net,
-        input_shape=batch_x[0].shape,
-        condition_shape=batch_y[0].shape,
-        mean_0=mean_0,
-        std_0=std_0,
-        embedding_net=embedding_net_y,
-    )

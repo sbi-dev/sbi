@@ -3,7 +3,7 @@
 
 
 from enum import Enum
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, Optional, Sequence, Union
 
 from torch import Tensor, nn
 
