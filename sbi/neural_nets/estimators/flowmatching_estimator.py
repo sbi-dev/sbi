@@ -142,7 +142,7 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
 
         # the network expects 2D input, so we flatten the input if necessary
         # and remember the original shape
-        target_shape = input.shape
+        # target_shape = input.shape
         input = input.reshape(-1, input.shape[-1])
         condition = condition.reshape(-1, *self.condition_shape)
         time = (

@@ -419,7 +419,8 @@ class GlobalEmbeddingMLP(nn.Module):
         try:
             cond_emb = torch.cat([x_emb, t_emb], dim=-1) if x_emb is not None else t_emb
         except RuntimeError as e:
-            shapes = f"x_emb shape: {x_emb.shape if x_emb is not None else 'None'}, t_emb shape: {t_emb.shape}"
+            shapes = f"x_emb shape: {x_emb.shape if x_emb is not None else 'None'},"
+            shapes += f"t_emb shape: {t_emb.shape}"
             raise RuntimeError(
                 f"Failed to concatenate embeddings with shapes {shapes}"
             ) from e
