@@ -361,7 +361,6 @@ class GlobalEmbeddingMLP(nn.Module):
     either sinusoidal or random fourier embeddings.
 
     Args:
-        x_emb_dim: The dimensionality of the input tensor.
         cond_emb_dim: The dimensionality of the conditioning embedding.
         time_emb_type: Type of time embedding to use, "sinusoidal" or "random_fourier".
         time_emb_dim: The dimensionality of the time embedding.
@@ -375,8 +374,8 @@ class GlobalEmbeddingMLP(nn.Module):
 
     def __init__(
         self,
-        x_emb_dim: int,
-        cond_emb_dim: int,
+        input_dim: int,
+        output_dim: int,
         time_emb_type: str = "sinusoidal",
         time_emb_dim: int = 16,
         sinusoidal_max_freq: float = 0.01,
@@ -403,7 +402,7 @@ class GlobalEmbeddingMLP(nn.Module):
             raise ValueError(f"Unknown time embedding type: {time_emb_type}")
 
         if use_x_emb:
-            self.input_layer = nn.Linear(cond_emb_dim + time_emb_dim, hidden_dim)
+            self.input_layer = nn.Linear(input_dim + time_emb_dim, hidden_dim)
         else:
             self.input_layer = nn.Linear(time_emb_dim, hidden_dim)
 
@@ -419,7 +418,7 @@ class GlobalEmbeddingMLP(nn.Module):
                 )
             )
 
-        self.output_layer = nn.Linear(hidden_dim, cond_emb_dim)
+        self.output_layer = nn.Linear(hidden_dim, output_dim)
 
     def forward(self, t: Tensor, x_emb: Optional[Tensor] = None) -> Tensor:
         t_emb = self.time_emb(t)
@@ -445,6 +444,7 @@ class VectorFieldMLP(VectorFieldNet):
     def __init__(
         self,
         input_dim: int,
+        condition_dim: int,
         condition_emb_dim: int,
         time_emb_dim: int,
         hidden_features: int = 64,
@@ -499,8 +499,8 @@ class VectorFieldMLP(VectorFieldNet):
 
         # Global MLP for time and condition embedding
         self.global_mlp = GlobalEmbeddingMLP(
-            x_emb_dim=input_dim,
-            cond_emb_dim=condition_emb_dim,
+            input_dim=condition_dim,
+            output_dim=condition_emb_dim,
             time_emb_dim=time_emb_dim,
             num_intermediate_layers=num_intermediate_mlp_layers,
             global_mlp_ratio=global_mlp_ratio,
@@ -817,8 +817,8 @@ class VectorFieldTransformer(VectorFieldNet):
 
         # global embedding mlp for conditioning
         self.global_mlp = GlobalEmbeddingMLP(
-            x_emb_dim=condition_dim,
-            cond_emb_dim=hidden_features,
+            input_dim=condition_dim,
+            output_dim=hidden_features,
             time_emb_dim=time_emb_dim,
             num_intermediate_layers=2,
             global_mlp_ratio=4,
@@ -909,6 +909,7 @@ def build_mlp_network(
     hidden_features: Union[Sequence[int], int] = 64,
     num_layers: int = 5,
     time_embedding_dim: int = 32,
+    condition_emb_dim: int = 64,
     embedding_net: nn.Module = nn.Identity(),
     mlp_ratio: int = 1,
     num_intermediate_mlp_layers: int = 0,
@@ -956,7 +957,8 @@ def build_mlp_network(
 
     vectorfield_net = VectorFieldMLP(
         input_dim=x_numel,
-        condition_emb_dim=y_numel,
+        condition_dim=y_numel,
+        condition_emb_dim=condition_emb_dim,
         time_emb_dim=time_emb_dim,
         hidden_features=hidden_dim,
         num_layers=num_layers,
@@ -1014,9 +1016,6 @@ def build_transformer_network(
     x_numel = get_numel(batch_x)
     y_numel = get_numel(batch_y, embedding_net=embedding_net)
 
-    # Create time embedding dimension
-    time_emb_dim = time_embedding_dim
-
     # Create the vector field network (Transformer)
     vectorfield_net = VectorFieldTransformer(
         input_dim=x_numel,
@@ -1025,7 +1024,7 @@ def build_transformer_network(
         num_layers=num_blocks,
         num_heads=num_heads,
         mlp_ratio=mlp_ratio,
-        time_emb_dim=time_emb_dim,
+        time_emb_dim=time_embedding_dim,
         time_emb_type=time_emb_type,
         sinusoidal_max_freq=sinusoidal_max_freq,
         fourier_scale=fourier_scale,

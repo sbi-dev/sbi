@@ -333,7 +333,7 @@ def posterior_score_nn(
     z_score_theta: Optional[str] = None,
     z_score_x: Optional[str] = None,
     t_embedding_dim: int = 16,
-    hidden_features: int = 64,
+    hidden_features: int = 128,
     embedding_net: nn.Module = nn.Identity(),
     **kwargs: Any,
 ) -> Callable:
@@ -393,7 +393,7 @@ def posterior_flow_nn(
     z_score_theta: Optional[str] = None,
     z_score_y: Optional[str] = None,
     t_embedding_dim: int = 16,
-    hidden_features: int = 64,
+    hidden_features: int = 128,
     embedding_net: nn.Module = nn.Identity(),
     **kwargs: Any,
 ) -> Callable:
