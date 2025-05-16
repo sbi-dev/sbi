@@ -1,6 +1,6 @@
 import pytest
 from scipy.stats import uniform
-from torch import Tensor, allclose, exp, eye, ones
+from torch import allclose, device, exp, eye, ones, zeros
 from torch.distributions import Normal, Uniform
 from torch.nn import L1Loss
 
@@ -141,10 +141,44 @@ def test_run_tarp_correct(distance, z_score_theta, accurate_samples):
         num_bins=30,
     )
 
-    assert allclose((ecp - alpha).abs().max(), Tensor([0.0]), atol=1e-1)
+    assert allclose((ecp - alpha).abs().max(), zeros((1,)), atol=1e-1)
     assert (
         ecp - alpha
     ).abs().sum() < 1.0  # integral of residuals should vanish, fig.2 in paper
+
+
+@pytest.mark.gpu
+@pytest.mark.parametrize("distance", (l1, l2))
+@pytest.mark.parametrize("z_score_theta", (True, False))
+def test_run_tarp_correct_on_cuda_device(distance, z_score_theta, accurate_samples):
+    dev = device("cuda")
+    theta, samples = accurate_samples
+    theta, samples = theta.to(dev), samples.to(dev)
+
+    with pytest.raises(NotImplementedError):
+        # let's make sure the execution problem is still there
+        # if torch fixes https://github.com/pytorch/pytorch/issues/69519
+        # this context manager should ensure, the case fails
+        # then we can fix the tarp code
+        from torch import histogram
+
+        histogram(zeros((3,)).cuda(), bins=4)
+
+    references = get_tarp_references(theta).to(dev)
+
+    ecp, alpha = _run_tarp(
+        samples,
+        theta,
+        references,
+        distance=distance,
+        z_score_theta=z_score_theta,
+        num_bins=30,
+    )
+
+    assert allclose((ecp - alpha).abs().max(), zeros((1,), device=dev), atol=1e-1)
+    assert (
+        ecp - alpha
+    ).abs().sum() < 1.05  # integral of residuals should vanish, fig.2 in paper
 
 
 @pytest.mark.parametrize("distance", (l1, l2))
@@ -158,7 +192,7 @@ def test_run_tarp_detect_overdispersed(distance, overdispersed_samples):
 
     # TARP detects that this is NOT a correct representation of the posterior
     # hence we test for not allclose
-    assert not allclose((ecp - alpha).abs().max(), Tensor([0.0]), atol=1e-1)
+    assert not allclose((ecp - alpha).abs().max(), zeros((1,)), atol=1e-1)
     assert (ecp - alpha).abs().sum() > 3.0  # integral is nonzero, fig.2 in paper
 
 
@@ -173,7 +207,7 @@ def test_run_tarp_detect_underdispersed(distance, underdispersed_samples):
 
     # TARP detects that this is NOT a correct representation of the posterior
     # hence we test for not allclose
-    assert not allclose((ecp - alpha).abs().max(), Tensor([0.0]), atol=1e-1)
+    assert not allclose((ecp - alpha).abs().max(), zeros((1,)), atol=1e-1)
     assert (ecp - alpha).abs().sum() > 3.0  # integral is nonzero, fig.2 in paper
 
 
@@ -188,7 +222,7 @@ def test_run_tarp_detect_bias(distance, biased_samples):
 
     # TARP detects that this is NOT a correct representation of the posterior
     # hence we test for not allclose
-    assert not allclose((ecp - alpha).abs().max(), Tensor([0.0]), atol=1e-1)
+    assert not allclose((ecp - alpha).abs().max(), zeros((1,)), atol=1e-1)
     assert (ecp - alpha).abs().sum() > 3.0  # integral is nonzero, fig.2 in paper
 
 
