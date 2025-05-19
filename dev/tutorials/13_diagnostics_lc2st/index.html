@@ -704,10 +704,12 @@
 <li>show you where (for which observation) and why (bais, overdispersion, etc.) it fails </li>
 </ul>
 <h2 id="illustration-on-a-benchmark-sbi-example">Illustration on a benchmark SBI example<a class="headerlink" href="#illustration-on-a-benchmark-sbi-example" title="Permanent link">&para;</a></h2>
-<p>We consider the Gaussian Mixture SBI task from <a href="https://arxiv.org/abs/2101.04653">Lueckmann et al, 2021</a>. It consists of inferring the common mean of a mixture of two 2D Gaussian distributions, one with much broader covariance than the other:
-- Prior: <span class="arithmatex">\(p(\theta) = \mathcal{U}(-10,10)\)</span>
-- Simulator: <span class="arithmatex">\(p(x|\theta) = 0.5 \mathcal{N}(\theta, \mathbf{I}_2)+ 0.5 \mathcal{N}(\theta, 0.1 \times \mathbf{I}_2)\)</span>
-- Dimensionality: <span class="arithmatex">\(\theta \in \mathbb{R}^2\)</span>, <span class="arithmatex">\(x \in \mathbb{R}^2\)</span></p>
+<p>We consider the Gaussian Mixture SBI task from <a href="https://arxiv.org/abs/2101.04653">Lueckmann et al, 2021</a>. It consists of inferring the common mean of a mixture of two 2D Gaussian distributions, one with much broader covariance than the other:</p>
+<ul>
+<li>Prior: <span class="arithmatex">\(p(\theta) = \mathcal{U}(-10,10)\)</span></li>
+<li>Simulator: <span class="arithmatex">\(p(x|\theta) = 0.5 \mathcal{N}(\theta, \mathbf{I}_2)+ 0.5 \mathcal{N}(\theta, 0.1 \times \mathbf{I}_2)\)</span></li>
+<li>Dimensionality: <span class="arithmatex">\(\theta \in \mathbb{R}^2\)</span>, <span class="arithmatex">\(x \in \mathbb{R}^2\)</span></li>
+</ul>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
