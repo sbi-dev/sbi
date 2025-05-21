@@ -5,12 +5,14 @@ from __future__ import annotations
 
 import pytest
 import torch
-from torch import eye, zeros
+from torch import Tensor, eye, zeros
 from torch.distributions import MultivariateNormal
 
+from sbi.inference import NRE
 from sbi.neural_nets.embedding_nets import CNNEmbedding
 from sbi.neural_nets.net_builders import build_linear_classifier
 from sbi.neural_nets.ratio_estimators import RatioEstimator
+from sbi.utils.torchutils import BoxUniform
 
 
 class EmbeddingNet(torch.nn.Module):
@@ -72,3 +74,58 @@ def test_api_ratio_estimator(ratio_estimator, theta_shape, x_shape):
         nsamples,
     ), f"""unnormalized_log_ratio shape is not correct. It is of shape
     {unnormalized_log_ratio.shape}, but should be {(nsamples,)}"""
+
+
+def test_ratio_estimator_inference_with_correct_classifier():
+    """Test NRE inference with a correct classifier."""
+
+    def build_classifier(theta, x):
+        net = torch.nn.Linear(theta.shape[1] + x.shape[1], 1)
+        return RatioEstimator(net=net, theta_shape=theta[0].shape, x_shape=x[0].shape)
+
+    def simulator(theta):
+        return 1.0 + theta + torch.randn(theta.shape, device=theta.device) * 0.1
+
+    num_dim = 3
+    prior = BoxUniform(low=-2 * torch.ones(num_dim), high=2 * torch.ones(num_dim))
+
+    inference = NRE(classifier=build_classifier)
+    theta = prior.sample((300,))
+    x = simulator(theta)
+
+    inference.append_simulations(theta, x).train(max_num_epochs=1)
+
+
+# Incorrect ratio estimator classifier builders
+def build_classifier_missing_args():  # Missing required parameters
+    pass
+
+
+def build_classifier_missing_return(theta: Tensor, x: Tensor):
+    # Missing return of RatioEstimator
+    pass
+
+
+@pytest.mark.parametrize(
+    "classifier",
+    [
+        build_classifier_missing_args,
+        build_classifier_missing_return,
+    ],
+)
+def test_ratio_estimator_inference_with_incorrect_classifier(classifier):
+    """Test NRE inference raises an error with incorrect classifiers."""
+
+    def simulator(theta):
+        return 1.0 + theta + torch.randn(theta.shape, device=theta.device) * 0.1
+
+    num_dim = 3
+    prior = BoxUniform(low=-2 * torch.ones(num_dim), high=2 * torch.ones(num_dim))
+    theta = prior.sample((300,))
+    x = simulator(theta)
+
+    inference = NRE(classifier=classifier)
+    inference.append_simulations(theta, x)
+
+    with pytest.raises((AttributeError, TypeError)):
+        inference.train(max_num_epochs=1)

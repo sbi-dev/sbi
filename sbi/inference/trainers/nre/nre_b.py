@@ -7,8 +7,7 @@ import torch
 from torch import Tensor, nn
 from torch.distributions import Distribution
 
-from sbi.inference.trainers.base import RatioEstimatorBuilder
-from sbi.inference.trainers.nre.nre_base import RatioEstimator
+from sbi.inference.trainers.nre.nre_base import RatioEstimator, RatioEstimatorBuilder
 from sbi.sbi_types import TensorboardSummaryWriter
 from sbi.utils.sbiutils import del_entries
 from sbi.utils.torchutils import assert_all_finite
