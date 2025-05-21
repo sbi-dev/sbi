@@ -29,7 +29,7 @@ class NPSE(VectorFieldInference):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
-        score_estimator: Union[str, VectorFieldEstimatorBuilder] = "mlp",
+        vf_estimator: Union[str, VectorFieldEstimatorBuilder] = "mlp",
         sde_type: Literal["vp", "ve", "subvp"] = "ve",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
@@ -41,7 +41,7 @@ class NPSE(VectorFieldInference):
 
         Args:
             prior: Prior distribution.
-            score_estimator: Neural network architecture for the
+            vf_estimator: Neural network architecture for the
                 vector field estimator. Can be a string (e.g. 'mlp' or 'ada_mlp') or a
                 callable that implements the `VectorFieldEstimatorBuilder` protocol
                 with `__call__` that receives `theta` and `x` and returns a
@@ -63,7 +63,7 @@ class NPSE(VectorFieldInference):
         """
         super().__init__(
             prior=prior,
-            vector_field_estimator_builder=score_estimator,
+            vector_field_estimator_builder=vf_estimator,
             device=device,
             logging_level=logging_level,
             summary_writer=summary_writer,
