@@ -7,7 +7,7 @@ from torch.distributions import Distribution
 from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi.inference.posteriors.vector_field_posterior import VectorFieldPosterior
-from sbi.inference.trainers.npse.vector_field_inference import (
+from sbi.inference.trainers.vfpe.base_vf_inference import (
     VectorFieldEstimatorBuilder,
     VectorFieldInference,
 )
@@ -29,7 +29,7 @@ class NPSE(VectorFieldInference):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
-        score_estimator: Union[str, VectorFieldEstimatorBuilder] = "mlp",
+        vf_estimator: Union[str, VectorFieldEstimatorBuilder] = "mlp",
         sde_type: Literal["vp", "ve", "subvp"] = "ve",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
@@ -41,7 +41,7 @@ class NPSE(VectorFieldInference):
 
         Args:
             prior: Prior distribution.
-            score_estimator: Neural network architecture for the
+            vf_estimator: Neural network architecture for the
                 vector field estimator. Can be a string (e.g. 'mlp' or 'ada_mlp') or a
                 callable that implements the `VectorFieldEstimatorBuilder` protocol
                 with `__call__` that receives `theta` and `x` and returns a
@@ -63,7 +63,7 @@ class NPSE(VectorFieldInference):
         """
         super().__init__(
             prior=prior,
-            vector_field_estimator_builder=score_estimator,
+            vector_field_estimator_builder=vf_estimator,
             device=device,
             logging_level=logging_level,
             summary_writer=summary_writer,
@@ -76,7 +76,7 @@ class NPSE(VectorFieldInference):
 
     def _build_default_nn_fn(self, **kwargs) -> VectorFieldEstimatorBuilder:
         net_type = kwargs.pop("vector_field_estimator_builder", "mlp")
-        return posterior_score_nn(score_net_type=net_type, **kwargs)
+        return posterior_score_nn(net=net_type, **kwargs)
 
     def build_posterior(
         self,

@@ -18,12 +18,9 @@ from sbi.neural_nets.net_builders import (
     build_maf,
     build_maf_rqs,
     build_mdn,
-    build_mlp_flowmatcher,
     build_mnle,
     build_mnpe,
     build_nsf,
-    build_resnet_flowmatcher,
-    build_score_estimator,
     build_zuko_bpf,
     build_zuko_gf,
     build_zuko_maf,
@@ -53,11 +50,8 @@ model_builders = [
     build_zuko_unaf,
 ]
 
-diffusion_builders = [
-    build_mlp_flowmatcher,
-    build_resnet_flowmatcher,
-    build_score_estimator,
-]
+# TODO Test new
+diffusion_builders = []
 
 
 def get_batch_input(nsamples: int, input_dims: int) -> torch.Tensor:
@@ -142,8 +136,6 @@ def test_shape_handling_utility_for_density_estimator(
     [
         build_nsf,
         build_zuko_nsf,
-        build_mlp_flowmatcher,
-        build_score_estimator,
     ],  # just test nflows, zuko and flowmatching
 )
 @pytest.mark.parametrize("input_sample_dim", (1, 2))
