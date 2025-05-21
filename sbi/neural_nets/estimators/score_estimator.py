@@ -113,8 +113,10 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         # We estimate the mean and std of the source distribution at time t_max.
         mean_t = self.approx_marginal_mean(torch.tensor([t_max]))
         std_t = self.approx_marginal_std(torch.tensor([t_max]))
-        self.register_buffer("mean_t", mean_t)
-        self.register_buffer("std_t", std_t)
+        mean_t = torch.broadcast_to(mean_t, (1, *input_shape))
+        std_t = torch.broadcast_to(std_t, (1, *input_shape))
+        self._mean_base = mean_t
+        self._std_base = std_t
 
         self.t_min = t_min
         self.t_max = t_max

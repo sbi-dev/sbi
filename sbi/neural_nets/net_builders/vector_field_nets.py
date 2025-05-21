@@ -211,9 +211,9 @@ def build_score_matching_estimator(
         net=vectorfield_net,
         input_shape=batch_x[0].shape,
         condition_shape=batch_y[0].shape,
+        embedding_net=embedding_net_y,
         mean_0=mean_0,
         std_0=std_0,
-        embedding_net=embedding_net_y,
     )
 
 
