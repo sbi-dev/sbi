@@ -17,7 +17,8 @@ from sbi.inference.posteriors import MCMCPosterior, RejectionPosterior, VIPoster
 from sbi.inference.posteriors.importance_posterior import ImportanceSamplingPosterior
 from sbi.inference.potentials import ratio_estimator_based_potential
 from sbi.inference.trainers.base import NeuralInference
-from sbi.neural_nets import classifier_nn, ratio_estimators
+from sbi.neural_nets import classifier_nn
+from sbi.neural_nets.ratio_estimators import RatioEstimator as RatioEstimatorNeuralNet
 from sbi.utils import (
     check_estimator_arg,
     check_prior,
@@ -29,7 +30,7 @@ from sbi.utils.torchutils import repeat_rows
 class RatioEstimatorBuilder(Protocol):
     """Protocol for building a ratio estimator from data."""
 
-    def __call__(self, theta: Tensor, x: Tensor) -> ratio_estimators.RatioEstimator:
+    def __call__(self, theta: Tensor, x: Tensor) -> RatioEstimatorNeuralNet:
         """Build a ratio estimator from theta and x, which mainly inform the
         shape of the input and the condition to the neural network.
 

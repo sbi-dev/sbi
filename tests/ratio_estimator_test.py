@@ -76,45 +76,45 @@ def test_api_ratio_estimator(ratio_estimator, theta_shape, x_shape):
     {unnormalized_log_ratio.shape}, but should be {(nsamples,)}"""
 
 
-def test_ratio_estimator_inference_with_correct_classifier():
-    """Test NRE inference with a correct classifier."""
-
-    def build_classifier(theta, x):
-        net = torch.nn.Linear(theta.shape[1] + x.shape[1], 1)
-        return RatioEstimator(net=net, theta_shape=theta[0].shape, x_shape=x[0].shape)
-
-    def simulator(theta):
-        return 1.0 + theta + torch.randn(theta.shape, device=theta.device) * 0.1
-
-    num_dim = 3
-    prior = BoxUniform(low=-2 * torch.ones(num_dim), high=2 * torch.ones(num_dim))
-
-    inference = NRE(classifier=build_classifier)
-    theta = prior.sample((300,))
-    x = simulator(theta)
-
-    inference.append_simulations(theta, x).train(max_num_epochs=1)
+def build_classifier(theta, x):
+    net = torch.nn.Linear(theta.shape[1] + x.shape[1], 1)
+    return RatioEstimator(net=net, theta_shape=theta[0].shape, x_shape=x[0].shape)
 
 
-# Incorrect ratio estimator classifier builders
-def build_classifier_missing_args():  # Missing required parameters
+def build_classifier_missing_args():
     pass
 
 
 def build_classifier_missing_return(theta: Tensor, x: Tensor):
-    # Missing return of RatioEstimator
     pass
 
 
 @pytest.mark.parametrize(
-    "classifier",
+    "classifier_builder",
     [
-        build_classifier_missing_args,
-        build_classifier_missing_return,
+        build_classifier,
+        pytest.param(
+            build_classifier_missing_args,
+            marks=pytest.mark.xfail(
+                raises=TypeError,
+                reason="Missing required parameters in classifier builder.",
+            ),
+        ),
+        pytest.param(
+            build_classifier_missing_return,
+            marks=pytest.mark.xfail(
+                raises=AttributeError,
+                reason="Missing return of RatioEstimator in classifier builder.",
+            ),
+        ),
     ],
 )
-def test_ratio_estimator_inference_with_incorrect_classifier(classifier):
-    """Test NRE inference raises an error with incorrect classifiers."""
+def test_nre_with_valid_and_invalid_classifier_builders(classifier_builder):
+    r"""Test NRE works with valid classifier builders and fails with invalid ones.
+
+    Args:
+        classifier_builder: Function to build the classifier.
+    """
 
     def simulator(theta):
         return 1.0 + theta + torch.randn(theta.shape, device=theta.device) * 0.1
@@ -124,8 +124,7 @@ def test_ratio_estimator_inference_with_incorrect_classifier(classifier):
     theta = prior.sample((300,))
     x = simulator(theta)
 
-    inference = NRE(classifier=classifier)
+    inference = NRE(classifier=classifier_builder)
     inference.append_simulations(theta, x)
 
-    with pytest.raises((AttributeError, TypeError)):
-        inference.train(max_num_epochs=1)
+    inference.train(max_num_epochs=1)
