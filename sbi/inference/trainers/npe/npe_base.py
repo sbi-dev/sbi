@@ -4,7 +4,7 @@
 import time
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from typing import Any, Callable, Dict, Optional, Union
+from typing import Any, Callable, Dict, Optional, Protocol, Union
 from warnings import warn
 
 import torch
@@ -25,7 +25,7 @@ from sbi.inference.posteriors.importance_posterior import ImportanceSamplingPost
 from sbi.inference.potentials import posterior_estimator_based_potential
 from sbi.inference.trainers.base import NeuralInference, check_if_proposal_has_default_x
 from sbi.neural_nets import posterior_nn
-from sbi.neural_nets.estimators import ConditionalDensityEstimator
+from sbi.neural_nets.estimators import ConditionalDensityEstimator, NFlowsFlow
 from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
     reshape_to_sample_batch_event,
@@ -45,11 +45,30 @@ from sbi.utils.sbiutils import ImproperEmpirical, mask_sims_from_prior
 from sbi.utils.torchutils import assert_all_finite
 
 
+class DensityEstimatorBuilder(Protocol):
+    """Protocol for building a neural network from the data for the density
+    estimator."""
+
+    def __call__(self, theta: Tensor, x: Tensor, **kwargs) -> NFlowsFlow:
+        """Build a density estimator from theta and x, which is mainly used for infering
+        shape and z-scoring. The density estimator should have the methods `.sample()`
+        and `.log_prob()`. The function should return an inheritance of `nn.Module`.
+
+        Args:
+            theta: Parameter sets.
+            x: Simulation outputs.
+
+        Returns:
+            Density Estimator.
+        """
+        ...
+
+
 class PosteriorEstimator(NeuralInference, ABC):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
-        density_estimator: Union[str, Callable] = "maf",
+        density_estimator: Union[str, DensityEstimatorBuilder] = "maf",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
