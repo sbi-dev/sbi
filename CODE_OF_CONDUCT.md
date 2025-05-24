@@ -3,9 +3,9 @@
 
 This project adheres to the [NumFOCUS Code of
 Conduct](https://numfocus.org/code-of-conduct). By participating, you are expected to
-uphold this code. Please report unacceptable behavior to Jan Boelts via Discord or
-directly to the NumFOCUS Code of Conduct Working Group at conduct@numfocus.org or via
-[this report form](https://numfocus.typeform.com/to/ynjGdT).
+uphold this code. Please report any potential violation of the code directly to the
+NumFOCUS Code of Conduct Working Group at conduct@numfocus.org or via [this report
+form](https://numfocus.typeform.com/to/ynjGdT).
 
 ## The Short Version
 
