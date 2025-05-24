@@ -68,8 +68,8 @@ jobs:
                   echo "   $file"
               done
               echo "Make sure the following two lines are provided and correctly spelled at the very start of all above listed files"
-              echo "$file_header_1"
-              echo "$file_header_2"
+              echo "$expected_header_1"
+              echo "$expected_header_2"
               exit 1
           else
               echo "✅ All files have the correct license headers."
