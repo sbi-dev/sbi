@@ -540,8 +540,6 @@ class VectorFieldInference(NeuralInference, ABC):
                 # is significantly above the typical fluctuations
                 adaptive_threshold = mean_changes + 1.5 * std_changes
 
-                print("Relative change: ", relative_change)
-                print("Adaptive threshold: ", adaptive_threshold)
 
                 if relative_change > adaptive_threshold:
                     self._epochs_since_last_improvement += 1
