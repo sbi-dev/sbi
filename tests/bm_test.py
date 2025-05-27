@@ -17,7 +17,6 @@ from .mini_sbibm.base_task import Task
 # Global settings
 SEED = 0
 TASKS = ["two_moons", "linear_mvg_2d", "gaussian_linear", "slcp"]
-NUM_SIMULATIONS = 2000
 NUM_EVALUATION_OBS = 3  # Currently only 3 observation tested for speed
 NUM_ROUNDS_SEQUENTIAL = 2
 NUM_EVALUATION_OBS_SEQ = 1
@@ -26,8 +25,7 @@ TRAIN_KWARGS = {}
 # Density estimators to test
 DENSITY_ESTIMATORS = ["mdn", "made", "maf", "nsf", "maf_rqs"]  # "Kinda exhaustive"
 CLASSIFIERS = ["mlp", "resnet"]
-NNS = ["mlp"]
-SCORE_ESTIMATORS = ["mlp", "ada_mlp"]
+VF_ESTIMATORS = ["mlp", "ada_mlp"]
 
 # Benchmarking method groups i.e. what to run for different --bm-mode
 METHOD_GROUPS = {
@@ -46,10 +44,10 @@ METHOD_PARAMS = {
     "npe": [{"density_estimator": de} for de in DENSITY_ESTIMATORS],
     "nle": [{"density_estimator": de} for de in ["maf", "nsf"]],
     "nre": [{"classifier": cl} for cl in CLASSIFIERS],
-    "fmpe": [{"density_estimator": nn} for nn in NNS],
+    "fmpe": [{"vf_estimator": nn} for nn in VF_ESTIMATORS],
     "npse": [
-        {"score_estimator": nn, "sde_type": sde}
-        for nn in SCORE_ESTIMATORS
+        {"vf_estimator": nn, "sde_type": sde}
+        for nn in VF_ESTIMATORS
         for sde in ["ve", "vp"]
     ],
     "snpe": [{}],
@@ -163,7 +161,7 @@ def eval_c2st(
 
 
 def train_and_eval_amortized_inference(
-    inference_class, task_name: str, extra_kwargs: dict, results_bag: ResultsBag
+    inference_class, task_name: str, extra_kwargs: dict, results_bag: ResultsBag, benchmark_num_simulations: int
 ) -> None:
     """
     Performs amortized inference evaluation.
@@ -177,7 +175,7 @@ def train_and_eval_amortized_inference(
     """
     torch.manual_seed(SEED)
     task = get_task(task_name)
-    thetas, xs = task.get_data(NUM_SIMULATIONS)
+    thetas, xs = task.get_data(benchmark_num_simulations)
     prior = task.get_prior()
 
     inference = inference_class(prior, **extra_kwargs)
@@ -189,13 +187,13 @@ def train_and_eval_amortized_inference(
 
     # Cache results
     results_bag.metric = mean_c2st
-    results_bag.num_simulations = NUM_SIMULATIONS
+    results_bag.num_simulations = benchmark_num_simulations
     results_bag.task_name = task_name
     results_bag.method = inference_class.__name__ + str(extra_kwargs)
 
 
 def train_and_eval_sequential_inference(
-    inference_class, task_name: str, extra_kwargs: dict, results_bag: ResultsBag
+    inference_class, task_name: str, extra_kwargs: dict, results_bag: ResultsBag, benchmark_num_simulations: int
 ) -> None:
     """
     Performs sequential inference evaluation.
@@ -208,7 +206,7 @@ def train_and_eval_sequential_inference(
     """
     torch.manual_seed(SEED)
     task = get_task(task_name)
-    num_simulations = NUM_SIMULATIONS // NUM_ROUNDS_SEQUENTIAL
+    num_simulations = benchmark_num_simulations // NUM_ROUNDS_SEQUENTIAL
     thetas, xs = task.get_data(num_simulations)
     prior = task.get_prior()
     idx_eval = NUM_EVALUATION_OBS_SEQ
@@ -237,7 +235,7 @@ def train_and_eval_sequential_inference(
 
     # Cache results
     results_bag.metric = c2st_val
-    results_bag.num_simulations = NUM_SIMULATIONS
+    results_bag.num_simulations = benchmark_num_simulations
     results_bag.task_name = task_name
     results_bag.method = inference_class.__name__ + str(extra_kwargs)
 
@@ -250,6 +248,7 @@ def test_run_benchmark(
     results_bag,
     extra_kwargs: dict,
     benchmark_mode: str,
+    benchmark_num_simulations: int,
 ) -> None:
     """
     Benchmark test for amortized and sequential inference methods.
@@ -264,9 +263,9 @@ def test_run_benchmark(
     """
     if benchmark_mode in ["snpe", "snle", "snre"]:
         train_and_eval_sequential_inference(
-            inference_class, task_name, extra_kwargs, results_bag
+            inference_class, task_name, extra_kwargs, results_bag, benchmark_num_simulations
         )
     else:
         train_and_eval_amortized_inference(
-            inference_class, task_name, extra_kwargs, results_bag
+            inference_class, task_name, extra_kwargs, results_bag, benchmark_num_simulations
         )

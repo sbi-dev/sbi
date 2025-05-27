@@ -16,6 +16,9 @@ from sbi.utils.sbiutils import seed_all_backends
 seed = 1
 harvested_fixture_data = None
 
+# Whether to keep benchmark results in a .csv or delete them.
+KEEP_BM_RESULTS = True
+
 
 # Use seed automatically for every test function.
 @pytest.fixture(autouse=True)
@@ -72,11 +75,26 @@ def pytest_addoption(parser):
         help="Run mini-benchmark tests with specified mode",
     )
 
+    parser.addoption(
+        "--bm-num-simulations",
+        action="store",
+        default=1000,
+        type=int,
+        help="Run mini-benchmark tests with specified number of simulations",
+    )
+
+
 
 @pytest.fixture
 def benchmark_mode(request):
     """Fixture to access the --bm value in test files."""
     return request.config.getoption("--bm-mode")
+
+
+@pytest.fixture
+def benchmark_num_simulations(request):
+    """Fixture to access the --bm-num-simulations value in test files."""
+    return int(request.config.getoption("--bm-num-simulations"))
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -234,7 +252,7 @@ def pytest_sessionfinish(session):
     session_results_df = get_session_results_df(session)
     suffix = 'all' if is_main_process(session) else get_xdist_worker_id(session)
     RESULTS_PATH = Path('./.bm_results/')
-    if RESULTS_PATH.exists():
+    if RESULTS_PATH.exists() and not KEEP_BM_RESULTS:
         rmtree(RESULTS_PATH)
     RESULTS_PATH.mkdir(exist_ok=False)
 
