@@ -416,13 +416,7 @@ def posterior_flow_nn(
             - 'transformer_cross_attention': Transformer with cross-attention.
             -  nn.Module: Custom network
             Defaults to 'mlp'.
-        z_score_theta: Whether to z-score thetas passing into the network, can be one
-            of:
-            - `none`, or None: do not z-score.
-            - `independent`: z-score each dimension independently.
-            - `structured`: treat dimensions as related, therefore compute mean and std
-            over the entire batch, instead of per-dimension. Should be used when each
-            sample is, for example, a time series or an image.
+        z_score_theta: This is not supported for FMPE and wil be ignored.
         z_score_x: Whether to z-score xs passing into the network, same options as
             z_score_theta.
         t_embedding_dim: Embedding dimension of diffusion time. Defaults to 16.

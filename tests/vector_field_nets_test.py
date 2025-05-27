@@ -17,6 +17,7 @@ from sbi.neural_nets.net_builders.vector_field_nets import (
     build_standard_mlp_network,
     build_score_matching_estimator,
     build_transformer_network,
+    build_adamlp_network,
 )
 
 
@@ -27,6 +28,23 @@ def test_mlp_network_shapes(input_event_shape, condition_event_shape, batch_dim)
     """Test whether MLP vector field networks produce correct output shapes."""
     network, inputs, conditions = _build_vector_field_components(
         "mlp", input_event_shape, condition_event_shape, batch_dim
+    )
+
+    # Create time parameter
+    t = torch.rand((batch_dim,))
+
+    # Test forward pass
+    outputs = network(inputs, conditions, t)
+    assert outputs.shape == inputs.shape, "Output shape should match input shape"
+
+
+@pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
+@pytest.mark.parametrize("condition_event_shape", ((1,), (7,)))
+@pytest.mark.parametrize("batch_dim", (1, 10))
+def test_adamlp_network_shapes(input_event_shape, condition_event_shape, batch_dim):
+    """Test whether AdaMLP vector field networks produce correct output shapes."""
+    network, inputs, conditions = _build_vector_field_components(
+        "ada_mlp", input_event_shape, condition_event_shape, batch_dim
     )
 
     # Create time parameter
@@ -56,7 +74,7 @@ def test_transformer_network_shapes(
     assert outputs.shape == inputs.shape, "Output shape should match input shape"
 
 
-@pytest.mark.parametrize("net_type", ["mlp", "transformer"])
+@pytest.mark.parametrize("net_type", ["mlp", "ada_mlp", "transformer"])
 @pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
 @pytest.mark.parametrize("condition_event_shape", ((1,), (7,)))
 @pytest.mark.parametrize("batch_dim", (1, 10))
@@ -81,7 +99,7 @@ def test_flow_matching_estimator_shapes(
     assert losses.shape == (batch_dim,), "Loss shape mismatch"
 
 
-@pytest.mark.parametrize("net_type", ["mlp", "transformer"])
+@pytest.mark.parametrize("net_type", ["mlp", "ada_mlp", "transformer"])
 @pytest.mark.parametrize("sde_type", ["vp", "ve", "subvp"])
 @pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
 @pytest.mark.parametrize("condition_event_shape", ((1,), (7,)))
@@ -113,7 +131,7 @@ def test_score_matching_estimator_shapes(
 
 
 @pytest.mark.gpu
-@pytest.mark.parametrize("net_type", ["mlp", "transformer"])
+@pytest.mark.parametrize("net_type", ["mlp", "ada_mlp", "transformer"])
 @pytest.mark.parametrize("device", ["cpu", "cuda"])
 def test_flow_matching_estimator_on_device(net_type, device):
     """Test whether flow matching estimator can be moved to the device."""
@@ -136,7 +154,7 @@ def test_flow_matching_estimator_on_device(net_type, device):
 
 
 @pytest.mark.gpu
-@pytest.mark.parametrize("net_type", ["mlp", "transformer"])
+@pytest.mark.parametrize("net_type", ["mlp", "ada_mlp", "transformer"])
 @pytest.mark.parametrize("sde_type", ["vp"])
 @pytest.mark.parametrize("device", ["cpu", "cuda"])
 def test_score_matching_estimator_on_device(net_type, sde_type, device):
@@ -179,6 +197,30 @@ def test_mlp_network_parameters(hidden_features, num_layers):
 
     # Verify it's the correct type
     assert isinstance(network, VectorFieldMLP), "Should be a VectorFieldMLP instance"
+
+    # Test a forward pass to ensure it works
+    inputs = torch.randn(10, 5)
+    conditions = torch.randn(10, 3)
+    times = torch.rand(10)
+
+    outputs = network(inputs, conditions, times)
+    assert outputs.shape == inputs.shape, "Output shape should match input shape"
+
+
+@pytest.mark.parametrize("hidden_features", [64, 128])
+@pytest.mark.parametrize("num_layers", [2, 4])
+def test_adamlp_network_parameters(hidden_features, num_layers):
+    """Test whether AdaMLP vector field networks can be built with different parameters."""
+    batch_x = torch.randn(100, 5)
+    batch_y = torch.randn(100, 3)
+
+    network = build_adamlp_network(
+        batch_x=batch_x,
+        batch_y=batch_y,
+        hidden_features=hidden_features,
+        num_layers=num_layers,
+        time_embedding_dim=32,
+    )
 
     # Test a forward pass to ensure it works
     inputs = torch.randn(10, 5)
@@ -245,6 +287,14 @@ def _build_vector_field_components(
     # Build the appropriate network
     if net_type == "mlp":
         network = build_standard_mlp_network(
+            batch_x=batch_x,
+            batch_y=batch_y,
+            hidden_features=64,
+            time_embedding_dim=32,
+            embedding_net=embedding_net,
+        )
+    elif net_type == "ada_mlp":
+        network = build_adamlp_network(
             batch_x=batch_x,
             batch_y=batch_y,
             hidden_features=64,
