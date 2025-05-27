@@ -16,7 +16,7 @@ from sbi.utils.sbiutils import seed_all_backends
 seed = 1
 harvested_fixture_data = None
 
-# Whether to keep benchmark results in a .csv or delete them.
+# Whether to keep benchmark results in a .csv or delete them
 KEEP_BM_RESULTS = True
 
 
