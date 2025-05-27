@@ -212,7 +212,7 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         condition: Tensor,
         times: Optional[Tensor] = None,
         control_variate=True,
-        control_variate_threshold=torch.inf,
+        control_variate_threshold=0.3,
     ) -> Tensor:
         r"""Defines the denoising score matching loss (e.g., from Song et al., ICLR
         2021). A random diffusion time is sampled from [0,1], and the network is trained
@@ -227,7 +227,9 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
             control_variate: Whether to use a control variate to reduce the variance of
                 the stochastic loss estimator.
             control_variate_threshold: Threshold for the control variate. If the std
-                exceeds this threshold, the control variate is not used.
+                exceeds this threshold, the control variate is not used. This is because
+                the control variate assumes a Taylor expansion of the score around the
+                mean, which is not valid for large std.
 
         Returns:
             MSE between target score and network output, scaled by the weight function.
@@ -468,7 +470,7 @@ class VPScoreEstimator(ConditionalScoreEstimator):
         beta_max: float = 10.0,
         mean_0: Union[Tensor, float] = 0.0,
         std_0: Union[Tensor, float] = 1.0,
-        t_min: float = 1e-4,
+        t_min: float = 1e-3,
         t_max: float = 1.0,
     ) -> None:
         self.beta_min = beta_min
@@ -762,8 +764,8 @@ class VEScoreEstimator(ConditionalScoreEstimator):
         condition_shape: torch.Size,
         embedding_net: nn.Module = nn.Identity(),
         weight_fn: Union[str, Callable] = "max_likelihood",
-        sigma_min: float = 1e-5,
-        sigma_max: float = 5.0,
+        sigma_min: float = 1e-4,
+        sigma_max: float = 10.0,
         mean_0: float = 0.0,
         std_0: float = 1.0,
     ) -> None:

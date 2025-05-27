@@ -76,7 +76,7 @@ class NPSE(VectorFieldInference):
 
     def _build_default_nn_fn(self, **kwargs) -> VectorFieldEstimatorBuilder:
         net_type = kwargs.pop("vector_field_estimator_builder", "mlp")
-        return posterior_score_nn(net=net_type, **kwargs)
+        return posterior_score_nn(model=net_type, **kwargs)
 
     def build_posterior(
         self,

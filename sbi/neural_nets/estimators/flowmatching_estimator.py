@@ -351,18 +351,3 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         for _ in range(len(self.input_shape)):
             std_t = std_t.unsqueeze(-1)
         return std_t
-
-    # this method will be removed in PR #1501
-    def _get_temporal_t_shape_fix(self, t: Tensor) -> Tensor:
-        """
-        This is a hack that allows us to use
-        the old nn builders that assume positional embedding of time
-        inside the forward method, resulting in a shape of (..., num_freqs * 2).
-        """
-        if t.ndim == 0:
-            t = t.reshape(1, 1)
-        elif t.ndim == 1:
-            t = t[..., None]
-        if t.shape[-1] == 1:
-            t = t.expand(*t.shape[:-1], self.num_freqs * 2)
-        return t

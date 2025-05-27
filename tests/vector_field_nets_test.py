@@ -14,7 +14,7 @@ from sbi.neural_nets.net_builders.vector_field_nets import (
     VectorFieldMLP,
     VectorFieldTransformer,
     build_flow_matching_estimator,
-    build_mlp_network,
+    build_standard_mlp_network,
     build_score_matching_estimator,
     build_transformer_network,
 )
@@ -169,7 +169,7 @@ def test_mlp_network_parameters(hidden_features, num_layers):
     batch_x = torch.randn(100, 5)
     batch_y = torch.randn(100, 3)
 
-    network = build_mlp_network(
+    network = build_standard_mlp_network(
         batch_x=batch_x,
         batch_y=batch_y,
         hidden_features=hidden_features,
@@ -244,11 +244,10 @@ def _build_vector_field_components(
 
     # Build the appropriate network
     if net_type == "mlp":
-        network = build_mlp_network(
+        network = build_standard_mlp_network(
             batch_x=batch_x,
             batch_y=batch_y,
             hidden_features=64,
-            num_layers=3,
             time_embedding_dim=32,
             embedding_net=embedding_net,
         )

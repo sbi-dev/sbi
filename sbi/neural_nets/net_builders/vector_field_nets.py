@@ -36,7 +36,7 @@ def build_flow_matching_estimator(
     num_blocks: int = 5,
     num_heads: int = 4,
     mlp_ratio: int = 4,
-    net: str | nn.Module = "mlp",  # "mlp" or "transformer"
+    net: str | nn.Module = "ada_mlp",  # "mlp", "ada_mlp", or "transformer"
     **kwargs,
 ) -> FlowMatchingEstimator:
     """Builds a flow matching estimator with the given network.
@@ -52,7 +52,7 @@ def build_flow_matching_estimator(
         num_blocks: Number of transformer blocks (for transformer).
         num_heads: Number of attention heads per block (for transformer).
         mlp_ratio: Ratio for MLP hidden dimension (for transformer).
-        net: Type of architecture to use, either "mlp" or "transformer".
+        net: Type of architecture to use, either "mlp", "ada_mlp", or "transformer".
         **kwargs: Additional arguments for the network.
 
     Returns:
@@ -70,7 +70,29 @@ def build_flow_matching_estimator(
 
     # Build network if not provided
     if net == "mlp":
-        vectorfield_net = build_mlp_network(
+        # Filter out AdaMLP-specific parameters
+        mlp_kwargs = {
+            k: v
+            for k, v in kwargs.items()
+            if k
+            not in [
+                "condition_emb_dim",
+                "mlp_ratio",
+                "num_intermediate_mlp_layers",
+                "adamlp_ratio",
+            ]
+        }
+        vectorfield_net = build_standard_mlp_network(
+            batch_x=batch_x,
+            batch_y=batch_y,
+            hidden_features=hidden_features,
+            num_layers=num_layers,
+            time_embedding_dim=time_embedding_dim,
+            embedding_net=embedding_net_y,
+            **mlp_kwargs,
+        )
+    elif net == "ada_mlp":
+        vectorfield_net = build_adamlp_network(
             batch_x=batch_x,
             batch_y=batch_y,
             hidden_features=hidden_features,
@@ -123,7 +145,7 @@ def build_score_matching_estimator(
     num_heads: int = 4,
     mlp_ratio: int = 4,
     time_embedding_dim: int = 32,
-    net: str | nn.Module = "mlp",  # "mlp" or "transformer"
+    net: str | nn.Module = "ada_mlp",  # "mlp", "ada_mlp", or "transformer"
     **kwargs,
 ) -> ConditionalScoreEstimator:
     """Builds a score matching estimator with the given network.
@@ -131,8 +153,6 @@ def build_score_matching_estimator(
     Args:
         batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring.
         batch_y: Batch of ys, used to infer dimensionality and (optional) z-scoring.
-        vectorfield_net: The vector field network to use. If None, a new network will
-            be built.
         z_score_x: Whether to z-score xs passing into the network.
         z_score_y: Whether to z-score ys passing into the network.
         embedding_net: Embedding network for batch_y.
@@ -144,7 +164,7 @@ def build_score_matching_estimator(
         num_heads: Number of attention heads per block (for transformer).
         mlp_ratio: Ratio for MLP hidden dimension (for transformer).
         time_embedding_dim: Number of dimensions for time embedding.
-        net: Type of architecture to use, either "mlp" or "transformer".
+        net: Type of architecture to use, either "mlp", "ada_mlp", or "transformer".
         **kwargs: Additional arguments for the network.
 
     Returns:
@@ -155,7 +175,29 @@ def build_score_matching_estimator(
 
     # Build network if not provided
     if net == "mlp":
-        vectorfield_net = build_mlp_network(
+        # Filter out AdaMLP-specific parameters
+        mlp_kwargs = {
+            k: v
+            for k, v in kwargs.items()
+            if k
+            not in [
+                "condition_emb_dim",
+                "mlp_ratio",
+                "num_intermediate_mlp_layers",
+                "adamlp_ratio",
+            ]
+        }
+        vectorfield_net = build_standard_mlp_network(
+            batch_x=batch_x,
+            batch_y=batch_y,
+            hidden_features=hidden_features,
+            num_layers=num_layers,
+            time_embedding_dim=time_embedding_dim,
+            embedding_net=embedding_net,
+            **mlp_kwargs,
+        )
+    elif net == "ada_mlp":
+        vectorfield_net = build_adamlp_network(
             batch_x=batch_x,
             batch_y=batch_y,
             hidden_features=hidden_features,
@@ -282,11 +324,16 @@ class RandomFourierTimeEmbedding(nn.Module):
 
     This is to be used as a utility for score-matching."""
 
-    def __init__(self, embed_dim=256, scale=30.0):
+    def __init__(self, embed_dim=256, scale=30.0, learnable=True):
         super().__init__()
         # Randomly sample weights during initialization. These weights are fixed
         # during optimization and are not trainable.
-        self.register_buffer("W", torch.randn(embed_dim // 2) * scale)
+        self.embed_dim = embed_dim
+        self.scale = scale
+        if not learnable:
+            self.register_buffer("W", torch.randn(embed_dim // 2) * scale)
+        else:
+            self.W = nn.Parameter(torch.randn(embed_dim // 2) * scale)
 
     def forward(self, times: Tensor):
         times_proj = times[:, None] * self.W[None, :] * 2 * torch.pi
@@ -311,6 +358,7 @@ class AdaMLPBlock(nn.Module):
         cond_dim: int,
         mlp_ratio: int = 1,
         activation: Callable = nn.GELU,
+        gate_activation: Callable = torch.nn.Tanh,
     ):
         super().__init__()
 
@@ -321,7 +369,7 @@ class AdaMLPBlock(nn.Module):
         )
 
         # Initialize the last layer to zero
-        self.ada_ln[-1].weight.data *= 0.1
+        self.ada_ln[-1].weight.data *= 0.01
         self.ada_ln[-1].bias.data.zero_()
 
         # MLP block
@@ -330,6 +378,8 @@ class AdaMLPBlock(nn.Module):
             activation(),
             nn.Linear(hidden_dim * mlp_ratio, hidden_dim),
         )
+
+        self.gate_activation = gate_activation()
 
     def forward(self, x: Tensor, cond: Tensor) -> Tensor:
         """
@@ -342,8 +392,7 @@ class AdaMLPBlock(nn.Module):
         """
 
         shift_, scale_, gate_ = self.ada_ln(cond).chunk(3, dim=-1)
-        gate_ = torch.sigmoid(gate_)  # TODO Maybe remove
-
+        gate_ = self.gate_activation(gate_)
         y = (scale_ + 1) * x + shift_
         y = self.block(y)
         y = x + gate_ * y
@@ -377,7 +426,7 @@ class GlobalEmbeddingMLP(nn.Module):
         input_dim: int,
         output_dim: int,
         time_emb_type: str = "sinusoidal",
-        time_emb_dim: int = 16,
+        time_emb_dim: int = 32,
         sinusoidal_max_freq: float = 0.01,
         fourier_scale: float = 30.0,
         hidden_dim: int = 100,
@@ -402,7 +451,8 @@ class GlobalEmbeddingMLP(nn.Module):
             raise ValueError(f"Unknown time embedding type: {time_emb_type}")
 
         if use_x_emb:
-            self.input_layer = nn.Linear(input_dim + time_emb_dim, hidden_dim)
+            input_embed_dim = max(time_emb_dim, input_dim)
+            self.input_layer = nn.Linear(input_embed_dim + time_emb_dim, hidden_dim)
         else:
             self.input_layer = nn.Linear(time_emb_dim, hidden_dim)
 
@@ -424,6 +474,9 @@ class GlobalEmbeddingMLP(nn.Module):
         t_emb = self.time_emb(t)
 
         try:
+            # Pad x_embed by repeating if smaller than time_emb_dim
+            pad_width = max(0, self.time_emb.embed_dim - x_emb.shape[-1])
+            x_emb = torch.nn.functional.pad(x_emb, (0, pad_width), mode='constant')
             cond_emb = torch.cat([x_emb, t_emb], dim=-1) if x_emb is not None else t_emb
         except RuntimeError as e:
             shapes = f"x_emb shape: {x_emb.shape if x_emb is not None else 'None'},"
@@ -445,6 +498,122 @@ class VectorFieldMLP(VectorFieldNet):
         self,
         input_dim: int,
         condition_dim: int,
+        time_emb_dim: int,
+        hidden_features: int = 64,
+        num_layers: int = 5,
+        activation: Callable = nn.GELU,
+        layer_norm: bool = True,
+        skip_connections: bool = True,
+        time_emb_type: str = "random_fourier",
+        sinusoidal_max_freq: float = 1000.0,
+        fourier_scale: float = 30.0,
+    ):
+        """Initialize vector field MLP.
+
+        Args:
+            input_dim: Dimension of the input (theta or state).
+            condition_dim: Dimension of the conditioning variable.
+            time_emb_dim: Dimension of the time embedding.
+            hidden_features: Number of hidden features in each layer.
+            num_layers: Number of layers in the network.
+            activation: Activation function.
+            layer_norm: Whether to use layer normalization.
+            skip_connections: Whether to use skip connections.
+            time_emb_type: Type of time embedding ("sinusoidal" or "random_fourier").
+            sinusoidal_max_freq: Maximum frequency for sinusoidal embeddings.
+            fourier_scale: Scale for random fourier embeddings.
+        """
+        super().__init__()
+
+        self.skip_connections = skip_connections
+        self.layer_norm = layer_norm
+
+        # Input layers
+        self.input_layer_theta = nn.Linear(input_dim, hidden_features)
+        self.input_layer_x = nn.Linear(condition_dim, hidden_features)
+        self.input_merge_layer = nn.Linear(
+            hidden_features + hidden_features, hidden_features
+        )
+
+        # Time embedding
+        if time_emb_type == "sinusoidal":
+            self.time_emb = SinusoidalTimeEmbedding(
+                embed_dim=time_emb_dim, max_freq=sinusoidal_max_freq
+            )
+        elif time_emb_type == "random_fourier":
+            self.time_emb = RandomFourierTimeEmbedding(
+                embed_dim=time_emb_dim, scale=fourier_scale
+            )
+        else:
+            raise ValueError(f"Unknown time embedding type: {time_emb_type}")
+
+        # Main network layers
+        self.activation = activation()
+        self.layers = nn.ModuleList()
+        for _ in range(num_layers):
+            self.layers.append(nn.Linear(hidden_features, hidden_features))
+
+        # Layer normalization if enabled
+        if layer_norm:
+            self.layers_norm = nn.ModuleList()
+            for _ in range(num_layers):
+                self.layers_norm.append(nn.LayerNorm(hidden_features))
+
+        # Time embedding projection
+        self.time_linear_layer = nn.Linear(time_emb_dim, hidden_features)
+
+        # Output layer
+        self.output_layer = nn.Linear(hidden_features, input_dim)
+        nn.init.zeros_(self.output_layer.weight)
+
+    def forward(self, theta: Tensor, x_emb_cond: Tensor, t: Tensor) -> Tensor:
+        """Forward pass through the MLP.
+
+        Args:
+            theta: Parameters (for FMPE) or state (for NPSE).
+            x: Conditioning information.
+            t: Time parameter embedding.
+
+        Returns:
+            Vector field evaluation at the provided points.
+        """
+        # Process inputs
+        theta_emb = self.input_layer_theta(theta)
+        x_emb = self.input_layer_x(x_emb_cond)
+        h = self.input_merge_layer(
+            self.activation(torch.cat([theta_emb, x_emb], dim=-1))
+        )
+
+        # Process time embedding
+        t_emb = self.time_emb(t)
+        t_emb = self.time_linear_layer(t_emb)
+
+        # Main network forward pass
+        h = self.activation(h)
+        for i in range(len(self.layers)):
+            h_old = h
+            h = self.layers[i](h)
+            h = self.activation(h)
+            h += t_emb
+            if self.skip_connections:
+                h += h_old
+            if self.layer_norm:
+                h = self.layers_norm[i](h)
+
+        return self.output_layer(h)
+
+
+class VectorFieldAdaMLP(VectorFieldNet):
+    """MLP for vector field estimation
+
+    Architecture adapted from "Scalable Diffusion Models with Transformers"
+    (Peebles & Xie, 2022) with adaptive layer norm for conditioning.
+    """
+
+    def __init__(
+        self,
+        input_dim: int,
+        condition_dim: int,
         condition_emb_dim: int,
         time_emb_dim: int,
         hidden_features: int = 64,
@@ -454,8 +623,8 @@ class VectorFieldMLP(VectorFieldNet):
         adamlp_ratio: int = 1,
         activation: Callable = nn.GELU,
         time_emb_type: str = "sinusoidal",
-        sinusoidal_max_freq: float = 1000.0,
-        fourier_scale: float = 16.0,
+        sinusoidal_max_freq: float = 10000.0,
+        fourier_scale: float = 30.0,
     ):
         """Initialize vector field MLP.
 
@@ -510,7 +679,6 @@ class VectorFieldMLP(VectorFieldNet):
             activation=activation,
         )
         self.input_dim = hidden_features
-
         # Input layer
         self.layers.append(nn.Linear(input_dim, hidden_features))
 
@@ -902,8 +1070,7 @@ class VectorFieldTransformer(VectorFieldNet):
 
 # ======= Factory Functions =======
 
-
-def build_mlp_network(
+def build_adamlp_network(
     batch_x: Tensor,
     batch_y: Tensor,
     hidden_features: Union[Sequence[int], int] = 64,
@@ -918,8 +1085,8 @@ def build_mlp_network(
     time_emb_type: str = "sinusoidal",
     sinusoidal_max_freq: float = 1000.0,
     fourier_scale: float = 16.0,
-) -> VectorFieldMLP:
-    """Builds a vector field MLP network.
+) -> VectorFieldAdaMLP:
+    """Builds an adaptive vector field MLP network.
 
     Args:
         batch_x: Batch of xs, used to infer dimensionality.
@@ -927,6 +1094,7 @@ def build_mlp_network(
         hidden_features: Number of hidden features in each layer.
         num_layers: Number of layers in the network.
         time_embedding_dim: Number of dimensions for time embedding.
+        condition_emb_dim: Dimension of the conditioning embedding.
         embedding_net: Embedding network for batch_y.
         mlp_ratio: Ratio of hidden dim to intermediate dim in global MLP.
         num_intermediate_mlp_layers: Number of intermediate layers in global MLP.
@@ -935,6 +1103,78 @@ def build_mlp_network(
         time_emb_type: Type of time embedding ("sinusoidal" or "random_fourier").
         sinusoidal_max_freq: Max frequency for sinusoidal embeddings.
         fourier_scale: Scale for random fourier embeddings.
+
+    Returns:
+        An adaptive vector field MLP network.
+    """
+    # Check inputs and device
+    check_data_device(batch_x, batch_y)
+
+    # Get dimensions
+    x_numel = get_numel(batch_x)
+    y_numel = get_numel(batch_y, embedding_net=embedding_net)
+
+    # Create time embedding dimension
+    time_emb_dim = time_embedding_dim
+
+    # Create the vector field network (MLP)
+    if isinstance(hidden_features, int):
+        hidden_dim = hidden_features
+    else:
+        hidden_dim = hidden_features[0] if len(hidden_features) > 0 else 256
+
+    vectorfield_net = VectorFieldAdaMLP(
+        input_dim=x_numel,
+        condition_dim=y_numel,
+        condition_emb_dim=condition_emb_dim,
+        time_emb_dim=time_emb_dim,
+        hidden_features=hidden_dim,
+        num_layers=num_layers,
+        global_mlp_ratio=mlp_ratio,
+        num_intermediate_mlp_layers=num_intermediate_mlp_layers,
+        adamlp_ratio=adamlp_ratio,
+        activation=activation,
+        time_emb_type=time_emb_type,
+        sinusoidal_max_freq=sinusoidal_max_freq,
+        fourier_scale=fourier_scale,
+    )
+
+    return vectorfield_net
+
+
+def build_standard_mlp_network(
+    batch_x: Tensor,
+    batch_y: Tensor,
+    hidden_features: Union[Sequence[int], int] = 64,
+    num_layers: int = 5,
+    time_embedding_dim: int = 32,
+    embedding_net: nn.Module = nn.Identity(),
+    activation: Callable = nn.GELU,
+    layer_norm: bool = True,
+    skip_connections: bool = True,
+    time_emb_type: str = "random_fourier",
+    sinusoidal_max_freq: float = 1000.0,
+    fourier_scale: float = 30.0,
+    condition_emb_dim: Optional[int] = None,
+    **kwargs,
+) -> VectorFieldMLP:
+    """Builds a standard vector field MLP network.
+
+    Args:
+        batch_x: Batch of xs, used to infer dimensionality.
+        batch_y: Batch of ys, used to infer dimensionality.
+        hidden_features: Number of hidden features in each layer.
+        num_layers: Number of layers in the network.
+        time_embedding_dim: Number of dimensions for time embedding.
+        embedding_net: Embedding network for batch_y.
+        activation: Activation function.
+        layer_norm: Whether to use layer normalization.
+        skip_connections: Whether to use skip connections.
+        time_emb_type: Type of time embedding ("sinusoidal" or "random_fourier").
+        sinusoidal_max_freq: Maximum frequency for sinusoidal embeddings.
+        fourier_scale: Scale for random fourier embeddings.
+        condition_emb_dim: Dimension of the conditioning embedding (ignored for standard MLP).
+        **kwargs: Additional arguments.
 
     Returns:
         A vector field MLP network.
@@ -958,14 +1198,12 @@ def build_mlp_network(
     vectorfield_net = VectorFieldMLP(
         input_dim=x_numel,
         condition_dim=y_numel,
-        condition_emb_dim=condition_emb_dim,
         time_emb_dim=time_emb_dim,
         hidden_features=hidden_dim,
         num_layers=num_layers,
-        global_mlp_ratio=mlp_ratio,
-        num_intermediate_mlp_layers=num_intermediate_mlp_layers,
-        adamlp_ratio=adamlp_ratio,
         activation=activation,
+        layer_norm=layer_norm,
+        skip_connections=skip_connections,
         time_emb_type=time_emb_type,
         sinusoidal_max_freq=sinusoidal_max_freq,
         fourier_scale=fourier_scale,

@@ -328,13 +328,16 @@ def posterior_nn(
 
 
 def posterior_score_nn(
-    sde_type: str,
-    net: Union[str, nn.Module] = "mlp",
-    z_score_theta: Optional[str] = None,
-    z_score_x: Optional[str] = None,
-    t_embedding_dim: int = 16,
-    hidden_features: int = 128,
+    model: Union[str, nn.Module] = "mlp",
+    sde_type: str = "ve",
+    z_score_theta: Optional[str] = "independent",
+    z_score_x: Optional[str] = "independent",
+    t_embedding_dim: int = 32,
+    condition_emb_dim: int = 100,
+    hidden_features: int = 100,
+    num_layers: int = 5,
     embedding_net: nn.Module = nn.Identity(),
+    time_emb_type: str = "sinusoidal",
     **kwargs: Any,
 ) -> Callable:
     """Build util function that builds a ScoreEstimator object for score-based
@@ -346,7 +349,7 @@ def posterior_score_nn(
             - 'subvp': Sub-variance preserving.
             - 've': Variance exploding.
             Defaults to 'vp'.
-        net: Type of regression network. One of:
+        model: Type of regression network. One of:
             - 'mlp': Fully connected feed-forward network.
             - 'transformer': Transformer network.
             - 'transformer_cross_attention': Transformer with cross-attention.
@@ -381,7 +384,10 @@ def posterior_score_nn(
             sde_type=sde_type,
             hidden_features=hidden_features,
             time_embedding_dim=t_embedding_dim,
-            net=net,
+            net=model,
+            time_emb_type=time_emb_type,
+            num_layers=num_layers,
+            condition_emb_dim=condition_emb_dim,
             **kwargs,
         )
 
@@ -389,19 +395,22 @@ def posterior_score_nn(
 
 
 def posterior_flow_nn(
-    net: Union[str, nn.Module] = "mlp",
+    model: Union[str, nn.Module] = "mlp",
     z_score_theta: Optional[str] = None,
-    z_score_y: Optional[str] = None,
-    t_embedding_dim: int = 16,
-    hidden_features: int = 128,
+    z_score_x: Optional[str] = "independent",
+    t_embedding_dim: int = 32,
+    condition_emb_dim: int = 100,
+    hidden_features: int = 100,
+    num_layers: int = 5,
     embedding_net: nn.Module = nn.Identity(),
+    time_emb_type: str = "sinusoidal",
     **kwargs: Any,
 ) -> Callable:
     """Build util function that builds a FlowMatchingEstimator object for flow-based
     posteriors.
 
     Args:
-        net: Type of regression network. One of:
+        model: Type of regression network. One of:
             - 'mlp': Fully connected feed-forward network.
             - 'transformer': Transformer network.
             - 'transformer_cross_attention': Transformer with cross-attention.
@@ -425,16 +434,21 @@ def posterior_flow_nn(
         Constructor function for FMPE.
     """
 
+    del z_score_theta  # Not used here
+
     def build_fn(batch_theta, batch_x):
         # Build the flow matching estimator
         return build_flow_matching_estimator(
             batch_x=batch_theta,
             batch_y=batch_x,
-            z_score_y=z_score_y,
+            z_score_y=z_score_x,
             embedding_net=embedding_net,
             hidden_features=hidden_features,
             time_embedding_dim=t_embedding_dim,
-            net=net,
+            time_emb_type=time_emb_type,
+            net=model,
+            num_layers=num_layers,
+            condition_emb_dim=condition_emb_dim,
             **kwargs,
         )
 
