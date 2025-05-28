@@ -18,7 +18,7 @@ from sbi.inference.posteriors.importance_posterior import ImportanceSamplingPost
 from sbi.inference.potentials import ratio_estimator_based_potential
 from sbi.inference.trainers.base import NeuralInference
 from sbi.neural_nets import classifier_nn
-from sbi.neural_nets.ratio_estimators import RatioEstimator as RatioEstimatorNeuralNet
+from sbi.neural_nets.ratio_estimators import RatioEstimator
 from sbi.utils import (
     check_estimator_arg,
     check_prior,
@@ -30,7 +30,7 @@ from sbi.utils.torchutils import repeat_rows
 class RatioEstimatorBuilder(Protocol):
     """Protocol for building a ratio estimator from data."""
 
-    def __call__(self, theta: Tensor, x: Tensor) -> RatioEstimatorNeuralNet:
+    def __call__(self, theta: Tensor, x: Tensor) -> RatioEstimator:
         """Build a ratio estimator from theta and x, which mainly inform the
         shape of the input and the condition to the neural network.
 
@@ -44,7 +44,7 @@ class RatioEstimatorBuilder(Protocol):
         ...
 
 
-class RatioEstimator(NeuralInference, ABC):
+class RatioEstimatorTrainer(NeuralInference, ABC):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
@@ -110,7 +110,7 @@ class RatioEstimator(NeuralInference, ABC):
         from_round: int = 0,
         algorithm: str = "SNRE",
         data_device: Optional[str] = None,
-    ) -> "RatioEstimator":
+    ) -> "RatioEstimatorTrainer":
         r"""Store parameters and simulation outputs to use them for later training.
 
         Data are stored as entries in lists for each type of variable (parameter/data).
