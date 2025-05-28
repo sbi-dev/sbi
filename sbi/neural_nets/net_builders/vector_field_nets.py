@@ -30,7 +30,7 @@ def build_flow_matching_estimator(
     batch_y: Tensor,
     z_score_y: Optional[str] = None,
     embedding_net: nn.Module = nn.Identity(),
-    hidden_features: Union[Sequence[int], int] = 200,
+    hidden_features: Union[Sequence[int], int] = 100,
     time_embedding_dim: int = 32,
     num_layers: int = 5,
     num_blocks: int = 5,
@@ -46,7 +46,7 @@ def build_flow_matching_estimator(
         batch_y: Batch of ys, used to infer dimensionality.
         embedding_net: Embedding network for batch_y.
         hidden_features: Number of hidden features in each layer (for MLP) or dimension
-        of hidden features (for transformer).
+            of hidden features (for transformer).
         time_embedding_dim: Number of dimensions for time embedding.
         num_layers: Number of layers in the network (for MLP).
         num_blocks: Number of transformer blocks (for transformer).
@@ -138,8 +138,8 @@ def build_score_matching_estimator(
     z_score_x: Optional[str] = None,
     z_score_y: Optional[str] = None,
     embedding_net: nn.Module = nn.Identity(),
-    sde_type: str = "vp",  # "vp", "subvp", or "ve"
-    hidden_features: Union[Sequence[int], int] = 200,
+    sde_type: str = "ve",  # "vp", "subvp", or "ve"
+    hidden_features: Union[Sequence[int], int] = 100,
     num_layers: int = 5,
     num_blocks: int = 5,
     num_heads: int = 4,
@@ -499,7 +499,7 @@ class VectorFieldMLP(VectorFieldNet):
         input_dim: int,
         condition_dim: int,
         time_emb_dim: int,
-        hidden_features: int = 64,
+        hidden_features: int = 100,
         num_layers: int = 5,
         activation: Callable = nn.GELU,
         layer_norm: bool = True,
@@ -616,51 +616,35 @@ class VectorFieldAdaMLP(VectorFieldNet):
         condition_dim: int,
         condition_emb_dim: int,
         time_emb_dim: int,
-        hidden_features: int = 64,
-        num_layers: int = 1,
-        global_mlp_ratio: int = 1,
+        hidden_features: int = 100,
+        num_layers: int = 5,
+        global_mlp_ratio: int = 4,
         num_intermediate_mlp_layers: int = 0,
-        adamlp_ratio: int = 1,
+        adamlp_ratio: int = 4,
         activation: Callable = nn.GELU,
         time_emb_type: str = "sinusoidal",
-        sinusoidal_max_freq: float = 10000.0,
+        sinusoidal_max_freq: float = 1000.0,
         fourier_scale: float = 30.0,
     ):
         """Initialize vector field MLP.
 
         Args:
-            input_dim (int):
-                Dimension of the input (theta or state).
-            condition_emb_dim (int):
-                Dimension of the conditioning variable.
-            time_emb_dim (int):
-                Dimension of the time embedding.
-            hidden_features (int):
-                Number of hidden features in each layer. Defaults to 64.
-            num_layers (int, optional):
-                Number of layers in the network. Defaults to 1.
-            global_mlp_ratio (int, optional):
-                Ratio of the hidden dimension to the intermediate
-                dimension in the global MLP. Defaults to 1.
-            num_intermediate_mlp_layers (int, optional):
-                Number of intermediate MLP blocks (Linear+GeLU+Linear)
-                in the global MLP. Defaults to 0.
-            adamlp_ratio (int, optional):
-                Ratio of the hidden dimension to the intermediate
-                dimension in the AdaMLPBlock. Defaults to 1.
-            activation (Callable, optional):
-                Activation function. Defaults to nn.GELU.
-            skip_connections (bool, optional):
-                Whether to use skip connections. Defaults to True.
-            time_emb_type (str, optional):
-                Type of time embedding to use, "sinusoidal" or
-                "random_fourier". Defaults to "sinusoidal".
-            sinusoidal_max_freq (float, optional):
-                The maximum frequency for sinusoidal embeddings.
-                Defaults to 1000.0.
-            fourier_scale (float, optional):
-                The scale for random fourier embeddings.
-                Defaults to 16.0.
+            input_dim: Dimension of the input (theta or state).
+            condition_emb_dim: Dimension of the conditioning variable.
+            time_emb_dim: Dimension of the time embedding.
+            hidden_features: Number of hidden features in each layer.
+            num_layers: Number of layers in the network.
+            global_mlp_ratio: Ratio of the hidden dimension to the intermediate
+                dimension in the global MLP.
+            num_intermediate_mlp_layers: Number of intermediate MLP blocks
+                (Linear+GeLU+Linear) in the global MLP.
+            adamlp_ratio: Ratio of the hidden dimension to the intermediate
+                dimension in the AdaMLPBlock.
+            activation: Activation function.
+            time_emb_type: Type of time embedding to use, "sinusoidal" or
+                "random_fourier".
+            sinusoidal_max_freq: The maximum frequency for sinusoidal embeddings.
+            fourier_scale: The scale for random fourier embeddings.
         """
         super().__init__()
 
@@ -950,11 +934,11 @@ class VectorFieldTransformer(VectorFieldNet):
         self,
         input_dim: int,
         condition_dim: int,
-        hidden_features: int = 128,
-        num_layers: int = 4,
+        hidden_features: int = 100,
+        num_layers: int = 5,
         num_heads: int = 4,
         mlp_ratio: int = 4,
-        time_emb_dim: int = 64,
+        time_emb_dim: int = 32,
         time_emb_type: str = "sinusoidal",
         sinusoidal_max_freq: float = 1000.0,
         fourier_scale: float = 30.0,
@@ -962,22 +946,23 @@ class VectorFieldTransformer(VectorFieldNet):
         is_x_emb_seq: bool = False,
         **kwargs,
     ):
-        """initialize dit-style transformer vector field network.
+        """Initialize dit-style transformer vector field network.
 
-        args:
-            input_dim: dimension of input data (theta)
-            condition_dim: dimension of conditioning data (x)
-            hidden_features: dimension of hidden features
-            num_layers: number of transformer layers
-            num_heads: number of attention heads
-            mlp_ratio: ratio for mlp hidden dimension
-            time_emb_dim: dimension of time embedding
-            time_emb_type: type of time embedding ('sinusoidal' or 'fourier')
-            sinusoidal_max_freq: maximum frequency for sinusoidal embedding
-            fourier_scale: scale for fourier embedding
-            activation: activation function
-            is_x_emb_seq: whether x_emb is a sequence (if true, cross-attention is used)
-            **kwargs: additional arguments
+        Args:
+            input_dim: Dimension of input data (theta).
+            condition_dim: Dimension of conditioning data (x).
+            hidden_features: Dimension of hidden features.
+            num_layers: Number of transformer layers.
+            num_heads: Number of attention heads.
+            mlp_ratio: Ratio for mlp hidden dimension.
+            time_emb_dim: Dimension of time embedding.
+            time_emb_type: Type of time embedding ('sinusoidal' or 'fourier').
+            sinusoidal_max_freq: Maximum frequency for sinusoidal embedding.
+            fourier_scale: Scale for fourier embedding.
+            activation: Activation function.
+            is_x_emb_seq: Whether x_emb is a sequence (if true, cross-attention is
+                used). NOTE: Effective usage is somewhat blocked by #1414
+            **kwargs: Additional arguments.
         """
         super().__init__()
 
@@ -1074,18 +1059,18 @@ class VectorFieldTransformer(VectorFieldNet):
 def build_adamlp_network(
     batch_x: Tensor,
     batch_y: Tensor,
-    hidden_features: Union[Sequence[int], int] = 64,
+    hidden_features: Union[Sequence[int], int] = 100,
     num_layers: int = 5,
     time_embedding_dim: int = 32,
-    condition_emb_dim: int = 64,
+    condition_emb_dim: int = 100,
     embedding_net: nn.Module = nn.Identity(),
-    mlp_ratio: int = 1,
+    mlp_ratio: int = 4,
     num_intermediate_mlp_layers: int = 0,
-    adamlp_ratio: int = 1,
+    adamlp_ratio: int = 4,
     activation: Callable = nn.GELU,
     time_emb_type: str = "sinusoidal",
     sinusoidal_max_freq: float = 1000.0,
-    fourier_scale: float = 16.0,
+    fourier_scale: float = 30.0,
 ) -> VectorFieldAdaMLP:
     """Builds an adaptive vector field MLP network.
 
@@ -1146,7 +1131,7 @@ def build_adamlp_network(
 def build_standard_mlp_network(
     batch_x: Tensor,
     batch_y: Tensor,
-    hidden_features: Union[Sequence[int], int] = 64,
+    hidden_features: Union[Sequence[int], int] = 100,
     num_layers: int = 5,
     time_embedding_dim: int = 32,
     embedding_net: nn.Module = nn.Identity(),
@@ -1217,7 +1202,7 @@ def build_standard_mlp_network(
 def build_transformer_network(
     batch_x: Tensor,
     batch_y: Tensor,
-    hidden_features: int = 64,
+    hidden_features: int = 100,
     num_blocks: int = 5,
     num_heads: int = 4,
     mlp_ratio: int = 4,
