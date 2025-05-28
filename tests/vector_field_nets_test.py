@@ -124,9 +124,8 @@ def test_adamlp_network_parameters(
 @pytest.mark.parametrize("num_heads", [4, 8])
 @pytest.mark.parametrize("mlp_ratio", [2, 4, 8])
 @pytest.mark.parametrize("time_emb_type", ["sinusoidal", "random_fourier"])
-@pytest.mark.parametrize("is_x_emb_seq", [True, False])
 def test_transformer_network_parameters(
-    hidden_features, num_blocks, num_heads, mlp_ratio, time_emb_type, is_x_emb_seq
+    hidden_features, num_blocks, num_heads, mlp_ratio, time_emb_type
 ):
     """Test whether transformer vector field networks can be built with different
     parameters."""
@@ -142,7 +141,6 @@ def test_transformer_network_parameters(
         mlp_ratio=mlp_ratio,
         time_embedding_dim=32,
         time_emb_type=time_emb_type,
-        is_x_emb_seq=is_x_emb_seq,
     )
 
     # Verify it's the correct type
