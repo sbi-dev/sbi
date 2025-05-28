@@ -14,6 +14,7 @@ from sbi.neural_nets.embedding_nets import CNNEmbedding
 from sbi.neural_nets.estimators.shape_handling import reshape_to_sample_batch_event
 from sbi.neural_nets.net_builders import (
     build_categoricalmassestimator,
+    build_flow_matching_estimator,
     build_made,
     build_maf,
     build_maf_rqs,
@@ -21,6 +22,7 @@ from sbi.neural_nets.net_builders import (
     build_mnle,
     build_mnpe,
     build_nsf,
+    build_score_matching_estimator,
     build_zuko_bpf,
     build_zuko_gf,
     build_zuko_maf,
@@ -30,8 +32,6 @@ from sbi.neural_nets.net_builders import (
     build_zuko_nsf,
     build_zuko_sospf,
     build_zuko_unaf,
-    build_flow_matching_estimator,
-    build_score_matching_estimator,
 )
 
 # List of all density estimator builders for testing.

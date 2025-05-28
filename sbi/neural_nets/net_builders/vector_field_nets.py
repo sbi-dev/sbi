@@ -1071,6 +1071,7 @@ def build_adamlp_network(
     time_emb_type: str = "sinusoidal",
     sinusoidal_max_freq: float = 1000.0,
     fourier_scale: float = 30.0,
+    **kwargs,
 ) -> VectorFieldAdaMLP:
     """Builds an adaptive vector field MLP network.
 
@@ -1093,6 +1094,8 @@ def build_adamlp_network(
     Returns:
         An adaptive vector field MLP network.
     """
+    del kwargs  # Unused
+
     # Check inputs and device
     check_data_device(batch_x, batch_y)
 
@@ -1141,7 +1144,6 @@ def build_standard_mlp_network(
     time_emb_type: str = "random_fourier",
     sinusoidal_max_freq: float = 1000.0,
     fourier_scale: float = 30.0,
-    condition_emb_dim: Optional[int] = None,
     **kwargs,
 ) -> VectorFieldMLP:
     """Builds a standard vector field MLP network.
@@ -1159,13 +1161,13 @@ def build_standard_mlp_network(
         time_emb_type: Type of time embedding ("sinusoidal" or "random_fourier").
         sinusoidal_max_freq: Maximum frequency for sinusoidal embeddings.
         fourier_scale: Scale for random fourier embeddings.
-        condition_emb_dim: Dimension of the conditioning embedding (ignored for standard
-            MLP).
         **kwargs: Additional arguments.
 
     Returns:
         A vector field MLP network.
     """
+    del kwargs  # Unused
+
     # Check inputs and device
     check_data_device(batch_x, batch_y)
 
@@ -1213,6 +1215,7 @@ def build_transformer_network(
     fourier_scale: float = 30.0,
     activation: Callable = nn.GELU,
     is_x_emb_seq: bool = False,
+    **kwargs,
 ) -> VectorFieldTransformer:
     """Builds a vector field transformer network.
 
@@ -1234,6 +1237,8 @@ def build_transformer_network(
     Returns:
         A vector field transformer network.
     """
+    del kwargs  # Unused
+
     # Check inputs and device
     check_data_device(batch_x, batch_y)
 

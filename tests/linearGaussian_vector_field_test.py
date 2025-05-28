@@ -194,9 +194,10 @@ def test_c2st_vector_field_on_linearGaussian_different_dims(vector_field_type):
     )
 
 
-# TODO: Add other nets
 @pytest.mark.parametrize("vector_field_type", [NPSE, FMPE])
-@pytest.mark.parametrize("model", ["mlp"])
+@pytest.mark.parametrize(
+    "model", ["mlp", "ada_mlp", pytest.param("transformer", marks=[pytest.mark.slow])]
+)
 def test_fmpe_with_different_models(vector_field_type, model):
     """Test fmpe with different vector field estimators on linear Gaussian."""
 
@@ -227,7 +228,7 @@ def test_fmpe_with_different_models(vector_field_type, model):
 
     inference = vector_field_type(prior, vf_estimator=estimator_build_fun)
 
-    inference.append_simulations(theta, x).train(training_batch_size=100)
+    inference.append_simulations(theta, x).train()
     posterior = inference.build_posterior().set_default_x(x_o)
     samples = posterior.sample((num_samples,))
 
