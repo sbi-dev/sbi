@@ -332,12 +332,11 @@ def posterior_score_nn(
     sde_type: str = "ve",
     z_score_theta: Optional[str] = "independent",
     z_score_x: Optional[str] = "independent",
-    t_embedding_dim: int = 32,
-    condition_emb_dim: int = 100,
     hidden_features: int = 100,
     num_layers: int = 5,
     embedding_net: nn.Module = nn.Identity(),
     time_emb_type: str = "sinusoidal",
+    t_embedding_dim: int = 32,
     **kwargs: Any,
 ) -> Callable:
     """Build util function that builds a ScoreEstimator object for score-based
@@ -364,30 +363,48 @@ def posterior_score_nn(
             sample is, for example, a time series or an image.
         z_score_x: Whether to z-score xs passing into the network, same options as
             z_score_theta.
-        t_embedding_dim: Embedding dimension of diffusion time. Defaults to 16.
         hidden_features: Number of hidden units per layer. Defaults to 50.
         embedding_net: Embedding network for x (conditioning variable). Defaults to
             nn.Identity().
+        time_emb_type: Type of time embedding. Defaults to 'sinusoidal'.
+        t_embedding_dim: Embedding dimension of diffusion time. Defaults to 32.
 
     Returns:
         Constructor function for NPSE.
     """
+
+    kwargs = dict(
+        zip(
+            (
+                "z_score_x",
+                "z_score_y",
+                "hidden_features",
+                "num_layers",
+                "embedding_net",
+                "time_embedding_dim",
+                "time_emb_type",
+                "net",
+            ),
+            (
+                z_score_x,
+                z_score_theta,
+                hidden_features,
+                num_layers,
+                check_net_device(embedding_net, "cpu", embedding_net_warn_msg),
+                t_embedding_dim,
+                time_emb_type,
+                model,
+            ),
+            strict=False,
+        ),
+        **kwargs,
+    )
 
     def build_fn(batch_theta, batch_x):
         # Build the score matching estimator
         return build_score_matching_estimator(
             batch_x=batch_theta,
             batch_y=batch_x,
-            z_score_x=z_score_theta,
-            z_score_y=z_score_x,
-            embedding_net=embedding_net,
-            sde_type=sde_type,
-            hidden_features=hidden_features,
-            time_embedding_dim=t_embedding_dim,
-            net=model,
-            time_emb_type=time_emb_type,
-            num_layers=num_layers,
-            condition_emb_dim=condition_emb_dim,
             **kwargs,
         )
 
@@ -398,12 +415,11 @@ def posterior_flow_nn(
     model: Union[str, nn.Module] = "mlp",
     z_score_theta: Optional[str] = None,
     z_score_x: Optional[str] = "independent",
-    t_embedding_dim: int = 32,
-    condition_emb_dim: int = 100,
     hidden_features: int = 100,
     num_layers: int = 5,
     embedding_net: nn.Module = nn.Identity(),
     time_emb_type: str = "sinusoidal",
+    t_embedding_dim: int = 32,
     **kwargs: Any,
 ) -> Callable:
     """Build util function that builds a FlowMatchingEstimator object for flow-based
@@ -416,33 +432,56 @@ def posterior_flow_nn(
             - 'transformer_cross_attention': Transformer with cross-attention.
             -  nn.Module: Custom network
             Defaults to 'mlp'.
-        z_score_theta: This is not supported for FMPE and wil be ignored.
+        z_score_theta: This is not supported for FMPE and will raise an error.
         z_score_x: Whether to z-score xs passing into the network, same options as
             z_score_theta.
-        t_embedding_dim: Embedding dimension of diffusion time. Defaults to 16.
         hidden_features: Number of hidden units per layer. Defaults to 50.
         embedding_net: Embedding network for x (conditioning variable). Defaults to
             nn.Identity().
+        time_emb_type: Type of time embedding. Defaults to 'sinusoidal'.
+        t_embedding_dim: Embedding dimension of diffusion time. Defaults to 32.
 
     Returns:
         Constructor function for FMPE.
     """
 
-    del z_score_theta  # Not used here
+    if z_score_theta is not None:
+        raise ValueError("z_score_theta is not supported for FMPE. You can z-score"
+                         "the inputs manually but doing so in the forward pass can"
+                         "negatively impact performance.")
+
+    kwargs = dict(
+        zip(
+            (
+                "z_score_x",
+                "z_score_y",
+                "embedding_net",
+                "hidden_features",
+                "time_embedding_dim",
+                "time_emb_type",
+                "net",
+                "num_layers",
+            ),
+            (
+                z_score_x,
+                z_score_theta,
+                embedding_net,
+                hidden_features,
+                t_embedding_dim,
+                time_emb_type,
+                model,
+                num_layers,
+            ),
+            strict=False,
+        ),
+        **kwargs,
+    )
 
     def build_fn(batch_theta, batch_x):
         # Build the flow matching estimator
         return build_flow_matching_estimator(
             batch_x=batch_theta,
             batch_y=batch_x,
-            z_score_y=z_score_x,
-            embedding_net=embedding_net,
-            hidden_features=hidden_features,
-            time_embedding_dim=t_embedding_dim,
-            time_emb_type=time_emb_type,
-            net=model,
-            num_layers=num_layers,
-            condition_emb_dim=condition_emb_dim,
             **kwargs,
         )
 
