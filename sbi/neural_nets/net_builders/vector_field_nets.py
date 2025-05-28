@@ -385,18 +385,25 @@ class GlobalEmbeddingMLP(nn.Module):
 
     def forward(self, t: Tensor, x_emb: Optional[Tensor] = None) -> Tensor:
         t_emb = self.time_emb(t)
-
-        try:
-            # Pad x_embed by repeating if smaller than time_emb_dim
-            pad_width = max(0, self.time_emb.embed_dim - x_emb.shape[-1])
-            x_emb = torch.nn.functional.pad(x_emb, (0, pad_width), mode='constant')
-            cond_emb = torch.cat([x_emb, t_emb], dim=-1) if x_emb is not None else t_emb
-        except RuntimeError as e:
-            shapes = f"x_emb shape: {x_emb.shape if x_emb is not None else 'None'},"
-            shapes += f"t_emb shape: {t_emb.shape}"
-            raise RuntimeError(
-                f"Failed to concatenate embeddings with shapes {shapes}"
-            ) from e
+        if x_emb is None:
+            cond_emb = t_emb
+        else:
+            try:
+                # Pad x_embed by repeating if smaller than time_emb_dim
+                pad_width = max(0, self.time_emb.embed_dim - x_emb.shape[-1])
+                x_emb = torch.nn.functional.pad(x_emb, (0, pad_width), mode='constant')
+                cond_emb = (
+                    torch.cat([x_emb, t_emb], dim=-1) if x_emb is not None else t_emb
+                )
+            except RuntimeError as e:
+                if isinstance(x_emb, Tensor):
+                    shapes = f"x_emb shape: {x_emb.shape},"
+                else:
+                    shapes = "x_emb shape: No Tensor,"
+                shapes += f"t_emb shape: {t_emb.shape}"
+                raise RuntimeError(
+                    f"Failed to concatenate embeddings with shapes {shapes}"
+                ) from e
 
         cond_emb = self.input_layer(cond_emb)
         for mlp_block in self.mlp_blocks:
