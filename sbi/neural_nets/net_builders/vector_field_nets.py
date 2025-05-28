@@ -1070,6 +1070,7 @@ class VectorFieldTransformer(VectorFieldNet):
 
 # ======= Factory Functions =======
 
+
 def build_adamlp_network(
     batch_x: Tensor,
     batch_y: Tensor,
@@ -1173,7 +1174,8 @@ def build_standard_mlp_network(
         time_emb_type: Type of time embedding ("sinusoidal" or "random_fourier").
         sinusoidal_max_freq: Maximum frequency for sinusoidal embeddings.
         fourier_scale: Scale for random fourier embeddings.
-        condition_emb_dim: Dimension of the conditioning embedding (ignored for standard MLP).
+        condition_emb_dim: Dimension of the conditioning embedding (ignored for standard
+            MLP).
         **kwargs: Additional arguments.
 
     Returns:

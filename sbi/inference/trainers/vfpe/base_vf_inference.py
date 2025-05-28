@@ -492,9 +492,9 @@ class VectorFieldInference(NeuralInference, ABC):
         """Return whether the training converged yet and save best model state so far.
 
         Checks for improvement in validation performance over previous epochs.
-        Uses an adaptive threshold that considers both the scale and variance of the loss.
-        The threshold is based on the exponential moving average of the loss and its
-        relative changes.
+        Uses an adaptive threshold that considers both the scale and variance of the
+        loss. The threshold is based on the exponential moving average of the loss and
+        its relative changes.
 
         Args:
             epoch: Current epoch in training.
@@ -539,7 +539,6 @@ class VectorFieldInference(NeuralInference, ABC):
                 # This means we only count as "no improvement" if the increase
                 # is significantly above the typical fluctuations
                 adaptive_threshold = mean_changes + 1.5 * std_changes
-
 
                 if relative_change > adaptive_threshold:
                     self._epochs_since_last_improvement += 1

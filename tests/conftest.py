@@ -84,7 +84,6 @@ def pytest_addoption(parser):
     )
 
 
-
 @pytest.fixture
 def benchmark_mode(request):
     """Fixture to access the --bm value in test files."""

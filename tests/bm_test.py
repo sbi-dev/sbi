@@ -161,7 +161,11 @@ def eval_c2st(
 
 
 def train_and_eval_amortized_inference(
-    inference_class, task_name: str, extra_kwargs: dict, results_bag: ResultsBag, benchmark_num_simulations: int
+    inference_class,
+    task_name: str,
+    extra_kwargs: dict,
+    results_bag: ResultsBag,
+    benchmark_num_simulations: int,
 ) -> None:
     """
     Performs amortized inference evaluation.
@@ -193,7 +197,11 @@ def train_and_eval_amortized_inference(
 
 
 def train_and_eval_sequential_inference(
-    inference_class, task_name: str, extra_kwargs: dict, results_bag: ResultsBag, benchmark_num_simulations: int
+    inference_class,
+    task_name: str,
+    extra_kwargs: dict,
+    results_bag: ResultsBag,
+    benchmark_num_simulations: int,
 ) -> None:
     """
     Performs sequential inference evaluation.
@@ -263,9 +271,17 @@ def test_run_benchmark(
     """
     if benchmark_mode in ["snpe", "snle", "snre"]:
         train_and_eval_sequential_inference(
-            inference_class, task_name, extra_kwargs, results_bag, benchmark_num_simulations
+            inference_class,
+            task_name,
+            extra_kwargs,
+            results_bag,
+            benchmark_num_simulations,
         )
     else:
         train_and_eval_amortized_inference(
-            inference_class, task_name, extra_kwargs, results_bag, benchmark_num_simulations
+            inference_class,
+            task_name,
+            extra_kwargs,
+            results_bag,
+            benchmark_num_simulations,
         )

@@ -13,11 +13,11 @@ from sbi.neural_nets.embedding_nets import CNNEmbedding
 from sbi.neural_nets.net_builders.vector_field_nets import (
     VectorFieldMLP,
     VectorFieldTransformer,
-    build_flow_matching_estimator,
-    build_standard_mlp_network,
-    build_score_matching_estimator,
-    build_transformer_network,
     build_adamlp_network,
+    build_flow_matching_estimator,
+    build_score_matching_estimator,
+    build_standard_mlp_network,
+    build_transformer_network,
 )
 
 
@@ -210,7 +210,8 @@ def test_mlp_network_parameters(hidden_features, num_layers):
 @pytest.mark.parametrize("hidden_features", [64, 128])
 @pytest.mark.parametrize("num_layers", [2, 4])
 def test_adamlp_network_parameters(hidden_features, num_layers):
-    """Test whether AdaMLP vector field networks can be built with different parameters."""
+    """Test whether AdaMLP vector field networks can be built with different parameters.
+    """
     batch_x = torch.randn(100, 5)
     batch_y = torch.randn(100, 3)
 
