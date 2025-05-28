@@ -110,7 +110,7 @@ def build_flow_matching_estimator(
             batch_x=batch_x,
             batch_y=batch_y,
             hidden_features=hidden_dim,
-            num_blocks=num_blocks,
+            num_layers=num_blocks,
             num_heads=num_heads,
             mlp_ratio=mlp_ratio,
             time_embedding_dim=time_embedding_dim,
@@ -215,7 +215,7 @@ def build_score_matching_estimator(
             batch_x=batch_x,
             batch_y=batch_y,
             hidden_features=hidden_dim,
-            num_blocks=num_blocks,
+            num_layers=num_blocks,
             num_heads=num_heads,
             mlp_ratio=mlp_ratio,
             time_embedding_dim=time_embedding_dim,
@@ -1016,6 +1016,7 @@ class VectorFieldTransformer(VectorFieldNet):
 
         # output projection, reshape later
         self.output_proj = nn.Linear(hidden_features, 1)
+        nn.init.zeros_(self.output_proj.weight)
 
     def forward(self, theta: Tensor, x_emb_cond: Tensor, t: Tensor) -> Tensor:
         """Forward pass through the transformer.
@@ -1205,9 +1206,9 @@ def build_transformer_network(
     batch_x: Tensor,
     batch_y: Tensor,
     hidden_features: int = 100,
-    num_blocks: int = 5,
+    num_layers: int = 5,
     num_heads: int = 4,
-    mlp_ratio: int = 4,
+    mlp_ratio: int = 2,
     time_embedding_dim: int = 32,
     embedding_net: nn.Module = nn.Identity(),
     time_emb_type: str = "sinusoidal",
@@ -1223,7 +1224,7 @@ def build_transformer_network(
         batch_x: Batch of xs, used to infer dimensionality.
         batch_y: Batch of ys, used to infer dimensionality.
         hidden_features: Dimension of hidden features.
-        num_blocks: Number of transformer blocks.
+        num_layers: Number of transformer layers.
         num_heads: Number of attention heads per block.
         mlp_ratio: Ratio for MLP hidden dimension.
         time_embedding_dim: Number of dimensions for time embedding.
@@ -1251,7 +1252,7 @@ def build_transformer_network(
         input_dim=x_numel,
         condition_dim=y_numel,
         hidden_features=hidden_features,
-        num_layers=num_blocks,
+        num_layers=num_layers,
         num_heads=num_heads,
         mlp_ratio=mlp_ratio,
         time_emb_dim=time_embedding_dim,
