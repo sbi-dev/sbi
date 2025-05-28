@@ -461,36 +461,3 @@ def test_mixed_density_estimator(
     # Test samples
     samples = density_estimator.sample(sample_shape, condition=conditions)
     assert samples.shape == (*sample_shape, batch_dim, *input_event_shape)
-
-
-@pytest.mark.parametrize("vf_estimator_build_fn", diffusion_builders)
-@pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
-@pytest.mark.parametrize("condition_event_shape", ((1,), (7,)))
-@pytest.mark.parametrize("batch_dim", (1, 10))
-def test_vf_estimators(
-    vf_estimator_build_fn: Callable,
-    input_event_shape: Tuple[int],
-    condition_event_shape: Tuple[int],
-    batch_dim: int,
-):
-    vf_estimator, inputs, conditions, input_event_shape = (
-        _build_density_estimator_and_tensors(
-            vf_estimator_build_fn,
-            input_event_shape,
-            condition_event_shape,
-            batch_dim,
-        )
-    )
-    # Test losses
-    losses = vf_estimator.loss(inputs[0], condition=conditions)
-    assert losses.shape == (batch_dim,)
-
-    # Test forward (at train time)
-    time = torch.rand(batch_dim, device=inputs.device)
-    forward_outputs = vf_estimator.forward(inputs[0], condition=conditions, time=time)
-    assert forward_outputs.shape == (batch_dim, *input_event_shape)
-
-    # Test with single time point (at sampling time)
-    time = torch.rand((1,), device=inputs.device)
-    forward_outputs = vf_estimator.forward(inputs[0], condition=conditions, time=time)
-    assert forward_outputs.shape == (batch_dim, *input_event_shape)

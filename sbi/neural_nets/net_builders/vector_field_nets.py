@@ -25,11 +25,14 @@ from sbi.utils.vector_field_utils import VectorFieldNet
 
 
 # ==================== Building Flow/Score Matching Estimators =========================
-def build_flow_matching_estimator(
+def build_vector_field_estimator(
     batch_x: Tensor,
     batch_y: Tensor,
+    estimator_type: str = "flow",  # "flow" or "score"
+    z_score_x: Optional[str] = None,
     z_score_y: Optional[str] = None,
     embedding_net: nn.Module = nn.Identity(),
+    sde_type: str = "ve",  # Only used for score estimator
     hidden_features: Union[Sequence[int], int] = 100,
     time_embedding_dim: int = 32,
     num_layers: int = 5,
@@ -38,137 +41,31 @@ def build_flow_matching_estimator(
     mlp_ratio: int = 4,
     net: str | nn.Module = "ada_mlp",  # "mlp", "ada_mlp", or "transformer"
     **kwargs,
-) -> FlowMatchingEstimator:
-    """Builds a flow matching estimator with the given network.
+) -> Union[FlowMatchingEstimator, ConditionalScoreEstimator]:
+    """Builds a vector field estimator (flow matching or score matching) with the given
+    network.
 
     Args:
         batch_x: Batch of xs, used to infer dimensionality.
         batch_y: Batch of ys, used to infer dimensionality.
-        embedding_net: Embedding network for batch_y.
-        hidden_features: Number of hidden features in each layer (for MLP) or dimension
-            of hidden features (for transformer).
-        time_embedding_dim: Number of dimensions for time embedding.
-        num_layers: Number of layers in the network (for MLP).
-        num_blocks: Number of transformer blocks (for transformer).
-        num_heads: Number of attention heads per block (for transformer).
-        mlp_ratio: Ratio for MLP hidden dimension (for transformer).
-        net: Type of architecture to use, either "mlp", "ada_mlp", or "transformer".
-        **kwargs: Additional arguments for the network.
-
-    Returns:
-        A flow matching estimator.
-    """
-    # Check inputs and device
-    check_data_device(batch_x, batch_y)
-
-    # Z-score setup
-    embedding_net_y = (
-        standardizing_net(batch_y, z_score_y == "structured")
-        if z_score_y
-        else nn.Identity()
-    )
-
-    # Build network if not provided
-    if net == "mlp":
-        # Filter out AdaMLP-specific parameters
-        mlp_kwargs = {
-            k: v
-            for k, v in kwargs.items()
-            if k
-            not in [
-                "condition_emb_dim",
-                "mlp_ratio",
-                "num_intermediate_mlp_layers",
-                "adamlp_ratio",
-            ]
-        }
-        vectorfield_net = build_standard_mlp_network(
-            batch_x=batch_x,
-            batch_y=batch_y,
-            hidden_features=hidden_features,
-            num_layers=num_layers,
-            time_embedding_dim=time_embedding_dim,
-            embedding_net=embedding_net_y,
-            **mlp_kwargs,
-        )
-    elif net == "ada_mlp":
-        vectorfield_net = build_adamlp_network(
-            batch_x=batch_x,
-            batch_y=batch_y,
-            hidden_features=hidden_features,
-            num_layers=num_layers,
-            time_embedding_dim=time_embedding_dim,
-            embedding_net=embedding_net_y,
-            **kwargs,
-        )
-    elif net == "transformer":
-        # For transformer, hidden_features must be an int
-        hidden_dim = (
-            hidden_features if isinstance(hidden_features, int) else hidden_features[0]
-        )
-        vectorfield_net = build_transformer_network(
-            batch_x=batch_x,
-            batch_y=batch_y,
-            hidden_features=hidden_dim,
-            num_layers=num_blocks,
-            num_heads=num_heads,
-            mlp_ratio=mlp_ratio,
-            time_embedding_dim=time_embedding_dim,
-            embedding_net=embedding_net,
-            **kwargs,
-        )
-    else:
-        if isinstance(net, nn.Module):
-            vectorfield_net = net
-        else:
-            raise ValueError(f"Unknown architecture: {net}")
-
-    # Create the flow matching estimator
-    return FlowMatchingEstimator(
-        net=vectorfield_net,
-        input_shape=batch_x[0].shape,
-        condition_shape=batch_y[0].shape,
-        embedding_net=embedding_net,
-    )
-
-
-def build_score_matching_estimator(
-    batch_x: Tensor,
-    batch_y: Tensor,
-    z_score_x: Optional[str] = None,
-    z_score_y: Optional[str] = None,
-    embedding_net: nn.Module = nn.Identity(),
-    sde_type: str = "ve",  # "vp", "subvp", or "ve"
-    hidden_features: Union[Sequence[int], int] = 100,
-    num_layers: int = 5,
-    num_blocks: int = 5,
-    num_heads: int = 4,
-    mlp_ratio: int = 4,
-    time_embedding_dim: int = 32,
-    net: str | nn.Module = "ada_mlp",  # "mlp", "ada_mlp", or "transformer"
-    **kwargs,
-) -> ConditionalScoreEstimator:
-    """Builds a score matching estimator with the given network.
-
-    Args:
-        batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring.
-        batch_y: Batch of ys, used to infer dimensionality and (optional) z-scoring.
+        estimator_type: Type of estimator to build, either "flow" or "score".
         z_score_x: Whether to z-score xs passing into the network.
         z_score_y: Whether to z-score ys passing into the network.
         embedding_net: Embedding network for batch_y.
         sde_type: SDE type for score estimator, one of "vp", "subvp", or "ve".
         hidden_features: Number of hidden features in each layer (for MLP) or dimension
             of hidden features (for transformer).
+        time_embedding_dim: Number of dimensions for time embedding.
         num_layers: Number of layers in the network (for MLP).
         num_blocks: Number of transformer blocks (for transformer).
         num_heads: Number of attention heads per block (for transformer).
         mlp_ratio: Ratio for MLP hidden dimension (for transformer).
-        time_embedding_dim: Number of dimensions for time embedding.
         net: Type of architecture to use, either "mlp", "ada_mlp", or "transformer".
         **kwargs: Additional arguments for the network.
 
     Returns:
-        A score matching estimator.
+        A vector field estimator (either FlowMatchingEstimator or
+        ConditionalScoreEstimator).
     """
     # Check inputs and device
     check_data_device(batch_x, batch_y)
@@ -230,33 +127,49 @@ def build_score_matching_estimator(
 
     # Z-score setup
     mean_0, std_0 = z_standardization(batch_x, z_score_x == "structured")
-
-    # Create input embeddings
     embedding_net_y = (
         standardizing_net(batch_y, z_score_y == "structured")
         if z_score_y
         else nn.Identity()
     )
 
-    # Choose the appropriate score estimator based on SDE type
-    if sde_type == "vp":
-        estimator_cls = VPScoreEstimator
-    elif sde_type == "subvp":
-        estimator_cls = SubVPScoreEstimator
-    elif sde_type == "ve":
-        estimator_cls = VEScoreEstimator
-    else:
-        raise ValueError(f"Unknown SDE type: {sde_type}")
+    if estimator_type == "flow":
+        return FlowMatchingEstimator(
+            net=vectorfield_net,
+            input_shape=batch_x[0].shape,
+            condition_shape=batch_y[0].shape,
+            embedding_net=embedding_net_y,
+        )
+    elif estimator_type == "score":
+        # Choose the appropriate score estimator based on SDE type
+        if sde_type == "vp":
+            estimator_cls = VPScoreEstimator
+        elif sde_type == "subvp":
+            estimator_cls = SubVPScoreEstimator
+        elif sde_type == "ve":
+            estimator_cls = VEScoreEstimator
+        else:
+            raise ValueError(f"Unknown SDE type: {sde_type}")
 
-    # Create the score estimator
-    return estimator_cls(
-        net=vectorfield_net,
-        input_shape=batch_x[0].shape,
-        condition_shape=batch_y[0].shape,
-        embedding_net=embedding_net_y,
-        mean_0=mean_0,
-        std_0=std_0,
-    )
+        return estimator_cls(
+            net=vectorfield_net,
+            input_shape=batch_x[0].shape,
+            condition_shape=batch_y[0].shape,
+            embedding_net=embedding_net_y,
+            mean_0=mean_0,
+            std_0=std_0,
+        )
+    else:
+        raise ValueError(f"Unknown estimator type: {estimator_type}")
+
+
+# For backward compatibility
+def build_flow_matching_estimator(*args, **kwargs):
+    return build_vector_field_estimator(*args, estimator_type="flow", **kwargs)
+
+
+def build_score_matching_estimator(*args, **kwargs):
+    return build_vector_field_estimator(*args, estimator_type="score", **kwargs)
 
 
 # ======= Time Embedding Shared Components =======
