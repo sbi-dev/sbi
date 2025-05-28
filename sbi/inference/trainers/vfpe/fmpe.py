@@ -9,12 +9,12 @@ from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi import utils as utils
 from sbi.inference.posteriors.vector_field_posterior import VectorFieldPosterior
-from sbi.inference.trainers.npse.vector_field_inference import (
+from sbi.inference.trainers.vfpe.base_vf_inference import (
     VectorFieldEstimatorBuilder,
     VectorFieldInference,
 )
-from sbi.neural_nets import flowmatching_nn
-from sbi.neural_nets.estimators import ConditionalVectorFieldEstimator
+from sbi.neural_nets.estimators.base import ConditionalVectorFieldEstimator
+from sbi.neural_nets.factory import posterior_flow_nn
 
 
 class FMPE(VectorFieldInference):
@@ -23,7 +23,7 @@ class FMPE(VectorFieldInference):
     def __init__(
         self,
         prior: Optional[Distribution],
-        density_estimator: Union[str, VectorFieldEstimatorBuilder] = "mlp",
+        vf_estimator: Union[str, VectorFieldEstimatorBuilder] = "mlp",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
@@ -34,7 +34,7 @@ class FMPE(VectorFieldInference):
 
         Args:
             prior: Prior distribution.
-            density_estimator: Neural network architecture used to learn the
+            vf_estimator: Neural network architecture used to learn the
                 vector field estimator. Can be a string (e.g. 'mlp' or 'ada_mlp') or a
                 callable that implements the `VectorFieldEstimatorBuilder` protocol
                 with `__call__` that receives `theta` and `x` and returns a
@@ -53,7 +53,7 @@ class FMPE(VectorFieldInference):
             logging_level=logging_level,
             summary_writer=summary_writer,
             show_progress_bars=show_progress_bars,
-            vector_field_estimator_builder=density_estimator,
+            vector_field_estimator_builder=vf_estimator,
             **kwargs,
         )
         # density_estimator name is kept since it is public API, but it is
@@ -61,7 +61,7 @@ class FMPE(VectorFieldInference):
 
     def _build_default_nn_fn(self, **kwargs) -> VectorFieldEstimatorBuilder:
         model = kwargs.pop("vector_field_estimator_builder", "mlp")
-        return flowmatching_nn(model=model, **kwargs)
+        return posterior_flow_nn(model, **kwargs)
 
     def build_posterior(
         self,

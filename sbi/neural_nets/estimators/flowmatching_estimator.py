@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import Optional, Union
 
 import torch
 import torch.nn as nn
@@ -53,13 +53,11 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
 
     def __init__(
         self,
-        net: VectorFieldNet,
+        net: Union[VectorFieldNet, nn.Module],
         input_shape: torch.Size,
         condition_shape: torch.Size,
         embedding_net: Optional[nn.Module] = None,
-        num_freqs: int = 3,  # This is ignored and will be removed in PR #1501
         noise_scale: float = 1e-3,
-        zscore_transform_input=None,  # This is ignored and will be removed in PR #1501
         **kwargs,
     ) -> None:
         r"""Creates a vector field estimator for Flow Matching.
@@ -80,8 +78,6 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         super().__init__(
             net=net, input_shape=input_shape, condition_shape=condition_shape
         )
-
-        self.num_freqs = num_freqs  # This will be removed in PR #1501
         self.noise_scale = noise_scale
         self._embedding_net = (
             embedding_net if embedding_net is not None else nn.Identity()
@@ -91,45 +87,46 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
     def embedding_net(self):
         return self._embedding_net
 
-    def forward(self, input: Tensor, condition: Tensor, t: Tensor) -> Tensor:
-        """
-        Forward pass of the FlowMatchingEstimator.
+    def forward(self, input: Tensor, condition: Tensor, time: Tensor) -> Tensor:
+        """Forward pass of the FlowMatchingEstimator.
 
         Args:
-            input: The input tensor.
-            condition: The condition tensor.
-            t: The time tensor.
+            input: Original data, x0. (input_batch_shape, *input_shape)
+            condition: Conditioning variable. (condition_batch_shape, *condition_shape)
+            time: SDE time variable in [0,1].
 
         Returns:
             The estimated vector field.
         """
-        # temporal fix that will be removed when the nn builders are updated
-        t = self._get_temporal_t_shape_fix(t)
-
+        # Continue with standard processing (broadcast shapes etc.)
+        batch_shape_input = input.shape[: -len(self.input_shape)]
+        batch_shape_cond = condition.shape[: -len(self.condition_shape)]
         batch_shape = torch.broadcast_shapes(
-            input.shape[: -len(self.input_shape)],
-            condition.shape[: -len(self.condition_shape)],
+            batch_shape_input,
+            batch_shape_cond,
         )
 
+        # embed the conditioning variable
+        condition_emb = self._embedding_net(condition)
+
         input = torch.broadcast_to(input, batch_shape + self.input_shape)
-        condition = torch.broadcast_to(condition, batch_shape + self.condition_shape)
-        t = torch.broadcast_to(t, batch_shape + t.shape[1:])
+        condition_emb = torch.broadcast_to(
+            condition_emb, batch_shape + condition_emb.shape[len(batch_shape_cond) :]
+        )
+        time = torch.broadcast_to(time, batch_shape)
 
-        # the network expects 2D input, so we flatten the input if necessary
-        # and remember the original shape
-        target_shape = input.shape
-        input = input.reshape(-1, input.shape[-1])
-        condition = condition.reshape(-1, *self.condition_shape)
-        t = t.reshape(-1, t.shape[-1])
-
-        # embed the input and condition
-        embedded_condition = self._embedding_net(condition)
+        # NOTE: To simplify use of external networks, we will flatten the tensors
+        # batch_shape to a single batch dimension.
+        input = input.reshape(-1, *input.shape[len(batch_shape) :])
+        condition_emb = condition_emb.reshape(
+            -1, *condition_emb.shape[len(batch_shape) :]
+        )
+        time = time.reshape(-1)
 
         # call the network to get the estimated vector field
-        v = self.net(theta=input, x=embedded_condition, t=t)
+        v = self.net(input, condition_emb, time)
+        v = v.reshape(*batch_shape + self.input_shape)
 
-        # reshape to the original shape
-        v = v.reshape(*target_shape)
         return v
 
     def loss(
@@ -181,7 +178,6 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         times_ = times[..., None]
 
         # sample from probability path at time t
-        # TODO: Change to notation from Lipman et al. or Tong et al.
         theta_1 = torch.randn_like(input)
         theta_t = (1 - times_) * input + (times_ + self.noise_scale) * theta_1
 
@@ -355,18 +351,3 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         for _ in range(len(self.input_shape)):
             std_t = std_t.unsqueeze(-1)
         return std_t
-
-    # this method will be removed in PR #1501
-    def _get_temporal_t_shape_fix(self, t: Tensor) -> Tensor:
-        """
-        This is a hack that allows us to use
-        the old nn builders that assume positional embedding of time
-        inside the forward method, resulting in a shape of (..., num_freqs * 2).
-        """
-        if t.ndim == 0:
-            t = t.reshape(1, 1)
-        elif t.ndim == 1:
-            t = t[..., None]
-        if t.shape[-1] == 1:
-            t = t.expand(*t.shape[:-1], self.num_freqs * 2)
-        return t
