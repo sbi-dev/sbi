@@ -30,6 +30,8 @@ from sbi.neural_nets.net_builders import (
     build_zuko_nsf,
     build_zuko_sospf,
     build_zuko_unaf,
+    build_flow_matching_estimator,
+    build_score_matching_estimator,
 )
 
 # List of all density estimator builders for testing.
@@ -50,8 +52,11 @@ model_builders = [
     build_zuko_unaf,
 ]
 
-# TODO Test new
-diffusion_builders = []
+
+diffusion_builders = [
+    build_flow_matching_estimator,
+    build_score_matching_estimator,
+]
 
 
 def get_batch_input(nsamples: int, input_dims: int) -> torch.Tensor:
@@ -136,7 +141,7 @@ def test_shape_handling_utility_for_density_estimator(
     [
         build_nsf,
         build_zuko_nsf,
-    ],  # just test nflows, zuko and flowmatching
+    ],  # just test nflows and zuko i.e. normalizing flows
 )
 @pytest.mark.parametrize("input_sample_dim", (1, 2))
 @pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
@@ -341,6 +346,8 @@ def _build_density_estimator_and_tensors(
         build_mnle,
         build_mnpe,
         build_categoricalmassestimator,
+        build_flow_matching_estimator,
+        build_score_matching_estimator,
     ]:
         density_estimator = density_estimator_build_fn(
             batch_x=batch_input,
@@ -454,3 +461,36 @@ def test_mixed_density_estimator(
     # Test samples
     samples = density_estimator.sample(sample_shape, condition=conditions)
     assert samples.shape == (*sample_shape, batch_dim, *input_event_shape)
+
+
+@pytest.mark.parametrize("vf_estimator_build_fn", diffusion_builders)
+@pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
+@pytest.mark.parametrize("condition_event_shape", ((1,), (7,)))
+@pytest.mark.parametrize("batch_dim", (1, 10))
+def test_vf_estimators(
+    vf_estimator_build_fn: Callable,
+    input_event_shape: Tuple[int],
+    condition_event_shape: Tuple[int],
+    batch_dim: int,
+):
+    vf_estimator, inputs, conditions, input_event_shape = (
+        _build_density_estimator_and_tensors(
+            vf_estimator_build_fn,
+            input_event_shape,
+            condition_event_shape,
+            batch_dim,
+        )
+    )
+    # Test losses
+    losses = vf_estimator.loss(inputs[0], condition=conditions)
+    assert losses.shape == (batch_dim,)
+
+    # Test forward (at train time)
+    time = torch.rand(batch_dim, device=inputs.device)
+    forward_outputs = vf_estimator.forward(inputs[0], condition=conditions, time=time)
+    assert forward_outputs.shape == (batch_dim, *input_event_shape)
+
+    # Test with single time point (at sampling time)
+    time = torch.rand((1,), device=inputs.device)
+    forward_outputs = vf_estimator.forward(inputs[0], condition=conditions, time=time)
+    assert forward_outputs.shape == (batch_dim, *input_event_shape)
