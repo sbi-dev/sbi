@@ -8,14 +8,14 @@ from torch.distributions import Distribution
 
 from sbi.inference.posteriors import MCMCPosterior, RejectionPosterior, VIPosterior
 from sbi.inference.potentials import likelihood_estimator_based_potential
-from sbi.inference.trainers.nle.nle_base import LikelihoodEstimator
+from sbi.inference.trainers.nle.nle_base import LikelihoodEstimatorTrainer
 from sbi.neural_nets.estimators import MixedDensityEstimator
 from sbi.sbi_types import TensorboardSummaryWriter, TorchModule
 from sbi.utils.sbiutils import del_entries
 from sbi.utils.user_input_checks import check_prior
 
 
-class MNLE(LikelihoodEstimator):
+class MNLE(LikelihoodEstimatorTrainer):
     """Mixed Neural Likelihood Estimation (MNLE) [1].
 
     Like NLE, but designed to be applied to data with mixed types, e.g., continuous

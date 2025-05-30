@@ -45,7 +45,7 @@ from sbi.utils.sbiutils import ImproperEmpirical, mask_sims_from_prior
 from sbi.utils.torchutils import assert_all_finite
 
 
-class PosteriorEstimator(NeuralInference, ABC):
+class PosteriorEstimatorTrainer(NeuralInference, ABC):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
@@ -103,7 +103,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         proposal: Optional[DirectPosterior] = None,
         exclude_invalid_x: Optional[bool] = None,
         data_device: Optional[str] = None,
-    ) -> "PosteriorEstimator":
+    ) -> "PosteriorEstimatorTrainer":
         r"""Store parameters and simulation outputs to use them for later training.
 
         Data are stored as entries in lists for each type of variable (parameter/data).

@@ -11,7 +11,7 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 
-from sbi.inference.trainers.npe.npe_base import PosteriorEstimator
+from sbi.inference.trainers.npe.npe_base import PosteriorEstimatorTrainer
 from sbi.neural_nets.estimators import UnconditionalDensityEstimator
 from sbi.utils.metrics import check_c2st
 
@@ -113,7 +113,7 @@ def calculate_p_misspecification(
 def calc_misspecification_mmd(
     x_obs: Tensor,
     x: Tensor,
-    inference: Optional[PosteriorEstimator] = None,
+    inference: Optional[PosteriorEstimatorTrainer] = None,
     mode: str = "x_space",
     n_shuffle: int = 1_000,
     max_samples: int = 1_000,

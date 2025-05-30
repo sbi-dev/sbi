@@ -10,7 +10,7 @@ from torch import Tensor, eye, nn, ones
 from torch.distributions import Distribution, MultivariateNormal, Uniform
 
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
-from sbi.inference.trainers.npe.npe_base import PosteriorEstimator
+from sbi.inference.trainers.npe.npe_base import PosteriorEstimatorTrainer
 from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
     reshape_to_sample_batch_event,
@@ -28,7 +28,7 @@ from sbi.utils.sbiutils import mog_log_prob
 from sbi.utils.torchutils import BoxUniform, assert_all_finite
 
 
-class NPE_C(PosteriorEstimator):
+class NPE_C(PosteriorEstimatorTrainer):
     """Neural Posterior Estimation algorithm (NPE-C) as in Greenberg et al. (2019). [1]
 
     [1] *Automatic Posterior Transformation for Likelihood-free Inference*,

@@ -26,7 +26,7 @@ from sbi.utils import check_estimator_arg, check_prior, x_shape_from_simulation
 from sbi.utils.torchutils import assert_all_finite
 
 
-class LikelihoodEstimator(NeuralInference, ABC):
+class LikelihoodEstimatorTrainer(NeuralInference, ABC):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
@@ -82,7 +82,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
         from_round: int = 0,
         algorithm: str = "SNLE",
         data_device: Optional[str] = None,
-    ) -> "LikelihoodEstimator":
+    ) -> "LikelihoodEstimatorTrainer":
         r"""Store parameters and simulation outputs to use them for later training.
 
         Data are stored as entries in lists for each type of variable (parameter/data).
