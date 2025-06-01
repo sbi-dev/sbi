@@ -7,13 +7,13 @@ import torch
 from torch import Tensor, nn, ones
 from torch.distributions import Distribution
 
-from sbi.inference.trainers.nre.nre_base import RatioEstimator
+from sbi.inference.trainers.nre.nre_base import RatioEstimatorTrainer
 from sbi.sbi_types import TensorboardSummaryWriter
 from sbi.utils.sbiutils import del_entries
 from sbi.utils.torchutils import assert_all_finite
 
 
-class NRE_A(RatioEstimator):
+class NRE_A(RatioEstimatorTrainer):
     """AALR, here known as Neural Ratio Estimation algorithm (NRE-A) [1].
 
     [1] *Likelihood-free MCMC with Amortized Approximate Likelihood Ratios*, Hermans
