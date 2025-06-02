@@ -26,7 +26,7 @@ from sbi.utils import (
 from sbi.utils.torchutils import repeat_rows
 
 
-class RatioEstimator(NeuralInference, ABC):
+class RatioEstimatorTrainer(NeuralInference, ABC):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
@@ -92,7 +92,7 @@ class RatioEstimator(NeuralInference, ABC):
         from_round: int = 0,
         algorithm: str = "SNRE",
         data_device: Optional[str] = None,
-    ) -> "RatioEstimator":
+    ) -> "RatioEstimatorTrainer":
         r"""Store parameters and simulation outputs to use them for later training.
 
         Data are stored as entries in lists for each type of variable (parameter/data).
