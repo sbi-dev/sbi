@@ -1020,7 +1020,7 @@
 
     <div class="doc doc-contents first">
             <p class="doc doc-class-bases">
-              Bases: <code><span title="sbi.inference.trainers.npe.npe_base.PosteriorEstimator">PosteriorEstimator</span></code></p>
+              Bases: <code><span title="sbi.inference.trainers.npe.npe_base.PosteriorEstimatorTrainer">PosteriorEstimatorTrainer</span></code></p>
 
 
         <p>Neural Posterior Estimation algorithm as in Papamakarios et al. (2016) [1].</p>
@@ -1390,7 +1390,7 @@ last round. In the last round, NPE-A can use a Mixture of Gaussians.</p>
 <span class="normal">371</span>
 <span class="normal">372</span>
 <span class="normal">373</span>
-<span class="normal">374</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NPE_A</span><span class="p">(</span><span class="n">PosteriorEstimator</span><span class="p">):</span>
+<span class="normal">374</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NPE_A</span><span class="p">(</span><span class="n">PosteriorEstimatorTrainer</span><span class="p">):</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Neural Posterior Estimation algorithm as in Papamakarios et al. (2016) [1].</span>
 
 <span class="sd">    [1] *Fast epsilon-free Inference of Simulation Models with Bayesian</span>
@@ -2961,7 +2961,7 @@ on the number of mixture components.</p>
 
     <div class="doc doc-contents first">
             <p class="doc doc-class-bases">
-              Bases: <code><span title="sbi.inference.trainers.npe.npe_base.PosteriorEstimator">PosteriorEstimator</span></code></p>
+              Bases: <code><span title="sbi.inference.trainers.npe.npe_base.PosteriorEstimatorTrainer">PosteriorEstimatorTrainer</span></code></p>
 
 
         <p>Neural Posterior Estimation algorithm (NPE-B) as in Lueckmann et al. (2017) [1].</p>
@@ -3100,7 +3100,7 @@ Thus, SNPE-B is not limited to Gaussian proposal.</p>
 <span class="normal">131</span>
 <span class="normal">132</span>
 <span class="normal">133</span>
-<span class="normal">134</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NPE_B</span><span class="p">(</span><span class="n">PosteriorEstimator</span><span class="p">):</span>
+<span class="normal">134</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NPE_B</span><span class="p">(</span><span class="n">PosteriorEstimatorTrainer</span><span class="p">):</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Neural Posterior Estimation algorithm (NPE-B) as in Lueckmann et al. (2017) [1].</span>
 
 <span class="sd">    [1] *Flexible statistical inference for mechanistic models of neural</span>
@@ -3460,7 +3460,7 @@ file location (default is <code>&lt;current working directory&gt;/logs</code>.)<
 
     <div class="doc doc-contents first">
             <p class="doc doc-class-bases">
-              Bases: <code><span title="sbi.inference.trainers.npe.npe_base.PosteriorEstimator">PosteriorEstimator</span></code></p>
+              Bases: <code><span title="sbi.inference.trainers.npe.npe_base.PosteriorEstimatorTrainer">PosteriorEstimatorTrainer</span></code></p>
 
 
         <p>Neural Posterior Estimation algorithm (NPE-C) as in Greenberg et al. (2019). [1]</p>
@@ -4144,7 +4144,7 @@ the atomic loss.</p>
 <span class="normal">672</span>
 <span class="normal">673</span>
 <span class="normal">674</span>
-<span class="normal">675</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NPE_C</span><span class="p">(</span><span class="n">PosteriorEstimator</span><span class="p">):</span>
+<span class="normal">675</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NPE_C</span><span class="p">(</span><span class="n">PosteriorEstimatorTrainer</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Neural Posterior Estimation algorithm (NPE-C) as in Greenberg et al. (2019). [1]</span>
 
 <span class="sd">    [1] *Automatic Posterior Transformation for Likelihood-free Inference*,</span>
@@ -6949,7 +6949,7 @@ probabilistic ODE with a numerical ODE solver.</p>
 
     <div class="doc doc-contents first">
             <p class="doc doc-class-bases">
-              Bases: <code><span title="sbi.inference.trainers.nle.nle_base.LikelihoodEstimator">LikelihoodEstimator</span></code></p>
+              Bases: <code><span title="sbi.inference.trainers.nle.nle_base.LikelihoodEstimatorTrainer">LikelihoodEstimatorTrainer</span></code></p>
 
 
         <p>Neural Likelihood Estimation (NLE) as in Papamakarios et al. (2019) [1].</p>
@@ -7006,7 +7006,7 @@ probabilistic ODE with a numerical ODE solver.</p>
 <span class="normal">51</span>
 <span class="normal">52</span>
 <span class="normal">53</span>
-<span class="normal">54</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NLE_A</span><span class="p">(</span><span class="n">LikelihoodEstimator</span><span class="p">):</span>
+<span class="normal">54</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NLE_A</span><span class="p">(</span><span class="n">LikelihoodEstimatorTrainer</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Neural Likelihood Estimation (NLE) as in Papamakarios et al. (2019) [1].</span>
 
 <span class="sd">    [1] Sequential Neural Likelihood: Fast Likelihood-free Inference with</span>
@@ -7296,7 +7296,7 @@ sampling.</p>
 
     <div class="doc doc-contents first">
             <p class="doc doc-class-bases">
-              Bases: <code><span title="sbi.inference.trainers.nre.nre_base.RatioEstimator">RatioEstimator</span></code></p>
+              Bases: <code><span title="sbi.inference.trainers.nre.nre_base.RatioEstimatorTrainer">RatioEstimatorTrainer</span></code></p>
 
 
         <p>AALR, here known as Neural Ratio Estimation algorithm (NRE-A) [1].</p>
@@ -7428,7 +7428,7 @@ sampling.</p>
 <span class="normal">130</span>
 <span class="normal">131</span>
 <span class="normal">132</span>
-<span class="normal">133</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NRE_A</span><span class="p">(</span><span class="n">RatioEstimator</span><span class="p">):</span>
+<span class="normal">133</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NRE_A</span><span class="p">(</span><span class="n">RatioEstimatorTrainer</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;AALR, here known as Neural Ratio Estimation algorithm (NRE-A) [1].</span>
 
 <span class="sd">    [1] *Likelihood-free MCMC with Amortized Approximate Likelihood Ratios*, Hermans</span>
@@ -8156,7 +8156,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 
     <div class="doc doc-contents first">
             <p class="doc doc-class-bases">
-              Bases: <code><span title="sbi.inference.trainers.nre.nre_base.RatioEstimator">RatioEstimator</span></code></p>
+              Bases: <code><span title="sbi.inference.trainers.nre.nre_base.RatioEstimatorTrainer">RatioEstimatorTrainer</span></code></p>
 
 
         <p>SRE, here known as Neural Ratio Estimation algorithm (NRE-B) [1].</p>
@@ -8286,7 +8286,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 <span class="normal">128</span>
 <span class="normal">129</span>
 <span class="normal">130</span>
-<span class="normal">131</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NRE_B</span><span class="p">(</span><span class="n">RatioEstimator</span><span class="p">):</span>
+<span class="normal">131</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NRE_B</span><span class="p">(</span><span class="n">RatioEstimatorTrainer</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;SRE, here known as Neural Ratio Estimation algorithm (NRE-B) [1].</span>
 
 <span class="sd">    [1] *On Contrastive Learning for Likelihood-free Inference*, Durkan et al.,</span>
@@ -9006,7 +9006,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 
     <div class="doc doc-contents first">
             <p class="doc doc-class-bases">
-              Bases: <code><span title="sbi.inference.trainers.nre.nre_base.RatioEstimator">RatioEstimator</span></code></p>
+              Bases: <code><span title="sbi.inference.trainers.nre.nre_base.RatioEstimatorTrainer">RatioEstimatorTrainer</span></code></p>
 
 
         <p>NRE-C [1] is a generalization of amortized versions of NRE_A and NRE_B.</p>
@@ -9229,7 +9229,7 @@ will be estimated only up to a function (normalizing constant) of the data
 <span class="normal">210</span>
 <span class="normal">211</span>
 <span class="normal">212</span>
-<span class="normal">213</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NRE_C</span><span class="p">(</span><span class="n">RatioEstimator</span><span class="p">):</span>
+<span class="normal">213</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NRE_C</span><span class="p">(</span><span class="n">RatioEstimatorTrainer</span><span class="p">):</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;NRE-C [1] is a generalization of amortized versions of NRE_A and NRE_B.</span>
 
 <span class="sd">    NRE-C:</span>
