@@ -148,9 +148,10 @@ def test_run_tarp_correct(distance, z_score_theta, accurate_samples):
 
 
 @pytest.mark.gpu
-@pytest.mark.parametrize("distance", (l1, l2))
-@pytest.mark.parametrize("z_score_theta", (True, False))
-def test_run_tarp_correct_on_cuda_device(distance, z_score_theta, accurate_samples):
+def test_run_tarp_correct_on_cuda_device(accurate_samples):
+
+    z_score_theta = True
+    distance = l2
     dev = device("cuda")
     theta, samples = accurate_samples
     theta, samples = theta.to(dev), samples.to(dev)
