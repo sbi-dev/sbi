@@ -138,7 +138,7 @@ def _run_tarp(
 
     """
     num_posterior_samples, num_tarp_samples, _ = posterior_samples.shape
-    inputdev = posterior_samples.device
+    input_device = posterior_samples.device
 
     assert references.shape == thetas.shape, (
         "references must have the same shape as thetas"
@@ -170,13 +170,13 @@ def _run_tarp(
         coverage_values.cpu(), density=True, bins=num_bins
     )
 
-    # return all tensors to inputdev to keep contract valid
-    hist, alpha_grid = hist.to(inputdev), alpha_grid.to(inputdev)
+    # return all tensors to input_device to keep contract valid
+    hist, alpha_grid = hist.to(input_device), alpha_grid.to(input_device)
 
     # calculate empirical CDF via cumsum and normalize
     ecp = torch.cumsum(hist, dim=0) / hist.sum()
     # add 0 to the beginning of the ecp curve to match the alpha grid
-    ecp = torch.cat([torch.zeros((1,), device=inputdev), ecp])
+    ecp = torch.cat([torch.zeros((1,), device=input_device), ecp])
 
     return ecp, alpha_grid
 
