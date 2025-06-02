@@ -149,7 +149,6 @@ def test_run_tarp_correct(distance, z_score_theta, accurate_samples):
 
 @pytest.mark.gpu
 def test_run_tarp_correct_on_cuda_device(accurate_samples):
-
     z_score_theta = True
     distance = l2
     dev = device("cuda")
