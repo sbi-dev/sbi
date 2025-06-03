@@ -536,7 +536,7 @@ class LC2ST_NF(LC2ST):
         References:
         [1] : https://arxiv.org/abs/2306.03580, https://github.com/JuliaLinhart/lc2st
         """
-        # Aplly the inverse transform to the thetas and the posterior samples
+        # Apply the inverse transform to the thetas and the posterior samples
         self.flow_inverse_transform = flow_inverse_transform
         inverse_thetas = flow_inverse_transform(thetas, xs).detach()
         inverse_posterior_samples = flow_inverse_transform(
