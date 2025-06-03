@@ -7,13 +7,14 @@ import torch
 from torch import Tensor, nn
 from torch.distributions import Distribution
 
-from sbi.inference.trainers.nre.nre_base import RatioEstimator, RatioEstimatorBuilder
+
+from sbi.inference.trainers.nre.nre_base import RatioEstimatorTrainer, RatioEstimatorBuilder
 from sbi.sbi_types import TensorboardSummaryWriter
 from sbi.utils.sbiutils import del_entries
 from sbi.utils.torchutils import assert_all_finite
 
 
-class NRE_C(RatioEstimator):
+class NRE_C(RatioEstimatorTrainer):
     r"""NRE-C [1] is a generalization of amortized versions of NRE_A and NRE_B.
 
     NRE-C:

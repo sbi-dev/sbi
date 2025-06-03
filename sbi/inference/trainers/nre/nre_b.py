@@ -7,13 +7,14 @@ import torch
 from torch import Tensor, nn
 from torch.distributions import Distribution
 
-from sbi.inference.trainers.nre.nre_base import RatioEstimator, RatioEstimatorBuilder
+
+from sbi.inference.trainers.nre.nre_base import RatioEstimatorTrainer, RatioEstimatorBuilder
 from sbi.sbi_types import TensorboardSummaryWriter
 from sbi.utils.sbiutils import del_entries
 from sbi.utils.torchutils import assert_all_finite
 
 
-class NRE_B(RatioEstimator):
+class NRE_B(RatioEstimatorTrainer):
     """SRE, here known as Neural Ratio Estimation algorithm (NRE-B) [1].
 
     [1] *On Contrastive Learning for Likelihood-free Inference*, Durkan et al.,
