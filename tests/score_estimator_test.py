@@ -9,7 +9,7 @@ import pytest
 import torch
 
 from sbi.neural_nets.embedding_nets import CNNEmbedding
-from sbi.neural_nets.net_builders import build_score_estimator
+from sbi.neural_nets.net_builders import build_score_matching_estimator
 
 
 @pytest.mark.parametrize("sde_type", ["vp", "ve", "subvp"])
@@ -17,7 +17,7 @@ from sbi.neural_nets.net_builders import build_score_estimator
 @pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
 @pytest.mark.parametrize("condition_event_shape", ((1,), (7,)))
 @pytest.mark.parametrize("batch_dim", (1, 10))
-@pytest.mark.parametrize("score_net", ["mlp", "ada_mlp"])
+@pytest.mark.parametrize("score_net", ["mlp"])
 def test_score_estimator_loss_shapes(
     sde_type,
     input_sample_dim,
@@ -33,7 +33,7 @@ def test_score_estimator_loss_shapes(
         condition_event_shape,
         batch_dim,
         input_sample_dim,
-        score_net=score_net,
+        net=score_net,
     )
 
     losses = score_estimator.loss(inputs[0], condition=conditions)
@@ -45,7 +45,7 @@ def test_score_estimator_loss_shapes(
 @pytest.mark.parametrize("device", ["cpu", "cuda"])
 def test_score_estimator_on_device(sde_type, device):
     """Test whether DensityEstimators can be moved to the device."""
-    score_estimator = build_score_estimator(
+    score_estimator = build_score_matching_estimator(
         torch.randn(100, 1), torch.randn(100, 1), sde_type=sde_type
     )
     score_estimator.to(device)
@@ -68,7 +68,7 @@ def test_score_estimator_on_device(sde_type, device):
 @pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
 @pytest.mark.parametrize("condition_event_shape", ((1,), (7,)))
 @pytest.mark.parametrize("batch_dim", (1, 10))
-@pytest.mark.parametrize("score_net", ["mlp", "ada_mlp"])
+@pytest.mark.parametrize("score_net", ["mlp"])
 def test_score_estimator_forward_shapes(
     sde_type,
     input_sample_dim,
@@ -84,7 +84,7 @@ def test_score_estimator_forward_shapes(
         condition_event_shape,
         batch_dim,
         input_sample_dim,
-        score_net=score_net,
+        net=score_net,
     )
     # Batched times
     times = torch.rand((batch_dim,))
@@ -114,21 +114,15 @@ def _build_score_estimator_and_tensors(
     building_xs = torch.randn((1000, *condition_event_shape))
 
     if len(condition_event_shape) > 1:
-        embedding_net_y = CNNEmbedding(condition_event_shape, kernel_size=1)
+        embedding_net = CNNEmbedding(condition_event_shape, kernel_size=1)
     else:
-        embedding_net_y = torch.nn.Identity()
+        embedding_net = torch.nn.Identity()
 
-    if len(input_event_shape) > 1:
-        embedding_net_x = CNNEmbedding(input_event_shape, kernel_size=1)
-    else:
-        embedding_net_x = torch.nn.Identity()
-
-    score_estimator = build_score_estimator(
+    score_estimator = build_score_matching_estimator(
         torch.randn_like(building_thetas),
         torch.randn_like(building_xs),
         sde_type=sde_type,
-        embedding_net_x=embedding_net_x,
-        embedding_net_y=embedding_net_y,
+        embedding_net=embedding_net,
         **kwargs,
     )
 

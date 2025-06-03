@@ -204,12 +204,12 @@ class VectorFieldInference(NeuralInference, ABC):
         training_batch_size: int = 200,
         learning_rate: float = 5e-4,
         validation_fraction: float = 0.1,
-        stop_after_epochs: int = 50,
-        max_num_epochs: int = 500,
+        stop_after_epochs: int = 20,
+        max_num_epochs: int = 2**31 - 1,
         clip_max_norm: Optional[float] = 5.0,
         calibration_kernel: Optional[Callable] = None,
         ema_loss_decay: float = 0.1,
-        validation_times: Union[Tensor, int] = 20,
+        validation_times: Union[Tensor, int] = 10,
         resume_training: bool = False,
         force_first_round_loss: bool = False,
         discard_prior_samples: bool = False,
@@ -335,8 +335,13 @@ class VectorFieldInference(NeuralInference, ABC):
         self._neural_net.to(self._device)
 
         if isinstance(validation_times, int):
+            # NOTE: We add a nugget to t_min as t_min is the boundary of the training
+            # domain and hence can be "unstable" and is not a good choice for
+            # evaluation. Same for flow mathching but with t_max
             validation_times = torch.linspace(
-                self._neural_net.t_min, self._neural_net.t_max, validation_times
+                self._neural_net.t_min + 0.1,
+                self._neural_net.t_max - 0.1,
+                validation_times,
             )
         assert isinstance(
             validation_times, Tensor
@@ -426,6 +431,8 @@ class VectorFieldInference(NeuralInference, ABC):
                         times_batch, *([1] * (masks_batch.ndim - 1))
                     )
 
+                    # This will repeat the validation times for each batch in the
+                    # validation set.
                     validation_times_rep = validation_times.repeat_interleave(
                         val_batch_size, dim=0
                     )
@@ -480,6 +487,68 @@ class VectorFieldInference(NeuralInference, ABC):
         self._neural_net.zero_grad(set_to_none=True)
 
         return deepcopy(self._neural_net)
+
+    def _converged(self, epoch: int, stop_after_epochs: int) -> bool:
+        """Return whether the training converged yet and save best model state so far.
+
+        Checks for improvement in validation performance over previous epochs.
+        Uses an adaptive threshold that considers both the scale and variance of the
+        loss. The threshold is based on the exponential moving average of the loss and
+        its relative changes.
+
+        Args:
+            epoch: Current epoch in training.
+            stop_after_epochs: How many fruitless epochs to let pass before stopping.
+
+        Returns:
+            Whether the training has stopped improving, i.e. has converged.
+        """
+        converged = False
+
+        assert self._neural_net is not None
+        neural_net = self._neural_net
+
+        # Initialize tracking of loss changes if not exists
+        if not hasattr(self, '_loss_changes'):
+            self._loss_changes = []
+
+        # (Re)-start the epoch count with the first epoch or any improvement.
+        if epoch == 0 or self._val_loss < self._best_val_loss:
+            self._best_val_loss = self._val_loss
+            self._epochs_since_last_improvement = 0
+            self._best_model_state_dict = deepcopy(neural_net.state_dict())
+        else:
+            # Calculate relative change in loss
+            relative_change = (self._val_loss - self._best_val_loss) / abs(
+                self._best_val_loss
+            )
+
+            # Update loss changes history (keep last stop_after_epochs changes)
+            self._loss_changes.append(relative_change)
+            if len(self._loss_changes) > stop_after_epochs:
+                self._loss_changes.pop(0)
+
+            # Calculate adaptive threshold based on recent loss changes
+            if len(self._loss_changes) >= 3:
+                # Use standard deviation of recent changes to determine threshold
+                recent_changes = torch.tensor(self._loss_changes)
+                std_changes = recent_changes.std().item()
+                mean_changes = recent_changes.mean().item()
+
+                # Adaptive threshold: mean + 2*std of recent changes
+                # This means we only count as "no improvement" if the increase
+                # is significantly above the typical fluctuations
+                adaptive_threshold = mean_changes + 1.5 * std_changes
+
+                if relative_change > adaptive_threshold:
+                    self._epochs_since_last_improvement += 1
+
+        # If no validation improvement over many epochs, stop training.
+        if self._epochs_since_last_improvement > stop_after_epochs - 1:
+            neural_net.load_state_dict(self._best_model_state_dict)
+            converged = True
+
+        return converged
 
     def _build_posterior(
         self,
