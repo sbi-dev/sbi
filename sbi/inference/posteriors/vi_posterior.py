@@ -65,8 +65,8 @@ class VIPosterior(NeuralPosterior):
         vi_method: str = "rKL",
         device: Union[str, torch.device] = "cpu",
         x_shape: Optional[torch.Size] = None,
-        parameters: Iterable = [],
-        modules: Iterable = [],
+        parameters: Optional[Iterable] = None,
+        modules: Optional[Iterable] = None,
     ):
         """
         Args:
@@ -140,8 +140,16 @@ class VIPosterior(NeuralPosterior):
         else:
             self.link_transform = theta_transform.inv
 
+        if parameters is None:
+            parameters = []
+        if modules is None:
+            modules = []
         # This will set the variational distribution and VI method
-        self.set_q(q, parameters=parameters, modules=modules)
+        self.set_q(
+            q,
+            parameters=parameters,
+            modules=modules,
+        )
         self.set_vi_method(vi_method)
 
         self._purpose = (
@@ -214,8 +222,8 @@ class VIPosterior(NeuralPosterior):
     def set_q(
         self,
         q: Union[str, PyroTransformedDistribution, "VIPosterior", Callable],
-        parameters: Iterable = [],
-        modules: Iterable = [],
+        parameters: Optional[Iterable] = None,
+        modules: Optional[Iterable] = None,
     ) -> None:
         """Defines the variational family.
 
@@ -244,6 +252,10 @@ class VIPosterior(NeuralPosterior):
             modules: List of modules associated with the distribution object.
 
         """
+        if parameters is None:
+            parameters = []
+        if modules is None:
+            modules = []
         self._q_arg = (q, parameters, modules)
         if isinstance(q, Distribution):
             q = adapt_variational_distribution(
