@@ -19,6 +19,14 @@ from sbi.utils.sbiutils import del_entries
 
 
 class MNPE(NPE_C):
+    r"""Mixed Neural Posterior Estimation (MNPE).
+
+    Like NPE-C, but designed to be applied to data with mixed types, e.g.,
+    continuous parameters and discrete parameters like they occur in models with
+    switching components. The emebedding net will only operate on the continuous
+    parameters, note this to design the dimension of the embedding net.
+    """
+
     def __init__(
         self,
         prior: Optional[Distribution] = None,
@@ -28,12 +36,7 @@ class MNPE(NPE_C):
         summary_writer: Optional[TensorboardSummaryWriter] = None,
         show_progress_bars: bool = True,
     ):
-        r"""Mixed Neural Posterior Estimation (MNPE).
-
-        Like NPE-C, but designed to be applied to data with mixed types, e.g.,
-        continuous parameters and discrete parameters like they occur in models with
-        switching components. The emebedding net will only operate on the continuous
-        parameters, note this to design the dimension of the embedding net.
+        r"""Initialize Mixed Neural Posterior Estimation (MNPE).
 
         Args:
             prior: A probability distribution that expresses prior knowledge about the

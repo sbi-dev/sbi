@@ -11,11 +11,13 @@ from sbi.inference.potentials.base_potential import BasePotential
 from sbi.samplers.importance.importance_sampling import importance_sample
 from sbi.samplers.importance.sir import sampling_importance_resampling
 from sbi.sbi_types import Shape, TorchTransform
+from sbi.utils.sbiutils import mcmc_transform
 from sbi.utils.torchutils import ensure_theta_batched
 
 
 class ImportanceSamplingPosterior(NeuralPosterior):
-    r"""Provides importance sampling to sample from the posterior.<br/><br/>
+    r"""Provides importance sampling to sample from the posterior.
+
     SNLE or SNRE train neural networks to approximate the likelihood(-ratios).
     `ImportanceSamplingPosterior` allows to estimate the posterior log-probability by
     estimating the normlalization constant with importance sampling. It also allows to
@@ -31,7 +33,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         method: str = "sir",
         oversampling_factor: int = 32,
         max_sampling_batch_size: int = 10_000,
-        device: Optional[str] = None,
+        device: Optional[Union[str, torch.device]] = None,
         x_shape: Optional[torch.Size] = None,
     ):
         """
@@ -64,6 +66,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         self.proposal = proposal
         self._normalization_constant = None
         self.method = method
+        self.theta_transform = theta_transform
 
         self.oversampling_factor = oversampling_factor
         self.max_sampling_batch_size = max_sampling_batch_size
@@ -73,6 +76,34 @@ class ImportanceSamplingPosterior(NeuralPosterior):
             "posterior and can evaluate the _unnormalized_ posterior density with "
             ".log_prob()."
         )
+        self.x_shape = x_shape
+
+    def to(self, device: Union[str, torch.device]) -> None:
+        """
+        Move the potential, the proposal and x_o to a new device.
+
+        It also reinstantiates the posterior with the new device.
+
+        Args:
+            device: Device on which to move the posterior to.
+        """
+        self.device = device
+        self.potential_fn.to(device)  # type: ignore
+        self.proposal.to(device)
+        x_o = None
+        if hasattr(self, "_x") and (self._x is not None):
+            x_o = self._x.to(device)
+
+        self.theta_transform = mcmc_transform(self.proposal, device=device)
+        super().__init__(
+            self.potential_fn,
+            theta_transform=self.theta_transform,
+            device=device,
+            x_shape=self.x_shape,
+        )
+        # super().__init__ erases the self._x, so we need to set it again
+        if x_o is not None:
+            self.set_default_x(x_o)
 
     def log_prob(
         self,
@@ -210,9 +241,9 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         show_progress_bars: bool = True,
     ) -> Tensor:
         raise NotImplementedError(
-            "Batched sampling is not implemented for ImportanceSamplingPosterior. "
-            "Alternatively you can use `sample` in a loop "
-            "[posterior.sample(theta, x_o) for x_o in x]."
+            "Batched sampling is not implemented for ImportanceSamplingPosterior. \
+           Alternatively you can use `sample` in a loop \
+           [posterior.sample(theta, x_o) for x_o in x]."
         )
 
     def _importance_sample(

@@ -39,34 +39,51 @@ def process_prior(
     prior: Union[Sequence[Distribution], Distribution, rv_frozen, multi_rv_frozen],
     custom_prior_wrapper_kwargs: Optional[Dict] = None,
 ) -> Tuple[Distribution, int, bool]:
-    """Return PyTorch distribution-like prior from user-provided prior.
+    """
+    Return PyTorch distribution-like prior from user-provided prior.
 
-    NOTE: If the prior argument is a sequence of PyTorch distributions, they will be
-    interpreted as independent prior dimensions wrapped in a `MultipleIndependent`
-    pytorch Distribution. In case the elements are not PyTorch distributions, make sure
-    to use process_prior on each element in the list beforehand. See FAQ 7 for details.
+    NOTE: If the prior argument is a sequence of PyTorch distributions, \
+    they will be interpreted as independent prior dimensions wrapped in a \
+    :class:`MultipleIndependent` PyTorch Distribution. In case the elements \
+    are not PyTorch distributions, make sure to use :func:`process_prior` \
+    on each element in the list beforehand.
 
-    NOTE: returns a tuple (processed_prior, num_params, whether_prior_returns_numpy).
-    The last two entries in the tuple can be passed on to `process_simulator` to prepare
-    the simulator as well. For example, it will take care of casting parameters to numpy
-    or adding a batch dimension to the simulator output, if needed.
+    NOTE: Returns a tuple `(processed_prior, num_params, \
+        whether_prior_returns_numpy)`. The last two entries in the tuple\
+        can be passed on to `process_simulator` to prepare the simulator. For \
+        example, it ensures parameters are cast to numpy or adds a batch \
+        dimension to the simulator output, if needed.
 
     Args:
-        prior: Prior object with `.sample()` and `.log_prob()` as provided by the user,
-            or a sequence of such objects.
-        custom_prior_wrapper_kwargs: kwargs to be passed to the class that wraps a
-            custom prior into a pytorch Distribution, e.g., for passing bounds for a
-            prior with bounded support (lower_bound, upper_bound), or argument
-            constraints.
-            (arg_constraints), see pytorch.distributions.Distribution for more info.
+        prior (:class:`~torch.distributions.distribution.Distribution` \
+            or Sequence[:class:`~torch.distributions.distribution.Distribution`]):
+            Prior object with `.sample()` and `.log_prob()`, or a sequence \
+                of such objects.
+        custom_prior_wrapper_kwargs (dict, optional):
+            Additional arguments passed to the wrapper class that processes the prior
+            into a PyTorch Distribution, such as bounds (`lower_bound`, `upper_bound`)
+            or argument constraints (`arg_constraints`).
 
     Raises:
-        AttributeError: If prior objects lacks `.sample()` or `.log_prob()`.
+        AttributeError: If prior objects lack `.sample()` or `.log_prob()`.
 
     Returns:
-        prior: Prior that emits samples and evaluates log prob as PyTorch Tensors.
-        theta_numel: Number of parameters - elements in a single sample from the prior.
-        prior_returns_numpy: Whether the return type of the prior was a Numpy array.
+        Tuple[torch.distributions.Distribution, int, bool]:
+            - `prior`: A PyTorch-compatible prior.
+            - `theta_numel`: Dimensionality of a single sample from the prior.
+            - `prior_returns_numpy`: Whether the prior originally returned NumPy arrays.
+
+    Example:
+    --------
+
+    ::
+
+        import torch
+        from torch.distributions import Uniform
+        from sbi.utils.user_input_checks import process_prior
+
+        prior = Uniform(torch.zeros(1), torch.ones(1))
+        prior, theta_numel, prior_returns_numpy = process_prior(prior)
     """
 
     # If prior is a sequence, assume independent components and check as PyTorch prior.
@@ -456,14 +473,33 @@ def process_simulator(
     """Returns a simulator that meets the requirements for usage in sbi.
 
     Args:
-        user_simulator: simulator provided by the user, possibly written in numpy.
-        prior: prior as pytorch distribution or processed with `process_prior`.
-        is_numpy_simulator: whether the simulator needs theta in numpy types, returned
+        user_simulator (Callable):
+            simulator provided by the user, possibly written in numpy.
+        prior (torch.distributions.Distribution):
+            prior as pytorch distribution or processed with :func:`process_prior`.
+        is_numpy_simulator (bool):
+            whether the simulator needs theta in numpy types, returned
             from `process_prior`.
 
     Returns:
-        simulator: processed simulator that returns `torch.Tensor` can handle batches
-            of parameters.
+        Callable:
+            simulator: processed simulator that returns :class:`torch.Tensor` \
+                and can handle batches of parameters.
+
+    Example:
+    --------
+
+    ::
+
+        import torch
+        from sbi.utils.user_input_checks import process_simulator
+        from torch.distributions import Uniform
+        from sbi.utils.user_input_checks import process_prior
+
+        prior = Uniform(torch.zeros(1), torch.ones(1))
+        prior, theta_numel, prior_returns_numpy = process_prior(prior)
+        simulator = lambda theta: theta + 1
+        simulator = process_simulator(simulator, prior, prior_returns_numpy)
     """
 
     assert isinstance(user_simulator, Callable), "Simulator must be a function."

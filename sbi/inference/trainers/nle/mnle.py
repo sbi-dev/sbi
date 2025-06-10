@@ -8,14 +8,25 @@ from torch.distributions import Distribution
 
 from sbi.inference.posteriors import MCMCPosterior, RejectionPosterior, VIPosterior
 from sbi.inference.potentials import likelihood_estimator_based_potential
-from sbi.inference.trainers.nle.nle_base import LikelihoodEstimator
+from sbi.inference.trainers.nle.nle_base import LikelihoodEstimatorTrainer
 from sbi.neural_nets.estimators import MixedDensityEstimator
 from sbi.sbi_types import TensorboardSummaryWriter, TorchModule
 from sbi.utils.sbiutils import del_entries
 from sbi.utils.user_input_checks import check_prior
 
 
-class MNLE(LikelihoodEstimator):
+class MNLE(LikelihoodEstimatorTrainer):
+    """Mixed Neural Likelihood Estimation (MNLE) [1].
+
+    Like NLE, but designed to be applied to data with mixed types, e.g., continuous
+    data and discrete data like they occur in decision-making experiments
+    (reation times and choices).
+
+    [1] Flexible and efficient simulation-based inference for models of
+    decision-making, Boelts et al. 2021,
+    https://www.biorxiv.org/content/10.1101/2021.12.22.473472v2
+    """
+
     def __init__(
         self,
         prior: Optional[Distribution] = None,
@@ -25,15 +36,7 @@ class MNLE(LikelihoodEstimator):
         summary_writer: Optional[TensorboardSummaryWriter] = None,
         show_progress_bars: bool = True,
     ):
-        r"""Mixed Neural Likelihood Estimation (MNLE) [1].
-
-        Like NLE, but designed to be applied to data with mixed types, e.g., continuous
-        data and discrete data like they occur in decision-making experiments
-        (reation times and choices).
-
-        [1] Flexible and efficient simulation-based inference for models of
-        decision-making, Boelts et al. 2021,
-        https://www.biorxiv.org/content/10.1101/2021.12.22.473472v2
+        r"""Initialize MNLE.
 
         Args:
             prior: A probability distribution that expresses prior knowledge about the

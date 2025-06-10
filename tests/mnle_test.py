@@ -20,9 +20,9 @@ from sbi.inference.potentials.likelihood_based_potential import (
 from sbi.neural_nets import likelihood_nn
 from sbi.neural_nets.embedding_nets import FCEmbedding
 from sbi.utils import BoxUniform, mcmc_transform
+from sbi.utils.metrics import check_c2st
 from sbi.utils.torchutils import atleast_2d, process_device
 from sbi.utils.user_input_checks_utils import MultipleIndependent
-from tests.test_utils import check_c2st
 
 
 # toy simulator for mixed data

@@ -28,9 +28,10 @@ from sbi.simulators.linear_gaussian import (
     true_posterior_linear_gaussian_mvn_prior,
 )
 from sbi.utils import BoxUniform
+from sbi.utils.metrics import check_c2st
 from sbi.utils.user_input_checks import process_prior
 
-from .test_utils import check_c2st, get_prob_outside_uniform_prior
+from .test_utils import get_prob_outside_uniform_prior
 
 
 @pytest.mark.parametrize("num_dim", (1,))  # dim 3 is tested below.

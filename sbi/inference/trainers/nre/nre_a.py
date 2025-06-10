@@ -7,13 +7,19 @@ import torch
 from torch import Tensor, nn, ones
 from torch.distributions import Distribution
 
-from sbi.inference.trainers.nre.nre_base import RatioEstimator
+from sbi.inference.trainers.nre.nre_base import RatioEstimatorTrainer
 from sbi.sbi_types import TensorboardSummaryWriter
 from sbi.utils.sbiutils import del_entries
 from sbi.utils.torchutils import assert_all_finite
 
 
-class NRE_A(RatioEstimator):
+class NRE_A(RatioEstimatorTrainer):
+    """AALR, here known as Neural Ratio Estimation algorithm (NRE-A) [1].
+
+    [1] *Likelihood-free MCMC with Amortized Approximate Likelihood Ratios*, Hermans
+        et al., ICML 2020, https://arxiv.org/abs/1903.04057
+    """
+
     def __init__(
         self,
         prior: Optional[Distribution] = None,
@@ -23,10 +29,7 @@ class NRE_A(RatioEstimator):
         summary_writer: Optional[TensorboardSummaryWriter] = None,
         show_progress_bars: bool = True,
     ):
-        r"""AALR[1], here known as NRE_A.
-
-        [1] _Likelihood-free MCMC with Amortized Approximate Likelihood Ratios_, Hermans
-            et al., ICML 2020, https://arxiv.org/abs/1903.04057
+        r"""Initialize NRE_A.
 
         Args:
             prior: A probability distribution that expresses prior knowledge about the

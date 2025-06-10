@@ -8,13 +8,28 @@ from torch import Tensor
 from torch.distributions import Distribution
 
 import sbi.utils as utils
-from sbi.inference.trainers.npe.npe_base import PosteriorEstimator
+from sbi.inference.trainers.npe.npe_base import PosteriorEstimatorTrainer
 from sbi.neural_nets.estimators.shape_handling import reshape_to_sample_batch_event
 from sbi.sbi_types import TensorboardSummaryWriter
 from sbi.utils.sbiutils import del_entries
 
 
-class NPE_B(PosteriorEstimator):
+class NPE_B(PosteriorEstimatorTrainer):
+    r"""Neural Posterior Estimation algorithm (NPE-B) as in Lueckmann et al. (2017) [1].
+
+    [1] *Flexible statistical inference for mechanistic models of neural
+        dynamics*, Lueckmann, Gonçalves et al., NeurIPS 2017. https://arxiv.org/abs/171
+
+    Like all NPE methods, this method trains a deep neural density estimator to
+    directly approximate the posterior. Also like all other NPE methods, in the
+    first round, this density estimator is trained with a maximum-likelihood loss.
+
+    This class implements NPE-B. NPE-B trains across multiple rounds with a
+    an importance-weighted log-loss. Unlike NPE-A the loss will make training
+    directly converge to the true posterior.
+    Thus, SNPE-B is not limited to Gaussian proposal.
+    """
+
     def __init__(
         self,
         prior: Optional[Distribution] = None,
@@ -24,20 +39,7 @@ class NPE_B(PosteriorEstimator):
         summary_writer: Optional[TensorboardSummaryWriter] = None,
         show_progress_bars: bool = True,
     ):
-        r"""NPE-B [1].
-
-        [1] _Flexible statistical inference for mechanistic models of neural dynamics_,
-            Lueckmann, Gonçalves et al., NeurIPS 2017,
-            https://arxiv.org/abs/1711.01861.
-
-        Like all NPE methods, this method trains a deep neural density estimator to
-        directly approximate the posterior. Also like all other NPE methods, in the
-        first round, this density estimator is trained with a maximum-likelihood loss.
-
-        This class implements NPE-B. NPE-B trains across multiple rounds with a
-        an importance-weighted log-loss. Unlike NPE-A the loss will make training
-        directly converge to the true posterior.
-        Thus, SNPE-B is not limited to Gaussian proposal.
+        r"""Initialize NPE-B.
 
         Args:
             prior: A probability distribution that expresses prior knowledge about the

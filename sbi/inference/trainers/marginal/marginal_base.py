@@ -5,7 +5,7 @@ import time
 from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
-from typing import Callable, Optional, Tuple, Union
+from typing import Any, Callable, Optional, Tuple, Union
 
 import torch
 from torch import Tensor
@@ -19,20 +19,46 @@ from sbi.neural_nets.estimators import UnconditionalDensityEstimator
 from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
 )
-from sbi.neural_nets.factory import marginal_nn
+from sbi.neural_nets.factory import ZukoFlowType, marginal_nn
 from sbi.utils import check_estimator_arg, get_log_root
 from sbi.utils.torchutils import assert_all_finite, process_device
 
+DensityEstimatorType = Union[ZukoFlowType, str, Callable[[Tensor], Any]]
+
 
 class MarginalTrainer:
+    """Utility class for training a marginal density estimator.
+
+    The Marginal density estimator can, in principle, be used for many things. In
+    the ``sbi`` toolbox, we usually use it only to detect misspecification (see the
+    how-to guide on the documentation website)."""
+
     def __init__(
         self,
-        density_estimator: Union[str, Callable] = "MAF",
+        density_estimator: DensityEstimatorType = ZukoFlowType.NSF,
         device: str = "cpu",
         summary_writer: Optional[SummaryWriter] = None,
         show_progress_bars: bool = True,
     ):
-        """Utility class for training a marginal estimator method."""
+        """Initialize the marginal trainer.
+
+        Args:
+            density_estimator: Density estimator to use. Can be a string or a callable.
+                If a string, it must be one of the following:
+                - "bpf": Bijector Polynomial Flow
+                - "maf": Masked Autoregressive Flow
+                - "naf": Neural Autoregressive Flow
+                - "ncsf": Neural Conditional Spline Flow
+                - "nsf": Neural Spline Flow
+                - "sospf": Sum-of-Squares Polynomial Flow
+                - "unaf": Unconditional Neural Autoregressive Flow
+                If a callable, it must be a function that returns a neural network
+                that inherits from `UnconditionalDensityEstimator`.
+            device: Device to use for training. Can be "cpu" or "cuda".
+            summary_writer: Summary writer for logging training progress. If None,
+                a new writer is created.
+            show_progress_bars: Whether to show progress bars during training.
+        """
 
         self._device = process_device(device)
         self._neural_net = None
@@ -53,11 +79,22 @@ class MarginalTrainer:
             epoch_durations_sec=[],
         )
 
-        check_estimator_arg(density_estimator)
-        if isinstance(density_estimator, str):
+        if isinstance(density_estimator, ZukoFlowType):
+            check_estimator_arg(density_estimator.value)
             self._build_neural_net = marginal_nn(model=density_estimator)
-        else:
+        elif isinstance(density_estimator, str):
+            check_estimator_arg(density_estimator)
+            self._build_neural_net = marginal_nn(
+                model=ZukoFlowType(density_estimator.lower())
+            )
+        elif callable(density_estimator):
+            check_estimator_arg(density_estimator)
             self._build_neural_net = density_estimator
+        else:
+            raise ValueError(
+                "density_estimator must be either a DensityEstimator, str, or a "
+                "Callable[[Tensor], Any]."
+            )
 
     def get_dataloaders(
         self,
@@ -65,6 +102,8 @@ class MarginalTrainer:
         validation_fraction: float = 0.1,
         dataloader_kwargs: Optional[dict] = None,
     ) -> Tuple[data.DataLoader, data.DataLoader]:
+        """Return training and validation dataloaders."""
+
         x = self.get_samples()
         dataset = data.TensorDataset(x)
 
@@ -179,6 +218,7 @@ class MarginalTrainer:
         self.optimizer = Adam(list(self._neural_net.parameters()), lr=learning_rate)
         self.epoch, self._val_loss = 0, float("Inf")
 
+        self._neural_net.to(self._device)
         while self.epoch <= max_num_epochs and not self._converged(
             self.epoch, stop_after_epochs
         ):

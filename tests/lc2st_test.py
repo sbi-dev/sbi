@@ -16,7 +16,7 @@ from sbi.simulators.gaussian_mixture import (
 
 
 @pytest.mark.parametrize("method", (LC2ST, LC2ST_NF))
-@pytest.mark.parametrize("classifier", ('mlp', 'random_forest', 'custom'))
+@pytest.mark.parametrize("classifier", ('mlp', 'random_forest', MLPClassifier))
 @pytest.mark.parametrize("cv_folds", (1, 2))
 @pytest.mark.parametrize("num_ensemble", (1, 3))
 @pytest.mark.parametrize("z_score", (True, False))
@@ -72,9 +72,6 @@ def test_running_lc2st(method, classifier, cv_folds, num_ensemble, z_score):
             "num_eval": num_eval,
         }
         kwargs_eval = {}
-    if classifier == "custom":
-        kwargs_test["clf_class"] = MLPClassifier
-        kwargs_test["clf_kwargs"] = {"alpha": 0.0, "max_iter": 2500}
     kwargs_test["classifier"] = classifier
 
     lc2st = method(

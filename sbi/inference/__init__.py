@@ -5,6 +5,7 @@ from sbi.inference.trainers.base import (
     infer,
 )
 from sbi.inference.trainers.fmpe import FMPE
+from sbi.inference.trainers.marginal import MarginalTrainer
 from sbi.inference.trainers.nle import MNLE, NLE_A
 from sbi.inference.trainers.npe import MNPE, NPE_A, NPE_B, NPE_C  # noqa: F401
 from sbi.inference.trainers.npse import NPSE
@@ -38,13 +39,16 @@ from sbi.inference.posteriors import (
     ImportanceSamplingPosterior,
     MCMCPosterior,
     RejectionPosterior,
-    ScorePosterior,
     VIPosterior,
+    VectorFieldPosterior,
 )
 from sbi.inference.potentials import (
     likelihood_estimator_based_potential,
     mixed_likelihood_estimator_based_potential,
     posterior_estimator_based_potential,
     ratio_estimator_based_potential,
+    vector_field_estimator_based_potential,
 )
 from sbi.utils.simulation_utils import simulate_for_sbi
+
+__all__ = ["FMPE", "MarginalTrainer", "NLE", "NPE", "NPSE", "NRE", "simulate_for_sbi"]

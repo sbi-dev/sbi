@@ -10,13 +10,13 @@ from pyro.infer.predictive import Predictive
 from torch.distributions import constraints
 
 from sbi.inference import NLE, NPE, NRE
+from sbi.utils.metrics import check_c2st
 from sbi.utils.pyroutils import (
     ConditionalDensityEstimatorDistribution,
     RatioEstimatorDistribution,
     get_transforms,
     to_pyro_distribution,
 )
-from tests.test_utils import check_c2st
 
 
 def flatten_mcmc_samples(mcmc_samples: dict[str, torch.Tensor]) -> torch.Tensor:

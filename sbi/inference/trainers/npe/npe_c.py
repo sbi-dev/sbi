@@ -10,7 +10,7 @@ from torch import Tensor, eye, nn, ones
 from torch.distributions import Distribution, MultivariateNormal, Uniform
 
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
-from sbi.inference.trainers.npe.npe_base import PosteriorEstimator
+from sbi.inference.trainers.npe.npe_base import PosteriorEstimatorTrainer
 from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
     reshape_to_sample_batch_event,
@@ -28,7 +28,41 @@ from sbi.utils.sbiutils import mog_log_prob
 from sbi.utils.torchutils import BoxUniform, assert_all_finite
 
 
-class NPE_C(PosteriorEstimator):
+class NPE_C(PosteriorEstimatorTrainer):
+    """Neural Posterior Estimation algorithm (NPE-C) as in Greenberg et al. (2019). [1]
+
+    [1] *Automatic Posterior Transformation for Likelihood-free Inference*,
+        Greenberg et al., ICML 2019, https://arxiv.org/abs/1905.07488.
+
+    Like all NPE methods, this method trains a deep neural density estimator to
+    directly approximate the posterior. Also like all other NPE methods, in the
+    first round, this density estimator is trained with a maximum-likelihood loss.
+
+    For the sequential mode in which the density estimator is trained across rounds,
+    this class implements two loss variants of NPE-C: the non-atomic and the atomic
+    version. The atomic loss of NPE-C can be used for any density estimator,
+    i.e. also for normalizing flows. However, it suffers from leakage issues. On
+    the other hand, the non-atomic loss can only be used only if the proposal
+    distribution is a mixture of Gaussians, the density estimator is a mixture of
+    Gaussians, and the prior is either Gaussian or Uniform. It does not suffer from
+    leakage issues. At the beginning of each round, we print whether the non-atomic
+    or the atomic version is used.
+
+    In this codebase, we will automatically switch to the non-atomic loss if the
+    following criteria are fulfilled:
+
+    - proposal is a `DirectPosterior` with density_estimator `mdn`, as built with
+      `sbi.neural_nets.posterior_nn()`.
+    - the density estimator is a `mdn`, as built with
+      `sbi.neural_nets.posterior_nn()`.
+    - `isinstance(prior, MultivariateNormal)` (from `torch.distributions`) or
+      ``isinstance(prior, sbi.utils.BoxUniform)``
+
+    Note that custom implementations of any of these densities (or estimators) will
+    not trigger the non-atomic loss, and the algorithm will fall back onto using
+    the atomic loss.
+    """
+
     def __init__(
         self,
         prior: Optional[Distribution] = None,
@@ -38,37 +72,7 @@ class NPE_C(PosteriorEstimator):
         summary_writer: Optional[TensorboardSummaryWriter] = None,
         show_progress_bars: bool = True,
     ):
-        r"""NPE-C / APT [1].
-
-        [1] _Automatic Posterior Transformation for Likelihood-free Inference_,
-            Greenberg et al., ICML 2019, https://arxiv.org/abs/1905.07488.
-
-        Like all NPE methods, this method trains a deep neural density estimator to
-        directly approximate the posterior. Also like all other NPE methods, in the
-        first round, this density estimator is trained with a maximum-likelihood loss.
-
-        For the sequential mode in which the density estimator is trained across rounds,
-        this class implements two loss variants of NPE-C: the non-atomic and the atomic
-        version. The atomic loss of NPE-C can be used for any density estimator,
-        i.e. also for normalizing flows. However, it suffers from leakage issues. On
-        the other hand, the non-atomic loss can only be used only if the proposal
-        distribution is a mixture of Gaussians, the density estimator is a mixture of
-        Gaussians, and the prior is either Gaussian or Uniform. It does not suffer from
-        leakage issues. At the beginning of each round, we print whether the non-atomic
-        or the atomic version is used.
-
-        In this codebase, we will automatically switch to the non-atomic loss if the
-        following criteria are fulfilled:<br/>
-        - proposal is a `DirectPosterior` with density_estimator `mdn`, as built
-            with `sbi.neural_nets.posterior_nn()`.<br/>
-        - the density estimator is a `mdn`, as built with
-            `sbi.neural_nets.posterior_nn()`.<br/>
-        - `isinstance(prior, MultivariateNormal)` (from `torch.distributions`) or
-            `isinstance(prior, sbi.utils.BoxUniform)`
-
-        Note that custom implementations of any of these densities (or estimators) will
-        not trigger the non-atomic loss, and the algorithm will fall back onto using
-        the atomic loss.
+        r"""Initialize NPE-C.
 
         Args:
             prior: A probability distribution that expresses prior knowledge about the
@@ -78,14 +82,14 @@ class NPE_C(PosteriorEstimator):
                 that builds a custom neural network can be provided. The function will
                 be called with the first batch of simulations (theta, x), which can
                 thus be used for shape inference and potentially for z-scoring. It
-                needs to return a PyTorch `nn.Module` implementing the density
+                needs to return a PyTorch ``nn.Module`` implementing the density
                 estimator. The density estimator needs to provide the methods
-                `.log_prob` and `.sample()`.
+                ``.log_prob`` and ``.sample()``.
             device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.
-            summary_writer: A tensorboard `SummaryWriter` to control, among others, log
-                file location (default is `<current working directory>/logs`.)
+            summary_writer: A tensorboard ``SummaryWriter`` to control, among others,
+                log file location (default is ``<current working directory>/logs``.)
             show_progress_bars: Whether to show a progressbar during training.
         """
 
@@ -121,16 +125,17 @@ class NPE_C(PosteriorEstimator):
                 validation set before terminating training.
             max_num_epochs: Maximum number of epochs to run. If reached, we stop
                 training even when the validation loss is still decreasing. Otherwise,
-                we train until validation loss increases (see also `stop_after_epochs`).
+                we train until validation loss increases (see also
+                ``stop_after_epochs``).
             clip_max_norm: Value at which to clip the total gradient norm in order to
                 prevent exploding gradients. Use None for no clipping.
             calibration_kernel: A function to calibrate the loss with respect to the
-                simulations `x`. See Lueckmann, Gonçalves et al., NeurIPS 2017.
+                simulations ``x``. See Lueckmann, Gonçalves et al., NeurIPS 2017.
             resume_training: Can be used in case training time is limited, e.g. on a
-                cluster. If `True`, the split between train and validation set, the
+                cluster. If ``True``, the split between train and validation set, the
                 optimizer, the number of epochs, and the best validation log-prob will
-                be restored from the last time `.train()` was called.
-            force_first_round_loss: If `True`, train with maximum likelihood,
+                be restored from the last time ``.train()`` was called.
+            force_first_round_loss: If ``True``, train with maximum likelihood,
                 i.e., potentially ignoring the correction for using a proposal
                 distribution different from the prior.
             discard_prior_samples: Whether to discard samples simulated in round 1, i.e.

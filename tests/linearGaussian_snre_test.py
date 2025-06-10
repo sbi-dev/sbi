@@ -23,7 +23,7 @@ from sbi.inference import (
     VIPosterior,
     ratio_estimator_based_potential,
 )
-from sbi.inference.trainers.nre.nre_base import RatioEstimator
+from sbi.neural_nets.ratio_estimators import RatioEstimator
 from sbi.simulators.linear_gaussian import (
     diagonal_linear_gaussian,
     linear_gaussian,
@@ -31,8 +31,8 @@ from sbi.simulators.linear_gaussian import (
     samples_true_posterior_linear_gaussian_uniform_prior,
     true_posterior_linear_gaussian_mvn_prior,
 )
+from sbi.utils.metrics import check_c2st
 from tests.test_utils import (
-    check_c2st,
     get_dkl_gaussian_prior,
     get_prob_outside_uniform_prior,
 )

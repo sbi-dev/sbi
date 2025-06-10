@@ -244,7 +244,7 @@ def z_standardization(
     batch_t: Tensor,
     structured_dims: bool = False,
     min_std: float = 1e-14,
-) -> [Tensor, Tensor]:
+) -> list[Tensor, Tensor]:
     """Computes mean and standard deviation for z-scoring
 
     Args:
@@ -327,7 +327,7 @@ def standardizing_net(
         # Compute per-dimension (independent) mean.
         t_mean = torch.mean(batch_t[is_valid_t], dim=0)
 
-    if len(batch_t > 1):
+    if len(batch_t) > 1:
         if structured_dims:
             # Compute std per-sample first.
             sample_std = torch.std(batch_t[is_valid_t], dim=1)
@@ -708,7 +708,7 @@ def mcmc_transform(
     prior: Distribution,
     num_prior_samples_for_zscoring: int = 1000,
     enable_transform: bool = True,
-    device: str = "cpu",
+    device: Union[str, torch.device] = "cpu",
     **kwargs,
 ) -> TorchTransform:
     """
@@ -719,9 +719,8 @@ def mcmc_transform(
 
     It does two things:
     1) When the prior support is bounded, it transforms the parameters into unbounded
-        space.
-    2) It z-scores the parameters such that MCMC is performed in a z-scored space
-    (when logit transformed, no z-scoring is applied/needed).
+    space.
+    2) It z-scores the parameters such that MCMC is performed in a z-scored space.
 
     Args:
         prior: The prior distribution.
@@ -965,6 +964,7 @@ def gradient_ascent(
         theta_transform = theta_transform
 
     init_probs = potential_fn(inits).detach()
+    inits = inits.to(init_probs.device)
 
     # Pick the `num_to_optimize` best init locations.
     sort_indices = torch.argsort(init_probs, dim=0)

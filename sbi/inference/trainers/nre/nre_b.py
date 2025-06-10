@@ -7,13 +7,19 @@ import torch
 from torch import Tensor, nn
 from torch.distributions import Distribution
 
-from sbi.inference.trainers.nre.nre_base import RatioEstimator
+from sbi.inference.trainers.nre.nre_base import RatioEstimatorTrainer
 from sbi.sbi_types import TensorboardSummaryWriter
 from sbi.utils.sbiutils import del_entries
 from sbi.utils.torchutils import assert_all_finite
 
 
-class NRE_B(RatioEstimator):
+class NRE_B(RatioEstimatorTrainer):
+    """SRE, here known as Neural Ratio Estimation algorithm (NRE-B) [1].
+
+    [1] *On Contrastive Learning for Likelihood-free Inference*, Durkan et al.,
+        ICML 2020, https://arxiv.org/pdf/2002.03712
+    """
+
     def __init__(
         self,
         prior: Optional[Distribution] = None,
@@ -23,10 +29,7 @@ class NRE_B(RatioEstimator):
         summary_writer: Optional[TensorboardSummaryWriter] = None,
         show_progress_bars: bool = True,
     ):
-        r"""SRE[1], here known as NRE_B.
-
-        [1] _On Contrastive Learning for Likelihood-free Inference_, Durkan et al.,
-            ICML 2020, https://arxiv.org/pdf/2002.03712
+        r"""Initialize NRE_B.
 
         Args:
             prior: A probability distribution that expresses prior knowledge about the

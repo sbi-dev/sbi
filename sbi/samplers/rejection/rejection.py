@@ -243,9 +243,8 @@ def accept_reject_sample(
         Accepted samples of shape `(sample_dim, batch_dim, *event_shape)`, and
         acceptance rates for each observation.
     """
-
     if kwargs:
-        logging.warn(
+        logging.warning(
             f"You passed arguments to `rejection_sampling_parameters` that "
             f"are unused when you do not specify a `proposal` in the same "
             f"dictionary. The unused arguments are: {kwargs}"
