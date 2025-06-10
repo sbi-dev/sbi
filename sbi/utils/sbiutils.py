@@ -244,7 +244,7 @@ def z_standardization(
     batch_t: Tensor,
     structured_dims: bool = False,
     min_std: float = 1e-14,
-) -> list[Tensor, Tensor]:
+) -> [Tensor, Tensor]:
     """Computes mean and standard deviation for z-scoring
 
     Args:
