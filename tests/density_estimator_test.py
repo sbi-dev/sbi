@@ -493,12 +493,13 @@ def test_build_zuko_flow_with_valid_unconstrained_transform(which_nf, x_dist):
     )
     assert isinstance(flow, ZukoFlow)
 
+
 @pytest.mark.parametrize("which_nf", ["MAF", "CNF"])
 def test_build_zuko_flow_missing_x_dist_raises_error(which_nf):
     """Test that ValueError is raised if `x_dist` is None when required."""
     batch_x = torch.randn(10, 5)
     batch_y = torch.randn(10, 3)
-    
+
     with pytest.raises(
         ValueError,
         match=r".*distribution.*x_dist.*",
