@@ -1002,6 +1002,7 @@ def build_zuko_bpf(
 
     return flow
 
+
 def build_zuko_flow(
     which_nf: str,
     batch_x: Tensor,
@@ -1042,11 +1043,11 @@ def build_zuko_flow(
         num_transforms: The number of transformations in the flow. Defaults to 5.
         embedding_net: The embedding network to use. Defaults to nn.Identity().
         x_dist: The distribution over x, used to determine the bounds for the
-            unconstrained transformation. 
-            - In Neural Posterior Estimation (NPE), x_dist typically corresponds 
+            unconstrained transformation.
+            - In Neural Posterior Estimation (NPE), x_dist typically corresponds
             to the prior over x.
-            - For Neural Likelihood Estimation (NLE) or Neural Ratio Estimation (NRE), 
-            x_dist may instead be a user-specified distribution that captures a 
+            - For Neural Likelihood Estimation (NLE) or Neural Ratio Estimation (NRE),
+            x_dist may instead be a user-specified distribution that captures a
             rough bounded support of the observed data space.
         **kwargs: Additional keyword arguments to pass to the flow constructor.
 
@@ -1105,7 +1106,7 @@ def build_zuko_flow(
                     biject_transform_zuko(transform_to_unconstrained),
                     transform,
                 )
-                
+
         elif z_score_x_bool:
             transform = (
                 standardizing_transform_zuko(batch_x, structured_x),
@@ -1125,7 +1126,7 @@ def build_zuko_flow(
         transforms = flow_built.transform.transforms
 
         z_score_x_bool, structured_x = z_score_parser(z_score_x)
-        
+
         if z_score_x == "transform_to_unconstrained":
             if x_dist is None:
                 raise ValueError(
@@ -1143,7 +1144,7 @@ def build_zuko_flow(
                     biject_transform_zuko(transform_to_unconstrained),
                     *transforms,
                 )
-                
+
         elif z_score_x_bool:
             transforms = (
                 standardizing_transform_zuko(batch_x, structured_x),
@@ -1168,7 +1169,6 @@ def build_zuko_flow(
     )
 
     return flow
-
 
 
 def build_zuko_unconditional_flow(
