@@ -296,7 +296,7 @@ class MLP(nn.Module):
         elif config["mlp_activation"] == "relu":
             self.activation_fn = F.relu
         else:
-            ValueError(
+            raise ValueError(
                 "Unsupported activation function, currently supported: `gelu, relu`"
             )
 
@@ -339,7 +339,7 @@ class RMSNorm(nn.Module):
         Args:
             hidden_states (torch.FloatTensor): input of shape `(batch_size,
             sequence_length, feature_space_dim)`
-            RMS normalization with per dimension scaling (self.weigth)
+            RMS normalization with per dimension scaling (self.weight)
         Returns:
             `(torch.FloatTensor)`
         """
@@ -631,7 +631,7 @@ class TransformerEmbedding(nn.Module):
     def __init__(self, config):
         super().__init__()
         """
-        Main class for constructing a tranformer embedding
+        Main class for constructing a transformer embedding
         Basic configuration parameters:
             pos_emb (string): position encoding to be used, currently available:
             {"rotary", "positional", "none"}
@@ -668,7 +668,7 @@ class TransformerEmbedding(nn.Module):
             patch_size (int): size of the square patches used to create the
             positional encoders
             num_channels (int): number of channels of the input image
-            vit_dropout (float): value for the droput of the attention layer
+            vit_dropout (float): value for the dropout of the attention layer
         """
         self.config = {
             "pos_emb": "rotary",
