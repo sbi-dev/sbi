@@ -3,7 +3,7 @@
 
 import copy
 from copy import deepcopy
-from typing import Callable, Dict, Iterable, Optional, Union
+from typing import Callable, Dict, Iterable, Literal, Optional, Union
 
 import numpy as np
 import torch
@@ -60,9 +60,14 @@ class VIPosterior(NeuralPosterior):
         self,
         potential_fn: Union[BasePotential, CustomPotential],
         prior: Optional[TorchDistribution] = None,  # type: ignore
-        q: Union[str, PyroTransformedDistribution, "VIPosterior", Callable] = "maf",
+        q: Union[
+            Literal["nsf", "scf", "maf", "mcf", "gaussian", "gaussian_diag"],
+            PyroTransformedDistribution,
+            "VIPosterior",
+            Callable,
+        ] = "maf",
         theta_transform: Optional[TorchTransform] = None,
-        vi_method: str = "rKL",
+        vi_method: Literal["rKL", "fKL", "IW", "alpha"] = "rKL",
         device: Union[str, torch.device] = "cpu",
         x_shape: Optional[torch.Size] = None,
         parameters: Optional[Iterable] = None,
