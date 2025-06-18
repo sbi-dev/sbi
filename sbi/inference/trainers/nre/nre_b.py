@@ -1,13 +1,16 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Callable, Dict, Optional, Union
+from typing import Dict, Optional, Union
 
 import torch
 from torch import Tensor, nn
 from torch.distributions import Distribution
 
-from sbi.inference.trainers.nre.nre_base import RatioEstimatorTrainer
+from sbi.inference.trainers.nre.nre_base import (
+    RatioEstimatorBuilder,
+    RatioEstimatorTrainer,
+)
 from sbi.sbi_types import TensorboardSummaryWriter
 from sbi.utils.sbiutils import del_entries
 from sbi.utils.torchutils import assert_all_finite
@@ -23,7 +26,7 @@ class NRE_B(RatioEstimatorTrainer):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
-        classifier: Union[str, Callable] = "resnet",
+        classifier: Union[str, RatioEstimatorBuilder] = "resnet",
         device: str = "cpu",
         logging_level: Union[int, str] = "warning",
         summary_writer: Optional[TensorboardSummaryWriter] = None,
@@ -37,11 +40,11 @@ class NRE_B(RatioEstimatorTrainer):
                 prior must be passed to `.build_posterior()`.
             classifier: Classifier trained to approximate likelihood ratios. If it is
                 a string, use a pre-configured network of the provided type (one of
-                linear, mlp, resnet). Alternatively, a function that builds a custom
-                neural network can be provided. The function will be called with the
-                first batch of simulations (theta, x), which can thus be used for shape
-                inference and potentially for z-scoring. It needs to return a PyTorch
-                `nn.Module` implementing the classifier.
+                linear, mlp, resnet), or a callable that implements the
+                `RatioEstimatorBuilder` protocol. The callable will be called with the
+                first batch of simulations (theta, x), which can thus be used for
+                shape inference and potentially for z-scoring. It returns a
+                `RatioEstimator`.
             device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.
