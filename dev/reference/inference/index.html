@@ -5690,7 +5690,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">vector_field_estimator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">ConditionalVectorFieldEstimator</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">sample_with</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;ode&quot;</span><span class="p">,</span>
+        <span class="n">sample_with</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;ode&quot;</span><span class="p">,</span> <span class="s2">&quot;sde&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;ode&quot;</span><span class="p">,</span>
         <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">VectorFieldPosterior</span><span class="p">:</span>
 <span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Build posterior from the flow matching estimator.</span>
@@ -6037,7 +6037,7 @@ flow matching estimator that was trained.</p>
                 <code>sample_with</code>
             </td>
             <td>
-                  <code><span title="str">str</span></code>
+                  <code><span title="typing.Literal">Literal</span>[&#39;ode&#39;, &#39;sde&#39;]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -6141,7 +6141,7 @@ a numerical ODE solver.</p>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">vector_field_estimator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">ConditionalVectorFieldEstimator</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">sample_with</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;ode&quot;</span><span class="p">,</span>
+    <span class="n">sample_with</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;ode&quot;</span><span class="p">,</span> <span class="s2">&quot;sde&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;ode&quot;</span><span class="p">,</span>
     <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">VectorFieldPosterior</span><span class="p">:</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Build posterior from the flow matching estimator.</span>
@@ -6393,7 +6393,7 @@ not tested yet.</p>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">vector_field_estimator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">ConditionalVectorFieldEstimator</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">sample_with</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;sde&quot;</span><span class="p">,</span>
+        <span class="n">sample_with</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;ode&quot;</span><span class="p">,</span> <span class="s2">&quot;sde&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;sde&quot;</span><span class="p">,</span>
         <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">VectorFieldPosterior</span><span class="p">:</span>
 <span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Build posterior from the vector field estimator.</span>
@@ -6784,7 +6784,7 @@ trained.</p>
                 <code>sample_with</code>
             </td>
             <td>
-                  <code><span title="str">str</span></code>
+                  <code><span title="typing.Literal">Literal</span>[&#39;ode&#39;, &#39;sde&#39;]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -6886,7 +6886,7 @@ probabilistic ODE with a numerical ODE solver.</p>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">vector_field_estimator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">ConditionalVectorFieldEstimator</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">sample_with</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;sde&quot;</span><span class="p">,</span>
+    <span class="n">sample_with</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;ode&quot;</span><span class="p">,</span> <span class="s2">&quot;sde&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;sde&quot;</span><span class="p">,</span>
     <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">VectorFieldPosterior</span><span class="p">:</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Build posterior from the vector field estimator.</span>
