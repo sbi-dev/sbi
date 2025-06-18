@@ -4,7 +4,7 @@
 import time
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from typing import Any, Callable, Optional, Protocol, Union
+from typing import Any, Callable, Literal, Optional, Protocol, Union
 
 import torch
 from torch import Tensor, ones
@@ -485,7 +485,7 @@ class VectorFieldInference(NeuralInference, ABC):
         self,
         vector_field_estimator: Optional[ConditionalVectorFieldEstimator] = None,
         prior: Optional[Distribution] = None,
-        sample_with: str = "sde",
+        sample_with: Literal["ode", "sde"] = "sde",
         **kwargs,
     ) -> VectorFieldPosterior:
         r"""Build posterior from the vector field estimator.

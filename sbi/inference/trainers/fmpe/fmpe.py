@@ -2,7 +2,7 @@
 # under the Apache License v2.0, see <https://www.apache.org/licenses/LICENSE-2.0>.
 
 
-from typing import Optional, Union
+from typing import Literal, Optional, Union
 
 from torch.distributions import Distribution
 from torch.utils.tensorboard.writer import SummaryWriter
@@ -67,7 +67,7 @@ class FMPE(VectorFieldInference):
         self,
         vector_field_estimator: Optional[ConditionalVectorFieldEstimator] = None,
         prior: Optional[Distribution] = None,
-        sample_with: str = "ode",
+        sample_with: Literal["ode", "sde"] = "ode",
         **kwargs,
     ) -> VectorFieldPosterior:
         r"""Build posterior from the flow matching estimator.
