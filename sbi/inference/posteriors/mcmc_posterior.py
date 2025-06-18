@@ -5,7 +5,7 @@ import warnings
 from copy import deepcopy
 from functools import partial
 from math import ceil
-from typing import Any, Callable, Dict, Optional, Union
+from typing import Any, Callable, Dict, Literal, Optional, Union
 from warnings import warn
 
 import arviz as az
@@ -50,15 +50,23 @@ class MCMCPosterior(NeuralPosterior):
         potential_fn: Union[Callable, BasePotential],
         proposal: Any,
         theta_transform: Optional[TorchTransform] = None,
-        method: str = "slice_np_vectorized",
+        method: Literal[
+            "slice_np",
+            "slice_np_vectorized",
+            "hmc_pyro",
+            "nuts_pyro",
+            "slice_pymc",
+            "hmc_pymc",
+            "nuts_pymc",
+        ] = "slice_np_vectorized",
         thin: int = -1,
         warmup_steps: int = 200,
         num_chains: int = 20,
-        init_strategy: str = "resample",
+        init_strategy: Literal["proposal", "sir", "resample"] = "resample",
         init_strategy_parameters: Optional[Dict[str, Any]] = None,
         init_strategy_num_candidates: Optional[int] = None,
         num_workers: int = 1,
-        mp_context: str = "spawn",
+        mp_context: Literal["fork", "spawn"] = "spawn",
         device: Optional[Union[str, torch.device]] = None,
         x_shape: Optional[torch.Size] = None,
     ):
