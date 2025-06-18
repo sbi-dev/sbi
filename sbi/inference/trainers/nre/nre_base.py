@@ -4,7 +4,7 @@
 import warnings
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from typing import Any, Callable, Dict, Literal, Optional, Union
+from typing import Any, Dict, Literal, Optional, Protocol, Union
 
 import torch
 from torch import Tensor, eye, nn, ones
