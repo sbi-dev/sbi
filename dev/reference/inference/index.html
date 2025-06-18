@@ -7311,10 +7311,7 @@ sampling.</p>
 
               <details class="quote">
                 <summary>Source code in <code>sbi/inference/trainers/nre/nre_a.py</code></summary>
-                <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 16</span>
-<span class="normal"> 17</span>
-<span class="normal"> 18</span>
-<span class="normal"> 19</span>
+                <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 19</span>
 <span class="normal"> 20</span>
 <span class="normal"> 21</span>
 <span class="normal"> 22</span>
@@ -7428,7 +7425,10 @@ sampling.</p>
 <span class="normal">130</span>
 <span class="normal">131</span>
 <span class="normal">132</span>
-<span class="normal">133</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NRE_A</span><span class="p">(</span><span class="n">RatioEstimatorTrainer</span><span class="p">):</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NRE_A</span><span class="p">(</span><span class="n">RatioEstimatorTrainer</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;AALR, here known as Neural Ratio Estimation algorithm (NRE-A) [1].</span>
 
 <span class="sd">    [1] *Likelihood-free MCMC with Amortized Approximate Likelihood Ratios*, Hermans</span>
@@ -7438,7 +7438,7 @@ sampling.</p>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">classifier</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;resnet&quot;</span><span class="p">,</span>
+        <span class="n">classifier</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">RatioEstimatorBuilder</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;resnet&quot;</span><span class="p">,</span>
         <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
         <span class="n">logging_level</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;warning&quot;</span><span class="p">,</span>
         <span class="n">summary_writer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TensorboardSummaryWriter</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -7452,11 +7452,11 @@ sampling.</p>
 <span class="sd">                prior must be passed to `.build_posterior()`.</span>
 <span class="sd">            classifier: Classifier trained to approximate likelihood ratios. If it is</span>
 <span class="sd">                a string, use a pre-configured network of the provided type (one of</span>
-<span class="sd">                linear, mlp, resnet). Alternatively, a function that builds a custom</span>
-<span class="sd">                neural network can be provided. The function will be called with the</span>
-<span class="sd">                first batch of simulations (theta, x), which can thus be used for shape</span>
-<span class="sd">                inference and potentially for z-scoring. It needs to return a PyTorch</span>
-<span class="sd">                `nn.Module` implementing the classifier.</span>
+<span class="sd">                linear, mlp, resnet), or a callable that implements the</span>
+<span class="sd">                `RatioEstimatorBuilder` protocol. The callable will be called with the</span>
+<span class="sd">                first batch of simulations (theta, x), which can thus be used for</span>
+<span class="sd">                shape inference and potentially for z-scoring. It returns a</span>
+<span class="sd">                `RatioEstimator`.</span>
 <span class="sd">            device: Training device, e.g., &quot;cpu&quot;, &quot;cuda&quot; or &quot;cuda:{0, 1, ...}&quot;.</span>
 <span class="sd">            logging_level: Minimum severity of messages to log. One of the strings</span>
 <span class="sd">                INFO, WARNING, DEBUG, ERROR and CRITICAL.</span>
@@ -7609,17 +7609,17 @@ prior must be passed to <code>.build_posterior()</code>.</p>
                 <code>classifier</code>
             </td>
             <td>
-                  <code><span title="typing.Union">Union</span>[<span title="str">str</span>, <span title="typing.Callable">Callable</span>]</code>
+                  <code><span title="typing.Union">Union</span>[<span title="str">str</span>, <span title="sbi.inference.trainers.nre.nre_base.RatioEstimatorBuilder">RatioEstimatorBuilder</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
                 <p>Classifier trained to approximate likelihood ratios. If it is
 a string, use a pre-configured network of the provided type (one of
-linear, mlp, resnet). Alternatively, a function that builds a custom
-neural network can be provided. The function will be called with the
-first batch of simulations (theta, x), which can thus be used for shape
-inference and potentially for z-scoring. It needs to return a PyTorch
-<code>nn.Module</code> implementing the classifier.</p>
+linear, mlp, resnet), or a callable that implements the
+<code>RatioEstimatorBuilder</code> protocol. The callable will be called with the
+first batch of simulations (theta, x), which can thus be used for
+shape inference and potentially for z-scoring. It returns a
+<code>RatioEstimator</code>.</p>
               </div>
             </td>
             <td>
@@ -7699,10 +7699,7 @@ sampling.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/trainers/nre/nre_a.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">23</span>
-<span class="normal">24</span>
-<span class="normal">25</span>
-<span class="normal">26</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">26</span>
 <span class="normal">27</span>
 <span class="normal">28</span>
 <span class="normal">29</span>
@@ -7731,10 +7728,13 @@ sampling.</p>
 <span class="normal">52</span>
 <span class="normal">53</span>
 <span class="normal">54</span>
-<span class="normal">55</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">55</span>
+<span class="normal">56</span>
+<span class="normal">57</span>
+<span class="normal">58</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">classifier</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;resnet&quot;</span><span class="p">,</span>
+    <span class="n">classifier</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">RatioEstimatorBuilder</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;resnet&quot;</span><span class="p">,</span>
     <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
     <span class="n">logging_level</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;warning&quot;</span><span class="p">,</span>
     <span class="n">summary_writer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TensorboardSummaryWriter</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -7748,11 +7748,11 @@ sampling.</p>
 <span class="sd">            prior must be passed to `.build_posterior()`.</span>
 <span class="sd">        classifier: Classifier trained to approximate likelihood ratios. If it is</span>
 <span class="sd">            a string, use a pre-configured network of the provided type (one of</span>
-<span class="sd">            linear, mlp, resnet). Alternatively, a function that builds a custom</span>
-<span class="sd">            neural network can be provided. The function will be called with the</span>
-<span class="sd">            first batch of simulations (theta, x), which can thus be used for shape</span>
-<span class="sd">            inference and potentially for z-scoring. It needs to return a PyTorch</span>
-<span class="sd">            `nn.Module` implementing the classifier.</span>
+<span class="sd">            linear, mlp, resnet), or a callable that implements the</span>
+<span class="sd">            `RatioEstimatorBuilder` protocol. The callable will be called with the</span>
+<span class="sd">            first batch of simulations (theta, x), which can thus be used for</span>
+<span class="sd">            shape inference and potentially for z-scoring. It returns a</span>
+<span class="sd">            `RatioEstimator`.</span>
 <span class="sd">        device: Training device, e.g., &quot;cpu&quot;, &quot;cuda&quot; or &quot;cuda:{0, 1, ...}&quot;.</span>
 <span class="sd">        logging_level: Minimum severity of messages to log. One of the strings</span>
 <span class="sd">            INFO, WARNING, DEBUG, ERROR and CRITICAL.</span>
@@ -8028,10 +8028,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/trainers/nre/nre_a.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 57</span>
-<span class="normal"> 58</span>
-<span class="normal"> 59</span>
-<span class="normal"> 60</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 60</span>
 <span class="normal"> 61</span>
 <span class="normal"> 62</span>
 <span class="normal"> 63</span>
@@ -8078,7 +8075,10 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 <span class="normal">104</span>
 <span class="normal">105</span>
 <span class="normal">106</span>
-<span class="normal">107</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
+<span class="normal">107</span>
+<span class="normal">108</span>
+<span class="normal">109</span>
+<span class="normal">110</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">training_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">200</span><span class="p">,</span>
     <span class="n">learning_rate</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">5e-4</span><span class="p">,</span>
@@ -8171,10 +8171,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 
               <details class="quote">
                 <summary>Source code in <code>sbi/inference/trainers/nre/nre_b.py</code></summary>
-                <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 16</span>
-<span class="normal"> 17</span>
-<span class="normal"> 18</span>
-<span class="normal"> 19</span>
+                <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 19</span>
 <span class="normal"> 20</span>
 <span class="normal"> 21</span>
 <span class="normal"> 22</span>
@@ -8286,7 +8283,10 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 <span class="normal">128</span>
 <span class="normal">129</span>
 <span class="normal">130</span>
-<span class="normal">131</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NRE_B</span><span class="p">(</span><span class="n">RatioEstimatorTrainer</span><span class="p">):</span>
+<span class="normal">131</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NRE_B</span><span class="p">(</span><span class="n">RatioEstimatorTrainer</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;SRE, here known as Neural Ratio Estimation algorithm (NRE-B) [1].</span>
 
 <span class="sd">    [1] *On Contrastive Learning for Likelihood-free Inference*, Durkan et al.,</span>
@@ -8296,7 +8296,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">classifier</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;resnet&quot;</span><span class="p">,</span>
+        <span class="n">classifier</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">RatioEstimatorBuilder</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;resnet&quot;</span><span class="p">,</span>
         <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
         <span class="n">logging_level</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;warning&quot;</span><span class="p">,</span>
         <span class="n">summary_writer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TensorboardSummaryWriter</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -8310,11 +8310,11 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 <span class="sd">                prior must be passed to `.build_posterior()`.</span>
 <span class="sd">            classifier: Classifier trained to approximate likelihood ratios. If it is</span>
 <span class="sd">                a string, use a pre-configured network of the provided type (one of</span>
-<span class="sd">                linear, mlp, resnet). Alternatively, a function that builds a custom</span>
-<span class="sd">                neural network can be provided. The function will be called with the</span>
-<span class="sd">                first batch of simulations (theta, x), which can thus be used for shape</span>
-<span class="sd">                inference and potentially for z-scoring. It needs to return a PyTorch</span>
-<span class="sd">                `nn.Module` implementing the classifier.</span>
+<span class="sd">                linear, mlp, resnet), or a callable that implements the</span>
+<span class="sd">                `RatioEstimatorBuilder` protocol. The callable will be called with the</span>
+<span class="sd">                first batch of simulations (theta, x), which can thus be used for</span>
+<span class="sd">                shape inference and potentially for z-scoring. It returns a</span>
+<span class="sd">                `RatioEstimator`.</span>
 <span class="sd">            device: Training device, e.g., &quot;cpu&quot;, &quot;cuda&quot; or &quot;cuda:{0, 1, ...}&quot;.</span>
 <span class="sd">            logging_level: Minimum severity of messages to log. One of the strings</span>
 <span class="sd">                INFO, WARNING, DEBUG, ERROR and CRITICAL.</span>
@@ -8465,17 +8465,17 @@ prior must be passed to <code>.build_posterior()</code>.</p>
                 <code>classifier</code>
             </td>
             <td>
-                  <code><span title="typing.Union">Union</span>[<span title="str">str</span>, <span title="typing.Callable">Callable</span>]</code>
+                  <code><span title="typing.Union">Union</span>[<span title="str">str</span>, <span title="sbi.inference.trainers.nre.nre_base.RatioEstimatorBuilder">RatioEstimatorBuilder</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
                 <p>Classifier trained to approximate likelihood ratios. If it is
 a string, use a pre-configured network of the provided type (one of
-linear, mlp, resnet). Alternatively, a function that builds a custom
-neural network can be provided. The function will be called with the
-first batch of simulations (theta, x), which can thus be used for shape
-inference and potentially for z-scoring. It needs to return a PyTorch
-<code>nn.Module</code> implementing the classifier.</p>
+linear, mlp, resnet), or a callable that implements the
+<code>RatioEstimatorBuilder</code> protocol. The callable will be called with the
+first batch of simulations (theta, x), which can thus be used for
+shape inference and potentially for z-scoring. It returns a
+<code>RatioEstimator</code>.</p>
               </div>
             </td>
             <td>
@@ -8555,10 +8555,7 @@ sampling.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/trainers/nre/nre_b.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">23</span>
-<span class="normal">24</span>
-<span class="normal">25</span>
-<span class="normal">26</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">26</span>
 <span class="normal">27</span>
 <span class="normal">28</span>
 <span class="normal">29</span>
@@ -8587,10 +8584,13 @@ sampling.</p>
 <span class="normal">52</span>
 <span class="normal">53</span>
 <span class="normal">54</span>
-<span class="normal">55</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">55</span>
+<span class="normal">56</span>
+<span class="normal">57</span>
+<span class="normal">58</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">classifier</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;resnet&quot;</span><span class="p">,</span>
+    <span class="n">classifier</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">RatioEstimatorBuilder</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;resnet&quot;</span><span class="p">,</span>
     <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
     <span class="n">logging_level</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;warning&quot;</span><span class="p">,</span>
     <span class="n">summary_writer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TensorboardSummaryWriter</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -8604,11 +8604,11 @@ sampling.</p>
 <span class="sd">            prior must be passed to `.build_posterior()`.</span>
 <span class="sd">        classifier: Classifier trained to approximate likelihood ratios. If it is</span>
 <span class="sd">            a string, use a pre-configured network of the provided type (one of</span>
-<span class="sd">            linear, mlp, resnet). Alternatively, a function that builds a custom</span>
-<span class="sd">            neural network can be provided. The function will be called with the</span>
-<span class="sd">            first batch of simulations (theta, x), which can thus be used for shape</span>
-<span class="sd">            inference and potentially for z-scoring. It needs to return a PyTorch</span>
-<span class="sd">            `nn.Module` implementing the classifier.</span>
+<span class="sd">            linear, mlp, resnet), or a callable that implements the</span>
+<span class="sd">            `RatioEstimatorBuilder` protocol. The callable will be called with the</span>
+<span class="sd">            first batch of simulations (theta, x), which can thus be used for</span>
+<span class="sd">            shape inference and potentially for z-scoring. It returns a</span>
+<span class="sd">            `RatioEstimator`.</span>
 <span class="sd">        device: Training device, e.g., &quot;cpu&quot;, &quot;cuda&quot; or &quot;cuda:{0, 1, ...}&quot;.</span>
 <span class="sd">        logging_level: Minimum severity of messages to log. One of the strings</span>
 <span class="sd">            INFO, WARNING, DEBUG, ERROR and CRITICAL.</span>
@@ -8884,10 +8884,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/trainers/nre/nre_b.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 57</span>
-<span class="normal"> 58</span>
-<span class="normal"> 59</span>
-<span class="normal"> 60</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 60</span>
 <span class="normal"> 61</span>
 <span class="normal"> 62</span>
 <span class="normal"> 63</span>
@@ -8931,7 +8928,10 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 <span class="normal">101</span>
 <span class="normal">102</span>
 <span class="normal">103</span>
-<span class="normal">104</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
+<span class="normal">104</span>
+<span class="normal">105</span>
+<span class="normal">106</span>
+<span class="normal">107</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">num_atoms</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span>
     <span class="n">training_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">200</span><span class="p">,</span>
@@ -9032,10 +9032,7 @@ will be estimated only up to a function (normalizing constant) of the data
 
               <details class="quote">
                 <summary>Source code in <code>sbi/inference/trainers/nre/nre_c.py</code></summary>
-                <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 16</span>
-<span class="normal"> 17</span>
-<span class="normal"> 18</span>
-<span class="normal"> 19</span>
+                <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 19</span>
 <span class="normal"> 20</span>
 <span class="normal"> 21</span>
 <span class="normal"> 22</span>
@@ -9229,7 +9226,10 @@ will be estimated only up to a function (normalizing constant) of the data
 <span class="normal">210</span>
 <span class="normal">211</span>
 <span class="normal">212</span>
-<span class="normal">213</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NRE_C</span><span class="p">(</span><span class="n">RatioEstimatorTrainer</span><span class="p">):</span>
+<span class="normal">213</span>
+<span class="normal">214</span>
+<span class="normal">215</span>
+<span class="normal">216</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NRE_C</span><span class="p">(</span><span class="n">RatioEstimatorTrainer</span><span class="p">):</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;NRE-C [1] is a generalization of amortized versions of NRE_A and NRE_B.</span>
 
 <span class="sd">    NRE-C:</span>
@@ -9253,7 +9253,7 @@ will be estimated only up to a function (normalizing constant) of the data
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">classifier</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;resnet&quot;</span><span class="p">,</span>
+        <span class="n">classifier</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">RatioEstimatorBuilder</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;resnet&quot;</span><span class="p">,</span>
         <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
         <span class="n">logging_level</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;warning&quot;</span><span class="p">,</span>
         <span class="n">summary_writer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TensorboardSummaryWriter</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -9267,11 +9267,11 @@ will be estimated only up to a function (normalizing constant) of the data
 <span class="sd">                prior must be passed to `.build_posterior()`.</span>
 <span class="sd">            classifier: Classifier trained to approximate likelihood ratios. If it is</span>
 <span class="sd">                a string, use a pre-configured network of the provided type (one of</span>
-<span class="sd">                linear, mlp, resnet). Alternatively, a function that builds a custom</span>
-<span class="sd">                neural network can be provided. The function will be called with the</span>
-<span class="sd">                first batch of simulations (theta, x), which can thus be used for shape</span>
-<span class="sd">                inference and potentially for z-scoring. It needs to return a PyTorch</span>
-<span class="sd">                `nn.Module` implementing the classifier.</span>
+<span class="sd">                linear, mlp, resnet), or a callable that implements the</span>
+<span class="sd">                `RatioEstimatorBuilder` protocol. The callable will be called with the</span>
+<span class="sd">                first batch of simulations (theta, x), which can thus be used for</span>
+<span class="sd">                shape inference and potentially for z-scoring. It returns a</span>
+<span class="sd">                `RatioEstimator`.</span>
 <span class="sd">            device: Training device, e.g., &quot;cpu&quot;, &quot;cuda&quot; or &quot;cuda:{0, 1, ...}&quot;.</span>
 <span class="sd">            logging_level: Minimum severity of messages to log. One of the strings</span>
 <span class="sd">                INFO, WARNING, DEBUG, ERROR and CRITICAL.</span>
@@ -9490,17 +9490,17 @@ prior must be passed to <code>.build_posterior()</code>.</p>
                 <code>classifier</code>
             </td>
             <td>
-                  <code><span title="typing.Union">Union</span>[<span title="str">str</span>, <span title="typing.Callable">Callable</span>]</code>
+                  <code><span title="typing.Union">Union</span>[<span title="str">str</span>, <span title="sbi.inference.trainers.nre.nre_base.RatioEstimatorBuilder">RatioEstimatorBuilder</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
                 <p>Classifier trained to approximate likelihood ratios. If it is
 a string, use a pre-configured network of the provided type (one of
-linear, mlp, resnet). Alternatively, a function that builds a custom
-neural network can be provided. The function will be called with the
-first batch of simulations (theta, x), which can thus be used for shape
-inference and potentially for z-scoring. It needs to return a PyTorch
-<code>nn.Module</code> implementing the classifier.</p>
+linear, mlp, resnet), or a callable that implements the
+<code>RatioEstimatorBuilder</code> protocol. The callable will be called with the
+first batch of simulations (theta, x), which can thus be used for
+shape inference and potentially for z-scoring. It returns a
+<code>RatioEstimator</code>.</p>
               </div>
             </td>
             <td>
@@ -9580,10 +9580,7 @@ sampling.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/trainers/nre/nre_c.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">37</span>
-<span class="normal">38</span>
-<span class="normal">39</span>
-<span class="normal">40</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">40</span>
 <span class="normal">41</span>
 <span class="normal">42</span>
 <span class="normal">43</span>
@@ -9612,10 +9609,13 @@ sampling.</p>
 <span class="normal">66</span>
 <span class="normal">67</span>
 <span class="normal">68</span>
-<span class="normal">69</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">69</span>
+<span class="normal">70</span>
+<span class="normal">71</span>
+<span class="normal">72</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">classifier</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;resnet&quot;</span><span class="p">,</span>
+    <span class="n">classifier</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">RatioEstimatorBuilder</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;resnet&quot;</span><span class="p">,</span>
     <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
     <span class="n">logging_level</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;warning&quot;</span><span class="p">,</span>
     <span class="n">summary_writer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TensorboardSummaryWriter</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -9629,11 +9629,11 @@ sampling.</p>
 <span class="sd">            prior must be passed to `.build_posterior()`.</span>
 <span class="sd">        classifier: Classifier trained to approximate likelihood ratios. If it is</span>
 <span class="sd">            a string, use a pre-configured network of the provided type (one of</span>
-<span class="sd">            linear, mlp, resnet). Alternatively, a function that builds a custom</span>
-<span class="sd">            neural network can be provided. The function will be called with the</span>
-<span class="sd">            first batch of simulations (theta, x), which can thus be used for shape</span>
-<span class="sd">            inference and potentially for z-scoring. It needs to return a PyTorch</span>
-<span class="sd">            `nn.Module` implementing the classifier.</span>
+<span class="sd">            linear, mlp, resnet), or a callable that implements the</span>
+<span class="sd">            `RatioEstimatorBuilder` protocol. The callable will be called with the</span>
+<span class="sd">            first batch of simulations (theta, x), which can thus be used for</span>
+<span class="sd">            shape inference and potentially for z-scoring. It returns a</span>
+<span class="sd">            `RatioEstimator`.</span>
 <span class="sd">        device: Training device, e.g., &quot;cpu&quot;, &quot;cuda&quot; or &quot;cuda:{0, 1, ...}&quot;.</span>
 <span class="sd">        logging_level: Minimum severity of messages to log. One of the strings</span>
 <span class="sd">            INFO, WARNING, DEBUG, ERROR and CRITICAL.</span>
@@ -9948,10 +9948,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/trainers/nre/nre_c.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 71</span>
-<span class="normal"> 72</span>
-<span class="normal"> 73</span>
-<span class="normal"> 74</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 74</span>
 <span class="normal"> 75</span>
 <span class="normal"> 76</span>
 <span class="normal"> 77</span>
@@ -10008,7 +10005,10 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 <span class="normal">128</span>
 <span class="normal">129</span>
 <span class="normal">130</span>
-<span class="normal">131</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
+<span class="normal">131</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">num_classes</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">5</span><span class="p">,</span>
     <span class="n">gamma</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span>
@@ -10115,8 +10115,7 @@ NeurIPS 2022. <a href="https://arxiv.org/abs/2208.13624">https://arxiv.org/abs/2
 
               <details class="quote">
                 <summary>Source code in <code>sbi/inference/trainers/nre/bnre.py</code></summary>
-                <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 16</span>
-<span class="normal"> 17</span>
+                <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 17</span>
 <span class="normal"> 18</span>
 <span class="normal"> 19</span>
 <span class="normal"> 20</span>
@@ -10250,7 +10249,8 @@ NeurIPS 2022. <a href="https://arxiv.org/abs/2208.13624">https://arxiv.org/abs/2
 <span class="normal">148</span>
 <span class="normal">149</span>
 <span class="normal">150</span>
-<span class="normal">151</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">BNRE</span><span class="p">(</span><span class="n">NRE_A</span><span class="p">):</span>
+<span class="normal">151</span>
+<span class="normal">152</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">BNRE</span><span class="p">(</span><span class="n">NRE_A</span><span class="p">):</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Balanced neural ratio estimation (BNRE) as in Delaunoy et al. (2022) [1].</span>
 
 <span class="sd">    BNRE is a variation of NRE aiming to produce more conservative posterior</span>
@@ -10265,7 +10265,7 @@ NeurIPS 2022. <a href="https://arxiv.org/abs/2208.13624">https://arxiv.org/abs/2
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">classifier</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;resnet&quot;</span><span class="p">,</span>
+        <span class="n">classifier</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">RatioEstimatorBuilder</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;resnet&quot;</span><span class="p">,</span>
         <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
         <span class="n">logging_level</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;warning&quot;</span><span class="p">,</span>
         <span class="n">summary_writer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TensorboardSummaryWriter</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -10279,11 +10279,11 @@ NeurIPS 2022. <a href="https://arxiv.org/abs/2208.13624">https://arxiv.org/abs/2
 <span class="sd">                prior must be passed to `.build_posterior()`.</span>
 <span class="sd">            classifier: Classifier trained to approximate likelihood ratios. If it is</span>
 <span class="sd">                a string, use a pre-configured network of the provided type (one of</span>
-<span class="sd">                linear, mlp, resnet). Alternatively, a function that builds a custom</span>
-<span class="sd">                neural network can be provided. The function will be called with the</span>
-<span class="sd">                first batch of simulations $(\theta, x)$, which can thus be used for</span>
-<span class="sd">                shape inference and potentially for z-scoring. It needs to return a</span>
-<span class="sd">                PyTorch `nn.Module` implementing the classifier.</span>
+<span class="sd">                linear, mlp, resnet), or a callable that implements the</span>
+<span class="sd">                `RatioEstimatorBuilder` protocol. The callable will be called with the</span>
+<span class="sd">                first batch of simulations (theta, x), which can thus be used for</span>
+<span class="sd">                shape inference and potentially for z-scoring. It returns a</span>
+<span class="sd">                `RatioEstimator`.</span>
 <span class="sd">            device: Training device, e.g., &quot;cpu&quot;, &quot;cuda&quot; or &quot;cuda:{0, 1, ...}&quot;.</span>
 <span class="sd">            logging_level: Minimum severity of messages to log. One of the strings</span>
 <span class="sd">                INFO, WARNING, DEBUG, ERROR and CRITICAL.</span>
@@ -10449,17 +10449,17 @@ prior must be passed to <code>.build_posterior()</code>.</p>
                 <code>classifier</code>
             </td>
             <td>
-                  <code><span title="typing.Union">Union</span>[<span title="str">str</span>, <span title="typing.Callable">Callable</span>]</code>
+                  <code><span title="typing.Union">Union</span>[<span title="str">str</span>, <span title="sbi.inference.trainers.nre.nre_base.RatioEstimatorBuilder">RatioEstimatorBuilder</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
                 <p>Classifier trained to approximate likelihood ratios. If it is
 a string, use a pre-configured network of the provided type (one of
-linear, mlp, resnet). Alternatively, a function that builds a custom
-neural network can be provided. The function will be called with the
-first batch of simulations <span class="arithmatex">\((\theta, x)\)</span>, which can thus be used for
-shape inference and potentially for z-scoring. It needs to return a
-PyTorch <code>nn.Module</code> implementing the classifier.</p>
+linear, mlp, resnet), or a callable that implements the
+<code>RatioEstimatorBuilder</code> protocol. The callable will be called with the
+first batch of simulations (theta, x), which can thus be used for
+shape inference and potentially for z-scoring. It returns a
+<code>RatioEstimator</code>.</p>
               </div>
             </td>
             <td>
@@ -10539,8 +10539,7 @@ sampling.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/trainers/nre/bnre.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">28</span>
-<span class="normal">29</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">29</span>
 <span class="normal">30</span>
 <span class="normal">31</span>
 <span class="normal">32</span>
@@ -10571,10 +10570,11 @@ sampling.</p>
 <span class="normal">57</span>
 <span class="normal">58</span>
 <span class="normal">59</span>
-<span class="normal">60</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">60</span>
+<span class="normal">61</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">classifier</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;resnet&quot;</span><span class="p">,</span>
+    <span class="n">classifier</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">RatioEstimatorBuilder</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;resnet&quot;</span><span class="p">,</span>
     <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
     <span class="n">logging_level</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;warning&quot;</span><span class="p">,</span>
     <span class="n">summary_writer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TensorboardSummaryWriter</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -10588,11 +10588,11 @@ sampling.</p>
 <span class="sd">            prior must be passed to `.build_posterior()`.</span>
 <span class="sd">        classifier: Classifier trained to approximate likelihood ratios. If it is</span>
 <span class="sd">            a string, use a pre-configured network of the provided type (one of</span>
-<span class="sd">            linear, mlp, resnet). Alternatively, a function that builds a custom</span>
-<span class="sd">            neural network can be provided. The function will be called with the</span>
-<span class="sd">            first batch of simulations $(\theta, x)$, which can thus be used for</span>
-<span class="sd">            shape inference and potentially for z-scoring. It needs to return a</span>
-<span class="sd">            PyTorch `nn.Module` implementing the classifier.</span>
+<span class="sd">            linear, mlp, resnet), or a callable that implements the</span>
+<span class="sd">            `RatioEstimatorBuilder` protocol. The callable will be called with the</span>
+<span class="sd">            first batch of simulations (theta, x), which can thus be used for</span>
+<span class="sd">            shape inference and potentially for z-scoring. It returns a</span>
+<span class="sd">            `RatioEstimator`.</span>
 <span class="sd">        device: Training device, e.g., &quot;cpu&quot;, &quot;cuda&quot; or &quot;cuda:{0, 1, ...}&quot;.</span>
 <span class="sd">        logging_level: Minimum severity of messages to log. One of the strings</span>
 <span class="sd">            INFO, WARNING, DEBUG, ERROR and CRITICAL.</span>
@@ -10658,8 +10658,7 @@ dataloader_kwargs: Additional or updated kwargs to be passed to the training
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/trainers/nre/bnre.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 62</span>
-<span class="normal"> 63</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 63</span>
 <span class="normal"> 64</span>
 <span class="normal"> 65</span>
 <span class="normal"> 66</span>
@@ -10710,7 +10709,8 @@ dataloader_kwargs: Additional or updated kwargs to be passed to the training
 <span class="normal">111</span>
 <span class="normal">112</span>
 <span class="normal">113</span>
-<span class="normal">114</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
+<span class="normal">114</span>
+<span class="normal">115</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">regularization_strength</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">100.0</span><span class="p">,</span>
     <span class="n">training_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">200</span><span class="p">,</span>
