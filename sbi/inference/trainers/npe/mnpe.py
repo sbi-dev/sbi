@@ -5,13 +5,7 @@ from typing import Any, Callable, Dict, Literal, Optional, Union
 
 from torch.distributions import Distribution
 
-from sbi.inference.posteriors import (
-    DirectPosterior,
-    ImportanceSamplingPosterior,
-    MCMCPosterior,
-    RejectionPosterior,
-    VIPosterior,
-)
+from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.trainers.npe.npe_c import NPE_C
 from sbi.neural_nets.estimators import MixedDensityEstimator
 from sbi.sbi_types import TensorboardSummaryWriter
@@ -112,13 +106,7 @@ class MNPE(NPE_C):
         vi_parameters: Optional[Dict[str, Any]] = None,
         rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
         importance_sampling_parameters: Optional[Dict[str, Any]] = None,
-    ) -> Union[
-        MCMCPosterior,
-        RejectionPosterior,
-        VIPosterior,
-        DirectPosterior,
-        ImportanceSamplingPosterior,
-    ]:
+    ) -> NeuralPosterior:
         """Build posterior from the neural density estimator.
 
         Args:
