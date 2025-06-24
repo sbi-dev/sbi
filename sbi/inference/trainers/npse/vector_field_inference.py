@@ -481,6 +481,9 @@ class VectorFieldInference(NeuralInference, ABC):
 
         return deepcopy(self._neural_net)
 
+    def _get_potential_function(self, prior, estimator):
+        pass
+
     def _build_posterior(
         self,
         vector_field_estimator: Optional[ConditionalVectorFieldEstimator] = None,
