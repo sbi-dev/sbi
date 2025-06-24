@@ -4,7 +4,7 @@
 import warnings
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from typing import Any, Dict, Literal, Optional, Protocol, Union
+from typing import Any, Callable, Dict, Literal, Optional, Protocol, Tuple, Union
 
 import torch
 from torch import Tensor, eye, nn, ones
@@ -13,15 +13,14 @@ from torch.nn.utils.clip_grad import clip_grad_norm_
 from torch.optim.adam import Adam
 from torch.utils.tensorboard.writer import SummaryWriter
 
-from sbi.inference.posteriors import MCMCPosterior, RejectionPosterior, VIPosterior
-from sbi.inference.posteriors.importance_posterior import ImportanceSamplingPosterior
+from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials import ratio_estimator_based_potential
 from sbi.inference.trainers.base import NeuralInference
 from sbi.neural_nets import classifier_nn
 from sbi.neural_nets.ratio_estimators import RatioEstimator
+from sbi.sbi_types import TorchTransform
 from sbi.utils import (
     check_estimator_arg,
-    check_prior,
     clamp_and_warn,
 )
 from sbi.utils.torchutils import repeat_rows
@@ -348,6 +347,30 @@ class RatioEstimatorTrainer(NeuralInference, ABC):
     def _loss(self, theta: Tensor, x: Tensor, num_atoms: int) -> Tensor:
         raise NotImplementedError
 
+    def _get_potential_function(
+        self, prior: Distribution, estimator: nn.Module
+    ) -> Tuple[Callable, TorchTransform]:
+        r"""Gets the potential for ratio-based methods.
+
+        It also returns a transformation that can be used to transform the potential
+        into unconstrained space.
+
+        Args:
+            prior: The prior distribution.
+            estimator: The neural network modelling likelihood-to-evidence ratio.
+
+        Returns:
+            The potential function and a transformation that maps
+            to unconstrained space.
+        """
+        potential_fn, theta_transform = ratio_estimator_based_potential(
+            ratio_estimator=estimator,
+            prior=prior,
+            x_o=None,
+        )
+
+        return potential_fn, theta_transform
+
     def build_posterior(
         self,
         density_estimator: Optional[nn.Module] = None,
@@ -367,9 +390,7 @@ class RatioEstimatorTrainer(NeuralInference, ABC):
         vi_parameters: Optional[Dict[str, Any]] = None,
         rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
         importance_sampling_parameters: Optional[Dict[str, Any]] = None,
-    ) -> Union[
-        MCMCPosterior, RejectionPosterior, VIPosterior, ImportanceSamplingPosterior
-    ]:
+    ) -> NeuralPosterior:
         r"""Build posterior from the neural density estimator.
 
         SNRE trains a neural network to approximate likelihood ratios. The
@@ -408,67 +429,14 @@ class RatioEstimatorTrainer(NeuralInference, ABC):
             Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods
             (the returned log-probability is unnormalized).
         """
-        if prior is None:
-            assert (
-                self._prior is not None
-            ), """You did not pass a prior. You have to pass the prior either at
-                initialization `inference = SNRE(prior)` or to `.build_posterior
-                (prior=prior)`."""
-            prior = self._prior
-        else:
-            check_prior(prior)
-
-        if density_estimator is None:
-            ratio_estimator = self._neural_net
-            # If internal net is used device is defined.
-            device = self._device
-        else:
-            ratio_estimator = density_estimator
-            # Otherwise, infer it from the device of the net parameters.
-            device = str(next(density_estimator.parameters()).device)
-
-        potential_fn, theta_transform = ratio_estimator_based_potential(
-            ratio_estimator=ratio_estimator,
-            prior=prior,
-            x_o=None,
+        return super().build_posterior(
+            density_estimator,
+            prior,
+            sample_with,
+            mcmc_method=mcmc_method,
+            vi_method=vi_method,
+            mcmc_parameters=mcmc_parameters,
+            vi_parameters=vi_parameters,
+            rejection_sampling_parameters=rejection_sampling_parameters,
+            importance_sampling_parameters=importance_sampling_parameters,
         )
-
-        if sample_with == "mcmc":
-            self._posterior = MCMCPosterior(
-                potential_fn=potential_fn,
-                theta_transform=theta_transform,
-                proposal=prior,
-                method=mcmc_method,
-                device=device,
-                **mcmc_parameters or {},
-            )
-        elif sample_with == "rejection":
-            self._posterior = RejectionPosterior(
-                potential_fn=potential_fn,
-                proposal=prior,
-                device=device,
-                **rejection_sampling_parameters or {},
-            )
-        elif sample_with == "vi":
-            self._posterior = VIPosterior(
-                potential_fn=potential_fn,
-                theta_transform=theta_transform,
-                prior=prior,  # type: ignore
-                vi_method=vi_method,
-                device=device,
-                **vi_parameters or {},
-            )
-        elif sample_with == "importance":
-            self._posterior = ImportanceSamplingPosterior(
-                potential_fn=potential_fn,
-                proposal=prior,
-                device=device,
-                **importance_sampling_parameters or {},
-            )
-        else:
-            raise NotImplementedError
-
-        # Store models at end of each round.
-        self._model_bank.append(deepcopy(self._posterior))
-
-        return deepcopy(self._posterior)
