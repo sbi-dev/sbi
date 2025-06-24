@@ -5,17 +5,24 @@ from abc import ABC, abstractmethod
 from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Literal, Optional, Tuple, Union
 from warnings import warn
 
 import torch
-from torch import Tensor
+from torch import Tensor, nn
 from torch.distributions import Distribution
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
+from sbi.inference.posteriors.direct_posterior import DirectPosterior
+from sbi.inference.posteriors.importance_posterior import ImportanceSamplingPosterior
+from sbi.inference.posteriors.mcmc_posterior import MCMCPosterior
+from sbi.inference.posteriors.rejection_posterior import RejectionPosterior
+from sbi.inference.posteriors.vi_posterior import VIPosterior
+from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
+from sbi.sbi_types import TorchTransform
 from sbi.utils import (
     check_prior,
     get_log_root,
@@ -305,6 +312,166 @@ class NeuralInference(ABC):
         show_train_summary: bool = False,
     ) -> NeuralPosterior:
         raise NotImplementedError
+
+    def build_posterior(
+        self,
+        estimator: Optional[Union[nn.Module, ConditionalDensityEstimator]],
+        prior: Optional[Distribution],
+        sample_with: Literal["mcmc", "rejection", "vi", "importance", "direct"],
+        **kwargs,
+    ) -> NeuralPosterior:
+        r"""Method for building posteriors.
+
+        This method serves as a base method for constructing a posterior based
+        on a given estimator and prior. The posterior can be sampled using one of
+        several inference methods specified by `sample_with`.
+        Args:
+            estimator: The estimator that the posterior is based on.
+            prior: A probability distribution that expresses prior knowledge about the
+                parameters, e.g. which ranges are meaningful for them. Must be a PyTorch
+                distribution, see FAQ for details on how to use custom distributions.
+            sample_with: The inference method to use. Must be one of:
+                - "mcmc"
+                - "rejection"
+                - "vi"
+                - "importance"
+                - "direct"
+            **kwargs: Additional method-specific parameters.
+        Returns:
+            NeuralPosterior object.
+        """
+        if prior is None:
+            cls_name = self.__class__.__name__
+            assert (
+                self._prior is not None
+            ), f"""You did not pass a prior. You have to pass the prior either at
+                initialization `inference = {cls_name}(prior)` or to `.build_posterior
+                (prior=prior)`."""
+            prior = self._prior
+        else:
+            check_prior(prior)
+
+        if estimator is None:
+            estimator = self._neural_net
+            # If internal net is used device is defined.
+            device = self._device
+        else:
+            # Otherwise, infer it from the device of the net parameters.
+            device = str(next(estimator.parameters()).device)
+
+        assert estimator is not None, "Expected a valid estimator object, but got None."
+
+        potential_fn, theta_transform = self._get_potential_function(prior, estimator)
+        self._posterior = self._create_posterior(
+            potential_fn,
+            theta_transform,
+            sample_with,
+            prior,
+            device,
+            estimator,
+            **kwargs,
+        )
+
+        # Store models at end of each round.
+        self._model_bank.append(deepcopy(self._posterior))
+
+        return deepcopy(self._posterior)
+
+    @abstractmethod
+    def _get_potential_function(
+        self,
+        prior: Distribution,
+        estimator: Union[nn.Module, ConditionalDensityEstimator],
+    ) -> Tuple:
+        """Subclass-specific potential creation"""
+        pass
+
+    def _create_posterior(
+        self,
+        potential_fn: Callable,
+        theta_transform: TorchTransform,
+        sample_with: Literal["mcmc", "rejection", "vi", "importance", "direct"],
+        prior: Distribution,
+        device: Union[str, torch.device],
+        estimator: Union[nn.Module, ConditionalDensityEstimator],
+        **kwargs,
+    ) -> NeuralPosterior:
+        """
+        Create a posterior object using the specified inference method.
+
+        Depending on the value of `sample_with`, this method instantiates one of the
+        supported posterior inference strategies. It configures
+        the posterior with the provided `potential_fn`, `theta_transform`, and `prior`.
+
+        Args:
+            potential_fn: The potential function from which to draw samples.
+            theta_transform: Transformation that will be applied during sampling.
+            sample_with: The inference method to use. Must be one of:
+                - "mcmc"
+                - "rejection"
+                - "vi"
+                - "importance"
+                - "direct"
+            prior: A probability distribution that expresses prior knowledge about the
+                parameters, e.g. which ranges are meaningful for them. Must be a PyTorch
+                distribution, see FAQ for details on how to use custom distributions.
+            device: torch device on which to train the neural net and on which to
+                perform all posterior operations, e.g. gpu or cpu.
+            estimator: The estimator that the posterior is based on.
+            **kwargs: Additional method-specific parameters. Supported keys:
+        Returns:
+            NeuralPosterior object.
+        """
+        posterior = None
+        if sample_with == "mcmc":
+            posterior = MCMCPosterior(
+                potential_fn=potential_fn,
+                theta_transform=theta_transform,
+                proposal=prior,
+                method=kwargs.get("mcmc_method", "slice_np_vectorized"),
+                device=device,
+                **(kwargs.get("mcmc_parameters") or {}),
+            )
+        elif sample_with == "rejection":
+            posterior = RejectionPosterior(
+                potential_fn=potential_fn,
+                proposal=prior,
+                device=device,
+                **(kwargs.get("rejection_sampling_parameters") or {}),
+            )
+        elif sample_with == "vi":
+            posterior = VIPosterior(
+                potential_fn=potential_fn,
+                theta_transform=theta_transform,
+                prior=prior,
+                vi_method=kwargs.get("vi_method", "rKL"),
+                device=device,
+                **(kwargs.get("vi_parameters") or {}),
+            )
+        elif sample_with == "importance":
+            posterior = ImportanceSamplingPosterior(
+                potential_fn=potential_fn,
+                proposal=prior,
+                device=device,
+                **(kwargs.get("importance_sampling_parameters") or {}),
+            )
+        elif sample_with == "direct":
+            posterior_estimator = estimator
+            assert isinstance(posterior_estimator, ConditionalDensityEstimator), (
+                f"Expected posterior_estimator to be an instance of "
+                " ConditionalDensityEstimator, "
+                f"but got {type(posterior_estimator).__name__} instead."
+            )
+            posterior = DirectPosterior(
+                posterior_estimator=posterior_estimator,
+                prior=prior,
+                device=device,
+                **(kwargs.get("direct_sampling_parameters") or {}),
+            )
+        else:
+            raise NotImplementedError
+
+        return posterior
 
     def get_dataloaders(
         self,
