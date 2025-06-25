@@ -11,13 +11,13 @@ from sbi import utils as utils
 from sbi.inference.posteriors.vector_field_posterior import VectorFieldPosterior
 from sbi.inference.trainers.npse.vector_field_inference import (
     VectorFieldEstimatorBuilder,
-    VectorFieldInference,
+    VectorFieldTrainer,
 )
 from sbi.neural_nets import flowmatching_nn
 from sbi.neural_nets.estimators import ConditionalVectorFieldEstimator
 
 
-class FMPE(VectorFieldInference):
+class FMPE(VectorFieldTrainer):
     """Flow Matching Posterior Estimation (FMPE)."""
 
     def __init__(

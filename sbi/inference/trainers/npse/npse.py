@@ -9,13 +9,13 @@ from torch.utils.tensorboard.writer import SummaryWriter
 from sbi.inference.posteriors.vector_field_posterior import VectorFieldPosterior
 from sbi.inference.trainers.npse.vector_field_inference import (
     VectorFieldEstimatorBuilder,
-    VectorFieldInference,
+    VectorFieldTrainer,
 )
 from sbi.neural_nets.estimators import ConditionalVectorFieldEstimator
 from sbi.neural_nets.factory import posterior_score_nn
 
 
-class NPSE(VectorFieldInference):
+class NPSE(VectorFieldTrainer):
     """Neural Posterior Score Estimation as in Geffner et al. and Sharrock et al.
 
     Instead of performing conditonal *density* estimation, NPSE methods perform
