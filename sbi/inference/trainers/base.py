@@ -22,12 +22,14 @@ from sbi.inference.posteriors.mcmc_posterior import MCMCPosterior
 from sbi.inference.posteriors.rejection_posterior import RejectionPosterior
 from sbi.inference.posteriors.vector_field_posterior import VectorFieldPosterior
 from sbi.inference.posteriors.vi_posterior import VIPosterior
+from sbi.inference.potentials.base_potential import BasePotential
 from sbi.neural_nets.estimators.base import (
     ConditionalDensityEstimator,
     ConditionalEstimator,
     ConditionalVectorFieldEstimator,
 )
 from sbi.neural_nets.ratio_estimators import RatioEstimator
+from sbi.sbi_types import TorchTransform
 from sbi.utils import (
     check_prior,
     get_log_root,
@@ -349,13 +351,6 @@ class NeuralInference(ABC):
         Returns:
             NeuralPosterior object.
         """
-        if estimator is not None and not isinstance(
-            estimator, (ConditionalEstimator, RatioEstimator)
-        ):
-            raise TypeError(
-                "estimator must be ConditionalEstimator or RatioEstimator,",
-                " got {type(estimator).__name__}",
-            )
 
         if prior is None:
             cls_name = self.__class__.__name__
@@ -373,6 +368,11 @@ class NeuralInference(ABC):
             # If internal net is used device is defined.
             device = self._device
         else:
+            if not isinstance(estimator, (ConditionalEstimator, RatioEstimator)):
+                raise TypeError(
+                    "estimator must be ConditionalEstimator or RatioEstimator,",
+                    f" got {type(estimator).__name__}",
+                )
             # Otherwise, infer it from the device of the net parameters.
             device = str(next(estimator.parameters()).device)
 
@@ -396,7 +396,7 @@ class NeuralInference(ABC):
         self,
         prior: Distribution,
         estimator: Union[RatioEstimator, ConditionalEstimator],
-    ) -> Tuple:
+    ) -> Tuple[BasePotential, TorchTransform]:
         """Subclass-specific potential creation"""
         pass
 

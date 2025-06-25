@@ -1,7 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Callable, Optional, Tuple, Union
+from typing import Optional, Tuple, Union
 
 import torch
 from torch import Tensor, nn
@@ -18,7 +18,7 @@ def ratio_estimator_based_potential(
     prior: Distribution,
     x_o: Optional[Tensor],
     enable_transform: bool = True,
-) -> Tuple[Callable, TorchTransform]:
+) -> Tuple["RatioBasedPotential", TorchTransform]:
     r"""Returns the potential for ratio-based methods.
 
     It also returns a transformation that can be used to transform the potential into

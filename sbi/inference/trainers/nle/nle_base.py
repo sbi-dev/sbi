@@ -15,6 +15,7 @@ from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials import likelihood_estimator_based_potential
+from sbi.inference.potentials.likelihood_based_potential import LikelihoodBasedPotential
 from sbi.inference.trainers.base import NeuralInference
 from sbi.neural_nets import likelihood_nn
 from sbi.neural_nets.estimators import ConditionalDensityEstimator
@@ -284,7 +285,7 @@ class LikelihoodEstimatorTrainer(NeuralInference, ABC):
 
     def _get_potential_function(
         self, prior: Distribution, estimator: ConditionalDensityEstimator
-    ) -> Tuple[Callable, TorchTransform]:
+    ) -> Tuple[LikelihoodBasedPotential, TorchTransform]:
         r"""Gets potential :math:`\log(p(x_o|\theta)p(\theta))` for
         likelihood estimator.
 

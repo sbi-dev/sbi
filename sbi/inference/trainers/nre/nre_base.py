@@ -4,7 +4,7 @@
 import warnings
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from typing import Any, Callable, Dict, Literal, Optional, Protocol, Tuple, Union
+from typing import Any, Dict, Literal, Optional, Protocol, Tuple, Union
 
 import torch
 from torch import Tensor, eye, nn, ones
@@ -15,6 +15,7 @@ from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials import ratio_estimator_based_potential
+from sbi.inference.potentials.ratio_based_potential import RatioBasedPotential
 from sbi.inference.trainers.base import NeuralInference
 from sbi.neural_nets import classifier_nn
 from sbi.neural_nets.ratio_estimators import RatioEstimator
@@ -349,7 +350,7 @@ class RatioEstimatorTrainer(NeuralInference, ABC):
 
     def _get_potential_function(
         self, prior: Distribution, estimator: RatioEstimator
-    ) -> Tuple[Callable, TorchTransform]:
+    ) -> Tuple[RatioBasedPotential, TorchTransform]:
         r"""Gets the potential for ratio-based methods.
 
         It also returns a transformation that can be used to transform the potential

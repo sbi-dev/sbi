@@ -4,7 +4,7 @@
 import time
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from typing import Any, Callable, Optional, Protocol, Union
+from typing import Any, Callable, Optional, Protocol, Tuple, Union
 
 import torch
 from torch import Tensor, ones
@@ -18,7 +18,12 @@ from sbi.inference import NeuralInference
 from sbi.inference.posteriors import (
     DirectPosterior,
 )
+from sbi.inference.potentials.vector_field_potential import (
+    VectorFieldBasedPotential,
+    vector_field_estimator_based_potential,
+)
 from sbi.neural_nets.estimators import ConditionalVectorFieldEstimator
+from sbi.sbi_types import TorchTransform
 from sbi.utils import (
     check_estimator_arg,
     handle_invalid_x,
@@ -480,8 +485,15 @@ class VectorFieldInference(NeuralInference, ABC):
 
         return deepcopy(self._neural_net)
 
-    def _get_potential_function(self, prior, estimator):
-        pass
+    def _get_potential_function(
+        self, prior: Distribution, estimator: ConditionalVectorFieldEstimator
+    ) -> Tuple[VectorFieldBasedPotential, TorchTransform]:
+        potential_fn, theta_transform = vector_field_estimator_based_potential(
+            estimator,
+            prior,
+            x_o=None,
+        )
+        return potential_fn, theta_transform
 
     def _loss_proposal_posterior(
         self,
