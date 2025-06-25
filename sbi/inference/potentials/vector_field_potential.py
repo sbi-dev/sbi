@@ -37,6 +37,9 @@ def vector_field_estimator_based_potential(
         enable_transform: Whether to enable transforms. Not supported yet.
         **kwargs: Additional keyword arguments passed to
             `VectorFieldBasedPotential`.
+    Returns:
+        The potential function and a transformation that maps
+        to unconstrained space.
     """
     device = str(next(vector_field_estimator.parameters()).device)
 

@@ -26,7 +26,7 @@ def likelihood_estimator_based_potential(
     prior: Distribution,  # type: ignore
     x_o: Optional[Tensor],
     enable_transform: bool = True,
-) -> Tuple[Callable, TorchTransform]:
+) -> Tuple["LikelihoodBasedPotential", TorchTransform]:
     r"""Returns potential :math:`\log(p(x_o|\theta)p(\theta))` for likelihood estimator.
 
     It also returns a transformation that can be used to transform the potential into
