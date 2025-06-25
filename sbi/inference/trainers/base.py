@@ -28,7 +28,6 @@ from sbi.neural_nets.estimators.base import (
     ConditionalVectorFieldEstimator,
 )
 from sbi.neural_nets.ratio_estimators import RatioEstimator
-from sbi.sbi_types import TorchTransform
 from sbi.utils import (
     check_prior,
     get_log_root,
@@ -379,14 +378,11 @@ class NeuralInference(ABC):
 
         assert estimator is not None, "Expected a valid estimator object, but got None."
 
-        potential_fn, theta_transform = self._get_potential_function(prior, estimator)
         self._posterior = self._create_posterior(
-            potential_fn,
-            theta_transform,
+            estimator,
             sample_with,
             prior,
             device,
-            estimator,
             **kwargs,
         )
 
@@ -406,14 +402,12 @@ class NeuralInference(ABC):
 
     def _create_posterior(
         self,
-        potential_fn: Callable,
-        theta_transform: TorchTransform,
+        estimator: Union[RatioEstimator, ConditionalEstimator],
         sample_with: Literal[
             "mcmc", "rejection", "vi", "importance", "direct", "sde", "ode"
         ],
         prior: Distribution,
         device: Union[str, torch.device],
-        estimator: Union[RatioEstimator, ConditionalEstimator],
         **kwargs,
     ) -> NeuralPosterior:
         """
@@ -445,39 +439,8 @@ class NeuralInference(ABC):
             NeuralPosterior object.
         """
         posterior = None
-        if sample_with == "mcmc":
-            posterior = MCMCPosterior(
-                potential_fn=potential_fn,
-                theta_transform=theta_transform,
-                proposal=prior,
-                method=kwargs.get("mcmc_method", "slice_np_vectorized"),
-                device=device,
-                **(kwargs.get("mcmc_parameters") or {}),
-            )
-        elif sample_with == "rejection":
-            posterior = RejectionPosterior(
-                potential_fn=potential_fn,
-                proposal=prior,
-                device=device,
-                **(kwargs.get("rejection_sampling_parameters") or {}),
-            )
-        elif sample_with == "vi":
-            posterior = VIPosterior(
-                potential_fn=potential_fn,
-                theta_transform=theta_transform,
-                prior=prior,
-                vi_method=kwargs.get("vi_method", "rKL"),
-                device=device,
-                **(kwargs.get("vi_parameters") or {}),
-            )
-        elif sample_with == "importance":
-            posterior = ImportanceSamplingPosterior(
-                potential_fn=potential_fn,
-                proposal=prior,
-                device=device,
-                **(kwargs.get("importance_sampling_parameters") or {}),
-            )
-        elif sample_with == "direct":
+
+        if sample_with == "direct":
             posterior_estimator = estimator
             assert isinstance(posterior_estimator, ConditionalDensityEstimator), (
                 f"Expected posterior_estimator to be an instance of "
@@ -507,7 +470,44 @@ class NeuralInference(ABC):
                 **kwargs,
             )
         else:
-            raise NotImplementedError
+            potential_fn, theta_transform = self._get_potential_function(
+                prior, estimator
+            )
+            if sample_with == "mcmc":
+                posterior = MCMCPosterior(
+                    potential_fn=potential_fn,
+                    theta_transform=theta_transform,
+                    proposal=prior,
+                    method=kwargs.get("mcmc_method", "slice_np_vectorized"),
+                    device=device,
+                    **(kwargs.get("mcmc_parameters") or {}),
+                )
+            elif sample_with == "rejection":
+                posterior = RejectionPosterior(
+                    potential_fn=potential_fn,
+                    proposal=prior,
+                    device=device,
+                    **(kwargs.get("rejection_sampling_parameters") or {}),
+                )
+            elif sample_with == "vi":
+                posterior = VIPosterior(
+                    potential_fn=potential_fn,
+                    theta_transform=theta_transform,
+                    prior=prior,
+                    vi_method=kwargs.get("vi_method", "rKL"),
+                    device=device,
+                    **(kwargs.get("vi_parameters") or {}),
+                )
+            elif sample_with == "importance":
+                posterior = ImportanceSamplingPosterior(
+                    potential_fn=potential_fn,
+                    proposal=prior,
+                    device=device,
+                    **(kwargs.get("importance_sampling_parameters") or {}),
+                )
+
+            else:
+                raise NotImplementedError
 
         return posterior
 
