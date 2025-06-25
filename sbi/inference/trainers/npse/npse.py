@@ -6,7 +6,7 @@ from typing import Literal, Optional, Union
 from torch.distributions import Distribution
 from torch.utils.tensorboard.writer import SummaryWriter
 
-from sbi.inference.posteriors.vector_field_posterior import VectorFieldPosterior
+from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.trainers.npse.vector_field_inference import (
     VectorFieldEstimatorBuilder,
     VectorFieldInference,
@@ -84,7 +84,7 @@ class NPSE(VectorFieldInference):
         prior: Optional[Distribution] = None,
         sample_with: Literal["ode", "sde"] = "sde",
         **kwargs,
-    ) -> VectorFieldPosterior:
+    ) -> NeuralPosterior:
         r"""Build posterior from the vector field estimator.
 
         Note that this is the same as the FMPE posterior, but the sample_with
@@ -112,8 +112,8 @@ class NPSE(VectorFieldInference):
         Returns:
             Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods.
         """
-        return self._build_posterior(
-            vector_field_estimator=vector_field_estimator,
+        return super().build_posterior(
+            estimator=vector_field_estimator,
             prior=prior,
             sample_with=sample_with,
             **kwargs,

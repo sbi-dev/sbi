@@ -20,8 +20,12 @@ from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.inference.posteriors.importance_posterior import ImportanceSamplingPosterior
 from sbi.inference.posteriors.mcmc_posterior import MCMCPosterior
 from sbi.inference.posteriors.rejection_posterior import RejectionPosterior
+from sbi.inference.posteriors.vector_field_posterior import VectorFieldPosterior
 from sbi.inference.posteriors.vi_posterior import VIPosterior
-from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
+from sbi.neural_nets.estimators.base import (
+    ConditionalDensityEstimator,
+    ConditionalVectorFieldEstimator,
+)
 from sbi.sbi_types import TorchTransform
 from sbi.utils import (
     check_prior,
@@ -317,7 +321,9 @@ class NeuralInference(ABC):
         self,
         estimator: Optional[Union[nn.Module, ConditionalDensityEstimator]],
         prior: Optional[Distribution],
-        sample_with: Literal["mcmc", "rejection", "vi", "importance", "direct"],
+        sample_with: Literal[
+            "mcmc", "rejection", "vi", "importance", "direct", "sde", "ode"
+        ],
         **kwargs,
     ) -> NeuralPosterior:
         r"""Method for building posteriors.
@@ -336,6 +342,8 @@ class NeuralInference(ABC):
                 - "vi"
                 - "importance"
                 - "direct"
+                - "sde"
+                - "ode"
             **kwargs: Additional method-specific parameters.
         Returns:
             NeuralPosterior object.
@@ -390,7 +398,9 @@ class NeuralInference(ABC):
         self,
         potential_fn: Callable,
         theta_transform: TorchTransform,
-        sample_with: Literal["mcmc", "rejection", "vi", "importance", "direct"],
+        sample_with: Literal[
+            "mcmc", "rejection", "vi", "importance", "direct", "sde", "ode"
+        ],
         prior: Distribution,
         device: Union[str, torch.device],
         estimator: Union[nn.Module, ConditionalDensityEstimator],
@@ -412,6 +422,8 @@ class NeuralInference(ABC):
                 - "vi"
                 - "importance"
                 - "direct"
+                - "sde"
+                - "ode"
             prior: A probability distribution that expresses prior knowledge about the
                 parameters, e.g. which ranges are meaningful for them. Must be a PyTorch
                 distribution, see FAQ for details on how to use custom distributions.
@@ -467,6 +479,22 @@ class NeuralInference(ABC):
                 prior=prior,
                 device=device,
                 **(kwargs.get("direct_sampling_parameters") or {}),
+            )
+        elif sample_with in ("sde", "ode"):
+            vector_field_estimator = estimator
+            assert isinstance(
+                vector_field_estimator, ConditionalVectorFieldEstimator
+            ), (
+                f"Expected vector_field_estimator to be an instance of "
+                " ConditionalVectorFieldEstimator, "
+                f"but got {type(vector_field_estimator).__name__} instead."
+            )
+            posterior = VectorFieldPosterior(
+                vector_field_estimator,
+                prior,
+                device=device,
+                sample_with=sample_with,
+                **kwargs,
             )
         else:
             raise NotImplementedError

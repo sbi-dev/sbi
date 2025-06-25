@@ -4,7 +4,7 @@
 import time
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from typing import Any, Callable, Literal, Optional, Protocol, Union
+from typing import Any, Callable, Optional, Protocol, Union
 
 import torch
 from torch import Tensor, ones
@@ -18,7 +18,6 @@ from sbi.inference import NeuralInference
 from sbi.inference.posteriors import (
     DirectPosterior,
 )
-from sbi.inference.posteriors.vector_field_posterior import VectorFieldPosterior
 from sbi.neural_nets.estimators import ConditionalVectorFieldEstimator
 from sbi.utils import (
     check_estimator_arg,
@@ -483,69 +482,6 @@ class VectorFieldInference(NeuralInference, ABC):
 
     def _get_potential_function(self, prior, estimator):
         pass
-
-    def _build_posterior(
-        self,
-        vector_field_estimator: Optional[ConditionalVectorFieldEstimator] = None,
-        prior: Optional[Distribution] = None,
-        sample_with: Literal["ode", "sde"] = "sde",
-        **kwargs,
-    ) -> VectorFieldPosterior:
-        r"""Build posterior from the vector field estimator.
-
-        For NPSE, the posterior distribution that is returned here implements the
-        following functionality over the raw neural density estimator:
-        - correct the calculation of the log probability such that it compensates for
-            the leakage.
-        - reject samples that lie outside of the prior bounds.
-
-        Args:
-            vector_field_estimator: The vector field estimator that the posterior
-                is based on. If `None`, use the latest vector field estimator that was
-                trained.
-            prior: Prior distribution.
-            sample_with: Method to use for sampling from the posterior. Can be one of
-                'sde' (default) or 'ode'. The 'sde' method uses the vector field to
-                do a Langevin diffusion step, while the 'ode' solves a probabilistic ODE
-                with a numerical ODE solver.
-            **kwargs: Additional keyword arguments passed to
-                `VectorFieldBasedPotential`.
-
-        Returns:
-            Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods.
-        """
-        if prior is None:
-            cls_name = self.__class__.__name__
-            assert self._prior is not None, (
-                "You did not pass a prior. You have to pass the prior either at "
-                f"initialization `inference = {cls_name}(prior)` or to "
-                "`.build_posterior(prior=prior)`."
-            )
-            prior = self._prior
-        else:
-            utils.check_prior(prior)
-
-        if vector_field_estimator is None:
-            vector_field_estimator = self._neural_net
-            # If internal net is used device is defined.
-            device = self._device
-        # Otherwise, infer it from the device of the net parameters.
-        else:
-            device = str(next(vector_field_estimator.parameters()).device)
-
-        posterior = VectorFieldPosterior(
-            vector_field_estimator,
-            prior,
-            device=device,
-            sample_with=sample_with,
-            **kwargs,
-        )
-
-        self._posterior = posterior
-        # Store models at end of each round.
-        self._model_bank.append(deepcopy(self._posterior))
-
-        return deepcopy(self._posterior)
 
     def _loss_proposal_posterior(
         self,

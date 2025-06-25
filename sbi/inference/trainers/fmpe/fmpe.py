@@ -8,7 +8,7 @@ from torch.distributions import Distribution
 from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi import utils as utils
-from sbi.inference.posteriors.vector_field_posterior import VectorFieldPosterior
+from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.trainers.npse.vector_field_inference import (
     VectorFieldEstimatorBuilder,
     VectorFieldInference,
@@ -69,7 +69,7 @@ class FMPE(VectorFieldInference):
         prior: Optional[Distribution] = None,
         sample_with: Literal["ode", "sde"] = "ode",
         **kwargs,
-    ) -> VectorFieldPosterior:
+    ) -> NeuralPosterior:
         r"""Build posterior from the flow matching estimator.
 
         Note that this is the same as the NPSE posterior, but the sample_with method
@@ -98,8 +98,8 @@ class FMPE(VectorFieldInference):
         Returns:
             Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods.
         """
-        return self._build_posterior(
-            vector_field_estimator=vector_field_estimator,
+        return super().build_posterior(
+            estimator=vector_field_estimator,
             prior=prior,
             sample_with=sample_with,
             **kwargs,
