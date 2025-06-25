@@ -348,7 +348,7 @@ class RatioEstimatorTrainer(NeuralInference, ABC):
         raise NotImplementedError
 
     def _get_potential_function(
-        self, prior: Distribution, estimator: nn.Module
+        self, prior: Distribution, estimator: RatioEstimator
     ) -> Tuple[Callable, TorchTransform]:
         r"""Gets the potential for ratio-based methods.
 
@@ -373,7 +373,7 @@ class RatioEstimatorTrainer(NeuralInference, ABC):
 
     def build_posterior(
         self,
-        density_estimator: Optional[nn.Module] = None,
+        density_estimator: Optional[RatioEstimator] = None,
         prior: Optional[Distribution] = None,
         sample_with: Literal["mcmc", "rejection", "vi", "importance"] = "mcmc",
         mcmc_method: Literal[

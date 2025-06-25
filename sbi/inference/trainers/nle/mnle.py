@@ -8,7 +8,7 @@ from torch.distributions import Distribution
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.trainers.nle.nle_base import LikelihoodEstimatorTrainer
 from sbi.neural_nets.estimators import MixedDensityEstimator
-from sbi.sbi_types import TensorboardSummaryWriter, TorchModule
+from sbi.sbi_types import TensorboardSummaryWriter
 from sbi.utils.sbiutils import del_entries
 
 
@@ -89,7 +89,7 @@ class MNLE(LikelihoodEstimatorTrainer):
 
     def build_posterior(
         self,
-        density_estimator: Optional[TorchModule] = None,
+        density_estimator: Optional[MixedDensityEstimator] = None,
         prior: Optional[Distribution] = None,
         sample_with: Literal["mcmc", "rejection", "vi"] = "mcmc",
         mcmc_method: Literal[

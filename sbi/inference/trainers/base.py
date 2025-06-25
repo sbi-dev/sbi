@@ -9,7 +9,7 @@ from typing import Any, Callable, Dict, Literal, Optional, Tuple, Union
 from warnings import warn
 
 import torch
-from torch import Tensor, nn
+from torch import Tensor
 from torch.distributions import Distribution
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
@@ -24,8 +24,10 @@ from sbi.inference.posteriors.vector_field_posterior import VectorFieldPosterior
 from sbi.inference.posteriors.vi_posterior import VIPosterior
 from sbi.neural_nets.estimators.base import (
     ConditionalDensityEstimator,
+    ConditionalEstimator,
     ConditionalVectorFieldEstimator,
 )
+from sbi.neural_nets.ratio_estimators import RatioEstimator
 from sbi.sbi_types import TorchTransform
 from sbi.utils import (
     check_prior,
@@ -319,7 +321,7 @@ class NeuralInference(ABC):
 
     def build_posterior(
         self,
-        estimator: Optional[Union[nn.Module, ConditionalDensityEstimator]],
+        estimator: Optional[Union[RatioEstimator, ConditionalEstimator]],
         prior: Optional[Distribution],
         sample_with: Literal[
             "mcmc", "rejection", "vi", "importance", "direct", "sde", "ode"
@@ -348,6 +350,14 @@ class NeuralInference(ABC):
         Returns:
             NeuralPosterior object.
         """
+        if estimator is not None and not isinstance(
+            estimator, (ConditionalEstimator, RatioEstimator)
+        ):
+            raise TypeError(
+                "estimator must be ConditionalEstimator or RatioEstimator,",
+                " got {type(estimator).__name__}",
+            )
+
         if prior is None:
             cls_name = self.__class__.__name__
             assert (
@@ -389,7 +399,7 @@ class NeuralInference(ABC):
     def _get_potential_function(
         self,
         prior: Distribution,
-        estimator: Union[nn.Module, ConditionalDensityEstimator],
+        estimator: Union[RatioEstimator, ConditionalEstimator],
     ) -> Tuple:
         """Subclass-specific potential creation"""
         pass
@@ -403,7 +413,7 @@ class NeuralInference(ABC):
         ],
         prior: Distribution,
         device: Union[str, torch.device],
-        estimator: Union[nn.Module, ConditionalDensityEstimator],
+        estimator: Union[RatioEstimator, ConditionalEstimator],
         **kwargs,
     ) -> NeuralPosterior:
         """
