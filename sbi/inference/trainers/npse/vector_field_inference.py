@@ -488,6 +488,15 @@ class VectorFieldInference(NeuralInference, ABC):
     def _get_potential_function(
         self, prior: Distribution, estimator: ConditionalVectorFieldEstimator
     ) -> Tuple[VectorFieldBasedPotential, TorchTransform]:
+        r"""Gets the potential function gradient for vector field estimators.
+
+        Args:
+            prior: The prior distribution.
+            estimator: The neural network modelling the vector field.
+        Returns:
+            The potential function and a transformation that maps
+            to unconstrained space.
+        """
         potential_fn, theta_transform = vector_field_estimator_based_potential(
             estimator,
             prior,
