@@ -418,8 +418,7 @@ class NeuralInference(ABC):
         the posterior with the provided `potential_fn`, `theta_transform`, and `prior`.
 
         Args:
-            potential_fn: The potential function from which to draw samples.
-            theta_transform: Transformation that will be applied during sampling.
+            estimator: The estimator that the posterior is based on.
             sample_with: The inference method to use. Must be one of:
                 - "mcmc"
                 - "rejection"
@@ -433,12 +432,10 @@ class NeuralInference(ABC):
                 distribution, see FAQ for details on how to use custom distributions.
             device: torch device on which to train the neural net and on which to
                 perform all posterior operations, e.g. gpu or cpu.
-            estimator: The estimator that the posterior is based on.
             **kwargs: Additional method-specific parameters. Supported keys:
         Returns:
             NeuralPosterior object.
         """
-        posterior = None
 
         if sample_with == "direct":
             posterior_estimator = estimator
@@ -447,7 +444,7 @@ class NeuralInference(ABC):
                 " ConditionalDensityEstimator, "
                 f"but got {type(posterior_estimator).__name__} instead."
             )
-            posterior = DirectPosterior(
+            return DirectPosterior(
                 posterior_estimator=posterior_estimator,
                 prior=prior,
                 device=device,
@@ -462,54 +459,50 @@ class NeuralInference(ABC):
                 " ConditionalVectorFieldEstimator, "
                 f"but got {type(vector_field_estimator).__name__} instead."
             )
-            posterior = VectorFieldPosterior(
+            return VectorFieldPosterior(
                 vector_field_estimator,
                 prior,
                 device=device,
                 sample_with=sample_with,
                 **kwargs,
             )
-        else:
-            potential_fn, theta_transform = self._get_potential_function(
-                prior, estimator
+
+        # Posteriors requiring potential_fn and theta_transform
+        potential_fn, theta_transform = self._get_potential_function(prior, estimator)
+        if sample_with == "mcmc":
+            return MCMCPosterior(
+                potential_fn=potential_fn,
+                theta_transform=theta_transform,
+                proposal=prior,
+                method=kwargs.get("mcmc_method", "slice_np_vectorized"),
+                device=device,
+                **(kwargs.get("mcmc_parameters") or {}),
             )
-            if sample_with == "mcmc":
-                posterior = MCMCPosterior(
-                    potential_fn=potential_fn,
-                    theta_transform=theta_transform,
-                    proposal=prior,
-                    method=kwargs.get("mcmc_method", "slice_np_vectorized"),
-                    device=device,
-                    **(kwargs.get("mcmc_parameters") or {}),
-                )
-            elif sample_with == "rejection":
-                posterior = RejectionPosterior(
-                    potential_fn=potential_fn,
-                    proposal=prior,
-                    device=device,
-                    **(kwargs.get("rejection_sampling_parameters") or {}),
-                )
-            elif sample_with == "vi":
-                posterior = VIPosterior(
-                    potential_fn=potential_fn,
-                    theta_transform=theta_transform,
-                    prior=prior,
-                    vi_method=kwargs.get("vi_method", "rKL"),
-                    device=device,
-                    **(kwargs.get("vi_parameters") or {}),
-                )
-            elif sample_with == "importance":
-                posterior = ImportanceSamplingPosterior(
-                    potential_fn=potential_fn,
-                    proposal=prior,
-                    device=device,
-                    **(kwargs.get("importance_sampling_parameters") or {}),
-                )
+        elif sample_with == "rejection":
+            return RejectionPosterior(
+                potential_fn=potential_fn,
+                proposal=prior,
+                device=device,
+                **(kwargs.get("rejection_sampling_parameters") or {}),
+            )
+        elif sample_with == "vi":
+            return VIPosterior(
+                potential_fn=potential_fn,
+                theta_transform=theta_transform,
+                prior=prior,
+                vi_method=kwargs.get("vi_method", "rKL"),
+                device=device,
+                **(kwargs.get("vi_parameters") or {}),
+            )
+        elif sample_with == "importance":
+            return ImportanceSamplingPosterior(
+                potential_fn=potential_fn,
+                proposal=prior,
+                device=device,
+                **(kwargs.get("importance_sampling_parameters") or {}),
+            )
 
-            else:
-                raise NotImplementedError
-
-        return posterior
+        raise NotImplementedError(f"Sampling method '{sample_with}' is not supported.")
 
     def get_dataloaders(
         self,
