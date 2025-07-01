@@ -320,6 +320,15 @@ class NeuralInference(ABC):
     ) -> NeuralPosterior:
         raise NotImplementedError
 
+    @abstractmethod
+    def _get_potential_function(
+        self,
+        prior: Distribution,
+        estimator: Union[RatioEstimator, ConditionalEstimator],
+    ) -> Tuple[BasePotential, TorchTransform]:
+        """Subclass-specific potential creation"""
+        pass
+
     def build_posterior(
         self,
         estimator: Optional[Union[RatioEstimator, ConditionalEstimator]],
@@ -334,6 +343,7 @@ class NeuralInference(ABC):
         This method serves as a base method for constructing a posterior based
         on a given estimator and prior. The posterior can be sampled using one of
         several inference methods specified by `sample_with`.
+
         Args:
             estimator: The estimator that the posterior is based on.
             prior: A probability distribution that expresses prior knowledge about the
@@ -348,6 +358,7 @@ class NeuralInference(ABC):
                 - "sde"
                 - "ode"
             **kwargs: Additional method-specific parameters.
+
         Returns:
             NeuralPosterior object.
         """
@@ -391,15 +402,6 @@ class NeuralInference(ABC):
 
         return deepcopy(self._posterior)
 
-    @abstractmethod
-    def _get_potential_function(
-        self,
-        prior: Distribution,
-        estimator: Union[RatioEstimator, ConditionalEstimator],
-    ) -> Tuple[BasePotential, TorchTransform]:
-        """Subclass-specific potential creation"""
-        pass
-
     def _create_posterior(
         self,
         estimator: Union[RatioEstimator, ConditionalEstimator],
@@ -433,6 +435,7 @@ class NeuralInference(ABC):
             device: torch device on which to train the neural net and on which to
                 perform all posterior operations, e.g. gpu or cpu.
             **kwargs: Additional method-specific parameters. Supported keys:
+
         Returns:
             NeuralPosterior object.
         """
