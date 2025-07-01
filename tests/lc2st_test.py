@@ -15,40 +15,88 @@ from sbi.simulators.gaussian_mixture import (
 )
 
 
+@pytest.fixture(scope="session")
+def basic_setup():
+    """Basic setup shared across LC2ST tests."""
+    dim = 2
+    prior = uniform_prior_gaussian_mixture(dim=dim)
+    simulator = gaussian_mixture
+    return {"dim": dim, "prior": prior, "simulator": simulator}
+
+
+@pytest.fixture(scope="session")
+def badly_trained_npe(basic_setup):
+    """Poorly trained NPE for basic functionality and true positive rate tests."""
+    prior = basic_setup["prior"]
+    simulator = basic_setup["simulator"]
+
+    num_train = 100
+    theta_train = prior.sample((num_train,))
+    x_train = simulator(theta_train)
+
+    inference = NPE(prior, density_estimator='maf')
+    inference = inference.append_simulations(theta=theta_train, x=x_train)
+    npe = inference.train(training_batch_size=100, max_num_epochs=1)
+
+    return npe
+
+
+@pytest.fixture(scope="session")
+def well_trained_npe(basic_setup):
+    """Well trained NPE for false positive rate tests."""
+    prior = basic_setup["prior"]
+    simulator = basic_setup["simulator"]
+
+    num_train = 10_000
+    theta_train = prior.sample((num_train,))
+    x_train = simulator(theta_train)
+
+    inference = NPE(prior, density_estimator='maf')
+    inference = inference.append_simulations(theta=theta_train, x=x_train)
+    npe = inference.train(training_batch_size=100)
+
+    return npe
+
+
+@pytest.fixture(scope="session")
+def calibration_data(basic_setup, badly_trained_npe):
+    """Calibration data for LC2ST tests."""
+    prior = basic_setup["prior"]
+    simulator = basic_setup["simulator"]
+    npe = badly_trained_npe
+
+    num_cal = 100  # Smaller for quick tests
+    thetas = prior.sample((num_cal,))
+    xs = simulator(thetas)
+    posterior_samples = npe.sample((1,), xs).reshape(-1, thetas.shape[-1]).detach()
+
+    return {"thetas": thetas, "xs": xs, "posterior_samples": posterior_samples}
+
+
 @pytest.mark.parametrize("method", (LC2ST, LC2ST_NF))
 @pytest.mark.parametrize("classifier", ('mlp', 'random_forest', MLPClassifier))
 @pytest.mark.parametrize("cv_folds", (1, 2))
 @pytest.mark.parametrize("num_ensemble", (1, 3))
 @pytest.mark.parametrize("z_score", (True, False))
-def test_running_lc2st(method, classifier, cv_folds, num_ensemble, z_score):
+def test_running_lc2st(
+    method,
+    classifier,
+    cv_folds,
+    num_ensemble,
+    z_score,
+    calibration_data,
+    badly_trained_npe,
+):
     """Tests running inference, LC2ST-(NF) and then getting test quantities."""
 
-    num_train = 100
-    num_cal = 100
     num_eval = 100
     num_trials_null = 2
 
-    # task
-    dim = 2
-    prior = uniform_prior_gaussian_mixture(dim=dim)
-    simulator = gaussian_mixture
-
-    # training data for the density estimator
-    theta_train = prior.sample((num_train,))
-    x_train = simulator(theta_train)
-
-    # Train the neural posterior estimators
-    inference = NPE(prior, density_estimator='maf')
-    inference = inference.append_simulations(theta=theta_train, x=x_train)
-    npe = inference.train(training_batch_size=100, max_num_epochs=1)
-
-    # calibration data for the test
-    thetas = prior.sample((num_cal,))
-    xs = simulator(thetas)
-    posterior_samples = (
-        npe.sample((1,), condition=xs).reshape(-1, thetas.shape[-1]).detach()
-    )
-    assert posterior_samples.shape == thetas.shape
+    # Get data from fixtures
+    thetas = calibration_data["thetas"]
+    xs = calibration_data["xs"]
+    posterior_samples = calibration_data["posterior_samples"]
+    npe = badly_trained_npe
 
     if method == LC2ST:
         theta_o = (
@@ -107,33 +155,19 @@ def test_running_lc2st(method, classifier, cv_folds, num_ensemble, z_score):
 
 @pytest.mark.slow
 @pytest.mark.parametrize("method", (LC2ST, LC2ST_NF))
-def test_lc2st_true_positiv_rate(method):
+def test_lc2st_true_positiv_rate(method, basic_setup, badly_trained_npe):
     """Tests the true positiv rate of the LC2ST-(NF) test:
     for a "bad" estimator, the LC2ST-(NF) should reject the null hypothesis."""
     num_runs = 100
     confidence_level = 0.95
 
-    # use small num_train and num_epochs to obtain "bad" estimator
-    # (no convergence to the true posterior)
-    num_train = 100
-    num_epochs = 2
-
     num_cal = 1_000
     num_eval = 10_000
 
-    # task
-    dim = 2
-    prior = uniform_prior_gaussian_mixture(dim=dim)
-    simulator = gaussian_mixture
-
-    # training data for the density estimator
-    theta_train = prior.sample((num_train,))
-    x_train = simulator(theta_train)
-
-    # Train the neural posterior estimators
-    inference = NPE(prior, density_estimator='maf')
-    inference = inference.append_simulations(theta=theta_train, x=x_train)
-    npe = inference.train(training_batch_size=100, max_num_epochs=num_epochs)
+    # Get data from fixtures
+    prior = basic_setup["prior"]
+    simulator = basic_setup["simulator"]
+    npe = badly_trained_npe
 
     thetas = prior.sample((num_cal,))
     xs = simulator(thetas)
@@ -186,32 +220,19 @@ def test_lc2st_true_positiv_rate(method):
 
 @pytest.mark.slow
 @pytest.mark.parametrize("method", (LC2ST, LC2ST_NF))
-def test_lc2st_false_positiv_rate(method, set_seed):
+def test_lc2st_false_positiv_rate(method, basic_setup, well_trained_npe, set_seed):
     """Tests the false positiv rate of the LC2ST-(NF) test:
     for a "good" estimator, the LC2ST-(NF) should not reject the null hypothesis."""
     num_runs = 100
     confidence_level = 0.95
 
-    # use big num_train and num_epochs to obtain "good" estimator
-    # (convergence of the estimator)
-    num_train = 10_000
-
     num_cal = 1_000
     num_eval = 10_000
 
-    # task
-    dim = 2
-    prior = uniform_prior_gaussian_mixture(dim=dim)
-    simulator = gaussian_mixture
-
-    # training data for the density estimator
-    theta_train = prior.sample((num_train,))
-    x_train = simulator(theta_train)
-
-    # Train the neural posterior estimators
-    inference = NPE(prior, density_estimator='maf')
-    inference = inference.append_simulations(theta=theta_train, x=x_train)
-    npe = inference.train(training_batch_size=100)
+    # Get data from fixtures
+    prior = basic_setup["prior"]
+    simulator = basic_setup["simulator"]
+    npe = well_trained_npe
 
     thetas = prior.sample((num_cal,))
     xs = simulator(thetas)

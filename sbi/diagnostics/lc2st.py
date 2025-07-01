@@ -312,7 +312,7 @@ class LC2ST:
             trained_clfs=self.trained_clfs,
             return_probs=True,
         )
-        return scores.mean()
+        return float(scores.mean())
 
     def p_value(
         self,
@@ -338,7 +338,7 @@ class LC2ST:
         _, stats_null = self.get_statistics_under_null_hypothesis(
             theta_o=theta_o, x_o=x_o, return_probs=True, verbosity=0
         )
-        return (stat_data < stats_null).mean()
+        return float((stat_data < stats_null).mean())
 
     def reject_test(
         self,
@@ -357,7 +357,7 @@ class LC2ST:
         Returns:
             The L-C2ST result: True if rejected, False otherwise.
         """
-        return self.p_value(theta_o=theta_o, x_o=x_o) < alpha
+        return bool(self.p_value(theta_o=theta_o, x_o=x_o) < alpha)
 
     def train_under_null_hypothesis(
         self,
@@ -739,7 +739,7 @@ def eval_lc2st(
     # probability of being in P (class 0)
     proba = clf.predict_proba(joint_p)[:, 0]  # type: ignore
     # mean squared error between proba and dirac at 0.5
-    score = ((proba - [0.5] * len(proba)) ** 2).mean()
+    score = float(((proba - [0.5] * len(proba)) ** 2).mean())
 
     if return_proba:
         return proba, score
