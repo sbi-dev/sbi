@@ -1018,12 +1018,13 @@ def build_zuko_flow(
     """
     Fundamental building blocks to build a Zuko normalizing flow model.
 
-    There are only 3 cases we consider in the if statements down below:
+    The following cases are considered in the if statements down below:
 
-    z_score_x is independent or none or structured, in which case we just use
-                 the normal standardizing transform.
-    z_score_x is logit but xdist is not valid, in which case we raise an error
-    z_score_x is logit and xdist is valid, in which case we give the logit transform.
+    z_score_x is `independent, `structured` or None, in which case we just use
+        the normal standardizing transform.
+    z_score_x is `transform_to_unconstrained`, in this case, we check if `x_dist` is
+        provided and has a support property. If `x_dist` is not valid (i.e. None
+        or has no support property), we raise an error.
 
     Args:
         which_nf (str): The type of normalizing flow to build.
@@ -1044,11 +1045,12 @@ def build_zuko_flow(
         embedding_net: The embedding network to use. Defaults to nn.Identity().
         x_dist: The distribution over x, used to determine the bounds for the
             unconstrained transformation.
-            - In Neural Posterior Estimation (NPE), x_dist typically corresponds
-            to the prior over x.
+            - In Neural Posterior Estimation (NPE), `x_dist` typically corresponds
+            to the prior over x (e.g., a `BoxUniform`).
             - For Neural Likelihood Estimation (NLE) or Neural Ratio Estimation (NRE),
-            x_dist may instead be a user-specified distribution that captures a
-            rough bounded support of the observed data space.
+            `x_dist` may instead be a user-specified distribution. However, make sure
+            all the data lies within the support of the distribution if you want to
+            use the `transform_to_unconstrained` option for NLE and NRE.
         **kwargs: Additional keyword arguments to pass to the flow constructor.
 
     Returns:
