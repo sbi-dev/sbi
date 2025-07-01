@@ -52,7 +52,7 @@ class VectorFieldPosterior(NeuralPosterior):
         max_sampling_batch_size: int = 10_000,
         device: Optional[Union[str, torch.device]] = None,
         enable_transform: bool = True,
-        sample_with: str = "sde",
+        sample_with: Literal["ode", "sde"] = "sde",
         **kwargs,
     ):
         """

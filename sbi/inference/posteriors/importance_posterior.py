@@ -1,7 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Any, Callable, Optional, Tuple, Union
+from typing import Any, Callable, Literal, Optional, Tuple, Union
 
 import torch
 from torch import Tensor
@@ -30,7 +30,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         potential_fn: Union[Callable, BasePotential],
         proposal: Any,
         theta_transform: Optional[TorchTransform] = None,
-        method: str = "sir",
+        method: Literal["sir", "importance"] = "sir",
         oversampling_factor: int = 32,
         max_sampling_batch_size: int = 10_000,
         device: Optional[Union[str, torch.device]] = None,

@@ -82,7 +82,7 @@ class NPSE(VectorFieldInference):
         self,
         vector_field_estimator: Optional[ConditionalVectorFieldEstimator] = None,
         prior: Optional[Distribution] = None,
-        sample_with: str = "sde",
+        sample_with: Literal["ode", "sde"] = "sde",
         **kwargs,
     ) -> VectorFieldPosterior:
         r"""Build posterior from the vector field estimator.
