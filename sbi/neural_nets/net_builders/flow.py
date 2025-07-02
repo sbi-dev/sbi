@@ -13,10 +13,13 @@ from pyknos.nflows.transforms.splines import (
     rational_quadratic,  # pyright: ignore[reportAttributeAccessIssue]
 )
 from torch import Tensor, nn, relu, tanh, tensor, uint8
+from torch.distributions import Distribution
 
 from sbi.neural_nets.estimators import NFlowsFlow, ZukoFlow, ZukoUnconditionalFlow
 from sbi.utils.nn_utils import MADEMoGWrapper, get_numel
 from sbi.utils.sbiutils import (
+    biject_transform_zuko,
+    mcmc_transform,
     standardizing_net,
     standardizing_transform,
     standardizing_transform_zuko,
@@ -1009,10 +1012,19 @@ def build_zuko_flow(
     hidden_features: Union[Sequence[int], int] = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
+    x_dist: Optional[Distribution] = None,
     **kwargs,
 ) -> ZukoFlow:
     """
     Fundamental building blocks to build a Zuko normalizing flow model.
+
+    The following cases are considered in the if statements down below:
+
+    z_score_x is `independent, `structured` or None, in which case we just use
+        the normal standardizing transform.
+    z_score_x is `transform_to_unconstrained`, in this case, we check if `x_dist` is
+        provided and has a support property. If `x_dist` is not valid (i.e. None
+        or has no support property), we raise an error.
 
     Args:
         which_nf (str): The type of normalizing flow to build.
@@ -1024,11 +1036,21 @@ def build_zuko_flow(
             - `structured`: treat dimensions as related, therefore compute mean and std
             over the entire batch, instead of per-dimension. Should be used when each
             sample is, for example, a time series or an image.
+            - `transform_to_unconstrained`: Transforms to
+            an unbound space, if bounds from `x_dist` are given.
         z_score_y: Whether to z-score ys passing into the network, same options as
             z_score_x.
         hidden_features: The number of hidden features in the flow. Defaults to 50.
         num_transforms: The number of transformations in the flow. Defaults to 5.
         embedding_net: The embedding network to use. Defaults to nn.Identity().
+        x_dist: The distribution over x, used to determine the bounds for the
+            unconstrained transformation.
+            - In Neural Posterior Estimation (NPE), `x_dist` typically corresponds
+            to the prior over x (e.g., a `BoxUniform`).
+            - For Neural Likelihood Estimation (NLE) or Neural Ratio Estimation (NRE),
+            `x_dist` may instead be a user-specified distribution. However, make sure
+            all the data lies within the support of the distribution if you want to
+            use the `transform_to_unconstrained` option for NLE and NRE.
         **kwargs: Additional keyword arguments to pass to the flow constructor.
 
     Returns:
@@ -1066,7 +1088,28 @@ def build_zuko_flow(
         transform = flow_built.transform
 
         z_score_x_bool, structured_x = z_score_parser(z_score_x)
-        if z_score_x_bool:
+
+        # Only x (i.e., prior for NPE) can be transformed to unbound space (not y)
+        # when x_dist is provided.
+        if z_score_x == "transform_to_unconstrained":
+            if x_dist is None:
+                raise ValueError(
+                    "Transformation to unconstrained space requires a distribution "
+                    "provided through `x_dist`."
+                )
+            elif not hasattr(x_dist, "support"):
+                raise ValueError(
+                    "`x_dist` requires a `.support` attribute for"
+                    "an unconstrained transformation."
+                )
+            else:
+                transform_to_unconstrained = mcmc_transform(x_dist)
+                transform = (
+                    biject_transform_zuko(transform_to_unconstrained),
+                    transform,
+                )
+
+        elif z_score_x_bool:
             transform = (
                 standardizing_transform_zuko(batch_x, structured_x),
                 transform,
@@ -1085,7 +1128,26 @@ def build_zuko_flow(
         transforms = flow_built.transform.transforms
 
         z_score_x_bool, structured_x = z_score_parser(z_score_x)
-        if z_score_x_bool:
+
+        if z_score_x == "transform_to_unconstrained":
+            if x_dist is None:
+                raise ValueError(
+                    "Transformation to unconstrained space requires a distribution "
+                    "provided through `x_dist`."
+                )
+            elif not hasattr(x_dist, "support"):
+                raise ValueError(
+                    "`x_dist` requires a `.support` attribute for"
+                    "an unconstrained transformation."
+                )
+            else:
+                transform_to_unconstrained = mcmc_transform(x_dist)
+                transforms = (
+                    biject_transform_zuko(transform_to_unconstrained),
+                    *transforms,
+                )
+
+        elif z_score_x_bool:
             transforms = (
                 standardizing_transform_zuko(batch_x, structured_x),
                 *transforms,
