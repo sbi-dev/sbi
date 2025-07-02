@@ -12,8 +12,8 @@ from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import PolynomialFeatures
 from torch import Tensor
 
-from sbi.inference.abc.distances import Distance
 from sbi.simulators.simutils import simulate_in_batches
+from sbi.utils.metrics import Distance
 
 
 class ABCBASE:
@@ -142,8 +142,8 @@ class ABCBASE:
                 sample_weight=sample_weight,
             )
             theta_adjusted[:, parameter_idx] += regression_model.predict(
-                observation.reshape(1, -1)
+                observation.reshape(1, -1).numpy()
             )
-            theta_adjusted[:, parameter_idx] -= regression_model.predict(x)
+            theta_adjusted[:, parameter_idx] -= regression_model.predict(x.numpy())
 
         return theta_adjusted

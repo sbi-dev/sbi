@@ -112,7 +112,7 @@ def test_smcabc_inference_on_linear_gaussian(
     kde=False,
     kde_bandwidth="cv",
     transform=False,
-    num_simulations=30000,
+    num_simulations=40000,
     num_iid_samples=1,
     distance_kwargs=None,
     ess_min=None,
