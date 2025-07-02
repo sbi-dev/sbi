@@ -147,7 +147,7 @@ class MCABC(ABCBASE):
             pilot_theta = self.prior.sample((num_pilot_simulations,))
             pilot_x = self._batched_simulator(pilot_theta)
 
-            sass_transform = self.get_sass_transform(
+            sass_transform = self._get_sass_transform(
                 pilot_theta, pilot_x, sass_expansion_degree
             )
 
@@ -204,7 +204,9 @@ class MCABC(ABCBASE):
         # Maybe adjust theta with LRA.
         if lra:
             self.logger.info("Running Linear regression adjustment.")
-            final_theta = self.run_lra(theta_accepted, x_accepted, observation=self.x_o)
+            final_theta = self._run_lra(
+                theta_accepted, x_accepted, observation=self.x_o
+            )
         else:
             final_theta = theta_accepted
 

@@ -84,7 +84,7 @@ class ABCBASE:
         self.logger = logging.getLogger(__name__)
 
     @staticmethod
-    def get_sass_transform(
+    def _get_sass_transform(
         theta: torch.Tensor,
         x: torch.Tensor,
         expansion_degree: int = 1,
@@ -121,7 +121,7 @@ class ABCBASE:
         return sumstats_transform
 
     @staticmethod
-    def run_lra(
+    def _run_lra(
         theta: torch.Tensor,
         x: torch.Tensor,
         observation: torch.Tensor,

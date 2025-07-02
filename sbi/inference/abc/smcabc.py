@@ -213,7 +213,7 @@ class SMCABC(ABCBASE):
             self.logger.info(
                 "Running SASS with %s pilot samples.", num_pilot_simulations
             )
-            sass_transform = self.run_sass_set_xo(
+            sass_transform = self._run_sass_set_xo(
                 num_particles,
                 num_pilot_simulations,
                 x_o,
@@ -262,7 +262,7 @@ class SMCABC(ABCBASE):
                 epsilon *= epsilon_decay
 
             # Get kernel variance from previous pop.
-            self.kernel_variance = self.get_kernel_variance(
+            self.kernel_variance = self._get_kernel_variance(
                 all_particles[pop_idx - 1],
                 torch.exp(all_log_weights[pop_idx - 1]),
                 samples_per_dim=500,
@@ -280,7 +280,7 @@ class SMCABC(ABCBASE):
 
             # Resample population if effective sampling size is too small.
             if ess_min is not None:
-                particles, log_weights = self.resample_if_ess_too_small(
+                particles, log_weights = self._resample_if_ess_too_small(
                     particles, log_weights, ess_min, pop_idx
                 )
 
@@ -301,7 +301,7 @@ class SMCABC(ABCBASE):
         # Maybe run LRA and adjust weights.
         if lra:
             self.logger.info("Running Linear regression adjustment.")
-            adjusted_particles, _ = self.run_lra_update_weights(
+            adjusted_particles, _ = self._run_lra_update_weights(
                 particles=all_particles[-1],
                 xs=all_x[-1],
                 observation=process_x(x_o),
