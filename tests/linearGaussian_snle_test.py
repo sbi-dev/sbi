@@ -504,17 +504,28 @@ def test_api_nle_sampling_methods(
     posterior.sample(sample_shape=(num_samples,), show_progress_bars=False)
 
 
-
-
-@pytest.mark.parametrize("num_dim", (1,))  # dim 3 is tested below.
+@pytest.mark.slow
+@pytest.mark.parametrize("num_dim", (1, 2))
 @pytest.mark.parametrize("prior_str", ("uniform", "gaussian"))
-def test_snle_unconstrained_space(
-    num_dim: int, prior_str: str, mcmc_params_fast: dict
+@pytest.mark.parametrize("model_str", ("zuko_maf", "zuko_nsf"))
+def test_c2st_nle_unconstrained_space(
+    num_dim: int, prior_str: str, model_str: str, mcmc_params_accurate: dict
 ):
-    """Test NLE API with 2 rounds, different priors num trials and MAP for unconstrained space."""
-    num_rounds = 2
-    num_samples = 1
-    num_simulations_per_round = 100
+    """Test SNL on linear Gaussian in unconstrained space.
+
+    Args:
+        num_dim: parameter dimension of the gaussian model
+        prior_str: one of "gaussian" or "uniform"
+
+    """
+    num_samples = 500
+    num_simulations = 3000
+    trials_to_test = [1]
+
+    # likelihood_mean will be likelihood_shift+theta
+    likelihood_shift = -1.0 * ones(num_dim)
+    # Use increased cov to avoid too small posterior cov for many trials.
+    likelihood_cov = 0.8 * eye(num_dim)
 
     if prior_str == "gaussian":
         prior_mean = zeros(num_dim)
@@ -523,31 +534,76 @@ def test_snle_unconstrained_space(
     else:
         prior = BoxUniform(-2.0 * ones(num_dim), 2.0 * ones(num_dim))
 
-    simulator = diagonal_linear_gaussian
-    
-    density_estimator_build_fun = likelihood_nn(
-        model="zuko_nsf",
+    def simulator(theta):
+        return linear_gaussian(theta, likelihood_shift, likelihood_cov)
+
+    # Use likelihood_nn with z_score_theta="transform_to_unconstrained"
+    density_estimator = likelihood_nn(
+        model_str,
         hidden_features=60,
         num_transforms=3,
         z_score_theta="transform_to_unconstrained",
         x_dist=prior,
     )
-    
-    inference = NLE(prior=prior, density_estimator=density_estimator_build_fun, show_progress_bars=False)
+    inference = NLE(density_estimator=density_estimator)
 
-    proposals = [prior]
-    for _ in range(num_rounds):
-        theta = proposals[-1].sample((num_simulations_per_round,))
-        x = simulator(theta)
-        inference.append_simulations(theta, x).train(
-            training_batch_size=100, max_num_epochs=2
+    theta = prior.sample((num_simulations,))
+    x = simulator(theta)
+
+    likelihood_estimator = inference.append_simulations(theta, x).train()
+
+    # Test inference amortized over trials.
+    for num_trials in trials_to_test:
+        x_o = zeros((num_trials, num_dim))
+        if prior_str == "gaussian":
+            gt_posterior = true_posterior_linear_gaussian_mvn_prior(
+                x_o, likelihood_shift, likelihood_cov, prior_mean, prior_cov
+            )
+            target_samples = gt_posterior.sample((num_samples,))
+        elif prior_str == "uniform":
+            target_samples = samples_true_posterior_linear_gaussian_uniform_prior(
+                x_o,
+                likelihood_shift,
+                likelihood_cov,
+                prior=prior,
+                num_samples=num_samples,
+            )
+        else:
+            raise ValueError(f"Wrong prior_str: '{prior_str}'.")
+
+        potential_fn, theta_transform = likelihood_estimator_based_potential(
+            prior=prior, likelihood_estimator=likelihood_estimator, x_o=x_o
         )
-        for num_trials in [1, 3]:
-            x_o = zeros((num_trials, num_dim))
-            posterior = inference.build_posterior(
-                mcmc_method="slice_np_vectorized",
-                mcmc_parameters=mcmc_params_fast,
-            ).set_default_x(x_o)
-            posterior.sample(sample_shape=(num_samples,))
-        proposals.append(posterior)
-        posterior.map(num_iter=1)
+        posterior = MCMCPosterior(
+            proposal=prior,
+            potential_fn=potential_fn,
+            theta_transform=theta_transform,
+            method="slice_np_vectorized",
+            **mcmc_params_accurate,
+        )
+
+        samples = posterior.sample(sample_shape=(num_samples,))
+
+        # Check performance based on c2st accuracy.
+        check_c2st(
+            samples,
+            target_samples,
+            alg=f"nle_a-{prior_str}-prior-{model_str}-{num_trials}-trials",
+        )
+
+        map_ = posterior.map(
+            num_init_samples=1_000,
+            init_method="proposal",
+            show_progress_bars=False,
+        )
+
+        if prior_str == "uniform":
+            # Check whether the returned probability outside of the support is zero.
+            posterior_prob = get_prob_outside_uniform_prior(posterior, prior, num_dim)
+            assert posterior_prob == 0.0, (
+                "The posterior probability outside of the prior support is not zero"
+            )
+
+            assert ((map_ - ones(num_dim)) ** 2).sum() < 0.5
+        else:
+            assert ((map_ - gt_posterior.mean) ** 2).sum() < 0.5
