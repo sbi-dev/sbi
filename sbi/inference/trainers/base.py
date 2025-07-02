@@ -329,6 +329,70 @@ class NeuralInference(ABC):
         """Subclass-specific potential creation"""
         pass
 
+    def _resolve_prior(self, prior: Optional[Distribution]) -> Distribution:
+        """
+        Resolves the prior distribution to use.
+
+        If a prior is passed, it is validated and returned.
+        If not passed, attempts to use the stored `self._prior`.
+        Raises an error if no valid prior is available.
+
+        Args:
+            prior: Optional prior distribution to resolve.
+
+        Returns:
+            A valid prior distribution.
+        """
+
+        if prior is None:
+            if self._prior is None:
+                cls_name = self.__class__.__name__
+                raise ValueError(
+                    f"""You did not pass a prior. You have to pass the prior either at
+                    initialization `inference = {cls_name}(prior)` or to `
+                    .build_posterior (prior=prior)`."""
+                )
+            prior = self._prior
+        else:
+            check_prior(prior)
+
+        return prior
+
+    def _resolve_estimator(
+        self, estimator: Optional[Union[RatioEstimator, ConditionalEstimator]]
+    ) -> Tuple[Union[RatioEstimator, ConditionalEstimator], str]:
+        """
+        Resolves the estimator and determines its device.
+
+        If no estimator is provided, the internal neural net (`self._neural_net`)
+        is used and the device is taken from `self._device`. Otherwise, validates
+        the passed estimator and infers its device.
+
+        Args:
+            estimator: Optional estimator to use.
+
+        Returns:
+            A tuple of (estimator, device).
+        """
+
+        if estimator is None:
+            assert self._neural_net is not None, (
+                "Provide an estimator or initialize self._neural_net."
+            )
+            estimator = self._neural_net
+            # If internal net is used device is defined.
+            device = self._device
+        else:
+            if not isinstance(estimator, (ConditionalEstimator, RatioEstimator)):
+                raise TypeError(
+                    "estimator must be ConditionalEstimator or RatioEstimator,"
+                    f" got {type(estimator).__name__}",
+                )
+            # Otherwise, infer it from the device of the net parameters.
+            device = str(next(estimator.parameters()).device)
+
+        return estimator, device
+
     def build_posterior(
         self,
         estimator: Optional[Union[RatioEstimator, ConditionalEstimator]],
@@ -363,36 +427,13 @@ class NeuralInference(ABC):
             NeuralPosterior object.
         """
 
-        if prior is None:
-            cls_name = self.__class__.__name__
-            assert (
-                self._prior is not None
-            ), f"""You did not pass a prior. You have to pass the prior either at
-                initialization `inference = {cls_name}(prior)` or to `.build_posterior
-                (prior=prior)`."""
-            prior = self._prior
-        else:
-            check_prior(prior)
-
-        if estimator is None:
-            estimator = self._neural_net
-            # If internal net is used device is defined.
-            device = self._device
-        else:
-            if not isinstance(estimator, (ConditionalEstimator, RatioEstimator)):
-                raise TypeError(
-                    "estimator must be ConditionalEstimator or RatioEstimator,",
-                    f" got {type(estimator).__name__}",
-                )
-            # Otherwise, infer it from the device of the net parameters.
-            device = str(next(estimator.parameters()).device)
-
-        assert estimator is not None, "Expected a valid estimator object, but got None."
+        prior = self._resolve_prior(prior)
+        estimator, device = self._resolve_estimator(estimator)
 
         self._posterior = self._create_posterior(
             estimator,
-            sample_with,
             prior,
+            sample_with,
             device,
             **kwargs,
         )
@@ -405,10 +446,10 @@ class NeuralInference(ABC):
     def _create_posterior(
         self,
         estimator: Union[RatioEstimator, ConditionalEstimator],
+        prior: Distribution,
         sample_with: Literal[
             "mcmc", "rejection", "vi", "importance", "direct", "sde", "ode"
         ],
-        prior: Distribution,
         device: Union[str, torch.device],
         **kwargs,
     ) -> NeuralPosterior:
@@ -416,11 +457,13 @@ class NeuralInference(ABC):
         Create a posterior object using the specified inference method.
 
         Depending on the value of `sample_with`, this method instantiates one of the
-        supported posterior inference strategies. It configures
-        the posterior with the provided `potential_fn`, `theta_transform`, and `prior`.
+        supported posterior inference strategies.
 
         Args:
             estimator: The estimator that the posterior is based on.
+            prior: A probability distribution that expresses prior knowledge about the
+                parameters, e.g. which ranges are meaningful for them. Must be a PyTorch
+                distribution, see FAQ for details on how to use custom distributions.
             sample_with: The inference method to use. Must be one of:
                 - "mcmc"
                 - "rejection"
@@ -429,12 +472,9 @@ class NeuralInference(ABC):
                 - "direct"
                 - "sde"
                 - "ode"
-            prior: A probability distribution that expresses prior knowledge about the
-                parameters, e.g. which ranges are meaningful for them. Must be a PyTorch
-                distribution, see FAQ for details on how to use custom distributions.
             device: torch device on which to train the neural net and on which to
                 perform all posterior operations, e.g. gpu or cpu.
-            **kwargs: Additional method-specific parameters. Supported keys:
+            **kwargs: Additional method-specific parameters.
 
         Returns:
             NeuralPosterior object.
@@ -447,7 +487,7 @@ class NeuralInference(ABC):
                 " ConditionalDensityEstimator, "
                 f"but got {type(posterior_estimator).__name__} instead."
             )
-            return DirectPosterior(
+            posterior = DirectPosterior(
                 posterior_estimator=posterior_estimator,
                 prior=prior,
                 device=device,
@@ -462,50 +502,56 @@ class NeuralInference(ABC):
                 " ConditionalVectorFieldEstimator, "
                 f"but got {type(vector_field_estimator).__name__} instead."
             )
-            return VectorFieldPosterior(
+            posterior = VectorFieldPosterior(
                 vector_field_estimator,
                 prior,
                 device=device,
                 sample_with=sample_with,
                 **kwargs,
             )
+        else:
+            # Posteriors requiring potential_fn and theta_transform
+            potential_fn, theta_transform = self._get_potential_function(
+                prior, estimator
+            )
+            if sample_with == "mcmc":
+                posterior = MCMCPosterior(
+                    potential_fn=potential_fn,
+                    theta_transform=theta_transform,
+                    proposal=prior,
+                    method=kwargs.get("mcmc_method", "slice_np_vectorized"),
+                    device=device,
+                    **(kwargs.get("mcmc_parameters") or {}),
+                )
+            elif sample_with == "rejection":
+                posterior = RejectionPosterior(
+                    potential_fn=potential_fn,
+                    proposal=prior,
+                    device=device,
+                    **(kwargs.get("rejection_sampling_parameters") or {}),
+                )
+            elif sample_with == "vi":
+                posterior = VIPosterior(
+                    potential_fn=potential_fn,
+                    theta_transform=theta_transform,
+                    prior=prior,
+                    vi_method=kwargs.get("vi_method", "rKL"),
+                    device=device,
+                    **(kwargs.get("vi_parameters") or {}),
+                )
+            elif sample_with == "importance":
+                posterior = ImportanceSamplingPosterior(
+                    potential_fn=potential_fn,
+                    proposal=prior,
+                    device=device,
+                    **(kwargs.get("importance_sampling_parameters") or {}),
+                )
+            else:
+                raise NotImplementedError(
+                    f"Sampling method '{sample_with}' is not supported."
+                )
 
-        # Posteriors requiring potential_fn and theta_transform
-        potential_fn, theta_transform = self._get_potential_function(prior, estimator)
-        if sample_with == "mcmc":
-            return MCMCPosterior(
-                potential_fn=potential_fn,
-                theta_transform=theta_transform,
-                proposal=prior,
-                method=kwargs.get("mcmc_method", "slice_np_vectorized"),
-                device=device,
-                **(kwargs.get("mcmc_parameters") or {}),
-            )
-        elif sample_with == "rejection":
-            return RejectionPosterior(
-                potential_fn=potential_fn,
-                proposal=prior,
-                device=device,
-                **(kwargs.get("rejection_sampling_parameters") or {}),
-            )
-        elif sample_with == "vi":
-            return VIPosterior(
-                potential_fn=potential_fn,
-                theta_transform=theta_transform,
-                prior=prior,
-                vi_method=kwargs.get("vi_method", "rKL"),
-                device=device,
-                **(kwargs.get("vi_parameters") or {}),
-            )
-        elif sample_with == "importance":
-            return ImportanceSamplingPosterior(
-                potential_fn=potential_fn,
-                proposal=prior,
-                device=device,
-                **(kwargs.get("importance_sampling_parameters") or {}),
-            )
-
-        raise NotImplementedError(f"Sampling method '{sample_with}' is not supported.")
+        return posterior
 
     def get_dataloaders(
         self,
