@@ -18,9 +18,11 @@ from sbi.utils.torchutils import BoxUniform
 @pytest.mark.slow
 @pytest.mark.parametrize("num_dim", (1, 2))
 @pytest.mark.parametrize("distance", ("l2", lambda x, xo: norm((x - xo), dim=-1)))
+@pytest.mark.parametrize("eps", (0.05, None))
 def test_mcabc_inference_on_linear_gaussian(
     num_dim,
     distance,
+    eps,
     lra=False,
     sass=False,
     sass_expansion_degree=1,
@@ -31,6 +33,9 @@ def test_mcabc_inference_on_linear_gaussian(
 ):
     x_o = zeros((num_iid_samples, num_dim))
     num_samples = 1000
+    num_simulations = 500000
+    quantile = num_samples / num_simulations
+    dim_scaled_eps = eps * num_dim if eps is not None else None
 
     # likelihood_mean will be likelihood_shift+theta
     likelihood_shift = -1.0 * ones(num_dim)
@@ -57,8 +62,9 @@ def test_mcabc_inference_on_linear_gaussian(
 
     phat = inferer(
         x_o,
-        120000,
-        quantile=0.01,
+        num_simulations,
+        eps=dim_scaled_eps,
+        quantile=quantile if eps is None else None,
         lra=lra,
         sass=sass,
         sass_expansion_degree=sass_expansion_degree,
@@ -68,20 +74,37 @@ def test_mcabc_inference_on_linear_gaussian(
         return_summary=False,
         num_iid_samples=num_iid_samples,
     )
-
     check_c2st(
-        phat.sample((num_samples,)) if kde else phat,
+        phat.sample((num_samples,)) if kde else phat[:num_samples],
         target_samples,
         alg=f"MCABC_lra{lra}_sass{sass}_kde{kde}_{kde_bandwidth}",
     )
 
 
 @pytest.mark.slow
+def test_mcabc_inference_on_linear_gaussian_eps_too_small():
+    num_dim = 1
+    x_o = zeros((1, num_dim))
+    prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
+
+    def simulator(theta):
+        return linear_gaussian(theta, -1.0 * ones(num_dim), 0.3 * eye(num_dim))
+
+    inferer = MCABC(simulator, prior)
+    with pytest.raises(AssertionError):
+        inferer(x_o, 100, eps=1e-12)
+
+
+@pytest.mark.slow
 @pytest.mark.parametrize("num_dim", (1, 2))
 @pytest.mark.parametrize("prior_type", ("uniform", "gaussian"))
+@pytest.mark.parametrize("algorithm_variant", ("A", "B", "C"))
+@pytest.mark.parametrize("kernel", ("gaussian", "uniform"))
 def test_smcabc_inference_on_linear_gaussian(
     num_dim,
     prior_type: str,
+    algorithm_variant: str,
+    kernel: str,
     distance="l2",
     lra=False,
     sass=False,
@@ -89,9 +112,10 @@ def test_smcabc_inference_on_linear_gaussian(
     kde=False,
     kde_bandwidth="cv",
     transform=False,
-    num_simulations=20000,
+    num_simulations=30000,
     num_iid_samples=1,
     distance_kwargs=None,
+    ess_min=None,
 ):
     x_o = zeros((num_iid_samples, num_dim))
     num_samples = 1000
@@ -122,7 +146,8 @@ def test_smcabc_inference_on_linear_gaussian(
         prior,
         distance=distance,
         simulation_batch_size=10000,
-        algorithm_variant="C",
+        algorithm_variant=algorithm_variant,
+        kernel=kernel,
         distance_kwargs=distance_kwargs,
     )
 
@@ -144,10 +169,11 @@ def test_smcabc_inference_on_linear_gaussian(
             transform=biject_to(prior.support) if transform else None,
         ),
         num_iid_samples=num_iid_samples,
+        ess_min=ess_min,
     )
 
     check_c2st(
-        phat.sample((num_samples,)) if kde else phat,
+        phat.sample((num_samples,)) if kde else phat[:num_samples],
         target_samples,
         alg=f"SMCABC-{prior_type}prior-lra{lra}-sass{sass}-kde{kde}-{kde_bandwidth}",
     )
@@ -155,6 +181,18 @@ def test_smcabc_inference_on_linear_gaussian(
     if kde:
         samples = phat.sample((10,))
         phat.log_prob(samples)
+
+
+@pytest.mark.slow
+def test_smcabc_resampling():
+    test_smcabc_inference_on_linear_gaussian(
+        num_dim=1,
+        prior_type="gaussian",
+        algorithm_variant="B",
+        kernel="gaussian",
+        num_simulations=200000,
+        ess_min=0.5,  # Trigger resampling when relative ESS < 0.5 (50% effective)
+    )
 
 
 @pytest.mark.slow
@@ -167,6 +205,7 @@ def test_mcabc_sass_lra(lra, sass_expansion_degree):
         sass=True,
         sass_expansion_degree=sass_expansion_degree,
         distance="l2",
+        eps=None,
     )
 
 
@@ -181,6 +220,8 @@ def test_smcabc_sass_lra(lra, sass_expansion_degree):
         sass_expansion_degree=sass_expansion_degree,
         prior_type="gaussian",
         num_simulations=20000,
+        algorithm_variant="C",
+        kernel="gaussian",
     )
 
 
@@ -188,7 +229,11 @@ def test_smcabc_sass_lra(lra, sass_expansion_degree):
 @pytest.mark.parametrize("kde_bandwidth", ("cv", "silvermann", "scott", 0.1))
 def test_mcabc_kde(kde_bandwidth):
     test_mcabc_inference_on_linear_gaussian(
-        num_dim=2, kde=True, kde_bandwidth=kde_bandwidth, distance="l2"
+        num_dim=2,
+        kde=True,
+        kde_bandwidth=kde_bandwidth,
+        distance="l2",
+        eps=None,
     )
 
 
@@ -203,6 +248,8 @@ def test_smcabc_kde(kde_bandwidth):
         kde=True,
         kde_bandwidth=kde_bandwidth,
         transform=True,
+        algorithm_variant="C",
+        kernel="gaussian",
     )
 
 
@@ -220,6 +267,7 @@ def test_mc_abc_iid_inference(distance, num_iid_samples, distance_kwargs):
         distance=distance,
         num_iid_samples=num_iid_samples,
         distance_kwargs=distance_kwargs,
+        eps=None,
     )
 
 
@@ -229,7 +277,12 @@ def test_mc_abc_iid_inference(distance, num_iid_samples, distance_kwargs):
     (
         ["l2", 1, None, -1],
         ["mmd", 20, {"scale": 1.0}, -1],
-        ["wasserstein", 10, {"epsilon": 1.0, "tol": 1e-6, "max_iter": 1000}, 1000],
+        [
+            "wasserstein",
+            10,
+            {"epsilon": 1.0, "tol": 1e-6, "max_iter": 1000},
+            1000,
+        ],
     ),
 )
 def test_smcabc_iid_inference(
@@ -242,4 +295,6 @@ def test_smcabc_iid_inference(
         num_iid_samples=num_iid_samples,
         num_simulations=20000,
         distance_kwargs=distance_kwargs,
+        algorithm_variant="C",
+        kernel="gaussian",
     )

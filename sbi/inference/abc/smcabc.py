@@ -699,7 +699,10 @@ class SMCABC(ABCBASE):
         """
 
         num_particles = particles.shape[0]
-        ess = (1 / torch.sum(torch.exp(2.0 * log_weights), dim=0)) / num_particles
+        # Calculate relative ESS (ESS/N) which ranges from 0 to 1
+        # This is scale-invariant and commonly used in SMC literature
+        weights = torch.exp(log_weights)
+        ess = ((torch.sum(weights) ** 2) / torch.sum(weights**2)) / num_particles
         # Resampling of weights for low ESS only for Sisson et al. 2007.
         if ess < ess_min:
             self.logger.info("ESS=%s too low, resampling pop %s...", ess, pop_idx)

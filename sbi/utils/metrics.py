@@ -172,6 +172,8 @@ def unbiased_mmd_squared(x: Tensor, y: Tensor, scale: Optional[float] = None):
     yy = f(y, y)
 
     s = torch.median(torch.sqrt(torch.cat((xx, xy, yy)))) if scale is None else scale
+    # Add small epsilon to prevent division by zero when distributions are identical
+    s = torch.clamp(s, min=1e-8) if isinstance(s, torch.Tensor) else max(s, 1e-8)
     c = -0.5 / (s**2)
 
     k = lambda a: torch.sum(torch.exp(c * a))
@@ -506,11 +508,3 @@ def l1(x: Tensor, y: Tensor, axis=-1) -> Tensor:
                 specified axis.
     """
     return torch.sum(torch.abs(x - y), dim=axis)
-
-
-def main():
-    _test()
-
-
-if __name__ == "__main__":
-    main()
