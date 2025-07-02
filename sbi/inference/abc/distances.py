@@ -80,7 +80,7 @@ class Distance:
         else:
             return self._batched_distance(x_o, x)
 
-    def _batched_distance(self, x_o, x):
+    def _batched_distance(self, x_o, x) -> torch.Tensor:
         """Evaluate the distance is mini-batches.
         Especially for statistical distances, batching over two empirical
         datasets can lead to memory overflow. Batching can help to resolve
@@ -112,24 +112,24 @@ class Distance:
         return self._requires_iid_data
 
 
-def mse_distance(x_o, x):
+def mse_distance(x_o, x) -> torch.Tensor:
     return torch.mean((x_o - x) ** 2, dim=-1)
 
 
-def l2_distance(x_o, x):
+def l2_distance(x_o, x) -> torch.Tensor:
     return torch.norm((x_o - x), dim=-1)
 
 
-def l1_distance(x_o, x):
+def l1_distance(x_o, x) -> torch.Tensor:
     return torch.mean(abs(x_o - x), dim=-1)
 
 
-def mmd(x_o, x, scale=None):
+def mmd(x_o, x, scale=None) -> torch.Tensor:
     dist_fn = partial(unbiased_mmd_squared, scale=scale)
     return torch.vmap(dist_fn, in_dims=(None, 0))(x_o, x)
 
 
-def wasserstein(x_o, x, epsilon=1e-3, max_iter=1000, tol=1e-9):
+def wasserstein(x_o, x, epsilon=1e-3, max_iter=1000, tol=1e-9) -> torch.Tensor:
     batched_x_o = x_o.repeat((x.shape[0], *[1] * len(x_o.shape)))
     return wasserstein_2_squared(
         batched_x_o, x, epsilon=epsilon, max_iter=max_iter, tol=tol

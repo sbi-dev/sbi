@@ -89,7 +89,7 @@ class ABCBASE:
         x: torch.Tensor,
         expansion_degree: int = 1,
         sample_weight=None,
-    ) -> Callable:
+    ) -> Callable[[torch.Tensor], torch.Tensor]:
         """Return semi-automatic summary statitics function.
 
         Running weighted linear regressin as in
