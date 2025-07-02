@@ -36,7 +36,9 @@ Therefore, you can enable the `transform_to_unconstrained` transformation when d
 density_estimator_build_fun = posterior_nn(
     model="zuko_nsf", hidden_features=60, num_transforms=3, z_score_theta="transform_to_unconstrained", x_dist=prior
 )
+
+inference = NPE_C(prior, density_estimator=density_estimator_build_fun)
 ```
 This ensures that your density estimator operates in a transformed space where it respects prior bounds, improving the efficiency of rejection sampling.
 
-Note: The logit transformation is currently only supported for `zuko` density estimators.
+Note: The logit transformation is currently only supported for `zuko` density estimators (e.g., `zuko_nsf` and `zuko_maf`).
