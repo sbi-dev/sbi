@@ -64,7 +64,7 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         net: Union[VectorFieldNet, nn.Module],
         input_shape: torch.Size,
         condition_shape: torch.Size,
-        embedding_net: nn.Module = nn.Identity(),
+        embedding_net: Optional[nn.Module] = None,
         weight_fn: Union[str, Callable] = "max_likelihood",
         mean_0: Union[Tensor, float] = 0.0,
         std_0: Union[Tensor, float] = 1.0,
@@ -78,10 +78,10 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         Args:
             net: Score estimator neural network with call signature: input, condition,
                 and time (in [0,1])].
-            input_shape: Shape of the input, e.g., the parameters.
+            input_shape: Shape of the input, i.e., the parameters.
             condition_shape: Shape of the conditioning variable.
             embedding_net: Network to embed the conditioning variable before passing it
-                to the score network.
+                to the score network. If None, the identity function is used.
             weight_fn: Function to compute the weights over time. Can be one of the
                 following:
                 - "identity": constant weights (1.),
@@ -95,7 +95,9 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         super().__init__(net, input_shape, condition_shape)
 
         # store embedding network
-        self._embedding_net = embedding_net
+        self._embedding_net = (
+            embedding_net if embedding_net is not None else nn.Identity()
+        )
 
         # Set lambdas (variance weights) function.
         self._set_weight_fn(weight_fn)
@@ -188,7 +190,6 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         # and the gaussian part (where it should end up) will dominate at the end of
         # the diffusion.
         scale = self.mean_t_fn(time) / self.std_fn(time)
-
         output_score = -scale * score_pred - score_gaussian
 
         return output_score

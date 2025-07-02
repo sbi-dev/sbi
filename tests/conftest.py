@@ -78,7 +78,7 @@ def pytest_addoption(parser):
     parser.addoption(
         "--bm-num-simulations",
         action="store",
-        default=1000,
+        default=2000,
         type=int,
         help="Run mini-benchmark tests with specified number of simulations",
     )

@@ -91,7 +91,7 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         """Forward pass of the FlowMatchingEstimator.
 
         Args:
-            input: Original data, x0. (input_batch_shape, *input_shape)
+            input: Original data, theta0. (input_batch_shape, *input_shape)
             condition: Conditioning variable. (condition_batch_shape, *condition_shape)
             time: SDE time variable in [0,1].
 

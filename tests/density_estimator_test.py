@@ -53,7 +53,7 @@ model_builders = [
 ]
 
 
-diffusion_builders = [
+vector_field_builders = [
     build_flow_matching_estimator,
     build_score_matching_estimator,
 ]

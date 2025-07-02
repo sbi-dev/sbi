@@ -271,7 +271,7 @@ class AdaMLPBlock(nn.Module):
         cond_dim: int,
         mlp_ratio: int = 1,
         activation: Callable = nn.GELU,
-        gate_activation: Callable = torch.nn.Tanh,
+        gate_activation: Callable = nn.Tanh,
     ):
         super().__init__()
 
