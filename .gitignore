@@ -102,3 +102,8 @@ target/
 # uv
 uv.lock
 .python-version
+
+# Serena cache
+.serena/
+# Refactoring plan
+refactoring_plan/

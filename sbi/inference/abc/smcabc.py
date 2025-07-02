@@ -570,7 +570,7 @@ class SMCABC(ABCBASE):
         # Contstruct function to get kernel log prob for given old particle.
         # The kernel is centered on each old particle as in all three variants (A,B,C).
         def kernel_log_prob(new_particle):
-            return self.get_new_kernel(old_particles).log_prob(new_particle)
+            return self._get_new_kernel(old_particles).log_prob(new_particle)
 
         # We still have to loop over particles here because
         # the kernel log probs are already batched across old particles.
@@ -610,12 +610,12 @@ class SMCABC(ABCBASE):
         num_accepted = 0
         parameters = []
         while num_accepted < num_samples:
-            parms = self.sample_from_population_with_weights(
+            parms = self._sample_from_population_with_weights(
                 particles, weights, num_samples=num_samples - num_accepted
             )
 
             # Create kernel on params and perturb.
-            parms_perturbed = self.get_new_kernel(parms).sample()
+            parms_perturbed = self._get_new_kernel(parms).sample()
 
             is_within_prior = within_support(self.prior, parms_perturbed)
             num_accepted += int(is_within_prior.sum().item())
@@ -704,7 +704,7 @@ class SMCABC(ABCBASE):
         if ess < ess_min:
             self.logger.info("ESS=%s too low, resampling pop %s...", ess, pop_idx)
             # First resample, then set to uniform weights as in Sisson et al. 2007.
-            particles = self.sample_from_population_with_weights(
+            particles = self._sample_from_population_with_weights(
                 particles, torch.exp(log_weights), num_samples=num_particles
             )
             log_weights = torch.log(1 / num_particles * torch.ones(num_particles))
@@ -727,7 +727,7 @@ class SMCABC(ABCBASE):
         Updates the SMC weights according to the new particles.
         """
 
-        adjusted_particels = self.run_lra(
+        adjusted_particels = self._run_lra(
             theta=particles,
             x=xs,
             observation=observation,
@@ -743,7 +743,7 @@ class SMCABC(ABCBASE):
 
         return adjusted_particels, adjusted_log_weights
 
-    def run_sass_set_xo(
+    def _run_sass_set_xo(
         self,
         num_particles: int,
         num_pilot_simulations: int,
@@ -771,8 +771,8 @@ class SMCABC(ABCBASE):
 
         # Adjust with LRA.
         if lra:
-            pilot_particles = self.run_lra(pilot_particles, pilot_xs, self.x_o)
-        sass_transform = self.get_sass_transform(
+            pilot_particles = self._run_lra(pilot_particles, pilot_xs, self.x_o)
+        sass_transform = self._get_sass_transform(
             pilot_particles,
             pilot_xs,
             expansion_degree=sass_expansion_degree,
@@ -780,13 +780,13 @@ class SMCABC(ABCBASE):
         )
         return sass_transform
 
-    def get_particle_ranges(
+    def _get_particle_ranges(
         self, particles: Tensor, weights: Tensor, samples_per_dim: int = 100
     ) -> Tensor:
         """Return range of particles in each parameter dimension."""
 
         # get weighted samples
-        samples = self.sample_from_population_with_weights(
+        samples = self._sample_from_population_with_weights(
             particles,
             weights,
             num_samples=samples_per_dim * particles.shape[1],
