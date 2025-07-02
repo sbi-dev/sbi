@@ -176,10 +176,9 @@ class MCABC(ABCBASE):
         if not self.distance.requires_iid_data:
             x = x.squeeze(1)
             self.x_shape = x[0].shape
-            self.x_o = process_x(x_o, self.x_shape)
         else:
             self.x_shape = x[0, 0].shape
-            self.x_o = process_x(x_o, self.x_shape)
+        self.x_o = process_x(x_o, self.x_shape)
 
         distances = self.distance(self.x_o, x)
 
