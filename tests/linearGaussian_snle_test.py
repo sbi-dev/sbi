@@ -502,3 +502,52 @@ def test_api_nle_sampling_methods(
         posterior.train(max_num_iters=10)
 
     posterior.sample(sample_shape=(num_samples,), show_progress_bars=False)
+
+
+
+
+@pytest.mark.parametrize("num_dim", (1,))  # dim 3 is tested below.
+@pytest.mark.parametrize("prior_str", ("uniform", "gaussian"))
+def test_snle_unconstrained_space(
+    num_dim: int, prior_str: str, mcmc_params_fast: dict
+):
+    """Test NLE API with 2 rounds, different priors num trials and MAP for unconstrained space."""
+    num_rounds = 2
+    num_samples = 1
+    num_simulations_per_round = 100
+
+    if prior_str == "gaussian":
+        prior_mean = zeros(num_dim)
+        prior_cov = eye(num_dim)
+        prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
+    else:
+        prior = BoxUniform(-2.0 * ones(num_dim), 2.0 * ones(num_dim))
+
+    simulator = diagonal_linear_gaussian
+    
+    density_estimator_build_fun = likelihood_nn(
+        model="zuko_nsf",
+        hidden_features=60,
+        num_transforms=3,
+        z_score_theta="transform_to_unconstrained",
+        x_dist=prior,
+    )
+    
+    inference = NLE(prior=prior, density_estimator=density_estimator_build_fun, show_progress_bars=False)
+
+    proposals = [prior]
+    for _ in range(num_rounds):
+        theta = proposals[-1].sample((num_simulations_per_round,))
+        x = simulator(theta)
+        inference.append_simulations(theta, x).train(
+            training_batch_size=100, max_num_epochs=2
+        )
+        for num_trials in [1, 3]:
+            x_o = zeros((num_trials, num_dim))
+            posterior = inference.build_posterior(
+                mcmc_method="slice_np_vectorized",
+                mcmc_parameters=mcmc_params_fast,
+            ).set_default_x(x_o)
+            posterior.sample(sample_shape=(num_samples,))
+        proposals.append(posterior)
+        posterior.map(num_iter=1)
