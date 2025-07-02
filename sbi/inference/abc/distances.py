@@ -114,18 +114,55 @@ class Distance:
 
 
 def mse_distance(x_o: Tensor, x: Tensor) -> Tensor:
+    """Calculates the Mean Squared Error (MSE) distance between two tensors.
+
+    Args:
+        x_o: The observed data tensor.
+        x: The simulated data tensor.
+
+    Returns:
+        The MSE distance.
+    """
     return torch.mean((x_o - x) ** 2, dim=-1)
 
 
 def l2_distance(x_o: Tensor, x: Tensor) -> Tensor:
+    """Calculates the L2 (Euclidean) distance between two tensors.
+
+    Args:
+        x_o: The observed data tensor.
+        x: The simulated data tensor.
+
+    Returns:
+        The L2 distance.
+    """
     return torch.norm((x_o - x), dim=-1)
 
 
 def l1_distance(x_o: Tensor, x: Tensor) -> Tensor:
+    """Calculates the L1 (Manhattan) distance between two tensors.
+
+    Args:
+        x_o: The observed data tensor.
+        x: The simulated data tensor.
+
+    Returns:
+        The L1 distance.
+    """
     return torch.mean(abs(x_o - x), dim=-1)
 
 
 def mmd(x_o: Tensor, x: Tensor, scale: Optional[float] = None) -> Tensor:
+    """Calculates the Maximum Mean Discrepancy (MMD) distance between two tensors.
+
+    Args:
+        x_o: The observed data tensor.
+        x: The simulated data tensor.
+        scale: Optional scale parameter for the MMD calculation.
+
+    Returns:
+        The MMD distance.
+    """
     dist_fn = partial(unbiased_mmd_squared, scale=scale)
     return torch.vmap(dist_fn, in_dims=(None, 0))(x_o, x)
 
@@ -137,6 +174,18 @@ def wasserstein(
     max_iter: int = 1000,
     tol: float = 1e-9,
 ) -> Tensor:
+    """Calculates the Wasserstein-2 distance between two tensors.
+
+    Args:
+        x_o: The observed data tensor.
+        x: The simulated data tensor.
+        epsilon: Regularization parameter for the Sinkhorn algorithm.
+        max_iter: Maximum number of iterations for the Sinkhorn algorithm.
+        tol: Tolerance for the Sinkhorn algorithm.
+
+    Returns:
+        The Wasserstein-2 distance.
+    """
     batched_x_o = x_o.repeat((x.shape[0], *[1] * len(x_o.shape)))
     return wasserstein_2_squared(
         batched_x_o, x, epsilon=epsilon, max_iter=max_iter, tol=tol
