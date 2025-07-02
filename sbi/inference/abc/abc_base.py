@@ -10,6 +10,7 @@ import numpy as np
 import torch
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import PolynomialFeatures
+from torch import Tensor
 
 from sbi.inference.abc.distances import Distance
 from sbi.simulators.simutils import simulate_in_batches
@@ -85,11 +86,11 @@ class ABCBASE:
 
     @staticmethod
     def _get_sass_transform(
-        theta: torch.Tensor,
-        x: torch.Tensor,
+        theta: Tensor,
+        x: Tensor,
         expansion_degree: int = 1,
-        sample_weight=None,
-    ) -> Callable[[torch.Tensor], torch.Tensor]:
+        sample_weight: Optional[Tensor] = None,
+    ) -> Callable[[Tensor], Tensor]:
         """Return semi-automatic summary statitics function.
 
         Running weighted linear regressin as in
@@ -122,11 +123,11 @@ class ABCBASE:
 
     @staticmethod
     def _run_lra(
-        theta: torch.Tensor,
-        x: torch.Tensor,
-        observation: torch.Tensor,
-        sample_weight=None,
-    ) -> torch.Tensor:
+        theta: Tensor,
+        x: Tensor,
+        observation: Tensor,
+        sample_weight: Optional[Tensor] = None,
+    ) -> Tensor:
         """Return parameters adjusted with linear regression adjustment.
 
         Implementation as in Beaumont et al. 2002: https://arxiv.org/abs/1707.01254

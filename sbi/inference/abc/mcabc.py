@@ -8,6 +8,7 @@ from typing import Any, Callable, Dict, Optional, Tuple, Union
 import torch
 from numpy import ndarray
 from torch import Tensor
+from torch.distributions import Distribution
 
 from sbi.inference.abc.abc_base import ABCBASE
 from sbi.utils.kde import KDEWrapper, get_kde
@@ -20,9 +21,9 @@ class MCABC(ABCBASE):
     def __init__(
         self,
         simulator: Callable,
-        prior,
+        prior: Distribution,
         distance: Union[str, Callable] = "l2",
-        requires_iid_data: Optional[None] = None,
+        requires_iid_data: Optional[bool] = None,
         distance_kwargs: Optional[Dict] = None,
         num_workers: int = 1,
         simulation_batch_size: int = 1,
@@ -135,6 +136,8 @@ class MCABC(ABCBASE):
         )
         if kde_kwargs is None:
             kde_kwargs = {}
+
+        x_o = process_x(x_o)
 
         # Run SASS and change the simulator and x_o accordingly.
         if sass:
