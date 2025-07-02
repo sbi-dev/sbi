@@ -14,7 +14,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.14">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.15">
     
     
       
@@ -5541,7 +5541,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 
     <div class="doc doc-contents first">
             <p class="doc doc-class-bases">
-              Bases: <code><span title="sbi.inference.trainers.npse.vector_field_inference.VectorFieldInference">VectorFieldInference</span></code></p>
+              Bases: <code><span title="sbi.inference.trainers.npse.vector_field_inference.VectorFieldTrainer">VectorFieldTrainer</span></code></p>
 
 
         <p>Flow Matching Posterior Estimation (FMPE).</p>
@@ -5640,7 +5640,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 <span class="normal">103</span>
 <span class="normal">104</span>
 <span class="normal">105</span>
-<span class="normal">106</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FMPE</span><span class="p">(</span><span class="n">VectorFieldInference</span><span class="p">):</span>
+<span class="normal">106</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FMPE</span><span class="p">(</span><span class="n">VectorFieldTrainer</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Flow Matching Posterior Estimation (FMPE).&quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
@@ -6205,7 +6205,7 @@ a numerical ODE solver.</p>
 
     <div class="doc doc-contents first">
             <p class="doc doc-class-bases">
-              Bases: <code><span title="sbi.inference.trainers.npse.vector_field_inference.VectorFieldInference">VectorFieldInference</span></code></p>
+              Bases: <code><span title="sbi.inference.trainers.npse.vector_field_inference.VectorFieldTrainer">VectorFieldTrainer</span></code></p>
 
 
         <p>Neural Posterior Score Estimation as in Geffner et al. and Sharrock et al.</p>
@@ -6326,7 +6326,7 @@ not tested yet.</p>
 <span class="normal">117</span>
 <span class="normal">118</span>
 <span class="normal">119</span>
-<span class="normal">120</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NPSE</span><span class="p">(</span><span class="n">VectorFieldInference</span><span class="p">):</span>
+<span class="normal">120</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NPSE</span><span class="p">(</span><span class="n">VectorFieldTrainer</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Neural Posterior Score Estimation as in Geffner et al. and Sharrock et al.</span>
 
 <span class="sd">    Instead of performing conditonal *density* estimation, NPSE methods perform</span>
@@ -16504,7 +16504,7 @@ simulator = process_simulator(simulator, prior, prior_returns_numpy)
       <script id="__config" type="application/json">{"base": "../..", "features": ["content.code.copy"], "search": "../../assets/javascripts/workers/search.d50fe291.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.13a4f30d.min.js"></script>
+      <script src="../../assets/javascripts/bundle.56ea9cef.min.js"></script>
       
         <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-MML-AM_CHTML"></script>
       
