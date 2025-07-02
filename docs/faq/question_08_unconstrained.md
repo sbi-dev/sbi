@@ -30,11 +30,11 @@ Instead of standardizing parameters using z-scoring, you can use the logit trans
 
 ### What do I do if my data is highly nonlinear?
 
-Therefore, you can enable the logit transformation when defining your density estimator, use:
+Therefore, you can enable the `transform_to_unconstrained` transformation when defining your density estimator, use:
 
 ```
 density_estimator_build_fun = posterior_nn(
-    model="zuko_nsf", hidden_features=60, num_transforms=3, z_score_theta="logit", x_dist=prior
+    model="zuko_nsf", hidden_features=60, num_transforms=3, z_score_theta="transform_to_unconstrained", x_dist=prior
 )
 ```
 This ensures that your density estimator operates in a transformed space where it respects prior bounds, improving the efficiency of rejection sampling.
