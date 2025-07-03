@@ -1,3 +1,6 @@
+# This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+
 from sbi.neural_nets.net_builders.categorial import build_categoricalmassestimator
 from sbi.neural_nets.net_builders.classifier import (
     build_linear_classifier,
