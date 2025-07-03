@@ -214,10 +214,10 @@ class MCABC(ABCBASE):
 
         if kde:
             self.logger.info(
-                """KDE on %s samples with bandwidth option
-                {kde_kwargs["bandwidth"] if "bandwidth" in kde_kwargs else "cv"}.
-                Beware that KDE can give unreliable results when used with too few
-                samples and in high dimensions.""",
+                "KDE on %s samples with bandwidth option"
+                f"{kde_kwargs.get('bandwidth', 'cv')}."
+                "Beware that KDE can give unreliable results when used with too few"
+                "samples and in high dimensions.",
                 final_theta.shape[0],
             )
 
