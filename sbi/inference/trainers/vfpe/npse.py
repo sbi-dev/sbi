@@ -42,7 +42,8 @@ class NPSE(VectorFieldInference):
         Args:
             prior: Prior distribution.
             vf_estimator: Neural network architecture for the
-                vector field estimator. Can be a string (e.g. 'mlp' or 'ada_mlp') or a
+                vector field estimator aiming to estimate the marginal scores of the
+                target diffusion process. Can be a string (e.g. 'mlp' or 'ada_mlp') or a
                 callable that implements the `VectorFieldEstimatorBuilder` protocol
                 with `__call__` that receives `theta` and `x` and returns a
                 `ConditionalVectorFieldEstimator`.
