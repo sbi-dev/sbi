@@ -92,15 +92,6 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
             t_min: Minimum time for diffusion (0 can be numerically unstable).
             t_max: Maximum time for diffusion.
         """
-        super().__init__(net, input_shape, condition_shape)
-
-        # store embedding network
-        self._embedding_net = (
-            embedding_net if embedding_net is not None else nn.Identity()
-        )
-
-        # Set lambdas (variance weights) function.
-        self._set_weight_fn(weight_fn)
 
         # Starting mean and std of the target distribution (otherwise assumes 0,1).
         # This will be used to precondition the score network to improve training.
@@ -109,20 +100,30 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         if not isinstance(std_0, Tensor):
             std_0 = torch.tensor([std_0])
 
-        self.register_buffer("mean_0", mean_0.clone().detach())
-        self.register_buffer("std_0", std_0.clone().detach())
-
-        # We estimate the mean and std of the source distribution at time t_max.
         mean_t = self.approx_marginal_mean(torch.tensor([t_max]))
         std_t = self.approx_marginal_std(torch.tensor([t_max]))
         mean_t = torch.broadcast_to(mean_t, (1, *input_shape))
         std_t = torch.broadcast_to(std_t, (1, *input_shape))
-        self._mean_base = mean_t
-        self._std_base = std_t
 
-        self.t_min = t_min
-        self.t_max = t_max
+        super().__init__(
+            net,
+            input_shape,
+            condition_shape,
+            mean_base=mean_t,
+            std_base=std_t,
+            t_min=t_min,
+            t_max=t_max,
+        )
 
+        # store embedding network
+        self._embedding_net = (
+            embedding_net if embedding_net is not None else nn.Identity()
+        )
+
+        # Set lambdas (variance weights) function.
+        self._set_weight_fn(weight_fn)
+        self.register_buffer("mean_0", mean_0.clone().detach())
+        self.register_buffer("std_0", std_0.clone().detach())
     @property
     def embedding_net(self):
         """Return the embedding network."""
