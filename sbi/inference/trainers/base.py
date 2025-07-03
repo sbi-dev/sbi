@@ -327,7 +327,57 @@ class NeuralInference(ABC):
         estimator: Union[RatioEstimator, ConditionalEstimator],
     ) -> Tuple[BasePotential, TorchTransform]:
         """Subclass-specific potential creation"""
-        pass
+        ...
+
+    def build_posterior(
+        self,
+        estimator: Optional[Union[RatioEstimator, ConditionalEstimator]],
+        prior: Optional[Distribution],
+        sample_with: Literal[
+            "mcmc", "rejection", "vi", "importance", "direct", "sde", "ode"
+        ],
+        **kwargs,
+    ) -> NeuralPosterior:
+        r"""Method for building posteriors.
+
+        This method serves as a base method for constructing a posterior based
+        on a given estimator and prior. The posterior can be sampled using one of
+        several inference methods specified by `sample_with`.
+
+        Args:
+            estimator: The estimator that the posterior is based on.
+            prior: A probability distribution that expresses prior knowledge about the
+                parameters, e.g. which ranges are meaningful for them. Must be a PyTorch
+                distribution, see FAQ for details on how to use custom distributions.
+            sample_with: The inference method to use. Must be one of:
+                - "mcmc"
+                - "rejection"
+                - "vi"
+                - "importance"
+                - "direct"
+                - "sde"
+                - "ode"
+            **kwargs: Additional method-specific parameters.
+
+        Returns:
+            NeuralPosterior object.
+        """
+
+        prior = self._resolve_prior(prior)
+        estimator, device = self._resolve_estimator(estimator)
+
+        self._posterior = self._create_posterior(
+            estimator,
+            prior,
+            sample_with,
+            device,
+            **kwargs,
+        )
+
+        # Store models at end of each round.
+        self._model_bank.append(deepcopy(self._posterior))
+
+        return deepcopy(self._posterior)
 
     def _resolve_prior(self, prior: Optional[Distribution]) -> Distribution:
         """
@@ -335,7 +385,7 @@ class NeuralInference(ABC):
 
         If a prior is passed, it is validated and returned.
         If not passed, attempts to use the stored `self._prior`.
-        Raises an error if no valid prior is available.
+        Raises a ValueError if no valid prior is available.
 
         Args:
             prior: Optional prior distribution to resolve.
@@ -392,56 +442,6 @@ class NeuralInference(ABC):
             device = str(next(estimator.parameters()).device)
 
         return estimator, device
-
-    def build_posterior(
-        self,
-        estimator: Optional[Union[RatioEstimator, ConditionalEstimator]],
-        prior: Optional[Distribution],
-        sample_with: Literal[
-            "mcmc", "rejection", "vi", "importance", "direct", "sde", "ode"
-        ],
-        **kwargs,
-    ) -> NeuralPosterior:
-        r"""Method for building posteriors.
-
-        This method serves as a base method for constructing a posterior based
-        on a given estimator and prior. The posterior can be sampled using one of
-        several inference methods specified by `sample_with`.
-
-        Args:
-            estimator: The estimator that the posterior is based on.
-            prior: A probability distribution that expresses prior knowledge about the
-                parameters, e.g. which ranges are meaningful for them. Must be a PyTorch
-                distribution, see FAQ for details on how to use custom distributions.
-            sample_with: The inference method to use. Must be one of:
-                - "mcmc"
-                - "rejection"
-                - "vi"
-                - "importance"
-                - "direct"
-                - "sde"
-                - "ode"
-            **kwargs: Additional method-specific parameters.
-
-        Returns:
-            NeuralPosterior object.
-        """
-
-        prior = self._resolve_prior(prior)
-        estimator, device = self._resolve_estimator(estimator)
-
-        self._posterior = self._create_posterior(
-            estimator,
-            prior,
-            sample_with,
-            device,
-            **kwargs,
-        )
-
-        # Store models at end of each round.
-        self._model_bank.append(deepcopy(self._posterior))
-
-        return deepcopy(self._posterior)
 
     def _create_posterior(
         self,
