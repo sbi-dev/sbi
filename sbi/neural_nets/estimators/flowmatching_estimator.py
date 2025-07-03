@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+import warnings
 from typing import Optional, Union
 
 import torch
@@ -67,13 +68,18 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
             input_shape: Shape of the input :math:`\theta`.
             condition_shape: Shape of the condition :math:`x_o`.
             embedding_net: Embedding network for the condition.
-            num_freqs: Number of frequencies to use for the positional time encoding.
-                This is ignored and will be removed.
             noise_scale: Scale of the noise added to the vector field
                 (:math:`\sigma_{min}` in [2]_).
             zscore_transform_input: Whether to z-score the input.
                 This is ignored and will be removed.
         """
+
+        if "num_freqs" in kwargs:
+            del kwargs["num_freqs"]
+            warnings.warn(
+                "num_freqs is deprecated and will be removed in the future. "
+                "Please use the positional_encoding_net instead."
+            )
 
         super().__init__(
             net=net, input_shape=input_shape, condition_shape=condition_shape

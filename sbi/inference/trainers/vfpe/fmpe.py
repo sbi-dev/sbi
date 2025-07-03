@@ -56,12 +56,10 @@ class FMPE(VectorFieldInference):
             vector_field_estimator_builder=vf_estimator,
             **kwargs,
         )
-        # density_estimator name is kept since it is public API, but it is
-        # actually misleading since it is a builder for an estimator.
 
     def _build_default_nn_fn(self, **kwargs) -> VectorFieldEstimatorBuilder:
         model = kwargs.pop("vector_field_estimator_builder", "mlp")
-        return posterior_flow_nn(model, **kwargs)
+        return posterior_flow_nn(model=model, **kwargs)
 
     def build_posterior(
         self,
