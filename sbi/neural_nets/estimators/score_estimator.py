@@ -463,10 +463,10 @@ class VPScoreEstimator(ConditionalScoreEstimator):
 
     def __init__(
         self,
-        net: Union[VectorFieldNet, nn.Module],
+        net: VectorFieldNet,
         input_shape: torch.Size,
         condition_shape: torch.Size,
-        embedding_net: nn.Module = nn.Identity(),
+        embedding_net: Optional[nn.Module] = None,
         weight_fn: Union[str, Callable] = "max_likelihood",
         beta_min: float = 0.01,
         beta_max: float = 10.0,
@@ -604,10 +604,10 @@ class SubVPScoreEstimator(ConditionalScoreEstimator):
 
     def __init__(
         self,
-        net: Union[VectorFieldNet, nn.Module],
+        net: VectorFieldNet,
         input_shape: torch.Size,
         condition_shape: torch.Size,
-        embedding_net: nn.Module = nn.Identity(),
+        embedding_net: Optional[nn.Module] = None,
         weight_fn: Union[str, Callable] = "max_likelihood",
         beta_min: float = 0.01,
         beta_max: float = 10.0,
@@ -761,10 +761,10 @@ class VEScoreEstimator(ConditionalScoreEstimator):
 
     def __init__(
         self,
-        net: Union[VectorFieldNet, nn.Module],
+        net: VectorFieldNet,
         input_shape: torch.Size,
         condition_shape: torch.Size,
-        embedding_net: nn.Module = nn.Identity(),
+        embedding_net: Optional[nn.Module] = None,
         weight_fn: Union[str, Callable] = "max_likelihood",
         sigma_min: float = 1e-4,
         sigma_max: float = 10.0,
