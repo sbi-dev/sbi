@@ -54,7 +54,7 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
 
     def __init__(
         self,
-        net: Union[VectorFieldNet, nn.Module],
+        net: VectorFieldNet,
         input_shape: torch.Size,
         condition_shape: torch.Size,
         embedding_net: Optional[nn.Module] = None,
