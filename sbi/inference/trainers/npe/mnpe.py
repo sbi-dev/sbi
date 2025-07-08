@@ -6,6 +6,13 @@ from typing import Any, Callable, Dict, Literal, Optional, Union
 from torch.distributions import Distribution
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
+from sbi.inference.posteriors.posterior_parameters import (
+    DirectPosteriorParameters,
+    ImportanceSamplingPosteriorParameters,
+    MCMCPosteriorParameters,
+    RejectionPosteriorParameters,
+    VIPosteriorParameters,
+)
 from sbi.inference.trainers.npe.npe_c import NPE_C
 from sbi.neural_nets.estimators import MixedDensityEstimator
 from sbi.sbi_types import TensorboardSummaryWriter
@@ -106,6 +113,15 @@ class MNPE(NPE_C):
         vi_parameters: Optional[Dict[str, Any]] = None,
         rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
         importance_sampling_parameters: Optional[Dict[str, Any]] = None,
+        posterior_parameters: Optional[
+            Union[
+                DirectPosteriorParameters,
+                MCMCPosteriorParameters,
+                VIPosteriorParameters,
+                RejectionPosteriorParameters,
+                ImportanceSamplingPosteriorParameters,
+            ]
+        ] = None,
     ) -> NeuralPosterior:
         """Build posterior from the neural density estimator.
 
@@ -131,6 +147,13 @@ class MNPE(NPE_C):
                 RejectionPosterior`.
             importance_sampling_parameters: Additional kwargs passed to
                 `ImportanceSamplingPosterior`.
+            posterior_parameters: Configuration passed to the init method for the
+                posterior. Must be one of the following
+                - `VIPosteriorParameters`
+                - `ImportanceSamplingPosteriorParameters`
+                - `MCMCPosteriorParameters`
+                - `DirectPosteriorParameters`
+                - `RejectionPosteriorParameters`
 
         Returns:
             Posterior $p(\theta|x)$ with `.sample()` and `.log_prob()` methods.
@@ -146,6 +169,7 @@ class MNPE(NPE_C):
             density_estimator=density_estimator,
             prior=prior,
             sample_with=sample_with,
+            posterior_parameters=posterior_parameters,
             mcmc_method=mcmc_method,
             vi_method=vi_method,
             direct_sampling_parameters=direct_sampling_parameters,
