@@ -453,10 +453,6 @@ class NeuralInference(ABC):
         Returns:
             NeuralPosterior object.
         """
-        if posterior_parameters is None:
-            posterior_parameters = self._build_posterior_parameters(
-                sample_with, **kwargs
-            )
 
         prior = self._resolve_prior(prior)
         estimator, device = self._resolve_estimator(estimator)
@@ -474,82 +470,6 @@ class NeuralInference(ABC):
         self._model_bank.append(deepcopy(self._posterior))
 
         return deepcopy(self._posterior)
-
-    def _build_posterior_parameters(
-        self,
-        sample_with: Literal[
-            "mcmc", "rejection", "vi", "importance", "direct", "sde", "ode"
-        ],
-        **kwargs,
-    ) -> Union[
-        VIPosteriorParameters,
-        VectorFieldPosteriorParameters,
-        ImportanceSamplingPosteriorParameters,
-        MCMCPosteriorParameters,
-        DirectPosteriorParameters,
-        RejectionPosteriorParameters,
-    ]:
-        """
-        Constructs and returns the appropriate posterior parameter object based
-        on the given sampling method.
-
-        Args:
-            sample_with: The sampling method to use. Must be one of
-                ["mcmc", "rejection", "vi", "importance", "direct", "ode", "sde"].
-            **kwargs: Additional method-specific parameters.
-
-        Returns:
-            An instance of the appropriate posterior parameters class, such as:
-                - MCMCPosteriorParameters
-                - RejectionPosteriorParameters
-                - VIPosteriorParameters
-                - ImportanceSamplingPosteriorParameters
-                - DirectPosteriorParameters
-                - VectorFieldPosteriorParameters
-        """
-
-        if sample_with == "mcmc":
-            mcmc_parameters = kwargs.pop("mcmc_parameters", {}) or {}
-            mcmc_parameters["method"] = kwargs.pop("mcmc_method", "slice_np_vectorized")
-            posterior_parameters = MCMCPosteriorParameters(**mcmc_parameters)
-        elif sample_with == "rejection":
-            rejection_sampling_parameters = (
-                kwargs.pop("rejection_sampling_parameters", {}) or {}
-            )
-            posterior_parameters = RejectionPosteriorParameters(
-                **rejection_sampling_parameters
-            )
-        elif sample_with == "vi":
-            vi_parameters = kwargs.pop("vi_parameters", {}) or {}
-            vi_parameters["vi_method"] = kwargs.pop("vi_method", "rKL")
-            posterior_parameters = VIPosteriorParameters(**vi_parameters)
-        elif sample_with == "importance":
-            importance_sampling_parameters = (
-                kwargs.pop("importance_sampling_parameters", {}) or {}
-            )
-            posterior_parameters = ImportanceSamplingPosteriorParameters(
-                **importance_sampling_parameters
-            )
-        elif sample_with == "direct":
-            direct_sampling_parameters = (
-                kwargs.pop("direct_sampling_parameters", {}) or {}
-            )
-            posterior_parameters = DirectPosteriorParameters(
-                **direct_sampling_parameters
-            )
-        elif sample_with in ("ode", "sde"):
-            max_sampling_batch_size = kwargs.pop("max_sampling_batch_size", 10_000)
-            enable_transform = kwargs.pop("enable_transform", True)
-            posterior_parameters = VectorFieldPosteriorParameters(
-                max_sampling_batch_size=max_sampling_batch_size,
-                enable_transform=enable_transform,
-            )
-        else:
-            raise NotImplementedError(
-                f"Posterior parameter construction not implemented for '{sample_with}'"
-            )
-
-        return posterior_parameters
 
     def _resolve_prior(self, prior: Optional[Distribution]) -> Distribution:
         """
@@ -623,13 +543,15 @@ class NeuralInference(ABC):
             "mcmc", "rejection", "vi", "importance", "direct", "sde", "ode"
         ],
         device: Union[str, torch.device],
-        posterior_parameters: Union[
-            VIPosteriorParameters,
-            VectorFieldPosteriorParameters,
-            ImportanceSamplingPosteriorParameters,
-            MCMCPosteriorParameters,
-            DirectPosteriorParameters,
-            RejectionPosteriorParameters,
+        posterior_parameters: Optional[
+            Union[
+                VIPosteriorParameters,
+                VectorFieldPosteriorParameters,
+                ImportanceSamplingPosteriorParameters,
+                MCMCPosteriorParameters,
+                DirectPosteriorParameters,
+                RejectionPosteriorParameters,
+            ]
         ],
         **kwargs,
     ) -> NeuralPosterior:
@@ -668,20 +590,25 @@ class NeuralInference(ABC):
             NeuralPosterior object.
         """
 
-        if isinstance(posterior_parameters, DirectPosteriorParameters):
+        if sample_with == "direct":
             posterior_estimator = estimator
             assert isinstance(posterior_estimator, ConditionalDensityEstimator), (
                 f"Expected posterior_estimator to be an instance of "
                 " ConditionalDensityEstimator, "
                 f"but got {type(posterior_estimator).__name__} instead."
             )
+            params = (
+                asdict(posterior_parameters)
+                if posterior_parameters
+                else kwargs.pop("direct_sampling_parameters", {}) or {}
+            )
             posterior = DirectPosterior(
                 posterior_estimator=posterior_estimator,
                 prior=prior,
                 device=device,
-                **asdict(posterior_parameters),
+                **params,
             )
-        elif isinstance(posterior_parameters, VectorFieldPosteriorParameters):
+        elif sample_with in ("ode", "sde"):
             vector_field_estimator = estimator
             assert isinstance(
                 vector_field_estimator, ConditionalVectorFieldEstimator
@@ -694,59 +621,85 @@ class NeuralInference(ABC):
                 "`sample_with` must be either",
                 " 'ode' or 'sde', got '{sample_with}'",
             )
-            posterior_parameters_dict = asdict(posterior_parameters)
 
-            overlapping_keys = posterior_parameters_dict.keys() & kwargs.keys()
-            if overlapping_keys:
+            params = asdict(posterior_parameters) if posterior_parameters else {}
+            duplicate_keys = params.keys() & kwargs.keys()
+
+            if duplicate_keys:
                 raise ValueError(
-                    "Conflicting keys in posterior_parameters and kwargs:",
-                    f"{overlapping_keys}",
+                    "Duplicate keys found between posterior_parameters",
+                    f"and kwargs: {duplicate_keys}",
                 )
+
+            # Include extra kwargs expected by VectorFieldPosterior's __init__.
+            params.update(kwargs)
 
             posterior = VectorFieldPosterior(
                 vector_field_estimator=vector_field_estimator,
                 prior=prior,
                 device=device,
                 sample_with=sample_with,
-                **posterior_parameters_dict,
-                **kwargs,
+                **params,
             )
         else:
             # Posteriors requiring potential_fn and theta_transform
             potential_fn, theta_transform = self._get_potential_function(
                 prior, estimator
             )
-            if isinstance(posterior_parameters, MCMCPosteriorParameters):
+            if sample_with == "mcmc":
+                if posterior_parameters is None:
+                    params = kwargs.pop("mcmc_parameters", {}) or {}
+                    params["method"] = kwargs.pop("mcmc_method", "slice_np_vectorized")
+                else:
+                    params = asdict(posterior_parameters)
                 posterior = MCMCPosterior(
                     potential_fn=potential_fn,
                     theta_transform=theta_transform,
                     proposal=prior,
                     device=device,
-                    **asdict(posterior_parameters),
+                    **params,
                 )
-            elif isinstance(posterior_parameters, RejectionPosteriorParameters):
+            elif sample_with == "rejection":
+                params = (
+                    asdict(posterior_parameters)
+                    if posterior_parameters
+                    else kwargs.pop("rejection_sampling_parameters", {}) or {}
+                )
                 posterior = RejectionPosterior(
                     potential_fn=potential_fn,
                     proposal=prior,
                     device=device,
-                    **asdict(posterior_parameters),
+                    **params,
                 )
-            elif isinstance(posterior_parameters, VIPosteriorParameters):
+            elif sample_with == "vi":
+                if posterior_parameters is None:
+                    params = kwargs.pop("vi_parameters", {}) or {}
+                    params["vi_method"] = kwargs.pop("vi_method", "rKL")
+                else:
+                    params = asdict(posterior_parameters)
                 posterior = VIPosterior(
                     potential_fn=potential_fn,
                     theta_transform=theta_transform,
                     prior=prior,
                     device=device,
-                    **asdict(posterior_parameters),
+                    **params,
                 )
-            elif isinstance(
-                posterior_parameters, ImportanceSamplingPosteriorParameters
-            ):
+            elif sample_with == "importance":
+                params = (
+                    asdict(posterior_parameters)
+                    if posterior_parameters
+                    else kwargs.pop("importance_sampling_parameters", {}) or {}
+                )
                 posterior = ImportanceSamplingPosterior(
                     potential_fn=potential_fn,
                     proposal=prior,
                     device=device,
-                    **asdict(posterior_parameters),
+                    **params,
+                )
+            else:
+                raise NotImplementedError(
+                    "Posterior parameter construction not implemented for",
+                    f"'{sample_with}'",
                 )
         return posterior
 
