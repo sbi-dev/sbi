@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, Iterable, Literal, Optional, Union
 
 import torch
@@ -79,6 +79,7 @@ class VectorFieldPosteriorParameters:
 
     max_sampling_batch_size: int = 10_000
     enable_transform: bool = True
+    vector_field_estimator_potential_args: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

@@ -457,7 +457,7 @@ class NeuralInference(ABC):
         prior = self._resolve_prior(prior)
         estimator, device = self._resolve_estimator(estimator)
 
-        params = self._resolve_posterior_parameters(
+        posterior_parameters = self._resolve_posterior_parameters(
             sample_with, posterior_parameters, **kwargs
         )
 
@@ -466,7 +466,7 @@ class NeuralInference(ABC):
             prior,
             sample_with,
             device,
-            **(params if isinstance(params, dict) else asdict(params)),
+            posterior_parameters,
         )
 
         # Store models at end of each round.
@@ -561,19 +561,17 @@ class NeuralInference(ABC):
         MCMCPosteriorParameters,
         DirectPosteriorParameters,
         RejectionPosteriorParameters,
-        Dict,
     ]:
         """
-        Resolves posterior parameters based on the sampling strategy.
+        Resolve posterior parameters based on the sampling strategy.
 
-        If `posterior_parameters` is provided, it is returned directly
-        (except for 'ode' or 'sde', where its fields are merged with any additional
-        keyword arguments). If not, sampling-specific parameters are extracted from
-        `kwargs` using predefined keys.
+        If `posterior_parameters` is provided, it is returned directly.
+
+        If `posterior_parameters` is not provided, this method extracts
+        sampling-specific parameters from `kwargs` using predefined keys
+        to instantiate the appropriate posterior parameters dataclass.
 
         Raises:
-            ValueError: If duplicate keys are found between `posterior_parameters`
-            and `kwargs` when using 'ode' or 'sde'.
             NotImplementedError: If an unsupported `sample_with` method is provided.
 
         Args:
@@ -582,42 +580,42 @@ class NeuralInference(ABC):
             **kwargs: Additional parameters to construct the posterior parameters.
 
         Returns:
-            A dictionary or dataclass instance containing the resolved posterior
+            A dataclass instance containing the resolved posterior
             parameters.
         """
 
-        if sample_with in ("ode", "sde"):
-            params = asdict(posterior_parameters) if posterior_parameters else {}
-            duplicate_keys = params.keys() & kwargs.keys()
-
-            if duplicate_keys:
-                raise ValueError(
-                    "Duplicate keys found between posterior_parameters",
-                    f"and kwargs: {duplicate_keys}",
-                )
-            # Include extra kwargs expected by VectorFieldPosterior's __init__.
-            params.update(kwargs)
-        elif posterior_parameters is not None:
-            params = posterior_parameters
-        else:
+        if posterior_parameters is None:
             if sample_with == "direct":
-                params = kwargs.pop("direct_sampling_parameters", {}) or {}
+                params = kwargs.get("direct_sampling_parameters", {}) or {}
+                posterior_parameters = DirectPosteriorParameters(**params)
             elif sample_with == "mcmc":
-                params = kwargs.pop("mcmc_parameters", {}) or {}
+                params = kwargs.get("mcmc_parameters", {}) or {}
                 params["method"] = kwargs.pop("mcmc_method", "slice_np_vectorized")
+                posterior_parameters = MCMCPosteriorParameters(**params)
+            elif sample_with in ("ode", "sde"):
+                posterior_parameters = VectorFieldPosteriorParameters(
+                    max_sampling_batch_size=kwargs.pop(
+                        "max_sampling_batch_size", 10_000
+                    ),
+                    enable_transform=kwargs.pop("enable_transform", True),
+                    vector_field_estimator_potential_args=kwargs,
+                )
             elif sample_with == "rejection":
-                params = kwargs.pop("rejection_sampling_parameters", {}) or {}
+                params = kwargs.get("rejection_sampling_parameters", {}) or {}
+                posterior_parameters = RejectionPosteriorParameters(**params)
             elif sample_with == "vi":
-                params = kwargs.pop("vi_parameters", {}) or {}
-                params["vi_method"] = kwargs.pop("vi_method", "rKL")
+                params = kwargs.get("vi_parameters", {}) or {}
+                params["vi_method"] = kwargs.get("vi_method", "rKL")
+                posterior_parameters = VIPosteriorParameters(**params)
             elif sample_with == "importance":
-                params = kwargs.pop("importance_sampling_parameters", {}) or {}
+                params = kwargs.get("importance_sampling_parameters", {}) or {}
+                posterior_parameters = ImportanceSamplingPosteriorParameters(**params)
             else:
                 raise NotImplementedError(
                     "Posterior parameter construction not implemented for",
                     f"'{sample_with}'",
                 )
-        return params
+        return posterior_parameters
 
     def _create_posterior(
         self,
@@ -627,7 +625,14 @@ class NeuralInference(ABC):
             "mcmc", "rejection", "vi", "importance", "direct", "sde", "ode"
         ],
         device: Union[str, torch.device],
-        **kwargs,
+        posterior_parameters: Union[
+            VIPosteriorParameters,
+            VectorFieldPosteriorParameters,
+            ImportanceSamplingPosteriorParameters,
+            MCMCPosteriorParameters,
+            DirectPosteriorParameters,
+            RejectionPosteriorParameters,
+        ],
     ) -> NeuralPosterior:
         """
         Create a posterior object using the specified inference method.
@@ -650,13 +655,20 @@ class NeuralInference(ABC):
                 - "ode"
             device: torch device on which to train the neural net and on which to
                 perform all posterior operations, e.g. gpu or cpu.
-            **kwargs: Additional posterior-specific parameters.
+            posterior_parameters: Configuration passed to the init method for the
+                posterior. Must be one of the following:
+                - `VIPosteriorParameters`
+                - `VectorFieldPosteriorParameters`
+                - `ImportanceSamplingPosteriorParameters`
+                - `MCMCPosteriorParameters`
+                - `DirectPosteriorParameters`
+                - `RejectionPosteriorParameters`
 
         Returns:
             NeuralPosterior object.
         """
 
-        if sample_with == "direct":
+        if isinstance(posterior_parameters, DirectPosteriorParameters):
             posterior_estimator = estimator
             assert isinstance(posterior_estimator, ConditionalDensityEstimator), (
                 f"Expected posterior_estimator to be an instance of "
@@ -667,9 +679,9 @@ class NeuralInference(ABC):
                 posterior_estimator=posterior_estimator,
                 prior=prior,
                 device=device,
-                **kwargs,
+                **asdict(posterior_parameters),
             )
-        elif sample_with in ("ode", "sde"):
+        elif isinstance(posterior_parameters, VectorFieldPosteriorParameters):
             vector_field_estimator = estimator
             assert isinstance(
                 vector_field_estimator, ConditionalVectorFieldEstimator
@@ -680,55 +692,60 @@ class NeuralInference(ABC):
             )
             assert sample_with in ("ode", "sde"), (
                 "`sample_with` must be either",
-                " 'ode' or 'sde', got '{sample_with}'",
+                f" 'ode' or 'sde', got '{sample_with}'",
             )
 
+            posterior_params_dict = asdict(posterior_parameters)
+            posterior_params_dict.pop('vector_field_estimator_potential_args', None)
             posterior = VectorFieldPosterior(
                 vector_field_estimator=vector_field_estimator,
                 prior=prior,
                 device=device,
                 sample_with=sample_with,
-                **kwargs,
+                **posterior_params_dict,
+                **posterior_parameters.vector_field_estimator_potential_args,
             )
         else:
             # Posteriors requiring potential_fn and theta_transform
             potential_fn, theta_transform = self._get_potential_function(
                 prior, estimator
             )
-            if sample_with == "mcmc":
+            if isinstance(posterior_parameters, MCMCPosteriorParameters):
                 posterior = MCMCPosterior(
                     potential_fn=potential_fn,
                     theta_transform=theta_transform,
                     proposal=prior,
                     device=device,
-                    **kwargs,
+                    **asdict(posterior_parameters),
                 )
-            elif sample_with == "rejection":
+            elif isinstance(posterior_parameters, RejectionPosteriorParameters):
                 posterior = RejectionPosterior(
                     potential_fn=potential_fn,
                     proposal=prior,
                     device=device,
-                    **kwargs,
+                    **asdict(posterior_parameters),
                 )
-            elif sample_with == "vi":
+            elif isinstance(posterior_parameters, VIPosteriorParameters):
                 posterior = VIPosterior(
                     potential_fn=potential_fn,
                     theta_transform=theta_transform,
                     prior=prior,
                     device=device,
-                    **kwargs,
+                    **asdict(posterior_parameters),
                 )
-            elif sample_with == "importance":
+            elif isinstance(
+                posterior_parameters, ImportanceSamplingPosteriorParameters
+            ):
                 posterior = ImportanceSamplingPosterior(
                     potential_fn=potential_fn,
                     proposal=prior,
                     device=device,
-                    **kwargs,
+                    **asdict(posterior_parameters),
                 )
             else:
                 raise NotImplementedError(
-                    "Posterior parameter construction not implemented for",
-                    f"'{sample_with}'",
+                    "Sampling method not implemented for",
+                    f"'{posterior_parameters}'",
                 )
         return posterior
 
