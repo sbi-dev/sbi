@@ -110,7 +110,6 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
             t_max=t_max,
         )
 
-
         # Set lambdas (variance weights) function.
         self._set_weight_fn(weight_fn)
         self.register_buffer("mean_0", mean_0.clone().detach())

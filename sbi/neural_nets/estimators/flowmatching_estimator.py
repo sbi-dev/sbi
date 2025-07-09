@@ -1,6 +1,5 @@
-from abc import ABC, abstractmethod
 import warnings
-from typing import Optional, Union
+from typing import Optional
 
 import torch
 import torch.nn as nn
@@ -8,6 +7,7 @@ from torch import Tensor
 
 from sbi.neural_nets.estimators.base import ConditionalVectorFieldEstimator
 from sbi.utils.vector_field_utils import VectorFieldNet
+
 
 class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
     r"""
@@ -72,7 +72,8 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
             del kwargs["num_freqs"]
             warnings.warn(
                 "num_freqs is deprecated and will be removed in the future. "
-                "Please use the positional_encoding_net instead."
+                "Please use the positional_encoding_net instead.",
+                stacklevel=2,
             )
 
         super().__init__(
