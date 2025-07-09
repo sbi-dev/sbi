@@ -7,13 +7,7 @@ import torch.nn as nn
 from torch import Tensor
 
 from sbi.neural_nets.estimators.base import ConditionalVectorFieldEstimator
-
-
-# abstract class to ensure forward signature for flow matching networks
-class VectorFieldNet(nn.Module, ABC):
-    @abstractmethod
-    def forward(self, theta: Tensor, x: Tensor, t: Tensor) -> Tensor: ...
-
+from sbi.utils.vector_field_utils import VectorFieldNet
 
 class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
     r"""
@@ -85,13 +79,6 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
             net=net, input_shape=input_shape, condition_shape=condition_shape
         )
         self.noise_scale = noise_scale
-        self._embedding_net = (
-            embedding_net if embedding_net is not None else nn.Identity()
-        )
-
-    @property
-    def embedding_net(self):
-        return self._embedding_net
 
     def forward(self, input: Tensor, condition: Tensor, time: Tensor) -> Tensor:
         """Forward pass of the FlowMatchingEstimator.
