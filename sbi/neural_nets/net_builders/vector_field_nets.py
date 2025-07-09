@@ -1169,6 +1169,12 @@ def build_transformer_network(
         y_numel = get_numel(batch_y, embedding_net=embedding_net)
     else:
         y_embed = embedding_net(batch_y[:1])
+        if y_embed.ndim != 3:
+            raise ValueError(
+                "If is_x_emb_seq is True, embedding must be sequence of values of shape"
+                f" (batch_size, sequence_length, embedding_dim), but got"
+                f" {y_embed.shape}"
+            )
         y_numel = y_embed.shape[-1]
 
     # Create the vector field network (Transformer)
