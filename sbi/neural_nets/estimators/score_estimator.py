@@ -106,6 +106,7 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
             condition_shape,
             mean_base=0.0,  # Will be updated after initialization
             std_base=1.0,  # Will be updated after initialization
+            embedding_net=embedding_net,
             t_min=t_min,
             t_max=t_max,
         )

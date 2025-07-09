@@ -77,7 +77,10 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
             )
 
         super().__init__(
-            net=net, input_shape=input_shape, condition_shape=condition_shape
+            net=net,
+            input_shape=input_shape,
+            condition_shape=condition_shape,
+            embedding_net=embedding_net,
         )
         self.noise_scale = noise_scale
 
