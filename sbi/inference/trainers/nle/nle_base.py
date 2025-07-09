@@ -4,7 +4,7 @@
 import warnings
 from abc import ABC
 from copy import deepcopy
-from typing import Any, Callable, Dict, Optional, Union
+from typing import Any, Callable, Dict, Literal, Optional, Union
 
 import torch
 from torch import Tensor
@@ -26,7 +26,7 @@ from sbi.utils import check_estimator_arg, check_prior, x_shape_from_simulation
 from sbi.utils.torchutils import assert_all_finite
 
 
-class LikelihoodEstimator(NeuralInference, ABC):
+class LikelihoodEstimatorTrainer(NeuralInference, ABC):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
@@ -82,7 +82,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
         from_round: int = 0,
         algorithm: str = "SNLE",
         data_device: Optional[str] = None,
-    ) -> "LikelihoodEstimator":
+    ) -> "LikelihoodEstimatorTrainer":
         r"""Store parameters and simulation outputs to use them for later training.
 
         Data are stored as entries in lists for each type of variable (parameter/data).
@@ -286,9 +286,17 @@ class LikelihoodEstimator(NeuralInference, ABC):
         self,
         density_estimator: Optional[ConditionalDensityEstimator] = None,
         prior: Optional[Distribution] = None,
-        sample_with: str = "mcmc",
-        mcmc_method: str = "slice_np_vectorized",
-        vi_method: str = "rKL",
+        sample_with: Literal["mcmc", "rejection", "vi", "importance"] = "mcmc",
+        mcmc_method: Literal[
+            "slice_np",
+            "slice_np_vectorized",
+            "hmc_pyro",
+            "nuts_pyro",
+            "slice_pymc",
+            "hmc_pymc",
+            "nuts_pymc",
+        ] = "slice_np_vectorized",
+        vi_method: Literal["rKL", "fKL", "IW", "alpha"] = "rKL",
         mcmc_parameters: Optional[Dict[str, Any]] = None,
         vi_parameters: Optional[Dict[str, Any]] = None,
         rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
@@ -308,11 +316,15 @@ class LikelihoodEstimator(NeuralInference, ABC):
                 If `None`, use the latest neural density estimator that was trained.
             prior: Prior distribution.
             sample_with: Method to use for sampling from the posterior. Must be one of
-                [`mcmc` | `rejection` | `vi`].
-            mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`,
-                `hmc`, `nuts`. Currently defaults to `slice_np` for a custom numpy
-                implementation of slice sampling; select `hmc`, `nuts` or `slice` for
-                Pyro-based sampling.
+                [`mcmc` | `rejection` | `vi` | `importance`].
+            mcmc_method: Method used for MCMC sampling, one of `slice_np`,
+                `slice_np_vectorized`, `hmc_pyro`, `nuts_pyro`, `slice_pymc`,
+                `hmc_pymc`, `nuts_pymc`. `slice_np` is a custom
+                numpy implementation of slice sampling. `slice_np_vectorized` is
+                identical to `slice_np`, but if `num_chains>1`, the chains are
+                vectorized for `slice_np_vectorized` whereas they are run sequentially
+                for `slice_np`. The samplers ending on `_pyro` are using Pyro, and
+                likewise the samplers ending on `_pymc` are using PyMC.
             vi_method: Method used for VI, one of [`rKL`, `fKL`, `IW`, `alpha`]. Note
                 some of the methods admit a `mode seeking` property (e.g. rKL) whereas
                 some admit a `mass covering` one (e.g fKL).

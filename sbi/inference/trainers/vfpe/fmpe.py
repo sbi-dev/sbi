@@ -2,7 +2,7 @@
 # under the Apache License v2.0, see <https://www.apache.org/licenses/LICENSE-2.0>.
 
 
-from typing import Optional, Union
+from typing import Literal, Optional, Union
 
 from torch.distributions import Distribution
 from torch.utils.tensorboard.writer import SummaryWriter
@@ -11,13 +11,13 @@ from sbi import utils as utils
 from sbi.inference.posteriors.vector_field_posterior import VectorFieldPosterior
 from sbi.inference.trainers.vfpe.base_vf_inference import (
     VectorFieldEstimatorBuilder,
-    VectorFieldInference,
+    VectorFieldTrainer,
 )
 from sbi.neural_nets.estimators.base import ConditionalVectorFieldEstimator
 from sbi.neural_nets.factory import posterior_flow_nn
 
 
-class FMPE(VectorFieldInference):
+class FMPE(VectorFieldTrainer):
     """Flow Matching Posterior Estimation (FMPE)."""
 
     def __init__(
@@ -65,7 +65,7 @@ class FMPE(VectorFieldInference):
         self,
         vector_field_estimator: Optional[ConditionalVectorFieldEstimator] = None,
         prior: Optional[Distribution] = None,
-        sample_with: str = "ode",
+        sample_with: Literal["ode", "sde"] = "ode",
         **kwargs,
     ) -> VectorFieldPosterior:
         r"""Build posterior from the flow matching estimator.

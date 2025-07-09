@@ -13,7 +13,7 @@ from torch import Tensor
 from torch.distributions import Distribution, MultivariateNormal
 
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
-from sbi.inference.trainers.npe.npe_base import PosteriorEstimator
+from sbi.inference.trainers.npe.npe_base import PosteriorEstimatorTrainer
 from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
 from sbi.sbi_types import TensorboardSummaryWriter, TorchModule
 from sbi.utils import torchutils
@@ -26,7 +26,7 @@ from sbi.utils.sbiutils import (
 from sbi.utils.torchutils import BoxUniform, assert_all_finite, atleast_2d
 
 
-class NPE_A(PosteriorEstimator):
+class NPE_A(PosteriorEstimatorTrainer):
     r"""Neural Posterior Estimation algorithm as in Papamakarios et al. (2016) [1].
 
     [1] *Fast epsilon-free Inference of Simulation Models with Bayesian

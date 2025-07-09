@@ -4,7 +4,7 @@
 import warnings
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from typing import Any, Callable, Dict, Optional, Union
+from typing import Any, Dict, Literal, Optional, Protocol, Union
 
 import torch
 from torch import Tensor, eye, nn, ones
@@ -18,6 +18,7 @@ from sbi.inference.posteriors.importance_posterior import ImportanceSamplingPost
 from sbi.inference.potentials import ratio_estimator_based_potential
 from sbi.inference.trainers.base import NeuralInference
 from sbi.neural_nets import classifier_nn
+from sbi.neural_nets.ratio_estimators import RatioEstimator
 from sbi.utils import (
     check_estimator_arg,
     check_prior,
@@ -26,11 +27,28 @@ from sbi.utils import (
 from sbi.utils.torchutils import repeat_rows
 
 
-class RatioEstimator(NeuralInference, ABC):
+class RatioEstimatorBuilder(Protocol):
+    """Protocol for building a ratio estimator from data."""
+
+    def __call__(self, theta: Tensor, x: Tensor) -> RatioEstimator:
+        """Build a ratio estimator from theta and x, which mainly inform the
+        shape of the input and the condition to the neural network.
+
+        Args:
+            theta: Parameter sets.
+            x: Simulation outputs.
+
+        Returns:
+            Ratio Estimator.
+        """
+        ...
+
+
+class RatioEstimatorTrainer(NeuralInference, ABC):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
-        classifier: Union[str, Callable] = "resnet",
+        classifier: Union[str, RatioEstimatorBuilder] = "resnet",
         device: str = "cpu",
         logging_level: Union[int, str] = "warning",
         summary_writer: Optional[SummaryWriter] = None,
@@ -56,11 +74,11 @@ class RatioEstimator(NeuralInference, ABC):
         Args:
             classifier: Classifier trained to approximate likelihood ratios. If it is
                 a string, use a pre-configured network of the provided type (one of
-                linear, mlp, resnet). Alternatively, a function that builds a custom
-                neural network can be provided. The function will be called with the
-                first batch of simulations (theta, x), which can thus be used for shape
-                inference and potentially for z-scoring. It needs to return a PyTorch
-                `nn.Module` implementing the classifier.
+                linear, mlp, resnet), or a callable that implements the
+                `RatioEstimatorBuilder` protocol. The callable will be called with the
+                first batch of simulations (theta, x), which can thus be used for
+                shape inference and potentially for z-scoring. It returns a
+                `RatioEstimator`.
 
         See docstring of `NeuralInference` class for all other arguments.
         """
@@ -92,7 +110,7 @@ class RatioEstimator(NeuralInference, ABC):
         from_round: int = 0,
         algorithm: str = "SNRE",
         data_device: Optional[str] = None,
-    ) -> "RatioEstimator":
+    ) -> "RatioEstimatorTrainer":
         r"""Store parameters and simulation outputs to use them for later training.
 
         Data are stored as entries in lists for each type of variable (parameter/data).
@@ -334,9 +352,17 @@ class RatioEstimator(NeuralInference, ABC):
         self,
         density_estimator: Optional[nn.Module] = None,
         prior: Optional[Distribution] = None,
-        sample_with: str = "mcmc",
-        mcmc_method: str = "slice_np_vectorized",
-        vi_method: str = "rKL",
+        sample_with: Literal["mcmc", "rejection", "vi", "importance"] = "mcmc",
+        mcmc_method: Literal[
+            "slice_np",
+            "slice_np_vectorized",
+            "hmc_pyro",
+            "nuts_pyro",
+            "slice_pymc",
+            "hmc_pymc",
+            "nuts_pymc",
+        ] = "slice_np_vectorized",
+        vi_method: Literal["rKL", "fKL", "IW", "alpha"] = "rKL",
         mcmc_parameters: Optional[Dict[str, Any]] = None,
         vi_parameters: Optional[Dict[str, Any]] = None,
         rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
@@ -359,11 +385,15 @@ class RatioEstimator(NeuralInference, ABC):
                 If `None`, use the latest neural density estimator that was trained.
             prior: Prior distribution.
             sample_with: Method to use for sampling from the posterior. Must be one of
-                [`mcmc` | `rejection` | `vi`].
-            mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`,
-                `hmc`, `nuts`. Currently defaults to `slice_np` for a custom numpy
-                implementation of slice sampling; select `hmc`, `nuts` or `slice` for
-                Pyro-based sampling.
+                [`mcmc` | `rejection` | `vi` | `importance`].
+            mcmc_method: Method used for MCMC sampling, one of `slice_np`,
+                `slice_np_vectorized`, `hmc_pyro`, `nuts_pyro`, `slice_pymc`,
+                `hmc_pymc`, `nuts_pymc`. `slice_np` is a custom
+                numpy implementation of slice sampling. `slice_np_vectorized` is
+                identical to `slice_np`, but if `num_chains>1`, the chains are
+                vectorized for `slice_np_vectorized` whereas they are run sequentially
+                for `slice_np`. The samplers ending on `_pyro` are using Pyro, and
+                likewise the samplers ending on `_pymc` are using PyMC.
             vi_method: Method used for VI, one of [`rKL`, `fKL`, `IW`, `alpha`]. Note
                 that some of the methods admit a `mode seeking` property (e.g. rKL)
                 whereas some admit a `mass covering` one (e.g fKL).

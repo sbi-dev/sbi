@@ -4,7 +4,7 @@
 import time
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from typing import Any, Callable, Optional, Protocol, Union
+from typing import Any, Callable, Literal, Optional, Protocol, Union
 
 import torch
 from torch import Tensor, ones
@@ -51,7 +51,7 @@ class VectorFieldEstimatorBuilder(Protocol):
         ...
 
 
-class VectorFieldInference(NeuralInference, ABC):
+class VectorFieldTrainer(NeuralInference, ABC):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
@@ -119,7 +119,7 @@ class VectorFieldInference(NeuralInference, ABC):
         proposal: Optional[DirectPosterior] = None,
         exclude_invalid_x: Optional[bool] = None,
         data_device: Optional[str] = None,
-    ) -> "VectorFieldInference":
+    ) -> "VectorFieldTrainer":
         r"""Store parameters and simulation outputs to use them for later training.
 
         Data are stored as entries in lists for each type of variable (parameter/data).
@@ -146,7 +146,7 @@ class VectorFieldInference(NeuralInference, ABC):
                 much VRAM can set to 'cpu' to store data on system memory instead.
 
         Returns:
-            VectorFieldInference object (returned so that this function is chainable).
+            VectorFieldTrainer object (returned so that this function is chainable).
         """
         inference_name = self.__class__.__name__
         assert proposal is None, (
@@ -554,7 +554,7 @@ class VectorFieldInference(NeuralInference, ABC):
         self,
         vector_field_estimator: Optional[ConditionalVectorFieldEstimator] = None,
         prior: Optional[Distribution] = None,
-        sample_with: str = "sde",
+        sample_with: Literal["ode", "sde"] = "sde",
         **kwargs,
     ) -> VectorFieldPosterior:
         r"""Build posterior from the vector field estimator.
