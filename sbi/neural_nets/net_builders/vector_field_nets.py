@@ -39,7 +39,7 @@ def build_vector_field_estimator(
     num_blocks: int = 5,
     num_heads: int = 4,
     mlp_ratio: int = 4,
-    net: str | nn.Module = "ada_mlp",  # "mlp", "ada_mlp", or "transformer"
+    net: Union[str, VectorFieldNet] = "mlp",
     **kwargs,
 ) -> Union[FlowMatchingEstimator, ConditionalScoreEstimator]:
     """Builds a vector field estimator (flow matching or score matching) with the given
@@ -60,7 +60,9 @@ def build_vector_field_estimator(
         num_blocks: Number of transformer blocks (for transformer).
         num_heads: Number of attention heads per block (for transformer).
         mlp_ratio: Ratio for MLP hidden dimension (for transformer).
-        net: Type of architecture to use, either "mlp", "ada_mlp", or "transformer".
+        net: Type of architecture to use, either "mlp", "ada_mlp", "transformer",
+            "transformer_cross_attention" or a custom network following the
+            VectorFieldNet protocol.
         **kwargs: Additional arguments for the network.
 
     Returns:
