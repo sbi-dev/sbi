@@ -132,9 +132,12 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         at a given time.
 
         Args:
-            input: Original data, x0. (input_batch_shape, *input_shape)
-            condition: Conditioning variable. (condition_batch_shape, *condition_shape)
-            times: SDE time variable in [0,1].
+            input: Inputs to evaluate the score estimator on of shape
+                    `(sample_dim_input, batch_dim_input, *event_shape_input)`.
+            condition: Conditions of shape
+                `(batch_dim_condition, *event_shape_condition)`.
+            time: Time variable in [0,1] of shape
+                `(batch_dim_time, *event_shape_time)`.
 
         Returns:
             Score (gradient of the density) at a given time, matches input shape.
@@ -668,6 +671,8 @@ class VEScoreEstimator(ConditionalScoreEstimator):
         sigma_max: float = 10.0,
         mean_0: float = 0.0,
         std_0: float = 1.0,
+        t_min: float = 1e-3,
+        t_max: float = 1.0,
     ) -> None:
         self.sigma_min = sigma_min
         self.sigma_max = sigma_max
@@ -679,6 +684,8 @@ class VEScoreEstimator(ConditionalScoreEstimator):
             weight_fn=weight_fn,
             mean_0=mean_0,
             std_0=std_0,
+            t_min=t_min,
+            t_max=t_max,
         )
 
     def mean_t_fn(self, times: Tensor) -> Tensor:
