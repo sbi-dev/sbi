@@ -36,7 +36,6 @@ def build_vector_field_estimator(
     hidden_features: Union[Sequence[int], int] = 100,
     time_embedding_dim: int = 32,
     num_layers: int = 5,
-    num_blocks: int = 5,
     num_heads: int = 4,
     mlp_ratio: int = 4,
     net: Union[str, VectorFieldNet] = "mlp",
@@ -56,8 +55,7 @@ def build_vector_field_estimator(
         hidden_features: Number of hidden features in each layer (for MLP) or dimension
             of hidden features (for transformer).
         time_embedding_dim: Number of dimensions for time embedding.
-        num_layers: Number of layers in the network (for MLP).
-        num_blocks: Number of transformer blocks (for transformer).
+        num_layers: Number of layers in the network.
         num_heads: Number of attention heads per block (for transformer).
         mlp_ratio: Ratio for MLP hidden dimension (for transformer).
         net: Type of architecture to use, either "mlp", "ada_mlp", "transformer",
@@ -114,7 +112,7 @@ def build_vector_field_estimator(
             batch_x=batch_x,
             batch_y=batch_y,
             hidden_features=hidden_dim,
-            num_layers=num_blocks,
+            num_layers=num_layers,
             num_heads=num_heads,
             mlp_ratio=mlp_ratio,
             time_embedding_dim=time_embedding_dim,

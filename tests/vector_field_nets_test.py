@@ -141,7 +141,7 @@ def test_adamlp_network_parameters(
 
 
 @pytest.mark.parametrize("hidden_features", [16, 32])
-@pytest.mark.parametrize("num_blocks", [1, 2])
+@pytest.mark.parametrize("num_layers", [1, 2])
 @pytest.mark.parametrize("num_heads", [2, 4])
 @pytest.mark.parametrize("mlp_ratio", [2, 4])
 @pytest.mark.parametrize("time_emb_type", ["sinusoidal", "random_fourier"])
@@ -151,7 +151,7 @@ def test_adamlp_network_parameters(
 @pytest.mark.parametrize("condition_dim", [1, 2])
 def test_transformer_network_parameters(
     hidden_features,
-    num_blocks,
+    num_layers,
     num_heads,
     mlp_ratio,
     time_emb_type,
@@ -169,7 +169,7 @@ def test_transformer_network_parameters(
         batch_x=batch_x,
         batch_y=batch_y,
         hidden_features=hidden_features,
-        num_blocks=num_blocks,
+        num_layers=num_layers,
         num_heads=num_heads,
         mlp_ratio=mlp_ratio,
         time_embedding_dim=time_embedding_dim,
@@ -186,7 +186,7 @@ def test_transformer_network_parameters(
 
 
 @pytest.mark.parametrize("hidden_features", [16, 32])
-@pytest.mark.parametrize("num_blocks", [1, 2])
+@pytest.mark.parametrize("num_layers", [1, 2])
 @pytest.mark.parametrize("num_heads", [2, 4])
 @pytest.mark.parametrize("mlp_ratio", [2, 4])
 @pytest.mark.parametrize("time_emb_type", ["sinusoidal", "random_fourier"])
@@ -196,7 +196,7 @@ def test_transformer_network_parameters(
 @pytest.mark.parametrize("condition_event_shape", [(1, 1), (2, 2)])
 def test_transformer_cross_attention_parameters(
     hidden_features,
-    num_blocks,
+    num_layers,
     num_heads,
     mlp_ratio,
     time_emb_type,
@@ -214,7 +214,7 @@ def test_transformer_cross_attention_parameters(
         batch_x=batch_x,
         batch_y=batch_y,
         hidden_features=hidden_features,
-        num_layers=num_blocks,
+        num_layers=num_layers,
         num_heads=num_heads,
         mlp_ratio=mlp_ratio,
         time_embedding_dim=time_embedding_dim,
