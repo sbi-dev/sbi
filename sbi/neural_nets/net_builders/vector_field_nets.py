@@ -825,9 +825,9 @@ class DiTBlockWithCrossAttention(nn.Module):
         # cross-attention with conditioning (no adaptive ln here)
 
         # project conditioning to hidden dimension
-        cond_emb = cond_emb.unsqueeze(-2)
+        cond_emb = cond_emb
         cond_emb = self.cond_proj(cond_emb)
-        cond_emb = cond_emb.squeeze(-2)
+        cond_emb = cond_emb
         cross_attn_out, _ = self.cross_attn(query=x_norm, key=cond_emb, value=cond_emb)
         x = x + cross_attn_out
 
@@ -1165,7 +1165,11 @@ def build_transformer_network(
 
     # Get dimensions
     x_numel = get_numel(batch_x)
-    y_numel = get_numel(batch_y, embedding_net=embedding_net)
+    if not is_x_emb_seq:
+        y_numel = get_numel(batch_y, embedding_net=embedding_net)
+    else:
+        y_embed = embedding_net(batch_y[:1])
+        y_numel = y_embed.shape[-1]
 
     # Create the vector field network (Transformer)
     vectorfield_net = VectorFieldTransformer(
