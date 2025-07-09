@@ -89,9 +89,9 @@ def test_vector_field_estimator_on_device(device, estimator_type, sde_type):
     assert str(loss.device).split(":")[0] == device, "Loss device mismatch."
 
 
-@pytest.mark.parametrize("input_sample_dim", (1, 2))
+@pytest.mark.parametrize("input_sample_dim", (1, 2, 3))
 @pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
-@pytest.mark.parametrize("condition_event_shape", ((1,), (7,)))
+@pytest.mark.parametrize("condition_event_shape", ((1,), (7,), (3, 3)))
 @pytest.mark.parametrize("batch_dim", (1, 10))
 @pytest.mark.parametrize(
     "estimator_type,sde_type",
@@ -147,9 +147,9 @@ def _build_vector_field_estimator_and_tensors(
     """
     # Use discrete thetas such that categorical density estimators can also use them.
     building_thetas = torch.randint(
-        0, 4, (1000, *input_event_shape), dtype=torch.float32
+        0, 4, (100, *input_event_shape), dtype=torch.float32
     )
-    building_xs = torch.randn((1000, *condition_event_shape))
+    building_xs = torch.randn((100, *condition_event_shape))
 
     if len(condition_event_shape) > 1:
         embedding_net = CNNEmbedding(condition_event_shape, kernel_size=1)

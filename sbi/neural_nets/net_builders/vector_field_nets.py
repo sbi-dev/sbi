@@ -130,9 +130,11 @@ def build_vector_field_estimator(
     # Z-score setup
     mean_0, std_0 = z_standardization(batch_x, z_score_x == "structured")
     embedding_net_y = (
-        standardizing_net(batch_y, z_score_y == "structured")
+        nn.Sequential(
+            standardizing_net(batch_y, z_score_y == "structured"), embedding_net
+        )
         if z_score_y
-        else nn.Identity()
+        else embedding_net
     )
 
     if estimator_type == "flow":
