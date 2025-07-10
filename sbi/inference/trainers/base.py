@@ -189,11 +189,6 @@ class NeuralInference(ABC):
         self._round = 0
         self._val_loss = float("Inf")
 
-        # XXX We could instantiate here the Posterior for all children. Two problems:
-        #     1. We must dispatch to right PotentialProvider for mcmc based on name
-        #     2. `method_family` cannot be resolved only from `self.__class__.__name__`,
-        #         since SRE, AALR demand different handling but are both in SRE class.
-
         self._summary_writer = (
             self._default_summary_writer() if summary_writer is None else summary_writer
         )
@@ -317,8 +312,7 @@ class NeuralInference(ABC):
         discard_prior_samples: bool = False,
         retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
-    ) -> NeuralPosterior:
-        raise NotImplementedError
+    ) -> NeuralPosterior: ...
 
     @abstractmethod
     def _get_potential_function(
