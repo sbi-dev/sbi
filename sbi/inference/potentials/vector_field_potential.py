@@ -63,9 +63,9 @@ class VectorFieldBasedPotential(BasePotential):
         vector_field_estimator: ConditionalVectorFieldEstimator,
         prior: Optional[Distribution],  # type: ignore
         x_o: Optional[Tensor] = None,
+        device: Union[str, torch.device] = "cpu",
         iid_method: Literal["fnpe", "gauss", "auto_gauss", "jac_gauss"] = "auto_gauss",
         iid_params: Optional[Dict[str, Any]] = None,
-        device: Union[str, torch.device] = "cpu",
         neural_ode_backend: str = "zuko",
         neural_ode_kwargs: Optional[Dict[str, Any]] = None,
     ):
@@ -81,11 +81,11 @@ class VectorFieldBasedPotential(BasePotential):
             vector_field_estimator: The neural network modelling the vector field.
             prior: The prior distribution.
             x_o: The observed data at which to evaluate the posterior.
+            device: The device on which to evaluate the potential.
             iid_method: Which method to use for computing the score in the iid setting.
                 We currently support "fnpe", "gauss", "auto_gauss", "jac_gauss".
             iid_params: Parameters for the iid method, for arguments see
                 `IIDScoreFunction`.
-            device: The device on which to evaluate the potential.
             neural_ode_backend: The backend to use for the neural ODE. Currently,
                 only "zuko" is supported.
             neural_ode_kwargs: Additional keyword arguments for the neural ODE.

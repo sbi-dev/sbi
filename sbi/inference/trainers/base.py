@@ -571,7 +571,7 @@ class NeuralInference(ABC):
                 prior,
                 device=device,
                 sample_with=sample_with,
-                **kwargs,
+                **(kwargs.get("vectorfield_sampling_parameters") or {}),
             )
         else:
             # Posteriors requiring potential_fn and theta_transform

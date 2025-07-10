@@ -2,7 +2,7 @@
 # under the Apache License v2.0, see <https://www.apache.org/licenses/LICENSE-2.0>.
 
 
-from typing import Literal, Optional, Union
+from typing import Any, Dict, Literal, Optional, Union
 
 from torch.distributions import Distribution
 from torch.utils.tensorboard.writer import SummaryWriter
@@ -64,7 +64,7 @@ class FMPE(VectorFieldInference):
         vector_field_estimator: Optional[ConditionalVectorFieldEstimator] = None,
         prior: Optional[Distribution] = None,
         sample_with: Literal["ode", "sde"] = "ode",
-        **kwargs,
+        vectorfield_sampling_parameters: Optional[Dict[str, Any]] = None,
     ) -> NeuralPosterior:
         r"""Build posterior from the flow matching estimator.
 
@@ -87,8 +87,8 @@ class FMPE(VectorFieldInference):
                 the score to do a Langevin diffusion step, while the 'ode' method
                 uses the score to define a probabilistic ODE and solves it with
                 a numerical ODE solver.
-            **kwargs: Additional keyword arguments passed to
-                `VectorFieldBasedPotential`.
+            vectorfield_sampling_parameters: Additional keyword arguments passed to
+                `VectorFieldPosterior`.
 
 
         Returns:
@@ -98,7 +98,7 @@ class FMPE(VectorFieldInference):
             estimator=vector_field_estimator,
             prior=prior,
             sample_with=sample_with,
-            **kwargs,
+            vectorfield_sampling_parameters=vectorfield_sampling_parameters,
         )
 
     def _build_default_nn_fn(self, **kwargs) -> VectorFieldEstimatorBuilder:
