@@ -22,16 +22,16 @@ from sbi.utils.torchutils import BoxUniform
 @pytest.mark.parametrize("distance", ("l2", lambda x, xo: norm((x - xo), dim=-1)))
 @pytest.mark.parametrize("eps", (0.05, None))
 def test_mcabc_inference_on_linear_gaussian(
-    num_dim,
-    distance,
-    eps,
-    lra=False,
-    sass=False,
-    sass_expansion_degree=1,
-    kde=False,
-    kde_bandwidth="cv",
-    num_iid_samples=1,
-    distance_kwargs=None,
+    num_dim: int,
+    distance: str,
+    eps: float,
+    lra: bool = False,
+    sass: bool = False,
+    sass_expansion_degree: int = 1,
+    kde: bool = False,
+    kde_bandwidth: str = "cv",
+    num_iid_samples: int = 1,
+    distance_kwargs: dict = None,
 ):
     x_o = zeros((num_iid_samples, num_dim))
     num_samples = 1000
@@ -103,21 +103,21 @@ def test_mcabc_inference_on_linear_gaussian_eps_too_small():
 @pytest.mark.parametrize("algorithm_variant", ("A", "B", "C"))
 @pytest.mark.parametrize("kernel", ("gaussian", "uniform"))
 def test_smcabc_inference_on_linear_gaussian(
-    num_dim,
+    num_dim: int,
     prior_type: str,
     algorithm_variant: str,
     kernel: str,
-    distance="l2",
-    lra=False,
-    sass=False,
-    sass_expansion_degree=1,
-    kde=False,
-    kde_bandwidth="cv",
-    transform=False,
-    num_simulations=40000,
-    num_iid_samples=1,
-    distance_kwargs=None,
-    ess_min=None,
+    distance: str = "l2",
+    lra: bool = False,
+    sass: bool = False,
+    sass_expansion_degree: int = 1,
+    kde: bool = False,
+    kde_bandwidth: str = "cv",
+    transform: bool = False,
+    num_simulations: int = 40000,
+    num_iid_samples: int = 1,
+    distance_kwargs: dict = None,
+    ess_min: float = None,
 ):
     x_o = zeros((num_iid_samples, num_dim))
     num_samples = 1000
@@ -312,18 +312,13 @@ def test_lra_mathematical_correctness():
     # True linear relationship: x = A * theta + noise
     A = torch.tensor([[1.0, 2.0], [0.5, -1.0], [2.0, 1.0]])  # [n_features, n_params]
 
-    # Generate synthetic theta and x with known relationship
     theta = torch.randn(n_samples, n_params)
     x = theta @ A.T + 0.1 * torch.randn(n_samples, n_features)
 
-    # Create observation that should lead to predictable adjustment
     observation = torch.tensor([[1.0, 0.0, 0.5]])  # [1, n_features]
 
-    # Run LRA
     theta_adjusted = ABCBASE._run_lra(theta, x, observation)
 
-    # For linear relationship, LRA should improve the fit
-    # Check that adjustment moves parameters toward expected values
     mean_adjustment = (theta_adjusted - theta).mean(dim=0)
 
     # The adjustment should be non-zero (LRA is doing something)
@@ -346,7 +341,6 @@ def test_lra_with_weights():
 
     n_samples, n_params, n_features = 50, 2, 2
 
-    # Create synthetic data
     theta = torch.randn(n_samples, n_params)
     x = theta + 0.1 * torch.randn(n_samples, n_features)
     observation = torch.zeros(1, n_features)
@@ -372,7 +366,6 @@ def test_sass_dimension_reduction():
     n_features_relevant, n_features_noise = 3, 5
     n_features_total = n_features_relevant + n_features_noise
 
-    # Generate parameters
     theta = torch.randn(n_samples, n_params)
 
     # Create features where only first few dimensions depend on theta
@@ -380,10 +373,8 @@ def test_sass_dimension_reduction():
     x_noise = torch.randn(n_samples, n_features_noise)  # Pure noise
     x = torch.cat([x_relevant, x_noise], dim=1)
 
-    # Get SASS transform
     sass_transform = ABCBASE._get_sass_transform(theta, x, expansion_degree=1)
 
-    # Apply transform to test data
     x_test = torch.randn(10, n_features_total)
     x_transformed = sass_transform(x_test)
 
@@ -393,7 +384,6 @@ def test_sass_dimension_reduction():
         f"SASS should output {n_params} features, got {x_transformed.shape[1]}"
     )
 
-    # Test that transform is deterministic
     x_transformed_2 = sass_transform(x_test)
     assert torch.allclose(x_transformed, x_transformed_2), (
         "SASS transform should be deterministic"
@@ -406,15 +396,12 @@ def test_sass_information_preservation():
 
     n_samples, n_params, n_features = 100, 2, 4
 
-    # Create data with known linear relationship
     A = torch.randn(n_params, n_features)
     theta = torch.randn(n_samples, n_params)
     x = theta @ A + 0.1 * torch.randn(n_samples, n_features)
 
-    # Get SASS transform
     sass_transform = ABCBASE._get_sass_transform(theta, x, expansion_degree=1)
 
-    # Apply to original data
     x_transformed = sass_transform(x)
 
     # The transformed features should still correlate with parameters
@@ -438,7 +425,6 @@ def test_sass_polynomial_expansion():
 
     n_samples, n_params, n_features = 50, 2, 2
 
-    # Create data with quadratic relationship
     theta = torch.randn(n_samples, n_params)
     x = theta + theta**2 + 0.1 * torch.randn(n_samples, n_features)
 
@@ -446,12 +432,10 @@ def test_sass_polynomial_expansion():
     sass_transform_linear = ABCBASE._get_sass_transform(theta, x, expansion_degree=1)
     sass_transform_quad = ABCBASE._get_sass_transform(theta, x, expansion_degree=2)
 
-    # Apply to test data
     x_test = torch.randn(10, n_features)
     x_transformed_linear = sass_transform_linear(x_test)
     x_transformed_quad = sass_transform_quad(x_test)
 
-    # Both should produce valid outputs
     assert x_transformed_linear.shape[1] == n_params, (
         "Linear SASS should output correct dimensions"
     )
