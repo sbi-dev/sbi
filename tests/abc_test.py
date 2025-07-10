@@ -3,7 +3,7 @@
 
 import pytest
 import torch
-from torch import eye, norm, ones, zeros
+from torch import Tensor, eye, norm, ones, zeros
 from torch.distributions import MultivariateNormal, biject_to
 
 from sbi.inference import MCABC, SMC
@@ -36,7 +36,6 @@ def test_mcabc_inference_on_linear_gaussian(
     x_o = zeros((num_iid_samples, num_dim))
     num_samples = 1000
     num_simulations = 500000
-    quantile = num_samples / num_simulations
     dim_scaled_eps = eps * num_dim if eps is not None else None
 
     # likelihood_mean will be likelihood_shift+theta
@@ -66,7 +65,7 @@ def test_mcabc_inference_on_linear_gaussian(
         x_o,
         num_simulations,
         eps=dim_scaled_eps,
-        quantile=quantile if eps is None else None,
+        quantile=num_samples / num_simulations if eps is None else None,
         lra=lra,
         sass=sass,
         sass_expansion_degree=sass_expansion_degree,
@@ -76,8 +75,14 @@ def test_mcabc_inference_on_linear_gaussian(
         return_summary=False,
         num_iid_samples=num_iid_samples,
     )
+
+    if kde:
+        posterior_samples: Tensor = phat.sample((num_samples,))
+    else:
+        posterior_samples: Tensor = phat[:num_samples]
+
     check_c2st(
-        phat.sample((num_samples,)) if kde else phat[:num_samples],
+        posterior_samples,
         target_samples,
         alg=f"MCABC_lra{lra}_sass{sass}_kde{kde}_{kde_bandwidth}",
     )
