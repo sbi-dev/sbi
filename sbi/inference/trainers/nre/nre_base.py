@@ -102,6 +102,9 @@ class RatioEstimatorTrainer(NeuralInference, ABC):
         else:
             self._build_neural_net = classifier
 
+    @abstractmethod
+    def _loss(self, theta: Tensor, x: Tensor, num_atoms: int) -> Tensor: ...
+
     def append_simulations(
         self,
         theta: Tensor,
@@ -323,55 +326,6 @@ class RatioEstimatorTrainer(NeuralInference, ABC):
 
         return deepcopy(self._neural_net)
 
-    def _classifier_logits(self, theta: Tensor, x: Tensor, num_atoms: int) -> Tensor:
-        """Return logits obtained through classifier forward pass.
-
-        The logits are obtained from atomic sets of (theta,x) pairs.
-        """
-        batch_size = theta.shape[0]
-        repeated_x = repeat_rows(x, num_atoms)
-
-        # Choose `1` or `num_atoms - 1` thetas from the rest of the batch for each x.
-        probs = ones(batch_size, batch_size) * (1 - eye(batch_size)) / (batch_size - 1)
-
-        choices = torch.multinomial(probs, num_samples=num_atoms - 1, replacement=False)
-
-        contrasting_theta = theta[choices]
-
-        atomic_theta = torch.cat((theta[:, None, :], contrasting_theta), dim=1).reshape(
-            batch_size * num_atoms, -1
-        )
-
-        return self._neural_net(atomic_theta, repeated_x)
-
-    @abstractmethod
-    def _loss(self, theta: Tensor, x: Tensor, num_atoms: int) -> Tensor:
-        raise NotImplementedError
-
-    def _get_potential_function(
-        self, prior: Distribution, estimator: RatioEstimator
-    ) -> Tuple[RatioBasedPotential, TorchTransform]:
-        r"""Gets the potential for ratio-based methods.
-
-        It also returns a transformation that can be used to transform the potential
-        into unconstrained space.
-
-        Args:
-            prior: The prior distribution.
-            estimator: The neural network modelling likelihood-to-evidence ratio.
-
-        Returns:
-            The potential function and a transformation that maps
-            to unconstrained space.
-        """
-        potential_fn, theta_transform = ratio_estimator_based_potential(
-            ratio_estimator=estimator,
-            prior=prior,
-            x_o=None,
-        )
-
-        return potential_fn, theta_transform
-
     def build_posterior(
         self,
         density_estimator: Optional[RatioEstimator] = None,
@@ -441,3 +395,48 @@ class RatioEstimatorTrainer(NeuralInference, ABC):
             rejection_sampling_parameters=rejection_sampling_parameters,
             importance_sampling_parameters=importance_sampling_parameters,
         )
+
+    def _classifier_logits(self, theta: Tensor, x: Tensor, num_atoms: int) -> Tensor:
+        """Return logits obtained through classifier forward pass.
+
+        The logits are obtained from atomic sets of (theta,x) pairs.
+        """
+        batch_size = theta.shape[0]
+        repeated_x = repeat_rows(x, num_atoms)
+
+        # Choose `1` or `num_atoms - 1` thetas from the rest of the batch for each x.
+        probs = ones(batch_size, batch_size) * (1 - eye(batch_size)) / (batch_size - 1)
+
+        choices = torch.multinomial(probs, num_samples=num_atoms - 1, replacement=False)
+
+        contrasting_theta = theta[choices]
+
+        atomic_theta = torch.cat((theta[:, None, :], contrasting_theta), dim=1).reshape(
+            batch_size * num_atoms, -1
+        )
+
+        return self._neural_net(atomic_theta, repeated_x)
+
+    def _get_potential_function(
+        self, prior: Distribution, estimator: RatioEstimator
+    ) -> Tuple[RatioBasedPotential, TorchTransform]:
+        r"""Gets the potential for ratio-based methods.
+
+        It also returns a transformation that can be used to transform the potential
+        into unconstrained space.
+
+        Args:
+            prior: The prior distribution.
+            estimator: The neural network modelling likelihood-to-evidence ratio.
+
+        Returns:
+            The potential function and a transformation that maps
+            to unconstrained space.
+        """
+        potential_fn, theta_transform = ratio_estimator_based_potential(
+            ratio_estimator=estimator,
+            prior=prior,
+            x_o=None,
+        )
+
+        return potential_fn, theta_transform

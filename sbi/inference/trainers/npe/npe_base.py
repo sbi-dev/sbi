@@ -93,6 +93,15 @@ class PosteriorEstimatorTrainer(NeuralInference, ABC):
         self._proposal_roundwise = []
         self.use_non_atomic_loss = False
 
+    @abstractmethod
+    def _log_prob_proposal_posterior(
+        self,
+        theta: Tensor,
+        x: Tensor,
+        masks: Tensor,
+        proposal: Optional[Any],
+    ) -> Tensor: ...
+
     def append_simulations(
         self,
         theta: Tensor,
@@ -433,34 +442,6 @@ class PosteriorEstimatorTrainer(NeuralInference, ABC):
 
         return deepcopy(self._neural_net)
 
-    def _get_potential_function(
-        self,
-        prior: Distribution,
-        estimator: ConditionalDensityEstimator,
-    ) -> Tuple[PosteriorBasedPotential, TorchTransform]:
-        r"""Gets the potential for posterior-based methods.
-
-        It also returns a transformation that can be used to transform the potential
-        into unconstrained space.
-
-        The potential is the same as the log-probability of the `posterior_estimator`,
-        but it is set to $-\inf$ outside of the prior bounds.
-
-        Args:
-            prior: The prior distribution.
-            estimator: The neural network modelling the posterior.
-
-        Returns:
-            The potential function and a transformation that maps
-            to unconstrained space.
-        """
-        potential_fn, theta_transform = posterior_estimator_based_potential(
-            posterior_estimator=estimator,
-            prior=prior,
-            x_o=None,
-        )
-        return potential_fn, theta_transform
-
     def build_posterior(
         self,
         density_estimator: Optional[ConditionalDensityEstimator] = None,
@@ -536,15 +517,33 @@ class PosteriorEstimatorTrainer(NeuralInference, ABC):
             direct_sampling_parameters=direct_sampling_parameters,
         )
 
-    @abstractmethod
-    def _log_prob_proposal_posterior(
+    def _get_potential_function(
         self,
-        theta: Tensor,
-        x: Tensor,
-        masks: Tensor,
-        proposal: Optional[Any],
-    ) -> Tensor:
-        raise NotImplementedError
+        prior: Distribution,
+        estimator: ConditionalDensityEstimator,
+    ) -> Tuple[PosteriorBasedPotential, TorchTransform]:
+        r"""Gets the potential for posterior-based methods.
+
+        It also returns a transformation that can be used to transform the potential
+        into unconstrained space.
+
+        The potential is the same as the log-probability of the `posterior_estimator`,
+        but it is set to $-\inf$ outside of the prior bounds.
+
+        Args:
+            prior: The prior distribution.
+            estimator: The neural network modelling the posterior.
+
+        Returns:
+            The potential function and a transformation that maps
+            to unconstrained space.
+        """
+        potential_fn, theta_transform = posterior_estimator_based_potential(
+            posterior_estimator=estimator,
+            prior=prior,
+            x_o=None,
+        )
+        return potential_fn, theta_transform
 
     def _loss(
         self,

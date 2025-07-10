@@ -74,10 +74,6 @@ class NPSE(VectorFieldInference):
         # score_estimator name is kept since it is public API, but it is
         # actually misleading since it is a builder for an estimator.
 
-    def _build_default_nn_fn(self, **kwargs) -> VectorFieldEstimatorBuilder:
-        net_type = kwargs.pop("vector_field_estimator_builder", "mlp")
-        return posterior_score_nn(score_net_type=net_type, **kwargs)
-
     def build_posterior(
         self,
         vector_field_estimator: Optional[ConditionalVectorFieldEstimator] = None,
@@ -118,3 +114,7 @@ class NPSE(VectorFieldInference):
             sample_with=sample_with,
             **kwargs,
         )
+
+    def _build_default_nn_fn(self, **kwargs) -> VectorFieldEstimatorBuilder:
+        net_type = kwargs.pop("vector_field_estimator_builder", "mlp")
+        return posterior_score_nn(score_net_type=net_type, **kwargs)

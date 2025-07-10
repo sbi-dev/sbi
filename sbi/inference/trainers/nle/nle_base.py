@@ -283,30 +283,6 @@ class LikelihoodEstimatorTrainer(NeuralInference, ABC):
 
         return deepcopy(self._neural_net)
 
-    def _get_potential_function(
-        self, prior: Distribution, estimator: ConditionalDensityEstimator
-    ) -> Tuple[LikelihoodBasedPotential, TorchTransform]:
-        r"""Gets potential :math:`\log(p(x_o|\theta)p(\theta))` for
-        likelihood estimator.
-
-        It also returns a transformation that can be used to transform the potential
-        into unconstrained space.
-
-        Args:
-            prior: The prior distribution.
-            estimator: The density estimator modelling the likelihood.
-
-        Returns:
-            The potential function $p(x_o|\theta)p(\theta)$ and a transformation that
-            maps to unconstrained space.
-        """
-        potential_fn, theta_transform = likelihood_estimator_based_potential(
-            likelihood_estimator=estimator,
-            prior=prior,
-            x_o=None,
-        )
-        return potential_fn, theta_transform
-
     def build_posterior(
         self,
         density_estimator: Optional[ConditionalDensityEstimator] = None,
@@ -374,6 +350,30 @@ class LikelihoodEstimatorTrainer(NeuralInference, ABC):
             rejection_sampling_parameters=rejection_sampling_parameters,
             importance_sampling_parameters=importance_sampling_parameters,
         )
+
+    def _get_potential_function(
+        self, prior: Distribution, estimator: ConditionalDensityEstimator
+    ) -> Tuple[LikelihoodBasedPotential, TorchTransform]:
+        r"""Gets potential :math:`\log(p(x_o|\theta)p(\theta))` for
+        likelihood estimator.
+
+        It also returns a transformation that can be used to transform the potential
+        into unconstrained space.
+
+        Args:
+            prior: The prior distribution.
+            estimator: The density estimator modelling the likelihood.
+
+        Returns:
+            The potential function $p(x_o|\theta)p(\theta)$ and a transformation that
+            maps to unconstrained space.
+        """
+        potential_fn, theta_transform = likelihood_estimator_based_potential(
+            likelihood_estimator=estimator,
+            prior=prior,
+            x_o=None,
+        )
+        return potential_fn, theta_transform
 
     def _loss(self, theta: Tensor, x: Tensor) -> Tensor:
         r"""Return loss for SNLE, which is the likelihood of $-\log q(x_i | \theta_i)$.
