@@ -105,5 +105,3 @@ uv.lock
 
 # Serena cache
 .serena/
-# Refactoring plan
-refactoring_plan/
