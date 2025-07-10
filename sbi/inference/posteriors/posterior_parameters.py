@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Callable, Dict, Iterable, Literal, Optional, Union
 
 import torch
@@ -79,7 +79,13 @@ class VectorFieldPosteriorParameters:
 
     max_sampling_batch_size: int = 10_000
     enable_transform: bool = True
-    vector_field_estimator_potential_args: Dict[str, Any] = field(default_factory=dict)
+
+    # fields passed from VectorfieldPosterior as keyword arguments
+    # to VectorFieldBasedPotential __init__ method
+    iid_method: Literal["fnpe", "gauss", "auto_gauss", "jac_gauss"] = "auto_gauss"
+    iid_params: Optional[Dict[str, Any]] = None
+    neural_ode_backend: str = "zuko"
+    neural_ode_kwargs: Optional[Dict[str, Any]] = None
 
 
 @dataclass(frozen=True)

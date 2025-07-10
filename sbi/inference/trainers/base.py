@@ -590,23 +590,20 @@ class NeuralInference(ABC):
                 posterior_parameters = DirectPosteriorParameters(**params)
             elif sample_with == "mcmc":
                 params = kwargs.get("mcmc_parameters", {}) or {}
-                params["method"] = kwargs.pop("mcmc_method", "slice_np_vectorized")
-                posterior_parameters = MCMCPosteriorParameters(**params)
-            elif sample_with in ("ode", "sde"):
-                posterior_parameters = VectorFieldPosteriorParameters(
-                    max_sampling_batch_size=kwargs.pop(
-                        "max_sampling_batch_size", 10_000
-                    ),
-                    enable_transform=kwargs.pop("enable_transform", True),
-                    vector_field_estimator_potential_args=kwargs,
+                posterior_parameters = MCMCPosteriorParameters(
+                    method=kwargs.get("mcmc_method", "slice_np_vectorized"), **params
                 )
+            elif sample_with in ("ode", "sde"):
+                params = kwargs.get("vectorfield_sampling_parameters", {}) or {}
+                posterior_parameters = VectorFieldPosteriorParameters(**params)
             elif sample_with == "rejection":
                 params = kwargs.get("rejection_sampling_parameters", {}) or {}
                 posterior_parameters = RejectionPosteriorParameters(**params)
             elif sample_with == "vi":
                 params = kwargs.get("vi_parameters", {}) or {}
-                params["vi_method"] = kwargs.get("vi_method", "rKL")
-                posterior_parameters = VIPosteriorParameters(**params)
+                posterior_parameters = VIPosteriorParameters(
+                    vi_method=kwargs.get("vi_method", "rKL"), **params
+                )
             elif sample_with == "importance":
                 params = kwargs.get("importance_sampling_parameters", {}) or {}
                 posterior_parameters = ImportanceSamplingPosteriorParameters(**params)
@@ -694,16 +691,12 @@ class NeuralInference(ABC):
                 "`sample_with` must be either",
                 f" 'ode' or 'sde', got '{sample_with}'",
             )
-
-            posterior_params_dict = asdict(posterior_parameters)
-            posterior_params_dict.pop('vector_field_estimator_potential_args', None)
             posterior = VectorFieldPosterior(
                 vector_field_estimator=vector_field_estimator,
                 prior=prior,
                 device=device,
                 sample_with=sample_with,
-                **posterior_params_dict,
-                **posterior_parameters.vector_field_estimator_potential_args,
+                **asdict(posterior_parameters),
             )
         else:
             # Posteriors requiring potential_fn and theta_transform
