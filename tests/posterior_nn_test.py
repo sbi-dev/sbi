@@ -14,6 +14,7 @@ from sbi.inference import (
     NPE_A,
     NPE_C,
     NPSE,
+    NRE,
     NRE_A,
     NRE_B,
     NRE_C,
@@ -379,7 +380,7 @@ def test_build_posterior_raises_with_invalid_estimator():
     theta = prior.sample((300,))
     x = simulator(theta)
 
-    inference = NRE_A(prior=prior)
+    inference = NRE(prior=prior)
     inference.append_simulations(theta, x)
 
     inference.train(max_num_epochs=1)
