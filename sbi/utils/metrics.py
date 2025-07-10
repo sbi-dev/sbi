@@ -1,8 +1,8 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import warnings
 from functools import partial
-from logging import warning
 from typing import Any, Callable, Dict, Optional, Union
 
 import numpy as np
@@ -366,10 +366,11 @@ def regularized_ot_dual(
         if torch.all(terminated):
             break
         if iters.max() == max_iter:
-            warning(
+            warnings.warn(
                 f"Sinkhorn iterations did not converge within {max_iter} iterations. "
                 f"Consider a bigger regularization parameter 'epsilon' "
-                "or increasing 'max_iter'."
+                "or increasing 'max_iter'.",
+                stacklevel=2,
             )
             break
         iters = torch.where(terminated, iters, iters + 1)
@@ -528,10 +529,11 @@ class Distance:
 
         if callable(distance):
             if requires_iid_data is None:
-                warning(
+                warnings.warn(
                     "Please specify if your the custom distance requires "
                     "iid data or is evaluated between single datapoints. "
-                    "By default, we assume that `requires_iid_data=False`"
+                    "By default, we assume that `requires_iid_data=False`",
+                    stacklevel=2,
                 )
                 requires_iid_data = False
             self.distance_fn = distance
