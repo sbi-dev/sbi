@@ -343,8 +343,8 @@ class VectorFieldTrainer(NeuralInference, ABC):
             # domain and hence can be "unstable" and is not a good choice for
             # evaluation. Same for flow mathching but with t_max
             validation_times = torch.linspace(
-                self._neural_net.t_min + 0.1,
-                self._neural_net.t_max - 0.1,
+                self._neural_net.t_min + 0.05,
+                self._neural_net.t_max - 0.05,
                 validation_times,
             )
         assert isinstance(
@@ -495,10 +495,10 @@ class VectorFieldTrainer(NeuralInference, ABC):
     def _converged(self, epoch: int, stop_after_epochs: int) -> bool:
         """Return whether the training converged yet and save best model state so far.
 
-        Checks for improvement in validation performance over previous epochs.
-        Uses an adaptive threshold that considers both the scale and variance of the
-        loss. The threshold is based on the exponential moving average of the loss and
-        its relative changes.
+        Uses a statistical approach to detect convergence by tracking the running mean
+        and standard deviation of validation losses. Training is considered converged
+        when the current loss is statistically significantly worse than the best loss
+        for a sustained period, accounting for natural fluctuations in the loss.
 
         Args:
             epoch: Current epoch in training.
@@ -512,44 +512,53 @@ class VectorFieldTrainer(NeuralInference, ABC):
         assert self._neural_net is not None
         neural_net = self._neural_net
 
-        # Initialize tracking of loss changes if not exists
-        if not hasattr(self, '_loss_changes'):
-            self._loss_changes = []
+        # Initialize tracking variables if not exists
+        if not hasattr(self, '_best_val_loss'):
+            self._best_val_loss = float('inf')
+            self._epochs_since_last_improvement = 0
+            self._best_model_state_dict = None
 
-        # (Re)-start the epoch count with the first epoch or any improvement.
-        if epoch == 0 or self._val_loss < self._best_val_loss:
+        # Check if we have a new best loss
+        if self._val_loss < self._best_val_loss:
             self._best_val_loss = self._val_loss
             self._epochs_since_last_improvement = 0
             self._best_model_state_dict = deepcopy(neural_net.state_dict())
         else:
-            # Calculate relative change in loss
-            relative_change = (self._val_loss - self._best_val_loss) / abs(
-                self._best_val_loss
-            )
+            # Only start statistical analysis after we have enough data
+            if len(self._summary["validation_loss"]) >= 5:
+                # Calculate running statistics of recent losses
+                recent_losses = torch.tensor(
+                    self._summary["validation_loss"][-stop_after_epochs:]
+                )
+                loss_std = recent_losses.std().item()
 
-            # Update loss changes history (keep last stop_after_epochs changes)
-            self._loss_changes.append(relative_change)
-            if len(self._loss_changes) > stop_after_epochs:
-                self._loss_changes.pop(0)
+                # Calculate how many standard deviations the current loss is from the
+                # best
+                if loss_std > 0:  # Avoid division by zero
+                    z_score = (self._val_loss - self._best_val_loss) / loss_std
 
-            # Calculate adaptive threshold based on recent loss changes
-            if len(self._loss_changes) >= 3:
-                # Use standard deviation of recent changes to determine threshold
-                recent_changes = torch.tensor(self._loss_changes)
-                std_changes = recent_changes.std().item()
-                mean_changes = recent_changes.mean().item()
-
-                # Adaptive threshold: mean + 2*std of recent changes
-                # This means we only count as "no improvement" if the increase
-                # is significantly above the typical fluctuations
-                adaptive_threshold = mean_changes + 1.5 * std_changes
-
-                if relative_change > adaptive_threshold:
-                    self._epochs_since_last_improvement += 1
+                    # Consider it "no improvement" if current loss is significantly
+                    # worse than the best loss (more than 2.0 std deviations above best)
+                    # This accounts for natural fluctuations while being sensitive to
+                    # real degradation
+                    if z_score > 2.0:
+                        self._epochs_since_last_improvement += 1
+                    else:
+                        # Reset counter if loss is within acceptable range
+                        self._epochs_since_last_improvement = 0
+                else:
+                    # If std is 0, any increase counts as no improvement
+                    if self._val_loss > self._best_val_loss:
+                        self._epochs_since_last_improvement += 1
+                    else:
+                        self._epochs_since_last_improvement = 0
+            else:
+                return False
 
         # If no validation improvement over many epochs, stop training.
         if self._epochs_since_last_improvement > stop_after_epochs - 1:
-            neural_net.load_state_dict(self._best_model_state_dict)
+            if self._best_model_state_dict is not None:
+                neural_net.load_state_dict(self._best_model_state_dict)
             converged = True
 
         return converged

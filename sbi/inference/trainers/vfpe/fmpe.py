@@ -2,6 +2,7 @@
 # under the Apache License v2.0, see <https://www.apache.org/licenses/LICENSE-2.0>.
 
 
+import warnings
 from typing import Any, Dict, Literal, Optional, Union
 
 from torch.distributions import Distribution
@@ -23,6 +24,7 @@ class FMPE(VectorFieldTrainer):
     def __init__(
         self,
         prior: Optional[Distribution],
+        density_estimator: Optional[VectorFieldEstimatorBuilder] = None,
         vf_estimator: Union[str, VectorFieldEstimatorBuilder] = "mlp",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
@@ -34,6 +36,7 @@ class FMPE(VectorFieldTrainer):
 
         Args:
             prior: Prior distribution.
+            density_estimator: Deprecated. Use `vf_estimator` instead.
             vf_estimator: Neural network architecture used to learn the
                 vector field estimator. Can be a string (e.g. 'mlp' or 'ada_mlp') or a
                 callable that implements the `VectorFieldEstimatorBuilder` protocol
@@ -46,6 +49,15 @@ class FMPE(VectorFieldTrainer):
             **kwargs: Additional keyword arguments passed to the default builder if
                 `density_estimator` is a string.
         """
+
+        if density_estimator is not None:
+            warnings.warn(
+                "`density_estimator` is deprecated and will be removed in a future "
+                "release. Use `vf_estimator` instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            vf_estimator = density_estimator
 
         super().__init__(
             prior=prior,
