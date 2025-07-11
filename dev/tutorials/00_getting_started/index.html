@@ -593,7 +593,7 @@ corresponding simulated data <code>x</code>.</p>
 <div class="codehilite"><pre><span></span><code>WARNING (pytensor.tensor.blas): Using NumPy C-API based implementation for BLAS functions.
 </code></pre></div>
 
-<p>The <code>sbi</code> toolbox uses neural networks to learn the relationship between parameters and data. In this exampmle, we will use neural perform posterior estimation (NPE). To run NPE, we first instatiate a trainer, which we call <code>inference</code>:</p>
+<p>The <code>sbi</code> toolbox uses neural networks to learn the relationship between parameters and data. In this example, we will use neural perform posterior estimation (NPE). To run NPE, we first instatiate a trainer, which we call <code>inference</code>:</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference</span><span class="w"> </span><span class="kn">import</span> <span class="n">NPE</span>
 
 <span class="n">inference</span> <span class="o">=</span> <span class="n">NPE</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">)</span>

@@ -4714,6 +4714,14 @@ the atomic loss.</p>
 
         <span class="k">return</span> <span class="n">means_pp</span>
 
+    <span class="k">def</span><span class="w"> </span><span class="nf">_maybe_z_score_theta</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">theta</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return potentially standardized theta if z-scoring was requested.&quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">z_score_theta</span><span class="p">:</span>
+            <span class="n">theta</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_neural_net</span><span class="o">.</span><span class="n">net</span><span class="o">.</span><span class="n">_transform</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">theta</span>
+
     <span class="nd">@staticmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">_logits_proposal_posterior</span><span class="p">(</span>
         <span class="n">means_pp</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
@@ -4781,14 +4789,6 @@ the atomic loss.</p>
         <span class="n">logits_pp</span> <span class="o">=</span> <span class="n">logit_factors</span> <span class="o">+</span> <span class="n">log_sqrt_det_ratio</span> <span class="o">+</span> <span class="n">exponent</span>
 
         <span class="k">return</span> <span class="n">logits_pp</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="nf">_maybe_z_score_theta</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">theta</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return potentially standardized theta if z-scoring was requested.&quot;&quot;&quot;</span>
-
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">z_score_theta</span><span class="p">:</span>
-            <span class="n">theta</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_neural_net</span><span class="o">.</span><span class="n">net</span><span class="o">.</span><span class="n">_transform</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
-
-        <span class="k">return</span> <span class="n">theta</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -5682,17 +5682,13 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
         <span class="c1"># density_estimator name is kept since it is public API, but it is</span>
         <span class="c1"># actually misleading since it is a builder for an estimator.</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">_build_default_nn_fn</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">VectorFieldEstimatorBuilder</span><span class="p">:</span>
-        <span class="n">model</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;vector_field_estimator_builder&quot;</span><span class="p">,</span> <span class="s2">&quot;mlp&quot;</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">flowmatching_nn</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-
     <span class="k">def</span><span class="w"> </span><span class="nf">build_posterior</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">vector_field_estimator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">ConditionalVectorFieldEstimator</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">sample_with</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;ode&quot;</span><span class="p">,</span> <span class="s2">&quot;sde&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;ode&quot;</span><span class="p">,</span>
-        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">VectorFieldPosterior</span><span class="p">:</span>
+        <span class="n">vectorfield_sampling_parameters</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NeuralPosterior</span><span class="p">:</span>
 <span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Build posterior from the flow matching estimator.</span>
 
 <span class="sd">        Note that this is the same as the NPSE posterior, but the sample_with method</span>
@@ -5714,19 +5710,23 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 <span class="sd">                the score to do a Langevin diffusion step, while the &#39;ode&#39; method</span>
 <span class="sd">                uses the score to define a probabilistic ODE and solves it with</span>
 <span class="sd">                a numerical ODE solver.</span>
-<span class="sd">            **kwargs: Additional keyword arguments passed to</span>
-<span class="sd">                `VectorFieldBasedPotential`.</span>
+<span class="sd">            vectorfield_sampling_parameters: Additional keyword arguments passed to</span>
+<span class="sd">                `VectorFieldPosterior`.</span>
 
 
 <span class="sd">        Returns:</span>
 <span class="sd">            Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_posterior</span><span class="p">(</span>
-            <span class="n">vector_field_estimator</span><span class="o">=</span><span class="n">vector_field_estimator</span><span class="p">,</span>
+        <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">(</span>
+            <span class="n">estimator</span><span class="o">=</span><span class="n">vector_field_estimator</span><span class="p">,</span>
             <span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span>
             <span class="n">sample_with</span><span class="o">=</span><span class="n">sample_with</span><span class="p">,</span>
-            <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+            <span class="n">vectorfield_sampling_parameters</span><span class="o">=</span><span class="n">vectorfield_sampling_parameters</span><span class="p">,</span>
         <span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_build_default_nn_fn</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">VectorFieldEstimatorBuilder</span><span class="p">:</span>
+        <span class="n">model</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;vector_field_estimator_builder&quot;</span><span class="p">,</span> <span class="s2">&quot;mlp&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">flowmatching_nn</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -5970,7 +5970,7 @@ with <code>__call__</code> that receives <code>theta</code> and <code>x</code> a
 
 
 <h3 id="sbi.inference.trainers.fmpe.fmpe.FMPE.build_posterior" class="doc doc-heading">
-            <code class=" language-python"><span class="n">build_posterior</span><span class="p">(</span><span class="n">vector_field_estimator</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">prior</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">sample_with</span><span class="o">=</span><span class="s1">&#39;ode&#39;</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
+            <code class=" language-python"><span class="n">build_posterior</span><span class="p">(</span><span class="n">vector_field_estimator</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">prior</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">sample_with</span><span class="o">=</span><span class="s1">&#39;ode&#39;</span><span class="p">,</span> <span class="n">vectorfield_sampling_parameters</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 <a href="#sbi.inference.trainers.fmpe.fmpe.FMPE.build_posterior" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -6054,18 +6054,19 @@ a numerical ODE solver.</p>
           </tr>
           <tr class="doc-section-item">
             <td>
-                <code>**kwargs</code>
+                <code>vectorfield_sampling_parameters</code>
             </td>
             <td>
+                  <code><span title="typing.Optional">Optional</span>[<span title="typing.Dict">Dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>]]</code>
             </td>
             <td>
               <div class="doc-md-description">
                 <p>Additional keyword arguments passed to
-<code>VectorFieldBasedPotential</code>.</p>
+<code>VectorFieldPosterior</code>.</p>
               </div>
             </td>
             <td>
-                  <code>{}</code>
+                  <code>None</code>
             </td>
           </tr>
       </tbody>
@@ -6083,7 +6084,7 @@ a numerical ODE solver.</p>
       <tbody>
           <tr class="doc-section-item">
             <td>
-                  <code><a class="autorefs autorefs-internal" title="VectorFieldPosterior (sbi.inference.posteriors.vector_field_posterior.VectorFieldPosterior)" href="../posteriors/#sbi.inference.posteriors.vector_field_posterior.VectorFieldPosterior">VectorFieldPosterior</a></code>
+                  <code><span title="sbi.inference.posteriors.base_posterior.NeuralPosterior">NeuralPosterior</span></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -6097,7 +6098,11 @@ a numerical ODE solver.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/trainers/fmpe/fmpe.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 66</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 62</span>
+<span class="normal"> 63</span>
+<span class="normal"> 64</span>
+<span class="normal"> 65</span>
+<span class="normal"> 66</span>
 <span class="normal"> 67</span>
 <span class="normal"> 68</span>
 <span class="normal"> 69</span>
@@ -6133,17 +6138,13 @@ a numerical ODE solver.</p>
 <span class="normal"> 99</span>
 <span class="normal">100</span>
 <span class="normal">101</span>
-<span class="normal">102</span>
-<span class="normal">103</span>
-<span class="normal">104</span>
-<span class="normal">105</span>
-<span class="normal">106</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_posterior</span><span class="p">(</span>
+<span class="normal">102</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_posterior</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">vector_field_estimator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">ConditionalVectorFieldEstimator</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">sample_with</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;ode&quot;</span><span class="p">,</span> <span class="s2">&quot;sde&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;ode&quot;</span><span class="p">,</span>
-    <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
-<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">VectorFieldPosterior</span><span class="p">:</span>
+    <span class="n">vectorfield_sampling_parameters</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NeuralPosterior</span><span class="p">:</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Build posterior from the flow matching estimator.</span>
 
 <span class="sd">    Note that this is the same as the NPSE posterior, but the sample_with method</span>
@@ -6165,18 +6166,18 @@ a numerical ODE solver.</p>
 <span class="sd">            the score to do a Langevin diffusion step, while the &#39;ode&#39; method</span>
 <span class="sd">            uses the score to define a probabilistic ODE and solves it with</span>
 <span class="sd">            a numerical ODE solver.</span>
-<span class="sd">        **kwargs: Additional keyword arguments passed to</span>
-<span class="sd">            `VectorFieldBasedPotential`.</span>
+<span class="sd">        vectorfield_sampling_parameters: Additional keyword arguments passed to</span>
+<span class="sd">            `VectorFieldPosterior`.</span>
 
 
 <span class="sd">    Returns:</span>
 <span class="sd">        Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_posterior</span><span class="p">(</span>
-        <span class="n">vector_field_estimator</span><span class="o">=</span><span class="n">vector_field_estimator</span><span class="p">,</span>
+    <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">(</span>
+        <span class="n">estimator</span><span class="o">=</span><span class="n">vector_field_estimator</span><span class="p">,</span>
         <span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span>
         <span class="n">sample_with</span><span class="o">=</span><span class="n">sample_with</span><span class="p">,</span>
-        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+        <span class="n">vectorfield_sampling_parameters</span><span class="o">=</span><span class="n">vectorfield_sampling_parameters</span><span class="p">,</span>
     <span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -6385,17 +6386,13 @@ not tested yet.</p>
         <span class="c1"># score_estimator name is kept since it is public API, but it is</span>
         <span class="c1"># actually misleading since it is a builder for an estimator.</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">_build_default_nn_fn</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">VectorFieldEstimatorBuilder</span><span class="p">:</span>
-        <span class="n">net_type</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;vector_field_estimator_builder&quot;</span><span class="p">,</span> <span class="s2">&quot;mlp&quot;</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">posterior_score_nn</span><span class="p">(</span><span class="n">score_net_type</span><span class="o">=</span><span class="n">net_type</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-
     <span class="k">def</span><span class="w"> </span><span class="nf">build_posterior</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">vector_field_estimator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">ConditionalVectorFieldEstimator</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">sample_with</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;ode&quot;</span><span class="p">,</span> <span class="s2">&quot;sde&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;sde&quot;</span><span class="p">,</span>
-        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">VectorFieldPosterior</span><span class="p">:</span>
+        <span class="n">vectorfield_sampling_parameters</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NeuralPosterior</span><span class="p">:</span>
 <span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Build posterior from the vector field estimator.</span>
 
 <span class="sd">        Note that this is the same as the FMPE posterior, but the sample_with</span>
@@ -6416,19 +6413,23 @@ not tested yet.</p>
 <span class="sd">                &#39;sde&#39; (default) or &#39;ode&#39;. The &#39;sde&#39; method uses the score to</span>
 <span class="sd">                do a Langevin diffusion step, while the &#39;ode&#39; method solves a</span>
 <span class="sd">                probabilistic ODE with a numerical ODE solver.</span>
-<span class="sd">            **kwargs: Additional keyword arguments passed to</span>
-<span class="sd">                `VectorFieldBasedPotential`.</span>
+<span class="sd">            vectorfield_sampling_parameters: Additional keyword arguments passed to</span>
+<span class="sd">                `VectorFieldPosterior`.</span>
 
 
 <span class="sd">        Returns:</span>
 <span class="sd">            Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_posterior</span><span class="p">(</span>
-            <span class="n">vector_field_estimator</span><span class="o">=</span><span class="n">vector_field_estimator</span><span class="p">,</span>
+        <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">(</span>
+            <span class="n">estimator</span><span class="o">=</span><span class="n">vector_field_estimator</span><span class="p">,</span>
             <span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span>
             <span class="n">sample_with</span><span class="o">=</span><span class="n">sample_with</span><span class="p">,</span>
-            <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+            <span class="n">vectorfield_sampling_parameters</span><span class="o">=</span><span class="n">vectorfield_sampling_parameters</span><span class="p">,</span>
         <span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_build_default_nn_fn</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">VectorFieldEstimatorBuilder</span><span class="p">:</span>
+        <span class="n">net_type</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;vector_field_estimator_builder&quot;</span><span class="p">,</span> <span class="s2">&quot;mlp&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">posterior_score_nn</span><span class="p">(</span><span class="n">score_net_type</span><span class="o">=</span><span class="n">net_type</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -6717,7 +6718,7 @@ string.</p>
 
 
 <h3 id="sbi.inference.trainers.npse.npse.NPSE.build_posterior" class="doc doc-heading">
-            <code class=" language-python"><span class="n">build_posterior</span><span class="p">(</span><span class="n">vector_field_estimator</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">prior</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">sample_with</span><span class="o">=</span><span class="s1">&#39;sde&#39;</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
+            <code class=" language-python"><span class="n">build_posterior</span><span class="p">(</span><span class="n">vector_field_estimator</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">prior</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">sample_with</span><span class="o">=</span><span class="s1">&#39;sde&#39;</span><span class="p">,</span> <span class="n">vectorfield_sampling_parameters</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 <a href="#sbi.inference.trainers.npse.npse.NPSE.build_posterior" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -6800,18 +6801,19 @@ probabilistic ODE with a numerical ODE solver.</p>
           </tr>
           <tr class="doc-section-item">
             <td>
-                <code>**kwargs</code>
+                <code>vectorfield_sampling_parameters</code>
             </td>
             <td>
+                  <code><span title="typing.Optional">Optional</span>[<span title="typing.Dict">Dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>]]</code>
             </td>
             <td>
               <div class="doc-md-description">
                 <p>Additional keyword arguments passed to
-<code>VectorFieldBasedPotential</code>.</p>
+<code>VectorFieldPosterior</code>.</p>
               </div>
             </td>
             <td>
-                  <code>{}</code>
+                  <code>None</code>
             </td>
           </tr>
       </tbody>
@@ -6829,7 +6831,7 @@ probabilistic ODE with a numerical ODE solver.</p>
       <tbody>
           <tr class="doc-section-item">
             <td>
-                  <code><a class="autorefs autorefs-internal" title="VectorFieldPosterior (sbi.inference.posteriors.vector_field_posterior.VectorFieldPosterior)" href="../posteriors/#sbi.inference.posteriors.vector_field_posterior.VectorFieldPosterior">VectorFieldPosterior</a></code>
+                  <code><span title="sbi.inference.posteriors.base_posterior.NeuralPosterior">NeuralPosterior</span></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -6843,7 +6845,11 @@ probabilistic ODE with a numerical ODE solver.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/trainers/npse/npse.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 81</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 77</span>
+<span class="normal"> 78</span>
+<span class="normal"> 79</span>
+<span class="normal"> 80</span>
+<span class="normal"> 81</span>
 <span class="normal"> 82</span>
 <span class="normal"> 83</span>
 <span class="normal"> 84</span>
@@ -6878,17 +6884,13 @@ probabilistic ODE with a numerical ODE solver.</p>
 <span class="normal">113</span>
 <span class="normal">114</span>
 <span class="normal">115</span>
-<span class="normal">116</span>
-<span class="normal">117</span>
-<span class="normal">118</span>
-<span class="normal">119</span>
-<span class="normal">120</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_posterior</span><span class="p">(</span>
+<span class="normal">116</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_posterior</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">vector_field_estimator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">ConditionalVectorFieldEstimator</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">sample_with</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;ode&quot;</span><span class="p">,</span> <span class="s2">&quot;sde&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;sde&quot;</span><span class="p">,</span>
-    <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
-<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">VectorFieldPosterior</span><span class="p">:</span>
+    <span class="n">vectorfield_sampling_parameters</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NeuralPosterior</span><span class="p">:</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Build posterior from the vector field estimator.</span>
 
 <span class="sd">    Note that this is the same as the FMPE posterior, but the sample_with</span>
@@ -6909,18 +6911,18 @@ probabilistic ODE with a numerical ODE solver.</p>
 <span class="sd">            &#39;sde&#39; (default) or &#39;ode&#39;. The &#39;sde&#39; method uses the score to</span>
 <span class="sd">            do a Langevin diffusion step, while the &#39;ode&#39; method solves a</span>
 <span class="sd">            probabilistic ODE with a numerical ODE solver.</span>
-<span class="sd">        **kwargs: Additional keyword arguments passed to</span>
-<span class="sd">            `VectorFieldBasedPotential`.</span>
+<span class="sd">        vectorfield_sampling_parameters: Additional keyword arguments passed to</span>
+<span class="sd">            `VectorFieldPosterior`.</span>
 
 
 <span class="sd">    Returns:</span>
 <span class="sd">        Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_posterior</span><span class="p">(</span>
-        <span class="n">vector_field_estimator</span><span class="o">=</span><span class="n">vector_field_estimator</span><span class="p">,</span>
+    <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">(</span>
+        <span class="n">estimator</span><span class="o">=</span><span class="n">vector_field_estimator</span><span class="p">,</span>
         <span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span>
         <span class="n">sample_with</span><span class="o">=</span><span class="n">sample_with</span><span class="p">,</span>
-        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+        <span class="n">vectorfield_sampling_parameters</span><span class="o">=</span><span class="n">vectorfield_sampling_parameters</span><span class="p">,</span>
     <span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>

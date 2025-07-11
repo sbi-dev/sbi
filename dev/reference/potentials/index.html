@@ -857,7 +857,7 @@ unconstrained space.</p>
       <tbody>
           <tr class="doc-section-item">
             <td>
-                  <code><span title="typing.Callable">Callable</span></code>
+                  <code><span title="sbi.inference.potentials.likelihood_based_potential.LikelihoodBasedPotential">LikelihoodBasedPotential</span></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -918,7 +918,7 @@ unconstrained space.</p>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Distribution</span><span class="p">,</span>  <span class="c1"># type: ignore</span>
     <span class="n">x_o</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">],</span>
     <span class="n">enable_transform</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
-<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Callable</span><span class="p">,</span> <span class="n">TorchTransform</span><span class="p">]:</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="s2">&quot;LikelihoodBasedPotential&quot;</span><span class="p">,</span> <span class="n">TorchTransform</span><span class="p">]:</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Returns potential :math:`\log(p(x_o|\theta)p(\theta))` for likelihood estimator.</span>
 
 <span class="sd">    It also returns a transformation that can be used to transform the potential into</span>
@@ -1059,7 +1059,7 @@ When False, an identity transform will be returned for <code>theta_transform</co
       <tbody>
           <tr class="doc-section-item">
             <td>
-                  <code><span title="typing.Callable">Callable</span></code>
+                  <code><span title="sbi.inference.potentials.ratio_based_potential.RatioBasedPotential">RatioBasedPotential</span></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -1118,7 +1118,7 @@ When False, an identity transform will be returned for <code>theta_transform</co
     <span class="n">prior</span><span class="p">:</span> <span class="n">Distribution</span><span class="p">,</span>
     <span class="n">x_o</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">],</span>
     <span class="n">enable_transform</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
-<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Callable</span><span class="p">,</span> <span class="n">TorchTransform</span><span class="p">]:</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="s2">&quot;RatioBasedPotential&quot;</span><span class="p">,</span> <span class="n">TorchTransform</span><span class="p">]:</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Returns the potential for ratio-based methods.</span>
 
 <span class="sd">    It also returns a transformation that can be used to transform the potential into</span>
@@ -1257,6 +1257,9 @@ When False, an identity transform will be returned for <code>theta_transform</co
           </tr>
       </tbody>
     </table>
+        <p>Returns:
+    The potential function and a transformation that maps
+    to unconstrained space.</p>
 
 
             <details class="quote">
@@ -1291,7 +1294,10 @@ When False, an identity transform will be returned for <code>theta_transform</co
 <span class="normal">51</span>
 <span class="normal">52</span>
 <span class="normal">53</span>
-<span class="normal">54</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">vector_field_estimator_based_potential</span><span class="p">(</span>
+<span class="normal">54</span>
+<span class="normal">55</span>
+<span class="normal">56</span>
+<span class="normal">57</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">vector_field_estimator_based_potential</span><span class="p">(</span>
     <span class="n">vector_field_estimator</span><span class="p">:</span> <span class="n">ConditionalVectorFieldEstimator</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">],</span>
     <span class="n">x_o</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">],</span>
@@ -1307,6 +1313,9 @@ When False, an identity transform will be returned for <code>theta_transform</co
 <span class="sd">        enable_transform: Whether to enable transforms. Not supported yet.</span>
 <span class="sd">        **kwargs: Additional keyword arguments passed to</span>
 <span class="sd">            `VectorFieldBasedPotential`.</span>
+<span class="sd">    Returns:</span>
+<span class="sd">        The potential function and a transformation that maps</span>
+<span class="sd">        to unconstrained space.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">device</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="nb">next</span><span class="p">(</span><span class="n">vector_field_estimator</span><span class="o">.</span><span class="n">parameters</span><span class="p">())</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
 
