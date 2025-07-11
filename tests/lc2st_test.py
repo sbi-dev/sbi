@@ -25,37 +25,36 @@ def basic_setup():
 
 
 @pytest.fixture(scope="session")
-def badly_trained_npe(basic_setup):
-    """Poorly trained NPE for basic functionality and true positive rate tests."""
-    prior = basic_setup["prior"]
-    simulator = basic_setup["simulator"]
+def npe_factory(basic_setup):
+    """Factory for creating NPE models with different training parameters."""
 
-    num_train = 100
-    theta_train = prior.sample((num_train,))
-    x_train = simulator(theta_train)
+    def _create_npe(num_simulations, max_epochs=None):
+        prior = basic_setup["prior"]
+        simulator = basic_setup["simulator"]
 
-    inference = NPE(prior, density_estimator='maf')
-    inference = inference.append_simulations(theta=theta_train, x=x_train)
-    npe = inference.train(training_batch_size=100, max_num_epochs=1)
+        theta_train = prior.sample((num_simulations,))
+        x_train = simulator(theta_train)
 
-    return npe
+        inference = NPE(prior, density_estimator='maf')
+        inference = inference.append_simulations(theta=theta_train, x=x_train)
+
+        train_kwargs = {"training_batch_size": 100}
+        if max_epochs:
+            train_kwargs["max_num_epochs"] = max_epochs
+
+        return inference.train(**train_kwargs)
+
+    return _create_npe
 
 
 @pytest.fixture(scope="session")
-def well_trained_npe(basic_setup):
-    """Well trained NPE for false positive rate tests."""
-    prior = basic_setup["prior"]
-    simulator = basic_setup["simulator"]
+def badly_trained_npe(npe_factory):
+    return npe_factory(num_simulations=100, max_epochs=1)
 
-    num_train = 10_000
-    theta_train = prior.sample((num_train,))
-    x_train = simulator(theta_train)
 
-    inference = NPE(prior, density_estimator='maf')
-    inference = inference.append_simulations(theta=theta_train, x=x_train)
-    npe = inference.train(training_batch_size=100)
-
-    return npe
+@pytest.fixture(scope="session")
+def well_trained_npe(npe_factory):
+    return npe_factory(num_simulations=10_000)
 
 
 @pytest.fixture(scope="session")
