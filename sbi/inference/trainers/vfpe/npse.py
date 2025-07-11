@@ -7,7 +7,7 @@ from torch.distributions import Distribution
 from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
-from sbi.inference.trainers.npse.vector_field_inference import (
+from sbi.inference.trainers.vfpe.base_vf_inference import (
     VectorFieldEstimatorBuilder,
     VectorFieldTrainer,
 )
@@ -29,7 +29,7 @@ class NPSE(VectorFieldTrainer):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
-        score_estimator: Union[str, VectorFieldEstimatorBuilder] = "mlp",
+        vf_estimator: Union[str, VectorFieldEstimatorBuilder] = "mlp",
         sde_type: Literal["vp", "ve", "subvp"] = "ve",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
@@ -41,8 +41,9 @@ class NPSE(VectorFieldTrainer):
 
         Args:
             prior: Prior distribution.
-            score_estimator: Neural network architecture for the
-                vector field estimator. Can be a string (e.g. 'mlp' or 'ada_mlp') or a
+            vf_estimator: Neural network architecture for the
+                vector field estimator aiming to estimate the marginal scores of the
+                target diffusion process. Can be a string (e.g. 'mlp' or 'ada_mlp') or a
                 callable that implements the `VectorFieldEstimatorBuilder` protocol
                 with `__call__` that receives `theta` and `x` and returns a
                 `ConditionalVectorFieldEstimator`.
@@ -63,7 +64,7 @@ class NPSE(VectorFieldTrainer):
         """
         super().__init__(
             prior=prior,
-            vector_field_estimator_builder=score_estimator,
+            vector_field_estimator_builder=vf_estimator,
             device=device,
             logging_level=logging_level,
             summary_writer=summary_writer,

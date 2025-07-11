@@ -2,6 +2,7 @@
 # under the Apache License v2.0, see <https://www.apache.org/licenses/LICENSE-2.0>.
 
 
+import warnings
 from typing import Any, Dict, Literal, Optional, Union
 
 from torch.distributions import Distribution
@@ -9,12 +10,12 @@ from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi import utils as utils
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
-from sbi.inference.trainers.npse.vector_field_inference import (
+from sbi.inference.trainers.vfpe.base_vf_inference import (
     VectorFieldEstimatorBuilder,
     VectorFieldTrainer,
 )
-from sbi.neural_nets import flowmatching_nn
-from sbi.neural_nets.estimators import ConditionalVectorFieldEstimator
+from sbi.neural_nets.estimators.base import ConditionalVectorFieldEstimator
+from sbi.neural_nets.factory import posterior_flow_nn
 
 
 class FMPE(VectorFieldTrainer):
@@ -23,7 +24,8 @@ class FMPE(VectorFieldTrainer):
     def __init__(
         self,
         prior: Optional[Distribution],
-        density_estimator: Union[str, VectorFieldEstimatorBuilder] = "mlp",
+        density_estimator: Optional[VectorFieldEstimatorBuilder] = None,
+        vf_estimator: Union[str, VectorFieldEstimatorBuilder] = "mlp",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
@@ -34,7 +36,8 @@ class FMPE(VectorFieldTrainer):
 
         Args:
             prior: Prior distribution.
-            density_estimator: Neural network architecture used to learn the
+            density_estimator: Deprecated. Use `vf_estimator` instead.
+            vf_estimator: Neural network architecture used to learn the
                 vector field estimator. Can be a string (e.g. 'mlp' or 'ada_mlp') or a
                 callable that implements the `VectorFieldEstimatorBuilder` protocol
                 with `__call__` that receives `theta` and `x` and returns a
@@ -47,17 +50,24 @@ class FMPE(VectorFieldTrainer):
                 `density_estimator` is a string.
         """
 
+        if density_estimator is not None:
+            warnings.warn(
+                "`density_estimator` is deprecated and will be removed in a future "
+                "release. Use `vf_estimator` instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            vf_estimator = density_estimator
+
         super().__init__(
             prior=prior,
             device=device,
             logging_level=logging_level,
             summary_writer=summary_writer,
             show_progress_bars=show_progress_bars,
-            vector_field_estimator_builder=density_estimator,
+            vector_field_estimator_builder=vf_estimator,
             **kwargs,
         )
-        # density_estimator name is kept since it is public API, but it is
-        # actually misleading since it is a builder for an estimator.
 
     def build_posterior(
         self,
@@ -103,4 +113,4 @@ class FMPE(VectorFieldTrainer):
 
     def _build_default_nn_fn(self, **kwargs) -> VectorFieldEstimatorBuilder:
         model = kwargs.pop("vector_field_estimator_builder", "mlp")
-        return flowmatching_nn(model=model, **kwargs)
+        return posterior_flow_nn(model=model, **kwargs)
