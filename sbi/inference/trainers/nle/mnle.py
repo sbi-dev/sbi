@@ -1,18 +1,15 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from copy import deepcopy
 from typing import Any, Callable, Dict, Literal, Optional, Union
 
 from torch.distributions import Distribution
 
-from sbi.inference.posteriors import MCMCPosterior, RejectionPosterior, VIPosterior
-from sbi.inference.potentials import likelihood_estimator_based_potential
+from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.trainers.nle.nle_base import LikelihoodEstimatorTrainer
 from sbi.neural_nets.estimators import MixedDensityEstimator
-from sbi.sbi_types import TensorboardSummaryWriter, TorchModule
+from sbi.sbi_types import TensorboardSummaryWriter
 from sbi.utils.sbiutils import del_entries
-from sbi.utils.user_input_checks import check_prior
 
 
 class MNLE(LikelihoodEstimatorTrainer):
@@ -92,7 +89,7 @@ class MNLE(LikelihoodEstimatorTrainer):
 
     def build_posterior(
         self,
-        density_estimator: Optional[TorchModule] = None,
+        density_estimator: Optional[MixedDensityEstimator] = None,
         prior: Optional[Distribution] = None,
         sample_with: Literal["mcmc", "rejection", "vi"] = "mcmc",
         mcmc_method: Literal[
@@ -108,7 +105,7 @@ class MNLE(LikelihoodEstimatorTrainer):
         mcmc_parameters: Optional[Dict[str, Any]] = None,
         vi_parameters: Optional[Dict[str, Any]] = None,
         rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
-    ) -> Union[MCMCPosterior, RejectionPosterior, VIPosterior]:
+    ) -> NeuralPosterior:
         r"""Build posterior from the neural density estimator.
 
         SNLE trains a neural network to approximate the likelihood $p(x|\theta)$. The
@@ -142,65 +139,20 @@ class MNLE(LikelihoodEstimatorTrainer):
             Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods
             (the returned log-probability is unnormalized).
         """
-        if prior is None:
-            assert (
-                self._prior is not None
-            ), """You did not pass a prior. You have to pass the prior either at
-            initialization `inference = SNLE(prior)` or to `.build_posterior
-            (prior=prior)`."""
-            prior = self._prior
-        else:
-            check_prior(prior)
+        if density_estimator is not None:
+            assert isinstance(
+                density_estimator, MixedDensityEstimator
+            ), f"""net must be of type MixedDensityEstimator but is {
+                type(density_estimator)
+            }."""
 
-        if density_estimator is None:
-            likelihood_estimator = self._neural_net
-            # If internal net is used device is defined.
-            device = self._device
-        else:
-            likelihood_estimator = density_estimator
-            # Otherwise, infer it from the device of the net parameters.
-            device = next(density_estimator.parameters()).device.type
-
-        assert isinstance(
-            likelihood_estimator, MixedDensityEstimator
-        ), f"""net must be of type MixedDensityEstimator but is {
-            type(likelihood_estimator)
-        }."""
-
-        (
-            potential_fn,
-            theta_transform,
-        ) = likelihood_estimator_based_potential(likelihood_estimator, prior, x_o=None)
-
-        if sample_with == "mcmc":
-            self._posterior = MCMCPosterior(
-                potential_fn=potential_fn,
-                theta_transform=theta_transform,
-                proposal=prior,
-                method=mcmc_method,
-                device=device,
-                **mcmc_parameters or {},
-            )
-        elif sample_with == "rejection":
-            self._posterior = RejectionPosterior(
-                potential_fn=potential_fn,
-                proposal=prior,
-                device=device,
-                **rejection_sampling_parameters or {},
-            )
-        elif sample_with == "vi":
-            self._posterior = VIPosterior(
-                potential_fn=potential_fn,
-                theta_transform=theta_transform,
-                prior=prior,  # type: ignore
-                vi_method=vi_method,
-                device=device,
-                **vi_parameters or {},
-            )
-        else:
-            raise NotImplementedError
-
-        # Store models at end of each round.
-        self._model_bank.append(deepcopy(self._posterior))
-
-        return deepcopy(self._posterior)
+        return super().build_posterior(
+            density_estimator=density_estimator,
+            prior=prior,
+            sample_with=sample_with,
+            mcmc_method=mcmc_method,
+            vi_method=vi_method,
+            mcmc_parameters=mcmc_parameters,
+            vi_parameters=vi_parameters,
+            rejection_sampling_parameters=rejection_sampling_parameters,
+        )

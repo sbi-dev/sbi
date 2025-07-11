@@ -598,6 +598,14 @@ class NPE_C(PosteriorEstimatorTrainer):
 
         return means_pp
 
+    def _maybe_z_score_theta(self, theta: Tensor) -> Tensor:
+        """Return potentially standardized theta if z-scoring was requested."""
+
+        if self.z_score_theta:
+            theta, _ = self._neural_net.net._transform(theta)
+
+        return theta
+
     @staticmethod
     def _logits_proposal_posterior(
         means_pp: Tensor,
@@ -665,11 +673,3 @@ class NPE_C(PosteriorEstimatorTrainer):
         logits_pp = logit_factors + log_sqrt_det_ratio + exponent
 
         return logits_pp
-
-    def _maybe_z_score_theta(self, theta: Tensor) -> Tensor:
-        """Return potentially standardized theta if z-scoring was requested."""
-
-        if self.z_score_theta:
-            theta, _ = self._neural_net.net._transform(theta)
-
-        return theta

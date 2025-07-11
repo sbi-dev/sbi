@@ -324,14 +324,6 @@ class MarginalTrainer:
 
         return converged
 
-    @staticmethod
-    def _maybe_show_progress(show: bool, epoch: int) -> None:
-        if show:
-            # end="\r" deletes the print statement when a new one appears.
-            # https://stackoverflow.com/questions/3419984/. `\r` in the beginning due
-            # to #330.
-            print("\r", f"Training neural network. Epochs trained: {epoch}", end="")
-
     def _summarize(
         self,
         round_: int,
@@ -401,3 +393,11 @@ class MarginalTrainer:
             )
 
         self._summary_writer.flush()
+
+    @staticmethod
+    def _maybe_show_progress(show: bool, epoch: int) -> None:
+        if show:
+            # end="\r" deletes the print statement when a new one appears.
+            # https://stackoverflow.com/questions/3419984/. `\r` in the beginning due
+            # to #330.
+            print("\r", f"Training neural network. Epochs trained: {epoch}", end="")
