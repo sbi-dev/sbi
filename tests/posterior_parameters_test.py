@@ -16,10 +16,11 @@ from sbi.inference.posteriors.posterior_parameters import (
 from sbi.inference.posteriors.rejection_posterior import RejectionPosterior
 from sbi.inference.posteriors.vector_field_posterior import VectorFieldPosterior
 from sbi.inference.posteriors.vi_posterior import VIPosterior
+from sbi.inference.potentials.vector_field_potential import VectorFieldBasedPotential
 
 
 @pytest.mark.parametrize(
-    ("parameter_dataclass", "posterior_class", "skipped_arguments"),
+    ("parameter_dataclass", "init_target_class", "skipped_arguments"),
     [
         (
             DirectPosteriorParameters,
@@ -49,13 +50,36 @@ from sbi.inference.posteriors.vi_posterior import VIPosterior
         (
             VectorFieldPosteriorParameters,
             VectorFieldPosterior,
-            {"vector_field_estimator", "device", "prior", "sample_with"},
+            {
+                "vector_field_estimator",
+                "device",
+                "prior",
+                "sample_with",
+                "iid_method",
+                "iid_params",
+                "neural_ode_backend",
+                "neural_ode_kwargs",
+            },
+        ),
+        (
+            VectorFieldPosteriorParameters,
+            VectorFieldBasedPotential,
+            {
+                "vector_field_estimator",
+                "device",
+                "prior",
+                "x_o",
+                "enable_transform",
+                "max_sampling_batch_size",
+            },
         ),
     ],
 )
-def test_signature_consistency(parameter_dataclass, posterior_class, skipped_arguments):
+def test_signature_consistency(
+    parameter_dataclass, init_target_class, skipped_arguments
+):
     dataclass_signature = inspect.signature(parameter_dataclass)
-    class_signature = inspect.signature(posterior_class.__init__)
+    class_signature = inspect.signature(init_target_class.__init__)
 
     skipped_arguments.add("self")
 
@@ -90,7 +114,7 @@ def test_signature_consistency(parameter_dataclass, posterior_class, skipped_arg
             dataclass_dict[name].annotation,
         )
         assert class_default == dataclass_default, (
-            f"Default mismatch for '{name}': "
+            f"Default value mismatch for '{name}': "
             f"class={class_default}, dataclass={dataclass_default}"
         )
         assert class_annotation == dataclass_annotation, (
