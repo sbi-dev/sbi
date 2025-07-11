@@ -525,33 +525,27 @@ class VectorFieldTrainer(NeuralInference, ABC):
             self._best_model_state_dict = deepcopy(neural_net.state_dict())
         else:
             # Only start statistical analysis after we have enough data
-            if len(self._summary["validation_loss"]) >= 5:
+            if len(self._summary["validation_loss"]) >= stop_after_epochs:
                 # Calculate running statistics of recent losses
                 recent_losses = torch.tensor(
-                    self._summary["validation_loss"][-stop_after_epochs:]
+                    self._summary["validation_loss"][-stop_after_epochs * 2 :]
                 )
                 loss_std = recent_losses.std().item()
 
                 # Calculate how many standard deviations the current loss is from the
                 # best
-                if loss_std > 0:  # Avoid division by zero
-                    z_score = (self._val_loss - self._best_val_loss) / loss_std
-
-                    # Consider it "no improvement" if current loss is significantly
-                    # worse than the best loss (more than 2.0 std deviations above best)
-                    # This accounts for natural fluctuations while being sensitive to
-                    # real degradation
-                    if z_score > 2.0:
-                        self._epochs_since_last_improvement += 1
-                    else:
-                        # Reset counter if loss is within acceptable range
-                        self._epochs_since_last_improvement = 0
+                diff_to_best_normalized = (
+                    self._val_loss - self._best_val_loss
+                ) / loss_std
+                # Consider it "no improvement" if current loss is significantly
+                # worse than the best loss (more than 2.67 std deviations above best)
+                # This accounts for natural fluctuations while being sensitive to
+                # real degradation
+                if diff_to_best_normalized > 2.67:
+                    self._epochs_since_last_improvement += 1
                 else:
-                    # If std is 0, any increase counts as no improvement
-                    if self._val_loss > self._best_val_loss:
-                        self._epochs_since_last_improvement += 1
-                    else:
-                        self._epochs_since_last_improvement = 0
+                    # Reset counter if loss is within acceptable range
+                    self._epochs_since_last_improvement = 0
             else:
                 return False
 
