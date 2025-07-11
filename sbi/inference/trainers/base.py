@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import warnings
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from dataclasses import asdict
@@ -573,6 +574,8 @@ class NeuralInference(ABC):
 
         Raises:
             NotImplementedError: If an unsupported `sample_with` method is provided.
+            ValueError: If posterior_parameter and a configuration dictionary are passed
+                together.
 
         Args:
             sample_with: The posterior sampling method to use.
@@ -612,6 +615,45 @@ class NeuralInference(ABC):
                     "Posterior parameter construction not implemented for",
                     f"'{sample_with}'",
                 )
+        else:
+            if (
+                kwargs.get("direct_sampling_parameters") is not None
+                or kwargs.get("mcmc_parameters") is not None
+                or kwargs.get("vectorfield_sampling_parameters") is not None
+                or kwargs.get("rejection_sampling_parameters") is not None
+                or kwargs.get("vi_parameters") is not None
+                or kwargs.get("importance_sampling_parameters") is not None
+            ):
+                raise ValueError(
+                    "You have passed values to both a configuration dictionary"
+                    "and posterior_parameters."
+                    "Please use either the configuration dictionary"
+                    " or posterior_parameters."
+                )
+            elif isinstance(posterior_parameters, MCMCPosteriorParameters):
+                mcmc_method = kwargs.get("mcmc_method")
+                if posterior_parameters.method != mcmc_method:
+                    warnings.warn(
+                        f"Mismatch between 'mcmc_method' and"
+                        " 'posterior_parameters.method': "
+                        f"mcmc_method={mcmc_method}, "
+                        f"posterior_parameters.method={posterior_parameters.method}. "
+                        "If you did not explicitly set 'mcmc_method', "
+                        "you can ignore this warning.",
+                        stacklevel=2,
+                    )
+            elif isinstance(posterior_parameters, VIPosteriorParameters):
+                vi_method = kwargs.get("vi_method")
+                if posterior_parameters.vi_method != vi_method:
+                    warnings.warn(
+                        f"Mismatch between 'vi_method' and "
+                        "'posterior_parameters.vi_method': "
+                        f"vi_method={vi_method}, "
+                        f"posterior_parameters.vi_method={posterior_parameters.vi_method}."
+                        " If you did not explicitly set 'vi_method', "
+                        "you can ignore this warning.",
+                        stacklevel=2,
+                    )
         return posterior_parameters
 
     def _create_posterior(

@@ -20,7 +20,7 @@ from sbi.inference.potentials.vector_field_potential import VectorFieldBasedPote
 
 
 @pytest.mark.parametrize(
-    ("parameter_dataclass", "init_target_class", "skipped_arguments"),
+    ("parameter_dataclass", "init_target_class", "skipped_fields_and_parameters"),
     [
         (
             DirectPosteriorParameters,
@@ -76,23 +76,24 @@ from sbi.inference.potentials.vector_field_potential import VectorFieldBasedPote
     ],
 )
 def test_signature_consistency(
-    parameter_dataclass, init_target_class, skipped_arguments
+    parameter_dataclass, init_target_class, skipped_fields_and_parameters
 ):
     dataclass_signature = inspect.signature(parameter_dataclass)
     class_signature = inspect.signature(init_target_class.__init__)
 
-    skipped_arguments.add("self")
+    skipped_fields_and_parameters.add("self")
 
     class_dict = {
         name: param
         for name, param in class_signature.parameters.items()
-        if name not in skipped_arguments and param.kind != inspect.Parameter.VAR_KEYWORD
+        if name not in skipped_fields_and_parameters
+        and param.kind != inspect.Parameter.VAR_KEYWORD
     }
 
     dataclass_dict = {
         name: param
         for name, param in dataclass_signature.parameters.items()
-        if name not in skipped_arguments
+        if name not in skipped_fields_and_parameters
     }
 
     # Compare if the dataclass and posterior_class have the same argument names
