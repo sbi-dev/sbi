@@ -8,7 +8,7 @@
 /*.pyc
 /*.egg
 /*.egg-info
-.venv
+.venv*
 
 # Notebook checkpoints
 .ipynb_checkpoints
@@ -102,3 +102,6 @@ target/
 # uv
 uv.lock
 .python-version
+
+# Serena cache
+.serena/
