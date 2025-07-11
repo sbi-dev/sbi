@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import pytest
 import torch
-from torch import eye, ones, zeros
+from torch import eye, nn, ones, zeros
 from torch.distributions import Independent, MultivariateNormal, Uniform
 
 from sbi.inference import (
@@ -14,6 +14,7 @@ from sbi.inference import (
     NPE_A,
     NPE_C,
     NPSE,
+    NRE,
     NRE_A,
     NRE_B,
     NRE_C,
@@ -26,6 +27,7 @@ from sbi.simulators.linear_gaussian import (
 )
 from sbi.utils.diagnostics_utils import get_posterior_samples_on_batch
 from sbi.utils.metrics import check_c2st
+from sbi.utils.torchutils import BoxUniform
 
 
 @pytest.mark.parametrize("snpe_method", [NPE_A, NPE_C])
@@ -363,3 +365,23 @@ def test_batched_sampling_and_logprob_accuracy(density_estimator: str):
         assert torch.allclose(
             target_log_probs.exp(), log_probs.exp(), atol=0.4, rtol=0.4
         ), "Batched log probs are not consistent with non-batched log probs."
+
+
+@pytest.mark.xfail(
+    raises=TypeError,
+    reason="Invalid density_estimator type passed to build_posterior",
+)
+def test_build_posterior_raises_with_invalid_estimator():
+    def simulator(theta):
+        return 1.0 + theta + torch.randn(theta.shape, device=theta.device) * 0.1
+
+    num_dim = 3
+    prior = BoxUniform(low=-2 * torch.ones(num_dim), high=2 * torch.ones(num_dim))
+    theta = prior.sample((300,))
+    x = simulator(theta)
+
+    inference = NRE(prior=prior)
+    inference.append_simulations(theta, x)
+
+    inference.train(max_num_epochs=1)
+    inference.build_posterior(density_estimator=nn.Module())
