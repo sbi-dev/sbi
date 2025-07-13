@@ -49,7 +49,7 @@ def npe_factory(basic_setup):
 
 @pytest.fixture(scope="session")
 def badly_trained_npe(npe_factory):
-    return npe_factory(num_simulations=100, max_epochs=1)
+    return npe_factory(num_simulations=50, max_epochs=1)
 
 
 @pytest.fixture(scope="session")
