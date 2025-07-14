@@ -625,9 +625,9 @@ class NeuralInference(ABC):
                 or kwargs.get("importance_sampling_parameters") is not None
             ):
                 raise ValueError(
-                    "You have passed values to both a configuration dictionary"
-                    "and posterior_parameters."
-                    "Please use either the configuration dictionary"
+                    "You have passed values to both a parameters dictionary"
+                    " and posterior_parameters."
+                    " Please use either the parameters dictionary"
                     " or posterior_parameters."
                 )
             elif isinstance(posterior_parameters, MCMCPosteriorParameters):

@@ -1,7 +1,9 @@
 import inspect
 
 import pytest
+import torch
 
+from sbi.inference import NRE
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.inference.posteriors.importance_posterior import ImportanceSamplingPosterior
 from sbi.inference.posteriors.mcmc_posterior import MCMCPosterior
@@ -17,6 +19,7 @@ from sbi.inference.posteriors.rejection_posterior import RejectionPosterior
 from sbi.inference.posteriors.vector_field_posterior import VectorFieldPosterior
 from sbi.inference.posteriors.vi_posterior import VIPosterior
 from sbi.inference.potentials.vector_field_potential import VectorFieldBasedPotential
+from sbi.utils.torchutils import BoxUniform
 
 
 @pytest.mark.parametrize(
@@ -122,3 +125,27 @@ def test_signature_consistency(
             f"Annotation mismatch for '{name}': "
             f"class={class_annotation}, dataclass={dataclass_annotation}"
         )
+
+
+@pytest.mark.xfail(
+    raises=ValueError,
+    reason="Parameter dictionary and posterior_parameter dataclass"
+    " shouldn't be passed together.",
+)
+def test_build_posterior_conflicting_params():
+    def simulator(theta):
+        return 1.0 + theta + torch.randn(theta.shape, device=theta.device) * 0.1
+
+    num_dim = 3
+    prior = BoxUniform(low=-2 * torch.ones(num_dim), high=2 * torch.ones(num_dim))
+    theta = prior.sample((300,))
+    x = simulator(theta)
+
+    inference = NRE(prior=prior)
+    inference.append_simulations(theta, x)
+    inference.train(max_num_epochs=1)
+
+    inference.build_posterior(
+        mcmc_parameters=dict(num_chains=1),
+        posterior_parameters=MCMCPosteriorParameters(),
+    )
