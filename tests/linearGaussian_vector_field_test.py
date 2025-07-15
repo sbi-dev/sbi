@@ -154,8 +154,8 @@ def test_c2st_simformer_on_linearGaussian(
     Test whether Simformer infers well a simple example with available ground truth.
     """
     # num_sim_nodes = 2  # theta, x
-    num_samples = 3000
-    num_simulations = 10000
+    num_samples = 5000
+    num_simulations = 15000
 
     x_o = zeros(1, num_dim)
 
