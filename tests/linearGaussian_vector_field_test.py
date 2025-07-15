@@ -198,7 +198,7 @@ def test_c2st_vector_field_on_linearGaussian_different_dims(vector_field_type):
 @pytest.mark.parametrize(
     "model", ["mlp", "ada_mlp", pytest.param("transformer", marks=[pytest.mark.slow])]
 )
-def test_fmpe_with_different_models(vector_field_type, model):
+def test_vfinference_with_different_models(vector_field_type, model):
     """Test fmpe with different vector field estimators on linear Gaussian."""
 
     theta_dim = 3
