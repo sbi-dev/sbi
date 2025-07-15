@@ -727,6 +727,26 @@ class MaskedVectorFieldInference(MaskedNeuralInference, ABC):
     def _build_default_nn_fn(self, **kwargs) -> MaskedVectorFieldEstimatorBuilder:
         pass
 
+    # TODO: Introduced to avoid conflicts, should adjust
+    def _get_potential_function(
+        self, prior: Distribution, estimator: ConditionalVectorFieldEstimator
+    ) -> Tuple[VectorFieldBasedPotential, TorchTransform]:
+        r"""Gets the potential function gradient for vector field estimators.
+
+        Args:
+            prior: The prior distribution.
+            estimator: The neural network modelling the vector field.
+        Returns:
+            The potential function and a transformation that maps
+            to unconstrained space.
+        """
+        potential_fn, theta_transform = vector_field_estimator_based_potential(
+            estimator,
+            prior,
+            x_o=None,
+        )
+        return potential_fn, theta_transform
+
     def append_simulations(
         self,
         inputs: Tensor,

@@ -1206,7 +1206,7 @@ class VectorFieldTransformer(VectorFieldNet):
         return h
 
 
-class SimformerNet(MaskedVectorFieldNet):
+class VectorFieldSimformer(MaskedVectorFieldNet):
     def __init__(
         self,
         in_features: int,
@@ -1569,7 +1569,7 @@ def build_simformer_network(
     fourier_scale: float = 30.0,
     activation: Callable = nn.SiLU,
     **kwargs,
-) -> SimformerNet:
+) -> VectorFieldSimformer:
     """Builds a Simformer network.
 
     Args:
@@ -1598,7 +1598,7 @@ def build_simformer_network(
     num_nodes = batch_x.shape[1]
 
     # Create the vector field network (Simformer)
-    vectorfield_net = SimformerNet(
+    vectorfield_net = VectorFieldSimformer(
         in_features=in_features,
         num_nodes=num_nodes,
         dim_val=dim_val,

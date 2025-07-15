@@ -60,8 +60,7 @@ def test_vector_field_estimator_loss_shapes(
         losses = estimator.loss(
             inputs[0], condition_mask=condition_masks, edge_mask=edge_masks
         )
-        # ! Need to reshape here for losses returning shape [1, 1, 1]
-        losses = losses.reshape(-1)
+        losses = losses
     else:
         losses = estimator.loss(inputs[0], condition=conditions)
 
@@ -241,7 +240,7 @@ def _build_vector_field_estimator_and_tensors(
         # Let's assume num_features = 1 for simplicity.
         num_nodes = input_event_shape[0]
         num_features = 1
-        building_inputs = building_thetas.reshape(1000, num_nodes, num_features)
+        building_inputs = building_thetas.reshape(100, num_nodes, num_features)
 
         estimator = build_masked_score_matching_estimator(
             building_inputs,

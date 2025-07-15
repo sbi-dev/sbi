@@ -11,12 +11,6 @@ from sbi.neural_nets.estimators.base import (
     ConditionalVectorFieldEstimator,
     MaskedConditionalVectorFieldEstimator,
 )
-from sbi.neural_nets.net_builders.vector_field_nets import (
-    SimformerNet,
-    VectorFieldAdaMLP,
-    VectorFieldMLP,
-    VectorFieldTransformer,
-)
 from sbi.utils.vector_field_utils import MaskedVectorFieldNet, VectorFieldNet
 
 
@@ -1036,13 +1030,7 @@ class VPScoreEstimator(ConditionalScoreEstimator):
 
     def __init__(
         self,
-        net: Union[
-            VectorFieldMLP,
-            VectorFieldAdaMLP,
-            VectorFieldTransformer,
-            SimformerNet,
-            VectorFieldNet,
-        ],
+        net: VectorFieldNet,
         input_shape: torch.Size,
         condition_shape: torch.Size,
         embedding_net: Optional[nn.Module] = None,
@@ -1146,13 +1134,7 @@ class SubVPScoreEstimator(ConditionalScoreEstimator):
 
     def __init__(
         self,
-        net: Union[
-            VectorFieldMLP,
-            VectorFieldAdaMLP,
-            VectorFieldTransformer,
-            SimformerNet,
-            VectorFieldNet,
-        ],
+        net: VectorFieldNet,
         input_shape: torch.Size,
         condition_shape: torch.Size,
         embedding_net: Optional[nn.Module] = None,
@@ -1272,13 +1254,7 @@ class VEScoreEstimator(ConditionalScoreEstimator):
 
     def __init__(
         self,
-        net: Union[
-            VectorFieldMLP,
-            VectorFieldAdaMLP,
-            VectorFieldTransformer,
-            SimformerNet,
-            VectorFieldNet,
-        ],
+        net: VectorFieldNet,
         input_shape: torch.Size,
         condition_shape: torch.Size,
         embedding_net: Optional[nn.Module] = None,
@@ -1378,13 +1354,7 @@ class VEScoreEstimator(ConditionalScoreEstimator):
 class MaskedVEScoreEstimator(MaskedConditionalScoreEstimator):
     def __init__(
         self,
-        net: Union[
-            VectorFieldMLP,
-            VectorFieldAdaMLP,
-            VectorFieldTransformer,
-            SimformerNet,
-            VectorFieldNet,
-        ],
+        net: VectorFieldNet,
         input_shape: torch.Size,
         embedding_net: nn.Module = nn.Identity(),
         weight_fn: Union[str, Callable] = "max_likelihood",

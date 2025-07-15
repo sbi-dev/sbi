@@ -1,17 +1,11 @@
 import warnings
-from typing import Optional, Union
+from typing import Optional
 
 import torch
 import torch.nn as nn
 from torch import Tensor
 
 from sbi.neural_nets.estimators.base import ConditionalVectorFieldEstimator
-from sbi.neural_nets.net_builders.vector_field_nets import (
-    SimformerNet,
-    VectorFieldAdaMLP,
-    VectorFieldMLP,
-    VectorFieldTransformer,
-)
 from sbi.utils.vector_field_utils import VectorFieldNet
 
 
@@ -54,13 +48,7 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
 
     def __init__(
         self,
-        net: Union[
-            VectorFieldMLP,
-            VectorFieldAdaMLP,
-            VectorFieldTransformer,
-            SimformerNet,
-            VectorFieldNet,
-        ],
+        net: VectorFieldNet,
         input_shape: torch.Size,
         condition_shape: torch.Size,
         embedding_net: Optional[nn.Module] = None,
