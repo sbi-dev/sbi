@@ -13,6 +13,7 @@ from sbi.inference.trainers.vfpe.base_vf_inference import (
 )
 from sbi.neural_nets.estimators import ConditionalVectorFieldEstimator
 from sbi.neural_nets.factory import posterior_score_nn
+import warnings
 
 
 class NPSE(VectorFieldTrainer):
@@ -30,6 +31,7 @@ class NPSE(VectorFieldTrainer):
         self,
         prior: Optional[Distribution] = None,
         vf_estimator: Union[str, VectorFieldEstimatorBuilder] = "mlp",
+        score_estimator: Optional[Union[str, VectorFieldEstimatorBuilder]] = None,
         sde_type: Literal["vp", "ve", "subvp"] = "ve",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
@@ -62,6 +64,15 @@ class NPSE(VectorFieldTrainer):
             - Sharrock, Louis, et al. "Sequential neural score estimation: Likelihood-
                 free inference with conditional score based diffusion models." ICML 2024
         """
+        if score_estimator is not None:
+            vf_estimator = score_estimator
+            # Deprecation warning
+            warnings.warn(
+                "`score_estimator` is deprecated. Use `vf_estimator` instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
         super().__init__(
             prior=prior,
             vector_field_estimator_builder=vf_estimator,
@@ -118,4 +129,4 @@ class NPSE(VectorFieldTrainer):
 
     def _build_default_nn_fn(self, **kwargs) -> VectorFieldEstimatorBuilder:
         net_type = kwargs.pop("vector_field_estimator_builder", "mlp")
-        return posterior_score_nn(score_net_type=net_type, **kwargs)
+        return posterior_score_nn(model=net_type, **kwargs)
