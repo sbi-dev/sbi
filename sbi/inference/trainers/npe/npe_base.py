@@ -4,7 +4,7 @@
 import time
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from typing import Any, Callable, Dict, Optional, Union
+from typing import Any, Callable, Dict, Literal, Optional, Tuple, Union
 from warnings import warn
 
 import torch
@@ -16,13 +16,10 @@ from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi.inference.posteriors import (
     DirectPosterior,
-    MCMCPosterior,
-    RejectionPosterior,
-    VIPosterior,
 )
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
-from sbi.inference.posteriors.importance_posterior import ImportanceSamplingPosterior
 from sbi.inference.potentials import posterior_estimator_based_potential
+from sbi.inference.potentials.posterior_based_potential import PosteriorBasedPotential
 from sbi.inference.trainers.base import NeuralInference, check_if_proposal_has_default_x
 from sbi.neural_nets import posterior_nn
 from sbi.neural_nets.estimators import ConditionalDensityEstimator
@@ -30,10 +27,10 @@ from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
     reshape_to_sample_batch_event,
 )
+from sbi.sbi_types import TorchTransform
 from sbi.utils import (
     RestrictedPrior,
     check_estimator_arg,
-    check_prior,
     handle_invalid_x,
     nle_nre_apt_msg_on_invalid_x,
     npe_msg_on_invalid_x,
@@ -45,7 +42,7 @@ from sbi.utils.sbiutils import ImproperEmpirical, mask_sims_from_prior
 from sbi.utils.torchutils import assert_all_finite
 
 
-class PosteriorEstimator(NeuralInference, ABC):
+class PosteriorEstimatorTrainer(NeuralInference, ABC):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
@@ -96,6 +93,15 @@ class PosteriorEstimator(NeuralInference, ABC):
         self._proposal_roundwise = []
         self.use_non_atomic_loss = False
 
+    @abstractmethod
+    def _log_prob_proposal_posterior(
+        self,
+        theta: Tensor,
+        x: Tensor,
+        masks: Tensor,
+        proposal: Optional[Any],
+    ) -> Tensor: ...
+
     def append_simulations(
         self,
         theta: Tensor,
@@ -103,7 +109,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         proposal: Optional[DirectPosterior] = None,
         exclude_invalid_x: Optional[bool] = None,
         data_device: Optional[str] = None,
-    ) -> "PosteriorEstimator":
+    ) -> "PosteriorEstimatorTrainer":
         r"""Store parameters and simulation outputs to use them for later training.
 
         Data are stored as entries in lists for each type of variable (parameter/data).
@@ -440,21 +446,25 @@ class PosteriorEstimator(NeuralInference, ABC):
         self,
         density_estimator: Optional[ConditionalDensityEstimator] = None,
         prior: Optional[Distribution] = None,
-        sample_with: str = "direct",
-        mcmc_method: str = "slice_np_vectorized",
-        vi_method: str = "rKL",
+        sample_with: Literal[
+            "mcmc", "rejection", "vi", "importance", "direct"
+        ] = "direct",
+        mcmc_method: Literal[
+            "slice_np",
+            "slice_np_vectorized",
+            "hmc_pyro",
+            "nuts_pyro",
+            "slice_pymc",
+            "hmc_pymc",
+            "nuts_pymc",
+        ] = "slice_np_vectorized",
+        vi_method: Literal["rKL", "fKL", "IW", "alpha"] = "rKL",
         direct_sampling_parameters: Optional[Dict[str, Any]] = None,
         mcmc_parameters: Optional[Dict[str, Any]] = None,
         vi_parameters: Optional[Dict[str, Any]] = None,
         rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
         importance_sampling_parameters: Optional[Dict[str, Any]] = None,
-    ) -> Union[
-        MCMCPosterior,
-        RejectionPosterior,
-        VIPosterior,
-        DirectPosterior,
-        ImportanceSamplingPosterior,
-    ]:
+    ) -> NeuralPosterior:
         r"""Build posterior from the neural density estimator.
 
         For SNPE, the posterior distribution that is returned here implements the
@@ -471,10 +481,14 @@ class PosteriorEstimator(NeuralInference, ABC):
             prior: Prior distribution.
             sample_with: Method to use for sampling from the posterior. Must be one of
                 [`direct` | `mcmc` | `rejection` | `vi` | `importance`].
-            mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`,
-                `hmc`, `nuts`. Currently defaults to `slice_np` for a custom numpy
-                implementation of slice sampling; select `hmc`, `nuts` or `slice` for
-                Pyro-based sampling.
+            mcmc_method: Method used for MCMC sampling, one of `slice_np`,
+                `slice_np_vectorized`, `hmc_pyro`, `nuts_pyro`, `slice_pymc`,
+                `hmc_pymc`, `nuts_pymc`. `slice_np` is a custom
+                numpy implementation of slice sampling. `slice_np_vectorized` is
+                identical to `slice_np`, but if `num_chains>1`, the chains are
+                vectorized for `slice_np_vectorized` whereas they are run sequentially
+                for `slice_np`. The samplers ending on `_pyro` are using Pyro, and
+                likewise the samplers ending on `_pymc` are using PyMC.
             vi_method: Method used for VI, one of [`rKL`, `fKL`, `IW`, `alpha`]. Note
                 some of the methods admit a `mode seeking` property (e.g. rKL) whereas
                 some admit a `mass covering` one (e.g fKL).
@@ -490,95 +504,46 @@ class PosteriorEstimator(NeuralInference, ABC):
             Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods
             (the returned log-probability is unnormalized).
         """
-        if prior is None:
-            assert self._prior is not None, (
-                "You did not pass a prior. You have to pass the prior either at "
-                "initialization `inference = SNPE(prior)` or to "
-                "`.build_posterior(prior=prior)`."
-            )
-            prior = self._prior
-        else:
-            check_prior(prior)
+        return super().build_posterior(
+            density_estimator,
+            prior,
+            sample_with,
+            mcmc_method=mcmc_method,
+            vi_method=vi_method,
+            mcmc_parameters=mcmc_parameters,
+            vi_parameters=vi_parameters,
+            rejection_sampling_parameters=rejection_sampling_parameters,
+            importance_sampling_parameters=importance_sampling_parameters,
+            direct_sampling_parameters=direct_sampling_parameters,
+        )
 
-        if density_estimator is None:
-            posterior_estimator = self._neural_net
-            # If internal net is used device is defined.
-            device = self._device
-        else:
-            posterior_estimator = density_estimator
-            # Otherwise, infer it from the device of the net parameters.
-            device = str(next(density_estimator.parameters()).device)
+    def _get_potential_function(
+        self,
+        prior: Distribution,
+        estimator: ConditionalDensityEstimator,
+    ) -> Tuple[PosteriorBasedPotential, TorchTransform]:
+        r"""Gets the potential for posterior-based methods.
 
+        It also returns a transformation that can be used to transform the potential
+        into unconstrained space.
+
+        The potential is the same as the log-probability of the `posterior_estimator`,
+        but it is set to $-\inf$ outside of the prior bounds.
+
+        Args:
+            prior: The prior distribution.
+            estimator: The neural network modelling the posterior.
+
+        Returns:
+            The potential function and a transformation that maps
+            to unconstrained space.
+        """
         potential_fn, theta_transform = posterior_estimator_based_potential(
-            posterior_estimator=posterior_estimator,
+            posterior_estimator=estimator,
             prior=prior,
             x_o=None,
         )
-
-        if sample_with == "direct":
-            self._posterior = DirectPosterior(
-                posterior_estimator=posterior_estimator,  # type: ignore
-                prior=prior,
-                device=device,
-                **direct_sampling_parameters or {},
-            )
-        elif sample_with == "rejection":
-            rejection_sampling_parameters = rejection_sampling_parameters or {}
-            if "proposal" not in rejection_sampling_parameters:
-                raise ValueError(
-                    "You passed `sample_with='rejection' but you did not specify a "
-                    "`proposal` in `rejection_sampling_parameters`. Until sbi "
-                    "v0.22.0, this was interpreted as directly sampling from the "
-                    "posterior. As of sbi v0.23.0, you instead have to use "
-                    "`sample_with='direct'` to do so."
-                )
-            self._posterior = RejectionPosterior(
-                potential_fn=potential_fn,
-                device=device,
-                **rejection_sampling_parameters,
-            )
-        elif sample_with == "mcmc":
-            self._posterior = MCMCPosterior(
-                potential_fn=potential_fn,
-                theta_transform=theta_transform,
-                proposal=prior,
-                method=mcmc_method,
-                device=device,
-                **mcmc_parameters or {},
-            )
-        elif sample_with == "vi":
-            self._posterior = VIPosterior(
-                potential_fn=potential_fn,
-                theta_transform=theta_transform,
-                prior=prior,  # type: ignore
-                vi_method=vi_method,
-                device=device,
-                **vi_parameters or {},
-            )
-        elif sample_with == "importance":
-            self._posterior = ImportanceSamplingPosterior(
-                potential_fn=potential_fn,
-                proposal=prior,
-                device=device,
-                **importance_sampling_parameters or {},
-            )
-        else:
-            raise NotImplementedError
-
-        # Store models at end of each round.
-        self._model_bank.append(deepcopy(self._posterior))
-
-        return deepcopy(self._posterior)
-
-    @abstractmethod
-    def _log_prob_proposal_posterior(
-        self,
-        theta: Tensor,
-        x: Tensor,
-        masks: Tensor,
-        proposal: Optional[Any],
-    ) -> Tensor:
-        raise NotImplementedError
+        return potential_fn, theta_transform
 
     def _loss(
         self,

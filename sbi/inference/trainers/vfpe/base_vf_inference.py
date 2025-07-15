@@ -4,7 +4,7 @@
 import time
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from typing import Any, Callable, Optional, Protocol, Union
+from typing import Any, Callable, Literal, Optional, Protocol, Tuple, Union
 
 import torch
 from torch import Tensor, ones
@@ -19,10 +19,15 @@ from sbi.inference.posteriors import (
     DirectPosterior,
 )
 from sbi.inference.posteriors.vector_field_posterior import VectorFieldPosterior
+from sbi.inference.potentials.vector_field_potential import (
+    VectorFieldBasedPotential,
+    vector_field_estimator_based_potential,
+)
 from sbi.neural_nets.estimators import (
     ConditionalVectorFieldEstimator,
     MaskedConditionalVectorFieldEstimator,
 )
+from sbi.sbi_types import TorchTransform
 from sbi.utils import (
     check_estimator_arg,
     handle_invalid_x,
@@ -77,7 +82,7 @@ class MaskedVectorFieldEstimatorBuilder(Protocol):
         ...
 
 
-class VectorFieldInference(NeuralInference, ABC):
+class VectorFieldTrainer(NeuralInference, ABC):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
@@ -145,7 +150,7 @@ class VectorFieldInference(NeuralInference, ABC):
         proposal: Optional[DirectPosterior] = None,
         exclude_invalid_x: Optional[bool] = None,
         data_device: Optional[str] = None,
-    ) -> "VectorFieldInference":
+    ) -> "VectorFieldTrainer":
         r"""Store parameters and simulation outputs to use them for later training.
 
         Data are stored as entries in lists for each type of variable (parameter/data).
@@ -172,7 +177,7 @@ class VectorFieldInference(NeuralInference, ABC):
                 much VRAM can set to 'cpu' to store data on system memory instead.
 
         Returns:
-            VectorFieldInference object (returned so that this function is chainable).
+            VectorFieldTrainer object (returned so that this function is chainable).
         """
         inference_name = self.__class__.__name__
         assert proposal is None, (
@@ -365,8 +370,8 @@ class VectorFieldInference(NeuralInference, ABC):
             # domain and hence can be "unstable" and is not a good choice for
             # evaluation. Same for flow mathching but with t_max
             validation_times = torch.linspace(
-                self._neural_net.t_min + 0.1,
-                self._neural_net.t_max - 0.1,
+                self._neural_net.t_min + 0.05,
+                self._neural_net.t_max - 0.05,
                 validation_times,
             )
         assert isinstance(
@@ -517,10 +522,10 @@ class VectorFieldInference(NeuralInference, ABC):
     def _converged(self, epoch: int, stop_after_epochs: int) -> bool:
         """Return whether the training converged yet and save best model state so far.
 
-        Checks for improvement in validation performance over previous epochs.
-        Uses an adaptive threshold that considers both the scale and variance of the
-        loss. The threshold is based on the exponential moving average of the loss and
-        its relative changes.
+        Uses a statistical approach to detect convergence by tracking the running mean
+        and standard deviation of validation losses. Training is considered converged
+        when the current loss is statistically significantly worse than the best loss
+        for a sustained period, accounting for natural fluctuations in the loss.
 
         Args:
             epoch: Current epoch in training.
@@ -534,110 +539,69 @@ class VectorFieldInference(NeuralInference, ABC):
         assert self._neural_net is not None
         neural_net = self._neural_net
 
-        # Initialize tracking of loss changes if not exists
-        if not hasattr(self, '_loss_changes'):
-            self._loss_changes = []
+        # Initialize tracking variables if not exists
+        if not hasattr(self, '_best_val_loss'):
+            self._best_val_loss = float('inf')
+            self._epochs_since_last_improvement = 0
+            self._best_model_state_dict = None
 
-        # (Re)-start the epoch count with the first epoch or any improvement.
-        if epoch == 0 or self._val_loss < self._best_val_loss:
+        # Check if we have a new best loss
+        if self._val_loss < self._best_val_loss:
             self._best_val_loss = self._val_loss
             self._epochs_since_last_improvement = 0
             self._best_model_state_dict = deepcopy(neural_net.state_dict())
         else:
-            # Calculate relative change in loss
-            relative_change = (self._val_loss - self._best_val_loss) / abs(
-                self._best_val_loss
-            )
+            # Only start statistical analysis after we have enough data
+            if len(self._summary["validation_loss"]) >= stop_after_epochs:
+                # Calculate running statistics of recent losses
+                recent_losses = torch.tensor(
+                    self._summary["validation_loss"][-stop_after_epochs * 2 :]
+                )
+                loss_std = recent_losses.std().item()
 
-            # Update loss changes history (keep last stop_after_epochs changes)
-            self._loss_changes.append(relative_change)
-            if len(self._loss_changes) > stop_after_epochs:
-                self._loss_changes.pop(0)
-
-            # Calculate adaptive threshold based on recent loss changes
-            if len(self._loss_changes) >= 3:
-                # Use standard deviation of recent changes to determine threshold
-                recent_changes = torch.tensor(self._loss_changes)
-                std_changes = recent_changes.std().item()
-                mean_changes = recent_changes.mean().item()
-
-                # Adaptive threshold: mean + 2*std of recent changes
-                # This means we only count as "no improvement" if the increase
-                # is significantly above the typical fluctuations
-                adaptive_threshold = mean_changes + 1.5 * std_changes
-
-                if relative_change > adaptive_threshold:
+                # Calculate how many standard deviations the current loss is from the
+                # best
+                diff_to_best_normalized = (
+                    self._val_loss - self._best_val_loss
+                ) / loss_std
+                # Consider it "no improvement" if current loss is significantly
+                # worse than the best loss (more than 2.67 std deviations above best)
+                # This accounts for natural fluctuations while being sensitive to
+                # real degradation
+                if diff_to_best_normalized > 2.67:
                     self._epochs_since_last_improvement += 1
+                else:
+                    # Reset counter if loss is within acceptable range
+                    self._epochs_since_last_improvement = 0
+            else:
+                return False
 
         # If no validation improvement over many epochs, stop training.
         if self._epochs_since_last_improvement > stop_after_epochs - 1:
-            neural_net.load_state_dict(self._best_model_state_dict)
+            if self._best_model_state_dict is not None:
+                neural_net.load_state_dict(self._best_model_state_dict)
             converged = True
 
         return converged
 
-    def _build_posterior(
-        self,
-        vector_field_estimator: Optional[ConditionalVectorFieldEstimator] = None,
-        prior: Optional[Distribution] = None,
-        sample_with: str = "sde",
-        **kwargs,
-    ) -> VectorFieldPosterior:
-        r"""Build posterior from the vector field estimator.
-
-        For NPSE, the posterior distribution that is returned here implements the
-        following functionality over the raw neural density estimator:
-        - correct the calculation of the log probability such that it compensates for
-            the leakage.
-        - reject samples that lie outside of the prior bounds.
+    def _get_potential_function(
+        self, prior: Distribution, estimator: ConditionalVectorFieldEstimator
+    ) -> Tuple[VectorFieldBasedPotential, TorchTransform]:
+        r"""Gets the potential function gradient for vector field estimators.
 
         Args:
-            vector_field_estimator: The vector field estimator that the posterior
-                is based on. If `None`, use the latest vector field estimator that was
-                trained.
-            prior: Prior distribution.
-            sample_with: Method to use for sampling from the posterior. Can be one of
-                'sde' (default) or 'ode'. The 'sde' method uses the vector field to
-                do a Langevin diffusion step, while the 'ode' solves a probabilistic ODE
-                with a numerical ODE solver.
-            **kwargs: Additional keyword arguments passed to
-                `VectorFieldBasedPotential`.
-
+            prior: The prior distribution.
+            estimator: The neural network modelling the vector field.
         Returns:
-            Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods.
+            The potential function and a transformation that maps
+            to unconstrained space.
         """
-        if prior is None:
-            cls_name = self.__class__.__name__
-            assert self._prior is not None, (
-                "You did not pass a prior. You have to pass the prior either at "
-                f"initialization `inference = {cls_name}(prior)` or to "
-                "`.build_posterior(prior=prior)`."
-            )
-            prior = self._prior
-        else:
-            utils.check_prior(prior)
-
-        if vector_field_estimator is None:
-            vector_field_estimator = self._neural_net
-            # If internal net is used device is defined.
-            device = self._device
-        # Otherwise, infer it from the device of the net parameters.
-        else:
-            device = str(next(vector_field_estimator.parameters()).device)
-
-        posterior = VectorFieldPosterior(
-            vector_field_estimator,
+        potential_fn, theta_transform = vector_field_estimator_based_potential(
+            estimator,
             prior,
-            device=device,
-            sample_with=sample_with,
-            **kwargs,
+            x_o=None,
         )
-
-        self._posterior = posterior
-        # Store models at end of each round.
-        self._model_bank.append(deepcopy(self._posterior))
-
-        return deepcopy(self._posterior)
+        return potential_fn, theta_transform
 
     def _loss_proposal_posterior(
         self,
@@ -1250,7 +1214,7 @@ class MaskedVectorFieldInference(MaskedNeuralInference, ABC):
         edge_mask: Tensor,
         mvf_estimator: Optional[MaskedConditionalVectorFieldEstimator] = None,
         prior: Optional[Distribution] = None,
-        sample_with: str = "sde",
+        sample_with: Literal['ode', 'sde'] = "sde",
         **kwargs,
     ) -> VectorFieldPosterior:
         r"""Build posterior for a given conditioning context.

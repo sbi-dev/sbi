@@ -98,18 +98,18 @@ def test_c2st_vector_field_on_linearGaussian(
         posterior = inference.build_posterior(
             vf_estimator,
             sample_with=method,
-            neural_ode_backend="zuko",
+            vectorfield_sampling_parameters={
+                "neural_ode_backend": "zuko",
+            },
         )
         posterior.set_default_x(x_o)
         samples = posterior.sample((num_samples,))
 
         # Compute the c2st and assert it is near chance level of 0.5.
-        # Increased tolerance to 0.12 because FMPE can be around 0.61 for some runs.
         check_c2st(
             samples,
             target_samples,
             alg=f"vector_field-{vector_field_type}-{prior_str}-{num_dim}D-{method}",
-            tol=0.15 if method == "ode" else 0.12,  # ODE with scores is less accurate
         )
 
     # Checks for log_prob()
@@ -277,7 +277,7 @@ def test_c2st_vector_field_on_linearGaussian_different_dims(vector_field_type):
 @pytest.mark.parametrize(
     "model", ["mlp", "ada_mlp", pytest.param("transformer", marks=[pytest.mark.slow])]
 )
-def test_fmpe_with_different_models(vector_field_type, model):
+def test_vfinference_with_different_models(vector_field_type, model):
     """Test fmpe with different vector field estimators on linear Gaussian."""
 
     theta_dim = 3

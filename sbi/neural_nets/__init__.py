@@ -1,5 +1,6 @@
 from sbi.neural_nets.factory import (
     classifier_nn,
+    flowmatching_nn,  # To be removed
     likelihood_nn,
     marginal_nn,
     posterior_flow_nn,
@@ -47,4 +48,5 @@ __all__ = [
     "posterior_nn",
     "posterior_score_nn",
     "posterior_flow_nn",
+    "flowmatching_nn",  # To be removed
 ]

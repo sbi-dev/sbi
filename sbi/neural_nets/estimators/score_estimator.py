@@ -11,6 +11,12 @@ from sbi.neural_nets.estimators.base import (
     ConditionalVectorFieldEstimator,
     MaskedConditionalVectorFieldEstimator,
 )
+from sbi.neural_nets.net_builders.vector_field_nets import (
+    SimformerNet,
+    VectorFieldAdaMLP,
+    VectorFieldMLP,
+    VectorFieldTransformer,
+)
 from sbi.utils.vector_field_utils import MaskedVectorFieldNet, VectorFieldNet
 
 
@@ -64,10 +70,10 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
 
     def __init__(
         self,
-        net: Union[VectorFieldNet, nn.Module],
+        net: VectorFieldNet,
         input_shape: torch.Size,
         condition_shape: torch.Size,
-        embedding_net: nn.Module = nn.Identity(),
+        embedding_net: Optional[nn.Module] = None,
         weight_fn: Union[str, Callable] = "max_likelihood",
         mean_0: Union[Tensor, float] = 0.0,
         std_0: Union[Tensor, float] = 1.0,
@@ -81,10 +87,10 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         Args:
             net: Score estimator neural network with call signature: input, condition,
                 and time (in [0,1])].
-            input_shape: Shape of the input, e.g., the parameters.
+            input_shape: Shape of the input, i.e., the parameters.
             condition_shape: Shape of the conditioning variable.
             embedding_net: Network to embed the conditioning variable before passing it
-                to the score network.
+                to the score network. If None, the identity function is used.
             weight_fn: Function to compute the weights over time. Can be one of the
                 following:
                 - "identity": constant weights (1.),
@@ -95,13 +101,6 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
             t_min: Minimum time for diffusion (0 can be numerically unstable).
             t_max: Maximum time for diffusion.
         """
-        super().__init__(net, input_shape, condition_shape)
-
-        # store embedding network
-        self._embedding_net = embedding_net
-
-        # Set lambdas (variance weights) function.
-        self._set_weight_fn(weight_fn)
 
         # Starting mean and std of the target distribution (otherwise assumes 0,1).
         # This will be used to precondition the score network to improve training.
@@ -110,24 +109,32 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         if not isinstance(std_0, Tensor):
             std_0 = torch.tensor([std_0])
 
+        super().__init__(
+            net,
+            input_shape,
+            condition_shape,
+            mean_base=0.0,  # Will be updated after initialization
+            std_base=1.0,  # Will be updated after initialization
+            embedding_net=embedding_net,
+            t_min=t_min,
+            t_max=t_max,
+        )
+
+        # Set lambdas (variance weights) function.
+        self._set_weight_fn(weight_fn)
         self.register_buffer("mean_0", mean_0.clone().detach())
         self.register_buffer("std_0", std_0.clone().detach())
 
-        # We estimate the mean and std of the source distribution at time t_max.
+        # Now that input_shape and mean_0, std_0 is set, we can compute the proper mean
+        # and std for the "base" distribution.
         mean_t = self.approx_marginal_mean(torch.tensor([t_max]))
         std_t = self.approx_marginal_std(torch.tensor([t_max]))
         mean_t = torch.broadcast_to(mean_t, (1, *input_shape))
         std_t = torch.broadcast_to(std_t, (1, *input_shape))
+
+        # Update the base distribution parameters
         self._mean_base = mean_t
         self._std_base = std_t
-
-        self.t_min = t_min
-        self.t_max = t_max
-
-    @property
-    def embedding_net(self):
-        """Return the embedding network."""
-        return self._embedding_net
 
     def forward(self, input: Tensor, condition: Tensor, time: Tensor) -> Tensor:
         r"""Forward pass of the score estimator
@@ -135,9 +142,12 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         at a given time.
 
         Args:
-            input: Original data, x0. (input_batch_shape, *input_shape)
-            condition: Conditioning variable. (condition_batch_shape, *condition_shape)
-            times: SDE time variable in [0,1].
+            input: Inputs to evaluate the score estimator on of shape
+                    `(sample_dim_input, batch_dim_input, *event_shape_input)`.
+            condition: Conditions of shape
+                `(batch_dim_condition, *event_shape_condition)`.
+            time: Time variable in [0,1] of shape
+                `(batch_dim_time, *event_shape_time)`.
 
         Returns:
             Score (gradient of the density) at a given time, matches input shape.
@@ -191,7 +201,6 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         # and the gaussian part (where it should end up) will dominate at the end of
         # the diffusion.
         scale = self.mean_t_fn(time) / self.std_fn(time)
-
         output_score = -scale * score_pred - score_gaussian
 
         return output_score
@@ -304,19 +313,7 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         Returns:
             Approximate marginal mean at a given time.
         """
-        # Handle case when times has 3 dimensions during sampling
-        original_shape = times.shape
-        has_sample_dim = len(original_shape) == 3
-
-        if has_sample_dim:
-            # Flatten the first two dimensions for computing the mean
-            times = times.reshape(-1)
-            mean = self.mean_t_fn(times) * self.mean_0
-            # Reshape back to original shape
-            mean = mean.reshape(*original_shape[:-1], *mean.shape[1:])
-            return mean
-        else:
-            return self.mean_t_fn(times) * self.mean_0
+        return self.mean_t_fn(times) * self.mean_0
 
     def approx_marginal_std(self, times: Tensor) -> Tensor:
         r"""Approximate the marginal standard deviation of the target distribution at a
@@ -328,21 +325,8 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         Returns:
             Approximate marginal standard deviation at a given time.
         """
-        # Handle case when times has 3 dimensions during sampling
-        original_shape = times.shape
-        has_sample_dim = len(original_shape) == 3
-
-        if has_sample_dim:
-            # Flatten the first two dimensions for computing the std
-            times = times.reshape(-1)
-            vars = self.mean_t_fn(times) ** 2 * self.std_0**2 + self.std_fn(times) ** 2
-            std = torch.sqrt(vars)
-            # Reshape back to original shape
-            std = std.reshape(*original_shape[:-1], *std.shape[1:])
-            return std
-        else:
-            vars = self.mean_t_fn(times) ** 2 * self.std_0**2 + self.std_fn(times) ** 2
-            return torch.sqrt(vars)
+        var = self.mean_t_fn(times) ** 2 * self.std_0**2 + self.std_fn(times) ** 2
+        return torch.sqrt(var)
 
     def mean_t_fn(self, times: Tensor) -> Tensor:
         r"""Conditional mean function, E[xt|x0], specifying the "mean factor" at a given
@@ -1052,10 +1036,16 @@ class VPScoreEstimator(ConditionalScoreEstimator):
 
     def __init__(
         self,
-        net: Union[VectorFieldNet, nn.Module],
+        net: Union[
+            VectorFieldMLP,
+            VectorFieldAdaMLP,
+            VectorFieldTransformer,
+            SimformerNet,
+            VectorFieldNet,
+        ],
         input_shape: torch.Size,
         condition_shape: torch.Size,
-        embedding_net: nn.Module = nn.Identity(),
+        embedding_net: Optional[nn.Module] = None,
         weight_fn: Union[str, Callable] = "max_likelihood",
         beta_min: float = 0.01,
         beta_max: float = 10.0,
@@ -1086,31 +1076,13 @@ class VPScoreEstimator(ConditionalScoreEstimator):
         Returns:
             Conditional mean at a given time.
         """
-        # Handle case when times has 3 dimensions during sampling
-        original_shape = times.shape
-        has_sample_dim = len(original_shape) == 3
-
-        if has_sample_dim:
-            # Flatten for computation
-            times_flat = times.reshape(-1)
-            phi = torch.exp(
-                -0.25 * times_flat**2.0 * (self.beta_max - self.beta_min)
-                - 0.5 * times_flat * self.beta_min
-            )
-            # Add necessary dimensions
-            for _ in range(len(self.input_shape)):
-                phi = phi.unsqueeze(-1)
-            # Reshape back to original
-            phi = phi.reshape(*original_shape[:-1], *phi.shape[1:])
-            return phi
-        else:
-            phi = torch.exp(
-                -0.25 * times**2.0 * (self.beta_max - self.beta_min)
-                - 0.5 * times * self.beta_min
-            )
-            for _ in range(len(self.input_shape)):
-                phi = phi.unsqueeze(-1)
-            return phi
+        phi = torch.exp(
+            -0.25 * times**2.0 * (self.beta_max - self.beta_min)
+            - 0.5 * times * self.beta_min
+        )
+        for _ in range(len(self.input_shape)):
+            phi = phi.unsqueeze(-1)
+        return phi
 
     def std_fn(self, times: Tensor) -> Tensor:
         """Standard deviation function for variance preserving SDEs.
@@ -1120,31 +1092,12 @@ class VPScoreEstimator(ConditionalScoreEstimator):
         Returns:
             Standard deviation at a given time.
         """
-        # Handle case when times has 3 dimensions during sampling
-        original_shape = times.shape
-        has_sample_dim = len(original_shape) == 3
-
-        if has_sample_dim:
-            # Flatten for computation
-            times_flat = times.reshape(-1)
-            std = 1.0 - torch.exp(
-                -0.5 * times_flat**2.0 * (self.beta_max - self.beta_min)
-                - times_flat * self.beta_min
-            )
-            # Add necessary dimensions
-            for _ in range(len(self.input_shape)):
-                std = std.unsqueeze(-1)
-            # Reshape back to original
-            std = std.reshape(*original_shape[:-1], *std.shape[1:])
-            return torch.sqrt(std)
-        else:
-            std = 1.0 - torch.exp(
-                -0.5 * times**2.0 * (self.beta_max - self.beta_min)
-                - times * self.beta_min
-            )
-            for _ in range(len(self.input_shape)):
-                std = std.unsqueeze(-1)
-            return torch.sqrt(std)
+        std = 1.0 - torch.exp(
+            -0.5 * times**2.0 * (self.beta_max - self.beta_min) - times * self.beta_min
+        )
+        for _ in range(len(self.input_shape)):
+            std = std.unsqueeze(-1)
+        return torch.sqrt(std)
 
     def _beta_schedule(self, times: Tensor) -> Tensor:
         """Linear beta schedule for mean scaling in variance preserving SDEs.
@@ -1193,10 +1146,16 @@ class SubVPScoreEstimator(ConditionalScoreEstimator):
 
     def __init__(
         self,
-        net: Union[VectorFieldNet, nn.Module],
+        net: Union[
+            VectorFieldMLP,
+            VectorFieldAdaMLP,
+            VectorFieldTransformer,
+            SimformerNet,
+            VectorFieldNet,
+        ],
         input_shape: torch.Size,
         condition_shape: torch.Size,
-        embedding_net: nn.Module = nn.Identity(),
+        embedding_net: Optional[nn.Module] = None,
         weight_fn: Union[str, Callable] = "max_likelihood",
         beta_min: float = 0.01,
         beta_max: float = 10.0,
@@ -1227,31 +1186,13 @@ class SubVPScoreEstimator(ConditionalScoreEstimator):
         Returns:
             Conditional mean at a given time.
         """
-        # Handle case when times has 3 dimensions during sampling
-        original_shape = times.shape
-        has_sample_dim = len(original_shape) == 3
-
-        if has_sample_dim:
-            # Flatten for computation
-            times_flat = times.reshape(-1)
-            phi = torch.exp(
-                -0.25 * times_flat**2.0 * (self.beta_max - self.beta_min)
-                - 0.5 * times_flat * self.beta_min
-            )
-            # Add necessary dimensions
-            for _ in range(len(self.input_shape)):
-                phi = phi.unsqueeze(-1)
-            # Reshape back to original
-            phi = phi.reshape(*original_shape[:-1], *phi.shape[1:])
-            return phi
-        else:
-            phi = torch.exp(
-                -0.25 * times**2.0 * (self.beta_max - self.beta_min)
-                - 0.5 * times * self.beta_min
-            )
-            for _ in range(len(self.input_shape)):
-                phi = phi.unsqueeze(-1)
-            return phi
+        phi = torch.exp(
+            -0.25 * times**2.0 * (self.beta_max - self.beta_min)
+            - 0.5 * times * self.beta_min
+        )
+        for _ in range(len(self.input_shape)):
+            phi = phi.unsqueeze(-1)
+        return phi
 
     def std_fn(self, times: Tensor) -> Tensor:
         """Standard deviation function for variance preserving SDEs.
@@ -1261,31 +1202,12 @@ class SubVPScoreEstimator(ConditionalScoreEstimator):
         Returns:
             Standard deviation at a given time.
         """
-        # Handle case when times has 3 dimensions during sampling
-        original_shape = times.shape
-        has_sample_dim = len(original_shape) == 3
-
-        if has_sample_dim:
-            # Flatten for computation
-            times_flat = times.reshape(-1)
-            std = 1.0 - torch.exp(
-                -0.5 * times_flat**2.0 * (self.beta_max - self.beta_min)
-                - times_flat * self.beta_min
-            )
-            # Add necessary dimensions
-            for _ in range(len(self.input_shape)):
-                std = std.unsqueeze(-1)
-            # Reshape back to original
-            std = std.reshape(*original_shape[:-1], *std.shape[1:])
-            return std
-        else:
-            std = 1.0 - torch.exp(
-                -0.5 * times**2.0 * (self.beta_max - self.beta_min)
-                - times * self.beta_min
-            )
-            for _ in range(len(self.input_shape)):
-                std = std.unsqueeze(-1)
-            return std
+        std = 1.0 - torch.exp(
+            -0.5 * times**2.0 * (self.beta_max - self.beta_min) - times * self.beta_min
+        )
+        for _ in range(len(self.input_shape)):
+            std = std.unsqueeze(-1)
+        return std
 
     def _beta_schedule(self, times: Tensor) -> Tensor:
         """Linear beta schedule for mean scaling in sub-variance preserving SDEs.
@@ -1350,15 +1272,23 @@ class VEScoreEstimator(ConditionalScoreEstimator):
 
     def __init__(
         self,
-        net: Union[VectorFieldNet, nn.Module],
+        net: Union[
+            VectorFieldMLP,
+            VectorFieldAdaMLP,
+            VectorFieldTransformer,
+            SimformerNet,
+            VectorFieldNet,
+        ],
         input_shape: torch.Size,
         condition_shape: torch.Size,
-        embedding_net: nn.Module = nn.Identity(),
+        embedding_net: Optional[nn.Module] = None,
         weight_fn: Union[str, Callable] = "max_likelihood",
         sigma_min: float = 1e-4,
         sigma_max: float = 10.0,
         mean_0: float = 0.0,
         std_0: float = 1.0,
+        t_min: float = 1e-3,
+        t_max: float = 1.0,
     ) -> None:
         self.sigma_min = sigma_min
         self.sigma_max = sigma_max
@@ -1370,6 +1300,8 @@ class VEScoreEstimator(ConditionalScoreEstimator):
             weight_fn=weight_fn,
             mean_0=mean_0,
             std_0=std_0,
+            t_min=t_min,
+            t_max=t_max,
         )
 
     def mean_t_fn(self, times: Tensor) -> Tensor:
@@ -1381,24 +1313,10 @@ class VEScoreEstimator(ConditionalScoreEstimator):
         Returns:
             Conditional mean at a given time.
         """
-        # Handle case when times has 3 dimensions during sampling
-        original_shape = times.shape
-        has_sample_dim = len(original_shape) == 3
-
-        if has_sample_dim:
-            # Create ones tensor
-            phi = torch.ones_like(times.reshape(-1), device=times.device)
-            # Add necessary dimensions
-            for _ in range(len(self.input_shape)):
-                phi = phi.unsqueeze(-1)
-            # Reshape back to original
-            phi = phi.reshape(*original_shape[:-1], *phi.shape[1:])
-            return phi
-        else:
-            phi = torch.ones_like(times, device=times.device)
-            for _ in range(len(self.input_shape)):
-                phi = phi.unsqueeze(-1)
-            return phi
+        phi = torch.ones_like(times, device=times.device)
+        for _ in range(len(self.input_shape)):
+            phi = phi.unsqueeze(-1)
+        return phi
 
     def std_fn(self, times: Tensor) -> Tensor:
         """Standard deviation function for variance exploding SDEs.
@@ -1409,25 +1327,10 @@ class VEScoreEstimator(ConditionalScoreEstimator):
         Returns:
             Standard deviation at a given time.
         """
-        # Handle case when times has 3 dimensions during sampling
-        original_shape = times.shape
-        has_sample_dim = len(original_shape) == 3
-
-        if has_sample_dim:
-            # Flatten for computation
-            times_flat = times.reshape(-1)
-            std = self.sigma_min * (self.sigma_max / self.sigma_min) ** times_flat
-            # Add necessary dimensions
-            for _ in range(len(self.input_shape)):
-                std = std.unsqueeze(-1)
-            # Reshape back to original
-            std = std.reshape(*original_shape[:-1], *std.shape[1:])
-            return std
-        else:
-            std = self.sigma_min * (self.sigma_max / self.sigma_min) ** times
-            for _ in range(len(self.input_shape)):
-                std = std.unsqueeze(-1)
-            return std
+        std = self.sigma_min * (self.sigma_max / self.sigma_min) ** times
+        for _ in range(len(self.input_shape)):
+            std = std.unsqueeze(-1)
+        return std
 
     def _sigma_schedule(self, times: Tensor) -> Tensor:
         """Geometric sigma schedule for variance exploding SDEs.
@@ -1475,7 +1378,13 @@ class VEScoreEstimator(ConditionalScoreEstimator):
 class MaskedVEScoreEstimator(MaskedConditionalScoreEstimator):
     def __init__(
         self,
-        net: Union[MaskedVectorFieldNet, nn.Module],
+        net: Union[
+            VectorFieldMLP,
+            VectorFieldAdaMLP,
+            VectorFieldTransformer,
+            SimformerNet,
+            VectorFieldNet,
+        ],
         input_shape: torch.Size,
         embedding_net: nn.Module = nn.Identity(),
         weight_fn: Union[str, Callable] = "max_likelihood",

@@ -1,4 +1,4 @@
-from abc import ABC, abstractmethod
+import warnings
 from typing import Optional, Union
 
 import torch
@@ -6,12 +6,13 @@ import torch.nn as nn
 from torch import Tensor
 
 from sbi.neural_nets.estimators.base import ConditionalVectorFieldEstimator
-
-
-# abstract class to ensure forward signature for flow matching networks
-class VectorFieldNet(nn.Module, ABC):
-    @abstractmethod
-    def forward(self, theta: Tensor, x: Tensor, t: Tensor) -> Tensor: ...
+from sbi.neural_nets.net_builders.vector_field_nets import (
+    SimformerNet,
+    VectorFieldAdaMLP,
+    VectorFieldMLP,
+    VectorFieldTransformer,
+)
+from sbi.utils.vector_field_utils import VectorFieldNet
 
 
 class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
@@ -53,7 +54,13 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
 
     def __init__(
         self,
-        net: Union[VectorFieldNet, nn.Module],
+        net: Union[
+            VectorFieldMLP,
+            VectorFieldAdaMLP,
+            VectorFieldTransformer,
+            SimformerNet,
+            VectorFieldNet,
+        ],
         input_shape: torch.Size,
         condition_shape: torch.Size,
         embedding_net: Optional[nn.Module] = None,
@@ -67,33 +74,38 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
             input_shape: Shape of the input :math:`\theta`.
             condition_shape: Shape of the condition :math:`x_o`.
             embedding_net: Embedding network for the condition.
-            num_freqs: Number of frequencies to use for the positional time encoding.
-                This is ignored and will be removed.
             noise_scale: Scale of the noise added to the vector field
                 (:math:`\sigma_{min}` in [2]_).
             zscore_transform_input: Whether to z-score the input.
                 This is ignored and will be removed.
         """
 
+        if "num_freqs" in kwargs:
+            del kwargs["num_freqs"]
+            warnings.warn(
+                "num_freqs is deprecated and will be removed in the future. "
+                "Please use the positional_encoding_net instead.",
+                stacklevel=2,
+            )
+
         super().__init__(
-            net=net, input_shape=input_shape, condition_shape=condition_shape
+            net=net,
+            input_shape=input_shape,
+            condition_shape=condition_shape,
+            embedding_net=embedding_net,
         )
         self.noise_scale = noise_scale
-        self._embedding_net = (
-            embedding_net if embedding_net is not None else nn.Identity()
-        )
-
-    @property
-    def embedding_net(self):
-        return self._embedding_net
 
     def forward(self, input: Tensor, condition: Tensor, time: Tensor) -> Tensor:
         """Forward pass of the FlowMatchingEstimator.
 
         Args:
-            input: Original data, x0. (input_batch_shape, *input_shape)
-            condition: Conditioning variable. (condition_batch_shape, *condition_shape)
-            time: SDE time variable in [0,1].
+            input: Inputs to evaluate the vector field on of shape
+                    `(sample_dim_input, batch_dim_input, *event_shape_input)`.
+            condition: Conditions of shape
+                `(batch_dim_condition, *event_shape_condition)`.
+            time: Time variable in [0,1] of shape
+                `(batch_dim_time, *event_shape_time)`.
 
         Returns:
             The estimated vector field.

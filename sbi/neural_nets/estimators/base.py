@@ -3,7 +3,7 @@
 
 import warnings
 from abc import ABC, abstractmethod
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Union
 
 import torch
 from torch import Tensor, nn
@@ -328,8 +328,9 @@ class ConditionalVectorFieldEstimator(ConditionalEstimator, ABC):
         condition_shape: torch.Size,
         t_min: float = 0.0,
         t_max: float = 1.0,
-        mean_base: float = 0.0,
-        std_base: float = 1.0,
+        embedding_net: Optional[nn.Module] = None,
+        mean_base: Union[float, Tensor] = 0.0,
+        std_base: Union[float, Tensor] = 1.0,
     ) -> None:
         r"""Base class for vector field estimators.
 
@@ -340,6 +341,8 @@ class ConditionalVectorFieldEstimator(ConditionalEstimator, ABC):
                             1D input.
             t_min: Minimum time for the vector field estimator.
             t_max: Maximum time for the vector field estimator.
+            embedding_net: Embedding network, if provided, it will be used to embed the
+                condition.
             mean_base: Mean of the base distribution.
             std_base: Standard deviation of the base distribution.
         """
@@ -360,6 +363,14 @@ class ConditionalVectorFieldEstimator(ConditionalEstimator, ABC):
         self.register_buffer(
             "_std_base", torch.empty(1, *self.input_shape).fill_(std_base)
         )
+        self._embedding_net = (
+            embedding_net if embedding_net is not None else nn.Identity()
+        )
+
+    @property
+    def embedding_net(self) -> nn.Module:
+        r"""Return the embedding network if it exists."""
+        return self._embedding_net
 
     @abstractmethod
     def forward(

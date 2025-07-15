@@ -15,7 +15,7 @@ class VectorFieldNet(nn.Module, ABC):
         """Forward pass to compute the vector field.
 
         Args:
-            theta: Parameters (for FMPE) or state (for NPSE)
+            theta: Parameters
             x: Conditioning information
             t: Time parameter (scalar or batched)
 

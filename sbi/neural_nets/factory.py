@@ -1,7 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-
+import warnings
 from enum import Enum
 from typing import Any, Callable, Optional, Union
 
@@ -431,6 +431,7 @@ def posterior_score_nn(
     embedding_net: nn.Module = nn.Identity(),
     time_emb_type: str = "sinusoidal",
     t_embedding_dim: int = 32,
+    score_net_type: Optional[Union[str, nn.Module]] = None,
     **kwargs: Any,
 ) -> Callable:
     """Build util function that builds a ScoreEstimator object for score-based
@@ -467,6 +468,15 @@ def posterior_score_nn(
         Constructor function for NPSE.
     """
 
+    if score_net_type is not None:
+        model = score_net_type
+        warnings.warn(
+            "score_net_type is deprecated and will be removed in a future release. "
+            "Please use model instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
     kwargs = dict(
         zip(
             (
@@ -499,6 +509,79 @@ def posterior_score_nn(
         return build_score_matching_estimator(
             batch_x=batch_theta,
             batch_y=batch_x,
+            sde_type=sde_type,
+            **kwargs,
+        )
+
+    return build_fn
+
+
+# TODO: remove this function on next release
+def flowmatching_nn(
+    model: str,
+    z_score_theta: Optional[str] = "independent",
+    z_score_x: Optional[str] = "independent",
+    hidden_features: int = 64,
+    num_layers: int = 5,
+    num_blocks: int = 5,
+    num_frequencies: int = 3,
+    embedding_net: nn.Module = nn.Identity(),
+    **kwargs: Any,
+) -> Callable:
+    r"""Returns a function that builds a neural net that can act as
+    a vector field estimator for Flow Matching. This function will usually
+    be used for Flow Matching. The returned function is to be passed to the
+
+    Args:
+        model: the type of regression network to learn the vector field. One of ['mlp',
+            'resnet'].
+        z_score_theta: Whether to z-score parameters $\theta$ before passing them into
+            the network, can take one of the following:
+            - `none`, or None: do not z-score.
+            - `independent`: z-score each dimension independently.
+            - `structured`: treat dimensions as related, therefore compute mean and std
+            over the entire batch, instead of per-dimension. Should be used when each
+            sample is, for example, a time series or an image.
+        z_score_x: Whether to z-score simulation outputs $x$ before passing them into
+            the network, same options as z_score_theta.
+        hidden_features: Number of hidden features.
+        num_layers: Number of transforms when a flow is used. Only relevant if
+            density estimator is a normalizing flow (i.e. currently either a `maf` or a
+            `nsf`). Ignored if density estimator is a `mdn` or `made`.
+        num_blocks: Number of blocks if a ResNet is used.
+        num_frequencies: Number of frequencies for the time embedding.
+        embedding_net: Optional embedding network for the condition.
+        kwargs: additional custom arguments passed to downstream build functions.
+    """
+    # NOTE: I keep this function because it was used in the documentation notebook
+    # examples.
+    warnings.warn(
+        "flowmatching_nn is deprecated and will be removed in a future release. "
+        "Please use posterior_flow_nn or the new vector field estimator builders "
+        "instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    implemented_models = ["mlp", "resnet"]
+
+    if model not in implemented_models:
+        raise NotImplementedError(f"Model {model} in not implemented for FMPE")
+
+    model_str = model + "_flowmatcher"
+
+    def build_fn(batch_theta, batch_x):
+        return model_builders[model_str](
+            batch_x=batch_theta,
+            batch_y=batch_x,
+            z_score_x=z_score_theta,
+            z_score_y=z_score_x,
+            hidden_features=hidden_features,
+            num_layers=num_layers,
+            num_blocks=num_blocks,
+            num_freqs=num_frequencies,
+            embedding_net=check_net_device(
+                embedding_net, "cpu", embedding_net_warn_msg
+            ),
             **kwargs,
         )
 
