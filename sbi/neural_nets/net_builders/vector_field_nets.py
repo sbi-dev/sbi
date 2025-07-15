@@ -235,9 +235,7 @@ class SinusoidalTimeEmbedding(nn.Module):
 
 
 class RandomFourierTimeEmbedding(nn.Module):
-    """Gaussian random features for encoding time steps.
-
-    This is to be used as a utility for score-matching."""
+    """Gaussian random features for encoding time steps."""
 
     def __init__(
         self, embed_dim: int = 100, scale: float = 30.0, learnable: bool = True
