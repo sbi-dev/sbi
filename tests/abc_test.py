@@ -13,6 +13,7 @@ from sbi.simulators.linear_gaussian import (
     samples_true_posterior_linear_gaussian_uniform_prior,
     true_posterior_linear_gaussian_mvn_prior,
 )
+from sbi.utils.kde import KDEWrapper
 from sbi.utils.metrics import check_c2st
 from sbi.utils.torchutils import BoxUniform
 
@@ -54,6 +55,8 @@ def test_mcabc_performance(num_dim: int, distance: str, eps: float):
         return_summary=False,
     )
 
+    if not isinstance(phat, Tensor):
+        raise TypeError("Expected phat to be a Tensor, got: {}".format(type(phat)))
     posterior_samples: Tensor = phat[:num_samples]
     print(posterior_samples.shape)
     check_c2st(posterior_samples, target_samples, alg=f"MCABC_{num_dim}d")
@@ -112,6 +115,9 @@ def test_smcabc_performance(prior_type: str, algorithm_variant: str, kernel: str
         distance_based_decay=True,
         return_summary=False,
     )
+
+    if not isinstance(phat, Tensor):
+        raise TypeError("Expected phat to be a Tensor, got: {}".format(type(phat)))
 
     check_c2st(
         phat[:num_samples],
@@ -250,11 +256,16 @@ def _fast_smcabc_test(**kwargs):
 
     # Verify we got results
     if defaults["kde"]:
-        assert hasattr(phat, 'sample')
+        if not isinstance(phat, KDEWrapper):
+            raise TypeError(
+                "Expected phat to be a KDEWrapper, got: {}".format(type(phat))
+            )
         samples = phat.sample((10,))
         assert samples.shape[0] == 10
         phat.log_prob(samples)
     else:
+        if not isinstance(phat, Tensor):
+            raise TypeError("Expected phat to be a Tensor, got: {}".format(type(phat)))
         assert phat.shape[0] > 0
 
 
@@ -378,7 +389,7 @@ def test_distance_function_edge_cases(test_type: str, distance_name: str | None)
             distance_metric = Distance(custom_distance, requires_iid_data=None)
         assert not distance_metric.requires_iid_data
 
-    elif test_type == "invalid_name":
+    elif test_type == "invalid_name" and distance_name is not None:
         with pytest.raises(AssertionError, match="must be one of"):
             Distance(distance_name)
 
