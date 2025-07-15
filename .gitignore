@@ -8,8 +8,8 @@
 /*.pyc
 /*.egg
 /*.egg-info
-.venv
-
+.venv*
+/.serena
 # Notebook checkpoints
 .ipynb_checkpoints
 
