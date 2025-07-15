@@ -253,7 +253,7 @@ def pytest_sessionfinish(session):
     RESULTS_PATH = Path('./.bm_results/')
     if RESULTS_PATH.exists() and not KEEP_BM_RESULTS:
         rmtree(RESULTS_PATH)
-    RESULTS_PATH.mkdir(exist_ok=False)
+    RESULTS_PATH.mkdir(exist_ok=True)
 
     if suffix == 'all':
         session_results_df.to_csv('./.bm_results/results_all.csv')
