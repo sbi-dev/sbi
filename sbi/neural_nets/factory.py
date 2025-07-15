@@ -337,6 +337,7 @@ def posterior_score_nn(
     embedding_net: nn.Module = nn.Identity(),
     time_emb_type: str = "sinusoidal",
     t_embedding_dim: int = 32,
+    score_net_type: Optional[Union[str, nn.Module]] = None,
     **kwargs: Any,
 ) -> Callable:
     """Build util function that builds a ScoreEstimator object for score-based
@@ -372,6 +373,15 @@ def posterior_score_nn(
     Returns:
         Constructor function for NPSE.
     """
+
+    if score_net_type is not None:
+        model = score_net_type
+        warnings.warn(
+            "score_net_type is deprecated and will be removed in a future release. "
+            "Please use model instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
     kwargs = dict(
         zip(
