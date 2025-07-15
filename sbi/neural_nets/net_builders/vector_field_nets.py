@@ -272,8 +272,8 @@ class AdaMLPBlock(nn.Module):
         hidden_dim: int,
         cond_dim: int,
         mlp_ratio: int = 1,
-        activation: Callable = nn.GELU,
-        gate_activation: Callable = nn.Tanh,
+        activation: type[nn.Module] = nn.GELU,
+        gate_activation: Callable = lambda x: (x + 1.0),
     ):
         super().__init__()
 
@@ -284,7 +284,7 @@ class AdaMLPBlock(nn.Module):
         )
 
         # Initialize the last layer to zero
-        self.ada_ln[-1].weight.data *= 0.01
+        self.ada_ln[-1].weight.data.zero_()
         self.ada_ln[-1].bias.data.zero_()
 
         # MLP block
@@ -294,7 +294,7 @@ class AdaMLPBlock(nn.Module):
             nn.Linear(hidden_dim * mlp_ratio, hidden_dim),
         )
 
-        self.gate_activation = gate_activation()
+        self.gate_activation = gate_activation
 
     def forward(self, x: Tensor, cond: Tensor) -> Tensor:
         """
@@ -392,8 +392,18 @@ class GlobalEmbeddingMLP(nn.Module):
         else:
             try:
                 # Pad x_embed by repeating if smaller than time_emb_dim
+                # This is just to have the same number of input weights as the time
+                # embedding.
                 pad_width = max(0, self.time_emb.embed_dim - x_emb.shape[-1])
-                x_emb = torch.nn.functional.pad(x_emb, (0, pad_width), mode='constant')
+                # Calculate the new total length after padding
+                target_length = x_emb.shape[-1] + pad_width
+                # Repeat/cycle the values along the last dimension
+                repeats = (target_length + x_emb.shape[-1] - 1) // x_emb.shape[
+                    -1
+                ]  # Ceiling division
+                cycled = x_emb.repeat(*([1] * (x_emb.ndim - 1)), repeats)
+                # Truncate to the target length
+                x_emb = cycled[..., :target_length]
                 cond_emb = (
                     torch.cat([x_emb, t_emb], dim=-1) if x_emb is not None else t_emb
                 )
@@ -488,20 +498,20 @@ class VectorFieldMLP(VectorFieldNet):
         self.output_layer = nn.Linear(hidden_features, input_dim)
         nn.init.zeros_(self.output_layer.weight)
 
-    def forward(self, theta: Tensor, x_emb_cond: Tensor, t: Tensor) -> Tensor:
+    def forward(self, input: Tensor, condition: Tensor, t: Tensor) -> Tensor:
         """Forward pass through the MLP.
 
         Args:
-            theta: Parameters (for FMPE) or state (for NPSE).
-            x: Conditioning information.
-            t: Time parameter embedding.
+            input: Input tensor on which the vector field is evaluated.
+            x: Condition for the conditional vector field.
+            t: Time embedding.
 
         Returns:
             Vector field evaluation at the provided points.
         """
         # Process inputs
-        theta_emb = self.input_layer_theta(theta)
-        x_emb = self.input_layer_x(x_emb_cond)
+        theta_emb = self.input_layer_theta(input)
+        x_emb = self.input_layer_x(condition)
         h = self.input_merge_layer(
             self.activation(torch.cat([theta_emb, x_emb], dim=-1))
         )
@@ -543,7 +553,7 @@ class VectorFieldAdaMLP(VectorFieldNet):
         global_mlp_ratio: int = 4,
         num_intermediate_mlp_layers: int = 0,
         adamlp_ratio: int = 4,
-        activation: Callable = nn.GELU,
+        activation: type[nn.Module] = nn.GELU,
         time_emb_type: str = "sinusoidal",
         sinusoidal_max_freq: float = 1000.0,
         fourier_scale: float = 30.0,
@@ -644,7 +654,8 @@ class DiTBlock(nn.Module):
         cond_dim: int,
         num_heads: int,
         mlp_ratio: int = 2,
-        activation: Callable = nn.GELU,
+        activation: type[nn.Module] = nn.GELU,
+        gate_activation: Callable = lambda x: (x + 1),
     ):
         """Initialize dit transformer block.
 
@@ -654,14 +665,15 @@ class DiTBlock(nn.Module):
             num_heads: number of attention heads
             mlp_ratio: ratio for mlp hidden dimension
             activation: activation function
+            gate_activation: activation function for the gate
         """
         super().__init__()
 
         # adaptive layer norm for attention
         self.ada_affine = nn.Sequential(
-            nn.Linear(cond_dim, hidden_dim),
+            nn.Linear(cond_dim, hidden_dim * 3),
             nn.SiLU(),
-            nn.Linear(hidden_dim, 6 * hidden_dim),  # 3 for attn, 3 for mlp
+            nn.Linear(hidden_dim * 3, 6 * hidden_dim),  # 3 for attn, 3 for mlp
         )
 
         # initialize last layer to zero
@@ -670,7 +682,9 @@ class DiTBlock(nn.Module):
 
         # attention
         self.attn = nn.MultiheadAttention(
-            embed_dim=hidden_dim, num_heads=num_heads, batch_first=True
+            embed_dim=hidden_dim,
+            num_heads=num_heads,
+            batch_first=True,
         )
 
         # mlp
@@ -679,6 +693,7 @@ class DiTBlock(nn.Module):
             activation(),
             nn.Linear(hidden_dim * mlp_ratio, hidden_dim),
         )
+        self.gate_activation = gate_activation
 
         # layer norms
         self.norm1 = nn.LayerNorm(hidden_dim)
@@ -709,6 +724,9 @@ class DiTBlock(nn.Module):
         mlp_scale = mlp_scale.view(batch_size, 1, -1)
         mlp_shift = mlp_shift.view(batch_size, 1, -1)
         mlp_gate = mlp_gate.view(batch_size, 1, -1)
+
+        attn_gate = self.gate_activation(attn_gate)
+        mlp_gate = self.gate_activation(mlp_gate)
 
         # attention with adaptive ln
         x_norm = self.norm1(x)
@@ -745,7 +763,8 @@ class DiTBlockWithCrossAttention(nn.Module):
         time_emb_dim: int,
         num_heads: int = 4,
         mlp_ratio: int = 4,
-        activation: Callable = nn.GELU,
+        activation: type[nn.Module] = nn.GELU,
+        gate_activation: Callable = lambda x: (x + 1.0),
     ):
         super().__init__()
 
@@ -757,7 +776,7 @@ class DiTBlockWithCrossAttention(nn.Module):
         )
 
         # initialize the last layer to zero
-        self.time_mlp[-1].weight.data *= 0.1
+        self.time_mlp[-1].weight.data.zero_()
         self.time_mlp[-1].bias.data.zero_()
 
         # self-attention
@@ -786,6 +805,7 @@ class DiTBlockWithCrossAttention(nn.Module):
         self.norm1 = nn.LayerNorm(hidden_dim)
         self.norm2 = nn.LayerNorm(hidden_dim)
         self.norm3 = nn.LayerNorm(hidden_dim)
+        self.gate_activation = gate_activation
 
     def forward(self, x: Tensor, cond_emb: Tensor, t_emb: Tensor) -> Tensor:
         """forward pass through the block.
@@ -812,6 +832,9 @@ class DiTBlockWithCrossAttention(nn.Module):
         mlp_shift = mlp_shift.unsqueeze(1)
         mlp_gate = mlp_gate.unsqueeze(1)
 
+        attn_gate = self.gate_activation(attn_gate)
+        mlp_gate = self.gate_activation(mlp_gate)
+
         # self-attention with adaptive ln
         x_norm = self.norm1(x)
         x_norm = x_norm * (attn_scale + 1) + attn_shift
@@ -827,9 +850,7 @@ class DiTBlockWithCrossAttention(nn.Module):
         # cross-attention with conditioning (no adaptive ln here)
 
         # project conditioning to hidden dimension
-        cond_emb = cond_emb
         cond_emb = self.cond_proj(cond_emb)
-        cond_emb = cond_emb
         cross_attn_out, _ = self.cross_attn(query=x_norm, key=cond_emb, value=cond_emb)
         x = x + cross_attn_out
 
@@ -864,15 +885,17 @@ class VectorFieldTransformer(VectorFieldNet):
         time_emb_type: str = "sinusoidal",
         sinusoidal_max_freq: float = 1000.0,
         fourier_scale: float = 30.0,
-        activation: Callable = nn.GELU,
+        activation: type[nn.Module] = nn.GELU,
         is_x_emb_seq: bool = False,
-        **kwargs,
+        global_mlp_ratio: int = 4,
+        num_intermediate_mlp_layers: int = 0,
+        positional_encoding: Optional[nn.Module] = None,
     ):
         """Initialize dit-style transformer vector field network.
 
         Args:
-            input_dim: Dimension of input data (theta).
-            condition_dim: Dimension of conditioning data (x).
+            input_dim: Dimension of input data (e.g. theta).
+            condition_dim: Dimension of conditioning data (e.g. x).
             hidden_features: Dimension of hidden features.
             num_layers: Number of transformer layers.
             num_heads: Number of attention heads.
@@ -883,8 +906,11 @@ class VectorFieldTransformer(VectorFieldNet):
             fourier_scale: Scale for fourier embedding.
             activation: Activation function.
             is_x_emb_seq: Whether x_emb is a sequence (if true, cross-attention is
-                used). NOTE: Effective usage is somewhat blocked by #1414
-            **kwargs: Additional arguments.
+                used).
+            global_mlp_ratio: Ratio for global MLP hidden dimension.
+            num_intermediate_mlp_layers: Number of intermediate layers in global MLP.
+            positional_encoding: Custom positional encoding module. If None, uses
+                nn.Embedding.
         """
         super().__init__()
 
@@ -895,8 +921,8 @@ class VectorFieldTransformer(VectorFieldNet):
             input_dim=condition_dim,
             output_dim=hidden_features,
             time_emb_dim=time_emb_dim,
-            num_intermediate_layers=2,
-            global_mlp_ratio=4,
+            num_intermediate_layers=num_intermediate_mlp_layers,
+            global_mlp_ratio=global_mlp_ratio,
             time_emb_type=time_emb_type,
             sinusoidal_max_freq=sinusoidal_max_freq,
             fourier_scale=fourier_scale,
@@ -909,9 +935,13 @@ class VectorFieldTransformer(VectorFieldNet):
         self.hidden_features = hidden_features
 
         # input projection
-        self.input_proj = nn.Conv1d(
-            input_dim, input_dim * hidden_features, kernel_size=1, groups=input_dim
-        )
+        self.input_proj = nn.Linear(1, hidden_features)
+
+        # This needs some positional encoding
+        if positional_encoding is None:
+            self.pos_embed_input = nn.Embedding(input_dim, hidden_features)
+        else:
+            self.pos_embed_input = positional_encoding
 
         # transformer blocks
         self.blocks = nn.ModuleList([
@@ -940,32 +970,33 @@ class VectorFieldTransformer(VectorFieldNet):
         self.output_proj = nn.Linear(hidden_features, 1)
         nn.init.zeros_(self.output_proj.weight)
 
-    def forward(self, theta: Tensor, x_emb_cond: Tensor, t: Tensor) -> Tensor:
+    def forward(self, input: Tensor, condition: Tensor, t: Tensor) -> Tensor:
         """Forward pass through the transformer.
 
         Args:
-            theta: parameters (for FMPE) or state (for NPSE)
-            x: conditioning information
-            t: time parameter embedding
+            input: Input tensor on which the vector field is evaluated.
+            condition: Condition for the conditional vector field.
+            t: Time embedding.
 
         Returns:
             Vector field evaluation at the provided points
         """
-        batch_size = theta.shape[0]
-
         # Get condition embedding
         cond_emb = self.global_mlp(
-            t, x_emb=x_emb_cond if not self.is_x_emb_seq else None
+            t, x_emb=condition if not self.is_x_emb_seq else None
         )
 
-        # Project input to hidden dimension using a simpler approach
-        h = theta.view(batch_size, self.input_dim, 1)  # [b, d, 1]
-        h = h.expand(-1, -1, self.hidden_features)  # [b, d, h]
+        # Project input to hidden dimension using input_proj
+        h = self.input_proj(input.unsqueeze(-1))  # [b, d, h]
+        pos_emb = self.pos_embed_input(
+            torch.arange(input.shape[-1], device=input.device)
+        )[None, ...]
+        h = h + pos_emb
 
         # pass through transformer blocks
         for _, block in enumerate(self.blocks):
             if self.is_x_emb_seq:
-                h = block(h, x_emb_cond, cond_emb)
+                h = block(h, condition, cond_emb)
             else:
                 h = block(h, cond_emb)
 

@@ -405,6 +405,7 @@ def posterior_score_nn(
         return build_score_matching_estimator(
             batch_x=batch_theta,
             batch_y=batch_x,
+            sde_type=sde_type,
             **kwargs,
         )
 
