@@ -15,9 +15,9 @@ from sbi.neural_nets.net_builders import (
 )
 
 
-@pytest.mark.parametrize("input_sample_dim", (1, 2))
+@pytest.mark.parametrize("input_sample_dim", (1, 2, 3))
 @pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
-@pytest.mark.parametrize("condition_event_shape", ((1,), (7,)))
+@pytest.mark.parametrize("condition_event_shape", ((1,), (7,), (3, 3)))
 @pytest.mark.parametrize("batch_dim", (1, 10))
 @pytest.mark.parametrize(
     "estimator_type,sde_type",
