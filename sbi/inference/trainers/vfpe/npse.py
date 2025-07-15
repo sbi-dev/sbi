@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import warnings
 from typing import Any, Dict, Literal, Optional, Union
 
 from torch.distributions import Distribution
@@ -13,7 +14,6 @@ from sbi.inference.trainers.vfpe.base_vf_inference import (
 )
 from sbi.neural_nets.estimators import ConditionalVectorFieldEstimator
 from sbi.neural_nets.factory import posterior_score_nn
-import warnings
 
 
 class NPSE(VectorFieldTrainer):

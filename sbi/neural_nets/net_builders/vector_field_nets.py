@@ -239,7 +239,9 @@ class RandomFourierTimeEmbedding(nn.Module):
 
     This is to be used as a utility for score-matching."""
 
-    def __init__(self, embed_dim=256, scale=30.0, learnable=True):
+    def __init__(
+        self, embed_dim: int = 100, scale: float = 30.0, learnable: bool = True
+    ):
         super().__init__()
         # Randomly sample weights during initialization. These weights are fixed
         # during optimization and are not trainable.
@@ -250,7 +252,7 @@ class RandomFourierTimeEmbedding(nn.Module):
         else:
             self.W = nn.Parameter(torch.randn(embed_dim // 2) * scale)
 
-    def forward(self, times: Tensor):
+    def forward(self, times: Tensor) -> Tensor:
         times_proj = times[:, None] * self.W[None, :] * 2 * torch.pi
         embedding = torch.cat([torch.sin(times_proj), torch.cos(times_proj)], dim=-1)
         return torch.squeeze(embedding, dim=1)
