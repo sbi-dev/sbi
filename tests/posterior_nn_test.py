@@ -18,6 +18,7 @@ from sbi.inference import (
     NRE_B,
     NRE_C,
     DirectPosterior,
+    Simformer,
 )
 from sbi.simulators.linear_gaussian import (
     diagonal_linear_gaussian,
@@ -289,6 +290,109 @@ def test_batched_score_sample_with_different_x(
         inference = vector_field_method(prior=prior)
         _ = inference.append_simulations(theta, x).train()
         posterior = inference.build_posterior(sample_with=sampling_method)
+
+        x_o = torch.stack([0.5 * ones(num_dim), -0.5 * ones(num_dim)], dim=0)
+        # test with multiple chains to test whether correct chains are
+        # concatenated.
+        sample_shape = torch.Size([1000])  # use enough samples for accuracy comparison
+        samples = posterior.sample_batched(sample_shape, x_o)
+
+        samples_separate1 = posterior.sample(sample_shape, x_o[0])
+        samples_separate2 = posterior.sample(sample_shape, x_o[1])
+
+        # Check if means are approx. same
+        samples_m = torch.mean(samples, dim=0, dtype=torch.float32)
+        samples_separate1_m = torch.mean(samples_separate1, dim=0, dtype=torch.float32)
+        samples_separate2_m = torch.mean(samples_separate2, dim=0, dtype=torch.float32)
+        samples_sep_m = torch.stack([samples_separate1_m, samples_separate2_m], dim=0)
+
+        assert torch.allclose(samples_m, samples_sep_m, atol=0.2, rtol=0.2), (
+            "Batched sampling is not consistent with separate sampling."
+        )
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("x_o_batch_dim", (0, 1, 2))
+@pytest.mark.parametrize("sampling_method", ["sde", "ode"])
+@pytest.mark.parametrize(
+    "sample_shape",
+    (
+        (5,),  # less than num_chains
+        (4, 2),  # 2D batch
+    ),
+)
+def test_batched_score_simformer_sample_with_different_x(
+    x_o_batch_dim: bool,
+    sampling_method: str,
+    sample_shape: torch.Size,
+):
+    num_dim = 2
+    num_sim_nodes = 2
+    num_simulations = 100
+
+    prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
+    simulator = diagonal_linear_gaussian
+
+    inference = Simformer(prior=prior)
+
+    training_condition_masks = torch.tensor([False, True]).repeat(num_simulations, 1)
+
+    thetas = prior.sample((num_simulations,))
+    xs = simulator(thetas)
+    inputs = torch.stack([thetas, xs], dim=1)
+
+    inference.append_simulations(
+        inputs=inputs,
+        condition_masks=training_condition_masks,
+    ).train(max_num_epochs=100)
+
+    x_o = ones(num_dim) if x_o_batch_dim == 0 else ones(x_o_batch_dim, num_dim)
+
+    # Build posterior for the specific task: infer theta (node 0) given x (node 1).
+    inference_condition_mask = torch.tensor([False, True])
+
+    posterior = inference.build_posterior(
+        condition_mask=inference_condition_mask,
+        sample_with=sampling_method,
+    )
+
+    samples = posterior.sample_batched(
+        sample_shape,
+        x_o,
+    )
+
+    assert (
+        samples.shape == (*sample_shape, x_o_batch_dim, num_dim)
+        if x_o_batch_dim > 0
+        else (*sample_shape, num_dim)
+    ), "Sample shape wrong"
+
+    # test only for 1 sample_shape case to avoid repeating this test.
+    if x_o_batch_dim > 1 and sample_shape == (5,):
+        assert samples.shape[1] == x_o_batch_dim, "Batch dimension wrong"
+        inference = Simformer(prior=prior)
+
+        training_condition_masks = torch.tensor([False, True]).repeat(
+            num_simulations, 1
+        )
+        # Create edge masks (fully connected)
+        edge_mask_single = torch.ones((num_sim_nodes, num_sim_nodes), dtype=torch.bool)
+        training_edge_masks = edge_mask_single.unsqueeze(0).expand(
+            num_simulations, -1, -1
+        )
+
+        inference.append_simulations(
+            inputs=inputs,
+            condition_masks=training_condition_masks,
+            edge_masks=training_edge_masks,
+        ).train(max_num_epochs=100)
+
+        inference_condition_mask = torch.tensor([False, True])
+
+        posterior = inference.build_posterior(
+            condition_mask=inference_condition_mask,
+            sample_with=sampling_method,
+        )
 
         x_o = torch.stack([0.5 * ones(num_dim), -0.5 * ones(num_dim)], dim=0)
         # test with multiple chains to test whether correct chains are

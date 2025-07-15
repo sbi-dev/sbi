@@ -11,6 +11,7 @@ import torch
 from sbi.neural_nets.embedding_nets import CNNEmbedding
 from sbi.neural_nets.net_builders import (
     build_flow_matching_estimator,
+    build_masked_score_matching_estimator,
     build_score_matching_estimator,
 )
 
@@ -20,15 +21,15 @@ from sbi.neural_nets.net_builders import (
 @pytest.mark.parametrize("condition_event_shape", ((1,), (7,)))
 @pytest.mark.parametrize("batch_dim", (1, 10))
 @pytest.mark.parametrize(
-    "estimator_type,sde_type",
+    "estimator_type,sde_type,net",
     [
-        ("flow", None),  # Flow matching doesn't use sde_type
-        ("score", "vp"),
-        ("score", "subvp"),
-        ("score", "ve"),
+        ("flow", None, "mlp"),  # Flow matching doesn't use sde_type
+        ("score", "vp", "mlp"),
+        ("score", "subvp", "mlp"),
+        ("score", "ve", "mlp"),
+        ("masked-score", "ve", "simformer"),
     ],
 )
-@pytest.mark.parametrize("net", ["mlp"])
 def test_vector_field_estimator_loss_shapes(
     input_sample_dim,
     input_event_shape,
@@ -39,7 +40,13 @@ def test_vector_field_estimator_loss_shapes(
     net,
 ):
     """Test whether `loss` of vector field estimators follow the shape convention."""
-    estimator, inputs, conditions = _build_vector_field_estimator_and_tensors(
+    (
+        estimator,
+        inputs,
+        conditions,
+        condition_masks,
+        edge_masks,
+    ) = _build_vector_field_estimator_and_tensors(
         input_event_shape,
         condition_event_shape,
         batch_dim,
@@ -49,7 +56,15 @@ def test_vector_field_estimator_loss_shapes(
         net=net,
     )
 
-    losses = estimator.loss(inputs[0], condition=conditions)
+    if estimator_type == "masked-score":
+        losses = estimator.loss(
+            inputs[0], condition_mask=condition_masks, edge_mask=edge_masks
+        )
+        # ! Need to reshape here for losses returning shape [1, 1, 1]
+        losses = losses.reshape(-1)
+    else:
+        losses = estimator.loss(inputs[0], condition=conditions)
+
     assert losses.shape == (batch_dim,)
 
 
@@ -62,6 +77,7 @@ def test_vector_field_estimator_loss_shapes(
         ("score", "vp"),
         ("score", "subvp"),
         ("score", "ve"),
+        ("masked-score", "ve"),
     ],
 )
 def test_vector_field_estimator_on_device(device, estimator_type, sde_type):
@@ -70,22 +86,37 @@ def test_vector_field_estimator_on_device(device, estimator_type, sde_type):
         estimator = build_flow_matching_estimator(
             torch.randn(100, 1), torch.randn(100, 1)
         )
-    else:
+    elif estimator_type == "score":
         estimator = build_score_matching_estimator(
             torch.randn(100, 1), torch.randn(100, 1), sde_type=sde_type
         )
+    elif estimator_type == "masked-score":
+        estimator = build_masked_score_matching_estimator(
+            torch.randn(100, 5, 1),
+            torch.randn(100, 5, 1),
+            sde_type=sde_type,
+            net="simformer",
+        )
+
     estimator.to(device)
 
-    # Test forward
-    inputs = torch.randn(100, 1, device=device)
-    condition = torch.randn(100, 1, device=device)
     time = torch.randn(1, device=device)
-    out = estimator(inputs, condition, time)
+
+    if estimator_type == "masked-score":
+        inputs = torch.randn(100, 5, 1, device=device)
+        condition_masks = torch.ones(100, 5, device=device)
+        edge_masks = torch.ones(100, 5, 5, device=device)
+        out = estimator(inputs, time, condition_masks, edge_masks)
+        loss = estimator.loss(inputs, condition_masks, edge_masks)
+    else:
+        # Test forward
+        inputs = torch.randn(100, 1, device=device)
+        condition = torch.randn(100, 1, device=device)
+        out = estimator(inputs, condition, time)
+        # Test loss
+        loss = estimator.loss(inputs, condition)
 
     assert str(out.device).split(":")[0] == device, "Output device mismatch."
-
-    # Test loss
-    loss = estimator.loss(inputs, condition)
     assert str(loss.device).split(":")[0] == device, "Loss device mismatch."
 
 
@@ -94,15 +125,15 @@ def test_vector_field_estimator_on_device(device, estimator_type, sde_type):
 @pytest.mark.parametrize("condition_event_shape", ((1,), (7,)))
 @pytest.mark.parametrize("batch_dim", (1, 10))
 @pytest.mark.parametrize(
-    "estimator_type,sde_type",
+    "estimator_type,sde_type,net",
     [
-        ("flow", None),  # Flow matching doesn't use sde_type
-        ("score", "vp"),
-        ("score", "subvp"),
-        ("score", "ve"),
+        ("flow", None, "mlp"),  # Flow matching doesn't use sde_type
+        ("score", "vp", "mlp"),
+        ("score", "subvp", "mlp"),
+        ("score", "ve", "mlp"),
+        ("masked-score", "ve", "simformer"),
     ],
 )
-@pytest.mark.parametrize("net", ["mlp"])
 def test_vector_field_estimator_forward_shapes(
     input_sample_dim,
     input_event_shape,
@@ -113,7 +144,13 @@ def test_vector_field_estimator_forward_shapes(
     net,
 ):
     """Test whether `forward` of vector field estimators follow the shape convention."""
-    estimator, inputs, conditions = _build_vector_field_estimator_and_tensors(
+    (
+        estimator,
+        inputs,
+        conditions,
+        condition_masks,
+        edge_masks,
+    ) = _build_vector_field_estimator_and_tensors(
         input_event_shape,
         condition_event_shape,
         batch_dim,
@@ -122,15 +159,41 @@ def test_vector_field_estimator_forward_shapes(
         sde_type=sde_type,
         net=net,
     )
+    inputs_for_forward = inputs[0]
+
     # Batched times
     times = torch.rand((batch_dim,))
-    outputs = estimator(inputs[0], condition=conditions, time=times)
-    assert outputs.shape == (batch_dim, *input_event_shape), "Output shape mismatch."
+    if estimator_type == "masked-score":
+        outputs = estimator(
+            inputs_for_forward,
+            time=times,
+            condition_mask=condition_masks,
+            edge_mask=edge_masks,
+        )
+        assert outputs.shape == inputs_for_forward.shape, "Output shape mismatch."
+    else:
+        outputs = estimator(inputs_for_forward, condition=conditions, time=times)
+        assert outputs.shape == (
+            batch_dim,
+            *input_event_shape,
+        ), "Output shape mismatch."
 
     # Single time
     time = torch.rand(())
-    outputs = estimator(inputs[0], condition=conditions, time=time)
-    assert outputs.shape == (batch_dim, *input_event_shape), "Output shape mismatch."
+    if estimator_type == "masked-score":
+        outputs = estimator(
+            inputs_for_forward,
+            time=time,
+            condition_mask=condition_masks,
+            edge_mask=edge_masks,
+        )
+        assert outputs.shape == inputs_for_forward.shape, "Output shape mismatch."
+    else:
+        outputs = estimator(inputs_for_forward, condition=conditions, time=time)
+        assert outputs.shape == (
+            batch_dim,
+            *input_event_shape,
+        ), "Output shape mismatch."
 
 
 def _build_vector_field_estimator_and_tensors(
@@ -145,7 +208,7 @@ def _build_vector_field_estimator_and_tensors(
     """
     Helper function for all tests that deal with shapes of vector field estimators.
     """
-    # Use discrete thetas such that categorical density estimators can also use them.
+    # Use discrete thetas such that categorical density esitmators can also use them.
     building_thetas = torch.randint(
         0, 4, (1000, *input_event_shape), dtype=torch.float32
     )
@@ -164,7 +227,7 @@ def _build_vector_field_estimator_and_tensors(
             embedding_net=embedding_net,
             **kwargs,
         )
-    else:
+    elif estimator_type == "score":
         estimator = build_score_matching_estimator(
             torch.randn_like(building_thetas),
             torch.randn_like(building_xs),
@@ -172,16 +235,43 @@ def _build_vector_field_estimator_and_tensors(
             sde_type=sde_type,
             **kwargs,
         )
+    elif estimator_type == "masked-score":
+        # For masked estimators, the input is different.
+        # The builder expects batch_x to have the shape of the combined inputs
+        # Let's assume num_features = 1 for simplicity.
+        num_nodes = input_event_shape[0]
+        num_features = 1
+        building_inputs = building_thetas.reshape(1000, num_nodes, num_features)
 
-    inputs = building_thetas[:batch_dim]
-    condition = building_xs[:batch_dim]
+        estimator = build_masked_score_matching_estimator(
+            building_inputs,
+            building_inputs,  # y is not used for simformer
+            embedding_net=embedding_net,
+            sde_type=sde_type,
+            **kwargs,
+        )
 
-    inputs = inputs.unsqueeze(0)
-    inputs = inputs.expand(
-        [
-            input_sample_dim,
-        ]
-        + [-1] * (1 + len(input_event_shape))
-    )
-    condition = condition
-    return estimator, inputs, condition
+    if estimator_type == "masked-score":
+        num_nodes = input_event_shape[0]
+        num_features = 1
+        inputs = building_thetas[:batch_dim].reshape(batch_dim, num_nodes, num_features)
+        condition_masks = torch.bernoulli(torch.rand(batch_dim, num_nodes))
+        edge_masks = torch.ones(batch_dim, num_nodes, num_nodes)
+        condition = None
+        inputs = inputs.unsqueeze(0).expand(
+            [input_sample_dim] + [-1] * (len(inputs.shape))
+        )
+        return estimator, inputs, condition, condition_masks, edge_masks
+    else:
+        inputs = building_thetas[:batch_dim]
+        condition = building_xs[:batch_dim]
+
+        inputs = inputs.unsqueeze(0)
+        inputs = inputs.expand(
+            [
+                input_sample_dim,
+            ]
+            + [-1] * (1 + len(input_event_shape))
+        )
+        condition = condition
+        return estimator, inputs, condition, None, None
