@@ -137,8 +137,6 @@ class MCABC(ABCBASE):
         if kde_kwargs is None:
             kde_kwargs = {}
 
-        x_o = process_x(x_o)
-
         # Run SASS and change the simulator and x_o accordingly.
         if sass:
             num_pilot_simulations = int(sass_fraction * num_simulations)
@@ -158,7 +156,7 @@ class MCABC(ABCBASE):
             def simulator(theta):
                 return sass_transform(self._batched_simulator(theta))
 
-            x_o = sass_transform(x_o)
+            x_o = sass_transform(process_x(x_o))
         else:
             simulator = self._batched_simulator
 
@@ -178,8 +176,8 @@ class MCABC(ABCBASE):
             self.x_shape = x[0].shape
         else:
             self.x_shape = x[0, 0].shape
-        self.x_o = process_x(x_o, self.x_shape)
 
+        self.x_o = process_x(x_o, self.x_shape)
         distances = self.distance(self.x_o, x)
 
         # Select based on acceptance threshold epsilon.
@@ -214,10 +212,10 @@ class MCABC(ABCBASE):
 
         if kde:
             self.logger.info(
-                "KDE on %s samples with bandwidth option"
-                f"{kde_kwargs.get('bandwidth', 'cv')}."
+                "KDE on %s samples with bandwidth option "
+                f"{kde_kwargs.get('bandwidth', 'cv')}. "
                 "Beware that KDE can give unreliable results when used with too few"
-                "samples and in high dimensions.",
+                " samples and in high dimensions.",
                 final_theta.shape[0],
             )
 

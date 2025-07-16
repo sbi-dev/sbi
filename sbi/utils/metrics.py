@@ -637,7 +637,6 @@ def mmd_distance(x_o: Tensor, x: Tensor, scale: Optional[float] = None) -> Tenso
     Returns:
         The MMD distance.
     """
-    from functools import partial
 
     dist_fn = partial(unbiased_mmd_squared, scale=scale)
     return torch.vmap(dist_fn, in_dims=(None, 0))(x_o, x)
