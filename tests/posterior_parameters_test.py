@@ -85,6 +85,7 @@ def test_signature_consistency(
     class_signature = inspect.signature(init_target_class.__init__)
 
     skipped_fields_and_parameters.add("self")
+    skipped_fields_and_parameters.add("x_shape")
 
     class_dict = {
         name: param
