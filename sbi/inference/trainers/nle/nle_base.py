@@ -12,6 +12,7 @@ from torch.distributions import Distribution
 from torch.nn.utils.clip_grad import clip_grad_norm_
 from torch.optim.adam import Adam
 from torch.utils.tensorboard.writer import SummaryWriter
+from typing_extensions import Self
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials import likelihood_estimator_based_potential
@@ -83,7 +84,7 @@ class LikelihoodEstimatorTrainer(NeuralInference, ABC):
         from_round: int = 0,
         algorithm: str = "SNLE",
         data_device: Optional[str] = None,
-    ) -> "LikelihoodEstimatorTrainer":
+    ) -> Self:
         r"""Store parameters and simulation outputs to use them for later training.
 
         Data are stored as entries in lists for each type of variable (parameter/data).
@@ -117,8 +118,8 @@ class LikelihoodEstimatorTrainer(NeuralInference, ABC):
                 "NLE gives systematically wrong results when exclude_invalid_x=True.",
                 stacklevel=2,
             )
-        # pyright false positive, will be fixed with pyright 1.1.310
-        return super().append_simulations(  # type: ignore
+
+        return super().append_simulations(
             theta=theta,
             x=x,
             exclude_invalid_x=exclude_invalid_x,

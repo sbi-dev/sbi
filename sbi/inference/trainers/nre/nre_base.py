@@ -12,6 +12,7 @@ from torch.distributions import Distribution
 from torch.nn.utils.clip_grad import clip_grad_norm_
 from torch.optim.adam import Adam
 from torch.utils.tensorboard.writer import SummaryWriter
+from typing_extensions import Self
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials import ratio_estimator_based_potential
@@ -113,7 +114,7 @@ class RatioEstimatorTrainer(NeuralInference, ABC):
         from_round: int = 0,
         algorithm: str = "SNRE",
         data_device: Optional[str] = None,
-    ) -> "RatioEstimatorTrainer":
+    ) -> Self:
         r"""Store parameters and simulation outputs to use them for later training.
 
         Data are stored as entries in lists for each type of variable (parameter/data).
@@ -147,7 +148,7 @@ class RatioEstimatorTrainer(NeuralInference, ABC):
                 stacklevel=2,
             )
 
-        return super().append_simulations(  # type: ignore
+        return super().append_simulations(
             theta=theta,
             x=x,
             exclude_invalid_x=exclude_invalid_x,

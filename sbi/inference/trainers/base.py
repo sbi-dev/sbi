@@ -14,6 +14,7 @@ from torch.distributions import Distribution
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard.writer import SummaryWriter
+from typing_extensions import Self
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
@@ -215,7 +216,7 @@ class NeuralInference(ABC):
         from_round: int = 0,
         algorithm: Optional[str] = None,
         data_device: Optional[str] = None,
-    ) -> "NeuralInference":
+    ) -> Self:
         r"""Store parameters and simulation outputs to use them for later training.
 
         Data are stored as entries in lists for each type of variable (parameter/data).
