@@ -24,8 +24,8 @@ class FMPE(VectorFieldTrainer):
     def __init__(
         self,
         prior: Optional[Distribution],
-        density_estimator: Optional[VectorFieldEstimatorBuilder] = None,
         vf_estimator: Union[str, VectorFieldEstimatorBuilder] = "mlp",
+        density_estimator: Optional[VectorFieldEstimatorBuilder] = None,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
@@ -36,12 +36,14 @@ class FMPE(VectorFieldTrainer):
 
         Args:
             prior: Prior distribution.
-            density_estimator: Deprecated. Use `vf_estimator` instead.
             vf_estimator: Neural network architecture used to learn the
                 vector field estimator. Can be a string (e.g. 'mlp' or 'ada_mlp') or a
                 callable that implements the `VectorFieldEstimatorBuilder` protocol
                 with `__call__` that receives `theta` and `x` and returns a
                 `ConditionalVectorFieldEstimator`.
+            density_estimator: Deprecated. Use `vf_estimator` instead. There to support
+                the old API with keyword `density_estimator` and raise a deprecation
+                warning.
             device: Device to use for training.
             logging_level: Logging level.
             summary_writer: Summary writer for tensorboard.
