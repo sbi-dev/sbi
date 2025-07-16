@@ -256,6 +256,12 @@ def pytest_sessionfinish(session):
     RESULTS_PATH.mkdir(exist_ok=True)
 
     if suffix == 'all':
-        session_results_df.to_csv('./.bm_results/results_all.csv')
+        results_file = './.bm_results/results_all.csv'
+        if Path(results_file).exists():
+            # Append without writing header
+            session_results_df.to_csv(results_file, mode='a', header=False)
+        else:
+            # Write with header if file does not exist
+            session_results_df.to_csv(results_file)
     else:
         session_results_df.to_csv('./.bm_results/results_%s.csv' % suffix)

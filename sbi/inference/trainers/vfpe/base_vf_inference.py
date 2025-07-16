@@ -538,10 +538,10 @@ class VectorFieldTrainer(NeuralInference, ABC):
                     self._val_loss - self._best_val_loss
                 ) / loss_std
                 # Consider it "no improvement" if current loss is significantly
-                # worse than the best loss (more than 2.67 std deviations above best)
+                # worse than the best loss (more than 2 std deviations above best)
                 # This accounts for natural fluctuations while being sensitive to
                 # real degradation
-                if diff_to_best_normalized > 2.67:
+                if diff_to_best_normalized > 2.0:
                     self._epochs_since_last_improvement += 1
                 else:
                     # Reset counter if loss is within acceptable range

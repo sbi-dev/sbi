@@ -35,6 +35,7 @@ METHOD_GROUPS = {
     "nre": [NRE_A, NRE_B, NRE_C, BNRE],
     "fmpe": [FMPE],
     "npse": [NPSE],
+    "vfpe": [FMPE, NPSE],
     "snpe": [NPE_C],  # NPE_B not implemented, NPE_A need Gaussian prior
     "snle": [NLE],
     "snre": [NRE_A, NRE_B, NRE_C, BNRE],
@@ -50,6 +51,7 @@ METHOD_PARAMS = {
         for nn in VF_ESTIMATORS
         for sde in ["ve", "vp"]
     ],
+    "vfpe": [{"vf_estimator": nn} for nn in VF_ESTIMATORS],
     "snpe": [{}],
     "snle": [{}],
     "snre": [{}],
