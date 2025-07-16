@@ -431,6 +431,10 @@ class VectorFieldPosterior(NeuralPosterior):
             else max_sampling_batch_size
         )
 
+        # Adjust max_sampling_batch_size to avoid excessive memory usage
+        if max_sampling_batch_size * batch_size > 100_000:
+            max_sampling_batch_size = max(1, 100_000 // batch_size)
+
         if self.sample_with == "ode":
             samples = rejection.accept_reject_sample(
                 proposal=self.sample_via_ode,
