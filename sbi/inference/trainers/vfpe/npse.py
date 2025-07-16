@@ -45,10 +45,10 @@ class NPSE(VectorFieldTrainer):
             prior: Prior distribution.
             vf_estimator: Neural network architecture for the
                 vector field estimator aiming to estimate the marginal scores of the
-                target diffusion process. Can be a string (e.g. 'mlp' or 'ada_mlp') or a
-                callable that implements the `VectorFieldEstimatorBuilder` protocol
-                with `__call__` that receives `theta` and `x` and returns a
-                `ConditionalVectorFieldEstimator`.
+                target diffusion process. Can be a string (e.g. 'mlp', 'ada_mlp' or
+                'transformer') or a callable that implements the
+                `VectorFieldEstimatorBuilder` protocol with `__call__` that receives
+                `theta` and `x` and returns a `ConditionalVectorFieldEstimator`.
             sde_type: Type of SDE to use. Must be one of ['vp', 've', 'subvp'].
             device: Device to run the training on.
             logging_level: Logging level for the training. Can be an integer or a
