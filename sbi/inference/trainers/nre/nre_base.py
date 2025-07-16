@@ -4,7 +4,7 @@
 import warnings
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from typing import Any, Dict, Literal, Optional, Protocol, Union
+from typing import Any, Dict, Literal, Optional, Protocol, Tuple, Union
 
 import torch
 from torch import Tensor, eye, nn, ones
@@ -12,16 +12,17 @@ from torch.distributions import Distribution
 from torch.nn.utils.clip_grad import clip_grad_norm_
 from torch.optim.adam import Adam
 from torch.utils.tensorboard.writer import SummaryWriter
+from typing_extensions import Self
 
-from sbi.inference.posteriors import MCMCPosterior, RejectionPosterior, VIPosterior
-from sbi.inference.posteriors.importance_posterior import ImportanceSamplingPosterior
+from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials import ratio_estimator_based_potential
+from sbi.inference.potentials.ratio_based_potential import RatioBasedPotential
 from sbi.inference.trainers.base import NeuralInference
 from sbi.neural_nets import classifier_nn
 from sbi.neural_nets.ratio_estimators import RatioEstimator
+from sbi.sbi_types import TorchTransform
 from sbi.utils import (
     check_estimator_arg,
-    check_prior,
     clamp_and_warn,
 )
 from sbi.utils.torchutils import repeat_rows
@@ -102,6 +103,9 @@ class RatioEstimatorTrainer(NeuralInference, ABC):
         else:
             self._build_neural_net = classifier
 
+    @abstractmethod
+    def _loss(self, theta: Tensor, x: Tensor, num_atoms: int) -> Tensor: ...
+
     def append_simulations(
         self,
         theta: Tensor,
@@ -110,7 +114,7 @@ class RatioEstimatorTrainer(NeuralInference, ABC):
         from_round: int = 0,
         algorithm: str = "SNRE",
         data_device: Optional[str] = None,
-    ) -> "RatioEstimatorTrainer":
+    ) -> Self:
         r"""Store parameters and simulation outputs to use them for later training.
 
         Data are stored as entries in lists for each type of variable (parameter/data).
@@ -144,7 +148,7 @@ class RatioEstimatorTrainer(NeuralInference, ABC):
                 stacklevel=2,
             )
 
-        return super().append_simulations(  # type: ignore
+        return super().append_simulations(
             theta=theta,
             x=x,
             exclude_invalid_x=exclude_invalid_x,
@@ -323,34 +327,9 @@ class RatioEstimatorTrainer(NeuralInference, ABC):
 
         return deepcopy(self._neural_net)
 
-    def _classifier_logits(self, theta: Tensor, x: Tensor, num_atoms: int) -> Tensor:
-        """Return logits obtained through classifier forward pass.
-
-        The logits are obtained from atomic sets of (theta,x) pairs.
-        """
-        batch_size = theta.shape[0]
-        repeated_x = repeat_rows(x, num_atoms)
-
-        # Choose `1` or `num_atoms - 1` thetas from the rest of the batch for each x.
-        probs = ones(batch_size, batch_size) * (1 - eye(batch_size)) / (batch_size - 1)
-
-        choices = torch.multinomial(probs, num_samples=num_atoms - 1, replacement=False)
-
-        contrasting_theta = theta[choices]
-
-        atomic_theta = torch.cat((theta[:, None, :], contrasting_theta), dim=1).reshape(
-            batch_size * num_atoms, -1
-        )
-
-        return self._neural_net(atomic_theta, repeated_x)
-
-    @abstractmethod
-    def _loss(self, theta: Tensor, x: Tensor, num_atoms: int) -> Tensor:
-        raise NotImplementedError
-
     def build_posterior(
         self,
-        density_estimator: Optional[nn.Module] = None,
+        density_estimator: Optional[RatioEstimator] = None,
         prior: Optional[Distribution] = None,
         sample_with: Literal["mcmc", "rejection", "vi", "importance"] = "mcmc",
         mcmc_method: Literal[
@@ -367,9 +346,7 @@ class RatioEstimatorTrainer(NeuralInference, ABC):
         vi_parameters: Optional[Dict[str, Any]] = None,
         rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
         importance_sampling_parameters: Optional[Dict[str, Any]] = None,
-    ) -> Union[
-        MCMCPosterior, RejectionPosterior, VIPosterior, ImportanceSamplingPosterior
-    ]:
+    ) -> NeuralPosterior:
         r"""Build posterior from the neural density estimator.
 
         SNRE trains a neural network to approximate likelihood ratios. The
@@ -408,67 +385,59 @@ class RatioEstimatorTrainer(NeuralInference, ABC):
             Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods
             (the returned log-probability is unnormalized).
         """
-        if prior is None:
-            assert (
-                self._prior is not None
-            ), """You did not pass a prior. You have to pass the prior either at
-                initialization `inference = SNRE(prior)` or to `.build_posterior
-                (prior=prior)`."""
-            prior = self._prior
-        else:
-            check_prior(prior)
+        return super().build_posterior(
+            density_estimator,
+            prior,
+            sample_with,
+            mcmc_method=mcmc_method,
+            vi_method=vi_method,
+            mcmc_parameters=mcmc_parameters,
+            vi_parameters=vi_parameters,
+            rejection_sampling_parameters=rejection_sampling_parameters,
+            importance_sampling_parameters=importance_sampling_parameters,
+        )
 
-        if density_estimator is None:
-            ratio_estimator = self._neural_net
-            # If internal net is used device is defined.
-            device = self._device
-        else:
-            ratio_estimator = density_estimator
-            # Otherwise, infer it from the device of the net parameters.
-            device = str(next(density_estimator.parameters()).device)
+    def _classifier_logits(self, theta: Tensor, x: Tensor, num_atoms: int) -> Tensor:
+        """Return logits obtained through classifier forward pass.
 
+        The logits are obtained from atomic sets of (theta,x) pairs.
+        """
+        batch_size = theta.shape[0]
+        repeated_x = repeat_rows(x, num_atoms)
+
+        # Choose `1` or `num_atoms - 1` thetas from the rest of the batch for each x.
+        probs = ones(batch_size, batch_size) * (1 - eye(batch_size)) / (batch_size - 1)
+
+        choices = torch.multinomial(probs, num_samples=num_atoms - 1, replacement=False)
+
+        contrasting_theta = theta[choices]
+
+        atomic_theta = torch.cat((theta[:, None, :], contrasting_theta), dim=1).reshape(
+            batch_size * num_atoms, -1
+        )
+
+        return self._neural_net(atomic_theta, repeated_x)
+
+    def _get_potential_function(
+        self, prior: Distribution, estimator: RatioEstimator
+    ) -> Tuple[RatioBasedPotential, TorchTransform]:
+        r"""Gets the potential for ratio-based methods.
+
+        It also returns a transformation that can be used to transform the potential
+        into unconstrained space.
+
+        Args:
+            prior: The prior distribution.
+            estimator: The neural network modelling likelihood-to-evidence ratio.
+
+        Returns:
+            The potential function and a transformation that maps
+            to unconstrained space.
+        """
         potential_fn, theta_transform = ratio_estimator_based_potential(
-            ratio_estimator=ratio_estimator,
+            ratio_estimator=estimator,
             prior=prior,
             x_o=None,
         )
 
-        if sample_with == "mcmc":
-            self._posterior = MCMCPosterior(
-                potential_fn=potential_fn,
-                theta_transform=theta_transform,
-                proposal=prior,
-                method=mcmc_method,
-                device=device,
-                **mcmc_parameters or {},
-            )
-        elif sample_with == "rejection":
-            self._posterior = RejectionPosterior(
-                potential_fn=potential_fn,
-                proposal=prior,
-                device=device,
-                **rejection_sampling_parameters or {},
-            )
-        elif sample_with == "vi":
-            self._posterior = VIPosterior(
-                potential_fn=potential_fn,
-                theta_transform=theta_transform,
-                prior=prior,  # type: ignore
-                vi_method=vi_method,
-                device=device,
-                **vi_parameters or {},
-            )
-        elif sample_with == "importance":
-            self._posterior = ImportanceSamplingPosterior(
-                potential_fn=potential_fn,
-                proposal=prior,
-                device=device,
-                **importance_sampling_parameters or {},
-            )
-        else:
-            raise NotImplementedError
-
-        # Store models at end of each round.
-        self._model_bank.append(deepcopy(self._posterior))
-
-        return deepcopy(self._posterior)
+        return potential_fn, theta_transform
