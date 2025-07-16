@@ -38,23 +38,21 @@ def npe_factory(basic_setup):
         inference = NPE(prior, density_estimator='maf')
         inference = inference.append_simulations(theta=theta_train, x=x_train)
 
-        train_kwargs = {"training_batch_size": 100}
-        if max_epochs:
-            train_kwargs["max_num_epochs"] = max_epochs
-
-        return inference.train(**train_kwargs)
+        return inference.train(
+            max_num_epochs=2**31 - 1 if max_epochs is None else max_epochs,
+        )
 
     return _create_npe
 
 
 @pytest.fixture(scope="session")
 def badly_trained_npe(npe_factory):
-    return npe_factory(num_simulations=100, max_epochs=1)
+    return npe_factory(num_simulations=50, max_epochs=1)
 
 
 @pytest.fixture(scope="session")
 def well_trained_npe(npe_factory):
-    return npe_factory(num_simulations=10_000)
+    return npe_factory(num_simulations=5_000)
 
 
 @pytest.fixture(scope="session")
@@ -276,7 +274,7 @@ def test_lc2st_false_positiv_rate(method, basic_setup, well_trained_npe, set_see
     proportion_rejected = torch.tensor(results).float().mean()
 
     assert proportion_rejected < (1 - confidence_level), (
-        f"LC2ST p-values too small, test should be rejected \
-        less then {(1 - confidence_level) * 100}% of the time, \
-        but was rejected {proportion_rejected * 100}% of the time."
+        "LC2ST p-values too small, test should be rejected "
+        f"less then {(1 - confidence_level) * 100.0:<.2f}% of the time, "
+        f"but was rejected {proportion_rejected * 100.0:<.2f}% of the time."
     )
