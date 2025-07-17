@@ -102,19 +102,19 @@ def test_importance_posterior_sample_log_prob(snplre_method: type):
 
 @pytest.mark.parametrize("snpe_method", [NPE_A, NPE_C])
 @pytest.mark.parametrize("x_o_batch_dim", (0, 1, 2))
-@pytest.mark.parametrize("prior", ("mvn", "uniform"))
+@pytest.mark.parametrize("prior_type", ("mvn", "uniform"))
 def test_batched_sample_log_prob_with_different_x(
     snpe_method: type,
     x_o_batch_dim: bool,
-    prior: str,
+    prior_type: str,
 ):
     num_dim = 2
     num_simulations = 1000
 
     # We also want to test on bounded support! Which will invoke leakage correction.
-    if prior == "mvn":
+    if prior_type == "mvn":
         prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
-    elif prior == "uniform":
+    elif prior_type == "uniform":
         prior = Independent(Uniform(-1.0 * ones(num_dim), 1.0 * ones(num_dim)), 1)
     simulator = diagonal_linear_gaussian
 
@@ -130,6 +130,12 @@ def test_batched_sample_log_prob_with_different_x(
     torch.manual_seed(0)
     samples = posterior.sample_batched((10,), x_o)
     batched_log_probs = posterior.log_prob_batched(samples, x_o)
+
+    # Test large max_sampling_batch_size to test capping warning.
+    with pytest.warns(UserWarning, match="Capping max_sampling_batch_size"):
+        posterior.sample_batched(
+            (10,), ones(3, num_dim), max_sampling_batch_size=40_000
+        )
 
     assert (
         samples.shape == (10, x_o_batch_dim, num_dim)
