@@ -51,6 +51,8 @@ class Simformer(MaskedVectorFieldInference):
             MaskedVectorFieldEstimatorBuilder,
         ] = "simformer",
         sde_type: Literal["vp", "ve", "subvp"] = "ve",
+        latent_idx: Optional[list | Tensor] = None,
+        observed_idx: Optional[list | Tensor] = None,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
@@ -94,17 +96,20 @@ class Simformer(MaskedVectorFieldInference):
             **kwargs,
         )
 
+        self.latent_idx = torch.as_tensor(latent_idx, dtype=torch.long)
+        self.observed_idx = torch.as_tensor(observed_idx, dtype=torch.long)
+
     def _build_default_nn_fn(self, **kwargs) -> MaskedVectorFieldEstimatorBuilder:
         net_type = kwargs.pop("vector_field_estimator_builder", "simformer")
         return simformer_nn(model=net_type, **kwargs)
 
     def build_posterior(
         self,
-        condition_mask: Tensor,
+        condition_mask: Optional[Tensor] = None,
         edge_mask: Optional[Tensor] = None,
         mvf_estimator: Optional[MaskedConditionalVectorFieldEstimator] = None,
         prior: Optional[Distribution] = None,
-        sample_with: str = "sde",
+        sample_with: Literal['ode', 'sde'] = "sde",
         **kwargs,
     ) -> VectorFieldPosterior:
         r"""Build posterior from the masked vector field estimator and given
@@ -112,6 +117,9 @@ class Simformer(MaskedVectorFieldInference):
 
         Args:
             condition_masks: A boolean mask indicating the role of each node.
+                If no condition mask is provided, the latent and observed indexes
+                passed at init time will be used. If no such indexes were passed before
+                an error will raise.
                 Expected shape: `(batch_size, num_nodes)`.
                 - `True` (or `1`): The node at this position is observed and its
                     features will be used for conditioning.
@@ -135,6 +143,9 @@ class Simformer(MaskedVectorFieldInference):
         Returns:
             Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods.
         """
+
+        if condition_mask is None:
+            condition_mask = self._generate_condition_mask()
 
         batch_dims = condition_mask.shape[:-1]
         num_nodes = condition_mask.shape[-1]
@@ -160,3 +171,19 @@ class Simformer(MaskedVectorFieldInference):
         sample_with: str = "sde",
     ):
         raise NotImplementedError
+
+    def _generate_condition_mask(
+        self,
+    ):
+        if self.latent_idx is None or self.observed_idx is None:
+            raise ValueError(
+                "You did not pass latent and observed variable indexes. "
+                "You should either pass a condition mask "
+                "at build_posterior() time or provide some "
+                "latent and observed variable indexes at __init__."
+            )
+        num_nodes = self.latent_idx.numel() + self.observed_idx.numel()
+        condition_mask = torch.zeros(num_nodes, dtype=torch.bool)
+        condition_mask[self.latent_idx] = False
+        condition_mask[self.observed_idx] = True
+        return condition_mask

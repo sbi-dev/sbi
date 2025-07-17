@@ -140,6 +140,9 @@ def test_c2st_vector_field_on_linearGaussian(
 
 
 # We always test num_dim and sample_with with defaults and mark the rests as slow.
+# TODO: This should be better tuned to find the right balance between required precision
+# and speed, maybe avoiding to pass a fixed condition mask to the Simformer
+# but letting it generate Bernoulli ones
 @pytest.mark.parametrize(
     "num_dim, prior_str, sample_with",
     [
@@ -154,10 +157,8 @@ def test_c2st_simformer_on_linearGaussian(
     Test whether Simformer infers well a simple example with available ground truth.
     """
     # num_sim_nodes = 2  # theta, x
-    num_samples = 5000
-    # TODO: this is currently a by-pass to the max_num_epochs=100
-    # should tune these params later to find a reasonable setting
-    num_simulations = 15000
+    num_samples = 3000
+    num_simulations = 10000
 
     x_o = zeros(1, num_dim)
 
@@ -189,24 +190,21 @@ def test_c2st_simformer_on_linearGaussian(
     # inputs shape: (num_simulations, num_nodes, num_features)
     inputs = torch.stack([thetas, xs], dim=1)
 
-    # Create condition masks (theta latent, x observed)
+    # Infer theta (node 0) given x (node 1).
+    inference = Simformer(
+        prior=prior, show_progress_bars=True, latent_idx=[0], observed_idx=[1]
+    )
+
     training_condition_masks = torch.tensor([False, True]).repeat(num_simulations, 1)
-
-    inference = Simformer(prior=prior, show_progress_bars=True)
-
     mvf_estimator = inference.append_simulations(
         inputs=inputs,
         condition_masks=training_condition_masks,
-    ).train(max_num_epochs=100)
-
-    # Build posterior for the specific task: infer theta (node 0) given x (node 1).
-    inference_condition_mask = torch.tensor([False, True])
+    ).train(max_num_epochs=150)
 
     for method in sample_with:
         posterior = inference.build_posterior(
             mvf_estimator=mvf_estimator,
-            condition_mask=inference_condition_mask,
-            sample_with=method,
+            sample_with=method,  # type: ignore
         ).set_default_x(x_o.squeeze(0))
 
         samples = posterior.sample((num_samples,))

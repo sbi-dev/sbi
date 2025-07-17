@@ -750,7 +750,7 @@ class MaskedVectorFieldInference(MaskedNeuralInference, ABC):
     def append_simulations(
         self,
         inputs: Tensor,
-        condition_masks: Tensor,
+        condition_masks: Optional[Tensor] = None,
         edge_masks: Optional[Tensor] = None,
         proposal: Optional[DirectPosterior] = None,
         exclude_invalid_x: Optional[bool] = None,
@@ -809,10 +809,35 @@ class MaskedVectorFieldInference(MaskedNeuralInference, ABC):
         if data_device is None:
             data_device = self._device
 
-        batch_dims = condition_masks.shape[:-1]
-        num_nodes = condition_masks.shape[-1]
+        batch_dims = inputs.shape[:-2]
+        num_nodes = inputs.shape[-2]
+
+        if condition_masks is None:
+            # Generate masks with Bernoulli.
+            condition_masks = torch.bernoulli(
+                torch.full((*batch_dims, num_nodes), 0.5, device=inputs.device)
+            ).bool()
+
+            if num_nodes >= 2:
+                # Find rows that are all True or all False.
+                all_same = condition_masks.all(dim=-1) | (~condition_masks.any(dim=-1))
+
+                # If there are any such rows, flip a random element to ensure
+                # there's at least one True and one False.
+                if all_same.any():
+                    invalid_indices = torch.where(all_same)
+
+                    # For each invalid row, select a random column to flip.
+                    cols_to_flip = torch.randint(
+                        num_nodes, (invalid_indices[0].shape[0],), device=inputs.device
+                    )
+
+                    # Create full indices for flipping and apply the flip.
+                    indices_to_flip = invalid_indices + (cols_to_flip,)
+                    condition_masks[indices_to_flip] = ~condition_masks[indices_to_flip]
+
         if edge_masks is None:
-            edge_masks = torch.ones((num_nodes, num_nodes)).bool()
+            edge_masks = torch.ones((num_nodes, num_nodes), device=inputs.device).bool()
             edge_masks = edge_masks.repeat(*batch_dims, 1, 1)
 
         inputs, condition_masks, edge_masks = validate_inputs_and_masks(
