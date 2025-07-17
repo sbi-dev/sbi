@@ -1587,7 +1587,17 @@ trained network to deal with these cases.</p>
 <span class="normal">523</span>
 <span class="normal">524</span>
 <span class="normal">525</span>
-<span class="normal">526</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DirectPosterior</span><span class="p">(</span><span class="n">NeuralPosterior</span><span class="p">):</span>
+<span class="normal">526</span>
+<span class="normal">527</span>
+<span class="normal">528</span>
+<span class="normal">529</span>
+<span class="normal">530</span>
+<span class="normal">531</span>
+<span class="normal">532</span>
+<span class="normal">533</span>
+<span class="normal">534</span>
+<span class="normal">535</span>
+<span class="normal">536</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DirectPosterior</span><span class="p">(</span><span class="n">NeuralPosterior</span><span class="p">):</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Posterior based on neural networks that directly estimate the posterior (NPE).</span>
 
 <span class="sd">    NPE trains a neural network to directly approximate the posterior distribution.</span>
@@ -1782,8 +1792,8 @@ trained network to deal with these cases.</p>
         <span class="c1"># throw warning if num_x * num_samples is too large</span>
         <span class="k">if</span> <span class="n">num_xos</span> <span class="o">*</span> <span class="n">num_samples</span> <span class="o">&gt;</span> <span class="mi">2</span><span class="o">**</span><span class="mi">21</span><span class="p">:</span>  <span class="c1"># 2 million-ish</span>
             <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
-                <span class="s2">&quot;Note that for batched sampling, the direct posterior sampling &quot;</span>
-                <span class="s2">&quot;generates </span><span class="si">{num_xos}</span><span class="s2"> * </span><span class="si">{num_samples}</span><span class="s2"> = {num_xos * num_samples} &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;Note that for batched sampling, the direct posterior sampling &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;generates </span><span class="si">{</span><span class="n">num_xos</span><span class="si">}</span><span class="s2"> * </span><span class="si">{</span><span class="n">num_samples</span><span class="si">}</span><span class="s2"> = </span><span class="si">{</span><span class="n">num_xos</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">num_samples</span><span class="si">}</span><span class="s2"> &quot;</span>
                 <span class="s2">&quot;samples. This can be slow and memory-intensive. Consider &quot;</span>
                 <span class="s2">&quot;reducing the number of samples or batch size.&quot;</span><span class="p">,</span>
                 <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
@@ -1794,6 +1804,16 @@ trained network to deal with these cases.</p>
             <span class="k">if</span> <span class="n">max_sampling_batch_size</span> <span class="ow">is</span> <span class="kc">None</span>
             <span class="k">else</span> <span class="n">max_sampling_batch_size</span>
         <span class="p">)</span>
+
+        <span class="c1"># Adjust max_sampling_batch_size to avoid excessive memory usage</span>
+        <span class="k">if</span> <span class="n">max_sampling_batch_size</span> <span class="o">*</span> <span class="n">num_xos</span> <span class="o">&gt;</span> <span class="mi">100_000</span><span class="p">:</span>
+            <span class="n">capped</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">100_000</span> <span class="o">//</span> <span class="n">num_xos</span><span class="p">)</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Capping max_sampling_batch_size from </span><span class="si">{</span><span class="n">max_sampling_batch_size</span><span class="si">}</span><span class="s2"> &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;to </span><span class="si">{</span><span class="n">capped</span><span class="si">}</span><span class="s2"> to avoid excessive memory usage.&quot;</span><span class="p">,</span>
+                <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">max_sampling_batch_size</span> <span class="o">=</span> <span class="n">capped</span>
 
         <span class="n">samples</span> <span class="o">=</span> <span class="n">rejection</span><span class="o">.</span><span class="n">accept_reject_sample</span><span class="p">(</span>
             <span class="n">proposal</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">posterior_estimator</span><span class="o">.</span><span class="n">sample</span><span class="p">,</span>
@@ -2447,17 +2467,7 @@ re-evaluate only whenever a new <code>x</code> is passed.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/direct_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">402</span>
-<span class="normal">403</span>
-<span class="normal">404</span>
-<span class="normal">405</span>
-<span class="normal">406</span>
-<span class="normal">407</span>
-<span class="normal">408</span>
-<span class="normal">409</span>
-<span class="normal">410</span>
-<span class="normal">411</span>
-<span class="normal">412</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">412</span>
 <span class="normal">413</span>
 <span class="normal">414</span>
 <span class="normal">415</span>
@@ -2504,7 +2514,17 @@ re-evaluate only whenever a new <code>x</code> is passed.</p>
 <span class="normal">456</span>
 <span class="normal">457</span>
 <span class="normal">458</span>
-<span class="normal">459</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">()</span>
+<span class="normal">459</span>
+<span class="normal">460</span>
+<span class="normal">461</span>
+<span class="normal">462</span>
+<span class="normal">463</span>
+<span class="normal">464</span>
+<span class="normal">465</span>
+<span class="normal">466</span>
+<span class="normal">467</span>
+<span class="normal">468</span>
+<span class="normal">469</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">()</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">leakage_correction</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
@@ -2708,17 +2728,7 @@ These parameters only have an effect if <code>norm_posterior=True</code>.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/direct_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">247</span>
-<span class="normal">248</span>
-<span class="normal">249</span>
-<span class="normal">250</span>
-<span class="normal">251</span>
-<span class="normal">252</span>
-<span class="normal">253</span>
-<span class="normal">254</span>
-<span class="normal">255</span>
-<span class="normal">256</span>
-<span class="normal">257</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">257</span>
 <span class="normal">258</span>
 <span class="normal">259</span>
 <span class="normal">260</span>
@@ -2786,7 +2796,17 @@ These parameters only have an effect if <code>norm_posterior=True</code>.</p>
 <span class="normal">322</span>
 <span class="normal">323</span>
 <span class="normal">324</span>
-<span class="normal">325</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">log_prob</span><span class="p">(</span>
+<span class="normal">325</span>
+<span class="normal">326</span>
+<span class="normal">327</span>
+<span class="normal">328</span>
+<span class="normal">329</span>
+<span class="normal">330</span>
+<span class="normal">331</span>
+<span class="normal">332</span>
+<span class="normal">333</span>
+<span class="normal">334</span>
+<span class="normal">335</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">log_prob</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">theta</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -3017,17 +3037,7 @@ These parameters only have an effect if <code>norm_posterior=True</code>.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/direct_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">327</span>
-<span class="normal">328</span>
-<span class="normal">329</span>
-<span class="normal">330</span>
-<span class="normal">331</span>
-<span class="normal">332</span>
-<span class="normal">333</span>
-<span class="normal">334</span>
-<span class="normal">335</span>
-<span class="normal">336</span>
-<span class="normal">337</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">337</span>
 <span class="normal">338</span>
 <span class="normal">339</span>
 <span class="normal">340</span>
@@ -3090,7 +3100,17 @@ These parameters only have an effect if <code>norm_posterior=True</code>.</p>
 <span class="normal">397</span>
 <span class="normal">398</span>
 <span class="normal">399</span>
-<span class="normal">400</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">log_prob_batched</span><span class="p">(</span>
+<span class="normal">400</span>
+<span class="normal">401</span>
+<span class="normal">402</span>
+<span class="normal">403</span>
+<span class="normal">404</span>
+<span class="normal">405</span>
+<span class="normal">406</span>
+<span class="normal">407</span>
+<span class="normal">408</span>
+<span class="normal">409</span>
+<span class="normal">410</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">log_prob_batched</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">theta</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
@@ -3406,17 +3426,7 @@ have a cached value.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/direct_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">461</span>
-<span class="normal">462</span>
-<span class="normal">463</span>
-<span class="normal">464</span>
-<span class="normal">465</span>
-<span class="normal">466</span>
-<span class="normal">467</span>
-<span class="normal">468</span>
-<span class="normal">469</span>
-<span class="normal">470</span>
-<span class="normal">471</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">471</span>
 <span class="normal">472</span>
 <span class="normal">473</span>
 <span class="normal">474</span>
@@ -3471,7 +3481,17 @@ have a cached value.</p>
 <span class="normal">523</span>
 <span class="normal">524</span>
 <span class="normal">525</span>
-<span class="normal">526</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">map</span><span class="p">(</span>
+<span class="normal">526</span>
+<span class="normal">527</span>
+<span class="normal">528</span>
+<span class="normal">529</span>
+<span class="normal">530</span>
+<span class="normal">531</span>
+<span class="normal">532</span>
+<span class="normal">533</span>
+<span class="normal">534</span>
+<span class="normal">535</span>
+<span class="normal">536</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">map</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">num_iter</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1_000</span><span class="p">,</span>
@@ -3917,7 +3937,17 @@ given every observation.</p>
 <span class="normal">242</span>
 <span class="normal">243</span>
 <span class="normal">244</span>
-<span class="normal">245</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">sample_batched</span><span class="p">(</span>
+<span class="normal">245</span>
+<span class="normal">246</span>
+<span class="normal">247</span>
+<span class="normal">248</span>
+<span class="normal">249</span>
+<span class="normal">250</span>
+<span class="normal">251</span>
+<span class="normal">252</span>
+<span class="normal">253</span>
+<span class="normal">254</span>
+<span class="normal">255</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">sample_batched</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">sample_shape</span><span class="p">:</span> <span class="n">Shape</span><span class="p">,</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
@@ -3947,8 +3977,8 @@ given every observation.</p>
     <span class="c1"># throw warning if num_x * num_samples is too large</span>
     <span class="k">if</span> <span class="n">num_xos</span> <span class="o">*</span> <span class="n">num_samples</span> <span class="o">&gt;</span> <span class="mi">2</span><span class="o">**</span><span class="mi">21</span><span class="p">:</span>  <span class="c1"># 2 million-ish</span>
         <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
-            <span class="s2">&quot;Note that for batched sampling, the direct posterior sampling &quot;</span>
-            <span class="s2">&quot;generates </span><span class="si">{num_xos}</span><span class="s2"> * </span><span class="si">{num_samples}</span><span class="s2"> = {num_xos * num_samples} &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;Note that for batched sampling, the direct posterior sampling &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;generates </span><span class="si">{</span><span class="n">num_xos</span><span class="si">}</span><span class="s2"> * </span><span class="si">{</span><span class="n">num_samples</span><span class="si">}</span><span class="s2"> = </span><span class="si">{</span><span class="n">num_xos</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">num_samples</span><span class="si">}</span><span class="s2"> &quot;</span>
             <span class="s2">&quot;samples. This can be slow and memory-intensive. Consider &quot;</span>
             <span class="s2">&quot;reducing the number of samples or batch size.&quot;</span><span class="p">,</span>
             <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
@@ -3959,6 +3989,16 @@ given every observation.</p>
         <span class="k">if</span> <span class="n">max_sampling_batch_size</span> <span class="ow">is</span> <span class="kc">None</span>
         <span class="k">else</span> <span class="n">max_sampling_batch_size</span>
     <span class="p">)</span>
+
+    <span class="c1"># Adjust max_sampling_batch_size to avoid excessive memory usage</span>
+    <span class="k">if</span> <span class="n">max_sampling_batch_size</span> <span class="o">*</span> <span class="n">num_xos</span> <span class="o">&gt;</span> <span class="mi">100_000</span><span class="p">:</span>
+        <span class="n">capped</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">100_000</span> <span class="o">//</span> <span class="n">num_xos</span><span class="p">)</span>
+        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Capping max_sampling_batch_size from </span><span class="si">{</span><span class="n">max_sampling_batch_size</span><span class="si">}</span><span class="s2"> &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;to </span><span class="si">{</span><span class="n">capped</span><span class="si">}</span><span class="s2"> to avoid excessive memory usage.&quot;</span><span class="p">,</span>
+            <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">max_sampling_batch_size</span> <span class="o">=</span> <span class="n">capped</span>
 
     <span class="n">samples</span> <span class="o">=</span> <span class="n">rejection</span><span class="o">.</span><span class="n">accept_reject_sample</span><span class="p">(</span>
         <span class="n">proposal</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">posterior_estimator</span><span class="o">.</span><span class="n">sample</span><span class="p">,</span>
@@ -12693,8 +12733,7 @@ the ODE to compute the log-probability.</p>
 
               <details class="quote">
                 <summary>Source code in <code>sbi/inference/posteriors/vector_field_posterior.py</code></summary>
-                <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 30</span>
-<span class="normal"> 31</span>
+                <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 31</span>
 <span class="normal"> 32</span>
 <span class="normal"> 33</span>
 <span class="normal"> 34</span>
@@ -13226,7 +13265,18 @@ the ODE to compute the log-probability.</p>
 <span class="normal">560</span>
 <span class="normal">561</span>
 <span class="normal">562</span>
-<span class="normal">563</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">VectorFieldPosterior</span><span class="p">(</span><span class="n">NeuralPosterior</span><span class="p">):</span>
+<span class="normal">563</span>
+<span class="normal">564</span>
+<span class="normal">565</span>
+<span class="normal">566</span>
+<span class="normal">567</span>
+<span class="normal">568</span>
+<span class="normal">569</span>
+<span class="normal">570</span>
+<span class="normal">571</span>
+<span class="normal">572</span>
+<span class="normal">573</span>
+<span class="normal">574</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">VectorFieldPosterior</span><span class="p">(</span><span class="n">NeuralPosterior</span><span class="p">):</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Posterior based on flow- or score-matching estimators.</span>
 
 <span class="sd">    This posterior samples from the vector field model - typically a score-based or a</span>
@@ -13630,6 +13680,16 @@ the ODE to compute the log-probability.</p>
             <span class="k">else</span> <span class="n">max_sampling_batch_size</span>
         <span class="p">)</span>
 
+        <span class="c1"># Adjust max_sampling_batch_size to avoid excessive memory usage</span>
+        <span class="k">if</span> <span class="n">max_sampling_batch_size</span> <span class="o">*</span> <span class="n">batch_size</span> <span class="o">&gt;</span> <span class="mi">100_000</span><span class="p">:</span>
+            <span class="n">capped</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">100_000</span> <span class="o">//</span> <span class="n">batch_size</span><span class="p">)</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Capping max_sampling_batch_size from </span><span class="si">{</span><span class="n">max_sampling_batch_size</span><span class="si">}</span><span class="s2"> &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;to </span><span class="si">{</span><span class="n">capped</span><span class="si">}</span><span class="s2"> to avoid excessive memory usage.&quot;</span><span class="p">,</span>
+                <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">max_sampling_batch_size</span> <span class="o">=</span> <span class="n">capped</span>
+
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">sample_with</span> <span class="o">==</span> <span class="s2">&quot;ode&quot;</span><span class="p">:</span>
             <span class="n">samples</span> <span class="o">=</span> <span class="n">rejection</span><span class="o">.</span><span class="n">accept_reject_sample</span><span class="p">(</span>
                 <span class="n">proposal</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">sample_via_ode</span><span class="p">,</span>
@@ -13922,8 +13982,7 @@ sampler or the SDE-based sampler.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/vector_field_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 48</span>
-<span class="normal"> 49</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 49</span>
 <span class="normal"> 50</span>
 <span class="normal"> 51</span>
 <span class="normal"> 52</span>
@@ -13978,7 +14037,8 @@ sampler or the SDE-based sampler.</p>
 <span class="normal">101</span>
 <span class="normal">102</span>
 <span class="normal">103</span>
-<span class="normal">104</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">104</span>
+<span class="normal">105</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">vector_field_estimator</span><span class="p">:</span> <span class="n">ConditionalVectorFieldEstimator</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Distribution</span><span class="p">,</span>  <span class="c1"># type: ignore</span>
@@ -14172,8 +14232,7 @@ consumption.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/vector_field_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">352</span>
-<span class="normal">353</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">353</span>
 <span class="normal">354</span>
 <span class="normal">355</span>
 <span class="normal">356</span>
@@ -14201,7 +14260,8 @@ consumption.</p>
 <span class="normal">378</span>
 <span class="normal">379</span>
 <span class="normal">380</span>
-<span class="normal">381</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">log_prob</span><span class="p">(</span>
+<span class="normal">381</span>
+<span class="normal">382</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">log_prob</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">theta</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -14457,18 +14517,7 @@ have a cached value.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/vector_field_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">472</span>
-<span class="normal">473</span>
-<span class="normal">474</span>
-<span class="normal">475</span>
-<span class="normal">476</span>
-<span class="normal">477</span>
-<span class="normal">478</span>
-<span class="normal">479</span>
-<span class="normal">480</span>
-<span class="normal">481</span>
-<span class="normal">482</span>
-<span class="normal">483</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">483</span>
 <span class="normal">484</span>
 <span class="normal">485</span>
 <span class="normal">486</span>
@@ -14548,7 +14597,18 @@ have a cached value.</p>
 <span class="normal">560</span>
 <span class="normal">561</span>
 <span class="normal">562</span>
-<span class="normal">563</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">map</span><span class="p">(</span>
+<span class="normal">563</span>
+<span class="normal">564</span>
+<span class="normal">565</span>
+<span class="normal">566</span>
+<span class="normal">567</span>
+<span class="normal">568</span>
+<span class="normal">569</span>
+<span class="normal">570</span>
+<span class="normal">571</span>
+<span class="normal">572</span>
+<span class="normal">573</span>
+<span class="normal">574</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">map</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">num_iter</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">,</span>
@@ -14890,8 +14950,7 @@ it and have the SCORE_DEFINED class attribute set to True.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/vector_field_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">142</span>
-<span class="normal">143</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">143</span>
 <span class="normal">144</span>
 <span class="normal">145</span>
 <span class="normal">146</span>
@@ -14991,7 +15050,8 @@ it and have the SCORE_DEFINED class attribute set to True.</p>
 <span class="normal">240</span>
 <span class="normal">241</span>
 <span class="normal">242</span>
-<span class="normal">243</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">sample</span><span class="p">(</span>
+<span class="normal">243</span>
+<span class="normal">244</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">sample</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">sample_shape</span><span class="p">:</span> <span class="n">Shape</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">(),</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -15321,8 +15381,7 @@ linear grid between t_max and t_min is used.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/vector_field_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">383</span>
-<span class="normal">384</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">384</span>
 <span class="normal">385</span>
 <span class="normal">386</span>
 <span class="normal">387</span>
@@ -15408,7 +15467,18 @@ linear grid between t_max and t_min is used.</p>
 <span class="normal">467</span>
 <span class="normal">468</span>
 <span class="normal">469</span>
-<span class="normal">470</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">sample_batched</span><span class="p">(</span>
+<span class="normal">470</span>
+<span class="normal">471</span>
+<span class="normal">472</span>
+<span class="normal">473</span>
+<span class="normal">474</span>
+<span class="normal">475</span>
+<span class="normal">476</span>
+<span class="normal">477</span>
+<span class="normal">478</span>
+<span class="normal">479</span>
+<span class="normal">480</span>
+<span class="normal">481</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">sample_batched</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">sample_shape</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">,</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
@@ -15458,6 +15528,16 @@ linear grid between t_max and t_min is used.</p>
         <span class="k">if</span> <span class="n">max_sampling_batch_size</span> <span class="ow">is</span> <span class="kc">None</span>
         <span class="k">else</span> <span class="n">max_sampling_batch_size</span>
     <span class="p">)</span>
+
+    <span class="c1"># Adjust max_sampling_batch_size to avoid excessive memory usage</span>
+    <span class="k">if</span> <span class="n">max_sampling_batch_size</span> <span class="o">*</span> <span class="n">batch_size</span> <span class="o">&gt;</span> <span class="mi">100_000</span><span class="p">:</span>
+        <span class="n">capped</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">100_000</span> <span class="o">//</span> <span class="n">batch_size</span><span class="p">)</span>
+        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Capping max_sampling_batch_size from </span><span class="si">{</span><span class="n">max_sampling_batch_size</span><span class="si">}</span><span class="s2"> &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;to </span><span class="si">{</span><span class="n">capped</span><span class="si">}</span><span class="s2"> to avoid excessive memory usage.&quot;</span><span class="p">,</span>
+            <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">max_sampling_batch_size</span> <span class="o">=</span> <span class="n">capped</span>
 
     <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">sample_with</span> <span class="o">==</span> <span class="s2">&quot;ode&quot;</span><span class="p">:</span>
         <span class="n">samples</span> <span class="o">=</span> <span class="n">rejection</span><span class="o">.</span><span class="n">accept_reject_sample</span><span class="p">(</span>
@@ -15591,8 +15671,7 @@ depend on the used ODE backend.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/vector_field_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">324</span>
-<span class="normal">325</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">325</span>
 <span class="normal">326</span>
 <span class="normal">327</span>
 <span class="normal">328</span>
@@ -15617,7 +15696,8 @@ depend on the used ODE backend.</p>
 <span class="normal">347</span>
 <span class="normal">348</span>
 <span class="normal">349</span>
-<span class="normal">350</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">sample_via_ode</span><span class="p">(</span>
+<span class="normal">350</span>
+<span class="normal">351</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">sample_via_ode</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">sample_shape</span><span class="p">:</span> <span class="n">Shape</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">(),</span>
     <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
@@ -15697,8 +15777,7 @@ depend on the used ODE backend.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/vector_field_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">106</span>
-<span class="normal">107</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">107</span>
 <span class="normal">108</span>
 <span class="normal">109</span>
 <span class="normal">110</span>
@@ -15731,7 +15810,8 @@ depend on the used ODE backend.</p>
 <span class="normal">137</span>
 <span class="normal">138</span>
 <span class="normal">139</span>
-<span class="normal">140</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">to</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">device</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="normal">140</span>
+<span class="normal">141</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">to</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">device</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Move posterior to device.</span>
 
 <span class="sd">    Args:</span>
