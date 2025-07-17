@@ -1,7 +1,6 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-import warnings
 from abc import ABC, abstractmethod
 from typing import Optional, Tuple, Union
 
@@ -774,7 +773,12 @@ class MaskedConditionalVectorFieldEstimatorWrapper(ConditionalVectorFieldEstimat
     as if it were a standard conditional estimator for a fixed mask configuration.
     """
 
-    def __init__(self, original_estimator, fixed_condition_mask, fixed_edge_mask):
+    def __init__(
+        self,
+        original_estimator: MaskedConditionalVectorFieldEstimator,
+        fixed_condition_mask: Optional[Tensor] = None,
+        fixed_edge_mask: Optional[Tensor] = None,
+    ):
         r"""Base class for masked vector field estimator wrapper to adapt it to a
         vector field estimator API.
 
@@ -892,11 +896,6 @@ class MaskedConditionalVectorFieldEstimatorWrapper(ConditionalVectorFieldEstimat
         # Assemble full input from give input and condition
         # Take (..., T*F) and returns (..., T, F)
 
-        # self._original_T = T
-        # self._original_F = F
-        # self._num_latent = num_latent
-        # self._num_observed = num_observed
-
         # Check shapes are correct
         if input.shape[-1] != self._num_latent * self._original_F:
             raise ValueError(
@@ -962,8 +961,8 @@ class MaskedConditionalVectorFieldEstimatorWrapper(ConditionalVectorFieldEstimat
         **kwargs,
     ) -> Tensor:
         raise NotImplementedError(
-            "The loss method of the UnmaskedWrapper is not "
-            "intended to be used directly. If you want to use "
+            "The loss method of the MaskedConditionalVectorFieldEstimator "
+            "is not intended to be used directly. If you want to use "
             "this estimator for a different inference method, "
             "please use the original masked estimator "
             "or implement a suitable loss."
@@ -993,9 +992,11 @@ class MaskedConditionalVectorFieldEstimatorWrapper(ConditionalVectorFieldEstimat
     # -------------------------- SDE METHODS --------------------------
 
     def score(self, input: Tensor, condition: Tensor, t: Tensor) -> Tensor:
+        # Adjust input over condition num trials
+        input = input.repeat(1, condition.shape[0], 1)
+
         # Assemble full input from give input and condition
         # input: (B, num_latent * F), condition: (B, num_observed * F)
-        input, condition = self._truncate_to_batch_multiple(input, condition)
         full_inputs_tensor = self._assemble_full_inputs(input, condition)
 
         # Call the original estimator's loss
@@ -1056,40 +1057,6 @@ class MaskedConditionalVectorFieldEstimatorWrapper(ConditionalVectorFieldEstimat
         latent_part = full_outputs[:, self._latent_idx, :]  # (B, num_latent, F)
 
         return latent_part.reshape_as(original_latent_tensor)
-
-    def _truncate_to_batch_multiple(
-        self, input: Tensor, condition: Tensor
-    ) -> tuple[Tensor, Tensor]:
-        # Get number of full batch items (flatten all dims except last)
-        input_batch = int(torch.prod(torch.tensor(input.shape[:-1])).item())
-        cond_batch = int(torch.prod(torch.tensor(condition.shape[:-1])).item())
-
-        if input_batch % cond_batch != 0:
-            truncated_input_batch = (input_batch // cond_batch) * cond_batch
-            warnings.warn(
-                f"Incompatible shapes: input batch size {input_batch} is not divisible "
-                f"by condition batch size {cond_batch}. "
-                f"Truncating to {truncated_input_batch} to ensure consistency."
-                f"You should sample a number of samples multiple "
-                f"of the number of elements in the condition: got {input.shape=}"
-                f"which is not a multiple of {condition.shape=}. "
-                f"This may be due to `x_o` having a "
-                f"different batch size than the input, or because the total number of "
-                f"samples is not divisible by the number of conditions. "
-                f"For example, if `x_o` has 3 trials and `num_samples=1000`, "
-                f"this will fail as 1000 is not divisible by 3. "
-                f"Instead, use a multiple of 3, e.g., 999 or 3000.",
-                stacklevel=2,
-            )
-            # Flatten batch dims then truncate
-            input = input.reshape(input_batch, -1)[:truncated_input_batch]
-            input = input.reshape(
-                *input.shape[:-1], self._num_latent * self._original_F
-            )
-
-            return input, condition
-        else:
-            return input, condition
 
 
 class UnconditionalEstimator(nn.Module, ABC):
