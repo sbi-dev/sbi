@@ -226,6 +226,12 @@ class DirectPosterior(NeuralPosterior):
                 stacklevel=2,
             )
 
+        max_sampling_batch_size = (
+            self.max_sampling_batch_size
+            if max_sampling_batch_size is None
+            else max_sampling_batch_size
+        )
+
         # Adjust max_sampling_batch_size to avoid excessive memory usage
         if max_sampling_batch_size * num_xos > 100_000:
             capped = max(1, 100_000 // num_xos)
@@ -235,13 +241,6 @@ class DirectPosterior(NeuralPosterior):
                 stacklevel=2,
             )
             max_sampling_batch_size = capped
-            max_sampling_batch_size = max(1, 100_000 // num_xos)
-
-        max_sampling_batch_size = (
-            self.max_sampling_batch_size
-            if max_sampling_batch_size is None
-            else max_sampling_batch_size
-        )
 
         samples = rejection.accept_reject_sample(
             proposal=self.posterior_estimator.sample,
