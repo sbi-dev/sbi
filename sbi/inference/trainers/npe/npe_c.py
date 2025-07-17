@@ -6,11 +6,12 @@ from typing import Callable, Dict, Optional, Union
 import torch
 from pyknos.mdn.mdn import MultivariateGaussianMDN as mdn
 from pyknos.nflows.transforms import CompositeTransform
-from torch import Tensor, eye, nn, ones
+from torch import Tensor, eye, ones
 from torch.distributions import Distribution, MultivariateNormal, Uniform
 
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.inference.trainers.npe.npe_base import PosteriorEstimatorTrainer
+from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
 from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
     reshape_to_sample_batch_event,
@@ -113,7 +114,7 @@ class NPE_C(PosteriorEstimatorTrainer):
         retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[Dict] = None,
-    ) -> nn.Module:
+    ) -> ConditionalDensityEstimator:
         r"""Return density estimator that approximates the distribution $p(\theta|x)$.
 
         Args:

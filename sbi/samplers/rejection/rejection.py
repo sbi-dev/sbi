@@ -218,8 +218,8 @@ def accept_reject_sample(
 
     Args:
         proposal: A callable that takes `sample_shape` as arguments (and kwargs as
-        needed). Returns samples from the proposal distribution with shape
-        (*sample_shape, event_dim).
+            needed). Returns samples from the proposal distribution with shape
+            (*sample_shape, event_dim).
         accept_reject_fn: Function that evaluates which samples are accepted or
             rejected. Must take a batch of parameters and return a boolean tensor which
             indicates which parameters get accepted.
@@ -275,7 +275,6 @@ def accept_reject_sample(
     accepted = [[] for _ in range(num_xos)]
     acceptance_rate = torch.full((num_xos,), float("Nan"))
     leakage_warning_raised = False
-    # Ruff suggestion
 
     # To cover cases with few samples without leakage:
     sampling_batch_size = min(num_samples, max_sampling_batch_size)
