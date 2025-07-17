@@ -616,45 +616,82 @@ class NeuralInference(ABC):
                     f"'{sample_with}'",
                 )
         else:
-            if (
-                kwargs.get("direct_sampling_parameters") is not None
-                or kwargs.get("mcmc_parameters") is not None
-                or kwargs.get("vectorfield_sampling_parameters") is not None
-                or kwargs.get("rejection_sampling_parameters") is not None
-                or kwargs.get("vi_parameters") is not None
-                or kwargs.get("importance_sampling_parameters") is not None
-            ):
-                raise ValueError(
-                    "You have passed values to both a parameters dictionary"
-                    " and posterior_parameters."
-                    " Please use either the parameters dictionary"
-                    " or posterior_parameters."
-                )
-            elif isinstance(posterior_parameters, MCMCPosteriorParameters):
-                mcmc_method = kwargs.get("mcmc_method")
-                if posterior_parameters.method != mcmc_method:
-                    warnings.warn(
-                        f"Mismatch between 'mcmc_method' and"
-                        " 'posterior_parameters.method': "
-                        f"mcmc_method={mcmc_method}, "
-                        f"posterior_parameters.method={posterior_parameters.method}. "
-                        "If you did not explicitly set 'mcmc_method', "
-                        "you can ignore this warning.",
-                        stacklevel=2,
-                    )
-            elif isinstance(posterior_parameters, VIPosteriorParameters):
-                vi_method = kwargs.get("vi_method")
-                if posterior_parameters.vi_method != vi_method:
-                    warnings.warn(
-                        f"Mismatch between 'vi_method' and "
-                        "'posterior_parameters.vi_method': "
-                        f"vi_method={vi_method}, "
-                        f"posterior_parameters.vi_method={posterior_parameters.vi_method}."
-                        " If you did not explicitly set 'vi_method', "
-                        "you can ignore this warning.",
-                        stacklevel=2,
-                    )
+            self._validate_no_duplicate_parameters(**kwargs)
+            self._validate_method_consistency(posterior_parameters, **kwargs)
+
         return posterior_parameters
+
+    def _validate_no_duplicate_parameters(self, **kwargs) -> None:
+        """
+        Ensure parameters aren't specified in both posterior_parameters and the
+        posterior parameter dictionaries in the build_posterior method.
+
+        Args:
+            **kwargs: Additional parameters to construct the posterior parameters
+        """
+
+        old_style_params = {
+            "direct_sampling_parameters",
+            "mcmc_parameters",
+            "vectorfield_sampling_parameters",
+            "rejection_sampling_parameters",
+            "vi_parameters",
+            "importance_sampling_parameters",
+        }
+
+        # Check if any old-style parameters were provided
+        provided_old_params = [
+            param for param in old_style_params if kwargs.get(param) is not None
+        ]
+
+        if provided_old_params:
+            raise ValueError(
+                f"Cannot use both old-style parameters {provided_old_params} "
+                f"and new-style posterior_parameters. Please use only one approach."
+            )
+
+    def _validate_method_consistency(
+        self,
+        posterior_parameters: Union[
+            VIPosteriorParameters,
+            VectorFieldPosteriorParameters,
+            ImportanceSamplingPosteriorParameters,
+            MCMCPosteriorParameters,
+            DirectPosteriorParameters,
+            RejectionPosteriorParameters,
+        ],
+        **kwargs,
+    ) -> None:
+        """
+        This method raises a warning for mistmatches between values passed in
+        mcmc_method and MCMCPosteriorParameters.method, or vi_method and
+        VIPosteriorParameters.vi_method.
+
+        Args:
+            posterior_parameters: Configuration passed to the init method for the
+                posterior.
+            kwargs: keyword arguments passed from build_posterior method.
+        """
+
+        if isinstance(posterior_parameters, MCMCPosteriorParameters):
+            mcmc_method = kwargs.get("mcmc_method")
+            if (
+                mcmc_method != "slice_np_vectorized"
+                and posterior_parameters.method != mcmc_method
+            ):
+                warnings.warn(
+                    f"Conflicting mcmc_method='{mcmc_method}' ignored in favor of "
+                    f"posterior_parameters.method='{posterior_parameters.method}'",
+                    stacklevel=2,
+                )
+        elif isinstance(posterior_parameters, VIPosteriorParameters):
+            vi_method = kwargs.get("vi_method")
+            if vi_method != "rKL" and posterior_parameters.vi_method != vi_method:
+                warnings.warn(
+                    f"Conflicting vi_method='{vi_method}' ignored in favor of "
+                    f"posterior_parameters.vi_method='{posterior_parameters.vi_method}'",
+                    stacklevel=2,
+                )
 
     def _create_posterior(
         self,
@@ -709,11 +746,12 @@ class NeuralInference(ABC):
 
         if isinstance(posterior_parameters, DirectPosteriorParameters):
             posterior_estimator = estimator
-            assert isinstance(posterior_estimator, ConditionalDensityEstimator), (
-                f"Expected posterior_estimator to be an instance of "
-                " ConditionalDensityEstimator, "
-                f"but got {type(posterior_estimator).__name__} instead."
-            )
+            if not isinstance(posterior_estimator, ConditionalDensityEstimator):
+                raise ValueError(
+                    f"Expected posterior_estimator to be an instance of "
+                    " ConditionalDensityEstimator, "
+                    f"but got {type(posterior_estimator).__name__} instead."
+                )
             posterior = DirectPosterior(
                 posterior_estimator=posterior_estimator,
                 prior=prior,
@@ -722,17 +760,17 @@ class NeuralInference(ABC):
             )
         elif isinstance(posterior_parameters, VectorFieldPosteriorParameters):
             vector_field_estimator = estimator
-            assert isinstance(
-                vector_field_estimator, ConditionalVectorFieldEstimator
-            ), (
-                f"Expected vector_field_estimator to be an instance of "
-                " ConditionalVectorFieldEstimator, "
-                f"but got {type(vector_field_estimator).__name__} instead."
-            )
-            assert sample_with in ("ode", "sde"), (
-                "`sample_with` must be either",
-                f" 'ode' or 'sde', got '{sample_with}'",
-            )
+            if not isinstance(vector_field_estimator, ConditionalVectorFieldEstimator):
+                raise ValueError(
+                    f"Expected vector_field_estimator to be an instance of "
+                    " ConditionalVectorFieldEstimator, "
+                    f"but got {type(vector_field_estimator).__name__} instead."
+                )
+            if sample_with not in ("ode", "sde"):
+                raise ValueError(
+                    "`sample_with` must be either",
+                    f" 'ode' or 'sde', got '{sample_with}'",
+                )
             posterior = VectorFieldPosterior(
                 vector_field_estimator=vector_field_estimator,
                 prior=prior,
