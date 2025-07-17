@@ -993,7 +993,8 @@ class MaskedConditionalVectorFieldEstimatorWrapper(ConditionalVectorFieldEstimat
 
     def score(self, input: Tensor, condition: Tensor, t: Tensor) -> Tensor:
         # Adjust input over condition num trials
-        input = input.repeat(1, condition.shape[0], 1)
+        if input.shape[1] == 1:
+            input = input.repeat(1, condition.shape[0], 1)
 
         # Assemble full input from give input and condition
         # input: (B, num_latent * F), condition: (B, num_observed * F)

@@ -96,8 +96,16 @@ class Simformer(MaskedVectorFieldInference):
             **kwargs,
         )
 
-        self.latent_idx = torch.as_tensor(latent_idx, dtype=torch.long)
-        self.observed_idx = torch.as_tensor(observed_idx, dtype=torch.long)
+        self.latent_idx = (
+            torch.as_tensor(latent_idx, dtype=torch.long)
+            if latent_idx is not None
+            else None
+        )
+        self.observed_idx = (
+            torch.as_tensor(observed_idx, dtype=torch.long)
+            if observed_idx is not None
+            else None
+        )
 
     def _build_default_nn_fn(self, **kwargs) -> MaskedVectorFieldEstimatorBuilder:
         net_type = kwargs.pop("vector_field_estimator_builder", "simformer")

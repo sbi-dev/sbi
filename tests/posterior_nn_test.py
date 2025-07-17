@@ -355,7 +355,7 @@ def test_batched_score_simformer_sample_with_different_x(
 
     posterior = inference.build_posterior(
         condition_mask=inference_condition_mask,
-        sample_with=sampling_method,
+        sample_with=sampling_method,  # type: ignore
     )
 
     samples = posterior.sample_batched(
@@ -393,7 +393,7 @@ def test_batched_score_simformer_sample_with_different_x(
 
         posterior = inference.build_posterior(
             condition_mask=inference_condition_mask,
-            sample_with=sampling_method,
+            sample_with=sampling_method,  # type: ignore
         )
 
         x_o = torch.stack([0.5 * ones(num_dim), -0.5 * ones(num_dim)], dim=0)
