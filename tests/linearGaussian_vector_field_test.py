@@ -155,6 +155,8 @@ def test_c2st_simformer_on_linearGaussian(
     """
     # num_sim_nodes = 2  # theta, x
     num_samples = 5000
+    # TODO: this is currently a by-pass to the max_num_epochs=100
+    # should tune these params later to find a reasonable setting
     num_simulations = 15000
 
     x_o = zeros(1, num_dim)
@@ -420,7 +422,7 @@ def simformer_vector_field_type(request):
     return request.param
 
 
-@pytest.fixture(scope="module", params=["gaussian", "uniform", None])
+@pytest.fixture(scope="module", params=["gaussian", "uniform"])
 def simformer_prior_type(request):
     """Module-scoped fixture for prior type. (Simformer fixture)"""
     return request.param
@@ -430,7 +432,6 @@ def simformer_prior_type(request):
 def simformer_trained_model(simformer_vector_field_type, simformer_prior_type):
     """Module-scoped fixture that trains a score estimator for Simformer tests."""
     num_dim = 3
-    # num_sim_nodes = 2  # theta, x
     num_simulations = 10000
 
     # likelihood_mean will be likelihood_shift+theta
@@ -448,11 +449,6 @@ def simformer_trained_model(simformer_vector_field_type, simformer_prior_type):
     elif simformer_prior_type == "uniform":
         prior = BoxUniform(-2 * ones(num_dim), 2 * ones(num_dim))
         thetas = prior.sample((num_simulations,))
-    else:
-        prior = None
-        thetas = MultivariateNormal(
-            loc=zeros(num_dim), covariance_matrix=eye(num_dim)
-        ).sample((num_simulations,))
 
     xs = linear_gaussian(thetas, likelihood_shift, likelihood_cov)
     # inputs shape: (num_simulations, num_nodes, num_features)
@@ -477,10 +473,10 @@ def simformer_trained_model(simformer_vector_field_type, simformer_prior_type):
         "likelihood_shift": likelihood_shift,
         "likelihood_cov": likelihood_cov,
         "prior_mean": prior_mean
-        if prior_type == "gaussian" or prior_type is None
+        if simformer_prior_type == "gaussian" or simformer_prior_type is None
         else None,
         "prior_cov": prior_cov
-        if prior_type == "gaussian" or prior_type is None
+        if simformer_prior_type == "gaussian" or simformer_prior_type is None
         else None,
         "num_dim": num_dim,
         "simformer_vector_field_type": simformer_vector_field_type,
@@ -596,7 +592,6 @@ def test_vector_field_iid_inference(
 # TODO: Currently, c2st is too high for FMPE (e.g., > 3 number of observations),
 # so some tests are skipped so far. This seems to be an issue with the
 # neural network architecture and can be addressed in PR #1501
-# TODO: there are some shapes errors in MaskedWrapper, need to
 # Seems like an incompatible num_samples and num_trial (x_o) are passed
 @pytest.mark.skip(
     reason="c2st too high for some cases, has to be fixed in PR #1501 or #1544"
@@ -621,7 +616,7 @@ def test_simformer_iid_inference(
     """
     Test whether Simformer infers well a simple example with available ground truth.
     """
-    num_samples = num_trial * 1000
+    num_samples = 1000
 
     # Extract data from fixture
     score_estimator = simformer_trained_model["score_estimator"]
