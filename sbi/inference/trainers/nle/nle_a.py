@@ -5,12 +5,12 @@ from typing import Callable, Optional, Union
 
 from torch.distributions import Distribution
 
-from sbi.inference.trainers.nle.nle_base import LikelihoodEstimator
+from sbi.inference.trainers.nle.nle_base import LikelihoodEstimatorTrainer
 from sbi.sbi_types import TensorboardSummaryWriter
 from sbi.utils.sbiutils import del_entries
 
 
-class NLE_A(LikelihoodEstimator):
+class NLE_A(LikelihoodEstimatorTrainer):
     """Neural Likelihood Estimation (NLE) as in Papamakarios et al. (2019) [1].
 
     [1] Sequential Neural Likelihood: Fast Likelihood-free Inference with

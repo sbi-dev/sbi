@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Literal, Optional, Tuple, Union
 from warnings import warn
 
 import torch
@@ -16,6 +16,20 @@ from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
+from sbi.inference.posteriors.direct_posterior import DirectPosterior
+from sbi.inference.posteriors.importance_posterior import ImportanceSamplingPosterior
+from sbi.inference.posteriors.mcmc_posterior import MCMCPosterior
+from sbi.inference.posteriors.rejection_posterior import RejectionPosterior
+from sbi.inference.posteriors.vector_field_posterior import VectorFieldPosterior
+from sbi.inference.posteriors.vi_posterior import VIPosterior
+from sbi.inference.potentials.base_potential import BasePotential
+from sbi.neural_nets.estimators.base import (
+    ConditionalDensityEstimator,
+    ConditionalEstimator,
+    ConditionalVectorFieldEstimator,
+)
+from sbi.neural_nets.ratio_estimators import RatioEstimator
+from sbi.sbi_types import TorchTransform
 from sbi.utils import (
     check_prior,
     get_log_root,
@@ -175,11 +189,6 @@ class NeuralInference(ABC):
         self._round = 0
         self._val_loss = float("Inf")
 
-        # XXX We could instantiate here the Posterior for all children. Two problems:
-        #     1. We must dispatch to right PotentialProvider for mcmc based on name
-        #     2. `method_family` cannot be resolved only from `self.__class__.__name__`,
-        #         since SRE, AALR demand different handling but are both in SRE class.
-
         self._summary_writer = (
             self._default_summary_writer() if summary_writer is None else summary_writer
         )
@@ -193,34 +202,9 @@ class NeuralInference(ABC):
             epoch_durations_sec=[],
         )
 
-    def get_simulations(
-        self,
-        starting_round: int = 0,
-    ) -> Tuple[Tensor, Tensor, Tensor]:
-        r"""Returns all $\theta$, $x$, and prior_masks from rounds >= `starting_round`.
-
-        If requested, do not return invalid data.
-
-        Args:
-            starting_round: The earliest round to return samples from (we start counting
-                from zero).
-            warn_on_invalid: Whether to give out a warning if invalid simulations were
-                found.
-
-        Returns: Parameters, simulation outputs, prior masks.
-        """
-
-        theta = get_simulations_since_round(
-            self._theta_roundwise, self._data_round_index, starting_round
-        )
-        x = get_simulations_since_round(
-            self._x_roundwise, self._data_round_index, starting_round
-        )
-        prior_masks = get_simulations_since_round(
-            self._prior_masks, self._data_round_index, starting_round
-        )
-
-        return theta, x, prior_masks
+    @property
+    def summary(self):
+        return self._summary
 
     @abstractmethod
     def append_simulations(
@@ -303,8 +287,45 @@ class NeuralInference(ABC):
         discard_prior_samples: bool = False,
         retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
-    ) -> NeuralPosterior:
-        raise NotImplementedError
+    ) -> NeuralPosterior: ...
+
+    @abstractmethod
+    def _get_potential_function(
+        self,
+        prior: Distribution,
+        estimator: Union[RatioEstimator, ConditionalEstimator],
+    ) -> Tuple[BasePotential, TorchTransform]:
+        """Subclass-specific potential creation"""
+        ...
+
+    def get_simulations(
+        self,
+        starting_round: int = 0,
+    ) -> Tuple[Tensor, Tensor, Tensor]:
+        r"""Returns all $\theta$, $x$, and prior_masks from rounds >= `starting_round`.
+
+        If requested, do not return invalid data.
+
+        Args:
+            starting_round: The earliest round to return samples from (we start counting
+                from zero).
+            warn_on_invalid: Whether to give out a warning if invalid simulations were
+                found.
+
+        Returns: Parameters, simulation outputs, prior masks.
+        """
+
+        theta = get_simulations_since_round(
+            self._theta_roundwise, self._data_round_index, starting_round
+        )
+        x = get_simulations_since_round(
+            self._x_roundwise, self._data_round_index, starting_round
+        )
+        prior_masks = get_simulations_since_round(
+            self._prior_masks, self._data_round_index, starting_round
+        )
+
+        return theta, x, prior_masks
 
     def get_dataloaders(
         self,
@@ -372,6 +393,230 @@ class NeuralInference(ABC):
 
         return train_loader, val_loader
 
+    def build_posterior(
+        self,
+        estimator: Optional[Union[RatioEstimator, ConditionalEstimator]],
+        prior: Optional[Distribution],
+        sample_with: Literal[
+            "mcmc", "rejection", "vi", "importance", "direct", "sde", "ode"
+        ],
+        **kwargs,
+    ) -> NeuralPosterior:
+        r"""Method for building posteriors.
+
+        This method serves as a base method for constructing a posterior based
+        on a given estimator and prior. The posterior can be sampled using one of
+        several inference methods specified by `sample_with`.
+
+        Args:
+            estimator: The estimator that the posterior is based on.
+            prior: A probability distribution that expresses prior knowledge about the
+                parameters, e.g. which ranges are meaningful for them. Must be a PyTorch
+                distribution, see FAQ for details on how to use custom distributions.
+            sample_with: The inference method to use. Must be one of:
+                - "mcmc"
+                - "rejection"
+                - "vi"
+                - "importance"
+                - "direct"
+                - "sde"
+                - "ode"
+            **kwargs: Additional method-specific parameters.
+
+        Returns:
+            NeuralPosterior object.
+        """
+
+        prior = self._resolve_prior(prior)
+        estimator, device = self._resolve_estimator(estimator)
+
+        self._posterior = self._create_posterior(
+            estimator,
+            prior,
+            sample_with,
+            device,
+            **kwargs,
+        )
+
+        # Store models at end of each round.
+        self._model_bank.append(deepcopy(self._posterior))
+
+        return deepcopy(self._posterior)
+
+    def _resolve_prior(self, prior: Optional[Distribution]) -> Distribution:
+        """
+        Resolves the prior distribution to use.
+
+        If a prior is passed, it is validated and returned.
+        If not passed, attempts to use the stored `self._prior`.
+        Raises a ValueError if no valid prior is available.
+
+        Args:
+            prior: Optional prior distribution to resolve.
+
+        Returns:
+            A valid prior distribution.
+        """
+
+        if prior is None:
+            if self._prior is None:
+                cls_name = self.__class__.__name__
+                raise ValueError(
+                    f"""You did not pass a prior. You have to pass the prior either at
+                    initialization `inference = {cls_name}(prior)` or to `
+                    .build_posterior (prior=prior)`."""
+                )
+            prior = self._prior
+        else:
+            check_prior(prior)
+
+        return prior
+
+    def _resolve_estimator(
+        self, estimator: Optional[Union[RatioEstimator, ConditionalEstimator]]
+    ) -> Tuple[Union[RatioEstimator, ConditionalEstimator], str]:
+        """
+        Resolves the estimator and determines its device.
+
+        If no estimator is provided, the internal neural net (`self._neural_net`)
+        is used and the device is taken from `self._device`. Otherwise, validates
+        the passed estimator and infers its device.
+
+        Args:
+            estimator: Optional estimator to use.
+
+        Returns:
+            A tuple of (estimator, device).
+        """
+
+        if estimator is None:
+            assert self._neural_net is not None, (
+                "Provide an estimator or initialize self._neural_net."
+            )
+            estimator = self._neural_net
+            # If internal net is used device is defined.
+            device = self._device
+        else:
+            if not isinstance(estimator, (ConditionalEstimator, RatioEstimator)):
+                raise TypeError(
+                    "estimator must be ConditionalEstimator or RatioEstimator,"
+                    f" got {type(estimator).__name__}",
+                )
+            # Otherwise, infer it from the device of the net parameters.
+            device = str(next(estimator.parameters()).device)
+
+        return estimator, device
+
+    def _create_posterior(
+        self,
+        estimator: Union[RatioEstimator, ConditionalEstimator],
+        prior: Distribution,
+        sample_with: Literal[
+            "mcmc", "rejection", "vi", "importance", "direct", "sde", "ode"
+        ],
+        device: Union[str, torch.device],
+        **kwargs,
+    ) -> NeuralPosterior:
+        """
+        Create a posterior object using the specified inference method.
+
+        Depending on the value of `sample_with`, this method instantiates one of the
+        supported posterior inference strategies.
+
+        Args:
+            estimator: The estimator that the posterior is based on.
+            prior: A probability distribution that expresses prior knowledge about the
+                parameters, e.g. which ranges are meaningful for them. Must be a PyTorch
+                distribution, see FAQ for details on how to use custom distributions.
+            sample_with: The inference method to use. Must be one of:
+                - "mcmc"
+                - "rejection"
+                - "vi"
+                - "importance"
+                - "direct"
+                - "sde"
+                - "ode"
+            device: torch device on which to train the neural net and on which to
+                perform all posterior operations, e.g. gpu or cpu.
+            **kwargs: Additional method-specific parameters.
+
+        Returns:
+            NeuralPosterior object.
+        """
+
+        if sample_with == "direct":
+            posterior_estimator = estimator
+            assert isinstance(posterior_estimator, ConditionalDensityEstimator), (
+                f"Expected posterior_estimator to be an instance of "
+                " ConditionalDensityEstimator, "
+                f"but got {type(posterior_estimator).__name__} instead."
+            )
+            posterior = DirectPosterior(
+                posterior_estimator=posterior_estimator,
+                prior=prior,
+                device=device,
+                **(kwargs.get("direct_sampling_parameters") or {}),
+            )
+        elif sample_with in ("sde", "ode"):
+            vector_field_estimator = estimator
+            assert isinstance(
+                vector_field_estimator, ConditionalVectorFieldEstimator
+            ), (
+                f"Expected vector_field_estimator to be an instance of "
+                " ConditionalVectorFieldEstimator, "
+                f"but got {type(vector_field_estimator).__name__} instead."
+            )
+            posterior = VectorFieldPosterior(
+                vector_field_estimator,
+                prior,
+                device=device,
+                sample_with=sample_with,
+                **(kwargs.get("vectorfield_sampling_parameters") or {}),
+            )
+        else:
+            # Posteriors requiring potential_fn and theta_transform
+            potential_fn, theta_transform = self._get_potential_function(
+                prior, estimator
+            )
+            if sample_with == "mcmc":
+                posterior = MCMCPosterior(
+                    potential_fn=potential_fn,
+                    theta_transform=theta_transform,
+                    proposal=prior,
+                    method=kwargs.get("mcmc_method", "slice_np_vectorized"),
+                    device=device,
+                    **(kwargs.get("mcmc_parameters") or {}),
+                )
+            elif sample_with == "rejection":
+                posterior = RejectionPosterior(
+                    potential_fn=potential_fn,
+                    proposal=prior,
+                    device=device,
+                    **(kwargs.get("rejection_sampling_parameters") or {}),
+                )
+            elif sample_with == "vi":
+                posterior = VIPosterior(
+                    potential_fn=potential_fn,
+                    theta_transform=theta_transform,
+                    prior=prior,
+                    vi_method=kwargs.get("vi_method", "rKL"),
+                    device=device,
+                    **(kwargs.get("vi_parameters") or {}),
+                )
+            elif sample_with == "importance":
+                posterior = ImportanceSamplingPosterior(
+                    potential_fn=potential_fn,
+                    proposal=prior,
+                    device=device,
+                    **(kwargs.get("importance_sampling_parameters") or {}),
+                )
+            else:
+                raise NotImplementedError(
+                    f"Sampling method '{sample_with}' is not supported."
+                )
+
+        return posterior
+
     def _converged(self, epoch: int, stop_after_epochs: int) -> bool:
         """Return whether the training converged yet and save best model state so far.
 
@@ -413,30 +658,6 @@ class NeuralInference(ABC):
         )
         return SummaryWriter(logdir)
 
-    @staticmethod
-    def _describe_round(round_: int, summary: Dict[str, list]) -> str:
-        epochs = summary["epochs_trained"][-1]
-        best_validation_loss = summary["best_validation_loss"][-1]
-
-        description = f"""
-        -------------------------
-        ||||| ROUND {round_ + 1} STATS |||||:
-        -------------------------
-        Epochs trained: {epochs}
-        Best validation performance: {best_validation_loss:.4f}
-        -------------------------
-        """
-
-        return description
-
-    @staticmethod
-    def _maybe_show_progress(show: bool, epoch: int) -> None:
-        if show:
-            # end="\r" deletes the print statement when a new one appears.
-            # https://stackoverflow.com/questions/3419984/. `\r` in the beginning due
-            # to #330.
-            print("\r", f"Training neural network. Epochs trained: {epoch}", end="")
-
     def _report_convergence_at_end(
         self, epoch: int, stop_after_epochs: int, max_num_epochs: int
     ) -> None:
@@ -448,7 +669,7 @@ class NeuralInference(ABC):
             )
         elif max_num_epochs == epoch:
             warn(
-                "Maximum number of epochs `max_num_epochs={max_num_epochs}` reached,"
+                f"Maximum number of epochs `max_num_epochs={max_num_epochs}` reached,"
                 "but network has not yet fully converged. Consider increasing it.",
                 stacklevel=2,
             )
@@ -523,9 +744,29 @@ class NeuralInference(ABC):
 
         self._summary_writer.flush()
 
-    @property
-    def summary(self):
-        return self._summary
+    @staticmethod
+    def _describe_round(round_: int, summary: Dict[str, list]) -> str:
+        epochs = summary["epochs_trained"][-1]
+        best_validation_loss = summary["best_validation_loss"][-1]
+
+        description = f"""
+        -------------------------
+        ||||| ROUND {round_ + 1} STATS |||||:
+        -------------------------
+        Epochs trained: {epochs}
+        Best validation performance: {best_validation_loss:.4f}
+        -------------------------
+        """
+
+        return description
+
+    @staticmethod
+    def _maybe_show_progress(show: bool, epoch: int) -> None:
+        if show:
+            # end="\r" deletes the print statement when a new one appears.
+            # https://stackoverflow.com/questions/3419984/. `\r` in the beginning due
+            # to #330.
+            print("\r", f"Training neural network. Epochs trained: {epoch}", end="")
 
     def __getstate__(self) -> Dict:
         """Returns the state of the object that is supposed to be pickled.

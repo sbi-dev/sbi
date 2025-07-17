@@ -1,21 +1,21 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Literal, Optional, Union
+from typing import Any, Dict, Literal, Optional, Union
 
 from torch.distributions import Distribution
 from torch.utils.tensorboard.writer import SummaryWriter
 
-from sbi.inference.posteriors.vector_field_posterior import VectorFieldPosterior
+from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.trainers.npse.vector_field_inference import (
     VectorFieldEstimatorBuilder,
-    VectorFieldInference,
+    VectorFieldTrainer,
 )
 from sbi.neural_nets.estimators import ConditionalVectorFieldEstimator
 from sbi.neural_nets.factory import posterior_score_nn
 
 
-class NPSE(VectorFieldInference):
+class NPSE(VectorFieldTrainer):
     """Neural Posterior Score Estimation as in Geffner et al. and Sharrock et al.
 
     Instead of performing conditonal *density* estimation, NPSE methods perform
@@ -74,17 +74,13 @@ class NPSE(VectorFieldInference):
         # score_estimator name is kept since it is public API, but it is
         # actually misleading since it is a builder for an estimator.
 
-    def _build_default_nn_fn(self, **kwargs) -> VectorFieldEstimatorBuilder:
-        net_type = kwargs.pop("vector_field_estimator_builder", "mlp")
-        return posterior_score_nn(score_net_type=net_type, **kwargs)
-
     def build_posterior(
         self,
         vector_field_estimator: Optional[ConditionalVectorFieldEstimator] = None,
         prior: Optional[Distribution] = None,
-        sample_with: str = "sde",
-        **kwargs,
-    ) -> VectorFieldPosterior:
+        sample_with: Literal["ode", "sde"] = "sde",
+        vectorfield_sampling_parameters: Optional[Dict[str, Any]] = None,
+    ) -> NeuralPosterior:
         r"""Build posterior from the vector field estimator.
 
         Note that this is the same as the FMPE posterior, but the sample_with
@@ -105,16 +101,20 @@ class NPSE(VectorFieldInference):
                 'sde' (default) or 'ode'. The 'sde' method uses the score to
                 do a Langevin diffusion step, while the 'ode' method solves a
                 probabilistic ODE with a numerical ODE solver.
-            **kwargs: Additional keyword arguments passed to
-                `VectorFieldBasedPotential`.
+            vectorfield_sampling_parameters: Additional keyword arguments passed to
+                `VectorFieldPosterior`.
 
 
         Returns:
             Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods.
         """
-        return self._build_posterior(
-            vector_field_estimator=vector_field_estimator,
+        return super().build_posterior(
+            estimator=vector_field_estimator,
             prior=prior,
             sample_with=sample_with,
-            **kwargs,
+            vectorfield_sampling_parameters=vectorfield_sampling_parameters,
         )
+
+    def _build_default_nn_fn(self, **kwargs) -> VectorFieldEstimatorBuilder:
+        net_type = kwargs.pop("vector_field_estimator_builder", "mlp")
+        return posterior_score_nn(score_net_type=net_type, **kwargs)

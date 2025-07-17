@@ -10,7 +10,7 @@ from torch import Tensor, eye, nn, ones
 from torch.distributions import Distribution, MultivariateNormal, Uniform
 
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
-from sbi.inference.trainers.npe.npe_base import PosteriorEstimator
+from sbi.inference.trainers.npe.npe_base import PosteriorEstimatorTrainer
 from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
     reshape_to_sample_batch_event,
@@ -28,7 +28,7 @@ from sbi.utils.sbiutils import mog_log_prob
 from sbi.utils.torchutils import BoxUniform, assert_all_finite
 
 
-class NPE_C(PosteriorEstimator):
+class NPE_C(PosteriorEstimatorTrainer):
     """Neural Posterior Estimation algorithm (NPE-C) as in Greenberg et al. (2019). [1]
 
     [1] *Automatic Posterior Transformation for Likelihood-free Inference*,
@@ -598,6 +598,14 @@ class NPE_C(PosteriorEstimator):
 
         return means_pp
 
+    def _maybe_z_score_theta(self, theta: Tensor) -> Tensor:
+        """Return potentially standardized theta if z-scoring was requested."""
+
+        if self.z_score_theta:
+            theta, _ = self._neural_net.net._transform(theta)
+
+        return theta
+
     @staticmethod
     def _logits_proposal_posterior(
         means_pp: Tensor,
@@ -665,11 +673,3 @@ class NPE_C(PosteriorEstimator):
         logits_pp = logit_factors + log_sqrt_det_ratio + exponent
 
         return logits_pp
-
-    def _maybe_z_score_theta(self, theta: Tensor) -> Tensor:
-        """Return potentially standardized theta if z-scoring was requested."""
-
-        if self.z_score_theta:
-            theta, _ = self._neural_net.net._transform(theta)
-
-        return theta
