@@ -668,6 +668,8 @@ class MaskedVectorFieldInference(MaskedNeuralInference, ABC):
         mvf_estimator_builder: Union[
             str, MaskedVectorFieldEstimatorBuilder
         ] = "simformer",
+        latent_idx: Optional[list | Tensor] = None,
+        observed_idx: Optional[list | Tensor] = None,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
@@ -722,6 +724,17 @@ class MaskedVectorFieldInference(MaskedNeuralInference, ABC):
             self._build_neural_net = mvf_estimator_builder
 
         self._proposal_roundwise = []
+
+        self.latent_idx = (
+            torch.as_tensor(latent_idx, dtype=torch.long)
+            if latent_idx is not None
+            else None
+        )
+        self.observed_idx = (
+            torch.as_tensor(observed_idx, dtype=torch.long)
+            if observed_idx is not None
+            else None
+        )
 
     @abstractmethod
     def _build_default_nn_fn(self, **kwargs) -> MaskedVectorFieldEstimatorBuilder:
@@ -1390,3 +1403,26 @@ class MaskedVectorFieldInference(MaskedNeuralInference, ABC):
 
         assert_all_finite(loss, f"{cls_name} loss")
         return calibration_kernel(inputs) * loss
+
+    def set_condtion_indexes(self, new_latent_idx, new_observed_idx):
+        self.latent_idx = new_latent_idx
+        self.observed_idx = new_observed_idx
+
+    def _generate_condition_mask(
+        self,
+    ):
+        if self.latent_idx is None or self.observed_idx is None:
+            raise ValueError(
+                "You did not pass latent and observed variable indexes. "
+                "You should either pass a condition mask "
+                "at build_posterior() time or provide some "
+                "latent and observed variable indexes at __init__. "
+                "If you already instanciated a Masked Vector Filed Inference "
+                "and would like to update the current conditon indexes, "
+                "you can use the setter function `set_condtion_indexes()`"
+            )
+        num_nodes = self.latent_idx.numel() + self.observed_idx.numel()
+        condition_mask = torch.zeros(num_nodes, dtype=torch.bool)
+        condition_mask[self.latent_idx] = False
+        condition_mask[self.observed_idx] = True
+        return condition_mask

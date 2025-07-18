@@ -88,23 +88,14 @@ class Simformer(MaskedVectorFieldInference):
         super().__init__(
             prior=prior,
             mvf_estimator_builder=mvf_estimator,
+            latent_idx=latent_idx,
+            observed_idx=observed_idx,
             device=device,
             logging_level=logging_level,
             summary_writer=summary_writer,
             show_progress_bars=show_progress_bars,
             sde_type=sde_type,
             **kwargs,
-        )
-
-        self.latent_idx = (
-            torch.as_tensor(latent_idx, dtype=torch.long)
-            if latent_idx is not None
-            else None
-        )
-        self.observed_idx = (
-            torch.as_tensor(observed_idx, dtype=torch.long)
-            if observed_idx is not None
-            else None
         )
 
     def _build_default_nn_fn(self, **kwargs) -> MaskedVectorFieldEstimatorBuilder:
@@ -195,26 +186,3 @@ class Simformer(MaskedVectorFieldInference):
         sample_with: str = "sde",
     ):
         raise NotImplementedError
-
-    def set_condtion_indexes(self, new_latent_idx, new_observed_idx):
-        self.latent_idx = new_latent_idx
-        self.observed_idx = new_observed_idx
-
-    def _generate_condition_mask(
-        self,
-    ):
-        if self.latent_idx is None or self.observed_idx is None:
-            raise ValueError(
-                "You did not pass latent and observed variable indexes. "
-                "You should either pass a condition mask "
-                "at build_posterior() time or provide some "
-                "latent and observed variable indexes at __init__. "
-                "If you already instanciated a Simformer and would like to "
-                "update the current conditon indexes, you can use the "
-                "setter function `set_condtion_indexes()"
-            )
-        num_nodes = self.latent_idx.numel() + self.observed_idx.numel()
-        condition_mask = torch.zeros(num_nodes, dtype=torch.bool)
-        condition_mask[self.latent_idx] = False
-        condition_mask[self.observed_idx] = True
-        return condition_mask
