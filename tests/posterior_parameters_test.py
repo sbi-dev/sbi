@@ -1,4 +1,5 @@
 import inspect
+from dataclasses import fields
 
 import pytest
 import torch
@@ -38,7 +39,13 @@ from sbi.utils.torchutils import BoxUniform
         (
             MCMCPosteriorParameters,
             MCMCPosterior,
-            {"potential_fn", "proposal", "device", "theta_transform"},
+            {
+                "potential_fn",
+                "proposal",
+                "device",
+                "theta_transform",
+                "init_strategy_num_candidates",
+            },
         ),
         (
             RejectionPosteriorParameters,
@@ -81,6 +88,24 @@ from sbi.utils.torchutils import BoxUniform
 def test_signature_consistency(
     parameter_dataclass, init_target_class, skipped_fields_and_parameters
 ):
+    """
+    Test that the constructor (__init__) signature of a target class matches the
+    signature of a corresponding parameter dataclass.
+
+    This function compares the argument names, default values, and type annotations
+    between the dataclass and the target class __init__ method, ignoring specified
+    parameters passed in `skipped_fields_and_parameters`.
+
+    Args:
+        parameter_dataclass: The dataclass whose signature is used as reference.
+        init_target_class: The class whose __init__ method signature is compared.
+        skipped_fields_and_parameters (set): A set of parameter names to ignore during
+            comparison (e.g., 'self', or fields not relevant for matching).
+
+    Raises:
+        AssertionError: If there is any mismatch in parameter names, default values,
+            or type annotations between the dataclass and the class constructor.
+    """
     dataclass_signature = inspect.signature(parameter_dataclass)
     class_signature = inspect.signature(init_target_class.__init__)
 
@@ -128,12 +153,194 @@ def test_signature_consistency(
         )
 
 
-@pytest.mark.xfail(
-    raises=ValueError,
-    reason="Parameter dictionary and posterior_parameter dataclass"
-    " shouldn't be passed together.",
+@pytest.mark.parametrize(
+    "build_posterior_arguments",
+    [
+        dict(
+            mcmc_method="slice_pymc",
+            posterior_parameters=MCMCPosteriorParameters(method="hmc_pyro"),
+        ),
+        dict(
+            vi_method="IW",
+            posterior_parameters=VIPosteriorParameters(vi_method="fKL"),
+        ),
+    ],
 )
-def test_build_posterior_conflicting_params():
+def test_build_posterior_warns_on_conflicting_args(build_posterior_arguments):
+    """
+    Test that build_posterior raises a UserWarning on conflicting parameter
+    combinations.
+    """
+    inference = get_inference()
+
+    with pytest.warns(UserWarning, match="ignored in favor of"):
+        inference.build_posterior(**build_posterior_arguments)
+
+
+@pytest.mark.parametrize(
+    "build_posterior_arguments",
+    [
+        pytest.param(
+            dict(
+                posterior_parameters=MCMCPosteriorParameters(
+                    method="slice_np_vectorized"
+                ),
+            ),
+        ),
+        pytest.param(
+            dict(
+                posterior_parameters=VIPosteriorParameters(vi_method="rKL"),
+            ),
+        ),
+    ],
+)
+def test_build_posterior_works_on_default_args(build_posterior_arguments):
+    """
+    Test that build_posterior doesn't raise on default parameters.
+    """
+
+    inference = get_inference()
+    inference.build_posterior(**build_posterior_arguments)
+
+
+@pytest.mark.parametrize(
+    ("build_posterior_arguments"),
+    [
+        pytest.param(
+            dict(
+                mcmc_parameters=dict(num_chains=1),
+                posterior_parameters=MCMCPosteriorParameters(),
+            ),
+            marks=pytest.mark.xfail(
+                raises=ValueError,
+                reason="Parameter dictionary and posterior_parameter dataclass"
+                " shouldn't be passed together.",
+            ),
+        ),
+        pytest.param(
+            dict(
+                posterior_parameters={},
+            ),
+            marks=pytest.mark.xfail(
+                raises=TypeError,
+                reason="Posterior parameters is expected to be type of"
+                " PosteriorParameters dataclass",
+            ),
+        ),
+    ],
+)
+def test_build_posterior_conflicting_params(build_posterior_arguments):
+    """
+    Test whether build_posterior properly raises errors when incorrect
+    posterior_parameters values are passed.
+    """
+    inference = get_inference()
+    inference.build_posterior(**build_posterior_arguments)
+
+
+def test_posterior_parameters_with_param_returns_the_same_type():
+    """
+    Test that calling `with_param()` without arguments returns an instance
+    of the same type and with the same values as the original.
+    """
+
+    posterior_parameters = MCMCPosteriorParameters()
+    new_posterior_parameters = posterior_parameters.with_param()
+
+    for field in posterior_parameters.__dataclass_fields__.values():
+        original_value = getattr(posterior_parameters, field.name)
+        new_value = getattr(new_posterior_parameters, field.name)
+
+        assert original_value == new_value, f"Mismatch in field '{field.name}'"
+
+
+def test_posterior_parameters_with_param_updates_value():
+    """
+    Test that `with_param()` correctly updates specified fields while keeping
+    other values unchanged.
+    """
+
+    posterior_parameters = MCMCPosteriorParameters(warmup_steps=100)
+    new_posterior_parameters = posterior_parameters.with_param(warmup_steps=10)
+
+    assert (
+        posterior_parameters.warmup_steps == 100
+        and new_posterior_parameters.warmup_steps == 10
+    )
+
+
+@pytest.mark.xfail(
+    raises=ValueError, reason="steps field does't exist in MCMCPosteriorParameters"
+)
+def test_posterior_parameters_fails_for_incorrect_parameter():
+    """
+    Test that `with_param()` raises a ValueError when an invalid field
+    (not defined in the dataclass) is passed.
+    """
+
+    posterior_parameters = MCMCPosteriorParameters()
+    _ = posterior_parameters.with_param(steps=10)
+
+
+@pytest.mark.parametrize(
+    "param_class",
+    [
+        DirectPosteriorParameters,
+        ImportanceSamplingPosteriorParameters,
+        MCMCPosteriorParameters,
+        RejectionPosteriorParameters,
+        VectorFieldPosteriorParameters,
+        VIPosteriorParameters,
+    ],
+)
+def test_valid_field_values(param_class):
+    """
+    Test that each PosteriorParameters subclass works when passed
+    default values for its fields.
+    """
+
+    for field in fields(param_class):
+        valid_kwarg = {}
+        valid_kwarg[field.name] = field.default
+
+        param_class(**valid_kwarg)
+
+
+def test_valid_primitive_type_conversion():
+    """
+    Test whether primitive types(int, float) are properly converted
+    to their field annotation types.
+    """
+
+    posterior_parameters = RejectionPosteriorParameters(m=1, num_iter_to_find_max=100.0)
+    assert isinstance(posterior_parameters.m, float) and isinstance(
+        posterior_parameters.num_iter_to_find_max, int
+    )
+
+
+@pytest.mark.xfail(raises=ValueError, reason="Type conversion failure")
+def test_invalid_primitive_conversion_failure():
+    """
+    Test whether primitive types(int, float) conversion fails when invalid type
+    is passed.
+    """
+
+    _ = RejectionPosteriorParameters(m="a")
+
+
+@pytest.mark.xfail(
+    raises=ValueError, reason="Invalid literal type passed to PosteriorParameters class"
+)
+def test_invalid_literal_field_values():
+    """
+    Test PosteriorParameters class construction when invalid literal
+    type is passed to a Literal type field.
+    """
+
+    MCMCPosteriorParameters(method="invalid")
+
+
+def get_inference():
     def simulator(theta):
         return 1.0 + theta + torch.randn(theta.shape, device=theta.device) * 0.1
 
@@ -145,8 +352,4 @@ def test_build_posterior_conflicting_params():
     inference = NRE(prior=prior)
     inference.append_simulations(theta, x)
     inference.train(max_num_epochs=1)
-
-    inference.build_posterior(
-        mcmc_parameters=dict(num_chains=1),
-        posterior_parameters=MCMCPosteriorParameters(),
-    )
+    return inference
