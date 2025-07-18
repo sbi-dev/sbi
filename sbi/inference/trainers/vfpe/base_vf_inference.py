@@ -1427,9 +1427,11 @@ class MaskedVectorFieldInference(MaskedNeuralInference, ABC):
         assert_all_finite(loss, f"{cls_name} loss")
         return calibration_kernel(inputs) * loss
 
-    def set_condtion_indexes(self, new_latent_idx, new_observed_idx):
-        self.latent_idx = new_latent_idx
-        self.observed_idx = new_observed_idx
+    def set_condition_indexes(
+        self, new_latent_idx: Union[list, Tensor], new_observed_idx: Union[list, Tensor]
+    ):
+        self.latent_idx = torch.as_tensor(new_latent_idx, dtype=torch.long)
+        self.observed_idx = torch.as_tensor(new_observed_idx, dtype=torch.long)
 
     def _generate_condition_mask(
         self,
