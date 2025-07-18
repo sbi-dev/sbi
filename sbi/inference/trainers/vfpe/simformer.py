@@ -152,6 +152,22 @@ class Simformer(MaskedVectorFieldInference):
             Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods.
         """
 
+        if (
+            condition_mask is None
+            and self.latent_idx is None
+            or self.observed_idx is None
+        ):
+            raise ValueError(
+                "You did not pass a condition mask or latent and observed variable "
+                "indexes. You should either pass a condition mask "
+                "at build_posterior() time or provide some "
+                "latent and observed variable indexes at __init__. "
+                "If you already instanciated a Simformer and would like to "
+                "provide the conditon indexes, you can use the "
+                "setter function `set_condtion_indexes() or provide a condition mask "
+                "at next call on the build_posterior() method."
+            )
+
         if condition_mask is None:
             condition_mask = self._generate_condition_mask()
 
@@ -180,6 +196,10 @@ class Simformer(MaskedVectorFieldInference):
     ):
         raise NotImplementedError
 
+    def set_condtion_indexes(self, new_latent_idx, new_observed_idx):
+        self.latent_idx = new_latent_idx
+        self.observed_idx = new_observed_idx
+
     def _generate_condition_mask(
         self,
     ):
@@ -188,7 +208,10 @@ class Simformer(MaskedVectorFieldInference):
                 "You did not pass latent and observed variable indexes. "
                 "You should either pass a condition mask "
                 "at build_posterior() time or provide some "
-                "latent and observed variable indexes at __init__."
+                "latent and observed variable indexes at __init__. "
+                "If you already instanciated a Simformer and would like to "
+                "update the current conditon indexes, you can use the "
+                "setter function `set_condtion_indexes()"
             )
         num_nodes = self.latent_idx.numel() + self.observed_idx.numel()
         condition_mask = torch.zeros(num_nodes, dtype=torch.bool)
