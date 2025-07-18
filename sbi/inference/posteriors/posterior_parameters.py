@@ -15,7 +15,12 @@ from typing import (
 
 from sbi.inference.posteriors.vi_posterior import VIPosterior
 from sbi.sbi_types import PyroTransformedDistribution, TorchTransform
-from sbi.utils.typechecks import is_nonnegative_int, is_positive_float, is_positive_int
+from sbi.utils.typechecks import (
+    is_bool,
+    is_nonnegative_int,
+    is_positive_float,
+    is_positive_int,
+)
 
 
 @dataclass(frozen=True)
@@ -58,7 +63,7 @@ class PosteriorParameters(ABC):
         Performs runtime validation and type enforcement after dataclass initialization.
 
         - Enforces that fields annotated with `Literal[...]` contain valid values.
-        - Attempts to cast fields annotated as primitive types (int, float, bool) to
+        - Attempts to cast fields annotated as primitive types (int, float) to
           their expected types if not already correctly typed.
         - Calls the `validate()` method at the end for additional custom checks.
 
@@ -79,7 +84,7 @@ class PosteriorParameters(ABC):
                         f"Field '{field_name}' must be one of {allowed},"
                         f" got {raw_value}"
                     )
-            elif target_type in (int, bool, float):
+            elif target_type in (int, float):
                 try:
                     value = target_type(raw_value)
                 except Exception as e:
@@ -113,6 +118,8 @@ class DirectPosteriorParameters(PosteriorParameters):
         """Validate DirectPosteriorParameters fields."""
         if not is_positive_int(self.max_sampling_batch_size):
             raise ValueError("max_sampling_batch_size must be greater than 0.")
+        if not is_bool(self.enable_transform):
+            raise TypeError("enable_transform must of type bool.")
 
 
 @dataclass(frozen=True)
@@ -149,9 +156,9 @@ class ImportanceSamplingPosteriorParameters(PosteriorParameters):
                 "theta_transform must be either None or of type TorchTransform"
             )
         if not is_positive_int(self.oversampling_factor):
-            raise TypeError("oversampling_factor must be greater than 0.")
+            raise ValueError("oversampling_factor must be greater than 0.")
         if not is_positive_int(self.max_sampling_batch_size):
-            raise TypeError("max_sampling_batch_size must be greater than 0.")
+            raise ValueError("max_sampling_batch_size must be greater than 0.")
 
 
 @dataclass(frozen=True)
@@ -217,12 +224,14 @@ class MCMCPosteriorParameters(PosteriorParameters):
             raise TypeError(
                 "init_strategy_parameters must be either None or of type Dict"
             )
+        if self.thin != -1 and not (1 <= self.thin <= 10):
+            raise ValueError("thin must be a value between 10 to 1, or -1.")
         if not is_nonnegative_int(self.warmup_steps):
-            raise TypeError("warmup_steps must be greater than or equal to 0.")
+            raise ValueError("warmup_steps must be greater than or equal to 0.")
         if not is_positive_int(self.num_chains):
-            raise TypeError("num_chains must be greater than 0.")
+            raise ValueError("num_chains must be greater than 0.")
         if not is_positive_int(self.num_workers):
-            raise TypeError("num_workers must be greater than 0.")
+            raise ValueError("num_workers must be greater than 0.")
 
 
 @dataclass(frozen=True)
@@ -259,13 +268,13 @@ class RejectionPosteriorParameters(PosteriorParameters):
             )
 
         if not is_positive_int(self.max_sampling_batch_size):
-            raise TypeError("max_sampling_batch_size must be greater than 0.")
+            raise ValueError("max_sampling_batch_size must be greater than 0.")
         if not is_positive_int(self.num_samples_to_find_max):
-            raise TypeError("num_samples_to_find_max must be greater than 0.")
+            raise ValueError("num_samples_to_find_max must be greater than 0.")
         if not is_nonnegative_int(self.num_iter_to_find_max):
-            raise TypeError("num_iter_to_find_max must be greater than or equal to 0.")
+            raise ValueError("num_iter_to_find_max must be greater than or equal to 0.")
         if not is_positive_float(self.m):
-            raise TypeError("m must be greater than 0.")
+            raise ValueError("m must be greater than 0.")
 
 
 @dataclass(frozen=True)
@@ -300,8 +309,8 @@ class VectorFieldPosteriorParameters(PosteriorParameters):
 
     def validate(self):
         """Validate VectorFieldPosteriorParameters fields."""
-        if self.enable_transform is True:
-            raise NotImplementedError("enable_transform=True is not supported yet.")
+        if not is_bool(self.enable_transform):
+            raise TypeError("enable_transform must of type bool.")
         if not (self.iid_params is None or isinstance(self.iid_params, Dict)):
             raise TypeError("iid_params must be either None or of type Dict")
         if not (
@@ -309,7 +318,7 @@ class VectorFieldPosteriorParameters(PosteriorParameters):
         ):
             raise TypeError("neural_ode_kwargs must be either None or of type Dict")
         if not is_positive_int(self.max_sampling_batch_size):
-            raise TypeError("max_sampling_batch_size must be greater than 0.")
+            raise ValueError("max_sampling_batch_size must be greater than 0.")
 
 
 @dataclass(frozen=True)
