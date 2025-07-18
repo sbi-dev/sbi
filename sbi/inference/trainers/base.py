@@ -25,6 +25,7 @@ from sbi.inference.posteriors.posterior_parameters import (
     DirectPosteriorParameters,
     ImportanceSamplingPosteriorParameters,
     MCMCPosteriorParameters,
+    PosteriorParameters,
     RejectionPosteriorParameters,
     VIPosteriorParameters,
     VectorFieldPosteriorParameters,
@@ -410,16 +411,7 @@ class NeuralInference(ABC):
         sample_with: Literal[
             "mcmc", "rejection", "vi", "importance", "direct", "sde", "ode"
         ],
-        posterior_parameters: Optional[
-            Union[
-                VIPosteriorParameters,
-                VectorFieldPosteriorParameters,
-                ImportanceSamplingPosteriorParameters,
-                MCMCPosteriorParameters,
-                DirectPosteriorParameters,
-                RejectionPosteriorParameters,
-            ]
-        ],
+        posterior_parameters: Optional[PosteriorParameters],
         **kwargs,
     ) -> NeuralPosterior:
         r"""Method for building posteriors.
@@ -442,13 +434,7 @@ class NeuralInference(ABC):
                 - "sde"
                 - "ode"
             posterior_parameters: Configuration passed to the init method for the
-                posterior. Must be one of the following:
-                - `VIPosteriorParameters`
-                - `VectorFieldPosteriorParameters`
-                - `ImportanceSamplingPosteriorParameters`
-                - `MCMCPosteriorParameters`
-                - `DirectPosteriorParameters`
-                - `RejectionPosteriorParameters`
+                posterior. Must be of type PosteriorParameters.
             **kwargs: Additional method-specific parameters.
 
         Returns:
@@ -544,25 +530,9 @@ class NeuralInference(ABC):
         sample_with: Literal[
             "mcmc", "rejection", "vi", "importance", "direct", "sde", "ode"
         ],
-        posterior_parameters: Optional[
-            Union[
-                VIPosteriorParameters,
-                VectorFieldPosteriorParameters,
-                ImportanceSamplingPosteriorParameters,
-                MCMCPosteriorParameters,
-                DirectPosteriorParameters,
-                RejectionPosteriorParameters,
-            ]
-        ],
+        posterior_parameters: Optional[PosteriorParameters],
         **kwargs,
-    ) -> Union[
-        VIPosteriorParameters,
-        VectorFieldPosteriorParameters,
-        ImportanceSamplingPosteriorParameters,
-        MCMCPosteriorParameters,
-        DirectPosteriorParameters,
-        RejectionPosteriorParameters,
-    ]:
+    ) -> PosteriorParameters:
         """
         Resolve posterior parameters based on the sampling strategy.
 
@@ -586,6 +556,14 @@ class NeuralInference(ABC):
             A dataclass instance containing the resolved posterior
             parameters.
         """
+
+        if posterior_parameters is not None and not isinstance(
+            posterior_parameters, PosteriorParameters
+        ):
+            raise TypeError(
+                "posterior_parameters must be PosteriorParameters,"
+                f" got {type(posterior_parameters).__name__}",
+            )
 
         if posterior_parameters is None:
             if sample_with == "direct":
@@ -651,16 +629,7 @@ class NeuralInference(ABC):
             )
 
     def _validate_method_consistency(
-        self,
-        posterior_parameters: Union[
-            VIPosteriorParameters,
-            VectorFieldPosteriorParameters,
-            ImportanceSamplingPosteriorParameters,
-            MCMCPosteriorParameters,
-            DirectPosteriorParameters,
-            RejectionPosteriorParameters,
-        ],
-        **kwargs,
+        self, posterior_parameters: PosteriorParameters, **kwargs
     ) -> None:
         """
         This method raises a warning for mistmatches between values passed in
@@ -701,14 +670,7 @@ class NeuralInference(ABC):
             "mcmc", "rejection", "vi", "importance", "direct", "sde", "ode"
         ],
         device: Union[str, torch.device],
-        posterior_parameters: Union[
-            VIPosteriorParameters,
-            VectorFieldPosteriorParameters,
-            ImportanceSamplingPosteriorParameters,
-            MCMCPosteriorParameters,
-            DirectPosteriorParameters,
-            RejectionPosteriorParameters,
-        ],
+        posterior_parameters: PosteriorParameters,
     ) -> NeuralPosterior:
         """
         Create a posterior object using the specified inference method.
@@ -732,13 +694,7 @@ class NeuralInference(ABC):
             device: torch device on which to train the neural net and on which to
                 perform all posterior operations, e.g. gpu or cpu.
             posterior_parameters: Configuration passed to the init method for the
-                posterior. Must be one of the following:
-                - `VIPosteriorParameters`
-                - `VectorFieldPosteriorParameters`
-                - `ImportanceSamplingPosteriorParameters`
-                - `MCMCPosteriorParameters`
-                - `DirectPosteriorParameters`
-                - `RejectionPosteriorParameters`
+                posterior. Must be of type PosteriorParameters.
 
         Returns:
             NeuralPosterior object.

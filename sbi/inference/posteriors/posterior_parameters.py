@@ -1,12 +1,100 @@
-from dataclasses import dataclass
-from typing import Any, Callable, Dict, Iterable, Literal, Optional, Union
+from abc import ABC, abstractmethod
+from dataclasses import dataclass, replace
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterable,
+    Literal,
+    Optional,
+    Union,
+    cast,
+    get_args,
+    get_origin,
+)
 
 from sbi.inference.posteriors.vi_posterior import VIPosterior
 from sbi.sbi_types import PyroTransformedDistribution, TorchTransform
+from sbi.utils.typechecks import is_nonnegative_int, is_positive_float, is_positive_int
 
 
 @dataclass(frozen=True)
-class DirectPosteriorParameters:
+class PosteriorParameters(ABC):
+    @abstractmethod
+    def validate(self):
+        """
+        Method for subclasses to override and implement
+        custom validation logic. Called at the end of __post_init__.
+        """
+        ...
+
+    def with_param(self, **kwargs):
+        """
+        Create a new instance of the class with updated field values.
+
+        Only allows updates to fields defined in the dataclass. Raises an error if
+        any unknown or invalid field names are passed.
+
+        Args:
+            **kwargs: Field-value pairs to override in the new instance.
+
+        Returns:
+            A new instance of the same class with updated values.
+
+        Raises:
+            ValueError: If any of the provided keys are not valid dataclass fields.
+        """
+        valid_fields = set(self.__dataclass_fields__)
+        for key in kwargs:
+            if key not in valid_fields:
+                raise ValueError(
+                    f"Invalid parameter: '{key}' is not a valid field"
+                    f" of {self.__class__.__name__}"
+                )
+        return replace(self, **kwargs)
+
+    def __post_init__(self) -> None:
+        """
+        Performs runtime validation and type enforcement after dataclass initialization.
+
+        - Enforces that fields annotated with `Literal[...]` contain valid values.
+        - Attempts to cast fields annotated as primitive types (int, float, bool) to
+          their expected types if not already correctly typed.
+        - Calls the `validate()` method at the end for additional custom checks.
+
+        Raises:
+            ValueError: If any field fails its Literal constraint or cannot be cast to
+                        the expected primitive type.
+        """
+        for field in self.__dataclass_fields__.values():
+            field_name = field.name
+            raw_value = getattr(self, field_name)
+            annotation = field.type
+            target_type = cast(type, annotation)
+
+            if get_origin(annotation) is Literal:
+                allowed = get_args(annotation)
+                if raw_value not in allowed:
+                    raise ValueError(
+                        f"Field '{field_name}' must be one of {allowed},"
+                        f" got {raw_value}"
+                    )
+            elif target_type in (int, bool, float):
+                try:
+                    value = target_type(raw_value)
+                except Exception as e:
+                    raise ValueError(
+                        f"Could not convert the value of the field {field} to the "
+                        f"expected type {target_type}."
+                    ) from e
+
+                object.__setattr__(self, field_name, value)
+
+        self.validate()
+
+
+@dataclass(frozen=True)
+class DirectPosteriorParameters(PosteriorParameters):
     """
     Parameters for initializing DirectPosterior.
 
@@ -21,9 +109,14 @@ class DirectPosteriorParameters:
     max_sampling_batch_size: int = 10_000
     enable_transform: bool = True
 
+    def validate(self):
+        """Validate DirectPosteriorParameters fields."""
+        if not is_positive_int(self.max_sampling_batch_size):
+            raise ValueError("max_sampling_batch_size must be greater than 0.")
+
 
 @dataclass(frozen=True)
-class ImportanceSamplingPosteriorParameters:
+class ImportanceSamplingPosteriorParameters(PosteriorParameters):
     """
     Parameters for initializing ImportanceSamplingPosterior.
 
@@ -46,9 +139,23 @@ class ImportanceSamplingPosteriorParameters:
     oversampling_factor: int = 32
     max_sampling_batch_size: int = 10_000
 
+    def validate(self):
+        """Validate ImportanceSamplingPosteriorParameters fields."""
+        if not (
+            self.theta_transform is None
+            or isinstance(self.theta_transform, TorchTransform)
+        ):
+            raise TypeError(
+                "theta_transform must be either None or of type TorchTransform"
+            )
+        if not is_positive_int(self.oversampling_factor):
+            raise TypeError("oversampling_factor must be greater than 0.")
+        if not is_positive_int(self.max_sampling_batch_size):
+            raise TypeError("max_sampling_batch_size must be greater than 0.")
+
 
 @dataclass(frozen=True)
-class MCMCPosteriorParameters:
+class MCMCPosteriorParameters(PosteriorParameters):
     """
     Parameters for initializing MCMCPosterior.
 
@@ -77,9 +184,6 @@ class MCMCPosteriorParameters:
             init strategy, e.g., for `init_strategy=sir` this could be
             `num_candidate_samples`, i.e., the number of candidates to find init
             locations (internal default is `1000`), or `device`.
-        init_strategy_num_candidates: Number of candidates to find init
-             locations in `init_strategy=sir` (deprecated, use
-             init_strategy_parameters instead).
         num_workers: number of cpu cores used to parallelize mcmc
         mp_context: Multiprocessing start method, either `"fork"` or `"spawn"`
             (default), used by Pyro and PyMC samplers. `"fork"` can be significantly
@@ -101,13 +205,28 @@ class MCMCPosteriorParameters:
     num_chains: int = 20
     init_strategy: Literal["proposal", "sir", "resample"] = "resample"
     init_strategy_parameters: Optional[Dict[str, Any]] = None
-    init_strategy_num_candidates: Optional[int] = None
     num_workers: int = 1
     mp_context: Literal["fork", "spawn"] = "spawn"
 
+    def validate(self):
+        """Validate MCMCPosteriorParameters fields."""
+        if not (
+            self.init_strategy_parameters is None
+            or isinstance(self.init_strategy_parameters, Dict)
+        ):
+            raise TypeError(
+                "init_strategy_parameters must be either None or of type Dict"
+            )
+        if not is_nonnegative_int(self.warmup_steps):
+            raise TypeError("warmup_steps must be greater than or equal to 0.")
+        if not is_positive_int(self.num_chains):
+            raise TypeError("num_chains must be greater than 0.")
+        if not is_positive_int(self.num_workers):
+            raise TypeError("num_workers must be greater than 0.")
+
 
 @dataclass(frozen=True)
-class RejectionPosteriorParameters:
+class RejectionPosteriorParameters(PosteriorParameters):
     """
     Parameters for initializing RejectionPosterior.
 
@@ -129,9 +248,28 @@ class RejectionPosteriorParameters:
     num_iter_to_find_max: int = 100
     m: float = 1.2
 
+    def validate(self):
+        """Validate RejectionPosteriorParameters fields."""
+        if not (
+            self.theta_transform is None
+            or isinstance(self.theta_transform, TorchTransform)
+        ):
+            raise TypeError(
+                "theta_transform must be either None or of type TorchTransform"
+            )
+
+        if not is_positive_int(self.max_sampling_batch_size):
+            raise TypeError("max_sampling_batch_size must be greater than 0.")
+        if not is_positive_int(self.num_samples_to_find_max):
+            raise TypeError("num_samples_to_find_max must be greater than 0.")
+        if not is_nonnegative_int(self.num_iter_to_find_max):
+            raise TypeError("num_iter_to_find_max must be greater than or equal to 0.")
+        if not is_positive_float(self.m):
+            raise TypeError("m must be greater than 0.")
+
 
 @dataclass(frozen=True)
-class VectorFieldPosteriorParameters:
+class VectorFieldPosteriorParameters(PosteriorParameters):
     """
     Parameters for initializing VectorFieldPosterior.
 
@@ -157,12 +295,25 @@ class VectorFieldPosteriorParameters:
     # to VectorFieldBasedPotential __init__ method
     iid_method: Literal["fnpe", "gauss", "auto_gauss", "jac_gauss"] = "auto_gauss"
     iid_params: Optional[Dict[str, Any]] = None
-    neural_ode_backend: str = "zuko"
+    neural_ode_backend: Literal["zuko"] = "zuko"
     neural_ode_kwargs: Optional[Dict[str, Any]] = None
+
+    def validate(self):
+        """Validate VectorFieldPosteriorParameters fields."""
+        if self.enable_transform is True:
+            raise NotImplementedError("enable_transform=True is not supported yet.")
+        if not (self.iid_params is None or isinstance(self.iid_params, Dict)):
+            raise TypeError("iid_params must be either None or of type Dict")
+        if not (
+            self.neural_ode_kwargs is None or isinstance(self.neural_ode_kwargs, Dict)
+        ):
+            raise TypeError("neural_ode_kwargs must be either None or of type Dict")
+        if not is_positive_int(self.max_sampling_batch_size):
+            raise TypeError("max_sampling_batch_size must be greater than 0.")
 
 
 @dataclass(frozen=True)
-class VIPosteriorParameters:
+class VIPosteriorParameters(PosteriorParameters):
     """
     Parameters for initializing VIPosterior.
 
@@ -202,3 +353,22 @@ class VIPosteriorParameters:
     vi_method: Literal["rKL", "fKL", "IW", "alpha"] = "rKL"
     parameters: Optional[Iterable] = None
     modules: Optional[Iterable] = None
+
+    def validate(self):
+        """Validate VIPosteriorParameters fields."""
+        valid_q = {"nsf", "scf", "maf", "mcf", "gaussian", "gaussian_diag"}
+
+        if isinstance(self.q, str) and self.q not in valid_q:
+            raise ValueError(f"If `q` is a string, it must be one of {valid_q}")
+        elif not isinstance(
+            self.q, (PyroTransformedDistribution, VIPosterior, Callable, str)
+        ):
+            raise TypeError(
+                "q must be either of typr PyroTransformedDistribution,"
+                " VIPosterioror or Callable"
+            )
+
+        if self.parameters is not None and not isinstance(self.parameters, Iterable):
+            raise TypeError("parameters must be iterable or None.")
+        if self.modules is not None and not isinstance(self.modules, Iterable):
+            raise TypeError("modules must be iterable or None.")
