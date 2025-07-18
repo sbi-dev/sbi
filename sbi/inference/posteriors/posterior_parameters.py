@@ -52,6 +52,7 @@ class PosteriorParameters(ABC):
         Raises:
             ValueError: If any of the provided keys are not valid dataclass fields.
         """
+
         valid_fields = set(self.__dataclass_fields__)
         for key in kwargs:
             if key not in valid_fields:
@@ -74,6 +75,7 @@ class PosteriorParameters(ABC):
             ValueError: If any field fails its Literal constraint or cannot be cast to
                         the expected primitive type.
         """
+
         for field in self.__dataclass_fields__.values():
             field_name = field.name
             raw_value = getattr(self, field_name)
@@ -119,6 +121,7 @@ class DirectPosteriorParameters(PosteriorParameters):
 
     def validate(self):
         """Validate DirectPosteriorParameters fields."""
+
         if not is_positive_int(self.max_sampling_batch_size):
             raise ValueError("max_sampling_batch_size must be greater than 0.")
         if not is_bool(self.enable_transform):
@@ -151,6 +154,7 @@ class ImportanceSamplingPosteriorParameters(PosteriorParameters):
 
     def validate(self):
         """Validate ImportanceSamplingPosteriorParameters fields."""
+
         if not (
             self.theta_transform is None
             or isinstance(self.theta_transform, TorchTransform)
@@ -220,6 +224,7 @@ class MCMCPosteriorParameters(PosteriorParameters):
 
     def validate(self):
         """Validate MCMCPosteriorParameters fields."""
+
         if not (
             self.init_strategy_parameters is None
             or isinstance(self.init_strategy_parameters, Dict)
@@ -262,6 +267,7 @@ class RejectionPosteriorParameters(PosteriorParameters):
 
     def validate(self):
         """Validate RejectionPosteriorParameters fields."""
+
         if not (
             self.theta_transform is None
             or isinstance(self.theta_transform, TorchTransform)
@@ -312,6 +318,7 @@ class VectorFieldPosteriorParameters(PosteriorParameters):
 
     def validate(self):
         """Validate VectorFieldPosteriorParameters fields."""
+
         if not is_bool(self.enable_transform):
             raise TypeError("enable_transform must of type bool.")
         if not (self.iid_params is None or isinstance(self.iid_params, Dict)):
@@ -368,6 +375,7 @@ class VIPosteriorParameters(PosteriorParameters):
 
     def validate(self):
         """Validate VIPosteriorParameters fields."""
+
         valid_q = {"nsf", "scf", "maf", "mcf", "gaussian", "gaussian_diag"}
 
         if isinstance(self.q, str) and self.q not in valid_q:
