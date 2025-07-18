@@ -12,12 +12,20 @@ def is_int(x):
     return isinstance(x, int)
 
 
+def is_float(x):
+    return isinstance(x, float)
+
+
 def is_positive_int(x):
     return is_int(x) and x > 0
 
 
 def is_nonnegative_int(x):
     return is_int(x) and x >= 0
+
+
+def is_positive_float(x):
+    return is_float(x) and x > 0
 
 
 def is_power_of_two(n):
