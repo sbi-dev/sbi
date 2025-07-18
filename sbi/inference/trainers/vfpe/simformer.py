@@ -3,7 +3,6 @@
 
 from typing import Literal, Optional, Union
 
-import torch
 from torch import Tensor
 from torch.distributions import Distribution
 from torch.utils.tensorboard.writer import SummaryWriter
@@ -143,34 +142,9 @@ class Simformer(MaskedVectorFieldInference):
             Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods.
         """
 
-        if (
-            condition_mask is None
-            and self.latent_idx is None
-            or self.observed_idx is None
-        ):
-            raise ValueError(
-                "You did not pass a condition mask or latent and observed variable "
-                "indexes. You should either pass a condition mask "
-                "at build_posterior() time or provide some "
-                "latent and observed variable indexes at __init__. "
-                "If you already instanciated a Simformer and would like to "
-                "provide the conditon indexes, you can use the "
-                "setter function `set_condtion_indexes() or provide a condition mask "
-                "at next call on the build_posterior() method."
-            )
-
-        if condition_mask is None:
-            condition_mask = self._generate_condition_mask()
-
-        batch_dims = condition_mask.shape[:-1]
-        num_nodes = condition_mask.shape[-1]
-        if edge_mask is None:
-            edge_mask = torch.ones((num_nodes, num_nodes)).bool()
-            edge_mask = edge_mask.repeat(*batch_dims, 1, 1)
-
         return self._build_posterior(
-            condition_mask,
-            edge_mask,
+            condition_mask=condition_mask,
+            edge_mask=edge_mask,
             mvf_estimator=mvf_estimator,
             prior=prior,
             sample_with=sample_with,

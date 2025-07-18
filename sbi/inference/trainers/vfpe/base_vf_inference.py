@@ -1268,8 +1268,8 @@ class MaskedVectorFieldInference(MaskedNeuralInference, ABC):
 
     def _build_posterior(
         self,
-        condition_mask: Tensor,
-        edge_mask: Tensor,
+        condition_mask: Optional[Tensor] = None,
+        edge_mask: Optional[Tensor] = None,
         mvf_estimator: Optional[MaskedConditionalVectorFieldEstimator] = None,
         prior: Optional[Distribution] = None,
         sample_with: Literal['ode', 'sde'] = "sde",
@@ -1307,6 +1307,29 @@ class MaskedVectorFieldInference(MaskedNeuralInference, ABC):
             A `VectorFieldPosterior` object representing $p(theta|x)$ with
             `.sample()` and `.log_prob()` methods.
         """
+
+        if condition_mask is None and (
+            self.latent_idx is None or self.observed_idx is None
+        ):
+            raise ValueError(
+                "You did not pass a condition mask or latent and observed variable "
+                "indexes. You should either pass a condition mask "
+                "at build_posterior() time or provide some "
+                "latent and observed variable indexes at __init__. "
+                "If you already instanciated a Simformer and would like to "
+                "provide the conditon indexes, you can use the "
+                "setter function `set_condtion_indexes() or provide a condition mask "
+                "at next call on the build_posterior() method."
+            )
+
+        if condition_mask is None:
+            condition_mask = self._generate_condition_mask()
+
+        batch_dims = condition_mask.shape[:-1]
+        num_nodes = condition_mask.shape[-1]
+        if edge_mask is None:
+            edge_mask = torch.ones((num_nodes, num_nodes)).bool()
+            edge_mask = edge_mask.repeat(*batch_dims, 1, 1)
 
         if prior is None:
             cls_name = self.__class__.__name__
