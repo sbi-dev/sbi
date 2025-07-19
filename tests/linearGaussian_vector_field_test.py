@@ -591,9 +591,9 @@ def test_vector_field_iid_inference(
 # so some tests are skipped so far. This seems to be an issue with the
 # neural network architecture and can be addressed in PR #1501
 # Seems like an incompatible num_samples and num_trial (x_o) are passed
-@pytest.mark.skip(
-    reason="c2st too high for some cases, has to be fixed in PR #1501 or #1544"
-)
+# TODO: for jac_gauss after first sampling GradTrackingTensor appear
+# which cannot be accessed as a normal tensor throuh shapes, thus errors arise in the
+# simformer wrapper
 @pytest.mark.slow
 @pytest.mark.parametrize(
     "iid_method, num_trial",
