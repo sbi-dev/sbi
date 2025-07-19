@@ -587,10 +587,7 @@ def test_vector_field_iid_inference(
     )
 
 
-# TODO: Currently, c2st is too high for FMPE (e.g., > 3 number of observations),
-# so some tests are skipped so far. This seems to be an issue with the
-# neural network architecture and can be addressed in PR #1501
-# Seems like an incompatible num_samples and num_trial (x_o) are passed
+# TODO: Needs to fine-tune hyper-parameters
 # TODO: for jac_gauss after first sampling GradTrackingTensor appear
 # which cannot be accessed as a normal tensor throuh shapes, thus errors arise in the
 # simformer wrapper
