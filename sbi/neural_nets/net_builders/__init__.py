@@ -23,5 +23,6 @@ from sbi.neural_nets.net_builders.mdn import build_mdn
 from sbi.neural_nets.net_builders.mixed_nets import build_mnle, build_mnpe
 from sbi.neural_nets.net_builders.vector_field_nets import (
     build_flow_matching_estimator,
+    build_masked_score_matching_estimator,
     build_score_matching_estimator,
 )
