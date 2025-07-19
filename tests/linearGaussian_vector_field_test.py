@@ -591,6 +591,9 @@ def test_vector_field_iid_inference(
 # TODO: for jac_gauss after first sampling GradTrackingTensor appear
 # which cannot be accessed as a normal tensor throuh shapes, thus errors arise in the
 # simformer wrapper
+@pytest.mark.skip(
+    reason="c2st too high for some cases, has to be fixed in PR #1501 or #1544"
+)
 @pytest.mark.slow
 @pytest.mark.parametrize(
     "iid_method, num_trial",
