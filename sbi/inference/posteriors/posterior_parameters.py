@@ -19,7 +19,6 @@ from typing import (
 from sbi.inference.posteriors.vi_posterior import VIPosterior
 from sbi.sbi_types import PyroTransformedDistribution, TorchTransform
 from sbi.utils.typechecks import (
-    is_bool,
     is_nonnegative_int,
     is_positive_float,
     is_positive_int,
@@ -67,7 +66,7 @@ class PosteriorParameters(ABC):
         Performs runtime validation and type enforcement after dataclass initialization.
 
         - Enforces that fields annotated with `Literal[...]` contain valid values.
-        - Attempts to cast fields annotated as primitive types (int, float) to
+        - Attempts to cast fields annotated as primitive types (int, float, bool) to
           their expected types if not already correctly typed.
         - Calls the `validate()` method at the end for additional custom checks.
 
@@ -82,6 +81,8 @@ class PosteriorParameters(ABC):
             annotation = field.type
             target_type = cast(type, annotation)
 
+            # Check if the value is among the valid choices
+            # defined by a Literal annotation
             if get_origin(annotation) is Literal:
                 allowed = get_args(annotation)
                 if raw_value not in allowed:
@@ -89,7 +90,8 @@ class PosteriorParameters(ABC):
                         f"Field '{field_name}' must be one of {allowed},"
                         f" got {raw_value}"
                     )
-            elif target_type in (int, float):
+            # Attempt to cast primitive type values to ensure type correctness
+            elif target_type in (int, float, bool):
                 try:
                     value = target_type(raw_value)
                 except Exception as e:
@@ -98,8 +100,10 @@ class PosteriorParameters(ABC):
                         f"expected type {target_type}."
                     ) from e
 
+                # Overwrite the original field value with the converted value
                 object.__setattr__(self, field_name, value)
 
+        # Run additional validations specified in subclasses
         self.validate()
 
 
@@ -124,8 +128,6 @@ class DirectPosteriorParameters(PosteriorParameters):
 
         if not is_positive_int(self.max_sampling_batch_size):
             raise ValueError("max_sampling_batch_size must be greater than 0.")
-        if not is_bool(self.enable_transform):
-            raise TypeError("enable_transform must of type bool.")
 
 
 @dataclass(frozen=True)
@@ -319,8 +321,6 @@ class VectorFieldPosteriorParameters(PosteriorParameters):
     def validate(self):
         """Validate VectorFieldPosteriorParameters fields."""
 
-        if not is_bool(self.enable_transform):
-            raise TypeError("enable_transform must of type bool.")
         if not (self.iid_params is None or isinstance(self.iid_params, Dict)):
             raise TypeError("iid_params must be either None or of type Dict")
         if not (

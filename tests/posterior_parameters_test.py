@@ -26,6 +26,22 @@ from sbi.inference.potentials.vector_field_potential import VectorFieldBasedPote
 from sbi.utils.torchutils import BoxUniform
 
 
+@pytest.fixture(scope="session")
+def get_inference():
+    def simulator(theta):
+        return 1.0 + theta + torch.randn(theta.shape, device=theta.device) * 0.1
+
+    num_dim = 3
+    prior = BoxUniform(low=-2 * torch.ones(num_dim), high=2 * torch.ones(num_dim))
+    theta = prior.sample((300,))
+    x = simulator(theta)
+
+    inference = NRE(prior=prior)
+    inference.append_simulations(theta, x)
+    inference.train(max_num_epochs=1)
+    return inference
+
+
 @pytest.mark.parametrize(
     ("parameter_dataclass", "init_target_class", "skipped_fields_and_parameters"),
     [
@@ -169,12 +185,14 @@ def test_signature_consistency(
         ),
     ],
 )
-def test_build_posterior_warns_on_conflicting_args(build_posterior_arguments):
+def test_build_posterior_warns_on_conflicting_args(
+    build_posterior_arguments, get_inference
+):
     """
     Test that build_posterior raises a UserWarning on conflicting parameter
     combinations.
     """
-    inference = get_inference()
+    inference = get_inference
 
     with pytest.warns(UserWarning, match="ignored in favor of"):
         inference.build_posterior(**build_posterior_arguments)
@@ -197,12 +215,14 @@ def test_build_posterior_warns_on_conflicting_args(build_posterior_arguments):
         ),
     ],
 )
-def test_build_posterior_works_on_default_args(build_posterior_arguments):
+def test_build_posterior_works_on_default_args(
+    build_posterior_arguments, get_inference
+):
     """
     Test that build_posterior doesn't raise on default parameters.
     """
 
-    inference = get_inference()
+    inference = get_inference
     inference.build_posterior(**build_posterior_arguments)
 
 
@@ -232,12 +252,12 @@ def test_build_posterior_works_on_default_args(build_posterior_arguments):
         ),
     ],
 )
-def test_build_posterior_conflicting_params(build_posterior_arguments):
+def test_build_posterior_conflicting_params(build_posterior_arguments, get_inference):
     """
     Test whether build_posterior properly raises errors when incorrect
     posterior_parameters values are passed.
     """
-    inference = get_inference()
+    inference = get_inference
     inference.build_posterior(**build_posterior_arguments)
 
 
@@ -309,23 +329,47 @@ def test_valid_field_values(param_class):
         param_class(**valid_kwarg)
 
 
-def test_valid_primitive_type_conversion():
+@pytest.mark.parametrize(
+    ("posterior_parameter_class", "parameter_name", "value", "expected_type"),
+    [
+        pytest.param(
+            RejectionPosteriorParameters,
+            "num_iter_to_find_max",
+            100.0,
+            int,
+        ),
+        pytest.param(
+            RejectionPosteriorParameters,
+            "m",
+            1,
+            float,
+        ),
+        pytest.param(
+            DirectPosteriorParameters,
+            "enable_transform",
+            0,
+            bool,
+        ),
+    ],
+)
+def test_valid_primitive_type_conversion(
+    posterior_parameter_class, parameter_name, value, expected_type
+):
     """
-    Test whether primitive types(int, float) are properly converted
-    to their field annotation types.
+    Test whether primitive types are properly converted to their field annotation types.
     """
 
-    posterior_parameters = RejectionPosteriorParameters(m=1, num_iter_to_find_max=100.0)
-    assert isinstance(posterior_parameters.m, float) and isinstance(
-        posterior_parameters.num_iter_to_find_max, int
+    posterior_parameter = posterior_parameter_class(**{parameter_name: value})
+    field_value = getattr(posterior_parameter, parameter_name)
+    assert isinstance(field_value, expected_type), (
+        f"Expected parameter type={expected_type} but got {type(field_value)}",
     )
 
 
 @pytest.mark.xfail(raises=ValueError, reason="Type conversion failure")
 def test_invalid_primitive_conversion_failure():
     """
-    Test whether primitive types(int, float) conversion fails when invalid type
-    is passed.
+    Test whether primitive types conversion fails when invalid type is passed.
     """
 
     _ = RejectionPosteriorParameters(m="a")
@@ -341,18 +385,3 @@ def test_invalid_literal_field_values():
     """
 
     MCMCPosteriorParameters(method="invalid")
-
-
-def get_inference():
-    def simulator(theta):
-        return 1.0 + theta + torch.randn(theta.shape, device=theta.device) * 0.1
-
-    num_dim = 3
-    prior = BoxUniform(low=-2 * torch.ones(num_dim), high=2 * torch.ones(num_dim))
-    theta = prior.sample((300,))
-    x = simulator(theta)
-
-    inference = NRE(prior=prior)
-    inference.append_simulations(theta, x)
-    inference.train(max_num_epochs=1)
-    return inference
