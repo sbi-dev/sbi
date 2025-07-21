@@ -557,15 +557,14 @@ class NeuralInference(ABC):
             parameters.
         """
 
-        if posterior_parameters is not None and not isinstance(
-            posterior_parameters, PosteriorParameters
-        ):
-            raise TypeError(
-                "posterior_parameters must be PosteriorParameters,"
-                f" got {type(posterior_parameters).__name__}",
+        if posterior_parameters is not None:
+            self._validate_no_duplicate_parameters(**kwargs)
+            self._validate_posterior_parameters_consistency(
+                posterior_parameters, **kwargs
             )
-
-        if posterior_parameters is None:
+        else:
+            # Resolve parameters passed through kwargs and convert
+            # into a subclass of PosteriorParameters
             if sample_with == "direct":
                 params = kwargs.get("direct_sampling_parameters", {}) or {}
                 posterior_parameters = DirectPosteriorParameters(**params)
@@ -593,9 +592,6 @@ class NeuralInference(ABC):
                     "Posterior parameter construction not implemented for",
                     f"'{sample_with}'",
                 )
-        else:
-            self._validate_no_duplicate_parameters(**kwargs)
-            self._validate_method_consistency(posterior_parameters, **kwargs)
 
         return posterior_parameters
 
@@ -628,11 +624,11 @@ class NeuralInference(ABC):
                 f"and new-style posterior_parameters. Please use only one approach."
             )
 
-    def _validate_method_consistency(
+    def _validate_posterior_parameters_consistency(
         self, posterior_parameters: PosteriorParameters, **kwargs
     ) -> None:
         """
-        This method raises a warning for mistmatches between values passed in
+        This method raises a warning for mismatches between values passed in
         mcmc_method and MCMCPosteriorParameters.method, or vi_method and
         VIPosteriorParameters.vi_method.
 
@@ -642,7 +638,12 @@ class NeuralInference(ABC):
             kwargs: keyword arguments passed from build_posterior method.
         """
 
-        if isinstance(posterior_parameters, MCMCPosteriorParameters):
+        if not isinstance(posterior_parameters, PosteriorParameters):
+            raise TypeError(
+                "posterior_parameters must be PosteriorParameters,"
+                f" got {type(posterior_parameters).__name__}",
+            )
+        elif isinstance(posterior_parameters, MCMCPosteriorParameters):
             mcmc_method = kwargs.get("mcmc_method")
             if (
                 mcmc_method != "slice_np_vectorized"
@@ -703,7 +704,7 @@ class NeuralInference(ABC):
         if isinstance(posterior_parameters, DirectPosteriorParameters):
             posterior_estimator = estimator
             if not isinstance(posterior_estimator, ConditionalDensityEstimator):
-                raise ValueError(
+                raise TypeError(
                     f"Expected posterior_estimator to be an instance of "
                     " ConditionalDensityEstimator, "
                     f"but got {type(posterior_estimator).__name__} instead."
@@ -717,7 +718,7 @@ class NeuralInference(ABC):
         elif isinstance(posterior_parameters, VectorFieldPosteriorParameters):
             vector_field_estimator = estimator
             if not isinstance(vector_field_estimator, ConditionalVectorFieldEstimator):
-                raise ValueError(
+                raise TypeError(
                     f"Expected vector_field_estimator to be an instance of "
                     " ConditionalVectorFieldEstimator, "
                     f"but got {type(vector_field_estimator).__name__} instead."
