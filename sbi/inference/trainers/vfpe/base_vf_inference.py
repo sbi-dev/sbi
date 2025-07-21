@@ -831,23 +831,22 @@ class MaskedVectorFieldInference(MaskedNeuralInference, ABC):
                 torch.full((*batch_dims, num_nodes), 0.5, device=inputs.device)
             ).bool()
 
-            if num_nodes >= 2:
-                # Find rows that are all True or all False.
-                all_same = condition_masks.all(dim=-1) | (~condition_masks.any(dim=-1))
+            # Find rows that are all True or all False.
+            all_same = condition_masks.all(dim=-1) | (~condition_masks.any(dim=-1))
 
-                # If there are any such rows, flip a random element to ensure
-                # there's at least one True and one False.
-                if all_same.any():
-                    invalid_indices = torch.where(all_same)
+            # If there are any such rows, flip a random element to ensure
+            # there's at least one True and one False.
+            if all_same.any():
+                invalid_indices = torch.where(all_same)
 
-                    # For each invalid row, select a random column to flip.
-                    cols_to_flip = torch.randint(
-                        num_nodes, (invalid_indices[0].shape[0],), device=inputs.device
-                    )
+                # For each invalid row, select a random column to flip.
+                cols_to_flip = torch.randint(
+                    num_nodes, (invalid_indices[0].shape[0],), device=inputs.device
+                )
 
-                    # Create full indices for flipping and apply the flip.
-                    indices_to_flip = invalid_indices + (cols_to_flip,)
-                    condition_masks[indices_to_flip] = ~condition_masks[indices_to_flip]
+                # Create full indices for flipping and apply the flip.
+                indices_to_flip = invalid_indices + (cols_to_flip,)
+                condition_masks[indices_to_flip] = ~condition_masks[indices_to_flip]
 
         if edge_masks is None:
             edge_masks = torch.ones((num_nodes, num_nodes), device=inputs.device).bool()
@@ -1268,8 +1267,8 @@ class MaskedVectorFieldInference(MaskedNeuralInference, ABC):
 
     def _build_posterior(
         self,
-        condition_mask: Optional[Tensor] = None,
-        edge_mask: Optional[Tensor] = None,
+        condition_mask: Optional[Tensor | list] = None,
+        edge_mask: Optional[Tensor | list] = None,
         mvf_estimator: Optional[MaskedConditionalVectorFieldEstimator] = None,
         prior: Optional[Distribution] = None,
         sample_with: Literal['ode', 'sde'] = "sde",
@@ -1324,12 +1323,16 @@ class MaskedVectorFieldInference(MaskedNeuralInference, ABC):
 
         if condition_mask is None:
             condition_mask = self._generate_condition_mask()
+        else:
+            condition_mask = torch.as_tensor(condition_mask, dtype=torch.bool)
 
         batch_dims = condition_mask.shape[:-1]
         num_nodes = condition_mask.shape[-1]
         if edge_mask is None:
             edge_mask = torch.ones((num_nodes, num_nodes)).bool()
             edge_mask = edge_mask.repeat(*batch_dims, 1, 1)
+        else:
+            edge_mask = torch.as_tensor(edge_mask, dtype=torch.bool)
 
         if prior is None:
             cls_name = self.__class__.__name__

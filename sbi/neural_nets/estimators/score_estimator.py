@@ -642,8 +642,8 @@ class MaskedConditionalScoreEstimator(MaskedConditionalVectorFieldEstimator):
     def loss(
         self,
         input: Tensor,
-        condition_mask: Optional[Tensor] = None,
-        edge_mask: Optional[Tensor] = None,
+        condition_mask: Tensor,
+        edge_mask: Tensor,
         times: Optional[Tensor] = None,
         control_variate: bool = True,
         control_variate_threshold: float = 0.3,
@@ -717,11 +717,7 @@ class MaskedConditionalScoreEstimator(MaskedConditionalVectorFieldEstimator):
         # True score
         score_target = -eps / std_t
 
-        # If condition_mask is None, generate one with Bernoulli(p=0.33)
-        if condition_mask is None:
-            condition_mask = torch.bernoulli(torch.full((B, T), 0.33, device=device))
         condition_mask = condition_mask.bool()
-
         if condition_mask.dim() == 1:
             # Shape of condition_mask is [T], I unsqueeze for broadcasting on B and F
             input_noised = torch.where(
@@ -751,11 +747,7 @@ class MaskedConditionalScoreEstimator(MaskedConditionalVectorFieldEstimator):
                 f"condition_mask has incorrect dimensions: {condition_mask.shape}"
             )
 
-        # If edge_mask is None, generate one of all ones [T, T] (fully connected graph)
-        if edge_mask is None:
-            edge_mask = torch.ones(B, T, T, device=device)
         edge_mask = edge_mask.bool()
-
         if edge_mask.dim() == 2:
             # Shaoe is [T, T], expand to batch dimension
             edge_mask = edge_mask.unsqueeze(0).expand(B, T, T)
