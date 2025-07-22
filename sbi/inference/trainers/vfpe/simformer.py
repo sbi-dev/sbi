@@ -10,13 +10,13 @@ from torch.utils.tensorboard.writer import SummaryWriter
 from sbi.inference.posteriors.vector_field_posterior import VectorFieldPosterior
 from sbi.inference.trainers.vfpe.base_vf_inference import (
     MaskedVectorFieldEstimatorBuilder,
-    MaskedVectorFieldInference,
+    MaskedVectorFieldTrainer,
 )
 from sbi.neural_nets.estimators import MaskedConditionalVectorFieldEstimator
 from sbi.neural_nets.factory import simformer_nn
 
 
-class Simformer(MaskedVectorFieldInference):
+class Simformer(MaskedVectorFieldTrainer):
     """Simformer as in Gloeckler et al. (2024).
 
     Simformer enables sampling from arbitrary conditional joint distributions,
@@ -63,8 +63,7 @@ class Simformer(MaskedVectorFieldInference):
         Args:
             prior: Prior distribution. Its primary use is for rejecting samples that
                 fall outside its defined support. For the core inference process,
-                this prior is ignored, as the actual "prior" over which the diffusion
-                model operates is standard Gaussian noise.
+                this prior is ignored.
             mvf_estimator: Neural network architecture for the masked
                 vector field estimator. Can be a string (e.g., `'simformer'`)
                 or a callable that implements the `MaskedVectorFieldEstimatorBuilder`

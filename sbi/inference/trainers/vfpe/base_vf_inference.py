@@ -39,6 +39,7 @@ from sbi.utils import (
 from sbi.utils.sbiutils import (
     ImproperEmpirical,
     mask_sims_from_prior,
+    simformer_msg_on_invalid_x,
 )
 from sbi.utils.torchutils import assert_all_finite
 from sbi.utils.user_input_checks import validate_inputs_and_masks
@@ -69,9 +70,6 @@ class MaskedVectorFieldEstimatorBuilder(Protocol):
     def __call__(self, inputs: Tensor) -> MaskedConditionalVectorFieldEstimator:
         """Build a masked vector field estimator from inputs, which mainly inform
         the shape of the input to the neural network.
-
-        Generally, it can also be used to z-score the data, but not in the case
-        of masked vector field estimators.
 
         Args:
             inputs: Simulation outputs.
@@ -661,7 +659,7 @@ class VectorFieldTrainer(NeuralInference, ABC):
         return calibration_kernel(x) * loss
 
 
-class MaskedVectorFieldInference(MaskedNeuralInference, ABC):
+class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
@@ -685,8 +683,7 @@ class MaskedVectorFieldInference(MaskedNeuralInference, ABC):
         Args:
             prior: Prior distribution. Its primary use is for rejecting samples that
                 fall outside its defined support. For the core inference process,
-                this prior is ignored, as the actual "prior" over which the diffusion
-                model operates is standard Gaussian noise.
+                this prior is ignored.
             mvf_estimator_builder: Neural network architecture for the
                 masked vector field estimator. Can be a string (e.g. 'simformer')
                 or a callable that implements the `MaskedVectorFieldEstimatorBuilder`
@@ -768,7 +765,7 @@ class MaskedVectorFieldInference(MaskedNeuralInference, ABC):
         proposal: Optional[DirectPosterior] = None,
         exclude_invalid_x: Optional[bool] = None,
         data_device: Optional[str] = None,
-    ) -> "MaskedVectorFieldInference":
+    ) -> "MaskedVectorFieldTrainer":
         r"""Store parameters and simulation outputs to use them for later training.
 
         Data are stored as entries in lists for each type of variable (inputs/masks).
@@ -779,23 +776,26 @@ class MaskedVectorFieldInference(MaskedNeuralInference, ABC):
 
         Args:
             inputs: Simulation outputs.
-            condition_masks: A boolean mask indicating the role of each node.
-                Expected shape: `(batch_size, num_nodes)`.
-                - `True` (or `1`): The node at this position is observed and its
+            condition_masks: A boolean mask indicating the role of each variable.
+                Expected shape: `(batch_size, num_variables)`.
+                - `True` (or `1`): The variable at this position is observed and its
                     features will be used for conditioning.
-                - `False` (or `0`): The node at this position is latent and its
-                    parameters are subject to inference.
+                - `False` (or `0`): The variable at this position is latent and its
+                    features are subject to inference.
             edge_masks: A boolean mask defining the adjacency matrix of the directed
-                acyclic graph (DAG) representing dependencies among nodes.
-                Expected shape: `(batch_size, num_nodes, num_nodes)`.
-                - `True` (or `1`): An edge exists from the row node to the column node.
-                - `False` (or `0`): No edge exists between these nodes.
+                acyclic graph (DAG) representing dependencies among variables.
+                Expected shape: `(batch_size, num_variables, num_variables)`.
+                - `True` (or `1`): An edge exists from the row variable to the column
+                    variable.
+                - `False` (or `0`): No edge exists between these variables.
             proposal: The distribution that the inputs were sampled from.
                 Pass `None` if the parameters were sampled from the prior. Multi-round
                 training is not yet implemented, so anything other than `None` will
                 raise an error.
             exclude_invalid_x: Whether invalid simulations are discarded during
-                training. For single-round training, it is fine to discard invalid
+                training. More specifically, if `True` nan or inf entries will be
+                forced to be latent (to be infered) in the condition_mask.
+                For single-round training, it is fine to discard invalid
                 simulations, but for multi-round sequential (atomic) training,
                 discarding invalid simulations gives systematically wrong results. If
                 `None`, it will be `True` in the first round and `False` in later
@@ -860,23 +860,33 @@ class MaskedVectorFieldInference(MaskedNeuralInference, ABC):
             training_device=self._device,
         )
 
-        is_valid_input, num_nans, num_infs = handle_invalid_x(
+        # TODO: the following lines to manage invalid inputs could be handles
+        # more gracefuly using an handle_invalid_inputs() helper function
+        _, num_nans, num_infs = handle_invalid_x(
             inputs, exclude_invalid_x=exclude_invalid_x
         )
 
-        inputs = inputs[is_valid_input]
-        condition_masks = condition_masks[is_valid_input]
-        edge_masks = edge_masks[is_valid_input]
+        # Differently from other sbi methods, we can still allow invalid values
+        inputs_is_nan_entries = torch.isnan(inputs).any(dim=-1)
+        inputs_is_inf_entries = torch.isinf(inputs).any(dim=-1)
+        is_valid_inputs_entries = ~inputs_is_nan_entries & ~inputs_is_inf_entries
 
-        # Check for problematic z-scoring
-        warn_if_zscoring_changes_data(inputs)
+        # We will simply force invalid inputs to be latent
+        condition_masks = condition_masks & is_valid_inputs_entries
 
-        npe_msg_on_invalid_x(
+        # Overwrite invalid entries with numerically stable values
+        inputs[~is_valid_inputs_entries] = 0.0
+
+        # Warn the user if invalid inputs are found
+        simformer_msg_on_invalid_x(
             num_nans,
             num_infs,
             exclude_invalid_x,
             algorithm=f"Single-round {inference_name}",
         )
+
+        # Check for problematic z-scoring
+        warn_if_zscoring_changes_data(inputs)
 
         self._data_round_index.append(current_round)
         prior_masks = mask_sims_from_prior(int(current_round > 0), inputs.size(0))

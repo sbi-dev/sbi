@@ -947,13 +947,12 @@ class MaskedNeuralInference(NeuralInference):
             condition_masks: Mask defining which variables in `inputs` are latent
                 or observed.
             edge_masks: Mask defining dependencies among variables in `inputs`,
-                equivalent to the adjacency mask in the DAG. If `None` it
+                equivalent to the adjacency matrix in the DAG. If `None` it
                 defaults to all ones, i.e., all variables attend each other
             exclude_invalid_x: Whether invalid simulations are discarded during
                 training. If `False`, The inference algorithm raises an error when
-                invalid simulations are found. If `True`, invalid simulations are
-                discarded and training can proceed, but this gives systematically wrong
-                results.
+                invalid simulations are found. If `True`, nan or inf entries will be
+                forced to be latent (to be infered) in the condition_mask.
             from_round: Which round the data stemmed from. Round 0 means from the prior.
                 With default settings, this is not used at all for the inference
                 algorithm. Only when the user later on requests

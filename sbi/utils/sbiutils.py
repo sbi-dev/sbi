@@ -402,6 +402,25 @@ def nle_nre_apt_msg_on_invalid_x(
             )
 
 
+def simformer_msg_on_invalid_x(
+    num_nans: int, num_infs: int, exclude_invalid_x: bool, algorithm: str
+) -> None:
+    if num_nans + num_infs > 0:
+        if exclude_invalid_x:
+            logging.warning(
+                f"Found {num_nans} NaN simulations and {num_infs} Inf simulations. "
+                "Samples presenting invalid entries will be forced to be latent in "
+                "the condition mask"
+            )
+        else:
+            logging.warning(
+                f"Found {num_nans} NaN simulations and {num_infs} Inf simulations. "
+                "They are not excluded from training due to `exclude_invalid_x=False`."
+                "Training will likely fail, we strongly recommend "
+                f"`exclude_invalid_x=True` for {algorithm}."
+            )
+
+
 def check_warn_and_setstate(
     state_dict: Dict,
     key_name: str,
