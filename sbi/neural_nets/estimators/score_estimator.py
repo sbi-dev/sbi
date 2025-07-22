@@ -690,9 +690,22 @@ class MaskedConditionalScoreEstimator(MaskedConditionalVectorFieldEstimator):
 
         """
         device = input.device
-        if input.dim() == 2:
-            # input is [T, F], unsqueeze batch dimension
+        if input.dim() == 1:
+            # Input is [T], unsqueeze batch and features dimension
+            input = input.unsqueeze(0).unsqueeze(-1)
+        elif input.dim() == 2:
+            # Input is [T, F], unsqueeze batch dimension
             input = input.unsqueeze(0)
+        elif input.dim() == 3:
+            # Already correct shape [B, T, F]
+            pass
+        else:
+            raise ValueError(
+                f"input has incorrect dimensions: {input.shape}"
+                f"input should have at most 3 dimensions "
+                f"but data passed had {input.dim()}"
+            )
+
         B, T, F = input.shape
 
         # Sample times if not provided
@@ -734,17 +747,11 @@ class MaskedConditionalScoreEstimator(MaskedConditionalVectorFieldEstimator):
                 input,
                 input_noised,
             )
-        elif condition_mask.dim() == 2:
-            # Shape of condition_mask is already [B, T, F], No need for broadcasting
-            input_noised = torch.where(
-                # Where condition_mask is True, use input (observed)
-                condition_mask,
-                input,
-                input_noised,
-            )
         else:
             raise ValueError(
-                f"condition_mask has incorrect dimensions: {condition_mask.shape}"
+                f"condition_mask has incorrect dimensions: {condition_mask.shape} "
+                f"condition_mask should have shape [T] or [B, T], where T is "
+                f"the number of nodes and B is the batch size."
             )
 
         edge_mask = edge_mask.bool()
@@ -755,7 +762,11 @@ class MaskedConditionalScoreEstimator(MaskedConditionalVectorFieldEstimator):
             # Already correct shape [B, T, T]
             pass
         else:
-            raise ValueError(f"edge_mask has incorrect dimensions: {edge_mask.shape}")
+            raise ValueError(
+                f"edge_mask has incorrect dimensions: {edge_mask.shape}"
+                f"edge_mask should have shape [T, T] or [B, T, T], where T is "
+                f"the number of nodes and B is the batch size."
+            )
 
         # Model prediction
         score_pred = self.forward(
