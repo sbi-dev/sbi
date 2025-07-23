@@ -1216,8 +1216,8 @@ class VectorFieldSimformer(MaskedVectorFieldNet):
         dim_cond: int = 16,
         time_embedding_dim: int = 16,
         hidden_features: int = 128,
-        num_blocks: int = 4,
-        num_heads: int = 8,
+        num_layers: int = 4,
+        num_heads: int = 4,
         mlp_ratio: int = 2,
         ada_time: int = False,
         time_emb_type: str = "random_fourier",
@@ -1235,7 +1235,7 @@ class VectorFieldSimformer(MaskedVectorFieldNet):
         self.dim_hidden = (
             hidden_features  # Dimension of the latent space in the transformer blocks
         )
-        self.num_blocks = num_blocks  # Number of transformer blocks to stack
+        self.num_layers = num_layers  # Number of transformer blocks to stack
         self.num_heads = (
             num_heads  # Number of attention heads per each transformer block
         )
@@ -1271,7 +1271,7 @@ class VectorFieldSimformer(MaskedVectorFieldNet):
         Block = MaskedDiTBlock if ada_time else MaskedTimeAdditiveBlock
         self.blocks = nn.ModuleList([
             Block(hidden_features, time_embedding_dim, num_heads, mlp_ratio, activation)
-            for _ in range(num_blocks)
+            for _ in range(num_layers)
         ])
 
         # Output projection
@@ -1606,7 +1606,7 @@ def build_simformer_network(
         dim_cond=dim_cond,
         time_embedding_dim=time_embedding_dim,
         hidden_features=hidden_features,
-        num_blocks=num_layers,
+        num_layers=num_layers,
         num_heads=num_heads,
         mlp_ratio=mlp_ratio,
         ada_time=ada_time,
