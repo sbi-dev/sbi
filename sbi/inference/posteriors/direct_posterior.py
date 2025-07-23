@@ -219,8 +219,8 @@ class DirectPosterior(NeuralPosterior):
         # throw warning if num_x * num_samples is too large
         if num_xos * num_samples > 2**21:  # 2 million-ish
             warnings.warn(
-                "Note that for batched sampling, the direct posterior sampling "
-                "generates {num_xos} * {num_samples} = {num_xos * num_samples} "
+                f"Note that for batched sampling, the direct posterior sampling "
+                f"generates {num_xos} * {num_samples} = {num_xos * num_samples} "
                 "samples. This can be slow and memory-intensive. Consider "
                 "reducing the number of samples or batch size.",
                 stacklevel=2,
@@ -231,6 +231,16 @@ class DirectPosterior(NeuralPosterior):
             if max_sampling_batch_size is None
             else max_sampling_batch_size
         )
+
+        # Adjust max_sampling_batch_size to avoid excessive memory usage
+        if max_sampling_batch_size * num_xos > 100_000:
+            capped = max(1, 100_000 // num_xos)
+            warnings.warn(
+                f"Capping max_sampling_batch_size from {max_sampling_batch_size} "
+                f"to {capped} to avoid excessive memory usage.",
+                stacklevel=2,
+            )
+            max_sampling_batch_size = capped
 
         samples = rejection.accept_reject_sample(
             proposal=self.posterior_estimator.sample,
