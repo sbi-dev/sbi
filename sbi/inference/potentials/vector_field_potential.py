@@ -66,7 +66,7 @@ class VectorFieldBasedPotential(BasePotential):
         device: Union[str, torch.device] = "cpu",
         iid_method: Literal["fnpe", "gauss", "auto_gauss", "jac_gauss"] = "auto_gauss",
         iid_params: Optional[Dict[str, Any]] = None,
-        neural_ode_backend: str = "zuko",
+        neural_ode_backend: Literal["zuko"] = "zuko",
         neural_ode_kwargs: Optional[Dict[str, Any]] = None,
     ):
         r"""

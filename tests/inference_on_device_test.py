@@ -197,12 +197,10 @@ def test_training_and_mcmc_on_device(
         elif sampling_method in ["rejection", "direct"]:
             # all other cases: rejection, direct
             posterior = inferer.build_posterior(
+                prior=prior
+                if sampling_method == "rejection" and method == NPE_C
+                else None,
                 sample_with=sampling_method,
-                rejection_sampling_parameters=(
-                    {"proposal": prior}
-                    if sampling_method == "rejection" and method == NPE_C
-                    else {}
-                ),
             )
         else:
             # build potential for NLE or NRE and construct ImportanceSamplingPosterior
@@ -685,7 +683,6 @@ def test_to_method_on_posteriors(device: str, sampling_method: str):
         posterior = inference.build_posterior(
             density_estimator=estimator,
             prior=prior,
-            rejection_sampling_parameters={"proposal": prior},
             sample_with=sampling_method,
         )
     else:

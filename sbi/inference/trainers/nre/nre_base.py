@@ -15,6 +15,12 @@ from torch.utils.tensorboard.writer import SummaryWriter
 from typing_extensions import Self
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
+from sbi.inference.posteriors.posterior_parameters import (
+    ImportanceSamplingPosteriorParameters,
+    MCMCPosteriorParameters,
+    RejectionPosteriorParameters,
+    VIPosteriorParameters,
+)
 from sbi.inference.potentials import ratio_estimator_based_potential
 from sbi.inference.potentials.ratio_based_potential import RatioBasedPotential
 from sbi.inference.trainers.base import NeuralInference
@@ -346,6 +352,14 @@ class RatioEstimatorTrainer(NeuralInference, ABC):
         vi_parameters: Optional[Dict[str, Any]] = None,
         rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
         importance_sampling_parameters: Optional[Dict[str, Any]] = None,
+        posterior_parameters: Optional[
+            Union[
+                MCMCPosteriorParameters,
+                VIPosteriorParameters,
+                RejectionPosteriorParameters,
+                ImportanceSamplingPosteriorParameters,
+            ]
+        ] = None,
     ) -> NeuralPosterior:
         r"""Build posterior from the neural density estimator.
 
@@ -380,6 +394,12 @@ class RatioEstimatorTrainer(NeuralInference, ABC):
                 `RejectionPosterior`.
             importance_sampling_parameters: Additional kwargs passed to
                 `ImportanceSamplingPosterior`.
+            posterior_parameters: Configuration passed to the init method for the
+                posterior. Must be one of the following:
+                - `VIPosteriorParameters`
+                - `ImportanceSamplingPosteriorParameters`
+                - `MCMCPosteriorParameters`
+                - `RejectionPosteriorParameters`
 
         Returns:
             Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods
@@ -389,6 +409,7 @@ class RatioEstimatorTrainer(NeuralInference, ABC):
             density_estimator,
             prior,
             sample_with,
+            posterior_parameters,
             mcmc_method=mcmc_method,
             vi_method=vi_method,
             mcmc_parameters=mcmc_parameters,

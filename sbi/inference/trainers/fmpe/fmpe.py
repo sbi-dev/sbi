@@ -9,6 +9,7 @@ from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi import utils as utils
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
+from sbi.inference.posteriors.posterior_parameters import VectorFieldPosteriorParameters
 from sbi.inference.trainers.npse.vector_field_inference import (
     VectorFieldEstimatorBuilder,
     VectorFieldTrainer,
@@ -65,6 +66,7 @@ class FMPE(VectorFieldTrainer):
         prior: Optional[Distribution] = None,
         sample_with: Literal["ode", "sde"] = "ode",
         vectorfield_sampling_parameters: Optional[Dict[str, Any]] = None,
+        posterior_parameters: Optional[VectorFieldPosteriorParameters] = None,
     ) -> NeuralPosterior:
         r"""Build posterior from the flow matching estimator.
 
@@ -89,16 +91,19 @@ class FMPE(VectorFieldTrainer):
                 a numerical ODE solver.
             vectorfield_sampling_parameters: Additional keyword arguments passed to
                 `VectorFieldPosterior`.
-
+            posterior_parameters: Configuration passed to the init method for
+                VectorFieldPosterior.
 
         Returns:
             Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods.
         """
+
         return super().build_posterior(
             estimator=vector_field_estimator,
             prior=prior,
             sample_with=sample_with,
             vectorfield_sampling_parameters=vectorfield_sampling_parameters,
+            posterior_parameters=posterior_parameters,
         )
 
     def _build_default_nn_fn(self, **kwargs) -> VectorFieldEstimatorBuilder:
