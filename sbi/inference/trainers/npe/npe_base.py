@@ -527,6 +527,11 @@ class PosteriorEstimatorTrainer(NeuralInference, ABC):
             Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods
             (the returned log-probability is unnormalized).
         """
+
+        self._check_prior_for_rejection_sampling(
+            prior, sample_with, posterior_parameters
+        )
+
         return super().build_posterior(
             density_estimator,
             prior,
@@ -568,6 +573,50 @@ class PosteriorEstimatorTrainer(NeuralInference, ABC):
             x_o=None,
         )
         return potential_fn, theta_transform
+
+    def _check_prior_for_rejection_sampling(
+        self,
+        prior: Optional[Distribution],
+        sample_with: Literal["mcmc", "rejection", "vi", "importance", "direct"],
+        posterior_parameters: Optional[
+            Union[
+                DirectPosteriorParameters,
+                MCMCPosteriorParameters,
+                VIPosteriorParameters,
+                RejectionPosteriorParameters,
+                ImportanceSamplingPosteriorParameters,
+            ]
+        ],
+    ) -> None:
+        """
+        Validates that when using rejection sampling, a prior distribution
+        is explicitly provided.
+
+        Args:
+            prior: Prior distribution.
+            sample_with: The sampling method used. Must be one of
+                "mcmc", "rejection", "vi", "importance", or "direct".
+            posterior_parameters: Configuration for building the posterior.
+        """
+
+        if sample_with == "rejection" and prior is None:
+            raise ValueError(
+                "You passed `sample_with='rejection' but you did not specify a "
+                "`prior`. Until sbi v0.22.0, this was interpreted as directly"
+                " sampling from the posterior. As of sbi v0.23.0, you instead have"
+                " to use `sample_with='direct'` to do so."
+            )
+        elif (
+            isinstance(posterior_parameters, RejectionPosteriorParameters)
+            and prior is None
+        ):
+            raise ValueError(
+                "You passed `posterior_parameters=RejectionPosteriorParameters`"
+                " but you did not specify a `prior`. Until sbi v0.22.0, this "
+                "was interpreted as directly sampling from the posterior. As of "
+                "sbi v0.23.0, you instead have to use "
+                "`posterior_parameters=DirectPosteriorParameters` to do so."
+            )
 
     def _loss(
         self,
