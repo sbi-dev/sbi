@@ -209,12 +209,12 @@ class VectorFieldTrainer(NeuralInference, ABC):
         training_batch_size: int = 200,
         learning_rate: float = 5e-4,
         validation_fraction: float = 0.1,
-        stop_after_epochs: int = 50,
-        max_num_epochs: int = 500,
+        stop_after_epochs: int = 20,
+        max_num_epochs: int = 2**31 - 1,
         clip_max_norm: Optional[float] = 5.0,
         calibration_kernel: Optional[Callable] = None,
         ema_loss_decay: float = 0.1,
-        validation_times: Union[Tensor, int] = 20,
+        validation_times: Union[Tensor, int] = 10,
         resume_training: bool = False,
         force_first_round_loss: bool = False,
         discard_prior_samples: bool = False,
@@ -340,8 +340,13 @@ class VectorFieldTrainer(NeuralInference, ABC):
         self._neural_net.to(self._device)
 
         if isinstance(validation_times, int):
+            # NOTE: We add a nugget to t_min as t_min is the boundary of the training
+            # domain and hence can be "unstable" and is not a good choice for
+            # evaluation. Same for flow mathching but with t_max
             validation_times = torch.linspace(
-                self._neural_net.t_min, self._neural_net.t_max, validation_times
+                self._neural_net.t_min + 0.05,
+                self._neural_net.t_max - 0.05,
+                validation_times,
             )
         assert isinstance(
             validation_times, Tensor
@@ -431,6 +436,8 @@ class VectorFieldTrainer(NeuralInference, ABC):
                         times_batch, *([1] * (masks_batch.ndim - 1))
                     )
 
+                    # This will repeat the validation times for each batch in the
+                    # validation set.
                     validation_times_rep = validation_times.repeat_interleave(
                         val_batch_size, dim=0
                     )
@@ -485,6 +492,71 @@ class VectorFieldTrainer(NeuralInference, ABC):
         self._neural_net.zero_grad(set_to_none=True)
 
         return deepcopy(self._neural_net)
+
+    def _converged(self, epoch: int, stop_after_epochs: int) -> bool:
+        """Return whether the training converged yet and save best model state so far.
+
+        Uses a statistical approach to detect convergence by tracking the running mean
+        and standard deviation of validation losses. Training is considered converged
+        when the current loss is statistically significantly worse than the best loss
+        for a sustained period, accounting for natural fluctuations in the loss.
+
+        Args:
+            epoch: Current epoch in training.
+            stop_after_epochs: How many fruitless epochs to let pass before stopping.
+
+        Returns:
+            Whether the training has stopped improving, i.e. has converged.
+        """
+        converged = False
+
+        assert self._neural_net is not None
+        neural_net = self._neural_net
+
+        # Initialize tracking variables if not exists
+        if not hasattr(self, '_best_val_loss'):
+            self._best_val_loss = float('inf')
+            self._epochs_since_last_improvement = 0
+            self._best_model_state_dict = None
+
+        # Check if we have a new best loss
+        if self._val_loss < self._best_val_loss:
+            self._best_val_loss = self._val_loss
+            self._epochs_since_last_improvement = 0
+            self._best_model_state_dict = deepcopy(neural_net.state_dict())
+        else:
+            # Only start statistical analysis after we have enough data
+            if len(self._summary["validation_loss"]) >= stop_after_epochs:
+                # Calculate running statistics of recent losses
+                recent_losses = torch.tensor(
+                    self._summary["validation_loss"][-stop_after_epochs * 2 :]
+                )
+                loss_std = recent_losses.std().item()
+
+                # Calculate how many standard deviations the current loss is from the
+                # best
+                diff_to_best_normalized = (
+                    self._val_loss - self._best_val_loss
+                ) / loss_std
+                # Consider it "no improvement" if current loss is significantly
+                # worse than the best loss (more than 2 std deviations above best)
+                # This accounts for natural fluctuations while being sensitive to
+                # real degradation
+                if diff_to_best_normalized > 2.0:
+                    self._epochs_since_last_improvement += 1
+                else:
+                    # Reset counter if loss is within acceptable range
+                    self._epochs_since_last_improvement = 0
+            else:
+                return False
+
+        # If no validation improvement over many epochs, stop training.
+        if self._epochs_since_last_improvement > stop_after_epochs - 1:
+            if self._best_model_state_dict is not None:
+                neural_net.load_state_dict(self._best_model_state_dict)
+            converged = True
+
+        return converged
 
     def _get_potential_function(
         self, prior: Distribution, estimator: ConditionalVectorFieldEstimator
