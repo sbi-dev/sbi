@@ -861,6 +861,7 @@ class MaskedNeuralInference(NeuralInference):
         # Initialize roundwise (inputs, prior_masks) for storage of parameters,
         # simulations and masks indicating if simulations came from prior.
         self._inputs_roundwise = []
+        self._valid_inputs_mask_roundwise = []
         self._prior_masks = []
         self._model_bank = []
 
@@ -895,7 +896,7 @@ class MaskedNeuralInference(NeuralInference):
     def get_simulations(
         self,
         starting_round: int = 0,
-    ) -> Tuple[Tensor, Tensor]:
+    ) -> Tuple[Tensor, Tensor, Tensor]:
         r"""Returns all inputs, condition_masks, edge_masks and prior_masks
         from rounds >= `starting_round`.
 
@@ -913,11 +914,14 @@ class MaskedNeuralInference(NeuralInference):
         inputs = get_simulations_since_round(
             self._inputs_roundwise, self._data_round_index, starting_round
         )
+        valid_inputs_mask = get_simulations_since_round(
+            self._valid_inputs_mask_roundwise, self._data_round_index, starting_round
+        )
         prior_masks = get_simulations_since_round(
             self._prior_masks, self._data_round_index, starting_round
         )
 
-        return inputs, prior_masks
+        return inputs, valid_inputs_mask, prior_masks
 
     @abstractmethod
     def append_simulations(
@@ -981,9 +985,9 @@ class MaskedNeuralInference(NeuralInference):
         """
 
         #
-        inputs, prior_masks = self.get_simulations(starting_round)
+        inputs, valid_inputs_mask, prior_masks = self.get_simulations(starting_round)
 
-        dataset = data.TensorDataset(inputs, prior_masks)
+        dataset = data.TensorDataset(inputs, valid_inputs_mask, prior_masks)
 
         # Get total number of training examples.
         num_examples = inputs.size(0)

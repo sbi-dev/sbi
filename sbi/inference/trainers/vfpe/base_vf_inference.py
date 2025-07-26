@@ -814,10 +814,8 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
         inputs_is_inf_entries = torch.isinf(inputs).any(dim=-1)
         is_valid_inputs_entries = ~inputs_is_nan_entries & ~inputs_is_inf_entries
 
-        if exclude_invalid_x:
-            self._is_valid_inputs_entries = is_valid_inputs_entries
-        else:
-            self._is_valid_inputs_entries = torch.ones_like(is_valid_inputs_entries)
+        if not exclude_invalid_x:
+            is_valid_inputs_entries = torch.ones_like(is_valid_inputs_entries)
 
         # Warn the user if invalid inputs are found
         simformer_msg_on_invalid_x(
@@ -834,6 +832,7 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
         prior_masks = mask_sims_from_prior(int(current_round > 0), inputs.size(0))
 
         self._inputs_roundwise.append(inputs)
+        self._valid_inputs_mask_roundwise.append(is_valid_inputs_entries)
         self._prior_masks.append(prior_masks)
 
         self._proposal_roundwise.append(proposal)
@@ -966,7 +965,7 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
         # arguments, which will build the neural network.
         if self._neural_net is None or retrain_from_scratch:
             # Get theta,x to initialize NN
-            inputs, _ = self.get_simulations(starting_round=start_idx)
+            inputs, _, _ = self.get_simulations(starting_round=start_idx)
             # Use only training data for building the neural net (z-scoring transforms)
 
             self._neural_net = self._build_neural_net(
@@ -1008,16 +1007,23 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
                 # Get batches on current device.
                 (
                     inputs_batch,
+                    valid_inputs_mask_batch,
                     prior_masks_batch,
                 ) = (
                     batch[0].to(self._device),
                     batch[1].to(self._device),
+                    batch[2].to(self._device),
                 )
 
                 # Generate condition and edge masks for current batch
-                condition_masks_batch = self._condition_mask_generator(inputs_batch).to(
-                    self._device
-                )
+                condition_masks_batch = (
+                    self._condition_mask_generator(inputs_batch)
+                    & valid_inputs_mask_batch
+                ).to(self._device)
+
+                # Default placeholder value to avoid inf and nan
+                inputs_batch[~valid_inputs_mask_batch] = 0.0
+
                 edge_masks_batch = self._edge_mask_generator(inputs_batch)
                 if edge_masks_batch is not None:
                     edge_masks_batch = edge_masks_batch.to(self._device)
@@ -1067,24 +1073,29 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
             with torch.no_grad():
                 for batch in val_loader:
                     (
-                        inputs_batch,
-                        prior_masks_batch,
+                        inputs_batch_val,
+                        valid_inputs_mask_batch_val,
+                        prior_masks_batch_val,
                     ) = (
                         batch[0].to(self._device),
                         batch[1].to(self._device),
+                        batch[2].to(self._device),
                     )
 
                     # For validation loss, we evaluate at a fixed set of times to reduce
                     # the variance in the validation loss, for improved convergence
                     # checks. We evaluate the entire validation batch at all times, so
                     # we repeat the batches here to match.
-                    val_batch_size = inputs_batch.shape[0]
+                    val_batch_size = inputs_batch_val.shape[0]
                     times_batch = validation_times.shape[0]
-                    inputs_batch = inputs_batch.repeat(
-                        times_batch, *([1] * (inputs_batch.ndim - 1))
+                    inputs_batch_val = inputs_batch_val.repeat(
+                        times_batch, *([1] * (inputs_batch_val.ndim - 1))
                     )
-                    prior_masks_batch = prior_masks_batch.repeat(
-                        times_batch, *([1] * (prior_masks_batch.ndim - 1))
+                    valid_inputs_mask_batch_val = valid_inputs_mask_batch_val.repeat(
+                        times_batch, *([1] * (valid_inputs_mask_batch_val.ndim - 1))
+                    )
+                    prior_masks_batch_val = prior_masks_batch_val.repeat(
+                        times_batch, *([1] * (prior_masks_batch_val.ndim - 1))
                     )
 
                     # This will repeat the validation times for each batch in the
@@ -1094,19 +1105,20 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
                     )
 
                     # Generate condition and edge masks for current batch
-                    condition_masks_batch = self._condition_mask_generator(
-                        inputs_batch
+                    condition_masks_batch_val = (
+                        self._condition_mask_generator(inputs_batch_val)
+                        & valid_inputs_mask_batch_val
                     ).to(self._device)
-                    edge_masks_batch = self._edge_mask_generator(inputs_batch)
-                    if edge_masks_batch is not None:
-                        edge_masks_batch = edge_masks_batch.to(self._device)
+                    edge_masks_batch_val = self._edge_mask_generator(inputs_batch_val)
+                    if edge_masks_batch_val is not None:
+                        edge_masks_batch_val = edge_masks_batch_val.to(self._device)
 
                     # Take negative loss here to get validation log_prob.
                     val_losses = self._loss(
-                        inputs=inputs_batch,
-                        condition_masks=condition_masks_batch,
-                        edge_masks=edge_masks_batch,
-                        masks=prior_masks_batch,
+                        inputs=inputs_batch_val,
+                        condition_masks=condition_masks_batch_val,
+                        edge_masks=edge_masks_batch_val,
+                        masks=prior_masks_batch_val,
                         proposal=proposal,
                         calibration_kernel=calibration_kernel,
                         times=validation_times_rep,
