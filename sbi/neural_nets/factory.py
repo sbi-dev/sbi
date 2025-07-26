@@ -32,6 +32,7 @@ from sbi.neural_nets.net_builders.mdn import build_mdn
 from sbi.neural_nets.net_builders.mixed_nets import build_mnle, build_mnpe
 from sbi.neural_nets.net_builders.vector_field_nets import (
     build_flow_matching_estimator,
+    build_masked_score_matching_estimator,
     build_score_matching_estimator,
 )
 from sbi.utils.nn_utils import check_net_device
@@ -71,6 +72,99 @@ class ZukoFlowType(Enum):
 
 embedding_net_warn_msg = """The passed embedding net will be moved to cpu for
                         constructing the net building function."""
+
+
+def simformer_nn(
+    model: str = "simformer",
+    sde_type: str = "ve",
+    hidden_features: int = 100,
+    num_heads: int = 4,
+    num_layers: int = 8,
+    mlp_ratio: int = 2,
+    time_embedding_dim: int = 32,
+    embedding_net: nn.Module = nn.Identity(),
+    dim_val: int = 64,
+    dim_id: int = 32,
+    dim_cond: int = 16,
+    ada_time: bool = False,
+    **kwargs: Any,
+) -> Callable:
+    r"""
+
+
+    Returns a function that builds a Simformer for learning arbitrary distributions.
+
+    The returned function is to be passed to the inference class when using the flexible
+    interface.
+
+    Note that in the view of the Simformer, there is no theta or x, just inputs with
+    variable condition and edge masks defining relationships between variables.
+
+    Args:
+        model (str): Name of the model architecture to use. Default is "simformer".
+        sde_type (str): Type of stochastic differential equation (SDE) to use.
+        hidden_features (int): Number of hidden features in each layer. Default is 100.
+        num_heads (int): Number of attention heads in the transformer layers.
+        num_layers (int): Number of transformer layers. Default is 8.
+        mlp_ratio (int): Ratio of MLP hidden dimension to embedding dimension.
+        time_embedding_dim (int): Dimension of the time embedding.
+        embedding_net (nn.Module): Optional embedding network to preprocess inputs.
+        dim_val (int): Dimension of value embeddings.
+        dim_id (int): Dimension of identifier embeddings.
+        dim_cond (int): Dimension of conditional embeddings.
+        ada_time (bool): Whether to use adaptive time embeddings.
+        **kwargs (Any): Additional keyword arguments passed to the underlying estimator
+            builder.
+    Returns:
+        Callable: A function that takes batch inputs and returns a masked score
+            matching estimator.
+
+    """
+
+    kwargs = dict(
+        zip(
+            (
+                "hidden_features",
+                "num_heads",
+                "num_layers",
+                "mlp_ratio",
+                "embedding_net",
+                "time_embedding_dim",
+                "dim_val",
+                "dim_id",
+                "dim_cond",
+                "ada_time",
+                "net",
+            ),
+            (
+                hidden_features,
+                num_heads,
+                num_layers,
+                mlp_ratio,
+                check_net_device(embedding_net, "cpu", embedding_net_warn_msg),
+                time_embedding_dim,
+                dim_val,
+                dim_id,
+                dim_cond,
+                ada_time,
+                model,
+            ),
+            strict=False,
+        ),
+        **kwargs,
+    )
+
+    def build_fn(
+        batch_inputs,
+    ):
+        # Build the score matching estimator
+        return build_masked_score_matching_estimator(
+            batch_x=batch_inputs,
+            batch_y=batch_inputs,  # Unused, only for compatibility
+            **kwargs,
+        )
+
+    return build_fn
 
 
 def classifier_nn(
