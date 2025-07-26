@@ -645,7 +645,7 @@ class MaskedConditionalVectorFieldEstimator(MaskedConditionalEstimator, ABC):
         input: Tensor,
         times: Tensor,
         condition_mask: Tensor,
-        edge_mask: Tensor,
+        edge_mask: Optional[Tensor],
     ) -> Tensor:
         r"""ODE flow function :math:`v(\theta_t, t, x_o)` of the vector field estimator.
 
@@ -985,7 +985,10 @@ class MaskedConditionalVectorFieldEstimatorWrapper(ConditionalVectorFieldEstimat
         full_inputs_tensor = self._assemble_full_inputs(input, condition)  # (B, T, F)
         B = full_inputs_tensor.shape[0]
         expanded_cond_mask = self._fixed_condition_mask.unsqueeze(0).expand(B, -1)
-        expanded_edge_mask = self._fixed_edge_mask.unsqueeze(0).expand(B, -1, -1)
+        if self._fixed_edge_mask is not None:
+            expanded_edge_mask = self._fixed_edge_mask.unsqueeze(0).expand(B, -1, -1)
+        else:
+            expanded_edge_mask = None
 
         # original_estimator.ode_fn returns (B, T, F)
         full_outputs_ode = self._original_estimator.ode_fn(
