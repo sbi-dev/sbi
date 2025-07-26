@@ -1024,7 +1024,8 @@ class MaskedNeuralInference(NeuralInference):
         return train_loader, val_loader
 
     def set_condition_masks(
-        self, condition_mask_generator: Union[Callable, Tensor, list, set]
+        self,
+        condition_mask_generator: Union[Callable[[Tensor], Tensor], Tensor, list, set],
     ):
         if isinstance(condition_mask_generator, Callable):
             self._condition_mask_generator = condition_mask_generator
@@ -1041,7 +1042,9 @@ class MaskedNeuralInference(NeuralInference):
             self._condition_mask_generator = generator
         return self  # Chainable
 
-    def set_edge_masks(self, edge_mask_generator: Union[Callable, Tensor, list, set]):
+    def set_edge_masks(
+        self, edge_mask_generator: Union[Callable[[Tensor], Tensor], Tensor, list, set]
+    ):
         if isinstance(edge_mask_generator, Callable):
             self._edge_mask_generator = edge_mask_generator
         elif isinstance(edge_mask_generator, Tensor):

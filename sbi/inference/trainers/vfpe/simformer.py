@@ -113,7 +113,7 @@ class Simformer(MaskedVectorFieldTrainer):
     def build_conditional(
         self,
         condition_mask: Union[Tensor, list],
-        edge_mask: Optional[Tensor],
+        edge_mask: Optional[Tensor] = None,
         mvf_estimator: Optional[MaskedConditionalVectorFieldEstimator] = None,
         prior: Optional[Distribution] = None,
         sample_with: Literal['ode', 'sde'] = "sde",
@@ -164,7 +164,7 @@ class Simformer(MaskedVectorFieldTrainer):
 
     def build_posterior(
         self,
-        edge_mask: Optional[Tensor],
+        edge_mask: Optional[Tensor] = None,
         mvf_estimator: Optional[MaskedConditionalVectorFieldEstimator] = None,
         prior: Optional[Distribution] = None,
         sample_with: Literal['ode', 'sde'] = "sde",
@@ -216,7 +216,7 @@ class Simformer(MaskedVectorFieldTrainer):
 
     def build_likelihood(
         self,
-        edge_mask: Optional[Tensor],
+        edge_mask: Optional[Tensor] = None,
         mvf_estimator: Optional[MaskedConditionalVectorFieldEstimator] = None,
         prior: Optional[Distribution] = None,
         sample_with: Literal['ode', 'sde'] = "sde",

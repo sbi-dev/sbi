@@ -1015,8 +1015,12 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
                 )
 
                 # Generate condition and edge masks for current batch
-                condition_masks_batch = self._condition_mask_generator(inputs_batch)
+                condition_masks_batch = self._condition_mask_generator(inputs_batch).to(
+                    self._device
+                )
                 edge_masks_batch = self._edge_mask_generator(inputs_batch)
+                if edge_masks_batch is not None:
+                    edge_masks_batch = edge_masks_batch.to(self._device)
 
                 train_losses = self._loss(
                     inputs=inputs_batch,
@@ -1090,8 +1094,12 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
                     )
 
                     # Generate condition and edge masks for current batch
-                    condition_masks_batch = self._condition_mask_generator(inputs_batch)
+                    condition_masks_batch = self._condition_mask_generator(
+                        inputs_batch
+                    ).to(self._device)
                     edge_masks_batch = self._edge_mask_generator(inputs_batch)
+                    if edge_masks_batch is not None:
+                        edge_masks_batch = edge_masks_batch.to(self._device)
 
                     # Take negative loss here to get validation log_prob.
                     val_losses = self._loss(
