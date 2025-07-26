@@ -329,7 +329,6 @@ def test_batched_score_simformer_sample_with_different_x(
     sample_shape: torch.Size,
 ):
     num_dim = 2
-    num_sim_nodes = 2
     num_simulations = 100
 
     prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
@@ -337,23 +336,20 @@ def test_batched_score_simformer_sample_with_different_x(
 
     inference = Simformer(prior=prior)
 
-    training_condition_masks = torch.tensor([False, True]).repeat(num_simulations, 1)
-
     thetas = prior.sample((num_simulations,))
     xs = simulator(thetas)
     inputs = torch.stack([thetas, xs], dim=1)
 
     inference.append_simulations(
         inputs=inputs,
-        condition_masks=training_condition_masks,
     ).train(max_num_epochs=100)
 
     x_o = ones(num_dim) if x_o_batch_dim == 0 else ones(x_o_batch_dim, num_dim)
 
-    # Build posterior for the specific task: infer theta (node 0) given x (node 1).
+    # Build conditional for the specific task: infer theta (node 0) given x (node 1).
     inference_condition_mask = torch.tensor([False, True])
 
-    posterior = inference.build_posterior(
+    posterior = inference.build_conditional(
         condition_mask=inference_condition_mask,
         sample_with=sampling_method,  # type: ignore
     )
@@ -374,24 +370,13 @@ def test_batched_score_simformer_sample_with_different_x(
         assert samples.shape[1] == x_o_batch_dim, "Batch dimension wrong"
         inference = Simformer(prior=prior)
 
-        training_condition_masks = torch.tensor([False, True]).repeat(
-            num_simulations, 1
-        )
-        # Create edge masks (fully connected)
-        edge_mask_single = torch.ones((num_sim_nodes, num_sim_nodes), dtype=torch.bool)
-        training_edge_masks = edge_mask_single.unsqueeze(0).expand(
-            num_simulations, -1, -1
-        )
-
         inference.append_simulations(
             inputs=inputs,
-            condition_masks=training_condition_masks,
-            edge_masks=training_edge_masks,
         ).train(max_num_epochs=100)
 
         inference_condition_mask = torch.tensor([False, True])
 
-        posterior = inference.build_posterior(
+        posterior = inference.build_conditional(
             condition_mask=inference_condition_mask,
             sample_with=sampling_method,  # type: ignore
         )

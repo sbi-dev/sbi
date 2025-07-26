@@ -195,10 +195,8 @@ def test_c2st_simformer_on_linearGaussian(
         prior=prior, show_progress_bars=True, latent_idx=[0], observed_idx=[1]
     )
 
-    training_condition_masks = torch.tensor([False, True]).repeat(num_simulations, 1)
     mvf_estimator = inference.append_simulations(
         inputs=inputs,
-        condition_masks=training_condition_masks,
     ).train(max_num_epochs=150)
 
     for method in sample_with:
@@ -453,15 +451,12 @@ def simformer_trained_model(simformer_vector_field_type, simformer_prior_type):
     inputs = torch.stack([thetas, xs], dim=1)
 
     # Create condition masks (theta latent, x observed)
-    training_condition_masks = torch.tensor([False, True]).repeat(num_simulations, 1)
-
     inference = Simformer(
         prior=prior, sde_type=simformer_vector_field_type, show_progress_bars=True
     )
 
     mvf_estimator = inference.append_simulations(
         inputs=inputs,
-        condition_masks=training_condition_masks,
     ).train(max_num_epochs=100)
 
     return {
@@ -496,11 +491,11 @@ def test_simformer_sde_ode_sampling_equivalence(simformer_trained_model):
     inference = simformer_trained_model["inference"]
     vector_field_type = simformer_trained_model["simformer_vector_field_type"]
     condition_mask = simformer_trained_model["inference_condition_mask"]
-    sde_posterior = inference.build_posterior(
+    sde_posterior = inference.build_conditional(
         condition_mask=condition_mask,
         sample_with="sde",
     ).set_default_x(x_o)
-    ode_posterior = inference.build_posterior(
+    ode_posterior = inference.build_conditional(
         condition_mask=condition_mask, sample_with="ode"
     ).set_default_x(x_o)
 
@@ -630,7 +625,7 @@ def test_simformer_iid_inference(
     condition_mask = simformer_trained_model["inference_condition_mask"]
 
     x_o = zeros(num_trial, num_dim)
-    posterior = inference.build_posterior(
+    posterior = inference.build_conditional(
         mvf_estimator=score_estimator, condition_mask=condition_mask, sample_with="sde"
     ).set_default_x(x_o)
     samples = posterior.sample((num_samples,), iid_method=iid_method)
@@ -732,20 +727,16 @@ def test_simformer_map():
     xs = simulator(thetas)
     inputs = torch.stack([thetas, xs], dim=1)
 
-    # Create condition masks (theta latent, x observed)
-    condition_masks = torch.tensor([False, True]).repeat(num_simulations, 1)
-
     inference = Simformer(prior=prior, show_progress_bars=True)
 
     inference.append_simulations(
         inputs=inputs,
-        condition_masks=condition_masks,
     ).train(max_num_epochs=100)
 
     # Build posterior for the specific task: infer theta (node 0) given x (node 1).
     inference_condition_mask = torch.tensor([False, True])
 
-    posterior = inference.build_posterior(
+    posterior = inference.build_conditional(
         condition_mask=inference_condition_mask,
     )
 
