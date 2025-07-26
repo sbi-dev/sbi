@@ -666,8 +666,6 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
         mvf_estimator_builder: Union[
             str, MaskedVectorFieldEstimatorBuilder
         ] = "simformer",
-        latent_idx: Optional[list | Tensor] = None,
-        observed_idx: Optional[list | Tensor] = None,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
@@ -687,8 +685,8 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
             mvf_estimator_builder: Neural network architecture for the
                 masked vector field estimator. Can be a string (e.g. 'simformer')
                 or a callable that implements the `MaskedVectorFieldEstimatorBuilder`
-                protocol with `__call__` that receives `inputs`, `condition_mask`,
-                and `edge_mask` and returns a `MaskedConditionalVectorFieldEstimator`.
+                protocol with `__call__` that receives `inputs`
+                and returns a `MaskedConditionalVectorFieldEstimator`.
             device: Device to run the training on.
             logging_level: Logging level for the training. Can be an integer or a
                 string.
@@ -722,22 +720,11 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
 
         self._proposal_roundwise = []
 
-        self.latent_idx = (
-            torch.as_tensor(latent_idx, dtype=torch.long)
-            if latent_idx is not None
-            else None
-        )
-        self.observed_idx = (
-            torch.as_tensor(observed_idx, dtype=torch.long)
-            if observed_idx is not None
-            else None
-        )
-
     @abstractmethod
     def _build_default_nn_fn(self, **kwargs) -> MaskedVectorFieldEstimatorBuilder:
         pass
 
-    # TODO: Introduced to avoid conflicts, should adjust
+    # ! Introduced to avoid conflicts, should adjust later
     def _get_potential_function(
         self, prior: Distribution, estimator: ConditionalVectorFieldEstimator
     ) -> Tuple[VectorFieldBasedPotential, TorchTransform]:
@@ -760,8 +747,6 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
     def append_simulations(
         self,
         inputs: Tensor,
-        condition_masks: Optional[Tensor] = None,
-        edge_masks: Optional[Tensor] = None,
         proposal: Optional[DirectPosterior] = None,
         exclude_invalid_x: Optional[bool] = None,
         data_device: Optional[str] = None,
@@ -770,24 +755,12 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
 
         Data are stored as entries in lists for each type of variable (inputs/masks).
 
-        Stores inputs, condition_masks, edge_masks and prior_masks (indicating if
-        simulations are coming from the prior or not) and an index indicating which
-        round the batch of simulations came from.
+        Stores inputs and prior_masks (indicating if simulations are coming from the
+        prior or not) and an index indicating which round the batch of simulations came
+        from.
 
         Args:
             inputs: Simulation outputs.
-            condition_masks: A boolean mask indicating the role of each variable.
-                Expected shape: `(batch_size, num_variables)`.
-                - `True` (or `1`): The variable at this position is observed and its
-                    features will be used for conditioning.
-                - `False` (or `0`): The variable at this position is latent and its
-                    features are subject to inference.
-            edge_masks: A boolean mask defining the adjacency matrix of the directed
-                acyclic graph (DAG) representing dependencies among variables.
-                Expected shape: `(batch_size, num_variables, num_variables)`.
-                - `True` (or `1`): An edge exists from the row variable to the column
-                    variable.
-                - `False` (or `0`): No edge exists between these variables.
             proposal: The distribution that the inputs were sampled from.
                 Pass `None` if the parameters were sampled from the prior. Multi-round
                 training is not yet implemented, so anything other than `None` will
@@ -822,45 +795,15 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
         if data_device is None:
             data_device = self._device
 
-        batch_dims = inputs.shape[:-2]
-        num_nodes = inputs.shape[-2]
-
-        if condition_masks is None:
-            # Generate masks with Bernoulli.
-            condition_masks = torch.bernoulli(
-                torch.full((*batch_dims, num_nodes), 0.5, device=inputs.device)
-            ).bool()
-
-            # Find rows that are all True or all False.
-            all_same = condition_masks.all(dim=-1) | (~condition_masks.any(dim=-1))
-
-            # If there are any such rows, flip a random element to ensure
-            # there's at least one True and one False.
-            if all_same.any():
-                invalid_indices = torch.where(all_same)
-
-                # For each invalid row, select a random column to flip.
-                cols_to_flip = torch.randint(
-                    num_nodes, (invalid_indices[0].shape[0],), device=inputs.device
-                )
-
-                # Create full indices for flipping and apply the flip.
-                indices_to_flip = invalid_indices + (cols_to_flip,)
-                condition_masks[indices_to_flip] = ~condition_masks[indices_to_flip]
-
-        if edge_masks is None:
-            edge_masks = torch.ones((num_nodes, num_nodes), device=inputs.device).bool()
-            edge_masks = edge_masks.repeat(*batch_dims, 1, 1)
-
-        inputs, condition_masks, edge_masks = validate_inputs_and_masks(
-            inputs,
-            condition_masks,
-            edge_masks,
+        inputs, _, _ = validate_inputs_and_masks(
+            inputs=inputs,
+            condition_masks=None,
+            edge_masks=None,
             data_device=data_device,
             training_device=self._device,
         )
 
-        # TODO: the following lines to manage invalid inputs could be handles
+        # TODO: the following lines to manage invalid inputs could be handled
         # more gracefuly using an handle_invalid_inputs() helper function
         _, num_nans, num_infs = handle_invalid_x(
             inputs, exclude_invalid_x=exclude_invalid_x
@@ -871,11 +814,10 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
         inputs_is_inf_entries = torch.isinf(inputs).any(dim=-1)
         is_valid_inputs_entries = ~inputs_is_nan_entries & ~inputs_is_inf_entries
 
-        # We will simply force invalid inputs to be latent
-        condition_masks = condition_masks & is_valid_inputs_entries
-
-        # Overwrite invalid entries with numerically stable values
-        inputs[~is_valid_inputs_entries] = 0.0
+        if exclude_invalid_x:
+            self._is_valid_inputs_entries = is_valid_inputs_entries
+        else:
+            self._is_valid_inputs_entries = torch.ones_like(is_valid_inputs_entries)
 
         # Warn the user if invalid inputs are found
         simformer_msg_on_invalid_x(
@@ -892,8 +834,6 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
         prior_masks = mask_sims_from_prior(int(current_round > 0), inputs.size(0))
 
         self._inputs_roundwise.append(inputs)
-        self._condition_masks_roundwise.append(condition_masks)
-        self._edge_masks_roundwise.append(edge_masks)
         self._prior_masks.append(prior_masks)
 
         self._proposal_roundwise.append(proposal)
@@ -1026,16 +966,14 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
         # arguments, which will build the neural network.
         if self._neural_net is None or retrain_from_scratch:
             # Get theta,x to initialize NN
-            inputs, condition_masks, edge_masks, _ = self.get_simulations(
-                starting_round=start_idx
-            )
+            inputs, _ = self.get_simulations(starting_round=start_idx)
             # Use only training data for building the neural net (z-scoring transforms)
 
             self._neural_net = self._build_neural_net(
                 inputs[self.train_indices].to("cpu"),
             )
 
-            del inputs, condition_masks, edge_masks
+            del inputs
 
         # Move entire net to device for training.
         self._neural_net.to(self._device)
@@ -1070,15 +1008,15 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
                 # Get batches on current device.
                 (
                     inputs_batch,
-                    condition_masks_batch,
-                    edge_masks_batch,
                     prior_masks_batch,
                 ) = (
                     batch[0].to(self._device),
                     batch[1].to(self._device),
-                    batch[2].to(self._device),
-                    batch[3].to(self._device),
                 )
+
+                # Generate condition and edge masks for current batch
+                condition_masks_batch = self._condition_mask_generator(inputs_batch)
+                edge_masks_batch = self._edge_mask_generator(inputs_batch)
 
                 train_losses = self._loss(
                     inputs=inputs_batch,
@@ -1126,14 +1064,10 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
                 for batch in val_loader:
                     (
                         inputs_batch,
-                        condition_masks_batch,
-                        edge_masks_batch,
                         prior_masks_batch,
                     ) = (
                         batch[0].to(self._device),
                         batch[1].to(self._device),
-                        batch[2].to(self._device),
-                        batch[3].to(self._device),
                     )
 
                     # For validation loss, we evaluate at a fixed set of times to reduce
@@ -1145,12 +1079,6 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
                     inputs_batch = inputs_batch.repeat(
                         times_batch, *([1] * (inputs_batch.ndim - 1))
                     )
-                    condition_masks_batch = condition_masks_batch.repeat(
-                        times_batch, *([1] * (condition_masks_batch.ndim - 1))
-                    )
-                    edge_masks_batch = edge_masks_batch.repeat(
-                        times_batch, *([1] * (edge_masks_batch.ndim - 1))
-                    )
                     prior_masks_batch = prior_masks_batch.repeat(
                         times_batch, *([1] * (prior_masks_batch.ndim - 1))
                     )
@@ -1160,6 +1088,10 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
                     validation_times_rep = validation_times.repeat_interleave(
                         val_batch_size, dim=0
                     )
+
+                    # Generate condition and edge masks for current batch
+                    condition_masks_batch = self._condition_mask_generator(inputs_batch)
+                    edge_masks_batch = self._edge_mask_generator(inputs_batch)
 
                     # Take negative loss here to get validation log_prob.
                     val_losses = self._loss(
@@ -1275,10 +1207,10 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
 
         return converged
 
-    def _build_posterior(
+    def _build_conditional(
         self,
-        condition_mask: Optional[Tensor | list] = None,
-        edge_mask: Optional[Tensor | list] = None,
+        condition_mask: Tensor,
+        edge_mask: Optional[Tensor],
         mvf_estimator: Optional[MaskedConditionalVectorFieldEstimator] = None,
         prior: Optional[Distribution] = None,
         sample_with: Literal['ode', 'sde'] = "sde",
@@ -1316,33 +1248,6 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
             A `VectorFieldPosterior` object representing $p(theta|x)$ with
             `.sample()` and `.log_prob()` methods.
         """
-
-        if condition_mask is None and (
-            self.latent_idx is None or self.observed_idx is None
-        ):
-            raise ValueError(
-                "You did not pass a condition mask or latent and observed variable "
-                "indexes. You should either pass a condition mask "
-                "at build_posterior() time or provide some "
-                "latent and observed variable indexes at __init__. "
-                "If you already instanciated a Simformer and would like to "
-                "provide the conditon indexes, you can use the "
-                "setter function `set_condtion_indexes() or provide a condition mask "
-                "at next call on the build_posterior() method."
-            )
-
-        if condition_mask is None:
-            condition_mask = self._generate_condition_mask()
-        else:
-            condition_mask = torch.as_tensor(condition_mask, dtype=torch.bool)
-
-        batch_dims = condition_mask.shape[:-1]
-        num_nodes = condition_mask.shape[-1]
-        if edge_mask is None:
-            edge_mask = torch.ones((num_nodes, num_nodes)).bool()
-            edge_mask = edge_mask.repeat(*batch_dims, 1, 1)
-        else:
-            edge_mask = torch.as_tensor(edge_mask, dtype=torch.bool)
 
         if prior is None:
             cls_name = self.__class__.__name__
@@ -1384,7 +1289,7 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
         self,
         inputs: Tensor,
         condition_masks: Tensor,
-        edge_masks: Tensor,
+        edge_masks: Optional[Tensor],
         masks: Tensor,
         proposal: Optional[Any],
         calibration_kernel: Callable,
@@ -1439,28 +1344,3 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
 
         assert_all_finite(loss, f"{cls_name} loss")
         return calibration_kernel(inputs) * loss
-
-    def set_condition_indexes(
-        self, new_latent_idx: Union[list, Tensor], new_observed_idx: Union[list, Tensor]
-    ):
-        self.latent_idx = torch.as_tensor(new_latent_idx, dtype=torch.long)
-        self.observed_idx = torch.as_tensor(new_observed_idx, dtype=torch.long)
-
-    def _generate_condition_mask(
-        self,
-    ):
-        if self.latent_idx is None or self.observed_idx is None:
-            raise ValueError(
-                "You did not pass latent and observed variable indexes. "
-                "You should either pass a condition mask "
-                "at build_posterior() time or provide some "
-                "latent and observed variable indexes at __init__. "
-                "If you already instanciated a Masked Vector Filed Inference "
-                "and would like to update the current conditon indexes, "
-                "you can use the setter function `set_condtion_indexes()`"
-            )
-        num_nodes = self.latent_idx.numel() + self.observed_idx.numel()
-        condition_mask = torch.zeros(num_nodes, dtype=torch.bool)
-        condition_mask[self.latent_idx] = False
-        condition_mask[self.observed_idx] = True
-        return condition_mask

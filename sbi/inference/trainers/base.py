@@ -861,8 +861,6 @@ class MaskedNeuralInference(NeuralInference):
         # Initialize roundwise (inputs, prior_masks) for storage of parameters,
         # simulations and masks indicating if simulations came from prior.
         self._inputs_roundwise = []
-        self._condition_masks_roundwise = []
-        self._edge_masks_roundwise = []
         self._prior_masks = []
         self._model_bank = []
 
@@ -871,6 +869,10 @@ class MaskedNeuralInference(NeuralInference):
 
         self._round = 0
         self._val_loss = float("Inf")
+
+        # Initialize condition and edge mask generators
+        self._condition_mask_generator = self._default_condition_masks_generator
+        self._edge_mask_generator = self._default_edge_masks_generator
 
         # XXX We could instantiate here the Posterior for all children. Two problems:
         #     1. We must dispatch to right PotentialProvider for mcmc based on name
@@ -893,7 +895,7 @@ class MaskedNeuralInference(NeuralInference):
     def get_simulations(
         self,
         starting_round: int = 0,
-    ) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
+    ) -> Tuple[Tensor, Tensor]:
         r"""Returns all inputs, condition_masks, edge_masks and prior_masks
         from rounds >= `starting_round`.
 
@@ -911,24 +913,16 @@ class MaskedNeuralInference(NeuralInference):
         inputs = get_simulations_since_round(
             self._inputs_roundwise, self._data_round_index, starting_round
         )
-        condition_masks = get_simulations_since_round(
-            self._condition_masks_roundwise, self._data_round_index, starting_round
-        )
-        edge_masks = get_simulations_since_round(
-            self._edge_masks_roundwise, self._data_round_index, starting_round
-        )
         prior_masks = get_simulations_since_round(
             self._prior_masks, self._data_round_index, starting_round
         )
 
-        return inputs, condition_masks, edge_masks, prior_masks
+        return inputs, prior_masks
 
     @abstractmethod
     def append_simulations(
         self,
         inputs: Tensor,
-        condition_masks: Tensor,
-        edge_masks: Optional[Tensor] = None,
         exclude_invalid_x: bool = False,
         from_round: int = 0,
         algorithm: Optional[str] = None,
@@ -944,11 +938,6 @@ class MaskedNeuralInference(NeuralInference):
 
         Args:
             inputs: Simulation outputs.
-            condition_masks: Mask defining which variables in `inputs` are latent
-                or observed.
-            edge_masks: Mask defining dependencies among variables in `inputs`,
-                equivalent to the adjacency matrix in the DAG. If `None` it
-                defaults to all ones, i.e., all variables attend each other
             exclude_invalid_x: Whether invalid simulations are discarded during
                 training. If `False`, The inference algorithm raises an error when
                 invalid simulations are found. If `True`, nan or inf entries will be
@@ -992,11 +981,9 @@ class MaskedNeuralInference(NeuralInference):
         """
 
         #
-        inputs, condition_masks, edge_masks, prior_masks = self.get_simulations(
-            starting_round
-        )
+        inputs, prior_masks = self.get_simulations(starting_round)
 
-        dataset = data.TensorDataset(inputs, condition_masks, edge_masks, prior_masks)
+        dataset = data.TensorDataset(inputs, prior_masks)
 
         # Get total number of training examples.
         num_examples = inputs.size(0)
@@ -1035,3 +1022,67 @@ class MaskedNeuralInference(NeuralInference):
         val_loader = data.DataLoader(dataset, **val_loader_kwargs)
 
         return train_loader, val_loader
+
+    def set_condition_masks(
+        self, condition_mask_generator: Union[Callable, Tensor, list, set]
+    ):
+        if isinstance(condition_mask_generator, Callable):
+            self._condition_mask_generator = condition_mask_generator
+        elif isinstance(condition_mask_generator, Tensor):
+            self._condition_mask_generator = lambda inputs: condition_mask_generator
+        elif isinstance(condition_mask_generator, (list, tuple, set)):
+            masks_list = list(condition_mask_generator)
+
+            def generator(inputs):
+                idx = torch.randint(len(masks_list), (inputs.shape[0],))
+                masks = [masks_list[i] for i in idx]
+                return torch.stack(masks)
+
+            self._condition_mask_generator = generator
+        return self  # Chainable
+
+    def set_edge_masks(self, edge_mask_generator: Union[Callable, Tensor, list, set]):
+        if isinstance(edge_mask_generator, Callable):
+            self._edge_mask_generator = edge_mask_generator
+        elif isinstance(edge_mask_generator, Tensor):
+            self._edge_mask_generator = lambda inputs: edge_mask_generator
+        elif isinstance(edge_mask_generator, (list, tuple, set)):
+            masks_list = list(edge_mask_generator)
+
+            def generator(inputs):
+                idx = torch.randint(len(masks_list), (inputs.shape[0],))
+                masks = [masks_list[i] for i in idx]
+                return torch.stack(masks)
+
+            self._edge_mask_generator = generator
+        return self  # Chainable
+
+    def _default_condition_masks_generator(self, inputs):
+        batch_dims = inputs.shape[:-2]
+        num_nodes = inputs.shape[-2]
+
+        # Generate masks with Bernoulli.
+        condition_masks = torch.bernoulli(
+            torch.full((*batch_dims, num_nodes), 0.5, device=inputs.device)
+        ).bool()
+
+        # Find rows that are all True or all False
+        all_same = condition_masks.all(dim=-1) | (~condition_masks.any(dim=-1))
+
+        # If there are any such rows, flip a random element to ensure
+        # there's at least one True and one False
+        if all_same.any():
+            invalid_indices = torch.where(all_same)
+
+            # For each invalid row, select a random column to flip
+            cols_to_flip = torch.randint(
+                num_nodes, (invalid_indices[0].shape[0],), device=inputs.device
+            )
+
+            # Create full indices for flipping and apply the flip
+            indices_to_flip = invalid_indices + (cols_to_flip,)
+            condition_masks[indices_to_flip] = ~condition_masks[indices_to_flip]
+        return condition_masks
+
+    def _default_edge_masks_generator(self, inputs):
+        return None

@@ -829,27 +829,34 @@ def validate_inputs_and_masks(
     inputs = _validate_tensor_properties_and_device(
         inputs, "inputs", data_device, training_device, torch.float32
     )
-    condition_masks = _validate_tensor_properties_and_device(
-        condition_masks,
-        "condition_masks",
-        data_device,
-        training_device,
-        (torch.bool, torch.int),
-    )
-    edge_masks = _validate_tensor_properties_and_device(
-        edge_masks, "edge_masks", data_device, training_device, (torch.bool, torch.int)
-    )
 
     # Check for consistent batch size across all inputs
     batch_size = inputs.shape[0]
-    assert condition_masks.shape[0] == batch_size, (
-        f"Batch size of condition_masks (={condition_masks.shape[0]}) must match "
-        f"batch size of inputs (={batch_size})."
-    )
-    assert edge_masks.shape[0] == batch_size, (
-        f"Batch size of edge_masks (={edge_masks.shape[0]}) must match "
-        f"batch size of inputs (={batch_size})."
-    )
+    if condition_masks is not None:
+        condition_masks = _validate_tensor_properties_and_device(
+            condition_masks,
+            "condition_masks",
+            data_device,
+            training_device,
+            (torch.bool, torch.int),
+        )
+        assert condition_masks.shape[0] == batch_size, (
+            f"Batch size of condition_masks (={condition_masks.shape[0]}) must match "
+            f"batch size of inputs (={batch_size})."
+        )
+
+    if edge_masks is not None:
+        edge_masks = _validate_tensor_properties_and_device(
+            edge_masks,
+            "edge_masks",
+            data_device,
+            training_device,
+            (torch.bool, torch.int),
+        )
+        assert edge_masks.shape[0] == batch_size, (
+            f"Batch size of edge_masks (={edge_masks.shape[0]}) must match "
+            f"batch size of inputs (={batch_size})."
+        )
 
     return inputs, condition_masks, edge_masks
 
