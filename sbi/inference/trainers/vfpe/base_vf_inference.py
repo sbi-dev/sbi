@@ -4,7 +4,7 @@
 import time
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from typing import Any, Callable, Literal, Optional, Protocol, Tuple, Union
+from typing import Any, Callable, Dict, Literal, Optional, Protocol, Tuple, Union
 
 import torch
 from torch import Tensor, ones
@@ -18,7 +18,7 @@ from sbi.inference import MaskedNeuralInference, NeuralInference
 from sbi.inference.posteriors import (
     DirectPosterior,
 )
-from sbi.inference.posteriors.vector_field_posterior import VectorFieldPosterior
+from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials.vector_field_potential import (
     VectorFieldBasedPotential,
     vector_field_estimator_based_potential,
@@ -737,6 +737,8 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
             The potential function and a transformation that maps
             to unconstrained space.
         """
+        # ! This is only called for sampling methods which are not sde or ode
+        # should I just raise a NotImplementedError?
         potential_fn, theta_transform = vector_field_estimator_based_potential(
             estimator,
             prior,
@@ -1234,8 +1236,9 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
         mvf_estimator: Optional[MaskedConditionalVectorFieldEstimator] = None,
         prior: Optional[Distribution] = None,
         sample_with: Literal['ode', 'sde'] = "sde",
+        vectorfield_sampling_parameters: Optional[Dict[str, Any]] = None,
         **kwargs,
-    ) -> VectorFieldPosterior:
+    ) -> NeuralPosterior:
         r"""Build posterior for a given conditioning context.
 
         This method constructs a `VectorFieldPosterior` object for a specific
@@ -1269,41 +1272,35 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
             `.sample()` and `.log_prob()` methods.
         """
 
-        if prior is None:
-            cls_name = self.__class__.__name__
-            assert self._prior is not None, (
-                "You did not pass a prior. You have to pass the prior either at "
-                f"initialization `inference = {cls_name}(prior)` or to "
-                "`.build_posterior(prior=prior)`."
-            )
-            prior = self._prior
-        else:
-            utils.check_prior(prior)
-
+        # ! This is also handled within super().build_posterior()
+        # via _resolve_estimator(),
+        # but we first need to call the Wrapper using
+        # build_conditional_vector_field_estimator() thus we must ensure it is not None.
+        # May seem dirty but the only alternative would be to
+        # refactor upsteream logic, which would require to pass
+        # condition and edge mask rather than limiting their use here;
+        # thus creating duplicate code for _create_posterior() and build_posterior()
+        # in the MaskedNeuralInference
         if mvf_estimator is None:
             mvf_estimator = self._neural_net
-            # If internal net is used device is defined.
-            device = self._device
-        # Otherwise, infer it from the device of the net parameters.
-        else:
-            device = str(next(mvf_estimator.parameters()).device)
 
-        posterior = VectorFieldPosterior(
-            mvf_estimator.build_conditional_vector_field_estimator(
+        # Since sbi is hard-coded with the "posterior-paradigm" there is a conflict with
+        # Simformer which rather generalizes these concept to arbitrary conditionals.
+        # Thus, even if I call build_posterior I rather use it as a general conditional
+        # distribution, employing a wrapper `build_conditional_vector_field_estimator()`
+        # that smartly adapt the API and acts some miscellaneuos operations.
+        # For the Simformer there is no concept of "posterior", as it simply works over
+        # masks that define what is latent (to be infered) and what is not.
+        # Future work could involve generalizing further sbi interface.
+        return super().build_posterior(
+            estimator=mvf_estimator.build_conditional_vector_field_estimator(
                 condition_mask, edge_mask
             ),
-            prior,
-            device=device,
+            prior=prior,
             sample_with=sample_with,
+            vectorfield_sampling_parameters=vectorfield_sampling_parameters,
             **kwargs,
         )
-
-        self._posterior = posterior
-        # Store models at end of each round.
-        # TODO: Should expand the model bank for different condition and edge masks
-        self._model_bank.append(deepcopy(self._posterior))
-
-        return deepcopy(self._posterior)
 
     def _loss(
         self,
