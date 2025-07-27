@@ -561,6 +561,7 @@ class MaskedConditionalVectorFieldEstimator(MaskedConditionalEstimator, ABC):
         input_shape: torch.Size,
         t_min: float = 0.0,
         t_max: float = 1.0,
+        embedding_net: Optional[nn.Module] = None,
         mean_base: float = 0.0,
         std_base: float = 1.0,
     ) -> None:
@@ -588,6 +589,9 @@ class MaskedConditionalVectorFieldEstimator(MaskedConditionalEstimator, ABC):
         )
         self.register_buffer(
             "_std_base", torch.empty(1, *self.input_shape).fill_(std_base)
+        )
+        self._embedding_net = (
+            embedding_net if embedding_net is not None else nn.Identity()
         )
 
     def build_conditional_vector_field_estimator(

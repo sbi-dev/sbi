@@ -12,7 +12,9 @@ from sbi.neural_nets.estimators.flowmatching_estimator import FlowMatchingEstima
 from sbi.neural_nets.estimators.score_estimator import (
     ConditionalScoreEstimator,
     MaskedConditionalScoreEstimator,
+    MaskedSubVPScoreEstimator,
     MaskedVEScoreEstimator,
+    MaskedVPScoreEstimator,
     SubVPScoreEstimator,
     VEScoreEstimator,
     VPScoreEstimator,
@@ -182,8 +184,10 @@ def build_vector_field_estimator(
         )
     elif estimator_type == "masked-score":
         # Choose the appropriate score estimator based on SDE type
-        if sde_type == "vp" or sde_type == "subvp":
-            raise NotImplementedError
+        if sde_type == "vp":
+            estimator_cls = MaskedVPScoreEstimator
+        elif sde_type == "subvp":
+            estimator_cls = MaskedSubVPScoreEstimator
         elif sde_type == "ve":
             estimator_cls = MaskedVEScoreEstimator
         else:

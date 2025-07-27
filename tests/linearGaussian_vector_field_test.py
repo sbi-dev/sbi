@@ -140,25 +140,32 @@ def test_c2st_vector_field_on_linearGaussian(
 
 
 # We always test num_dim and sample_with with defaults and mark the rests as slow.
-# TODO: This should be better tuned to find the right balance between required precision
-# and speed, maybe avoiding to pass a fixed condition mask to the Simformer
-# but letting it generate Bernoulli ones
 @pytest.mark.parametrize(
-    "num_dim, prior_str, sample_with",
+    "vector_field_type, num_dim, prior_str, sample_with",
     [
-        (3, "uniform", ["sde", "ode"]),
-        (3, "gaussian", ["sde", "ode"]),
+        ("vp", 1, "gaussian", ["sde", "ode"]),
+        ("vp", 3, "uniform", ["sde", "ode"]),
+        ("vp", 3, "gaussian", ["sde", "ode"]),
+        ("ve", 3, "uniform", ["sde", "ode"]),
+        ("subvp", 3, "uniform", ["sde", "ode"]),
+        # ("fmpe", 1, "gaussian", ["sde", "ode"]),
+        # ("fmpe", 1, "uniform", ["sde", "ode"]),
+        # ("fmpe", 3, "gaussian", ["sde", "ode"]),
+        # ("fmpe", 3, "uniform", ["sde", "ode"]),
     ],
 )
 def test_c2st_simformer_on_linearGaussian(
-    num_dim: int, prior_str: str, sample_with: List[str]
+    vector_field_type: str, num_dim: int, prior_str: str, sample_with: List[str]
 ):
     """
     Test whether Simformer infers well a simple example with available ground truth.
     """
-    # num_sim_nodes = 2  # theta, x
-    num_samples = 3000
-    num_simulations = 10000
+    # TODO: This should be better tuned to find the right
+    # balance between required precision and speed
+    num_samples = 3000  # 1000
+    num_simulations = 10000  # 2500
+    max_num_epochs = 150  # 100
+    tol = 0.15
 
     x_o = zeros(1, num_dim)
 
@@ -190,14 +197,18 @@ def test_c2st_simformer_on_linearGaussian(
     # inputs shape: (num_simulations, num_nodes, num_features)
     inputs = torch.stack([thetas, xs], dim=1)
 
-    # Infer theta (node 0) given x (node 1).
+    # Infer theta (node 0) given x (node 1)
     inference = Simformer(
-        prior=prior, show_progress_bars=True, latent_idx=[0], observed_idx=[1]
+        prior=prior,
+        sde_type=vector_field_type,
+        show_progress_bars=True,
+        latent_idx=[0],
+        observed_idx=[1],  # type: ignore
     )
 
     mvf_estimator = inference.append_simulations(
         inputs=inputs,
-    ).train(max_num_epochs=150)
+    ).train(max_num_epochs=max_num_epochs)
 
     for method in sample_with:
         posterior = inference.build_posterior(
@@ -210,8 +221,8 @@ def test_c2st_simformer_on_linearGaussian(
         check_c2st(
             samples,
             target_samples,
-            alg=f"simformer-{prior_str}-{num_dim}D-{method}",
-            tol=0.15,
+            alg=f"simformer-{vector_field_type}-{prior_str}-{num_dim}D-{method}",
+            tol=tol,
         )
 
 
@@ -412,7 +423,7 @@ def test_vector_field_sde_ode_sampling_equivalence(vector_field_trained_model):
     )
 
 
-@pytest.fixture(scope="module", params=["ve"])
+@pytest.fixture(scope="module", params=["vp", "ve", "subvp"])  # add also "fmpe"
 def simformer_vector_field_type(request):
     """Module-scoped fixture for vector field type. (Simformer fixture)"""
     return request.param
@@ -584,8 +595,8 @@ def test_vector_field_iid_inference(
 
 # TODO: Needs to fine-tune hyper-parameters
 # TODO: for jac_gauss after first sampling GradTrackingTensor appear
-# which cannot be accessed as a normal tensor throuh shapes, thus errors arise in the
-# simformer wrapper
+# which cannot be accessed as a normal tensor throuh shapes,
+# thus errors arise in the simformer wrapper
 @pytest.mark.skip(
     reason="c2st too high for some cases, has to be fixed in PR #1501 or #1544"
 )

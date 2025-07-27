@@ -489,7 +489,7 @@ class MaskedConditionalScoreEstimator(MaskedConditionalVectorFieldEstimator):
         self,
         net: Union[MaskedVectorFieldNet, nn.Module],
         input_shape: torch.Size,
-        embedding_net: nn.Module = nn.Identity(),
+        embedding_net: Optional[nn.Module] = None,
         weight_fn: Union[str, Callable] = "max_likelihood",
         mean_0: Union[Tensor, float] = 0.0,
         std_0: Union[Tensor, float] = 1.0,
@@ -516,19 +516,23 @@ class MaskedConditionalScoreEstimator(MaskedConditionalVectorFieldEstimator):
             t_min: Minimum time for diffusion (0 can be numerically unstable).
             t_max: Maximum time for diffusion.
         """
-        super().__init__(net, input_shape)
-
-        # Store embedding network
-        self._embedding_net = embedding_net
-
-        # Set lambdas (variance weights) function.
-        self._set_weight_fn(weight_fn)
-
         if not isinstance(mean_0, Tensor):
             mean_0 = torch.tensor([mean_0])
         if not isinstance(std_0, Tensor):
             std_0 = torch.tensor([std_0])
 
+        super().__init__(
+            net,
+            input_shape,
+            mean_base=0.0,  # Will be updated after initialization
+            std_base=1.0,  # Will be updated after initialization
+            embedding_net=embedding_net,
+            t_min=t_min,
+            t_max=t_max,
+        )
+
+        # Set lambdas (variance weights) function.
+        self._set_weight_fn(weight_fn)
         self.register_buffer("mean_0", mean_0.clone().detach())
         self.register_buffer("std_0", std_0.clone().detach())
 
@@ -537,11 +541,10 @@ class MaskedConditionalScoreEstimator(MaskedConditionalVectorFieldEstimator):
         std_t = self.approx_marginal_std(torch.tensor([t_max]))
         mean_t = torch.broadcast_to(mean_t, (1, *input_shape))
         std_t = torch.broadcast_to(std_t, (1, *input_shape))
+
+        # Update the base distribution parameters
         self._mean_base = mean_t
         self._std_base = std_t
-
-        self.t_min = t_min
-        self.t_max = t_max
 
     @property
     def embedding_net(self):
@@ -1029,36 +1032,10 @@ class MaskedConditionalScoreEstimator(MaskedConditionalVectorFieldEstimator):
         return v
 
 
-class VPScoreEstimator(ConditionalScoreEstimator):
-    """Class for score estimators with variance preserving SDEs (i.e., DDPM)."""
-
-    def __init__(
-        self,
-        net: VectorFieldNet,
-        input_shape: torch.Size,
-        condition_shape: torch.Size,
-        embedding_net: Optional[nn.Module] = None,
-        weight_fn: Union[str, Callable] = "max_likelihood",
-        beta_min: float = 0.01,
-        beta_max: float = 10.0,
-        mean_0: Union[Tensor, float] = 0.0,
-        std_0: Union[Tensor, float] = 1.0,
-        t_min: float = 1e-3,
-        t_max: float = 1.0,
-    ) -> None:
-        self.beta_min = beta_min
-        self.beta_max = beta_max
-        super().__init__(
-            net,
-            input_shape,
-            condition_shape,
-            embedding_net=embedding_net,
-            weight_fn=weight_fn,
-            mean_0=mean_0,
-            std_0=std_0,
-            t_min=t_min,
-            t_max=t_max,
-        )
+class VariancePreservingSDE:
+    input_shape: torch.Size
+    beta_max: float
+    beta_min: float
 
     def mean_t_fn(self, times: Tensor) -> Tensor:
         """Conditional mean function for variance preserving SDEs.
@@ -1133,8 +1110,8 @@ class VPScoreEstimator(ConditionalScoreEstimator):
         return g
 
 
-class SubVPScoreEstimator(ConditionalScoreEstimator):
-    """Class for score estimators with sub-variance preserving SDEs."""
+class VPScoreEstimator(ConditionalScoreEstimator, VariancePreservingSDE):
+    """Class for score estimators with variance preserving SDEs (i.e., DDPM)."""
 
     def __init__(
         self,
@@ -1145,9 +1122,9 @@ class SubVPScoreEstimator(ConditionalScoreEstimator):
         weight_fn: Union[str, Callable] = "max_likelihood",
         beta_min: float = 0.01,
         beta_max: float = 10.0,
-        mean_0: float = 0.0,
-        std_0: float = 1.0,
-        t_min: float = 1e-2,
+        mean_0: Union[Tensor, float] = 0.0,
+        std_0: Union[Tensor, float] = 1.0,
+        t_min: float = 1e-3,
         t_max: float = 1.0,
     ) -> None:
         self.beta_min = beta_min
@@ -1163,6 +1140,72 @@ class SubVPScoreEstimator(ConditionalScoreEstimator):
             t_min=t_min,
             t_max=t_max,
         )
+
+    def mean_t_fn(self, times: Tensor) -> Tensor:
+        return VariancePreservingSDE.mean_t_fn(self, times)
+
+    def std_fn(self, times: Tensor) -> Tensor:
+        return VariancePreservingSDE.std_fn(self, times)
+
+    def _beta_schedule(self, times: Tensor) -> Tensor:
+        return VariancePreservingSDE._beta_schedule(self, times)
+
+    def drift_fn(self, input: Tensor, times: Tensor) -> Tensor:
+        return VariancePreservingSDE.drift_fn(self, input, times)
+
+    def diffusion_fn(self, input: Tensor, times: Tensor) -> Tensor:
+        return VariancePreservingSDE.diffusion_fn(self, input, times)
+
+
+class MaskedVPScoreEstimator(MaskedConditionalScoreEstimator, VariancePreservingSDE):
+    """Class for score estimators with variance preserving SDEs (i.e., DDPM)."""
+
+    def __init__(
+        self,
+        net: VectorFieldNet,
+        input_shape: torch.Size,
+        embedding_net: Optional[nn.Module] = None,
+        weight_fn: Union[str, Callable] = "max_likelihood",
+        beta_min: float = 0.01,
+        beta_max: float = 10.0,
+        mean_0: Union[Tensor, float] = 0.0,
+        std_0: Union[Tensor, float] = 1.0,
+        t_min: float = 1e-3,
+        t_max: float = 1.0,
+    ) -> None:
+        self.beta_min = beta_min
+        self.beta_max = beta_max
+        super().__init__(
+            net,
+            input_shape,
+            embedding_net=embedding_net,
+            weight_fn=weight_fn,
+            mean_0=mean_0,
+            std_0=std_0,
+            t_min=t_min,
+            t_max=t_max,
+        )
+
+    def mean_t_fn(self, times: Tensor) -> Tensor:
+        return VariancePreservingSDE.mean_t_fn(self, times)
+
+    def std_fn(self, times: Tensor) -> Tensor:
+        return VariancePreservingSDE.std_fn(self, times)
+
+    def _beta_schedule(self, times: Tensor) -> Tensor:
+        return VariancePreservingSDE._beta_schedule(self, times)
+
+    def drift_fn(self, input: Tensor, times: Tensor) -> Tensor:
+        return VariancePreservingSDE.drift_fn(self, input, times)
+
+    def diffusion_fn(self, input: Tensor, times: Tensor) -> Tensor:
+        return VariancePreservingSDE.diffusion_fn(self, input, times)
+
+
+class SubVariancePreservingSDE:
+    input_shape: torch.Size
+    beta_max: float
+    beta_min: float
 
     def mean_t_fn(self, times: Tensor) -> Tensor:
         """Conditional mean function for sub-variance preserving SDEs.
@@ -1251,6 +1294,100 @@ class SubVPScoreEstimator(ConditionalScoreEstimator):
             g = g.unsqueeze(-1)
 
         return g
+
+
+class SubVPScoreEstimator(ConditionalScoreEstimator, SubVariancePreservingSDE):
+    """Class for score estimators with sub-variance preserving SDEs."""
+
+    def __init__(
+        self,
+        net: VectorFieldNet,
+        input_shape: torch.Size,
+        condition_shape: torch.Size,
+        embedding_net: Optional[nn.Module] = None,
+        weight_fn: Union[str, Callable] = "max_likelihood",
+        beta_min: float = 0.01,
+        beta_max: float = 10.0,
+        mean_0: float = 0.0,
+        std_0: float = 1.0,
+        t_min: float = 1e-2,
+        t_max: float = 1.0,
+    ) -> None:
+        self.beta_min = beta_min
+        self.beta_max = beta_max
+        super().__init__(
+            net,
+            input_shape,
+            condition_shape,
+            embedding_net=embedding_net,
+            weight_fn=weight_fn,
+            mean_0=mean_0,
+            std_0=std_0,
+            t_min=t_min,
+            t_max=t_max,
+        )
+
+    def mean_t_fn(self, times: Tensor) -> Tensor:
+        return SubVariancePreservingSDE.mean_t_fn(self, times)
+
+    def std_fn(self, times: Tensor) -> Tensor:
+        return SubVariancePreservingSDE.std_fn(self, times)
+
+    def _beta_schedule(self, times: Tensor) -> Tensor:
+        return SubVariancePreservingSDE._beta_schedule(self, times)
+
+    def drift_fn(self, input: Tensor, times: Tensor) -> Tensor:
+        return SubVariancePreservingSDE.drift_fn(self, input, times)
+
+    def diffusion_fn(self, input: Tensor, times: Tensor) -> Tensor:
+        return SubVariancePreservingSDE.diffusion_fn(self, input, times)
+
+
+class MaskedSubVPScoreEstimator(
+    MaskedConditionalScoreEstimator, SubVariancePreservingSDE
+):
+    """Class for score estimators with sub-variance preserving SDEs."""
+
+    def __init__(
+        self,
+        net: VectorFieldNet,
+        input_shape: torch.Size,
+        embedding_net: Optional[nn.Module] = None,
+        weight_fn: Union[str, Callable] = "max_likelihood",
+        beta_min: float = 0.01,
+        beta_max: float = 10.0,
+        mean_0: float = 0.0,
+        std_0: float = 1.0,
+        t_min: float = 1e-2,
+        t_max: float = 1.0,
+    ) -> None:
+        self.beta_min = beta_min
+        self.beta_max = beta_max
+        super().__init__(
+            net,
+            input_shape,
+            embedding_net=embedding_net,
+            weight_fn=weight_fn,
+            mean_0=mean_0,
+            std_0=std_0,
+            t_min=t_min,
+            t_max=t_max,
+        )
+
+    def mean_t_fn(self, times: Tensor) -> Tensor:
+        return SubVariancePreservingSDE.mean_t_fn(self, times)
+
+    def std_fn(self, times: Tensor) -> Tensor:
+        return SubVariancePreservingSDE.std_fn(self, times)
+
+    def _beta_schedule(self, times: Tensor) -> Tensor:
+        return SubVariancePreservingSDE._beta_schedule(self, times)
+
+    def drift_fn(self, input: Tensor, times: Tensor) -> Tensor:
+        return SubVariancePreservingSDE.drift_fn(self, input, times)
+
+    def diffusion_fn(self, input: Tensor, times: Tensor) -> Tensor:
+        return SubVariancePreservingSDE.diffusion_fn(self, input, times)
 
 
 class VarianceExplodingSDE:
@@ -1397,6 +1534,8 @@ class MaskedVEScoreEstimator(MaskedConditionalScoreEstimator, VarianceExplodingS
         sigma_max: float = 10.0,
         mean_0: Union[Tensor, float] = 0.0,
         std_0: Union[Tensor, float] = 1.0,
+        t_min: float = 1e-3,
+        t_max: float = 1.0,
     ) -> None:
         self.sigma_min = sigma_min
         self.sigma_max = sigma_max
@@ -1407,6 +1546,8 @@ class MaskedVEScoreEstimator(MaskedConditionalScoreEstimator, VarianceExplodingS
             weight_fn=weight_fn,
             mean_0=mean_0,
             std_0=std_0,
+            t_min=t_min,
+            t_max=t_max,
         )
 
     def mean_t_fn(self, times: Tensor) -> Tensor:

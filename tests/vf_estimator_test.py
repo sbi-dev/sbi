@@ -217,7 +217,7 @@ def _build_vector_field_estimator_and_tensors(
 # *** ======== Masked Estimator ======== *** #
 
 
-@pytest.mark.parametrize("sde_type", ["ve"])
+@pytest.mark.parametrize("sde_type", ["ve", "vp", "subvp"])
 @pytest.mark.parametrize("input_sample_dim", (1, 2))
 @pytest.mark.parametrize("input_event_shape", ((3, 5), (3, 1)))
 @pytest.mark.parametrize("batch_dim", (1, 10))
@@ -250,7 +250,7 @@ def test_masked_vector_field_estimator_loss_shapes(
 
 
 @pytest.mark.gpu
-@pytest.mark.parametrize("sde_type", ["ve"])
+@pytest.mark.parametrize("sde_type", ["ve", "vp", "subvp"])
 @pytest.mark.parametrize("device", ["cpu", "cuda"])
 @pytest.mark.parametrize("score_net", ["simformer"])
 def test_masked_vector_field_estimator_on_device(sde_type, device, score_net):
@@ -277,7 +277,7 @@ def test_masked_vector_field_estimator_on_device(sde_type, device, score_net):
     assert str(loss.device).split(":")[0] == device, "Loss device mismatch."
 
 
-@pytest.mark.parametrize("sde_type", ["ve"])
+@pytest.mark.parametrize("sde_type", ["ve", "vp", "subvp"])
 @pytest.mark.parametrize("input_sample_dim", (1, 2))
 @pytest.mark.parametrize("input_event_shape", ((5, 1), (5, 4)))
 @pytest.mark.parametrize("batch_dim", (1, 10))
@@ -363,7 +363,7 @@ def _build_masked_vector_field_estimator_and_tensors(
 # *** ======== Unmasked Estimator ======== *** #
 
 
-@pytest.mark.parametrize("sde_type", ["ve"])
+@pytest.mark.parametrize("sde_type", ["ve", "vp", "subvp"])
 @pytest.mark.parametrize("input_sample_dim", (1, 2))
 @pytest.mark.parametrize("input_event_shape", ((3, 5), (3, 1)))
 @pytest.mark.parametrize("batch_dim", (1, 10))
@@ -394,7 +394,7 @@ def test_unmasked_wrapper_vector_field_estimator_loss_shapes(
 
 
 @pytest.mark.gpu
-@pytest.mark.parametrize("sde_type", ["ve"])
+@pytest.mark.parametrize("sde_type", ["ve", "vp", "subvp"])
 @pytest.mark.parametrize("device", ["cpu", "cuda"])
 @pytest.mark.parametrize("score_net", ["simformer"])
 def test_unmasked_wrapper_vector_field_estimator_on_device(sde_type, device, score_net):
@@ -424,7 +424,7 @@ def test_unmasked_wrapper_vector_field_estimator_on_device(sde_type, device, sco
     assert str(out.device).split(":")[0] == device, "Output device mismatch."
 
 
-@pytest.mark.parametrize("sde_type", ["ve"])
+@pytest.mark.parametrize("sde_type", ["ve", "vp", "subvp"])
 @pytest.mark.parametrize("input_sample_dim", (1, 2))
 @pytest.mark.parametrize("input_event_shape", ((3, 5), (3, 1)))
 @pytest.mark.parametrize("batch_dim", (1, 10))
