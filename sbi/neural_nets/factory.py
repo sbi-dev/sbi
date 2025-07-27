@@ -79,7 +79,7 @@ def simformer_nn(
     sde_type: str = "ve",
     hidden_features: int = 100,
     num_heads: int = 4,
-    num_layers: int = 8,
+    num_layers: int = 4,
     mlp_ratio: int = 2,
     time_embedding_dim: int = 32,
     embedding_net: nn.Module = nn.Identity(),

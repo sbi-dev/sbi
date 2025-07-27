@@ -686,7 +686,7 @@ class VectorFieldAdaMLP(VectorFieldNet):
         return h
 
 
-class MaskedTimeAdditiveBlock(nn.Module):
+class TimeAdditiveBlock(nn.Module):
     def __init__(
         self,
         hidden_dim: int,
@@ -805,7 +805,7 @@ class DiTBlock(nn.Module):
         self.norm1 = nn.LayerNorm(hidden_features)
         self.norm2 = nn.LayerNorm(hidden_features)
 
-    def forward(self, x: Tensor, cond: Tensor) -> Tensor:
+    def forward(self, x: Tensor, cond: Tensor, mask: Optional[Tensor] = None) -> Tensor:
         """Forward pass through the block.
 
         args:
@@ -838,87 +838,6 @@ class DiTBlock(nn.Module):
         x_norm = self.norm1(x)
         x_norm = x_norm * (attn_scale + 1) + attn_shift
 
-        # self-attention
-        attn_out, _ = self.attn(x_norm, x_norm, x_norm)
-        x = x + attn_gate * attn_out
-
-        # mlp with adaptive ln
-        x_norm = self.norm2(x)
-        x_norm = x_norm * (mlp_scale + 1) + mlp_shift
-
-        # mlp
-        mlp_out = self.mlp(x_norm)
-        x = x + mlp_gate * mlp_out
-
-        return x
-
-
-class MaskedDiTBlock(nn.Module):
-    def __init__(
-        self,
-        hidden_dim: int,
-        cond_dim: int,
-        num_heads: int,
-        mlp_ratio: int = 2,
-        activation: Callable = nn.SiLU,
-    ):
-        """Initialize masked dit transformer block.
-
-        args:
-            hidden_dim: dimension of hidden features
-            cond_dim: dimension of conditioning features
-            num_heads: number of attention heads
-            mlp_ratio: ratio for mlp hidden dimension
-            activation: activation function
-        """
-        super().__init__()
-
-        # adaptive layer norm for attention
-        self.ada_affine = nn.Sequential(
-            nn.Linear(cond_dim, hidden_dim),
-            activation(),
-            nn.Linear(hidden_dim, 6 * hidden_dim),  # 3 for attn, 3 for mlp
-        )
-
-        # initialize last layer to zero
-        self.ada_affine[-1].weight.data.zero_()
-        self.ada_affine[-1].bias.data.zero_()
-
-        # attention
-        self.attn = nn.MultiheadAttention(
-            embed_dim=hidden_dim, num_heads=num_heads, batch_first=True
-        )
-
-        # mlp
-        self.mlp = nn.Sequential(
-            nn.Linear(hidden_dim, hidden_dim * mlp_ratio),
-            activation(),
-            nn.Linear(hidden_dim * mlp_ratio, hidden_dim),
-        )
-
-        # layer norms
-        self.norm1 = nn.LayerNorm(hidden_dim)
-        self.norm2 = nn.LayerNorm(hidden_dim)
-
-    def forward(self, x, cond, mask):
-        B, T, D = x.shape
-
-        ada_params = self.ada_affine(cond)
-        attn_shift, attn_scale, attn_gate, mlp_shift, mlp_scale, mlp_gate = (
-            ada_params.chunk(6, dim=-1)
-        )
-
-        attn_scale = attn_scale.view(B, 1, D)
-        attn_shift = attn_shift.view(B, 1, D)
-        attn_gate = attn_gate.view(B, 1, D)
-        mlp_scale = mlp_scale.view(B, 1, D)
-        mlp_shift = mlp_shift.view(B, 1, D)
-        mlp_gate = mlp_gate.view(B, 1, D)
-
-        # Adaptive LayerNorm before attention
-        x_norm = self.norm1(x)
-        x_norm = x_norm * (attn_scale + 1) + attn_shift
-
         # Prepare attention mask
         if mask is not None and mask.dim() == 3:
             # mask: [B, T, T] -> [B * num_heads, T, T]
@@ -929,15 +848,15 @@ class MaskedDiTBlock(nn.Module):
                 .reshape(B * self.attn.num_heads, T, T)
             )
 
-        # Self-attention
+        # self-attention
         attn_out, _ = self.attn(x_norm, x_norm, x_norm, attn_mask=mask)
         x = x + attn_gate * attn_out
 
-        # Adaptive LayerNorm before MLP
+        # mlp with adaptive ln
         x_norm = self.norm2(x)
         x_norm = x_norm * (mlp_scale + 1) + mlp_shift
 
-        # MLP
+        # mlp
         mlp_out = self.mlp(x_norm)
         x = x + mlp_gate * mlp_out
 
@@ -1272,7 +1191,7 @@ class VectorFieldSimformer(MaskedVectorFieldNet):
         self.in_proj = nn.Linear(dim_val + dim_id + dim_cond, hidden_features)
 
         # Transformer blocks
-        Block = MaskedDiTBlock if ada_time else MaskedTimeAdditiveBlock
+        Block = DiTBlock if ada_time else TimeAdditiveBlock
         self.blocks = nn.ModuleList([
             Block(hidden_features, time_embedding_dim, num_heads, mlp_ratio, activation)
             for _ in range(num_layers)
