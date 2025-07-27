@@ -160,11 +160,9 @@ def test_c2st_simformer_on_linearGaussian(
     """
     Test whether Simformer infers well a simple example with available ground truth.
     """
-    # TODO: This should be better tuned to find the right
-    # balance between required precision and speed
-    num_samples = 3000  # 1000
-    num_simulations = 10000  # 2500
-    max_num_epochs = 150  # 100
+    num_samples = 1000
+    num_simulations = 5000
+    max_num_epochs = 100
     tol = 0.15
 
     x_o = zeros(1, num_dim)
