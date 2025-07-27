@@ -1253,36 +1253,20 @@ class SubVPScoreEstimator(ConditionalScoreEstimator):
         return g
 
 
-class VEScoreEstimator(ConditionalScoreEstimator):
-    """Class for score estimators with variance exploding SDEs (i.e., NCSN / SMLD)."""
+class VarianceExplodingSDE:
+    """
+    Mixin for variance exploding SDE logic.
 
-    def __init__(
-        self,
-        net: VectorFieldNet,
-        input_shape: torch.Size,
-        condition_shape: torch.Size,
-        embedding_net: Optional[nn.Module] = None,
-        weight_fn: Union[str, Callable] = "max_likelihood",
-        sigma_min: float = 1e-4,
-        sigma_max: float = 10.0,
-        mean_0: float = 0.0,
-        std_0: float = 1.0,
-        t_min: float = 1e-3,
-        t_max: float = 1.0,
-    ) -> None:
-        self.sigma_min = sigma_min
-        self.sigma_max = sigma_max
-        super().__init__(
-            net,
-            input_shape,
-            condition_shape,
-            embedding_net=embedding_net,
-            weight_fn=weight_fn,
-            mean_0=mean_0,
-            std_0=std_0,
-            t_min=t_min,
-            t_max=t_max,
-        )
+    Expects the child class to define:
+        - self.input_shape
+        - self.sigma_min
+        - self.sigma_max
+    """
+
+    # Expected attributes at child
+    input_shape: torch.Size
+    sigma_max: float
+    sigma_min: float
 
     def mean_t_fn(self, times: Tensor) -> Tensor:
         """Conditional mean function for variance exploding SDEs, which is always 1.
@@ -1355,7 +1339,54 @@ class VEScoreEstimator(ConditionalScoreEstimator):
         return g
 
 
-class MaskedVEScoreEstimator(MaskedConditionalScoreEstimator):
+class VEScoreEstimator(ConditionalScoreEstimator, VarianceExplodingSDE):
+    """Class for score estimators with variance exploding SDEs (i.e., NCSN / SMLD)."""
+
+    def __init__(
+        self,
+        net: VectorFieldNet,
+        input_shape: torch.Size,
+        condition_shape: torch.Size,
+        embedding_net: Optional[nn.Module] = None,
+        weight_fn: Union[str, Callable] = "max_likelihood",
+        sigma_min: float = 1e-4,
+        sigma_max: float = 10.0,
+        mean_0: float = 0.0,
+        std_0: float = 1.0,
+        t_min: float = 1e-3,
+        t_max: float = 1.0,
+    ) -> None:
+        self.sigma_min = sigma_min
+        self.sigma_max = sigma_max
+        super().__init__(
+            net,
+            input_shape,
+            condition_shape,
+            embedding_net=embedding_net,
+            weight_fn=weight_fn,
+            mean_0=mean_0,
+            std_0=std_0,
+            t_min=t_min,
+            t_max=t_max,
+        )
+
+    def mean_t_fn(self, times: Tensor) -> Tensor:
+        return VarianceExplodingSDE.mean_t_fn(self, times)
+
+    def std_fn(self, times: Tensor) -> Tensor:
+        return VarianceExplodingSDE.std_fn(self, times)
+
+    def _sigma_schedule(self, times: Tensor) -> Tensor:
+        return VarianceExplodingSDE._sigma_schedule(self, times)
+
+    def drift_fn(self, input: Tensor, times: Tensor) -> Tensor:
+        return VarianceExplodingSDE.drift_fn(self, input, times)
+
+    def diffusion_fn(self, input: Tensor, times: Tensor) -> Tensor:
+        return VarianceExplodingSDE.diffusion_fn(self, input, times)
+
+
+class MaskedVEScoreEstimator(MaskedConditionalScoreEstimator, VarianceExplodingSDE):
     def __init__(
         self,
         net: VectorFieldNet,
@@ -1379,71 +1410,16 @@ class MaskedVEScoreEstimator(MaskedConditionalScoreEstimator):
         )
 
     def mean_t_fn(self, times: Tensor) -> Tensor:
-        """Conditional mean function for variance exploding SDEs, which is always 1.
-
-        Args:
-            times: SDE time variable in [0,1].
-
-        Returns:
-            Conditional mean at a given time.
-        """
-        phi = torch.ones_like(times, device=times.device)
-        for _ in range(len(self.input_shape)):
-            phi = phi.unsqueeze(-1)
-        return phi
+        return VarianceExplodingSDE.mean_t_fn(self, times)
 
     def std_fn(self, times: Tensor) -> Tensor:
-        """Standard deviation function for variance exploding SDEs.
-
-        Args:
-            times: SDE time variable in [0,1].
-
-        Returns:
-            Standard deviation at a given time.
-        """
-        std = self.sigma_min * (self.sigma_max / self.sigma_min) ** times
-        for _ in range(len(self.input_shape)):
-            std = std.unsqueeze(-1)
-        return std
+        return VarianceExplodingSDE.std_fn(self, times)
 
     def _sigma_schedule(self, times: Tensor) -> Tensor:
-        """Geometric sigma schedule for variance exploding SDEs.
-
-        Args:
-            times: SDE time variable in [0,1].
-
-        Returns:
-            Sigma schedule at a given time.
-        """
-        return self.sigma_min * (self.sigma_max / self.sigma_min) ** times
+        return VarianceExplodingSDE._sigma_schedule(self, times)
 
     def drift_fn(self, input: Tensor, times: Tensor) -> Tensor:
-        """Drift function for variance exploding SDEs.
-
-        Args:
-            input: Original data, x0.
-            times: SDE time variable in [0,1].
-
-        Returns:
-            Drift function at a given time.
-        """
-        return torch.zeros_like(input)
+        return VarianceExplodingSDE.drift_fn(self, input, times)
 
     def diffusion_fn(self, input: Tensor, times: Tensor) -> Tensor:
-        """Diffusion function for variance exploding SDEs.
-
-        Args:
-            input: Original data, x0.
-            times: SDE time variable in [0,1].
-
-        Returns:
-            Diffusion function at a given time.
-        """
-        g = self._sigma_schedule(times) * math.sqrt(
-            (2 * math.log(self.sigma_max / self.sigma_min))
-        )
-
-        while len(g.shape) < len(input.shape):
-            g = g.unsqueeze(-1)
-
-        return g
+        return VarianceExplodingSDE.diffusion_fn(self, input, times)
