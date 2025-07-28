@@ -75,7 +75,7 @@ class MaskedVectorFieldEstimatorBuilder(Protocol):
             inputs: Simulation outputs.
 
         Returns:
-            MaskedVectorFieldEstimator.
+            Masked vector field estimator.
         """
         ...
 
@@ -673,7 +673,7 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
         **kwargs,
     ):
         """Base class for masked vector field inference methods. It is
-        used for Simformer.
+        used for (Score) Simformer and Flow Matching Simformer.
 
         NOTE: Masked Vector field inference does not support multi-round inference
         with flexible proposals yet.
@@ -724,28 +724,6 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
     def _build_default_nn_fn(self, **kwargs) -> MaskedVectorFieldEstimatorBuilder:
         pass
 
-    # ! Introduced to avoid conflicts, should adjust later
-    def _get_potential_function(
-        self, prior: Distribution, estimator: ConditionalVectorFieldEstimator
-    ) -> Tuple[VectorFieldBasedPotential, TorchTransform]:
-        r"""Gets the potential function gradient for vector field estimators.
-
-        Args:
-            prior: The prior distribution.
-            estimator: The neural network modelling the vector field.
-        Returns:
-            The potential function and a transformation that maps
-            to unconstrained space.
-        """
-        # ! This is only called for sampling methods which are not sde or ode
-        # should I just raise a NotImplementedError?
-        potential_fn, theta_transform = vector_field_estimator_based_potential(
-            estimator,
-            prior,
-            x_o=None,
-        )
-        return potential_fn, theta_transform
-
     def append_simulations(
         self,
         inputs: Tensor,
@@ -755,11 +733,11 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
     ) -> "MaskedVectorFieldTrainer":
         r"""Store parameters and simulation outputs to use them for later training.
 
-        Data are stored as entries in lists for each type of variable (inputs/masks).
+        Data are stored as entries in lists for each type of variable (parameter/data).
 
-        Stores inputs and prior_masks (indicating if simulations are coming from the
-        prior or not) and an index indicating which round the batch of simulations came
-        from.
+        Stores inputs, invalid_inputs_masks (indicating entires which report NaN or Inf)
+        and prior_masks (indicating if simulations are coming from the prior or not),
+        and an index indicating which round the batch of simulations came from.
 
         Args:
             inputs: Simulation outputs.
@@ -865,9 +843,12 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[dict] = None,
     ) -> MaskedConditionalVectorFieldEstimator:
-        r"""Returns a masked vector field estimator that approximates any joint
+        r"""Returns a masked vector field estimator that approximates any conditional
         distribution through a continuous transformation from the base
         noise distribution to the target.
+
+        NOTE: This method is common for both score-based Simformer and flow
+        matching Simformer.
 
         The denoising score matching loss has a high
         variance, which makes it more difficult to detect converegence. To reduce this
@@ -911,7 +892,7 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
                 and validation dataloaders (like, e.g., a collate_fn)
 
         Returns:
-            Vector field estimator that approximates the posterior.
+            Masked vector field estimator that approximates the posterior.
         """
         # Load data from most recent round.
         self._round = max(self._data_round_index)
@@ -1229,6 +1210,28 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
 
         return converged
 
+    # ! Introduced to avoid conflicts, should adjust later
+    def _get_potential_function(
+        self, prior: Distribution, estimator: ConditionalVectorFieldEstimator
+    ) -> Tuple[VectorFieldBasedPotential, TorchTransform]:
+        r"""Gets the potential function gradient for vector field estimators.
+
+        Args:
+            prior: The prior distribution.
+            estimator: The neural network modelling the vector field.
+        Returns:
+            The potential function and a transformation that maps
+            to unconstrained space.
+        """
+        # ! This is only called for sampling methods which are not sde or ode
+        # should I just raise a NotImplementedError?
+        potential_fn, theta_transform = vector_field_estimator_based_potential(
+            estimator,
+            prior,
+            x_o=None,
+        )
+        return potential_fn, theta_transform
+
     def _build_conditional(
         self,
         condition_mask: Tensor,
@@ -1239,39 +1242,6 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
         vectorfield_sampling_parameters: Optional[Dict[str, Any]] = None,
         **kwargs,
     ) -> NeuralPosterior:
-        r"""Build posterior for a given conditioning context.
-
-        This method constructs a `VectorFieldPosterior` object for a specific
-        inference problem defined by the `condition_mask` and `edge_mask`.
-
-        Args:
-            condition_masks: A boolean mask indicating the role of each node.
-                Expected shape: `(batch_size, num_nodes)`.
-                - `True` (or `1`): The node at this position is observed and its
-                    features will be used for conditioning.
-                - `False` (or `0`): The node at this position is latent and its
-                    parameters are subject to inference.
-            edge_masks: A boolean mask defining the adjacency matrix of the directed
-                acyclic graph (DAG) representing dependencies among nodes.
-                Expected shape: `(batch_size, num_nodes, num_nodes)`.
-                - `True` (or `1`): An edge exists from the row node to the column node.
-                - `False` (or `0`): No edge exists between these nodes.
-            mvf_estimator_builder: The masked vector field estimator that the
-                posterior is based on. If `None`, use the latest vector field estimator
-                that was trained.
-            prior: The prior distribution.
-            sample_with: Method to use for sampling from the posterior. Can be one of
-                'sde' (default) or 'ode'. The 'sde' method uses the vector field to
-                do a Langevin diffusion step, while the 'ode' solves a probabilistic ODE
-                with a numerical ODE solver.
-            **kwargs: Additional keyword arguments passed to the
-                `VectorFieldPosterior`.
-
-        Returns:
-            A `VectorFieldPosterior` object representing $p(theta|x)$ with
-            `.sample()` and `.log_prob()` methods.
-        """
-
         # ! This is also handled within super().build_posterior()
         # via _resolve_estimator(),
         # but we first need to call the Wrapper using

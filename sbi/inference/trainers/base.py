@@ -335,11 +335,13 @@ class NeuralInference(ABC):
         resume_training: bool = False,
         dataloader_kwargs: Optional[dict] = None,
     ) -> Tuple[data.DataLoader, data.DataLoader]:
-        """Return dataloaders for training and validation.
+        r"""Return dataloaders for training and validation.
 
         Args:
-            dataset: holding all theta and x, optionally masks.
+            starting_round: round from which loading data.
             training_batch_size: training arg of inference methods.
+            validation_fraction: float in (0, 1) indicating which fraction of data
+                should be reserved for validation.
             resume_training: Whether the current call is resuming training so that no
                 new training and validation indices into the dataset have to be created.
             dataloader_kwargs: Additional or updated kwargs to be passed to the training
@@ -893,36 +895,8 @@ class MaskedNeuralInference(NeuralInference):
             epoch_durations_sec=[],
         )
 
-    def get_simulations(
-        self,
-        starting_round: int = 0,
-    ) -> Tuple[Tensor, Tensor, Tensor]:
-        r"""Returns all inputs, condition_masks, edge_masks and prior_masks
-        from rounds >= `starting_round`.
-
-        If requested, do not return invalid data.
-
-        Args:
-            starting_round: The earliest round to return samples from (we start counting
-                from zero).
-            warn_on_invalid: Whether to give out a warning if invalid simulations were
-                found.
-
-        Returns: Parameters, simulation outputs, prior masks.
-        """
-
-        inputs = get_simulations_since_round(
-            self._inputs_roundwise, self._data_round_index, starting_round
-        )
-        valid_inputs_mask = get_simulations_since_round(
-            self._valid_inputs_mask_roundwise, self._data_round_index, starting_round
-        )
-        prior_masks = get_simulations_since_round(
-            self._prior_masks, self._data_round_index, starting_round
-        )
-
-        return inputs, valid_inputs_mask, prior_masks
-
+    # Must be re-defined to specify the new interface using inputs
+    # rather than thetas and x
     @abstractmethod
     def append_simulations(
         self,
@@ -936,9 +910,9 @@ class MaskedNeuralInference(NeuralInference):
 
         Data are stored as entries in lists for each type of variable (parameter/data).
 
-        Stores inputs and prior_masks (indicating if simulations are coming from the
-        prior or not) and an index indicating which round the batch of simulations came
-        from.
+        Stores inputs, invalid_inputs_masks (indicating entires which report NaN or Inf)
+        and prior_masks (indicating if simulations are coming from the prior or not),
+        and an index indicating which round the batch of simulations came from.
 
         Args:
             inputs: Simulation outputs.
@@ -957,10 +931,42 @@ class MaskedNeuralInference(NeuralInference):
                 the training is happening. If training a large dataset on a GPU with not
                 much VRAM can set to 'cpu' to store data on system memory instead.
         Returns:
-            NeuralInference object (returned so that this function is chainable).
+            MaskedNeuralInference object (returned so that this function is chainable).
         """
         pass
 
+    # Must be re-defined to specify the new interface using inputs
+    # rather than thetas and x
+    def get_simulations(
+        self,
+        starting_round: int = 0,
+    ) -> Tuple[Tensor, Tensor, Tensor]:
+        r"""Returns all inputs, valid_inputs_masks, prior_masks
+        from rounds >= `starting_round`.
+
+        Args:
+            starting_round: The earliest round to return samples from (we start counting
+                from zero).
+            warn_on_invalid: Whether to give out a warning if invalid simulations were
+                found.
+
+        Returns: simulation outputs, invalid data masks, prior masks.
+        """
+
+        inputs = get_simulations_since_round(
+            self._inputs_roundwise, self._data_round_index, starting_round
+        )
+        valid_inputs_masks = get_simulations_since_round(
+            self._valid_inputs_mask_roundwise, self._data_round_index, starting_round
+        )
+        prior_masks = get_simulations_since_round(
+            self._prior_masks, self._data_round_index, starting_round
+        )
+
+        return inputs, valid_inputs_masks, prior_masks
+
+    # Must be re-defined to specify the new interface using inputs
+    # rather than thetas and x
     def get_dataloaders(
         self,
         starting_round: int = 0,
@@ -972,12 +978,14 @@ class MaskedNeuralInference(NeuralInference):
         """Return dataloaders for training and validation.
 
         Args:
-            dataset: holding all theta and x, optionally masks.
+            starting_round: round from which loading data.
             training_batch_size: training arg of inference methods.
+            validation_fraction: float in (0, 1) indicating which fraction of data
+                should be reserved for validation.
             resume_training: Whether the current call is resuming training so that no
                 new training and validation indices into the dataset have to be created.
             dataloader_kwargs: Additional or updated kwargs to be passed to the training
-                and validation dataloaders (like, e.g., a collate_fn).
+                and validation dataloaders (like, e.g., a collate_fn)
 
         Returns:
             Tuple of dataloaders for training and validation.
@@ -1027,10 +1035,27 @@ class MaskedNeuralInference(NeuralInference):
 
         return train_loader, val_loader
 
-    def set_condition_masks(
+    def set_condition_masks_generator(
         self,
         condition_mask_generator: Union[Callable[[Tensor], Tensor], Tensor, list, set],
     ):
+        """Set the condition mask generator.
+
+        The condition mask generator is a callable that generates the condition masks
+        thay will be employed at training time. It can otherwise also accept a fixed
+        condition mask or a set of condition masks which will be drawn uniformly.
+
+        If a callable is passed it must accept as parameter the input tensor to inform
+        it about the shapes that should be used to generate the masks.
+
+        Args:
+            condition_mask_generator: Callable that takes `inputs` and returns a
+                boolean tensor, or a fixed boolean tensor, or a list/tuple/set of
+                boolean tensors from which to randomly sample.
+
+        Returns:
+            MaskedNeuralInference object (returned so that this function is chainable).
+        """
         if isinstance(condition_mask_generator, Callable):
             self._condition_mask_generator = condition_mask_generator
         elif isinstance(condition_mask_generator, Tensor):
@@ -1046,9 +1071,26 @@ class MaskedNeuralInference(NeuralInference):
             self._condition_mask_generator = generator
         return self  # Chainable
 
-    def set_edge_masks(
+    def set_edge_masks_generator(
         self, edge_mask_generator: Union[Callable[[Tensor], Tensor], Tensor, list, set]
     ):
+        """Set the edge mask generator.
+
+        The edge mask generator is a callable that generates the edge masks
+        thay will be employed at training time. It can otherwise also accept a fixed
+        edge mask or a set of edge masks which will be drawn uniformly.
+
+        If a callable is passed it must accept as parameter the input tensor to inform
+        it about the shapes that should be used to generate the masks.
+
+        Args:
+            edge_mask_generator: Callable that takes `inputs` and returns a
+                boolean tensor, or a fixed boolean tensor, or a list/tuple/set of
+                boolean tensors from which to randomly sample.
+
+        Returns:
+            MaskedNeuralInference object (returned so that this function is chainable).
+        """
         if isinstance(edge_mask_generator, Callable):
             self._edge_mask_generator = edge_mask_generator
         elif isinstance(edge_mask_generator, Tensor):
@@ -1065,10 +1107,17 @@ class MaskedNeuralInference(NeuralInference):
         return self  # Chainable
 
     def _default_condition_masks_generator(self, inputs):
+        """The default condition mask generator employed
+        if none is specified by the user. It consists on batch-wise
+        Bernoulli masks at p=0.5, with an extra check that ensures
+        at both states (Latent/Observed, i.e., False/True) are included
+        in each mask
+        """
+
         batch_dims = inputs.shape[:-2]
         num_nodes = inputs.shape[-2]
 
-        # Generate masks with Bernoulli.
+        # Generate masks with Bernoulli
         condition_masks = torch.bernoulli(
             torch.full((*batch_dims, num_nodes), 0.5, device=inputs.device)
         ).bool()
@@ -1092,4 +1141,10 @@ class MaskedNeuralInference(NeuralInference):
         return condition_masks
 
     def _default_edge_masks_generator(self, inputs):
+        """The default edge mask generator employed
+        if none is specified by the user. It simply pass
+        None as a full-attention masks (equivalent to a
+        full ones) in order to save memory. `input` is specified
+        for compatibility altough ignored."""
+
         return None
