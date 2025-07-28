@@ -150,7 +150,7 @@ def z_score_parser(z_score_flag: Optional[str]) -> Tuple[bool, bool]:
     else:
         # Return warning due to invalid option, defaults to not z-scoring.
         raise ValueError(
-            "Invalid z-scoring option. Use 'none', 'independent'"
+            "Invalid z-scoring option. Use 'none', 'independent' "
             "'structured' or 'transform_to_unconstrained'."
         )
 
