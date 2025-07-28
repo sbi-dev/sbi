@@ -1037,7 +1037,7 @@ def build_zuko_flow(
             over the entire batch, instead of per-dimension. Should be used when each
             sample is, for example, a time series or an image.
             - `transform_to_unconstrained`: Transforms to
-            an unbound space, if bounds from `x_dist` are given.
+            an unbounded space if bounds from `x_dist` are given.
         z_score_y: Whether to z-score ys passing into the network, same options as
             z_score_x.
         hidden_features: The number of hidden features in the flow. Defaults to 50.
