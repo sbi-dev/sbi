@@ -158,7 +158,7 @@ def build_vector_field_estimator(
 
     if estimator_type == "flow":
         return FlowMatchingEstimator(
-            net=vectorfield_net,
+            net=vectorfield_net,  # type: ignore
             input_shape=batch_x[0].shape,
             condition_shape=batch_y[0].shape,
             embedding_net=embedding_net_y,
@@ -175,7 +175,7 @@ def build_vector_field_estimator(
             raise ValueError(f"Unknown SDE type: {sde_type}")
 
         return estimator_cls(
-            net=vectorfield_net,
+            net=vectorfield_net,  # type: ignore
             input_shape=batch_x[0].shape,
             condition_shape=batch_y[0].shape,
             embedding_net=embedding_net_y,
@@ -194,7 +194,7 @@ def build_vector_field_estimator(
             raise ValueError(f"Unknown SDE type: {sde_type}")
 
         return estimator_cls(
-            net=vectorfield_net,
+            net=vectorfield_net,  # type: ignore
             input_shape=batch_x[0].shape,
             embedding_net=embedding_net_y,
             mean_0=mean_0,
@@ -689,11 +689,11 @@ class VectorFieldAdaMLP(VectorFieldNet):
 class TimeAdditiveBlock(nn.Module):
     def __init__(
         self,
-        hidden_dim: int,
+        hidden_features: int,
         cond_dim: int,
         num_heads: int,
         mlp_ratio: int = 2,
-        activation: Callable = nn.SiLU,
+        activation: type[nn.Module] = nn.GELU,
     ):
         """Initialize masked time additive transformer block.
 
@@ -705,29 +705,29 @@ class TimeAdditiveBlock(nn.Module):
             activation: activation function
         """
         super().__init__()
-        self.norm1 = nn.LayerNorm(hidden_dim)
+        self.norm1 = nn.LayerNorm(hidden_features)
         self.attn = nn.MultiheadAttention(
-            embed_dim=hidden_dim, num_heads=num_heads, batch_first=True
+            embed_dim=hidden_features, num_heads=num_heads, batch_first=True
         )
-        self.norm2 = nn.LayerNorm(hidden_dim)
-        self.mlp_fc1 = nn.Linear(hidden_dim, int(hidden_dim * mlp_ratio))
+        self.norm2 = nn.LayerNorm(hidden_features)
+        self.mlp_fc1 = nn.Linear(hidden_features, int(hidden_features * mlp_ratio))
         self.mlp_act = activation()
-        self.mlp_time_proj = nn.Linear(cond_dim, int(hidden_dim * mlp_ratio))
-        self.mlp_fc2 = nn.Linear(int(hidden_dim * mlp_ratio), hidden_dim)
+        self.mlp_time_proj = nn.Linear(cond_dim, int(hidden_features * mlp_ratio))
+        self.mlp_fc2 = nn.Linear(int(hidden_features * mlp_ratio), hidden_features)
 
-    def forward(self, x, cond, mask):
-        B, T, D = x.shape
+    def forward(self, x: Tensor, cond: Tensor, mask: Optional[Tensor] = None):
+        batch_size, seq_lenght, _ = x.shape
 
         # First LayerNorm and self-attention with masking
         x_norm = self.norm1(x)
 
         if mask is not None and mask.dim() == 3:
             # mask: [B, T, T] -> [B * num_heads, T, T]
-            B, T, _ = mask.shape
+            batch_size, seq_lenght, _ = mask.shape
             mask = (
                 mask.unsqueeze(1)
-                .expand(B, self.attn.num_heads, T, T)
-                .reshape(B * self.attn.num_heads, T, T)
+                .expand(batch_size, self.attn.num_heads, seq_lenght, seq_lenght)
+                .reshape(batch_size * self.attn.num_heads, seq_lenght, seq_lenght)
             )
 
         attn_out, _ = self.attn(query=x_norm, key=x_norm, value=x_norm, attn_mask=mask)
@@ -809,11 +809,12 @@ class DiTBlock(nn.Module):
         """Forward pass through the block.
 
         args:
-            x: input tensor (b, d)
-            cond: conditioning tensor (b, d_cond)
+            x: input tensor
+            cond: conditioning tensor
+            mask: attention mask
 
         returns:
-            output tensor (b, d)
+            output tensor
         """
         # get adaptive ln parameters
         ada_params = self.ada_affine(cond)
@@ -839,14 +840,20 @@ class DiTBlock(nn.Module):
         x_norm = x_norm * (attn_scale + 1) + attn_shift
 
         # Prepare attention mask
-        if mask is not None and mask.dim() == 3:
-            # mask: [B, T, T] -> [B * num_heads, T, T]
-            B, T, _ = mask.shape
-            mask = (
-                mask.unsqueeze(1)
-                .expand(B, self.attn.num_heads, T, T)
-                .reshape(B * self.attn.num_heads, T, T)
-            )
+        if mask is not None:
+            if mask.dim() == 3:
+                # mask: [B, T, T] -> [B * num_heads, T, T]
+                seq_lenght = mask.shape[1]
+                mask = (
+                    mask.unsqueeze(1)
+                    .expand(batch_size, self.attn.num_heads, seq_lenght, seq_lenght)
+                    .reshape(batch_size * self.attn.num_heads, seq_lenght, seq_lenght)
+                )
+            elif mask.dim() == 2:
+                # [T, T], pass as-is
+                pass
+            else:
+                raise ValueError(f"Unsupported mask shape for DiT Block: {mask.shape}")
 
         # self-attention
         attn_out, _ = self.attn(x_norm, x_norm, x_norm, attn_mask=mask)
@@ -1146,7 +1153,7 @@ class VectorFieldSimformer(MaskedVectorFieldNet):
         time_emb_type: str = "random_fourier",
         sinusoidal_max_freq: float = 0.01,
         fourier_scale: float = 30.0,
-        activation: Callable = nn.SiLU,
+        activation: type[nn.Module] = nn.GELU,
     ):
         super().__init__()
         self.in_features = in_features  # Number of features by each node (F)
@@ -1193,7 +1200,13 @@ class VectorFieldSimformer(MaskedVectorFieldNet):
         # Transformer blocks
         Block = DiTBlock if ada_time else TimeAdditiveBlock
         self.blocks = nn.ModuleList([
-            Block(hidden_features, time_embedding_dim, num_heads, mlp_ratio, activation)
+            Block(
+                hidden_features=hidden_features,
+                cond_dim=time_embedding_dim,
+                num_heads=num_heads,
+                mlp_ratio=mlp_ratio,
+                activation=activation,
+            )
             for _ in range(num_layers)
         ])
 
@@ -1490,7 +1503,7 @@ def build_simformer_network(
     time_emb_type: str = "random_fourier",
     sinusoidal_max_freq: float = 0.01,
     fourier_scale: float = 30.0,
-    activation: Callable = nn.SiLU,
+    activation: type[nn.Module] = nn.GELU,
     **kwargs,
 ) -> VectorFieldSimformer:
     """Builds a Simformer network.
