@@ -599,23 +599,17 @@ class PosteriorEstimatorTrainer(NeuralInference, ABC):
             posterior_parameters: Configuration for building the posterior.
         """
 
-        if sample_with == "rejection" and prior is None:
+        if (
+            sample_with == "rejection"
+            or isinstance(posterior_parameters, RejectionPosteriorParameters)
+        ) and prior is None:
             raise ValueError(
-                "You passed `sample_with='rejection' but you did not specify a "
-                "`prior`. Until sbi v0.22.0, this was interpreted as directly"
-                " sampling from the posterior. As of sbi v0.23.0, you instead have"
-                " to use `sample_with='direct'` to do so."
-            )
-        elif (
-            isinstance(posterior_parameters, RejectionPosteriorParameters)
-            and prior is None
-        ):
-            raise ValueError(
-                "You passed `posterior_parameters=RejectionPosteriorParameters`"
-                " but you did not specify a `prior`. Until sbi v0.22.0, this "
-                "was interpreted as directly sampling from the posterior. As of "
-                "sbi v0.23.0, you instead have to use "
-                "`posterior_parameters=DirectPosteriorParameters` to do so."
+                "You indicated sampling via rejection sampling but "
+                "haven't passed a prior. As of sbi v0.23.0, you either have"
+                " to pass a prior to perform rejection sampling using the prior"
+                " as proposal, or to use the posterior as proposal, you have to"
+                " use a DirectPosterior via `sample_with='direct' or"
+                " `posterior_parameters=DirectPosteriorParameters`."
             )
 
     def _loss(
