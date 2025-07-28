@@ -8,7 +8,10 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 
-from sbi.neural_nets.estimators.flowmatching_estimator import FlowMatchingEstimator
+from sbi.neural_nets.estimators.flowmatching_estimator import (
+    FlowMatchingEstimator,
+    MaskedFlowMatchingEstimator,
+)
 from sbi.neural_nets.estimators.score_estimator import (
     ConditionalScoreEstimator,
     MaskedConditionalScoreEstimator,
@@ -163,6 +166,12 @@ def build_vector_field_estimator(
             condition_shape=batch_y[0].shape,
             embedding_net=embedding_net_y,
         )
+    elif estimator_type == "masked-flow":
+        return MaskedFlowMatchingEstimator(
+            net=vectorfield_net,  # type: ignore
+            input_shape=batch_x[0].shape,
+            embedding_net=embedding_net_y,
+        )
     elif estimator_type == "score":
         # Choose the appropriate score estimator based on SDE type
         if sde_type == "vp":
@@ -207,6 +216,10 @@ def build_vector_field_estimator(
 # For backward compatibility
 def build_flow_matching_estimator(*args, **kwargs):
     return build_vector_field_estimator(*args, estimator_type="flow", **kwargs)
+
+
+def build_masked_flow_matching_estimator(*args, **kwargs):
+    return build_vector_field_estimator(*args, estimator_type="masked-flow", **kwargs)
 
 
 def build_score_matching_estimator(*args, **kwargs):
