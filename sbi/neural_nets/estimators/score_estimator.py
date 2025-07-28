@@ -1033,6 +1033,15 @@ class MaskedConditionalScoreEstimator(MaskedConditionalVectorFieldEstimator):
 
 
 class VariancePreservingSDE:
+    """
+    Mixin for variance preserving SDE.
+
+    Expects the child class to define:
+        - self.input_shape
+        - self.beta_max
+        - self.beta_min
+    """
+
     input_shape: torch.Size
     beta_max: float
     beta_min: float
@@ -1203,6 +1212,15 @@ class MaskedVPScoreEstimator(MaskedConditionalScoreEstimator, VariancePreserving
 
 
 class SubVariancePreservingSDE:
+    """
+    Mixin for sub variance preserving SDE.
+
+    Expects the child class to define:
+        - self.input_shape
+        - self.beta_max
+        - self.beta_min
+    """
+
     input_shape: torch.Size
     beta_max: float
     beta_min: float
@@ -1392,7 +1410,7 @@ class MaskedSubVPScoreEstimator(
 
 class VarianceExplodingSDE:
     """
-    Mixin for variance exploding SDE logic.
+    Mixin for variance exploding SDE.
 
     Expects the child class to define:
         - self.input_shape

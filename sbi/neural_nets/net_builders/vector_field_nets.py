@@ -1213,7 +1213,9 @@ class VectorFieldSimformer(MaskedVectorFieldNet):
         # Output projection
         self.out_linear = nn.Linear(hidden_features, in_features)
 
-    def forward(self, inputs, t, condition_mask, edge_mask):
+    def forward(
+        self, inputs: Tensor, t: Tensor, condition_mask: Tensor, edge_mask: Tensor
+    ) -> Tensor:
         B, T, F = inputs.shape
         device = inputs.device
 
