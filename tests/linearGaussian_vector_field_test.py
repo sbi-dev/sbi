@@ -198,10 +198,10 @@ def test_c2st_simformer_on_linearGaussian(
     # Infer theta (node 0) given x (node 1)
     inference = Simformer(
         prior=prior,
-        sde_type=vector_field_type,
+        sde_type=vector_field_type,  # type: ignore
         show_progress_bars=True,
-        latent_idx=[0],
-        observed_idx=[1],  # type: ignore
+        posterior_latent_idx=[0],
+        posterior_observed_idx=[1],
     )
 
     mvf_estimator = inference.append_simulations(
