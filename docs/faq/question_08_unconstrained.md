@@ -28,14 +28,14 @@ This ensures that your density estimator operates in a
 transformed space where it respects prior bounds,
 improving the efficiency of rejection sampling.
 
->Note: The `x_dist=prior` might seem confusing - internally,
-sbi uses generic `x,y` notation where for NPE, x represents
-parameters (θ) and y represents data. 
+Note: The `x_dist=prior` might seem confusing - internally,
+sbi uses generic `x,y` notation where for NPE, `x` represents
+parameters (θ) and `y` represents data.
 This is why we pass the prior as `x_dist`.
 
 Important:
 
 - This transformation is currently only supported for zuko density estimators.
-- For **NLE/NRE**, setting up this transformation is more 
+- For **NLE/NRE**, setting up this transformation is more
 complex as it requires estimating bounds for the simulated data
 rather than using prior bounds.
