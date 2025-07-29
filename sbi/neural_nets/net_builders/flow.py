@@ -2,7 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from functools import partial
-from typing import List, Optional, Sequence, Union
+from typing import List, Literal, Optional, Sequence, Union
 
 import torch
 import zuko
@@ -1007,8 +1007,10 @@ def build_zuko_flow(
     which_nf: str,
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Optional[str] = "independent",
-    z_score_y: Optional[str] = "independent",
+    z_score_x: Literal["none", "independent",
+                       "structured", "transform_to_unconstrained"],
+    z_score_y: Literal["none", "independent",
+                       "structured", "transform_to_unconstrained"],
     hidden_features: Union[Sequence[int], int] = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
@@ -1085,83 +1087,37 @@ def build_zuko_flow(
     # Continuous normalizing flows (CNF) only have one transform,
     # so we need to handle them slightly differently.
     if which_nf == "CNF":
-        transform = flow_built.transform
-
-        z_score_x_bool, structured_x = z_score_parser(z_score_x)
-
-        # Only x (i.e., prior for NPE) can be transformed to unbound space (not y)
-        # when x_dist is provided.
-        if z_score_x == "transform_to_unconstrained":
-            if x_dist is None:
-                raise ValueError(
-                    "Transformation to unconstrained space requires a distribution "
-                    "provided through `x_dist`."
-                )
-            elif not hasattr(x_dist, "support"):
-                raise ValueError(
-                    "`x_dist` requires a `.support` attribute for"
-                    "an unconstrained transformation."
-                )
-            else:
-                transform_to_unconstrained = mcmc_transform(x_dist)
-                transform = (
-                    biject_transform_zuko(transform_to_unconstrained),
-                    transform,
-                )
-
-        elif z_score_x_bool:
-            transform = (
-                standardizing_transform_zuko(batch_x, structured_x),
-                transform,
-            )
-
-        z_score_y_bool, structured_y = z_score_parser(z_score_y)
-        if z_score_y_bool:
-            # Prepend standardizing transform to y-embedding.
-            embedding_net = nn.Sequential(
-                standardizing_transform_zuko(batch_y, structured_y), embedding_net
-            )
-
-        # Combine transforms.
-        neural_net = zuko.flows.Flow(transform, flow_built.base)
+        # Transforms is 1 continuous transform for CNF
+        transforms = flow_built.transform
     else:
         transforms = flow_built.transform.transforms
 
-        z_score_x_bool, structured_x = z_score_parser(z_score_x)
+    z_score_x_bool, structured_x = z_score_parser(z_score_x)
 
-        if z_score_x == "transform_to_unconstrained":
-            if x_dist is None:
-                raise ValueError(
-                    "Transformation to unconstrained space requires a distribution "
-                    "provided through `x_dist`."
-                )
-            elif not hasattr(x_dist, "support"):
-                raise ValueError(
-                    "`x_dist` requires a `.support` attribute for"
-                    "an unconstrained transformation."
-                )
-            else:
-                transform_to_unconstrained = mcmc_transform(x_dist)
-                transforms = (
-                    biject_transform_zuko(transform_to_unconstrained),
-                    *transforms,
-                )
+    if z_score_x == "transform_to_unconstrained":
+        transforms = get_transform_to_unconstrained(x_dist, which_nf, transforms)
 
-        elif z_score_x_bool:
+    elif z_score_x_bool:
+        if which_nf == "CNF":
+            transforms = (
+                standardizing_transform_zuko(batch_x, structured_x),
+                transforms,
+            )
+        else:
             transforms = (
                 standardizing_transform_zuko(batch_x, structured_x),
                 *transforms,
             )
 
-        z_score_y_bool, structured_y = z_score_parser(z_score_y)
-        if z_score_y_bool:
-            # Prepend standardizing transform to y-embedding.
-            embedding_net = nn.Sequential(
-                standardizing_net(batch_y, structured_y), embedding_net
-            )
+    z_score_y_bool, structured_y = z_score_parser(z_score_y)
+    if z_score_y_bool:
+        # Prepend standardizing transform to y-embedding.
+        embedding_net = nn.Sequential(
+            standardizing_net(batch_y, structured_y), embedding_net
+        )
 
-        # Combine transforms.
-        neural_net = zuko.flows.Flow(transforms, flow_built.base)
+    # Combine transforms.
+    neural_net = zuko.flows.Flow(transforms, flow_built.base)
 
     flow = ZukoFlow(
         neural_net,
@@ -1171,6 +1127,37 @@ def build_zuko_flow(
     )
 
     return flow
+
+
+def get_transform_to_unconstrained(
+    x_dist: Distribution,
+    which_nf: str,
+    transforms: zuko.flows.Transforms,
+) -> zuko.flows.Transform:
+    if x_dist is None:
+        raise ValueError(
+            "Transformation to unconstrained space requires a distribution "
+            "provided through `x_dist`."
+        )
+    elif not hasattr(x_dist, "support"):
+        raise ValueError(
+            "`x_dist` requires a `.support` attribute for"
+            "an unconstrained transformation."
+        )
+    else:
+        transform_to_unconstrained = mcmc_transform(x_dist)
+        if which_nf == "CNF":
+            # Transforms is 1 continuous transform for CNF
+            transforms = (
+                biject_transform_zuko(transform_to_unconstrained),
+                transforms,
+            )
+        else:
+            transforms = (
+                biject_transform_zuko(transform_to_unconstrained),
+                *transforms,
+            )
+    return transforms
 
 
 def build_zuko_unconditional_flow(
