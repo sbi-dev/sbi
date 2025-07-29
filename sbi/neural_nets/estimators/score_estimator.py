@@ -618,22 +618,28 @@ class MaskedConditionalScoreEstimator(MaskedConditionalVectorFieldEstimator):
         input: Tensor,
         t: Tensor,
         condition_mask: Tensor,
-        edge_mask: Tensor,
+        edge_mask: Optional[Tensor],
     ) -> Tensor:
         r"""Score function of the score estimator.
 
         Args:
             input: Original data, x0.
             t: SDE time variable in [t_min, t_max].
-            condition_masks: A boolean mask indicating the role of each node.
-                - `True` (or `1`): The node at this position is observed and its
+            condition_mask: A boolean mask indicating the role of each variable.
+                Expected shape: `(batch_size, num_variables)`.
+                - `True` (or `1`): The variable at this position is observed and its
                     features will be used for conditioning.
-                - `False` (or `0`): The node at this position is latent and its
-                    parameters are subject to inference.
-            edge_masks: A boolean mask defining the adjacency matrix of the directed
-                acyclic graph (DAG) representing dependencies among nodes.
-                - `True` (or `1`): An edge exists from the row node to the column node.
-                - `False` (or `0`): No edge exists between these nodes.
+                - `False` (or `0`): The variable at this position is latent and its
+                    features are subject to inference.
+            edge_mask: A boolean mask defining the adjacency matrix of the directed
+                acyclic graph (DAG) representing dependencies among variables.
+                Expected shape: `(batch_size, num_variables, num_variables)`.
+                - `True` (or `1`): An edge exists from the row variable to the column
+                    variable.
+                - `False` (or `0`): No edge exists between these variables.
+                - if None, it will be equivalent to a full attention (i.e., full ones)
+                                mask, we suggest you to use None instead of ones
+                    to save memory resources
 
         Returns:
             Score function value.
@@ -662,31 +668,31 @@ class MaskedConditionalScoreEstimator(MaskedConditionalVectorFieldEstimator):
             input: Original data
                 Shape: [B, T, F]
             times: SDE time variable in [t_min, t_max]. Uniformly sampled if None.
-            condition_masks: A boolean mask indicating the role of each node.
-                Shape: `(batch_size, num_nodes)` or `(num_nodes,)`.
-                - `True` (or `1`): The node at this position is observed and its
+            condition_mask: A boolean mask indicating the role of each variable.
+                Expected shape: `(batch_size, num_variables)`.
+                - `True` (or `1`): The variable at this position is observed and its
                     features will be used for conditioning.
-                - `False` (or `0`): The node at this position is latent and its
-                    parameters are subject to inference.
-                This mask is internally broadcast to match the batch dimension before
-                being passed to `self.net`.
-                If not provided, it will be
-                    automatically generate by a Bernoulli(p=0.33)
-            edge_masks: A boolean mask defining the adjacency matrix of the directed
-                acyclic graph (DAG) representing dependencies among nodes.
-                Shape: `(batch_size, num_nodes, num_nodes)` or `(num_nodes, num_nodes)`
-                - `True` (or `1`): An edge exists from the row node to the column node.
-                - `False` (or `0`): No edge exists between these nodes.
-                This mask is internally broadcast to match the batch dimension before
-                being passed to `self.net`.
-                If not provided, it will be automatically
-                    generated as a full-connected DAG, i.e., a tensor of ones
+                - `False` (or `0`): The variable at this position is latent and its
+                    features are subject to inference.
+            edge_mask: A boolean mask defining the adjacency matrix of the directed
+                acyclic graph (DAG) representing dependencies among variables.
+                Expected shape: `(batch_size, num_variables, num_variables)`.
+                - `True` (or `1`): An edge exists from the row variable to the column
+                    variable.
+                - `False` (or `0`): No edge exists between these variables.
+                - if None, it will be equivalent to a full attention (i.e., full ones)
+                    mask, we suggest you to use None instead of ones
+                    to save memory resources
             control_variate: Whether to use a control variate to reduce the variance of
                 the stochastic loss estimator.
             control_variate_threshold: Threshold for the control variate. If the std
                 exceeds this threshold, the control variate is not used. This is because
                 the control variate assumes a Taylor expansion of the score around the
                 mean, which is not valid for large std.
+            rebalance_loss: If True, the loss for each batch item is divided by the
+                number of latent (unobserved) variables in that item. This is useful
+                when the number of latent variables varies across the batch, as it
+                prevents items with more latent variables from dominating the loss.
 
         Returns:
             MSE between target score and network output, scaled by the weight function.

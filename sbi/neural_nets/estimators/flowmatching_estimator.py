@@ -359,7 +359,8 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
 class MaskedFlowMatchingEstimator(MaskedConditionalVectorFieldEstimator):
     r"""
     Rectified flow matching estimator class that estimates the conditional vector field,
-    :math:`v(\theta_t, t; x_o) = \mathbb{E}[\theta_1 - \theta_0 | \theta_t, x_o = x_o]`
+    :math:`v(\text{inputs}_t, t; x_o) = \mathbb{E}[\text{inputs}_1 - \text{inputs}_0 |
+        \text{inputs}_t, x_o = x_o]`
 
     This estimator implements the flow matching approach where the vector field is
     learned by matching the flow between the base and target distributions. The vector
@@ -420,7 +421,11 @@ class MaskedFlowMatchingEstimator(MaskedConditionalVectorFieldEstimator):
         self.noise_scale = noise_scale
 
     def forward(
-        self, input: Tensor, time: Tensor, condition_mask: Tensor, edge_mask: Tensor
+        self,
+        input: Tensor,
+        time: Tensor,
+        condition_mask: Tensor,
+        edge_mask: Optional[Tensor],
     ) -> Tensor:
         """Forward pass of the FlowMatchingEstimator.
 
@@ -429,6 +434,21 @@ class MaskedFlowMatchingEstimator(MaskedConditionalVectorFieldEstimator):
                     `(sample_dim_input, batch_dim_input, *event_shape_input)`.
             time: Time variable in [0,1] of shape
                 `(batch_dim_time, *event_shape_time)`.
+            condition_mask: A boolean mask indicating the role of each variable.
+                Expected shape: `(batch_size, num_variables)`.
+                - `True` (or `1`): The variable at this position is observed and its
+                    features will be used for conditioning.
+                - `False` (or `0`): The variable at this position is latent and its
+                    features are subject to inference.
+            edge_mask: A boolean mask defining the adjacency matrix of the directed
+                acyclic graph (DAG) representing dependencies among variables.
+                Expected shape: `(batch_size, num_variables, num_variables)`.
+                - `True` (or `1`): An edge exists from the row variable to the column
+                    variable.
+                - `False` (or `0`): No edge exists between these variables.
+                - if None, it will be equivalent to a full attention (i.e., full ones)
+                    mask, we suggest you to use None instead of ones
+                    to save memory resources
 
         Returns:
             The estimated vector field.
@@ -454,7 +474,7 @@ class MaskedFlowMatchingEstimator(MaskedConditionalVectorFieldEstimator):
         self,
         input: Tensor,
         condition_mask: Tensor,
-        edge_mask: Tensor,
+        edge_mask: Optional[Tensor],
         times: Optional[Tensor] = None,
         rebalance_loss: bool = True,
         **kwargs,
@@ -465,35 +485,56 @@ class MaskedFlowMatchingEstimator(MaskedConditionalVectorFieldEstimator):
         trajectories as described in the original paper [1]_:
 
         .. math::
-            \mathbb{E}_{\theta_0 \sim p_{data}, t \sim \text{Uniform}[0, 1]},
-            \theta_t = t \cdot \theta_1 + (1 - t) \cdot \theta_0,
-            \left[ \| v(\theta_t, t; x_o = x_o) - (\theta_1 - \theta_0) \|^2 \right]
+            \mathbb{E}_{\text{inputs}_0 \sim p_{data}, t \sim \text{Uniform}[0, 1]},
+            \text{inputs}_t = t \cdot \text{inputs}_1 + (1 - t) \cdot \text{inputs}_0,
+            \left[ \| v(\text{inputs}_t, t; x_o = x_o) - (\text{inputs}_1 -
+                \text{inputs}_0) \|^2 \right]
 
-        where :math:`v(\theta_t, t; x_o)` is the vector field estimated by the neural
+        where :math:`v(\text{inputs}_t, t; x_o)` is the vector field
+            estimated by the neural
         network (see Equation 1 in [1]_ with added conditioning on :math:`x_o`. The
-        notation is changed to match the standard SBI notation: :math:`\theta_0 = x_0`
-        and :math:`\theta_1 = x_1`).
+        notation is changed to match the standard SBI notation:
+            :math:`\text{inputs}_0 = x_0` and :math:`\text{inputs}_1 = x_1`).
 
         The loss is computed as the mean squared error between the vector field:
 
         .. math::
-            L(\theta_0, \theta_1, t, x_o) = \| v(\theta_t, t; x_o) -
-            (\theta_1 - \theta_0) \|^2
+            L(\text{inputs}_0, \text{inputs}_1, t, x_o) = \| v(\text{inputs}_t, t; x_o)
+                - (\text{inputs}_1 - \text{inputs}_0) \|^2
 
             where
 
             .. math::
-                \theta_1 \sim p_{base}
-                \theta_t = t \cdot \theta_1 + (1 - t) \cdot \theta_0
+                \text{inputs}_1 \sim p_{base}
+                \text{inputs}_t = t \cdot \text{inputs}_1 + (1 - t) \cdot
+                    \text{inputs}_0
 
             Additionally, the small noise :math:`\sigma_{min}` is added to the
             vector field as per [2]_ to address numerical issues at small times.
 
         Args:
-            theta: Parameters (:math:`\theta_0`).
-            x: Observed data (:math:`x_o`).
-            times: Time steps to compute the loss at.
-                Optional, will sample from [0, 1] if not provided.
+            input: Original data
+                Shape: [B, T, F]
+            times: SDE time variable in [t_min, t_max]. Uniformly sampled if None.
+            condition_mask: A boolean mask indicating the role of each variable.
+                Expected shape: `(batch_size, num_variables)`.
+                - `True` (or `1`): The variable at this position is observed and its
+                    features will be used for conditioning.
+                - `False` (or `0`): The variable at this position is latent and its
+                    features are subject to inference.
+            edge_mask: A boolean mask defining the adjacency matrix of the directed
+                acyclic graph (DAG) representing dependencies among variables.
+                Expected shape: `(batch_size, num_variables, num_variables)`.
+                - `True` (or `1`): An edge exists from the row variable to the column
+                    variable.
+                - `False` (or `0`): No edge exists between these variables.
+                - if None, it will be equivalent to a full attention (i.e., full ones)
+                    mask, we suggest you to use None instead of ones
+                    to save memory resources
+            rebalance_loss: If True, the loss for each batch item is divided by the
+                number of latent (unobserved) variables in that item. This is useful
+                when the number of latent variables varies across the batch, as it
+                prevents items with more latent variables from dominating the loss.
 
         Returns:
             Loss value.
@@ -543,25 +584,40 @@ class MaskedFlowMatchingEstimator(MaskedConditionalVectorFieldEstimator):
         edge_mask: Tensor,
     ) -> Tensor:
         r"""
-        ODE flow function :math:`v(\theta_t, t, x_o)` of the vector field estimator.
+        ODE flow function :math:`v(\text{inputs}_t, t, x_o)` of the vector field
+            estimator.
 
         The target distribution can be sampled from by solving the following ODE:
 
         .. math::
-            d\theta_t = v(\theta_t, t; x_o) dt
+            d\text{inputs}_t = v(\text{inputs}_t, t; x_o) dt
 
-        with initial :math:`\theta_1` sampled from the base distribution.
-        Here :math:`v(\theta_t, t; x_o)` is the vector field estimated by the
+        with initial :math:`\text{inputs}_1` sampled from the base distribution.
+        Here :math:`v(\text{inputs}_t, t; x_o)` is the vector field estimated by the
         flow matching neural network (see Equation 1 in [1]_ with added
         conditioning on :math:`x_o`).
 
         Args:
-            input: :math:`\theta_t`.
-            condition: Conditioning variable :math:`x_o`.
+            input: :math:`\text{inputs}_t`.
             times: Time :math:`t`.
+            condition_mask: A boolean mask indicating the role of each variable.
+                Expected shape: `(batch_size, num_variables)`.
+                - `True` (or `1`): The variable at this position is observed and its
+                    features will be used for conditioning.
+                - `False` (or `0`): The variable at this position is latent and its
+                    features are subject to inference.
+            edge_mask: A boolean mask defining the adjacency matrix of the directed
+                acyclic graph (DAG) representing dependencies among variables.
+                Expected shape: `(batch_size, num_variables, num_variables)`.
+                - `True` (or `1`): An edge exists from the row variable to the column
+                    variable.
+                - `False` (or `0`): No edge exists between these variables.
+                - if None, it will be equivalent to a full attention (i.e., full ones)
+                    mask, we suggest you to use None instead of ones
+                    to save memory resources
 
         Returns:
-            Estimated vector field :math:`v(\theta_t, t; x_o)`.
+            Estimated vector field :math:`v(\text{inputs}_t, t; x_o)`.
             The shape is the same as the input.
         """
         return self.forward(input, times, condition_mask, edge_mask)
@@ -574,17 +630,32 @@ class MaskedFlowMatchingEstimator(MaskedConditionalVectorFieldEstimator):
         The score function is calculated based on [3]_ (see Equation 13):
 
         .. math::
-            \nabla_{\theta_t} \log p(\theta_t | x_o) =
-            (- (1 - t) v(\theta_t, t; x_o) - \theta_0 ) / t
+            \nabla_{\text{inputs}_t} \log p(\text{inputs}_t | x_o) =
+            (- (1 - t) v(\text{inputs}_t, t; x_o) - \text{inputs}_0 ) / t
 
         Taking into account the noise scale :math:`\sigma_{min}`, the score function is
-        :math:`\nabla_{\theta_t} \log p(\theta_t | x_o) =
-            (- (1 - t) v(\theta_t, t; x_o) - \theta_0 ) / (t + \sigma_{min})`.
+        :math:`\nabla_{\text{inputs}_t} \log p(\text{inputs}_t | x_o) =
+            (- (1 - t) v(\text{inputs}_t, t; x_o) -
+                \text{inputs}_0 ) / (t + \sigma_{min})`.
 
         Args:
             input: variable whose distribution is estimated.
-            condition: Conditioning variable.
             t: Time.
+            condition_mask: A boolean mask indicating the role of each variable.
+                Expected shape: `(batch_size, num_variables)`.
+                - `True` (or `1`): The variable at this position is observed and its
+                    features will be used for conditioning.
+                - `False` (or `0`): The variable at this position is latent and its
+                    features are subject to inference.
+            edge_mask: A boolean mask defining the adjacency matrix of the directed
+                acyclic graph (DAG) representing dependencies among variables.
+                Expected shape: `(batch_size, num_variables, num_variables)`.
+                - `True` (or `1`): An edge exists from the row variable to the column
+                    variable.
+                - `False` (or `0`): No edge exists between these variables.
+                - if None, it will be equivalent to a full attention (i.e., full ones)
+                    mask, we suggest you to use None instead of ones
+                    to save memory resources
 
         Returns:
             Score function of the vector field estimator.
@@ -599,19 +670,20 @@ class MaskedFlowMatchingEstimator(MaskedConditionalVectorFieldEstimator):
         The drift function is calculated based on [3]_ (see Equation 7):
 
         .. math::
-            f(t) = - \theta_t / (1 - t)
+            f(t) = - \text{inputs}_t / (1 - t)
 
         The drift function :math:`f(t)` and diffusion function :math:`\g(t)`
         enable SDE sampling:
 
         .. math::
-            d\theta_t = [f(t) - g(t)^2 \nabla_{\theta_t} \log p(\theta_t | x_o)]dt
+            d\text{inputs}_t = [f(t) - g(t)^2 \nabla_{\text{inputs}_t}
+                \log p(\text{inputs}_t | x_o)]dt
             + \g(t) dW_t
 
         where :math:`dW_t` is the Wiener process.
 
         Args:
-            input: Parameters :math:`\theta_t`.
+            input: Parameters :math:`\text{inputs}_t`.
             times: SDE time variable in [0,1].
 
         Returns:
@@ -636,7 +708,7 @@ class MaskedFlowMatchingEstimator(MaskedConditionalVectorFieldEstimator):
 
 
         Args:
-            input: Parameters :math:`\theta_t`.
+            input: Parameters :math:`\text{inputs}_t`.
             times: SDE time variable in [0,1].
 
         Returns:
@@ -651,13 +723,14 @@ class MaskedFlowMatchingEstimator(MaskedConditionalVectorFieldEstimator):
 
     def mean_t_fn(self, times: Tensor) -> Tensor:
         r"""Linear coefficient of the perturbation kernel expectation
-        :math:`\mu_t(t) = E[\theta_t | \theta_0]` for the flow matching estimator.
+        :math:`\mu_t(t) = E[\text{inputs}_t | \text{inputs}_0]` for the flow matching
+            estimator.
 
         The perturbation kernel for rectified flows with Gaussian base distribution is:
 
         .. math::
-            N(\theta_t; \mu_t(t), \sigma_t(t)^2) ,
-            \mu_t(t) = (1 - t) \cdot \theta_0 + t \cdot \mu_{base}
+            N(\text{inputs}_t; \mu_t(t), \sigma_t(t)^2) ,
+            \mu_t(t) = (1 - t) \cdot \text{inputs}_0 + t \cdot \mu_{base}
             \sigma_t(t) = t \cdot \sigma_{base}
 
         So far, the implementation of iid methods assumes that the mean_base
@@ -682,8 +755,8 @@ class MaskedFlowMatchingEstimator(MaskedConditionalVectorFieldEstimator):
         The perturbation kernel for rectified flows with Gaussian base distribution is:
 
         .. math::
-            N(\theta_t; \mu_t(t), \sigma_t(t)^2) ,
-            \mu_t(t) = (1 - t) \cdot \theta_0 + t \cdot \mu_{base}
+            N(\text{inputs}_t; \mu_t(t), \sigma_t(t)^2) ,
+            \mu_t(t) = (1 - t) \cdot \text{inputs}_0 + t \cdot \mu_{base}
             \sigma_t(t) = t \cdot \sigma_{base}
 
         Taking into account the noise scale :math:`\sigma_{min}`, the standard deviation

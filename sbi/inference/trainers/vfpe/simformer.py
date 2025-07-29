@@ -32,6 +32,8 @@ class Simformer(MaskedVectorFieldTrainer):
     Dependencies among variables are defined by a boolean adjacency matrix `edge_mask`.
     - `True` (or `1`): An edge exists from the row variable to the column variable.
     - `False` (or `0`): No edge exists.
+    - if None, it will be equivalent to a full attention (i.e., full ones)
+        mask, we suggest you to use None instead of ones to save memory resources
 
     NOTE:
         - Multi-round inference is not supported yet; the API is present for coherence
@@ -143,6 +145,9 @@ class Simformer(MaskedVectorFieldTrainer):
                 - `True` (or `1`): An edge exists from the row variable to the column
                     variable.
                 - `False` (or `0`): No edge exists between these variables.
+                - if None, it will be equivalent to a full attention (i.e., full ones)
+                    mask, we suggest you to use None instead of ones
+                    to save memory resources
             mvf_estimator: Neural network architecture for the masked
                 vector field estimator. Can be a callable that implements
                 the `MaskedVectorFieldEstimatorBuilder` protocol.
@@ -192,12 +197,15 @@ class Simformer(MaskedVectorFieldTrainer):
         later)
 
         Args:
-            edge_masks: A boolean mask defining the adjacency matrix of the directed
+            edge_mask: A boolean mask defining the adjacency matrix of the directed
                 acyclic graph (DAG) representing dependencies among variables.
                 Expected shape: `(batch_size, num_variables, num_variables)`.
                 - `True` (or `1`): An edge exists from the row variable to the column
                     variable.
                 - `False` (or `0`): No edge exists between these variables.
+                - if None, it will be equivalent to a full attention (i.e., full ones)
+                    mask, we suggest you to use None instead of ones
+                    to save memory resources
              mvf_estimator: Neural network architecture for the masked
                 vector field estimator. Can be a callable that implements
                 the `MaskedVectorFieldEstimatorBuilder` protocol.
@@ -250,12 +258,15 @@ class Simformer(MaskedVectorFieldTrainer):
         of the condition masked generated from the latent and observed indexes.
 
         Args:
-            edge_masks: A boolean mask defining the adjacency matrix of the directed
+            edge_mask: A boolean mask defining the adjacency matrix of the directed
                 acyclic graph (DAG) representing dependencies among variables.
                 Expected shape: `(batch_size, num_variables, num_variables)`.
                 - `True` (or `1`): An edge exists from the row variable to the column
                     variable.
                 - `False` (or `0`): No edge exists between these variables.
+                - if None, it will be equivalent to a full attention (i.e., full ones)
+                    mask, we suggest you to use None instead of ones
+                    to save memory resources
              mvf_estimator: Neural network architecture for the masked
                 vector field estimator. Can be a callable that implements
                 the `MaskedVectorFieldEstimatorBuilder` protocol.

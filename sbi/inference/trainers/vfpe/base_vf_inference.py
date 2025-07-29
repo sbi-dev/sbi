@@ -901,22 +901,17 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
             # TODO: Modify to "not-supported"
             assert force_first_round_loss or resume_training, (
                 "You have already trained this neural network. After you had trained "
-                "the network, you again appended simulations with `append_simulations"
-                "(inputs, condition_masks, edge_masks)`, but you did not provide a "
-                "proposal.\n"
+                "the network, you again appended simulations with `append_simulations "
+                "but you did not provide a proposal.\n"
                 "If the new simulations are sampled from the prior, you can set "
                 "`.train(..., force_first_round_loss=True`). However, if the new "
                 "simulations were not sampled from the prior, you should pass the "
-                "proposal, i.e. "
-                "   `append_simulations(inputs, condition_masks, edge_masks)`.\n"
+                "proposal, i.e. `append_simulations(inputs, proposal)`.\n"
                 "If your samples are not sampled from the prior and you do not pass a "
                 "proposal and you set `force_first_round_loss=True`, the result of "
                 "Simformer will not be the true posterior. Instead, it will be the "
                 "proposal posterior, which (usually) is more narrow than the true "
                 "posterior.\n"
-                "NOTE: Simformer's training loss does not use the `prior` in the "
-                "traditional sbi sense; the actual base distribution for diffusion "
-                "is a standard Gaussian."
             )
 
         # Calibration kernels proposed in Lueckmann, Gonçalves et al., 2017.
@@ -1283,38 +1278,6 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
         times: Optional[Tensor] = None,
         force_first_round_loss: bool = False,
     ) -> Tensor:
-        r"""Return loss from masked vector field estimator. Currently only single-round
-        training is implemented, i.e., no proposal correction is applied for later
-        rounds.
-
-        The loss can be weighted with a calibration kernel.
-
-        Args:
-            inputs: Simulation outputs.
-            condition_masks: A boolean mask indicating the role of each node.
-                Expected shape: `(batch_size, num_nodes)`.
-                - `True` (or `1`): The node at this position is observed and its
-                    features will be used for conditioning.
-                - `False` (or `0`): The node at this position is latent and its
-                    parameters are subject to inference.
-            edge_masks: A boolean mask defining the adjacency matrix of the directed
-                acyclic graph (DAG) representing dependencies among nodes.
-                Expected shape: `(batch_size, num_nodes, num_nodes)`.
-                - `True` (or `1`): An edge exists from the row node to the column node.
-                - `False` (or `0`): No edge exists between these nodes.
-            masks: Prior masks. Ignored for now.
-            proposal: Proposal distribution. Ignored for now.
-            calibration_kernel: Calibration kernel.
-            times: Times :math:`t`.
-            force_first_round_loss: If `True`, ignore the correction for using a
-                proposal distribution different from the prior. Since the
-                correction is not implemented yet, `False` will raise an error
-                on any round other than the first one.
-
-        Returns:
-            Calibration kernel-weighted loss implemented by the vector field estimator.
-        """
-
         if times is not None:
             times = times.to(self._device)
 

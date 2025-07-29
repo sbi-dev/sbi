@@ -1150,6 +1150,11 @@ class VectorFieldTransformer(VectorFieldNet):
 
 
 class VectorFieldSimformer(MaskedVectorFieldNet):
+    """Simformer for vector field estimation.
+
+    This class implements the Simformer as in Gloeckler et al. (2024).
+    """
+
     def __init__(
         self,
         in_features: int,
@@ -1229,6 +1234,30 @@ class VectorFieldSimformer(MaskedVectorFieldNet):
     def forward(
         self, inputs: Tensor, t: Tensor, condition_mask: Tensor, edge_mask: Tensor
     ) -> Tensor:
+        """Forward pass through the Simfomer.
+
+        Args:
+            input: Input tensor on which the vector field is evaluated.
+            t: Time embedding.
+            condition_mask: A boolean mask indicating the role of each variable.
+                Expected shape: `(batch_size, num_variables)`.
+                - `True` (or `1`): The variable at this position is observed and its
+                    features will be used for conditioning.
+                - `False` (or `0`): The variable at this position is latent and its
+                    features are subject to inference.
+            edge_mask: A boolean mask defining the adjacency matrix of the directed
+                acyclic graph (DAG) representing dependencies among variables.
+                Expected shape: `(batch_size, num_variables, num_variables)`.
+                - `True` (or `1`): An edge exists from the row variable to the column
+                    variable.
+                - `False` (or `0`): No edge exists between these variables.
+                - if None, it will be equivalent to a full attention (i.e., full ones)
+                    mask, we suggest you to use None instead of ones
+                    to save memory resources
+
+        Returns:
+            Vector field evaluation at the provided points
+        """
         B, T, F = inputs.shape
         device = inputs.device
 
@@ -1538,7 +1567,7 @@ def build_simformer_network(
         ada_time: Whether to use adaptive time conditioning in transformer blocks.
 
     Returns:
-        A SimformerNet vector field network.
+        A Simformer vector field network.
     """
 
     del kwargs  # Unused

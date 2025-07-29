@@ -142,6 +142,9 @@ class FlowMatchingSimformer(MaskedVectorFieldTrainer):
                 - `True` (or `1`): An edge exists from the row variable to the column
                     variable.
                 - `False` (or `0`): No edge exists between these variables.
+                - if None, it will be equivalent to a full attention (i.e., full ones)
+                    mask, we suggest you to use None instead of ones
+                    to save memory resources
             mvf_estimator: Neural network architecture for the masked
                 vector field estimator. Can be a callable that implements
                 the `MaskedVectorFieldEstimatorBuilder` protocol.
@@ -197,6 +200,9 @@ class FlowMatchingSimformer(MaskedVectorFieldTrainer):
                 - `True` (or `1`): An edge exists from the row variable to the column
                     variable.
                 - `False` (or `0`): No edge exists between these variables.
+                - if None, it will be equivalent to a full attention (i.e., full ones)
+                    mask, we suggest you to use None instead of ones
+                    to save memory resources
              mvf_estimator: Neural network architecture for the masked
                 vector field estimator. Can be a callable that implements
                 the `MaskedVectorFieldEstimatorBuilder` protocol.
@@ -249,12 +255,15 @@ class FlowMatchingSimformer(MaskedVectorFieldTrainer):
         of the condition masked generated from the latent and observed indexes.
 
         Args:
-            edge_masks: A boolean mask defining the adjacency matrix of the directed
+            edge_mask: A boolean mask defining the adjacency matrix of the directed
                 acyclic graph (DAG) representing dependencies among variables.
                 Expected shape: `(batch_size, num_variables, num_variables)`.
                 - `True` (or `1`): An edge exists from the row variable to the column
                     variable.
                 - `False` (or `0`): No edge exists between these variables.
+                - if None, it will be equivalent to a full attention (i.e., full ones)
+                    mask, we suggest you to use None instead of ones
+                    to save memory resources
              mvf_estimator: Neural network architecture for the masked
                 vector field estimator. Can be a callable that implements
                 the `MaskedVectorFieldEstimatorBuilder` protocol.

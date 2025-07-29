@@ -590,15 +590,13 @@ def simformer_score_nn(
     ada_time: bool = False,
     **kwargs: Any,
 ) -> Callable:
-    r"""
-
-
-    Returns a function that builds a Simformer for learning arbitrary distributions.
+    r"""Returns a function that builds a Score based Simformer
+    for learning arbitrary distributions.
 
     The returned function is to be passed to the inference class when using the flexible
     interface.
 
-    Note that in the view of the Simformer, there is no theta or x, just inputs with
+    Note that in the scope of the Simformer, there is no theta or x, just inputs with
     variable condition and edge masks defining relationships between variables.
 
     Args:
@@ -619,7 +617,6 @@ def simformer_score_nn(
     Returns:
         Callable: A function that takes batch inputs and returns a masked score
             matching estimator.
-
     """
 
     kwargs = dict(
@@ -684,9 +681,8 @@ def simformer_flow_nn(
     **kwargs: Any,
 ) -> Callable:
     r"""
-
-
-    Returns a function that builds a Simformer for learning arbitrary distributions.
+    Returns a function that builds a Flow Matching Simformer
+    for learning arbitrary distributions.
 
     The returned function is to be passed to the inference class when using the flexible
     interface.

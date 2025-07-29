@@ -117,10 +117,21 @@ class ConditionalEstimator(nn.Module, ABC):
 
 
 class MaskedConditionalEstimator(nn.Module, ABC):
-    r""" """
+    r"""Base class for masked conditional estimators that estimate properties of
+    distributions conditional on an input.
+
+    For example, this can be:
+    - Masked conditional density estimator of the posterior $p(\theta|x)$.
+    - Masked conditional density estimator of the likelihood $p(x|\theta)$.
+    - Masked conditional vector field estimator e.g. $\nabla_\theta \log p(\theta|x)$.
+
+    Subclasses of ConditionalEstimator should implement the
+    ``loss(input, condition_mask, edge_mask, condition)`` method
+    to be compatible with sbi's training procedures.
+    """
 
     def __init__(self, input_shape: Tuple) -> None:
-        r"""Construct a conditional estimator given input shape.
+        r"""Construct a masked conditional estimator given input shape.
 
         Args:
             input_shape: Event shape of the input at which the density is being
@@ -651,14 +662,15 @@ class MaskedConditionalVectorFieldEstimator(MaskedConditionalEstimator, ABC):
         condition_mask: Tensor,
         edge_mask: Optional[Tensor],
     ) -> Tensor:
-        r"""ODE flow function :math:`v(\theta_t, t, x_o)` of the vector field estimator.
+        r"""ODE flow function :math:`v(\text{inputs}_t, t, x_o)`
+            of the vector field estimator.
 
         The target distribution can be sampled from by solving the following ODE:
 
         .. math::
-            d\theta_t = v(\theta_t, t; x_o) dt
+            d\text{inputs}_t = v(\text{inputs}_t, t; x_o) dt
 
-        with initial :math:`\theta_1` sampled from the base distribution.
+        with initial :math:`\text{inputs}_1` sampled from the base distribution.
 
         Args:
             input: variable whose distribution is estimated.
@@ -667,7 +679,7 @@ class MaskedConditionalVectorFieldEstimator(MaskedConditionalEstimator, ABC):
         Raises:
             NotImplementedError: This method should be implemented by sub-classes.
         """
-        ...
+        raise NotImplementedError("ODE is not implemented for this estimator.")
 
     # -------------------------- SDE METHODS --------------------------
 
@@ -681,10 +693,11 @@ class MaskedConditionalVectorFieldEstimator(MaskedConditionalEstimator, ABC):
         r"""Time-dependent score function
 
         .. math::
-            s(t, \theta_t; x_o) = \nabla_{\theta_t} \log p(\theta_t | x_o)
+            s(t, \text{inputs}_t; x_o) = \nabla_{\text{inputs}_t}
+                \log p(\text{inputs}_t | x_o)
 
         Args:
-            input: Input parameters :math:`\theta_t`.
+            input: Input parameters :math:`\text{inputs}_t`.
             t: Time.
 
         Raises:
@@ -694,11 +707,12 @@ class MaskedConditionalVectorFieldEstimator(MaskedConditionalEstimator, ABC):
 
     def mean_t_fn(self, times: Tensor) -> Tensor:
         r"""Linear coefficient mean_t of the perturbation kernel expectation
-        :math:`\mu_t(t) = E[\theta_t | \theta_0] = \text{mean_t}(t) \cdot \theta_0`
+        :math:`\mu_t(t) = E[\text{inputs}_t | \text{inputs}_0] = \text{mean_t}(t)
+            \cdot \text{inputs}_0`
         specifying the "mean factor" at a given time, which is always multiplied by
-        :math:`\theta_0` to get the mean of the noise distribution, i.e.,
-        :math:`p(\theta_t | \theta_0) = N(\theta_t;
-                \text{mean_t}(t)*\theta_0, \text{std_t}(t)).`
+        :math:`\text{inputs}_0` to get the mean of the noise distribution, i.e.,
+        :math:`p(\text{inputs}_t | \text{inputs}_0) = N(\text{inputs}_t;
+                \text{mean_t}(t)*\text{inputs}_0, \text{std_t}(t)).`
 
         Args:
             times: SDE time variable in [0,1].
@@ -713,8 +727,8 @@ class MaskedConditionalVectorFieldEstimator(MaskedConditionalEstimator, ABC):
             time,
 
         .. math::
-            p(\theta_t | \theta_0) = N(\theta_t; \text{mean_t}(t) \cdot
-            \theta_0, \text{std_t}(t)^2).
+            p(\text{inputs}_t | \text{inputs}_0) = N(\text{inputs}_t; \text{mean_t}(t)
+            \cdot \text{inputs}_0, \text{std_t}(t)^2).
 
         Args:
             times: SDE time variable in [0,1].
@@ -731,14 +745,14 @@ class MaskedConditionalVectorFieldEstimator(MaskedConditionalEstimator, ABC):
         enable SDE sampling:
 
         .. math::
-            d\theta_t = [f(t) - g(t)^2 \nabla_{\theta_t} \log p(\theta_t | x_o)]dt
-              + \g(t) dW_t
+            d\text{inputs}_t = [f(t) - g(t)^2 \nabla_{\text{inputs}_t}
+                \log p(\text{inputs}_t | x_o)]dt + \g(t) dW_t
 
         where :math:`dW_t` is the Wiener process.
 
 
         Args:
-            input: input parameters :math:`\theta_t`.
+            input: input parameters :math:`\text{inputs}_t`.
             times: SDE time variable in [0,1].
 
         Raises:
@@ -754,13 +768,13 @@ class MaskedConditionalVectorFieldEstimator(MaskedConditionalEstimator, ABC):
         enable SDE sampling:
 
         .. math::
-            d\theta_t = [f(t) - g(t)^2 \nabla_{\theta_t} \log p(\theta_t | x_o)]dt
-              + \g(t) dW_t
+            d\text{inputs}_t = [f(t) - g(t)^2 \nabla_{\text{inputs}_t}
+                \log p(\text{inputs}_t | x_o)]dt + \g(t) dW_t
 
         where :math:`dW_t` is the Wiener process.
 
         Args:
-            input: input parameters :math:`\theta_t`.
+            input: input parameters :math:`\text{inputs}_t`.
             times: SDE time variable in [0,1].
 
         Raises:
@@ -770,7 +784,7 @@ class MaskedConditionalVectorFieldEstimator(MaskedConditionalEstimator, ABC):
 
 
 class MaskedConditionalVectorFieldEstimatorWrapper(ConditionalVectorFieldEstimator):
-    r"""Base class for wrapper to adapt masked conditional vector field estimator
+    r"""Wrapper to adapt masked conditional vector field estimator
     to a conditional vector field estimator interface.
 
     This wrapper adapts a MaskedConditionalVectorFieldEstimator to the
@@ -800,13 +814,14 @@ class MaskedConditionalVectorFieldEstimatorWrapper(ConditionalVectorFieldEstimat
                 - `True` (or `1`): An edge exists from the row variable to the
                      column variable
                 - `False` (or `0`): No edge exists.
+                - if None, it will be equivalent to a full attention (i.e., full ones)
+                    mask, we suggest you to use None instead of ones
+                    to save memory resources
         """
 
         T, F = original_estimator.input_shape
 
         # Input checks for fixed_condition_mask
-        if not isinstance(fixed_condition_mask, torch.Tensor):
-            raise TypeError("fixed_condition_mask must be a torch.Tensor.")
         if fixed_condition_mask.dim() != 1:
             raise ValueError(
                 f"fixed_condition_mask must be 1-dimensional, got shape "
@@ -825,8 +840,6 @@ class MaskedConditionalVectorFieldEstimatorWrapper(ConditionalVectorFieldEstimat
 
         # Input checks for fixed_edge_mask
         if fixed_edge_mask is not None:
-            if not isinstance(fixed_edge_mask, torch.Tensor):
-                raise TypeError("fixed_edge_mask must be a torch.Tensor or None.")
             if fixed_edge_mask.dim() != 2:
                 raise ValueError(
                     f"fixed_edge_mask must be 2-dimensional, got shape "
