@@ -8,21 +8,27 @@ import torch
 
 from sbi import utils as utils
 from sbi.inference import NLE, NPE, NRE
+from sbi.inference.posteriors.posterior_parameters import (
+    DirectPosteriorParameters,
+    MCMCPosteriorParameters,
+    RejectionPosteriorParameters,
+    VIPosteriorParameters,
+)
 from sbi.inference.posteriors.vi_posterior import VIPosterior
 
 
 @pytest.mark.parametrize(
-    "inference_method, sampling_method",
+    "inference_method, posterior_parameter",
     (
-        (NPE, "direct"),
-        pytest.param(NLE, "mcmc", marks=pytest.mark.mcmc),
-        pytest.param(NRE, "mcmc", marks=pytest.mark.mcmc),
-        pytest.param(NRE, "vi", marks=pytest.mark.mcmc),
-        (NRE, "rejection"),
+        (NPE, DirectPosteriorParameters),
+        pytest.param(NLE, MCMCPosteriorParameters, marks=pytest.mark.mcmc),
+        pytest.param(NRE, MCMCPosteriorParameters, marks=pytest.mark.mcmc),
+        pytest.param(NRE, VIPosteriorParameters, marks=pytest.mark.mcmc),
+        (NRE, RejectionPosteriorParameters),
     ),
 )
 def test_picklability(
-    inference_method, sampling_method: str, tmp_path, mcmc_params_fast
+    inference_method, posterior_parameter, tmp_path, mcmc_params_fast
 ):
     num_dim = 2
     prior = utils.BoxUniform(low=-2 * torch.ones(num_dim), high=2 * torch.ones(num_dim))
@@ -33,10 +39,14 @@ def test_picklability(
 
     inference = inference_method(prior=prior)
     _ = inference.append_simulations(theta, x).train(max_num_epochs=1)
-    posterior = inference.build_posterior(
-        sample_with=sampling_method, mcmc_parameters=mcmc_params_fast
-    ).set_default_x(x_o)
-
+    if posterior_parameter is MCMCPosteriorParameters:
+        posterior = inference.build_posterior(
+            posterior_parameters=posterior_parameter(**mcmc_params_fast)
+        ).set_default_x(x_o)
+    else:
+        posterior = inference.build_posterior(
+            posterior_parameters=posterior_parameter()
+        ).set_default_x(x_o)
     # After sample and log_prob, the posterior should still be picklable
     if isinstance(posterior, VIPosterior):
         posterior.train(max_num_iters=10)

@@ -10,6 +10,7 @@ from torch import Tensor
 from torch.distributions import Beta, Binomial, Distribution, Gamma
 
 from sbi.inference import MNLE, MCMCPosterior
+from sbi.inference.posteriors.posterior_parameters import MCMCPosteriorParameters
 from sbi.inference.posteriors.rejection_posterior import RejectionPosterior
 from sbi.inference.posteriors.vi_posterior import VIPosterior
 from sbi.inference.potentials.base_potential import BasePotential
@@ -182,7 +183,9 @@ def test_mnle_accuracy_with_different_samplers_and_trials(
     ).sample((num_samples,), show_progress_bars=False)
 
     posterior = trainer.build_posterior(
-        prior=prior, sample_with=sampler, mcmc_parameters=mcmc_params_accurate
+        prior=prior,
+        sample_with=sampler,
+        posterior_parameters=MCMCPosteriorParameters(**mcmc_params_accurate),
     )
     posterior.set_default_x(x_o)
     if sampler == "vi":

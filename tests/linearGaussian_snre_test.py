@@ -23,6 +23,7 @@ from sbi.inference import (
     VIPosterior,
     ratio_estimator_based_potential,
 )
+from sbi.inference.posteriors.posterior_parameters import MCMCPosteriorParameters
 from sbi.neural_nets.ratio_estimators import RatioEstimator
 from sbi.simulators.linear_gaussian import (
     diagonal_linear_gaussian,
@@ -65,8 +66,9 @@ def test_api_nre_multiple_trials_and_rounds_map(
         for num_trials in [1, 3]:
             x_o = zeros((num_trials, num_dim))
             posterior = inference.build_posterior(
-                mcmc_method="slice_np_vectorized",
-                mcmc_parameters=mcmc_params_fast,
+                posterior_parameters=MCMCPosteriorParameters(
+                    method="slice_np_vectorized", **mcmc_params_fast
+                )
             ).set_default_x(x_o)
             posterior.sample(sample_shape=(num_samples,))
         proposals.append(posterior)

@@ -21,7 +21,10 @@ from sbi.inference import (
     NRE_C,
     DirectPosterior,
 )
-from sbi.inference.posteriors.posterior_parameters import RejectionPosteriorParameters
+from sbi.inference.posteriors.posterior_parameters import (
+    MCMCPosteriorParameters,
+    RejectionPosteriorParameters,
+)
 from sbi.simulators.linear_gaussian import (
     diagonal_linear_gaussian,
     linear_gaussian,
@@ -195,9 +198,10 @@ def test_batched_mcmc_sample_log_prob_with_different_x(
     x_o = ones(num_dim) if x_o_batch_dim == 0 else ones(x_o_batch_dim, num_dim)
 
     posterior = inference.build_posterior(
-        sample_with="mcmc",
-        mcmc_method="slice_np_vectorized",
-        mcmc_parameters=mcmc_params_fast,
+        posterior_parameters=MCMCPosteriorParameters(
+            method="slice_np_vectorized",
+            **mcmc_params_fast,
+        )
     )
 
     samples = posterior.sample_batched(
@@ -219,9 +223,10 @@ def test_batched_mcmc_sample_log_prob_with_different_x(
         inference = snlre_method(prior=prior)
         _ = inference.append_simulations(theta, x).train()
         posterior = inference.build_posterior(
-            sample_with="mcmc",
-            mcmc_method="slice_np_vectorized",
-            mcmc_parameters=mcmc_params_fast,
+            posterior_parameters=MCMCPosteriorParameters(
+                method="slice_np_vectorized",
+                **mcmc_params_fast,
+            )
         )
 
         x_o = torch.stack([0.5 * ones(num_dim), -0.5 * ones(num_dim)], dim=0)
