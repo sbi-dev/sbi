@@ -34,8 +34,12 @@ nflow_specific_kwargs = ["num_bins", "num_components", "tail_bound"]
 def build_made(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Optional[str] = "independent",
-    z_score_y: Optional[str] = "independent",
+    z_score_x: Literal[
+        "none", "independent", "structured", "transform_to_unconstrained"
+    ],
+    z_score_y: Literal[
+        "none", "independent", "structured", "transform_to_unconstrained"
+    ],
     hidden_features: int = 50,
     num_mixture_components: int = 10,
     embedding_net: nn.Module = nn.Identity(),
@@ -105,8 +109,12 @@ def build_made(
 def build_maf(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Optional[str] = "independent",
-    z_score_y: Optional[str] = "independent",
+    z_score_x: Literal[
+        "none", "independent", "structured", "transform_to_unconstrained"
+    ],
+    z_score_y: Literal[
+        "none", "independent", "structured", "transform_to_unconstrained"
+    ],
     hidden_features: int = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
@@ -193,8 +201,12 @@ def build_maf(
 def build_maf_rqs(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Optional[str] = "independent",
-    z_score_y: Optional[str] = "independent",
+    z_score_x: Literal[
+        "none", "independent", "structured", "transform_to_unconstrained"
+    ],
+    z_score_y: Literal[
+        "none", "independent", "structured", "transform_to_unconstrained"
+    ],
     hidden_features: int = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
@@ -305,8 +317,12 @@ def build_maf_rqs(
 def build_nsf(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Optional[str] = "independent",
-    z_score_y: Optional[str] = "independent",
+    z_score_x: Literal[
+        "none", "independent", "structured", "transform_to_unconstrained"
+    ],
+    z_score_y: Literal[
+        "none", "independent", "structured", "transform_to_unconstrained"
+    ],
     hidden_features: int = 50,
     num_transforms: int = 5,
     num_bins: int = 10,
@@ -427,8 +443,12 @@ def build_nsf(
 def build_zuko_nice(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Optional[str] = "independent",
-    z_score_y: Optional[str] = "independent",
+    z_score_x: Literal[
+        "none", "independent", "structured", "transform_to_unconstrained"
+    ],
+    z_score_y: Literal[
+        "none", "independent", "structured", "transform_to_unconstrained"
+    ],
     hidden_features: Union[Sequence[int], int] = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
@@ -482,8 +502,12 @@ def build_zuko_nice(
 def build_zuko_maf(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Optional[str] = "independent",
-    z_score_y: Optional[str] = "independent",
+    z_score_x: Literal[
+        "none", "independent", "structured", "transform_to_unconstrained"
+    ],
+    z_score_y: Literal[
+        "none", "independent", "structured", "transform_to_unconstrained"
+    ],
     hidden_features: Union[Sequence[int], int] = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
@@ -534,8 +558,12 @@ def build_zuko_maf(
 def build_zuko_nsf(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Optional[str] = "independent",
-    z_score_y: Optional[str] = "independent",
+    z_score_x: Literal[
+        "none", "independent", "structured", "transform_to_unconstrained"
+    ],
+    z_score_y: Literal[
+        "none", "independent", "structured", "transform_to_unconstrained"
+    ],
     hidden_features: Union[Sequence[int], int] = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
@@ -595,8 +623,12 @@ def build_zuko_nsf(
 def build_zuko_ncsf(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Optional[str] = "independent",
-    z_score_y: Optional[str] = "independent",
+    z_score_x: Literal[
+        "none", "independent", "structured", "transform_to_unconstrained"
+    ],
+    z_score_y: Literal[
+        "none", "independent", "structured", "transform_to_unconstrained"
+    ],
     hidden_features: Union[Sequence[int], int] = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
@@ -651,8 +683,12 @@ def build_zuko_ncsf(
 def build_zuko_sospf(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Optional[str] = "independent",
-    z_score_y: Optional[str] = "independent",
+    z_score_x: Literal[
+        "none", "independent", "structured", "transform_to_unconstrained"
+    ],
+    z_score_y: Literal[
+        "none", "independent", "structured", "transform_to_unconstrained"
+    ],
     hidden_features: Union[Sequence[int], int] = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
@@ -705,8 +741,12 @@ def build_zuko_sospf(
 def build_zuko_naf(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Optional[str] = "independent",
-    z_score_y: Optional[str] = "independent",
+    z_score_x: Literal[
+        "none", "independent", "structured", "transform_to_unconstrained"
+    ],
+    z_score_y: Literal[
+        "none", "independent", "structured", "transform_to_unconstrained"
+    ],
     hidden_features: Union[Sequence[int], int] = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
@@ -771,8 +811,12 @@ def build_zuko_naf(
 def build_zuko_unaf(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Optional[str] = "independent",
-    z_score_y: Optional[str] = "independent",
+    z_score_x: Literal[
+        "none", "independent", "structured", "transform_to_unconstrained"
+    ],
+    z_score_y: Literal[
+        "none", "independent", "structured", "transform_to_unconstrained"
+    ],
     hidden_features: Union[Sequence[int], int] = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
@@ -837,8 +881,12 @@ def build_zuko_unaf(
 def build_zuko_cnf(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Optional[str] = "independent",
-    z_score_y: Optional[str] = "independent",
+    z_score_x: Literal[
+        "none", "independent", "structured", "transform_to_unconstrained"
+    ],
+    z_score_y: Literal[
+        "none", "independent", "structured", "transform_to_unconstrained"
+    ],
     hidden_features: Union[Sequence[int], int] = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
@@ -891,8 +939,12 @@ def build_zuko_cnf(
 def build_zuko_gf(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Optional[str] = "independent",
-    z_score_y: Optional[str] = "independent",
+    z_score_x: Literal[
+        "none", "independent", "structured", "transform_to_unconstrained"
+    ],
+    z_score_y: Literal[
+        "none", "independent", "structured", "transform_to_unconstrained"
+    ],
     hidden_features: Union[Sequence[int], int] = 50,
     num_transforms: int = 3,
     embedding_net: nn.Module = nn.Identity(),
@@ -948,8 +1000,12 @@ def build_zuko_gf(
 def build_zuko_bpf(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Optional[str] = "independent",
-    z_score_y: Optional[str] = "independent",
+    z_score_x: Literal[
+        "none", "independent", "structured", "transform_to_unconstrained"
+    ],
+    z_score_y: Literal[
+        "none", "independent", "structured", "transform_to_unconstrained"
+    ],
     hidden_features: Union[Sequence[int], int] = 50,
     num_transforms: int = 3,
     embedding_net: nn.Module = nn.Identity(),
@@ -1007,10 +1063,12 @@ def build_zuko_flow(
     which_nf: str,
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Literal["none", "independent",
-                       "structured", "transform_to_unconstrained"],
-    z_score_y: Literal["none", "independent",
-                       "structured", "transform_to_unconstrained"],
+    z_score_x: Literal[
+        "none", "independent", "structured", "transform_to_unconstrained"
+    ],
+    z_score_y: Literal[
+        "none", "independent", "structured", "transform_to_unconstrained"
+    ],
     hidden_features: Union[Sequence[int], int] = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
@@ -1163,7 +1221,9 @@ def get_transform_to_unconstrained(
 def build_zuko_unconditional_flow(
     which_nf: str,
     batch_x: Tensor,
-    z_score_x: Optional[str] = "independent",
+    z_score_x: Literal[
+        "none", "independent", "structured", "transform_to_unconstrained"
+    ],
     hidden_features: Union[Sequence[int], int] = 50,
     num_transforms: int = 5,
     **kwargs,
