@@ -293,7 +293,7 @@ def test_consistent_run_tarp_results_with_posterior(method):
     num_dim = 2
     prior = BoxUniform(-ones(num_dim), ones(num_dim))
 
-    num_simulations = 1000
+    num_simulations = 1500
     num_tarp_sims = 500
     num_posterior_samples = 1000
 
@@ -308,7 +308,7 @@ def test_consistent_run_tarp_results_with_posterior(method):
     theta = prior.sample((num_simulations,))
     x = simulator(theta)
 
-    inferer.append_simulations(theta, x).train(training_batch_size=200)
+    inferer.append_simulations(theta, x).train()
     posterior = inferer.build_posterior()
 
     thetas = prior.sample((num_tarp_sims,))
