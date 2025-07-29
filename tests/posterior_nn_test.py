@@ -11,6 +11,7 @@ from torch.distributions import Independent, MultivariateNormal, Uniform
 from sbi.inference import (
     FMPE,
     NLE_A,
+    NPE,
     NPE_A,
     NPE_C,
     NPSE,
@@ -20,6 +21,7 @@ from sbi.inference import (
     NRE_C,
     DirectPosterior,
 )
+from sbi.inference.posteriors.posterior_parameters import RejectionPosteriorParameters
 from sbi.simulators.linear_gaussian import (
     diagonal_linear_gaussian,
     linear_gaussian,
@@ -391,3 +393,24 @@ def test_build_posterior_raises_with_invalid_estimator():
 
     inference.train(max_num_epochs=1)
     inference.build_posterior(density_estimator=nn.Module())
+
+
+@pytest.mark.xfail(
+    raises=ValueError,
+    reason="Prior must be passed through build_posterior method for rejection"
+    " sampling in NPE",
+)
+def test_build_posterior_raises_error_for_rejection_sampling():
+    def simulator(theta):
+        return 1.0 + theta + torch.randn(theta.shape, device=theta.device) * 0.1
+
+    num_dim = 3
+    prior = BoxUniform(low=-2 * torch.ones(num_dim), high=2 * torch.ones(num_dim))
+    theta = prior.sample((300,))
+    x = simulator(theta)
+
+    inference = NPE(prior=prior)
+    inference.append_simulations(theta, x)
+
+    inference.train(max_num_epochs=1)
+    inference.build_posterior(posterior_parameters=RejectionPosteriorParameters())

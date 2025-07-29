@@ -19,6 +19,13 @@ from sbi.inference.posteriors import (
     DirectPosterior,
 )
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
+from sbi.inference.posteriors.posterior_parameters import (
+    DirectPosteriorParameters,
+    ImportanceSamplingPosteriorParameters,
+    MCMCPosteriorParameters,
+    RejectionPosteriorParameters,
+    VIPosteriorParameters,
+)
 from sbi.inference.potentials import posterior_estimator_based_potential
 from sbi.inference.potentials.posterior_based_potential import PosteriorBasedPotential
 from sbi.inference.trainers.base import NeuralInference, check_if_proposal_has_default_x
@@ -465,6 +472,15 @@ class PosteriorEstimatorTrainer(NeuralInference, ABC):
         vi_parameters: Optional[Dict[str, Any]] = None,
         rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
         importance_sampling_parameters: Optional[Dict[str, Any]] = None,
+        posterior_parameters: Optional[
+            Union[
+                DirectPosteriorParameters,
+                MCMCPosteriorParameters,
+                VIPosteriorParameters,
+                RejectionPosteriorParameters,
+                ImportanceSamplingPosteriorParameters,
+            ]
+        ] = None,
     ) -> NeuralPosterior:
         r"""Build posterior from the neural density estimator.
 
@@ -500,15 +516,28 @@ class PosteriorEstimatorTrainer(NeuralInference, ABC):
                 `RejectionPosterior`.
             importance_sampling_parameters: Additional kwargs passed to
                 `ImportanceSamplingPosterior`.
+            posterior_parameters: Configuration passed to the init method for the
+                posterior. Must be one of the following
+                - `VIPosteriorParameters`
+                - `ImportanceSamplingPosteriorParameters`
+                - `MCMCPosteriorParameters`
+                - `DirectPosteriorParameters`
+                - `RejectionPosteriorParameters`
 
         Returns:
             Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods
             (the returned log-probability is unnormalized).
         """
+
+        self._check_prior_for_rejection_sampling(
+            prior, sample_with, posterior_parameters
+        )
+
         return super().build_posterior(
             density_estimator,
             prior,
             sample_with,
+            posterior_parameters,
             mcmc_method=mcmc_method,
             vi_method=vi_method,
             mcmc_parameters=mcmc_parameters,
@@ -545,6 +574,44 @@ class PosteriorEstimatorTrainer(NeuralInference, ABC):
             x_o=None,
         )
         return potential_fn, theta_transform
+
+    def _check_prior_for_rejection_sampling(
+        self,
+        prior: Optional[Distribution],
+        sample_with: Literal["mcmc", "rejection", "vi", "importance", "direct"],
+        posterior_parameters: Optional[
+            Union[
+                DirectPosteriorParameters,
+                MCMCPosteriorParameters,
+                VIPosteriorParameters,
+                RejectionPosteriorParameters,
+                ImportanceSamplingPosteriorParameters,
+            ]
+        ],
+    ) -> None:
+        """
+        Validates that when using rejection sampling, a prior distribution
+        is explicitly provided.
+
+        Args:
+            prior: Prior distribution.
+            sample_with: The sampling method used. Must be one of
+                "mcmc", "rejection", "vi", "importance", or "direct".
+            posterior_parameters: Configuration for building the posterior.
+        """
+
+        if (
+            sample_with == "rejection"
+            or isinstance(posterior_parameters, RejectionPosteriorParameters)
+        ) and prior is None:
+            raise ValueError(
+                "You indicated sampling via rejection sampling but "
+                "haven't passed a prior. As of sbi v0.23.0, you either have"
+                " to pass a prior to perform rejection sampling using the prior"
+                " as proposal, or to use the posterior as proposal, you have to"
+                " use a DirectPosterior via `sample_with='direct' or"
+                " `posterior_parameters=DirectPosteriorParameters`."
+            )
 
     def _loss(
         self,
