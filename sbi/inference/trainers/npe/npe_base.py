@@ -46,7 +46,11 @@ from sbi.utils import (
     validate_theta_and_x,
     warn_if_zscoring_changes_data,
 )
-from sbi.utils.sbiutils import ImproperEmpirical, mask_sims_from_prior
+from sbi.utils.sbiutils import (
+    ImproperEmpirical,
+    mask_sims_from_prior,
+    warn_if_deprecated,
+)
 from sbi.utils.torchutils import assert_all_finite
 
 
@@ -528,6 +532,20 @@ class PosteriorEstimatorTrainer(NeuralInference, ABC):
             Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods
             (the returned log-probability is unnormalized).
         """
+
+        warn_if_deprecated(
+            self.build_posterior,
+            locals(),
+            {
+                "direct_sampling_parameters",
+                "mcmc_parameters",
+                "vi_parameters",
+                "rejection_sampling_parameters",
+                "importance_sampling_parameters",
+                "mcmc_method",
+                "vi_method",
+            },
+        )
 
         self._check_prior_for_rejection_sampling(
             prior, sample_with, posterior_parameters

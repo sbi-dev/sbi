@@ -1,11 +1,23 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import inspect
 import logging
 import random
 import warnings
 from math import pi
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Type, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+    Type,
+    Union,
+)
 
 import numpy as np
 import pyknos.nflows.transforms as nflows_tf
@@ -1006,3 +1018,43 @@ def seed_all_backends(seed: Optional[Union[int, Tensor]] = None) -> None:
     torch.cuda.manual_seed(seed)
     torch.backends.cudnn.deterministic = True  # type: ignore
     torch.backends.cudnn.benchmark = False  # type: ignore
+
+
+def warn_if_deprecated(
+    method: Callable, locals_dict: Dict[str, Any], deprecated_keys: Set
+) -> None:
+    """
+    Issues a warning if any deprecated parameters are used with non-default values.
+
+    This function compares the values of deprecated parameters (from `locals_dict`)
+    against their default values in the given `method` signature. If a deprecated
+    parameter is explicitly set to a non-default value, a `DeprecationWarning` is
+    raised.
+
+    Args:
+        method: The function whose parameters are checked.
+        locals_dict: The arguments of the function.
+        deprecated_keys: The names of the parameters that are deprecated.
+
+    """
+
+    # Get the signature of the function
+    method_signature = inspect.signature(method)
+
+    used = []
+    for key in deprecated_keys:
+        if key in locals_dict and key in method_signature.parameters:
+            default_value = method_signature.parameters[key].default
+
+            # Compare value to default
+            if locals_dict[key] != default_value:
+                used.append(key)
+
+    if used:
+        warnings.warn(
+            f"The following arguments are deprecated and"
+            " will be removed in a future version: "
+            f"{', '.join(used)}. Please use `posterior_parameters` instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )

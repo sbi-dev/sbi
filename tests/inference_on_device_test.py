@@ -33,6 +33,9 @@ from sbi.inference.posteriors.ensemble_posterior import (
 )
 from sbi.inference.posteriors.importance_posterior import ImportanceSamplingPosterior
 from sbi.inference.posteriors.mcmc_posterior import MCMCPosterior
+from sbi.inference.posteriors.posterior_parameters import (
+    MCMCPosteriorParameters,
+)
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.inference.potentials.likelihood_based_potential import LikelihoodBasedPotential
 from sbi.inference.potentials.posterior_based_potential import PosteriorBasedPotential
@@ -190,9 +193,9 @@ def test_training_and_mcmc_on_device(
         # mcmc cases
         if sampling_method in ["slice_np", "slice_np_vectorized", "nuts_pymc"]:
             posterior = inferer.build_posterior(
-                sample_with="mcmc",
-                mcmc_method=sampling_method,
-                mcmc_parameters=mcmc_params_fast,
+                posterior_parameters=MCMCPosteriorParameters(
+                    method=sampling_method, **mcmc_params_fast
+                )
             )
         elif sampling_method in ["rejection", "direct"]:
             # all other cases: rejection, direct
