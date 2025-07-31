@@ -43,6 +43,7 @@ Training
 
    advanced_tutorials/18_training_interface.ipynb
    advanced_tutorials/02_multiround_inference.ipynb
+   advanced_tutorials/22_adaptive_learning_rates.ipynb
 
 
 Sampling
