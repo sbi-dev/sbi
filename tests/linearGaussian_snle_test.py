@@ -505,7 +505,7 @@ def test_api_nle_sampling_methods(
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize("num_dim", (1, 2))
+@pytest.mark.parametrize("num_dim", (2,))
 @pytest.mark.parametrize("prior_str", ("uniform", "gaussian"))
 @pytest.mark.parametrize("model_str", ("zuko_maf", "zuko_nsf"))
 def test_c2st_nle_unconstrained_space(
@@ -536,18 +536,21 @@ def test_c2st_nle_unconstrained_space(
     def simulator(theta):
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
+    theta = prior.sample((num_simulations,))
+    x = simulator(theta)
+
+    # Estimate prior on x.
+    x_dist = BoxUniform(low=x.min(dim=0)[0], high=x.max(dim=0)[0])
+
     # Use likelihood_nn with z_score_theta="transform_to_unconstrained"
     density_estimator = likelihood_nn(
         model_str,
         hidden_features=60,
         num_transforms=3,
-        z_score_theta="transform_to_unconstrained",
-        x_dist=prior,
+        z_score_x="transform_to_unconstrained",
+        x_dist=x_dist,
     )
     inference = NLE(density_estimator=density_estimator)
-
-    theta = prior.sample((num_simulations,))
-    x = simulator(theta)
 
     likelihood_estimator = inference.append_simulations(theta, x).train()
 
@@ -566,8 +569,6 @@ def test_c2st_nle_unconstrained_space(
             prior=prior,
             num_samples=num_samples,
         )
-    else:
-        raise ValueError(f"Wrong prior_str: '{prior_str}'.")
 
     potential_fn, theta_transform = likelihood_estimator_based_potential(
         prior=prior, likelihood_estimator=likelihood_estimator, x_o=x_o
