@@ -213,14 +213,16 @@ class RatioEstimatorTrainer(NeuralInference, ABC):
             loss_kwargs: Additional or updated kwargs to be passed to the self._loss fn.
             lr_scheduler: Learning rate scheduler type or config dict. Options:
                 - "plateau": ReduceLROnPlateau
-                - "exponential": ExponentialLR  
+                - "exponential": ExponentialLR
                 - "cosine": CosineAnnealingLR
                 - "step": StepLR
                 - "multistep": MultiStepLR
                 - "cyclic": CyclicLR
                 - Dict with 'type' and scheduler parameters
-            lr_scheduler_kwargs: Additional scheduler parameters to override defaults.
-            min_lr_threshold: Optional minimum learning rate threshold for early stopping.
+            lr_scheduler_kwargs: Additional scheduler parameters to override
+                defaults.
+            min_lr_threshold: Optional minimum learning rate threshold for
+                early stopping.
 
         Returns:
             Classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
@@ -326,7 +328,7 @@ class RatioEstimatorTrainer(NeuralInference, ABC):
                 self._val_loss = val_loss_sum / (
                     len(val_loader) * val_loader.batch_size  # type: ignore
                 )
-                
+
                 # Step scheduler after validation loss computation
                 if self._scheduler is not None:
                     if isinstance(self._scheduler, ReduceLROnPlateau):
@@ -338,7 +340,7 @@ class RatioEstimatorTrainer(NeuralInference, ABC):
                 current_lr = self.optimizer.param_groups[0]["lr"]
                 self._learning_rates.append(current_lr)
                 self._summary["learning_rates"].append(current_lr)
-                
+
                 # Log validation log prob for every epoch.
                 self._summary["validation_loss"].append(self._val_loss)
 

@@ -123,7 +123,7 @@ posterior = inference.train(
     lr_scheduler="cyclic",
     lr_scheduler_kwargs={
         "base_lr": 1e-5,        # Minimum in cycle
-        "max_lr": 1e-3,         # Maximum in cycle  
+        "max_lr": 1e-3,         # Maximum in cycle
         "step_size_up": 10,     # Epochs to go from base to max
         "mode": "triangular",   # Triangular cycle
     },
@@ -186,7 +186,7 @@ methods = [NPE, NLE_A, NRE_A, MNLE, NRE_B, NRE_C, BNRE]
 for Method in methods:
     inference = Method(prior=prior)
     inference.append_simulations(theta, x)
-    
+
     # Same scheduler syntax for all methods
     estimator = inference.train(
         lr_scheduler="plateau",

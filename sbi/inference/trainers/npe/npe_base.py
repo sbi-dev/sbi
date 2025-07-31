@@ -281,14 +281,16 @@ class PosteriorEstimatorTrainer(NeuralInference, ABC):
                 and validation dataloaders (like, e.g., a collate_fn)
             lr_scheduler: Learning rate scheduler type or config dict. Options:
                 - "plateau": ReduceLROnPlateau
-                - "exponential": ExponentialLR  
+                - "exponential": ExponentialLR
                 - "cosine": CosineAnnealingLR
                 - "step": StepLR
                 - "multistep": MultiStepLR
                 - "cyclic": CyclicLR
                 - Dict with 'type' and scheduler parameters
-            lr_scheduler_kwargs: Additional scheduler parameters to override defaults.
-            min_lr_threshold: Optional minimum learning rate threshold for early stopping.
+            lr_scheduler_kwargs: Additional scheduler parameters to
+                override defaults.
+            min_lr_threshold: Optional minimum learning rate threshold for
+                early stopping.
 
         Returns:
             Density estimator that approximates the distribution $p(\theta|x)$.

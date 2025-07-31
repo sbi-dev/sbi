@@ -14,12 +14,12 @@ import torch
 from torch import Tensor
 from torch.distributions import Distribution
 from torch.optim.lr_scheduler import (
-    ReduceLROnPlateau,
-    ExponentialLR,
     CosineAnnealingLR,
-    StepLR,
-    MultiStepLR,
     CyclicLR,
+    ExponentialLR,
+    MultiStepLR,
+    ReduceLROnPlateau,
+    StepLR,
 )
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
@@ -805,12 +805,12 @@ class NeuralInference(ABC):
         max_num_epochs: int,
     ) -> Optional[torch.optim.lr_scheduler._LRScheduler]:
         """Create learning rate scheduler based on configuration.
-        
+
         Args:
             optimizer: The optimizer to attach the scheduler to.
             lr_scheduler: Scheduler type or config dict. Options:
                 - "plateau": ReduceLROnPlateau (default)
-                - "exponential": ExponentialLR  
+                - "exponential": ExponentialLR
                 - "cosine": CosineAnnealingLR
                 - "step": StepLR
                 - "multistep": MultiStepLR
@@ -818,7 +818,7 @@ class NeuralInference(ABC):
                 - Dict with 'type' and parameters
             lr_scheduler_kwargs: Additional scheduler parameters.
             max_num_epochs: Maximum number of training epochs.
-            
+
         Returns:
             Learning rate scheduler instance or None if no scheduler requested.
         """
@@ -959,7 +959,11 @@ class NeuralInference(ABC):
 
         # Optional: Stop if learning rate becomes too small
         lr_converged = False
-        if min_lr_threshold is not None and hasattr(self, "optimizer") and self.optimizer is not None:
+        if (
+            min_lr_threshold is not None
+            and hasattr(self, "optimizer")
+            and self.optimizer is not None
+        ):
             current_lr = self.optimizer.param_groups[0]["lr"]
             lr_converged = current_lr < min_lr_threshold
 
@@ -1065,7 +1069,10 @@ class NeuralInference(ABC):
             )
 
         # Add learning rate tracking for every epoch
-        if "learning_rates" in self._summary and len(self._summary["learning_rates"]) > offset:
+        if (
+            "learning_rates" in self._summary
+            and len(self._summary["learning_rates"]) > offset
+        ):
             for i, lr in enumerate(self._summary["learning_rates"][offset:]):
                 self._summary_writer.add_scalar(
                     tag="learning_rate",
