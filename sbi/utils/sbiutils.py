@@ -227,7 +227,7 @@ class CallableTransform:
 
 
 def biject_transform_zuko(
-    transform,
+    transform: TorchTransform,
 ) -> zuko.flows.UnconditionalTransform:
     """
     Wraps a pytorch transform in a Zuko unconditional transfrom on a bounded interval.

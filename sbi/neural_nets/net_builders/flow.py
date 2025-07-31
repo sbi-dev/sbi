@@ -1061,15 +1061,26 @@ def build_zuko_bpf(
 
 
 def build_zuko_flow(
-    which_nf: str,
+    which_nf: Literal[
+        "BPF",
+        "CNF",
+        "GF",
+        "MAF",
+        "NCSF",
+        "NAF",
+        "NICE",
+        "NSF",
+        "SOSPF",
+        "UNAF",
+    ],
     batch_x: Tensor,
     batch_y: Tensor,
     z_score_x: Literal[
         "none", "independent", "structured", "transform_to_unconstrained"
-    ],
+    ] = "independent",
     z_score_y: Literal[
         "none", "independent", "structured", "transform_to_unconstrained"
-    ],
+    ] = "independent",
     hidden_features: Union[Sequence[int], int] = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
@@ -1117,66 +1128,32 @@ def build_zuko_flow(
     Returns:
         ZukoFlow: The constructed Zuko normalizing flow model.
     """
-
     check_data_device(batch_x, batch_y)
     x_numel = get_numel(batch_x, embedding_net=None)
     y_numel = get_numel(batch_y, embedding_net=embedding_net)
 
-    # keep only zuko kwargs
+    # Keep only zuko kwargs
     kwargs = {k: v for k, v in kwargs.items() if k not in nflow_specific_kwargs}
 
     if isinstance(hidden_features, int):
         hidden_features = [hidden_features] * num_transforms
 
-    build_nf = getattr(zuko.flows, which_nf)
+    # Get base transforms from specified flow
+    base, base_transforms = _get_base_and_transforms(
+        which_nf, x_numel, y_numel, hidden_features, num_transforms, **kwargs
+    )
 
-    if which_nf == "CNF":
-        flow_built = build_nf(
-            features=x_numel, context=y_numel, hidden_features=hidden_features, **kwargs
-        )
-    else:
-        flow_built = build_nf(
-            features=x_numel,
-            context=y_numel,
-            hidden_features=hidden_features,
-            transforms=num_transforms,
-            **kwargs,
-        )
+    # Prepare x transforms to prepend
+    x_transforms = _prepare_x_transforms(z_score_x, batch_x, x_dist)
 
-    # Continuous normalizing flows (CNF) only have one transform,
-    # so we need to handle them slightly differently.
-    if which_nf == "CNF":
-        # Transforms is 1 continuous transform for CNF
-        transforms = flow_built.transform
-    else:
-        transforms = flow_built.transform.transforms
+    # Combine all transforms
+    transforms = x_transforms + base_transforms
 
-    z_score_x_bool, structured_x = z_score_parser(z_score_x)
+    # Maybe add y-z-scoring via embedding network
+    embedding_net = _prepare_y_embedding(z_score_y, batch_y, embedding_net)
 
-    if z_score_x == "transform_to_unconstrained":
-        transforms = get_transform_to_unconstrained(x_dist, which_nf, transforms)
-
-    elif z_score_x_bool:
-        if which_nf == "CNF":
-            transforms = (
-                standardizing_transform_zuko(batch_x, structured_x),
-                transforms,
-            )
-        else:
-            transforms = (
-                standardizing_transform_zuko(batch_x, structured_x),
-                *transforms,
-            )
-
-    z_score_y_bool, structured_y = z_score_parser(z_score_y)
-    if z_score_y_bool:
-        # Prepend standardizing transform to y-embedding.
-        embedding_net = nn.Sequential(
-            standardizing_net(batch_y, structured_y), embedding_net
-        )
-
-    # Combine transforms.
-    neural_net = zuko.flows.Flow(transforms, flow_built.base)
+    # Create final neural network
+    neural_net = zuko.flows.Flow(transforms, base)
 
     flow = ZukoFlow(
         neural_net,
@@ -1188,35 +1165,112 @@ def build_zuko_flow(
     return flow
 
 
-def get_transform_to_unconstrained(
-    x_dist: Distribution,
+def _get_base_and_transforms(
     which_nf: str,
-    transforms: zuko.flows.Transforms,
-) -> zuko.flows.Transform:
-    if x_dist is None:
-        raise ValueError(
-            "Transformation to unconstrained space requires a distribution "
-            "provided through `x_dist`."
+    x_numel: int,
+    y_numel: int,
+    hidden_features: Sequence[int],
+    num_transforms: int,
+    **kwargs,
+) -> Tuple[LazyDistribution, tuple]:
+    """
+    Build the base zuko flow and extract its transforms.
+
+    Args:
+        which_nf: The type of normalizing flow to build.
+        x_numel: Number of elements in x.
+        y_numel: Number of elements in y.
+        hidden_features: Hidden features as a sequence.
+        num_transforms: Number of transforms.
+        **kwargs: Additional arguments for flow constructor.
+
+    Returns:
+        base_transforms: Tuple of transforms from the built flow.
+    """
+    build_nf = getattr(zuko.flows, which_nf)
+
+    if which_nf == "CNF":
+        flow: Flow = build_nf(
+            features=x_numel, context=y_numel, hidden_features=hidden_features, **kwargs
         )
-    elif not hasattr(x_dist, "support"):
-        raise ValueError(
-            "`x_dist` requires a `.support` attribute for"
-            "an unconstrained transformation."
-        )
+        # CNF has a single continuous transform
+        base_transforms = (flow.transform,)
     else:
-        transform_to_unconstrained = mcmc_transform(x_dist)
-        if which_nf == "CNF":
-            # Transforms is 1 continuous transform for CNF
-            transforms = (
-                biject_transform_zuko(transform_to_unconstrained),
-                transforms,
+        flow: Flow = build_nf(
+            features=x_numel,
+            context=y_numel,
+            hidden_features=hidden_features,
+            transforms=num_transforms,
+            **kwargs,
+        )
+        # Regular flows have multiple discrete transforms
+        base_transforms = tuple(flow.transform.transforms)
+
+    return flow.base, base_transforms
+
+
+def _prepare_x_transforms(
+    z_score_x: Literal[
+        "none", "independent", "structured", "transform_to_unconstrained"
+    ],
+    batch_x: Tensor,
+    x_dist: Optional[Distribution],
+) -> tuple:
+    """
+    Prepare transforms to prepend for x processing.
+
+    Args:
+        z_score_x: Type of x preprocessing.
+        batch_x: Batch of x data.
+        x_dist: Distribution for unconstrained transformation.
+
+    Returns:
+        Tuple of transforms to prepend (empty tuple if no preprocessing).
+    """
+    transforms = ()
+    z_score_x_bool, structured_x = z_score_parser(z_score_x)
+    if z_score_x == "transform_to_unconstrained":
+        if x_dist is None:
+            raise ValueError(
+                "Transformation to unconstrained space requires a distribution "
+                "provided through `x_dist`."
             )
-        else:
-            transforms = (
-                biject_transform_zuko(transform_to_unconstrained),
-                *transforms,
+        if not hasattr(x_dist, "support"):
+            raise ValueError(
+                "`x_dist` requires a `.support` attribute for"
+                "an unconstrained transformation."
             )
+        transform_to_unconstrained = biject_transform_zuko(mcmc_transform(x_dist))
+        transforms = (transform_to_unconstrained,)
+    elif z_score_x_bool:
+        z_score_transform = standardizing_transform_zuko(batch_x, structured_x)
+        transforms = (z_score_transform,)
+
     return transforms
+
+
+def _prepare_y_embedding(
+    z_score_y: Literal[
+        "none", "independent", "structured", "transform_to_unconstrained"
+    ],
+    batch_y: Tensor,
+    embedding_net: nn.Module,
+) -> nn.Module:
+    """
+    Prepend the embedding network for y, adding z-scoring if needed.
+
+    Args:
+        z_score_y: Type of y preprocessing.
+        batch_y: Batch of y data.
+        embedding_net: Original embedding network.
+
+    Returns:
+        Modified embedding network.
+    """
+    z_score_y_bool, structured_y = z_score_parser(z_score_y)
+    if z_score_y_bool:
+        return nn.Sequential(standardizing_net(batch_y, structured_y), embedding_net)
+    return embedding_net
 
 
 def build_zuko_unconditional_flow(
