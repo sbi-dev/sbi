@@ -1,3 +1,6 @@
+# This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+
 from typing import List
 
 import numpy as np
@@ -100,7 +103,9 @@ def test_c2st_vector_field_on_linearGaussian(
         posterior = inference.build_posterior(
             score_estimator,
             sample_with=method,
-            neural_ode_backend="zuko",
+            vectorfield_sampling_parameters={
+                "neural_ode_backend": "zuko",
+            },
         )
         posterior.set_default_x(x_o)
         samples = posterior.sample((num_samples,))

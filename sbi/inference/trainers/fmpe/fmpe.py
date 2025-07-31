@@ -1,23 +1,24 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Apache License v2.0, see <https://www.apache.org/licenses/LICENSE-2.0>.
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 
-from typing import Literal, Optional, Union
+from typing import Any, Dict, Literal, Optional, Union
 
 from torch.distributions import Distribution
 from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi import utils as utils
-from sbi.inference.posteriors.vector_field_posterior import VectorFieldPosterior
+from sbi.inference.posteriors.base_posterior import NeuralPosterior
+from sbi.inference.posteriors.posterior_parameters import VectorFieldPosteriorParameters
 from sbi.inference.trainers.npse.vector_field_inference import (
     VectorFieldEstimatorBuilder,
-    VectorFieldInference,
+    VectorFieldTrainer,
 )
 from sbi.neural_nets import flowmatching_nn
 from sbi.neural_nets.estimators import ConditionalVectorFieldEstimator
 
 
-class FMPE(VectorFieldInference):
+class FMPE(VectorFieldTrainer):
     """Flow Matching Posterior Estimation (FMPE)."""
 
     def __init__(
@@ -59,17 +60,14 @@ class FMPE(VectorFieldInference):
         # density_estimator name is kept since it is public API, but it is
         # actually misleading since it is a builder for an estimator.
 
-    def _build_default_nn_fn(self, **kwargs) -> VectorFieldEstimatorBuilder:
-        model = kwargs.pop("vector_field_estimator_builder", "mlp")
-        return flowmatching_nn(model=model, **kwargs)
-
     def build_posterior(
         self,
         vector_field_estimator: Optional[ConditionalVectorFieldEstimator] = None,
         prior: Optional[Distribution] = None,
         sample_with: Literal["ode", "sde"] = "ode",
-        **kwargs,
-    ) -> VectorFieldPosterior:
+        vectorfield_sampling_parameters: Optional[Dict[str, Any]] = None,
+        posterior_parameters: Optional[VectorFieldPosteriorParameters] = None,
+    ) -> NeuralPosterior:
         r"""Build posterior from the flow matching estimator.
 
         Note that this is the same as the NPSE posterior, but the sample_with method
@@ -91,16 +89,23 @@ class FMPE(VectorFieldInference):
                 the score to do a Langevin diffusion step, while the 'ode' method
                 uses the score to define a probabilistic ODE and solves it with
                 a numerical ODE solver.
-            **kwargs: Additional keyword arguments passed to
-                `VectorFieldBasedPotential`.
-
+            vectorfield_sampling_parameters: Additional keyword arguments passed to
+                `VectorFieldPosterior`.
+            posterior_parameters: Configuration passed to the init method for
+                VectorFieldPosterior.
 
         Returns:
             Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods.
         """
-        return self._build_posterior(
-            vector_field_estimator=vector_field_estimator,
+
+        return super().build_posterior(
+            estimator=vector_field_estimator,
             prior=prior,
             sample_with=sample_with,
-            **kwargs,
+            vectorfield_sampling_parameters=vectorfield_sampling_parameters,
+            posterior_parameters=posterior_parameters,
         )
+
+    def _build_default_nn_fn(self, **kwargs) -> VectorFieldEstimatorBuilder:
+        model = kwargs.pop("vector_field_estimator_builder", "mlp")
+        return flowmatching_nn(model=model, **kwargs)
