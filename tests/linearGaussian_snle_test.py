@@ -502,3 +502,90 @@ def test_api_nle_sampling_methods(
         posterior.train(max_num_iters=10)
 
     posterior.sample(sample_shape=(num_samples,), show_progress_bars=False)
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("num_dim", (2,))
+@pytest.mark.parametrize("prior_str", ("uniform", "gaussian"))
+@pytest.mark.parametrize("model_str", ("zuko_maf", "zuko_nsf"))
+def test_c2st_nle_unconstrained_space(
+    num_dim: int, prior_str: str, model_str: str, mcmc_params_accurate: dict
+):
+    """Test SNL on linear Gaussian in unconstrained space.
+
+    Args:
+        num_dim: parameter dimension of the gaussian model
+        prior_str: one of "gaussian" or "uniform"
+
+    """
+    num_samples = 500
+    num_simulations = 3000
+
+    # likelihood_mean will be likelihood_shift+theta
+    likelihood_shift = -1.0 * ones(num_dim)
+    # Use increased cov to avoid too small posterior cov for many trials.
+    likelihood_cov = 0.8 * eye(num_dim)
+
+    if prior_str == "gaussian":
+        prior_mean = zeros(num_dim)
+        prior_cov = eye(num_dim)
+        prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
+    else:
+        prior = BoxUniform(-2.0 * ones(num_dim), 2.0 * ones(num_dim))
+
+    def simulator(theta):
+        return linear_gaussian(theta, likelihood_shift, likelihood_cov)
+
+    theta = prior.sample((num_simulations,))
+    x = simulator(theta)
+
+    # Estimate prior on x.
+    x_dist = BoxUniform(low=x.min(dim=0)[0], high=x.max(dim=0)[0])
+
+    # Use likelihood_nn with z_score_theta="transform_to_unconstrained"
+    density_estimator = likelihood_nn(
+        model_str,
+        hidden_features=60,
+        num_transforms=3,
+        z_score_x="transform_to_unconstrained",
+        x_dist=x_dist,
+    )
+    inference = NLE(density_estimator=density_estimator)
+
+    likelihood_estimator = inference.append_simulations(theta, x).train()
+
+    # Test inference amortized over trials.
+    x_o = zeros((1, num_dim))
+    if prior_str == "gaussian":
+        gt_posterior = true_posterior_linear_gaussian_mvn_prior(
+            x_o, likelihood_shift, likelihood_cov, prior_mean, prior_cov
+        )
+        target_samples = gt_posterior.sample((num_samples,))
+    elif prior_str == "uniform":
+        target_samples = samples_true_posterior_linear_gaussian_uniform_prior(
+            x_o,
+            likelihood_shift,
+            likelihood_cov,
+            prior=prior,
+            num_samples=num_samples,
+        )
+
+    potential_fn, theta_transform = likelihood_estimator_based_potential(
+        prior=prior, likelihood_estimator=likelihood_estimator, x_o=x_o
+    )
+    posterior = MCMCPosterior(
+        proposal=prior,
+        potential_fn=potential_fn,
+        theta_transform=theta_transform,
+        method="slice_np_vectorized",
+        **mcmc_params_accurate,
+    )
+
+    samples = posterior.sample(sample_shape=(num_samples,))
+
+    # Check performance based on c2st accuracy.
+    check_c2st(
+        samples,
+        target_samples,
+        alg=f"nle_a-{prior_str}-prior-{model_str}",
+    )
