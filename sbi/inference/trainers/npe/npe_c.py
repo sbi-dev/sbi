@@ -1,7 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Callable, Dict, Optional, Union
+from typing import Any, Callable, Dict, Optional, Union
 
 import torch
 from pyknos.mdn.mdn import MultivariateGaussianMDN as mdn
@@ -114,6 +114,9 @@ class NPE_C(PosteriorEstimatorTrainer):
         retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[Dict] = None,
+        lr_scheduler: Optional[Union[str, Dict[str, Any]]] = None,
+        lr_scheduler_kwargs: Optional[Dict[str, Any]] = None,
+        min_lr_threshold: Optional[float] = None,
     ) -> ConditionalDensityEstimator:
         r"""Return density estimator that approximates the distribution $p(\theta|x)$.
 

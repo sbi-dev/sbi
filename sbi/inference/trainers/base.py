@@ -13,6 +13,14 @@ from warnings import warn
 import torch
 from torch import Tensor
 from torch.distributions import Distribution
+from torch.optim.lr_scheduler import (
+    ReduceLROnPlateau,
+    ExponentialLR,
+    CosineAnnealingLR,
+    StepLR,
+    MultiStepLR,
+    CyclicLR,
+)
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard.writer import SummaryWriter
@@ -205,6 +213,11 @@ class NeuralInference(ABC):
             self._default_summary_writer() if summary_writer is None else summary_writer
         )
 
+        # Learning rate scheduler tracking
+        self._scheduler = None
+        self._scheduler_config = None
+        self._learning_rates = []  # Track LR changes for logging
+
         # Logging during training (by SummaryWriter).
         self._summary = dict(
             epochs_trained=[],
@@ -212,6 +225,7 @@ class NeuralInference(ABC):
             validation_loss=[],
             training_loss=[],
             epoch_durations_sec=[],
+            learning_rates=[],
         )
 
     @property
@@ -299,6 +313,9 @@ class NeuralInference(ABC):
         discard_prior_samples: bool = False,
         retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
+        lr_scheduler: Optional[Union[str, Dict[str, Any]]] = None,
+        lr_scheduler_kwargs: Optional[Dict[str, Any]] = None,
+        min_lr_threshold: Optional[float] = None,
     ) -> NeuralPosterior: ...
 
     @abstractmethod
@@ -780,14 +797,146 @@ class NeuralInference(ABC):
                 )
         return posterior
 
-    def _converged(self, epoch: int, stop_after_epochs: int) -> bool:
+    def _create_lr_scheduler(
+        self,
+        optimizer: torch.optim.Optimizer,
+        lr_scheduler: Optional[Union[str, Dict[str, Any]]],
+        lr_scheduler_kwargs: Optional[Dict[str, Any]],
+        max_num_epochs: int,
+    ) -> Optional[torch.optim.lr_scheduler._LRScheduler]:
+        """Create learning rate scheduler based on configuration.
+        
+        Args:
+            optimizer: The optimizer to attach the scheduler to.
+            lr_scheduler: Scheduler type or config dict. Options:
+                - "plateau": ReduceLROnPlateau (default)
+                - "exponential": ExponentialLR  
+                - "cosine": CosineAnnealingLR
+                - "step": StepLR
+                - "multistep": MultiStepLR
+                - "cyclic": CyclicLR
+                - Dict with 'type' and parameters
+            lr_scheduler_kwargs: Additional scheduler parameters.
+            max_num_epochs: Maximum number of training epochs.
+            
+        Returns:
+            Learning rate scheduler instance or None if no scheduler requested.
+        """
+        if lr_scheduler is None:
+            return None
+
+        # Merge kwargs
+        scheduler_kwargs = lr_scheduler_kwargs or {}
+
+        if isinstance(lr_scheduler, str):
+            scheduler_type = lr_scheduler.lower()
+
+            if scheduler_type == "plateau":
+                return ReduceLROnPlateau(
+                    optimizer,
+                    mode="min",
+                    factor=scheduler_kwargs.get("factor", 0.5),
+                    patience=scheduler_kwargs.get("patience", 10),
+                    verbose=scheduler_kwargs.get("verbose", True),
+                    min_lr=scheduler_kwargs.get("min_lr", 0),
+                    **{
+                        k: v
+                        for k, v in scheduler_kwargs.items()
+                        if k not in ["factor", "patience", "verbose", "min_lr"]
+                    },
+                )
+            elif scheduler_type == "exponential":
+                return ExponentialLR(
+                    optimizer,
+                    gamma=scheduler_kwargs.get("gamma", 0.95),
+                    **{k: v for k, v in scheduler_kwargs.items() if k != "gamma"},
+                )
+            elif scheduler_type == "cosine":
+                return CosineAnnealingLR(
+                    optimizer,
+                    T_max=scheduler_kwargs.get("T_max", max_num_epochs),
+                    eta_min=scheduler_kwargs.get("eta_min", 0),
+                    **{
+                        k: v
+                        for k, v in scheduler_kwargs.items()
+                        if k not in ["T_max", "eta_min"]
+                    },
+                )
+            elif scheduler_type == "step":
+                return StepLR(
+                    optimizer,
+                    step_size=scheduler_kwargs.get("step_size", 30),
+                    gamma=scheduler_kwargs.get("gamma", 0.1),
+                    **{
+                        k: v
+                        for k, v in scheduler_kwargs.items()
+                        if k not in ["step_size", "gamma"]
+                    },
+                )
+            elif scheduler_type == "multistep":
+                return MultiStepLR(
+                    optimizer,
+                    milestones=scheduler_kwargs.get("milestones", [100, 200]),
+                    gamma=scheduler_kwargs.get("gamma", 0.1),
+                    **{
+                        k: v
+                        for k, v in scheduler_kwargs.items()
+                        if k not in ["milestones", "gamma"]
+                    },
+                )
+            elif scheduler_type == "cyclic":
+                return CyclicLR(
+                    optimizer,
+                    base_lr=scheduler_kwargs.get("base_lr", 1e-4),
+                    max_lr=scheduler_kwargs.get("max_lr", 1e-2),
+                    **{
+                        k: v
+                        for k, v in scheduler_kwargs.items()
+                        if k not in ["base_lr", "max_lr"]
+                    },
+                )
+            else:
+                raise ValueError(f"Unknown scheduler type: {scheduler_type}")
+
+        elif isinstance(lr_scheduler, dict):
+            scheduler_type = lr_scheduler.get("type", "").lower()
+            params = {**lr_scheduler}
+            params.pop("type", None)
+            params.update(scheduler_kwargs)
+
+            if scheduler_type == "plateau":
+                return ReduceLROnPlateau(optimizer, mode="min", **params)
+            elif scheduler_type == "exponential":
+                return ExponentialLR(optimizer, **params)
+            elif scheduler_type == "cosine":
+                params.setdefault("T_max", max_num_epochs)
+                return CosineAnnealingLR(optimizer, **params)
+            elif scheduler_type == "step":
+                return StepLR(optimizer, **params)
+            elif scheduler_type == "multistep":
+                return MultiStepLR(optimizer, **params)
+            elif scheduler_type == "cyclic":
+                return CyclicLR(optimizer, **params)
+            else:
+                raise ValueError(f"Unknown scheduler type: {scheduler_type}")
+
+        return None
+
+    def _converged(
+        self,
+        epoch: int,
+        stop_after_epochs: int,
+        min_lr_threshold: Optional[float] = None,
+    ) -> bool:
         """Return whether the training converged yet and save best model state so far.
 
         Checks for improvement in validation performance over previous epochs.
+        Optionally checks if learning rate has fallen below threshold.
 
         Args:
             epoch: Current epoch in training.
             stop_after_epochs: How many fruitless epochs to let pass before stopping.
+            min_lr_threshold: Optional minimum learning rate threshold for convergence.
 
         Returns:
             Whether the training has stopped improving, i.e. has converged.
@@ -805,10 +954,20 @@ class NeuralInference(ABC):
         else:
             self._epochs_since_last_improvement += 1
 
+        # Standard early stopping based on validation loss plateau
+        standard_converged = self._epochs_since_last_improvement > stop_after_epochs - 1
+
+        # Optional: Stop if learning rate becomes too small
+        lr_converged = False
+        if min_lr_threshold is not None and hasattr(self, "optimizer") and self.optimizer is not None:
+            current_lr = self.optimizer.param_groups[0]["lr"]
+            lr_converged = current_lr < min_lr_threshold
+
+        converged = standard_converged or lr_converged
+
         # If no validation improvement over many epochs, stop training.
-        if self._epochs_since_last_improvement > stop_after_epochs - 1:
+        if converged:
             neural_net.load_state_dict(self._best_model_state_dict)
-            converged = True
 
         return converged
 
@@ -904,6 +1063,15 @@ class NeuralInference(ABC):
                 scalar_value=eds,
                 global_step=offset + i,
             )
+
+        # Add learning rate tracking for every epoch
+        if "learning_rates" in self._summary and len(self._summary["learning_rates"]) > offset:
+            for i, lr in enumerate(self._summary["learning_rates"][offset:]):
+                self._summary_writer.add_scalar(
+                    tag="learning_rate",
+                    scalar_value=lr,
+                    global_step=offset + i,
+                )
 
         self._summary_writer.flush()
 

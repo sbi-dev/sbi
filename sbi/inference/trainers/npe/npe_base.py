@@ -12,6 +12,7 @@ from torch import Tensor, ones
 from torch.distributions import Distribution
 from torch.nn.utils.clip_grad import clip_grad_norm_
 from torch.optim.adam import Adam
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.tensorboard.writer import SummaryWriter
 from typing_extensions import Self
 
@@ -242,6 +243,9 @@ class PosteriorEstimatorTrainer(NeuralInference, ABC):
         retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[dict] = None,
+        lr_scheduler: Optional[Union[str, Dict[str, Any]]] = None,
+        lr_scheduler_kwargs: Optional[Dict[str, Any]] = None,
+        min_lr_threshold: Optional[float] = None,
     ) -> ConditionalDensityEstimator:
         r"""Return density estimator that approximates the distribution $p(\theta|x)$.
 
@@ -275,6 +279,16 @@ class PosteriorEstimatorTrainer(NeuralInference, ABC):
                 loss after the training.
             dataloader_kwargs: Additional or updated kwargs to be passed to the training
                 and validation dataloaders (like, e.g., a collate_fn)
+            lr_scheduler: Learning rate scheduler type or config dict. Options:
+                - "plateau": ReduceLROnPlateau
+                - "exponential": ExponentialLR  
+                - "cosine": CosineAnnealingLR
+                - "step": StepLR
+                - "multistep": MultiStepLR
+                - "cyclic": CyclicLR
+                - Dict with 'type' and scheduler parameters
+            lr_scheduler_kwargs: Additional scheduler parameters to override defaults.
+            min_lr_threshold: Optional minimum learning rate threshold for early stopping.
 
         Returns:
             Density estimator that approximates the distribution $p(\theta|x)$.
@@ -356,10 +370,13 @@ class PosteriorEstimatorTrainer(NeuralInference, ABC):
 
         if not resume_training:
             self.optimizer = Adam(list(self._neural_net.parameters()), lr=learning_rate)
+            self._scheduler = self._create_lr_scheduler(
+                self.optimizer, lr_scheduler, lr_scheduler_kwargs, max_num_epochs
+            )
             self.epoch, self._val_loss = 0, float("Inf")
 
         while self.epoch <= max_num_epochs and not self._converged(
-            self.epoch, stop_after_epochs
+            self.epoch, stop_after_epochs, min_lr_threshold
         ):
             # Train for a single epoch.
             self._neural_net.train()
@@ -425,6 +442,18 @@ class PosteriorEstimatorTrainer(NeuralInference, ABC):
             self._val_loss = val_loss_sum / (
                 len(val_loader) * val_loader.batch_size  # type: ignore
             )
+            # Step scheduler after validation loss computation
+            if self._scheduler is not None:
+                if isinstance(self._scheduler, ReduceLROnPlateau):
+                    self._scheduler.step(self._val_loss)
+                else:
+                    self._scheduler.step()
+
+            # Track and log current learning rate
+            current_lr = self.optimizer.param_groups[0]["lr"]
+            self._learning_rates.append(current_lr)
+            self._summary["learning_rates"].append(current_lr)
+
             # Log validation loss for every epoch.
             self._summary["validation_loss"].append(self._val_loss)
             self._summary["epoch_durations_sec"].append(time.time() - epoch_start_time)
