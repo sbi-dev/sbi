@@ -803,7 +803,7 @@ class NeuralInference(ABC):
         lr_scheduler: Optional[Union[str, Dict[str, Any]]],
         lr_scheduler_kwargs: Optional[Dict[str, Any]],
         max_num_epochs: int,
-    ) -> Optional[torch.optim.lr_scheduler._LRScheduler]:
+    ) -> Optional[torch.optim.lr_scheduler.LRScheduler]:
         """Create learning rate scheduler based on configuration.
 
         Args:
