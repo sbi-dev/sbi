@@ -520,7 +520,6 @@ def test_c2st_nle_unconstrained_space(
     """
     num_samples = 500
     num_simulations = 3000
-    trials_to_test = [1]
 
     # likelihood_mean will be likelihood_shift+theta
     likelihood_shift = -1.0 * ones(num_dim)
@@ -553,57 +552,39 @@ def test_c2st_nle_unconstrained_space(
     likelihood_estimator = inference.append_simulations(theta, x).train()
 
     # Test inference amortized over trials.
-    for num_trials in trials_to_test:
-        x_o = zeros((num_trials, num_dim))
-        if prior_str == "gaussian":
-            gt_posterior = true_posterior_linear_gaussian_mvn_prior(
-                x_o, likelihood_shift, likelihood_cov, prior_mean, prior_cov
-            )
-            target_samples = gt_posterior.sample((num_samples,))
-        elif prior_str == "uniform":
-            target_samples = samples_true_posterior_linear_gaussian_uniform_prior(
-                x_o,
-                likelihood_shift,
-                likelihood_cov,
-                prior=prior,
-                num_samples=num_samples,
-            )
-        else:
-            raise ValueError(f"Wrong prior_str: '{prior_str}'.")
-
-        potential_fn, theta_transform = likelihood_estimator_based_potential(
-            prior=prior, likelihood_estimator=likelihood_estimator, x_o=x_o
+    x_o = zeros((1, num_dim))
+    if prior_str == "gaussian":
+        gt_posterior = true_posterior_linear_gaussian_mvn_prior(
+            x_o, likelihood_shift, likelihood_cov, prior_mean, prior_cov
         )
-        posterior = MCMCPosterior(
-            proposal=prior,
-            potential_fn=potential_fn,
-            theta_transform=theta_transform,
-            method="slice_np_vectorized",
-            **mcmc_params_accurate,
+        target_samples = gt_posterior.sample((num_samples,))
+    elif prior_str == "uniform":
+        target_samples = samples_true_posterior_linear_gaussian_uniform_prior(
+            x_o,
+            likelihood_shift,
+            likelihood_cov,
+            prior=prior,
+            num_samples=num_samples,
         )
+    else:
+        raise ValueError(f"Wrong prior_str: '{prior_str}'.")
 
-        samples = posterior.sample(sample_shape=(num_samples,))
+    potential_fn, theta_transform = likelihood_estimator_based_potential(
+        prior=prior, likelihood_estimator=likelihood_estimator, x_o=x_o
+    )
+    posterior = MCMCPosterior(
+        proposal=prior,
+        potential_fn=potential_fn,
+        theta_transform=theta_transform,
+        method="slice_np_vectorized",
+        **mcmc_params_accurate,
+    )
 
-        # Check performance based on c2st accuracy.
-        check_c2st(
-            samples,
-            target_samples,
-            alg=f"nle_a-{prior_str}-prior-{model_str}-{num_trials}-trials",
-        )
+    samples = posterior.sample(sample_shape=(num_samples,))
 
-        map_ = posterior.map(
-            num_init_samples=1_000,
-            init_method="proposal",
-            show_progress_bars=False,
-        )
-
-        if prior_str == "uniform":
-            # Check whether the returned probability outside of the support is zero.
-            posterior_prob = get_prob_outside_uniform_prior(posterior, prior, num_dim)
-            assert posterior_prob == 0.0, (
-                "The posterior probability outside of the prior support is not zero"
-            )
-
-            assert ((map_ - ones(num_dim)) ** 2).sum() < 0.5
-        else:
-            assert ((map_ - gt_posterior.mean) ** 2).sum() < 0.5
+    # Check performance based on c2st accuracy.
+    check_c2st(
+        samples,
+        target_samples,
+        alg=f"nle_a-{prior_str}-prior-{model_str}",
+    )

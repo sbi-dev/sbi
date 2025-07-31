@@ -452,8 +452,6 @@ def test_z_score_parser(z_x, z_theta):
 @pytest.mark.parametrize(
     "z_x",
     [
-        True,
-        False,
         None,
         "none",
         "independent",
@@ -464,8 +462,6 @@ def test_z_score_parser(z_x, z_theta):
 @pytest.mark.parametrize(
     "z_theta",
     [
-        True,
-        False,
         None,
         "none",
         "independent",

@@ -10,7 +10,6 @@ from typing import (
     Callable,
     Dict,
     List,
-    Literal,
     Optional,
     Sequence,
     Tuple,
@@ -113,9 +112,7 @@ def clamp_and_warn(name: str, value: float, min_val: float, max_val: float) -> f
 
 
 def z_score_parser(
-    z_score_flag: Optional[
-        Literal["none", "independent", "structured", "transform_to_unconstrained"]
-    ],
+    z_score_flag: Optional[str] = None,
 ) -> Tuple[bool, bool]:
     """Parses string z-score flag into booleans.
 
