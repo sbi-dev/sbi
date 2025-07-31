@@ -1044,18 +1044,7 @@ def build_zuko_bpf(
 
 
 def build_zuko_flow(
-    which_nf: Literal[
-        "BPF",
-        "CNF",
-        "GF",
-        "MAF",
-        "NCSF",
-        "NAF",
-        "NICE",
-        "NSF",
-        "SOSPF",
-        "UNAF",
-    ],
+    which_nf: str,
     batch_x: Tensor,
     batch_y: Tensor,
     z_score_x: Literal[
@@ -1126,7 +1115,7 @@ def build_zuko_flow(
         which_nf, x_numel, y_numel, hidden_features, num_transforms, **kwargs
     )
 
-    # Prepare x transforms to prepend
+    # Get x transforms (z-score or logit transform)
     x_transforms = _prepare_x_transforms(z_score_x, batch_x, x_dist)
 
     # Combine all transforms
@@ -1168,7 +1157,7 @@ def _get_base_and_transforms(
         **kwargs: Additional arguments for flow constructor.
 
     Returns:
-        base_transforms: Tuple of transforms from the built flow.
+        tuple of flow base and its transforms.
     """
     build_nf = getattr(zuko.flows, which_nf)
 
@@ -1271,46 +1260,21 @@ def build_zuko_unconditional_flow(
     if isinstance(hidden_features, int):
         hidden_features = [hidden_features] * num_transforms
 
-    build_nf = getattr(zuko.flows, which_nf)
+    base, base_transforms = _get_base_and_transforms(
+        which_nf, x_numel, 0, hidden_features, num_transforms, **kwargs
+    )
 
-    if which_nf == "CNF":
-        flow_built = build_nf(
-            features=x_numel, hidden_features=hidden_features, **kwargs
+    z_score_x_bool, structured_x = z_score_parser(z_score_x)
+    if z_score_x_bool:
+        # TODO: Check whether first base transform, then z-score is correct (it's the
+        # other way around in the conditional flows).
+        transforms = (
+            *base_transforms,
+            standardizing_transform_zuko(batch_x, structured_x),
         )
-    else:
-        flow_built = build_nf(
-            features=x_numel,
-            hidden_features=hidden_features,
-            transforms=num_transforms,
-            **kwargs,
-        )
 
-    # Continuous normalizing flows (CNF) only have one transform,
-    # so we need to handle them slightly differently.
-    if which_nf == "CNF":
-        transform = flow_built.transform
-
-        z_score_x_bool, structured_x = z_score_parser(z_score_x)
-        if z_score_x_bool:
-            transform = (
-                transform,
-                standardizing_transform_zuko(batch_x, structured_x),
-            )
-
-        # Combine transforms.
-        neural_net = zuko.flows.Flow(transform, flow_built.base)
-    else:
-        transforms = flow_built.transform.transforms
-
-        z_score_x_bool, structured_x = z_score_parser(z_score_x)
-        if z_score_x_bool:
-            transforms = (
-                *transforms,
-                standardizing_transform_zuko(batch_x, structured_x),
-            )
-
-        # Combine transforms.
-        neural_net = zuko.flows.Flow(transforms, flow_built.base)
+    # Combine transforms.
+    neural_net = zuko.flows.Flow(transforms, base)
 
     flow = ZukoUnconditionalFlow(
         neural_net,
