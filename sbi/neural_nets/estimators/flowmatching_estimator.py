@@ -436,6 +436,7 @@ class MaskedFlowMatchingEstimator(MaskedConditionalVectorFieldEstimator):
                 `(batch_dim_time, *event_shape_time)`.
             condition_mask: A boolean mask indicating the role of each variable.
                 Expected shape: `(batch_size, num_variables)`.
+
                 - `True` (or `1`): The variable at this position is observed and its
                     features will be used for conditioning.
                 - `False` (or `0`): The variable at this position is latent and its
@@ -443,6 +444,7 @@ class MaskedFlowMatchingEstimator(MaskedConditionalVectorFieldEstimator):
             edge_mask: A boolean mask defining the adjacency matrix of the directed
                 acyclic graph (DAG) representing dependencies among variables.
                 Expected shape: `(batch_size, num_variables, num_variables)`.
+
                 - `True` (or `1`): An edge exists from the row variable to the column
                     variable.
                 - `False` (or `0`): No edge exists between these variables.
@@ -518,6 +520,7 @@ class MaskedFlowMatchingEstimator(MaskedConditionalVectorFieldEstimator):
             times: SDE time variable in [t_min, t_max]. Uniformly sampled if None.
             condition_mask: A boolean mask indicating the role of each variable.
                 Expected shape: `(batch_size, num_variables)`.
+
                 - `True` (or `1`): The variable at this position is observed and its
                     features will be used for conditioning.
                 - `False` (or `0`): The variable at this position is latent and its
@@ -525,6 +528,7 @@ class MaskedFlowMatchingEstimator(MaskedConditionalVectorFieldEstimator):
             edge_mask: A boolean mask defining the adjacency matrix of the directed
                 acyclic graph (DAG) representing dependencies among variables.
                 Expected shape: `(batch_size, num_variables, num_variables)`.
+
                 - `True` (or `1`): An edge exists from the row variable to the column
                     variable.
                 - `False` (or `0`): No edge exists between these variables.
@@ -602,6 +606,7 @@ class MaskedFlowMatchingEstimator(MaskedConditionalVectorFieldEstimator):
             times: Time :math:`t`.
             condition_mask: A boolean mask indicating the role of each variable.
                 Expected shape: `(batch_size, num_variables)`.
+
                 - `True` (or `1`): The variable at this position is observed and its
                     features will be used for conditioning.
                 - `False` (or `0`): The variable at this position is latent and its
@@ -609,6 +614,7 @@ class MaskedFlowMatchingEstimator(MaskedConditionalVectorFieldEstimator):
             edge_mask: A boolean mask defining the adjacency matrix of the directed
                 acyclic graph (DAG) representing dependencies among variables.
                 Expected shape: `(batch_size, num_variables, num_variables)`.
+
                 - `True` (or `1`): An edge exists from the row variable to the column
                     variable.
                 - `False` (or `0`): No edge exists between these variables.
@@ -643,6 +649,7 @@ class MaskedFlowMatchingEstimator(MaskedConditionalVectorFieldEstimator):
             t: Time.
             condition_mask: A boolean mask indicating the role of each variable.
                 Expected shape: `(batch_size, num_variables)`.
+
                 - `True` (or `1`): The variable at this position is observed and its
                     features will be used for conditioning.
                 - `False` (or `0`): The variable at this position is latent and its
@@ -650,6 +657,7 @@ class MaskedFlowMatchingEstimator(MaskedConditionalVectorFieldEstimator):
             edge_mask: A boolean mask defining the adjacency matrix of the directed
                 acyclic graph (DAG) representing dependencies among variables.
                 Expected shape: `(batch_size, num_variables, num_variables)`.
+
                 - `True` (or `1`): An edge exists from the row variable to the column
                     variable.
                 - `False` (or `0`): No edge exists between these variables.

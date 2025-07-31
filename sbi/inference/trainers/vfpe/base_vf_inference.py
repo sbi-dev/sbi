@@ -1205,9 +1205,8 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
 
         return converged
 
-    # ! Introduced to avoid conflicts, should adjust later
     def _get_potential_function(
-        self, prior: Distribution, estimator: ConditionalVectorFieldEstimator
+        self, prior: Distribution, estimator: MaskedConditionalVectorFieldEstimator
     ) -> Tuple[VectorFieldBasedPotential, TorchTransform]:
         r"""Gets the potential function gradient for vector field estimators.
 
@@ -1218,14 +1217,8 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
             The potential function and a transformation that maps
             to unconstrained space.
         """
-        # ! This is only called for sampling methods which are not sde or ode
-        # should I just raise a NotImplementedError?
-        potential_fn, theta_transform = vector_field_estimator_based_potential(
-            estimator,
-            prior,
-            x_o=None,
-        )
-        return potential_fn, theta_transform
+
+        raise NotImplementedError("...")
 
     def _build_conditional(
         self,
@@ -1257,6 +1250,7 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
         # For the Simformer there is no concept of "posterior", as it simply works over
         # masks that define what is latent (to be infered) and what is not.
         # Future work could involve generalizing further sbi interface.
+        # ! Add for "collisions" of method's name
         return super().build_posterior(
             estimator=mvf_estimator.build_conditional_vector_field_estimator(
                 condition_mask, edge_mask

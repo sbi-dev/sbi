@@ -30,18 +30,18 @@ class FlowMatchingSimformer(MaskedVectorFieldTrainer):
 
     The roles of variables—latent (to be inferred) or observed (to be conditioned on)—
     are specified by a boolean mask `condition_mask`.
+
     - `True` (or `1`): The variable is observed (conditioned on).
     - `False` (or `0`): The variable is latent (to be inferred).
 
     Dependencies among variables are defined by a boolean adjacency matrix `edge_mask`.
+
     - `True` (or `1`): An edge exists from the row variable to the column variable.
     - `False` (or `0`): No edge exists.
 
     NOTE:
         - Multi-round inference is not supported yet; the API is present for coherence
             with sbi.
-        - The `prior` argument is currently only used for sample rejection in cases
-            where the inferred variables fall outside expected support.
     """
 
     def __init__(
@@ -132,6 +132,7 @@ class FlowMatchingSimformer(MaskedVectorFieldTrainer):
         Args:
             condition_mask: A boolean mask indicating the role of each variable.
                 Expected shape: `(batch_size, num_variables)`.
+
                 - `True` (or `1`): The variable at this position is observed and its
                     features will be used for conditioning.
                 - `False` (or `0`): The variable at this position is latent and its
@@ -139,12 +140,13 @@ class FlowMatchingSimformer(MaskedVectorFieldTrainer):
             edge_mask: A boolean mask defining the adjacency matrix of the directed
                 acyclic graph (DAG) representing dependencies among variables.
                 Expected shape: `(batch_size, num_variables, num_variables)`.
+
                 - `True` (or `1`): An edge exists from the row variable to the column
-                    variable.
+                variable.
                 - `False` (or `0`): No edge exists between these variables.
                 - if None, it will be equivalent to a full attention (i.e., full ones)
-                    mask, we suggest you to use None instead of ones
-                    to save memory resources
+                mask, we suggest you to use None instead of ones
+                to save memory resources
             mvf_estimator: Neural network architecture for the masked
                 vector field estimator. Can be a callable that implements
                 the `MaskedVectorFieldEstimatorBuilder` protocol.
@@ -197,13 +199,14 @@ class FlowMatchingSimformer(MaskedVectorFieldTrainer):
             edge_mask: A boolean mask defining the adjacency matrix of the directed
                 acyclic graph (DAG) representing dependencies among variables.
                 Expected shape: `(batch_size, num_variables, num_variables)`.
+
                 - `True` (or `1`): An edge exists from the row variable to the column
-                    variable.
+                variable.
                 - `False` (or `0`): No edge exists between these variables.
                 - if None, it will be equivalent to a full attention (i.e., full ones)
-                    mask, we suggest you to use None instead of ones
-                    to save memory resources
-             mvf_estimator: Neural network architecture for the masked
+                mask, we suggest you to use None instead of ones
+                to save memory resources
+            mvf_estimator: Neural network architecture for the masked
                 vector field estimator. Can be a callable that implements
                 the `MaskedVectorFieldEstimatorBuilder` protocol.
                 If a callable, `__call__` must accept `inputs`, and return
@@ -258,13 +261,14 @@ class FlowMatchingSimformer(MaskedVectorFieldTrainer):
             edge_mask: A boolean mask defining the adjacency matrix of the directed
                 acyclic graph (DAG) representing dependencies among variables.
                 Expected shape: `(batch_size, num_variables, num_variables)`.
+
                 - `True` (or `1`): An edge exists from the row variable to the column
-                    variable.
+                variable.
                 - `False` (or `0`): No edge exists between these variables.
                 - if None, it will be equivalent to a full attention (i.e., full ones)
-                    mask, we suggest you to use None instead of ones
-                    to save memory resources
-             mvf_estimator: Neural network architecture for the masked
+                mask, we suggest you to use None instead of ones
+                to save memory resources
+            mvf_estimator: Neural network architecture for the masked
                 vector field estimator. Can be a callable that implements
                 the `MaskedVectorFieldEstimatorBuilder` protocol.
                 If a callable, `__call__` must accept `inputs`, and return

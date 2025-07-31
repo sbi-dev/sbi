@@ -33,6 +33,7 @@ Neural nets
    advanced_tutorials/12_iid_data_and_permutation_invariant_embeddings.ipynb
    advanced_tutorials/19_flowmatching_and_scorematching.ipynb
    advanced_tutorials/20_score_based_methods_new_features.ipynb
+   advanced_tutorials/22_simformer.ipynb
 
 
 Training

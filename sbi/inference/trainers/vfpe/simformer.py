@@ -33,13 +33,11 @@ class Simformer(MaskedVectorFieldTrainer):
     - `True` (or `1`): An edge exists from the row variable to the column variable.
     - `False` (or `0`): No edge exists.
     - if None, it will be equivalent to a full attention (i.e., full ones)
-        mask, we suggest you to use None instead of ones to save memory resources
+    mask, we suggest you to use None instead of ones to save memory resources
 
     NOTE:
         - Multi-round inference is not supported yet; the API is present for coherence
           with sbi.
-        - The `prior` argument is currently only used for sample rejection in cases
-          where the inferred variables fall outside expected support.
     """
 
     def __init__(
@@ -72,18 +70,18 @@ class Simformer(MaskedVectorFieldTrainer):
             sde_type: Type of SDE to use. Must be one of ['vp', 've', 'subvp'].
                 NOTE: Only ve (variance exploding) is supported by now.
             posterior_latent_idx: List or Tensor of indexes identifying which
-                variables are latent (to be infered), i.e.,
-                i.e, which variables identify $\theta$.
+            variables are latent (to be infered),
+            i.e, which variables identify $\theta$.
             posterior_observed_idx: List or Tensor of indexes identifying which
-                variables are observed (to be infered) according to a posterior,
-                i.e, which variables identify $x$.
+            variables are observed (to be infered) according to a posterior,
+            i.e, which variables identify $x$.
             device: Device to run the training on.
             logging_level: Logging level for the training. Can be an integer or a
-                string.
+            string.
             summary_writer: Tensorboard summary writer.
             show_progress_bars: Whether to show progress bars during training.
             kwargs: Additional keyword arguments passed to the default builder if
-                `score_estimator` is a string.
+            `score_estimator` is a string.
 
         References:
             - Gloeckler, Deistler, Weilbach, Wood, Macke.
@@ -136,18 +134,18 @@ class Simformer(MaskedVectorFieldTrainer):
             condition_mask: A boolean mask indicating the role of each variable.
                 Expected shape: `(batch_size, num_variables)`.
                 - `True` (or `1`): The variable at this position is observed and its
-                    features will be used for conditioning.
+                features will be used for conditioning.
                 - `False` (or `0`): The variable at this position is latent and its
-                    features are subject to inference.
+                features are subject to inference.
             edge_mask: A boolean mask defining the adjacency matrix of the directed
                 acyclic graph (DAG) representing dependencies among variables.
                 Expected shape: `(batch_size, num_variables, num_variables)`.
                 - `True` (or `1`): An edge exists from the row variable to the column
-                    variable.
+                variable.
                 - `False` (or `0`): No edge exists between these variables.
                 - if None, it will be equivalent to a full attention (i.e., full ones)
-                    mask, we suggest you to use None instead of ones
-                    to save memory resources
+                mask, we suggest you to use None instead of ones
+                to save memory resources
             mvf_estimator: Neural network architecture for the masked
                 vector field estimator. Can be a callable that implements
                 the `MaskedVectorFieldEstimatorBuilder` protocol.
@@ -201,12 +199,12 @@ class Simformer(MaskedVectorFieldTrainer):
                 acyclic graph (DAG) representing dependencies among variables.
                 Expected shape: `(batch_size, num_variables, num_variables)`.
                 - `True` (or `1`): An edge exists from the row variable to the column
-                    variable.
+                variable.
                 - `False` (or `0`): No edge exists between these variables.
                 - if None, it will be equivalent to a full attention (i.e., full ones)
-                    mask, we suggest you to use None instead of ones
-                    to save memory resources
-             mvf_estimator: Neural network architecture for the masked
+                mask, we suggest you to use None instead of ones
+                to save memory resources
+            mvf_estimator: Neural network architecture for the masked
                 vector field estimator. Can be a callable that implements
                 the `MaskedVectorFieldEstimatorBuilder` protocol.
                 If a callable, `__call__` must accept `inputs`, and return
@@ -262,11 +260,11 @@ class Simformer(MaskedVectorFieldTrainer):
                 acyclic graph (DAG) representing dependencies among variables.
                 Expected shape: `(batch_size, num_variables, num_variables)`.
                 - `True` (or `1`): An edge exists from the row variable to the column
-                    variable.
+                variable.
                 - `False` (or `0`): No edge exists between these variables.
                 - if None, it will be equivalent to a full attention (i.e., full ones)
-                    mask, we suggest you to use None instead of ones
-                    to save memory resources
+                mask, we suggest you to use None instead of ones
+                to save memory resources
              mvf_estimator: Neural network architecture for the masked
                 vector field estimator. Can be a callable that implements
                 the `MaskedVectorFieldEstimatorBuilder` protocol.
@@ -303,14 +301,18 @@ class Simformer(MaskedVectorFieldTrainer):
         )
 
     def set_condition_indexes(
-        self, new_latent_idx: Union[list, Tensor], new_observed_idx: Union[list, Tensor]
+        self,
+        new_posterior_latent_idx: Union[list, Tensor],
+        new_posterior_observed_idx: Union[list, Tensor],
     ):
         """Set the latent and observed condition indexes for posterior inference
-        if not passed at init time, or if an update is desired"""
+        if not passed at init time, or if an update is desired."""
 
-        self.posterior_latent_idx = torch.as_tensor(new_latent_idx, dtype=torch.long)
+        self.posterior_latent_idx = torch.as_tensor(
+            new_posterior_latent_idx, dtype=torch.long
+        )
         self.posterior_observed_idx = torch.as_tensor(
-            new_observed_idx, dtype=torch.long
+            new_posterior_observed_idx, dtype=torch.long
         )
 
     def _generate_posterior_condition_mask(self):

@@ -143,10 +143,11 @@ def test_c2st_vector_field_on_linearGaussian(
 @pytest.mark.parametrize(
     "vector_field_type, num_dim, prior_str, sample_with",
     [
-        ("vp", 1, "gaussian", ["sde", "ode"]),
-        ("vp", 3, "uniform", ["sde", "ode"]),
-        ("vp", 3, "gaussian", ["sde", "ode"]),
-        ("ve", 3, "uniform", ["sde", "ode"]),
+        ("vp", 1, "gaussian", ["sde", "ode"]),  # marsk as gpu or slow
+        ("vp", 3, "uniform", ["sde", "ode"]),  # marsk as gpu or slow
+        ("vp", 3, "gaussian", ["sde", "ode"]),  # marsk as gpu or slow
+        ("ve", 3, "uniform", ["sde", "ode"]),  # marsk as gpu or slow
+        ("ve", 3, "gaussian", ["sde", "ode"]),  # default
         ("subvp", 3, "uniform", ["sde", "ode"]),
         # ("fmpe", 1, "gaussian", ["sde", "ode"]),
         # ("fmpe", 1, "uniform", ["sde", "ode"]),
