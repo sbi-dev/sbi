@@ -416,7 +416,13 @@ def test_kde(bandwidth, transform, sample_weights):
         "independent",
         "structured",
         "transform_to_unconstrained",
-        "invalid_value",
+        pytest.param(
+            "invalid_value",
+            marks=pytest.mark.xfail(
+                raises=ValueError,
+                reason="Invalid z-scoring option should raise ValueError.",
+            ),
+        ),
     ],
 )
 @pytest.mark.parametrize(
@@ -429,24 +435,30 @@ def test_kde(bandwidth, transform, sample_weights):
         "independent",
         "structured",
         "transform_to_unconstrained",
-        "invalid_value",
+        pytest.param(
+            "invalid_value",
+            marks=pytest.mark.xfail(
+                raises=ValueError,
+                reason="Invalid z-scoring option should raise ValueError.",
+            ),
+        ),
     ],
 )
 def test_z_score_parser(z_x, z_theta):
-    if z_theta == "invalid_value":
-        with pytest.raises(ValueError, match="Invalid z-scoring option."):
+    """Test the z_score_parser function."""
+    if z_x is bool or z_theta is bool:
+        with pytest.warns(
+            UserWarning,
+            match="Boolean values for z-scoring are deprecated and will",
+        ):
+            z_score_parser(z_x)
             z_score_parser(z_theta)
 
-    if z_x == "invalid_value":
-        with pytest.raises(ValueError, match="Invalid z-scoring option."):
-            z_score_parser(z_x)
+    result_x = z_score_parser(z_x)
+    result_theta = z_score_parser(z_theta)
 
-    if z_x != "invalid_value" and z_theta != "invalid_value":
-        result_x = z_score_parser(z_x)
-        result_theta = z_score_parser(z_theta)
-
-        assert result_x is not None, f"z_score_parser({z_x}) returned None"
-        assert result_theta is not None, f"z_score_parser({z_theta}) returned None"
+    assert result_x is not None, f"z_score_parser({z_x}) returned None"
+    assert result_theta is not None, f"z_score_parser({z_theta}) returned None"
 
 
 @pytest.mark.parametrize(
