@@ -387,10 +387,17 @@ def test_invalid_literal_field_values():
     MCMCPosteriorParameters(method="invalid")
 
 
-def test_if_warning_raised_for_deprecated_build_posterior_parameters(get_inference):
+@pytest.mark.parametrize(
+    "params", [dict(vi_parameters={}), dict(mcmc_parameters={"thin": 10})]
+)
+def test_if_warning_raised_for_deprecated_build_posterior_parameters(
+    params, get_inference
+):
     """
     Check if the build_posterior method raises a warning for deprecated parameters
     """
 
-    with pytest.warns(DeprecationWarning):
-        get_inference.build_posterior(mcmc_parameters={})
+    with pytest.warns(
+        DeprecationWarning, match="The following arguments are deprecated"
+    ):
+        get_inference.build_posterior(**params)

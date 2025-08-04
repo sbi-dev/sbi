@@ -7,7 +7,7 @@ from copy import deepcopy
 from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Dict, Literal, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Union
 from warnings import warn
 
 import torch
@@ -558,12 +558,15 @@ class NeuralInference(ABC):
             parameters.
         """
 
+        deprecated_params = self._resolve_deprecated_params(**kwargs)
+
         if posterior_parameters is not None:
-            self._validate_no_duplicate_parameters(**kwargs)
+            self._validate_no_duplicate_parameters(deprecated_params)
             self._validate_posterior_parameters_consistency(
                 posterior_parameters, **kwargs
             )
         else:
+            self._raise_deprecation_warning(deprecated_params, **kwargs)
             # Resolve parameters passed through kwargs and convert
             # into a subclass of PosteriorParameters
             if sample_with == "direct":
@@ -596,16 +599,20 @@ class NeuralInference(ABC):
 
         return posterior_parameters
 
-    def _validate_no_duplicate_parameters(self, **kwargs) -> None:
+    def _resolve_deprecated_params(self, **kwargs) -> List[str]:
         """
-        Ensure parameters aren't specified in both posterior_parameters and the
-        posterior parameter dictionaries in the build_posterior method.
+        Identify deprecated posterior construction parameters
+        provided to the method.
 
         Args:
-            **kwargs: Additional parameters to construct the posterior parameters
+            **kwargs: Keyword arguments potentially containing deprecated
+                      posterior parameters.
+
+        Returns:
+            A list of names of deprecated posterior parameters that were provided.
         """
 
-        old_style_params = {
+        deprecated_params = {
             "direct_sampling_parameters",
             "mcmc_parameters",
             "vectorfield_sampling_parameters",
@@ -614,14 +621,59 @@ class NeuralInference(ABC):
             "importance_sampling_parameters",
         }
 
-        # Check if any old-style parameters were provided
-        provided_old_params = [
-            param for param in old_style_params if kwargs.get(param) is not None
+        # Check if any deprecated parameters were provided
+        provided_deprecated_params = [
+            param for param in deprecated_params if kwargs.get(param) is not None
         ]
 
-        if provided_old_params:
+        return provided_deprecated_params
+
+    def _raise_deprecation_warning(
+        self, deprecated_params: List[str], **kwargs
+    ) -> None:
+        """
+        Raise a deprecation warning if a deprecated posterior parameters or
+        non-default arguments are used.
+
+        Args:
+            deprecated_params: List of deprecated posterior parameter names provided.
+            **kwargs: Additional keyword arguments.
+        """
+
+        mcmc_method = kwargs.get("mcmc_method")
+        vi_method = kwargs.get("vi_method")
+
+        if (
+            deprecated_params
+            or mcmc_method != "slice_np_vectorized"
+            or vi_method != "rKL"
+        ):
+            warnings.warn(
+                f"The following arguments are deprecated and"
+                " will be removed in a future version: "
+                f"{', '.join(deprecated_params)}. Please use `posterior_parameters`"
+                " instead. You can follow this guide "
+                "https://sbi.readthedocs.io/en/latest/how_to_guide/19_posterior_parameters.html#",
+                FutureWarning,
+                stacklevel=2,
+            )
+
+    def _validate_no_duplicate_parameters(self, deprecated_params: List[str]) -> None:
+        """
+        Validate that deprecated and new-style posterior parameters are not used
+        together.
+
+        Args:
+            deprecated_params: List of deprecated posterior parameter names provided.
+
+        Raises:
+            ValueError: If both deprecated parameters and new-style
+                        `posterior_parameters`are used in the same call.
+        """
+
+        if deprecated_params:
             raise ValueError(
-                f"Cannot use both old-style parameters {provided_old_params} "
+                f"Cannot use both old-style parameters {deprecated_params} "
                 f"and new-style posterior_parameters. Please use only one approach."
             )
 
