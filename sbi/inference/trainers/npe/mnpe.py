@@ -16,7 +16,7 @@ from sbi.inference.posteriors.posterior_parameters import (
 from sbi.inference.trainers.npe.npe_c import NPE_C
 from sbi.neural_nets.estimators import MixedDensityEstimator
 from sbi.sbi_types import TensorboardSummaryWriter
-from sbi.utils.sbiutils import del_entries, warn_if_deprecated
+from sbi.utils.sbiutils import del_entries
 
 
 class MNPE(NPE_C):
@@ -158,21 +158,6 @@ class MNPE(NPE_C):
         Returns:
             Posterior $p(\theta|x)$ with `.sample()` and `.log_prob()` methods.
         """
-
-        warn_if_deprecated(
-            self.build_posterior,
-            locals(),
-            {
-                "direct_sampling_parameters",
-                "mcmc_parameters",
-                "vi_parameters",
-                "rejection_sampling_parameters",
-                "importance_sampling_parameters",
-                "mcmc_method",
-                "vi_method",
-            },
-        )
-
         if density_estimator is not None:
             assert isinstance(
                 density_estimator, MixedDensityEstimator

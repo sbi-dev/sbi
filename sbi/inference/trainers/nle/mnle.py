@@ -15,7 +15,7 @@ from sbi.inference.posteriors.posterior_parameters import (
 from sbi.inference.trainers.nle.nle_base import LikelihoodEstimatorTrainer
 from sbi.neural_nets.estimators import MixedDensityEstimator
 from sbi.sbi_types import TensorboardSummaryWriter
-from sbi.utils.sbiutils import del_entries, warn_if_deprecated
+from sbi.utils.sbiutils import del_entries
 
 
 class MNLE(LikelihoodEstimatorTrainer):
@@ -162,20 +162,6 @@ class MNLE(LikelihoodEstimatorTrainer):
             Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods
             (the returned log-probability is unnormalized).
         """
-
-        warn_if_deprecated(
-            self.build_posterior,
-            locals(),
-            {
-                "mcmc_parameters",
-                "vi_parameters",
-                "rejection_sampling_parameters",
-                "importance_sampling_parameters",
-                "mcmc_method",
-                "vi_method",
-            },
-        )
-
         if density_estimator is not None:
             assert isinstance(
                 density_estimator, MixedDensityEstimator

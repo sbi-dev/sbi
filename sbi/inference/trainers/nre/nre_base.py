@@ -31,7 +31,6 @@ from sbi.utils import (
     check_estimator_arg,
     clamp_and_warn,
 )
-from sbi.utils.sbiutils import warn_if_deprecated
 from sbi.utils.torchutils import repeat_rows
 
 
@@ -406,20 +405,6 @@ class RatioEstimatorTrainer(NeuralInference, ABC):
             Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods
             (the returned log-probability is unnormalized).
         """
-
-        warn_if_deprecated(
-            self.build_posterior,
-            locals(),
-            {
-                "mcmc_parameters",
-                "vi_parameters",
-                "rejection_sampling_parameters",
-                "importance_sampling_parameters",
-                "mcmc_method",
-                "vi_method",
-            },
-        )
-
         return super().build_posterior(
             density_estimator,
             prior,

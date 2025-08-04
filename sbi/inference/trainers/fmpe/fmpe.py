@@ -16,7 +16,6 @@ from sbi.inference.trainers.npse.vector_field_inference import (
 )
 from sbi.neural_nets import flowmatching_nn
 from sbi.neural_nets.estimators import ConditionalVectorFieldEstimator
-from sbi.utils.sbiutils import warn_if_deprecated
 
 
 class FMPE(VectorFieldTrainer):
@@ -98,14 +97,6 @@ class FMPE(VectorFieldTrainer):
         Returns:
             Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods.
         """
-
-        warn_if_deprecated(
-            self.build_posterior,
-            locals(),
-            {
-                "vectorfield_sampling_parameters",
-            },
-        )
 
         return super().build_posterior(
             estimator=vector_field_estimator,
