@@ -388,7 +388,13 @@ def test_invalid_literal_field_values():
 
 
 @pytest.mark.parametrize(
-    "params", [dict(vi_parameters={}), dict(mcmc_parameters={"thin": 10})]
+    "params",
+    [
+        dict(mcmc_method="slice_pymc"),
+        dict(vi_method="fKL"),
+        dict(vi_parameters={}),
+        dict(mcmc_parameters={"thin": 10}),
+    ],
 )
 def test_if_warning_raised_for_deprecated_build_posterior_parameters(
     params, get_inference
@@ -397,7 +403,5 @@ def test_if_warning_raised_for_deprecated_build_posterior_parameters(
     Check if the build_posterior method raises a warning for deprecated parameters
     """
 
-    with pytest.warns(
-        DeprecationWarning, match="The following arguments are deprecated"
-    ):
+    with pytest.warns(FutureWarning, match="The following arguments are deprecated"):
         get_inference.build_posterior(**params)

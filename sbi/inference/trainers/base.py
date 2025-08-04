@@ -663,19 +663,22 @@ class NeuralInference(ABC):
             **kwargs: Additional keyword arguments.
         """
 
-        mcmc_method = kwargs.get("mcmc_method")
-        vi_method = kwargs.get("vi_method")
+        deprecated_params = deprecated_params.copy()
 
-        if (
-            deprecated_params
-            or mcmc_method != "slice_np_vectorized"
-            or vi_method != "rKL"
-        ):
+        is_default_mcmc_method = kwargs.get("mcmc_method") == "slice_np_vectorized"
+        is_default_vi_method = kwargs.get("vi_method") == "rKL"
+
+        if not is_default_mcmc_method:
+            deprecated_params.append("mcmc_method")
+        if not is_default_vi_method:
+            deprecated_params.append("vi_method")
+
+        if deprecated_params:
             warnings.warn(
                 f"The following arguments are deprecated and"
                 " will be removed in a future version: "
                 f"{', '.join(deprecated_params)}. Please use `posterior_parameters`"
-                " instead. You can follow this guide "
+                " instead. Refer to this guide for details:\n"
                 "https://sbi.readthedocs.io/en/latest/how_to_guide/19_posterior_parameters.html#",
                 FutureWarning,
                 stacklevel=2,
