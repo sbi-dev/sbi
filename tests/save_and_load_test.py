@@ -18,7 +18,7 @@ from sbi.inference.posteriors.vi_posterior import VIPosterior
 
 
 @pytest.mark.parametrize(
-    "inference_method, posterior_parameter",
+    "inference_method, posterior_parameters",
     (
         (NPE, DirectPosteriorParameters),
         pytest.param(NLE, MCMCPosteriorParameters, marks=pytest.mark.mcmc),
@@ -28,7 +28,10 @@ from sbi.inference.posteriors.vi_posterior import VIPosterior
     ),
 )
 def test_picklability(
-    inference_method, posterior_parameter, tmp_path, mcmc_params_fast
+    inference_method,
+    posterior_parameters,
+    tmp_path,
+    mcmc_params_fast: MCMCPosteriorParameters,
 ):
     num_dim = 2
     prior = utils.BoxUniform(low=-2 * torch.ones(num_dim), high=2 * torch.ones(num_dim))
@@ -39,13 +42,13 @@ def test_picklability(
 
     inference = inference_method(prior=prior)
     _ = inference.append_simulations(theta, x).train(max_num_epochs=1)
-    if posterior_parameter is MCMCPosteriorParameters:
+    if posterior_parameters is MCMCPosteriorParameters:
         posterior = inference.build_posterior(
-            posterior_parameters=posterior_parameter(**mcmc_params_fast)
+            posterior_parameters=mcmc_params_fast
         ).set_default_x(x_o)
     else:
         posterior = inference.build_posterior(
-            posterior_parameters=posterior_parameter()
+            posterior_parameters=posterior_parameters()
         ).set_default_x(x_o)
     # After sample and log_prob, the posterior should still be picklable
     if isinstance(posterior, VIPosterior):

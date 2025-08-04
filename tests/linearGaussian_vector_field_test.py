@@ -104,9 +104,7 @@ def test_c2st_vector_field_on_linearGaussian(
         posterior = inference.build_posterior(
             score_estimator,
             sample_with=method,
-            posterior_parameters=VectorFieldPosteriorParameters(
-                neural_ode_backend="zuko"
-            ),
+            posterior_parameters=VectorFieldPosteriorParameters(),
         )
         posterior.set_default_x(x_o)
         samples = posterior.sample((num_samples,))

@@ -81,7 +81,7 @@ def test_running_sbc(
     prior_type: str,
     reduce_fn_str: str,
     sampler: Optional[str],
-    mcmc_params_fast: dict,
+    mcmc_params_fast: MCMCPosteriorParameters,
 ):
     """Test running inference and then SBC and obtaining nltp with different methods."""
     # Setup
@@ -110,9 +110,7 @@ def test_running_sbc(
     posterior_kwargs = {}
     if method == NLE:
         posterior_kwargs = {
-            "posterior_parameters": MCMCPosteriorParameters(
-                method="slice_np_vectorized", **mcmc_params_fast
-            )
+            "posterior_parameters": mcmc_params_fast
             if sampler == "mcmc"
             else VIPosteriorParameters()
         }
