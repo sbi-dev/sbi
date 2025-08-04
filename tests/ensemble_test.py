@@ -106,7 +106,6 @@ def test_c2st_posterior_ensemble_on_linearGaussian(
     if isinstance(inferer, (NLE_A, NRE_A)):
         samples = posterior.sample(
             (num_samples,),
-            method="slice_np_vectorized",
             **asdict(mcmc_params_accurate),
         )
     else:

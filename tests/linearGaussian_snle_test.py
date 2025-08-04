@@ -482,12 +482,13 @@ def test_api_nle_sampling_methods(
         or "nuts" in sampling_method
         or "hmc" in sampling_method
     ):
+        mcmc_params_fast = mcmc_params_fast.with_param(
+            method=sampling_method, init_strategy=init_strategy
+        )
         posterior = MCMCPosterior(
             potential_fn,
             proposal=prior,
             theta_transform=theta_transform,
-            method=sampling_method,
-            init_strategy=init_strategy,
             **asdict(mcmc_params_fast),
         )
     elif sample_with == "importance":

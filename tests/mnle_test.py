@@ -136,10 +136,11 @@ def test_mnle_api(
     elif isinstance(posterior, RejectionPosterior):
         posterior.sample((1,))
     elif isinstance(posterior, MCMCPosterior):
+        mcmc_params_fast = mcmc_params_fast.with_param(
+            init_strategy="proposal", method="hmc_pyro"
+        )
         posterior.sample(
             (1,),
-            init_strategy="proposal",
-            method="hmc_pyro",
             **asdict(mcmc_params_fast),
         )
 

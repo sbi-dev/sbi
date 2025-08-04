@@ -54,7 +54,9 @@ def test_api_posterior_sampler_set(
 ):
     """Runs SNL and checks that posterior_sampler is correctly set."""
     x_o = zeros((num_trials, num_dim))
-    mcmc_params_fast = mcmc_params_fast.with_param(num_chains=num_chains)
+    mcmc_params_fast = mcmc_params_fast.with_param(
+        num_chains=num_chains, method=sampling_method
+    )
 
     prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
     simulator = diagonal_linear_gaussian
@@ -70,7 +72,6 @@ def test_api_posterior_sampler_set(
     posterior = MCMCPosterior(
         potential_fn,
         theta_transform=transform,
-        method=sampling_method,
         proposal=prior,
         **asdict(mcmc_params_fast),
     )

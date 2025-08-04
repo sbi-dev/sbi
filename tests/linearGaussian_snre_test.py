@@ -399,11 +399,11 @@ def test_api_sre_sampling_methods(
         or "nuts" in sampling_method
         or "hmc" in sampling_method
     ):
+        mcmc_params_fast = mcmc_params_fast.with_param(method=sampling_method)
         posterior = MCMCPosterior(
             potential_fn,
             proposal=prior,
             theta_transform=theta_transform,
-            method=sampling_method,
             **asdict(mcmc_params_fast),
         )
     elif sample_with == "importance":

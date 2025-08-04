@@ -426,11 +426,11 @@ def test_api_snpe_c_posterior_correction(
         posterior_estimator, prior, x_o
     )
     if sample_with == "mcmc":
+        mcmc_params_fast = mcmc_params_fast.with_param(method=mcmc_method)
         posterior = MCMCPosterior(
             potential_fn=potential_fn,
             theta_transform=theta_transform,
             proposal=prior,
-            method=mcmc_method,
             **asdict(mcmc_params_fast),
         )
     elif sample_with == "rejection":
