@@ -558,7 +558,7 @@ class NeuralInference(ABC):
             parameters.
         """
 
-        deprecated_params = self._resolve_deprecated_params(**kwargs)
+        deprecated_params = self._resolve_deprecated_posterior_parameters(**kwargs)
 
         if posterior_parameters is not None:
             self._validate_no_duplicate_parameters(deprecated_params)
@@ -567,39 +567,62 @@ class NeuralInference(ABC):
             )
         else:
             self._raise_deprecation_warning(deprecated_params, **kwargs)
-            # Resolve parameters passed through kwargs and convert
-            # into a subclass of PosteriorParameters
-            if sample_with == "direct":
-                params = kwargs.get("direct_sampling_parameters", {}) or {}
-                posterior_parameters = DirectPosteriorParameters(**params)
-            elif sample_with == "mcmc":
-                params = kwargs.get("mcmc_parameters", {}) or {}
-                posterior_parameters = MCMCPosteriorParameters(
-                    method=kwargs.get("mcmc_method", "slice_np_vectorized"), **params
-                )
-            elif sample_with in ("ode", "sde"):
-                params = kwargs.get("vectorfield_sampling_parameters", {}) or {}
-                posterior_parameters = VectorFieldPosteriorParameters(**params)
-            elif sample_with == "rejection":
-                params = kwargs.get("rejection_sampling_parameters", {}) or {}
-                posterior_parameters = RejectionPosteriorParameters(**params)
-            elif sample_with == "vi":
-                params = kwargs.get("vi_parameters", {}) or {}
-                posterior_parameters = VIPosteriorParameters(
-                    vi_method=kwargs.get("vi_method", "rKL"), **params
-                )
-            elif sample_with == "importance":
-                params = kwargs.get("importance_sampling_parameters", {}) or {}
-                posterior_parameters = ImportanceSamplingPosteriorParameters(**params)
-            else:
-                raise NotImplementedError(
-                    "Posterior parameter construction not implemented for",
-                    f"'{sample_with}'",
-                )
+            posterior_parameters = self._build_posterior_parameters(
+                sample_with, **kwargs
+            )
 
         return posterior_parameters
 
-    def _resolve_deprecated_params(self, **kwargs) -> List[str]:
+    def _build_posterior_parameters(
+        self,
+        sample_with: Literal[
+            "mcmc", "rejection", "vi", "importance", "direct", "sde", "ode"
+        ],
+        **kwargs,
+    ) -> PosteriorParameters:
+        """
+        Resolve parameters passed through kwargs and convert into a
+        subclass of PosteriorParameters.
+
+        Args:
+            sample_with: The posterior sampling method to use.
+            **kwargs: Additional parameters to construct the posterior parameters.
+        Returns
+            A dataclass instance containing the resolved posterior
+            parameters.
+        """
+
+        if sample_with == "direct":
+            params = kwargs.get("direct_sampling_parameters", {}) or {}
+            posterior_parameters = DirectPosteriorParameters(**params)
+        elif sample_with == "mcmc":
+            params = kwargs.get("mcmc_parameters", {}) or {}
+            posterior_parameters = MCMCPosteriorParameters(
+                method=kwargs.get("mcmc_method", "slice_np_vectorized"), **params
+            )
+        elif sample_with in ("ode", "sde"):
+            params = kwargs.get("vectorfield_sampling_parameters", {}) or {}
+            posterior_parameters = VectorFieldPosteriorParameters(**params)
+        elif sample_with == "rejection":
+            params = kwargs.get("rejection_sampling_parameters", {}) or {}
+            posterior_parameters = RejectionPosteriorParameters(**params)
+        elif sample_with == "vi":
+            params = kwargs.get("vi_parameters", {}) or {}
+            posterior_parameters = VIPosteriorParameters(
+                vi_method=kwargs.get("vi_method", "rKL"), **params
+            )
+        elif sample_with == "importance":
+            params = kwargs.get("importance_sampling_parameters", {}) or {}
+            posterior_parameters = ImportanceSamplingPosteriorParameters(**params)
+        else:
+            raise NotImplementedError(
+                "Posterior parameter construction not implemented for",
+                f"'{sample_with}'",
+            )
+
+        return posterior_parameters
+
+    def _resolve_deprecated_posterior_parameters(self, **kwargs) -> List[str]:
         """
         Identify deprecated posterior construction parameters
         provided to the method.
