@@ -1,10 +1,8 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-import collections
 import copy
-import logging
-from dataclasses import asdict, is_dataclass
+from dataclasses import asdict
 from typing import (
     Any,
     Callable,
@@ -21,7 +19,6 @@ from warnings import warn
 
 import matplotlib as mpl
 import numpy as np
-import six
 import torch
 from matplotlib import cm
 from matplotlib import pyplot as plt
@@ -41,74 +38,20 @@ from sbi.analysis.plotting_classes import (
     get_default_offdiag_kwargs,
 )
 from sbi.utils.analysis_utils import pp_vals
-
-try:
-    collectionsAbc = collections.abc  # type: ignore
-except AttributeError:
-    collectionsAbc = collections
-
+from sbi.utils.plotting_helpers import (
+    convert_to_list_of_numpy,
+    ensure_numpy,
+    handle_nan_infs,
+    to_list_kwargs,
+    to_list_string,
+    update,
+)
 
 UpperLietral = Literal["hist", "scatter", "contour", "kde"]
 LowerLiteral = Literal["hist", "scatter", "contour", "kde"]
 DiagLiteral = Literal["hist", "scatter", "kde"]
 K = TypeVar("K")
 KwargsType = Union[List[Optional[Union[Dict, K]]], Dict, K, None]
-
-
-def hex2rgb(hex: str) -> List[int]:
-    """Pass 16 to the integer function for change of base"""
-    return [int(hex[i : i + 2], 16) for i in range(1, 6, 2)]
-
-
-def rgb2hex(RGB: List[int]) -> str:
-    """Components need to be integers for hex to make sense"""
-    RGB = [int(x) for x in RGB]
-    return "#" + "".join([
-        "0{0:x}".format(v) if v < 16 else "{0:x}".format(v) for v in RGB
-    ])
-
-
-def to_list_string(
-    x: Optional[Union[str, List[Optional[str]]]], len: int
-) -> List[Optional[str]]:
-    """If x is not a list, make it a list of strings of length `len`."""
-    if not isinstance(x, list):
-        return [x for _ in range(len)]
-    return x
-
-
-def to_list_kwargs(x: KwargsType, len: int) -> List[Optional[Dict]]:
-    """If x is not a list, make it a list of dicts of length `len`."""
-
-    if not isinstance(x, list):
-        x = [x for _ in range(len)]
-
-    dict_list = []
-    for value in x:
-        if is_dataclass(value) and not isinstance(value, type):
-            dict_list.append(asdict(value))
-        elif value is None or isinstance(value, Dict):
-            dict_list.append(value)
-        else:
-            raise TypeError(
-                f"Expected type of dataclass, dict or None, got type={type(x)}"
-            )
-
-    return dict_list
-
-
-def _update(d: Dict, u: Optional[Dict]) -> Dict:
-    """update dictionary with user input, see: https://stackoverflow.com/a/3233356"""
-    if u is not None:
-        for k, v in six.iteritems(u):
-            dv = d.get(k, {})
-            if not isinstance(dv, collectionsAbc.Mapping):  # type: ignore
-                d[k] = v
-            elif isinstance(v, collectionsAbc.Mapping):  # type: ignore
-                d[k] = _update(dv, v)
-            else:
-                d[k] = v
-    return d
 
 
 # Plotting functions
@@ -569,44 +512,6 @@ def probs2contours(
     return contours
 
 
-def ensure_numpy(t: Union[np.ndarray, torch.Tensor]) -> np.ndarray:
-    """
-    Returns np.ndarray if torch.Tensor was provided.
-
-    Used because samples_nd() can only handle np.ndarray.
-    """
-    if isinstance(t, torch.Tensor):
-        return t.numpy()
-    elif not isinstance(t, np.ndarray):
-        return np.array(t)
-    return t
-
-
-def handle_nan_infs(samples: List[np.ndarray]) -> List[np.ndarray]:
-    """Check if there are NaNs or Infs in the samples."""
-    for i in range(len(samples)):
-        if np.isnan(samples[i]).any():
-            logging.warning("NaNs found in samples, omitting datapoints.")
-        if np.isinf(samples[i]).any():
-            logging.warning("Infs found in samples, omitting datapoints.")
-            # cast inf to nan, so they are omitted in the next step
-            np.nan_to_num(
-                samples[i], copy=False, nan=np.nan, posinf=np.nan, neginf=np.nan
-            )
-        samples[i] = samples[i][~np.isnan(samples[i]).any(axis=1)]
-    return samples
-
-
-def convert_to_list_of_numpy(
-    arr: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
-) -> List[np.ndarray]:
-    """Converts a list of torch.Tensor to a list of np.ndarray."""
-    if not isinstance(arr, list):
-        arr = ensure_numpy(arr)
-        return [arr]
-    return [ensure_numpy(a) for a in arr]
-
-
 def infer_limits(
     samples: List[np.ndarray],
     dim: int,
@@ -721,66 +626,6 @@ def get_conditional_diag_func(opts, limits, eps_margins, resolution):
         )
 
     return diag_func
-
-
-def _prepare_kwargs(
-    plot: Optional[Union[List[Optional[str]], str]],
-    samples: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
-    get_plot_funcs: Callable,
-    get_default_kwargs: Callable,
-    plot_kwargs: KwargsType,
-) -> Tuple[List[Optional[Dict]], List[Optional[Callable]]]:
-    # Prepare kwargs
-    plot_list = to_list_string(plot, len(samples))
-    plot_kwargs_list = to_list_kwargs(plot_kwargs, len(samples))
-    plot_func = get_plot_funcs(plot_list)
-    plot_kwargs_filled = []
-    for i, (plot_i, plot_kwargs_i) in enumerate(
-        zip(plot_list, plot_kwargs_list, strict=False)
-    ):
-        plot_kwarg_filled_i = get_default_kwargs(plot_i, i)
-        # update the defaults dictionary with user provided values
-        plot_kwarg_filled_i = _update(plot_kwarg_filled_i, plot_kwargs_i)
-        plot_kwargs_filled.append(plot_kwarg_filled_i)
-
-    return plot_kwargs_filled, plot_func
-
-
-def _prepare_fig_kwargs(
-    fig_kwargs: Optional[Union[Dict, FigKwargs]],
-    samples: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
-):
-    if fig_kwargs is None or isinstance(fig_kwargs, Dict):
-        fig_kwargs_filled = FigKwargs(**(fig_kwargs or {}))
-    elif isinstance(fig_kwargs, FigKwargs):
-        fig_kwargs_filled = fig_kwargs
-
-    if fig_kwargs_filled.legend and len(fig_kwargs_filled.samples_labels) < len(
-        samples
-    ):
-        raise ValueError("Provide at least as many labels as samples.")
-
-    return fig_kwargs_filled
-
-
-def _use_deprecated_plot(
-    deprecated_method: Callable, **kwargs
-) -> Tuple[FigureBase, Axes]:
-    warn(
-        "you passed deprecated arguments **kwargs, use fig_kwargs instead.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    return deprecated_method(**kwargs)
-
-
-def _prepare_upper(
-    offdiag: Optional[Union[List[Optional[str]], str]],
-    upper: Optional[Union[List[Optional[str]], str]],
-) -> Optional[Union[List[Optional[str]], str]]:
-    if offdiag is not None:
-        warn("offdiag is deprecated, use upper or lower instead.", stacklevel=2)
-    return offdiag or upper
 
 
 def pairplot(
@@ -916,6 +761,66 @@ def pairplot(
         axes,
         fig_kwargs_filled,
     )
+
+
+def _prepare_kwargs(
+    plot: Optional[Union[List[Optional[str]], str]],
+    samples: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
+    get_plot_funcs: Callable,
+    get_default_kwargs: Callable,
+    plot_kwargs: KwargsType,
+) -> Tuple[List[Optional[Dict]], List[Optional[Callable]]]:
+    # Prepare kwargs
+    plot_list = to_list_string(plot, len(samples))
+    plot_kwargs_list = to_list_kwargs(plot_kwargs, len(samples))
+    plot_func = get_plot_funcs(plot_list)
+    plot_kwargs_filled = []
+    for i, (plot_i, plot_kwargs_i) in enumerate(
+        zip(plot_list, plot_kwargs_list, strict=False)
+    ):
+        plot_kwarg_filled_i = get_default_kwargs(plot_i, i)
+        # update the defaults dictionary with user provided values
+        plot_kwarg_filled_i = update(plot_kwarg_filled_i, plot_kwargs_i)
+        plot_kwargs_filled.append(plot_kwarg_filled_i)
+
+    return plot_kwargs_filled, plot_func
+
+
+def _prepare_fig_kwargs(
+    fig_kwargs: Optional[Union[Dict, FigKwargs]],
+    samples: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
+):
+    if fig_kwargs is None or isinstance(fig_kwargs, Dict):
+        fig_kwargs_filled = FigKwargs(**(fig_kwargs or {}))
+    elif isinstance(fig_kwargs, FigKwargs):
+        fig_kwargs_filled = fig_kwargs
+
+    if fig_kwargs_filled.legend and len(fig_kwargs_filled.samples_labels) < len(
+        samples
+    ):
+        raise ValueError("Provide at least as many labels as samples.")
+
+    return fig_kwargs_filled
+
+
+def _use_deprecated_plot(
+    deprecated_method: Callable, **kwargs
+) -> Tuple[FigureBase, Axes]:
+    warn(
+        "you passed deprecated arguments **kwargs, use fig_kwargs instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return deprecated_method(**kwargs)
+
+
+def _prepare_upper(
+    offdiag: Optional[Union[List[Optional[str]], str]],
+    upper: Optional[Union[List[Optional[str]], str]],
+) -> Optional[Union[List[Optional[str]], str]]:
+    if offdiag is not None:
+        warn("offdiag is deprecated, use upper or lower instead.", stacklevel=2)
+    return offdiag or upper
 
 
 def marginal_plot(
@@ -1077,8 +982,8 @@ def conditional_marginal_plot(
     opts = _get_default_opts()
     # update the defaults dictionary by the current values of the variables (passed by
     # the user)
-    opts = _update(opts, locals())
-    opts = _update(opts, kwargs)
+    opts = update(opts, locals())
+    opts = update(opts, kwargs)
 
     dim, limits, eps_margins = prepare_for_conditional_plot(condition, opts)
 
@@ -1154,8 +1059,8 @@ def conditional_pairplot(
     opts = _get_default_opts()
     # update the defaults dictionary by the current values of the variables (passed by
     # the user)
-    opts = _update(opts, locals())
-    opts = _update(opts, kwargs)
+    opts = update(opts, locals())
+    opts = update(opts, kwargs)
     opts["lower"] = None
 
     dim, limits, eps_margins = prepare_for_conditional_plot(condition, opts)
@@ -2175,8 +2080,8 @@ def pairplot_dep(
     # update the defaults dictionary by the current values of the variables (passed by
     # the user)
 
-    opts = _update(opts, locals())
-    opts = _update(opts, kwargs)
+    opts = update(opts, locals())
+    opts = update(opts, kwargs)
 
     samples, dim, limits = prepare_for_plot(samples, limits)
 
@@ -2351,8 +2256,8 @@ def marginal_plot_dep(
     # update the defaults dictionary by the current values of the variables (passed by
     # the user)
 
-    opts = _update(opts, locals())
-    opts = _update(opts, kwargs)
+    opts = update(opts, locals())
+    opts = update(opts, kwargs)
 
     samples, dim, limits = prepare_for_plot(samples, limits)
 
