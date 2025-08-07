@@ -770,7 +770,21 @@ def _prepare_kwargs(
     get_default_kwargs: Callable,
     plot_kwargs: KwargsType,
 ) -> Tuple[List[Optional[Dict]], List[Optional[Callable]]]:
-    # Prepare kwargs
+    """
+    Prepares a list of plotting functions and their corresponding kwargs per sample.
+
+    Args:
+        plot: Plot type(s) to use (e.g., 'scatter', 'kde', etc.).
+        samples: Input samples to be plotted.
+        get_plot_funcs: Function that maps plot names to callable plot functions.
+        get_default_kwargs: Function that generates default kwargs for each plot type.
+        plot_kwargs: User-specified overrides for the plot kwargs.
+
+    Returns:
+        - List of merged keyword arguments for each sample.
+        - List of corresponding plot functions.
+    """
+
     plot_list = to_list_string(plot, len(samples))
     plot_kwargs_list = to_list_kwargs(plot_kwargs, len(samples))
     plot_func = get_plot_funcs(plot_list)
@@ -790,6 +804,21 @@ def _prepare_fig_kwargs(
     fig_kwargs: Optional[Union[Dict, FigKwargs]],
     samples: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
 ) -> Dict:
+    """
+    Normalizes and validates figure-level kwargs into a flat dictionary.
+
+    Args:
+        fig_kwargs: User-provided figure keyword arguments.
+        samples: Input samples to be plotted.
+
+    Raises:
+        ValueError: If the number of sample labels is less than
+            the number of samples when a legend is specified.
+
+    Returns:
+        A dictionary of fully resolved figure-level keyword arguments.
+    """
+
     if fig_kwargs is None:
         fig_kwargs = asdict(FigKwargs())
     elif isinstance(fig_kwargs, FigKwargs):
@@ -806,6 +835,17 @@ def _prepare_fig_kwargs(
 def _use_deprecated_plot(
     deprecated_method: Callable, **kwargs
 ) -> Tuple[FigureBase, Axes]:
+    """
+    Issues a deprecation warning and invokes the old-style plotting method.
+
+    Args:
+        deprecated_method: The deprecated plotting function.
+        **kwargs: Arbitrary keyword arguments passed to the deprecated function.
+
+    Returns:
+        The figure and axes objects returned by the plotting function.
+    """
+
     warn(
         "you passed deprecated arguments **kwargs, use fig_kwargs instead.",
         DeprecationWarning,
@@ -818,6 +858,20 @@ def _prepare_upper(
     offdiag: Optional[Union[List[Optional[str]], str]],
     upper: Optional[Union[List[Optional[str]], str]],
 ) -> Optional[Union[List[Optional[str]], str]]:
+    """
+    Handles deprecated 'offdiag' argument by falling back to 'upper'.
+
+    If 'offdiag' is provided, a deprecation warning is issued and its value is used.
+    Otherwise, 'upper' is returned.
+
+    Args:
+        offdiag: Deprecated off-diagonal plot specifier.
+        upper: New argument to specify upper triangle plot behavior.
+
+    Returns:
+        Resolved plot specification.
+    """
+
     if offdiag is not None:
         warn("offdiag is deprecated, use upper or lower instead.", stacklevel=2)
     return offdiag or upper
