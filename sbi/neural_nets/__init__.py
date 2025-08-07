@@ -36,6 +36,7 @@ def __getattr__(name):
         warnings.warn(
             "`flowmatching_nn` is deprecated and will be removed in the future. "
             "Please use `posterior_flow_nn` instead.",
+            FutureWarning,
             stacklevel=2,
         )
         return flowmatching_nn  # To be removed
