@@ -76,6 +76,7 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
             warnings.warn(
                 "num_freqs is deprecated and will be removed in the future. "
                 "Please use the positional_encoding_net instead.",
+                FutureWarning,
                 stacklevel=2,
             )
 
