@@ -731,3 +731,61 @@ def test_multiround_mog_training():
         _ = inference.append_simulations(theta, x, proposal=proposal).train()
         posterior = inference.build_posterior().set_default_x(x_o)
         proposal = posterior
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize(
+    "num_dim",
+    ((2), (1)),
+)
+@pytest.mark.parametrize("npe_method", [NPE_B, NPE_C])
+@pytest.mark.parametrize(
+    "density_estimator",
+    ["zuko_maf", "zuko_nsf"],
+)
+def test_density_estimators_unconstrained_space(
+    num_dim, npe_method: type, density_estimator
+):
+    """Test NPE B/C in inconstrained space."""
+
+    x_o = zeros(1, num_dim)
+    num_samples = 1000
+    num_simulations = 2500
+
+    # likelihood_mean will be likelihood_shift+theta
+    likelihood_shift = -1.0 * ones(num_dim)
+    likelihood_cov = 0.3 * eye(num_dim)
+
+    prior = utils.BoxUniform(-2.0 * ones(num_dim), 2.0 * ones(num_dim))
+
+    target_samples = samples_true_posterior_linear_gaussian_uniform_prior(
+        x_o, likelihood_shift, likelihood_cov, prior, num_samples
+    )
+
+    def simulator(theta):
+        return linear_gaussian(theta, likelihood_shift, likelihood_cov)
+
+    # Train in unconstrained space
+
+    density_estimator_build_fun = posterior_nn(
+        model=density_estimator,
+        hidden_features=60,
+        num_transforms=3,
+        z_score_theta="transform_to_unconstrained",
+        x_dist=prior,
+    )
+
+    inference = npe_method(prior, density_estimator=density_estimator_build_fun)
+
+    theta = prior.sample((num_simulations,))
+    x = simulator(theta)
+    posterior_estimator = inference.append_simulations(theta, x).train(
+        training_batch_size=100
+    )
+    posterior = DirectPosterior(
+        prior=prior, posterior_estimator=posterior_estimator
+    ).set_default_x(x_o)
+    samples = posterior.sample((num_samples,))
+
+    # Compute the c2st and assert it is near chance level of 0.5.
+    check_c2st(samples, target_samples, alg=f"npe_{density_estimator}")
