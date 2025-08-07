@@ -177,7 +177,7 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         score_gaussian = (input - mean) / std**2
 
         # Score prediction by the network
-        # NOTE: To simplify, use of external networks, we will flatten the tensors
+        # NOTE: To simplify usage of external networks, we will flatten the tensors
         # batch_shape to a single batch dimension.
         input_enc = input_enc.reshape(-1, *input_enc.shape[len(batch_shape) :])
         condition_emb = condition_emb.reshape(
