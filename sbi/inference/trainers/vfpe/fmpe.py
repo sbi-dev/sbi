@@ -41,9 +41,8 @@ class FMPE(VectorFieldTrainer):
                 callable that implements the `VectorFieldEstimatorBuilder` protocol
                 with `__call__` that receives `theta` and `x` and returns a
                 `ConditionalVectorFieldEstimator`.
-            density_estimator: Deprecated. Use `vf_estimator` instead. There to support
-                the old API with keyword `density_estimator` and raise a deprecation
-                warning.
+            density_estimator: Deprecated. Use `vf_estimator` instead. When passed, a
+                warning is raised and the `vf_estimator="mlp"` default is used. 
             device: Device to use for training.
             logging_level: Logging level.
             summary_writer: Summary writer for tensorboard.
