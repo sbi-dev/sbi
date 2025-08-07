@@ -659,7 +659,22 @@ class SubVPScoreEstimator(ConditionalScoreEstimator):
 
 
 class VEScoreEstimator(ConditionalScoreEstimator):
-    """Class for score estimators with variance exploding SDEs (i.e., NCSN / SMLD)."""
+    """Class for score estimators with variance exploding SDEs (i.e., NCSN / SMLD).
+
+
+    Args:
+       sigma_min: This defines the smallest "noise" level in the diffusion process. This
+           ideally would be 0., but denoising score matching losses as employed in most
+           diffusion models are ill-suited for this case as their variance explodes to
+           infinity. Hence often a "small" value is chosen (the larger, the easier to
+           learn but the "noisier" the end result if not addressed post-hoc).
+       sigma_max: This is the final standard deviation after running the full diffusion
+           process. Ideally this would approach ∞ such that x0 and xT are truly
+           independent; it should be at least chosen such that x_T ~ N(0, sigma_max) at
+           least approximately. If p(x0) for example has itself a very large variance,
+           then you might have to increase this.
+
+    """
 
     def __init__(
         self,
