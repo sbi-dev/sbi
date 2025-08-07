@@ -28,7 +28,7 @@ from sbi.utils.vector_field_utils import VectorFieldNet
 def build_vector_field_estimator(
     batch_x: Tensor,
     batch_y: Tensor,
-    estimator_type: str = "flow",  # "flow" or "score"
+    estimator_type: Literal["flow", "score"] = "flow",
     z_score_x: Optional[str] = None,
     z_score_y: Optional[str] = None,
     embedding_net: nn.Module = nn.Identity(),
