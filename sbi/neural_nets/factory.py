@@ -530,9 +530,9 @@ def posterior_flow_nn(
 
     if z_score_theta is not None:
         raise ValueError(
-            "z_score_theta is not supported for FMPE. You can z-score"
-            "the inputs manually but doing so in the forward pass can"
-            "negatively impact performance."
+            "z_score_theta is not supported for FMPE. For simulator "
+            "parameters with highly different scales, we recommend "
+            "z-scoring the inputs manually beforehand."
         )
 
     kwargs = dict(
