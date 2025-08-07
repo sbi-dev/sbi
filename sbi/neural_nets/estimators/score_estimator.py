@@ -435,7 +435,27 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
 
 
 class VPScoreEstimator(ConditionalScoreEstimator):
-    """Class for score estimators with variance preserving SDEs (i.e., DDPM)."""
+    """Class for score estimators with variance preserving SDEs (i.e., DDPM).
+
+    The SDE defining the diffusion process is characterized by the following hyper-
+    parameters.
+
+    Args:
+        beta_min: This defines the smallest noise rate (i.e. how much the input is
+            "scaled" down in contrast to how much noise is added) in the subVPSDE.
+            Ideally, this would be 0, but score matching losses as employed in most
+            diffusion models can become unstable if beta_min is zero. A small positive
+            value is chosen to stabilize training (the smaller, the closer to an ODE;
+            the larger, the easier to train but the noisier the resulting samples).
+        beta_max: This defines the largest noise rate in the variance-preserving SDE.
+            It sets the maximum variance introduced by the diffusion process; when
+            integrated over [0, T], the marginal distribution at time T should
+            approximate N(0, I).
+
+    NOTE: Together with t_min and t_max they ultimatively define the loss function.
+        Changing these might also require changing t_min and t_max to find a good
+        tradeoff between bias and variance.
+    """
 
     def __init__(
         self,
@@ -539,7 +559,27 @@ class VPScoreEstimator(ConditionalScoreEstimator):
 
 
 class SubVPScoreEstimator(ConditionalScoreEstimator):
-    """Class for score estimators with sub-variance preserving SDEs."""
+    """Class for score estimators with sub-variance preserving SDEs.
+
+    The SDE defining the diffusion process is characterized by the following hyper-
+    parameters.
+
+    Args:
+        beta_min: This defines the smallest noise rate (i.e. how much the input is
+            "scaled" down in contrast to how much noise is added) in the subVPSDE.
+            Ideally, this would be 0, but score matching losses as employed in most
+            diffusion models can become unstable if beta_min is zero. A small positive
+            value is chosen to stabilize training (the smaller, the closer to an ODE;
+            the larger, the easier to train but the noisier the resulting samples).
+        beta_max: This defines the largest noise rate in the variance-preserving SDE.
+            It sets the maximum variance introduced by the diffusion process; when
+            integrated over [0, T], the marginal distribution at time T should
+            approximate N(0, I).
+
+    NOTE: Together with t_min and t_max they ultimatively define the loss function.
+        Changing these might also require changing t_min and t_max to find a good
+        tradeoff between bias and variance.
+    """
 
     def __init__(
         self,
@@ -676,6 +716,10 @@ class VEScoreEstimator(ConditionalScoreEstimator):
            independent; it should be at least chosen such that x_T ~ N(0, sigma_max) at
            least approximately. If p(x0) for example has itself a very large variance,
            then you might have to increase this.
+
+    NOTE: Together with t_min and t_max they ultimatively define the loss function.
+        Changing these might also require changing t_min and t_max to find a good
+        tradeoff between bias and variance.
 
     """
 
