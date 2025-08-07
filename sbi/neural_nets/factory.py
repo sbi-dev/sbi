@@ -35,6 +35,7 @@ from sbi.neural_nets.net_builders.vector_field_nets import (
     build_score_matching_estimator,
 )
 from sbi.utils.nn_utils import check_net_device
+from sbi.utils.vector_field_utils import VectorFieldNet
 
 model_builders = {
     "mdn": build_mdn,
@@ -329,7 +330,8 @@ def posterior_nn(
 
 def posterior_score_nn(
     model: Union[
-        Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"], nn.Module
+        Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
+        VectorFieldNet,
     ] = "mlp",
     sde_type: str = "ve",
     z_score_theta: Optional[str] = "independent",
@@ -339,7 +341,12 @@ def posterior_score_nn(
     embedding_net: nn.Module = nn.Identity(),
     time_emb_type: Literal["sinusoidal", "fourier"] = "sinusoidal",
     t_embedding_dim: int = 32,
-    score_net_type: Optional[Union[str, nn.Module]] = None,
+    score_net_type: Optional[
+        Union[
+            Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
+            VectorFieldNet,
+        ]
+    ] = None,
     **kwargs: Any,
 ) -> Callable:
     """Build util function that builds a ScoreEstimator object for score-based
@@ -500,7 +507,8 @@ def flowmatching_nn(
 
 def posterior_flow_nn(
     model: Union[
-        Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"], nn.Module
+        Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
+        VectorFieldNet,
     ] = "mlp",
     z_score_theta: Optional[str] = None,
     z_score_x: Optional[str] = "independent",

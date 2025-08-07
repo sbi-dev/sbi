@@ -38,7 +38,10 @@ def build_vector_field_estimator(
     num_layers: int = 5,
     num_heads: int = 10,
     mlp_ratio: int = 4,
-    net: Union[str, VectorFieldNet] = "mlp",
+    net: Union[
+        Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
+        VectorFieldNet,
+    ] = "mlp",
     **kwargs,
 ) -> Union[FlowMatchingEstimator, ConditionalScoreEstimator]:
     """Builds a vector field estimator (flow matching or score matching) with the given

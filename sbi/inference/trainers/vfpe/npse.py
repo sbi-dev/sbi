@@ -35,7 +35,12 @@ class NPSE(VectorFieldTrainer):
             Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
             VectorFieldEstimatorBuilder,
         ] = "mlp",
-        score_estimator: Optional[Union[str, VectorFieldEstimatorBuilder]] = None,
+        score_estimator: Optional[
+            Union[
+                Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
+                VectorFieldEstimatorBuilder,
+            ]
+        ] = None,
         sde_type: Literal["vp", "ve", "subvp"] = "ve",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
