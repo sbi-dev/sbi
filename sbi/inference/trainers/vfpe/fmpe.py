@@ -10,6 +10,7 @@ from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi import utils as utils
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
+from sbi.inference.posteriors.posterior_parameters import VectorFieldPosteriorParameters
 from sbi.inference.trainers.vfpe.base_vf_inference import (
     VectorFieldEstimatorBuilder,
     VectorFieldTrainer,
@@ -24,7 +25,10 @@ class FMPE(VectorFieldTrainer):
     def __init__(
         self,
         prior: Optional[Distribution],
-        vf_estimator: Union[str, VectorFieldEstimatorBuilder] = "mlp",
+        vf_estimator: Union[
+            Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
+            VectorFieldEstimatorBuilder,
+        ] = "mlp",
         density_estimator: Optional[VectorFieldEstimatorBuilder] = None,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
@@ -37,12 +41,13 @@ class FMPE(VectorFieldTrainer):
         Args:
             prior: Prior distribution.
             vf_estimator: Neural network architecture used to learn the
-                vector field estimator. Can be a string (e.g. 'mlp' or 'ada_mlp') or a
-                callable that implements the `VectorFieldEstimatorBuilder` protocol
-                with `__call__` that receives `theta` and `x` and returns a
+                vector field estimator. Can be a string (e.g. 'mlp', 'ada_mlp',
+                'transformer' or 'transformer_cross_attn') or a callable that
+                implements the `VectorFieldEstimatorBuilder` protocol with
+                `__call__` that receives `theta` and `x` and returns a
                 `ConditionalVectorFieldEstimator`.
             density_estimator: Deprecated. Use `vf_estimator` instead. When passed, a
-                warning is raised and the `vf_estimator="mlp"` default is used. 
+                warning is raised and the `vf_estimator="mlp"` default is used.
             device: Device to use for training.
             logging_level: Logging level.
             summary_writer: Summary writer for tensorboard.

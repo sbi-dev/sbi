@@ -328,14 +328,16 @@ def posterior_nn(
 
 
 def posterior_score_nn(
-    model: Union[str, nn.Module] = "mlp",
+    model: Union[
+        Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"], nn.Module
+    ] = "mlp",
     sde_type: str = "ve",
     z_score_theta: Optional[str] = "independent",
     z_score_x: Optional[str] = "independent",
     hidden_features: int = 100,
     num_layers: int = 5,
     embedding_net: nn.Module = nn.Identity(),
-    time_emb_type: str = "sinusoidal",
+    time_emb_type: Literal["sinusoidal", "fourier"] = "sinusoidal",
     t_embedding_dim: int = 32,
     score_net_type: Optional[Union[str, nn.Module]] = None,
     **kwargs: Any,
@@ -351,6 +353,8 @@ def posterior_score_nn(
             Defaults to 'vp'.
         model: Type of regression network. One of:
             - 'mlp': Fully connected feed-forward network.
+            - 'ada_mlp': Fully connected feed-forward with adaptive
+               layer normalization for conditioning.
             - 'transformer': Transformer network.
             - 'transformer_cross_attention': Transformer with cross-attention.
             -  nn.Module: Custom network
@@ -495,13 +499,15 @@ def flowmatching_nn(
 
 
 def posterior_flow_nn(
-    model: Union[str, nn.Module] = "mlp",
+    model: Union[
+        Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"], nn.Module
+    ] = "mlp",
     z_score_theta: Optional[str] = None,
     z_score_x: Optional[str] = "independent",
     hidden_features: int = 100,
     num_layers: int = 5,
     embedding_net: nn.Module = nn.Identity(),
-    time_emb_type: str = "sinusoidal",
+    time_emb_type: Literal["sinusoidal", "fourier"] = "sinusoidal",
     t_embedding_dim: int = 32,
     **kwargs: Any,
 ) -> Callable:
@@ -511,6 +517,8 @@ def posterior_flow_nn(
     Args:
         model: Type of regression network. One of:
             - 'mlp': Fully connected feed-forward network.
+            - 'ada_mlp': Fully connected feed-forward with adaptive
+                layer normalization for conditioning.
             - 'transformer': Transformer network.
             - 'transformer_cross_attention': Transformer with cross-attention.
             -  nn.Module: Custom network
@@ -519,6 +527,7 @@ def posterior_flow_nn(
         z_score_x: Whether to z-score xs passing into the network, same options as
             z_score_theta.
         hidden_features: Number of hidden units per layer. Defaults to 50.
+        num_layers: Number of hidden layers. Defaults to 5.
         embedding_net: Embedding network for x (conditioning variable). Defaults to
             nn.Identity().
         time_emb_type: Type of time embedding. Defaults to 'sinusoidal'.

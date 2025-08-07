@@ -255,7 +255,7 @@ class VectorFieldTrainer(NeuralInference, ABC):
             validation_times: Diffusion times at which to evaluate the validation loss
                 to reduce variance of validation loss.
             validation_times_nugget: As both diffusion and flow matching losses often
-                have high variance losses at the end, we add a small nugget for computing
+                have high variance losses at the end, we add a small nugget to compute
                 the validation loss. Default is 0.05 i.e. t_min + 0.05 or t_max - 0.5.
             resume_training: Can be used in case training time is limited, e.g. on a
                 cluster. If `True`, the split between train and validation set, the
@@ -501,13 +501,13 @@ class VectorFieldTrainer(NeuralInference, ABC):
         """Return whether the training converged yet and save best model state so far.
 
         Diffusion or flow matching objectives are inherently more stochastic than MLE
-        for e.g. NPE because they additionally add "noise" by construction. We hence 
-        use a statistical approach to detect convergence by tracking standard deviation 
+        for e.g. NPE because they additionally add "noise" by construction. We hence
+        use a statistical approach to detect convergence by tracking standard deviation
         of validation losses. Training is considered converged when the current loss is
         significantly worse than the best loss for a sustained period (more than 2 std
         deviations above best).
 
-        NOTE: The standard deviation of the `validation_loss `is computed in a running 
+        NOTE: The standard deviation of the `validation_loss `is computed in a running
             fashion over the most recent 2 × stop_after_epochs loss values.
 
         Args:
