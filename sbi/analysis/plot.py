@@ -339,7 +339,7 @@ def _format_subplot(
     limits: Union[List[List[float]], torch.Tensor],
     ticks: Optional[Union[List, torch.Tensor]],
     labels_dim: List[str],
-    fig_kwargs: FigKwargs,
+    fig_kwargs: Dict,
     row: int,
     col: int,
     dim: int,
@@ -365,16 +365,16 @@ def _format_subplot(
 
     # Background color
     if (
-        hasattr(fig_kwargs.fig_bg_colors, current)
-        and getattr(fig_kwargs.fig_bg_colors, current) is not None
+        current in fig_kwargs["fig_bg_colors"]
+        and fig_kwargs["fig_bg_colors"][current] is not None
     ):
-        ax.set_facecolor(getattr(fig_kwargs.fig_bg_colors, current))
+        ax.set_facecolor(fig_kwargs["fig_bg_colors"][current])
     # Limits
     if isinstance(limits, Tensor):
         assert limits.dim() == 2, "Limits should be a 2D tensor."
         limits = limits.tolist()
     if current == "diag":
-        eps = fig_kwargs.x_lim_add_eps
+        eps = fig_kwargs["x_lim_add_eps"]
         ax.set_xlim((limits[col][0] - eps, limits[col][1] + eps))
     else:
         ax.set_xlim((limits[col][0], limits[col][1]))
@@ -389,12 +389,12 @@ def _format_subplot(
             ax.set_yticks((ticks[row][0], ticks[row][1]))  # pyright: ignore[reportCallIssue]
 
     # make square
-    if fig_kwargs.square_subplots:
+    if fig_kwargs["square_subplots"]:
         ax.set_box_aspect(1)
     # Despine
     ax.spines["right"].set_visible(False)
     ax.spines["top"].set_visible(False)
-    ax.spines["bottom"].set_position(("outward", fig_kwargs.despine.offset))
+    ax.spines["bottom"].set_position(("outward", fig_kwargs["despine"]["offset"]))
 
     # Formatting axes
     if current == "diag":  # diagonals
@@ -404,7 +404,7 @@ def _format_subplot(
                 xhide=False,
                 xlabel=labels_dim[col],
                 yhide=True,
-                tickformatter=fig_kwargs.tickformatter,
+                tickformatter=fig_kwargs["tickformatter"],
             )
         else:
             _format_axis(ax, xhide=True, yhide=True)
@@ -415,14 +415,14 @@ def _format_subplot(
                 xhide=False,
                 xlabel=labels_dim[col],
                 yhide=True,
-                tickformatter=fig_kwargs.tickformatter,
+                tickformatter=fig_kwargs["tickformatter"],
             )
         else:
             _format_axis(ax, xhide=True, yhide=True)
-    if fig_kwargs.tick_labels is not None:
+    if fig_kwargs["tick_labels"] is not None:
         ax.set_xticklabels((  # pyright: ignore[reportCallIssue]
-            str(fig_kwargs.tick_labels[col][0]),
-            str(fig_kwargs.tick_labels[col][1]),
+            str(fig_kwargs["tick_labels"][col][0]),
+            str(fig_kwargs["tick_labels"][col][1]),
         ))
 
 
@@ -675,13 +675,13 @@ def pairplot(
         ticks: Position of the ticks.
         offdiag: deprecated, use upper instead.
         diag_kwargs: Additional arguments to adjust the diagonal plot,
-            see the source code in `_get_default_diag_kwarg()`
+            see the source code in `get_default_diag_kwarg()`
         upper_kwargs: Additional arguments to adjust the upper diagonal plot,
-            see the source code in `_get_default_offdiag_kwarg()`
+            see the source code in `get_default_offdiag_kwarg()`
         lower_kwargs: Additional arguments to adjust the lower diagonal plot,
-            see the source code in `_get_default_offdiag_kwarg()`
+            see the source code in `get_default_offdiag_kwarg()`
         fig_kwargs: Additional arguments to adjust the overall figure,
-            see the source code in `_get_default_fig_kwargs()`
+            see the source code in `FigKwargs`
         fig: matplotlib figure to plot on.
         axes: matplotlib axes corresponding to fig.
         **kwargs: Additional arguments to adjust the plot (deprecated).
@@ -789,18 +789,18 @@ def _prepare_kwargs(
 def _prepare_fig_kwargs(
     fig_kwargs: Optional[Union[Dict, FigKwargs]],
     samples: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
-):
-    if fig_kwargs is None or isinstance(fig_kwargs, Dict):
-        fig_kwargs_filled = FigKwargs(**(fig_kwargs or {}))
+) -> Dict:
+    if fig_kwargs is None:
+        fig_kwargs = asdict(FigKwargs())
     elif isinstance(fig_kwargs, FigKwargs):
-        fig_kwargs_filled = fig_kwargs
+        fig_kwargs = asdict(fig_kwargs)
+    else:
+        fig_kwargs = update(asdict(FigKwargs()), fig_kwargs)
 
-    if fig_kwargs_filled.legend and len(fig_kwargs_filled.samples_labels) < len(
-        samples
-    ):
+    if fig_kwargs["legend"] and len(fig_kwargs["samples_labels"]) < len(samples):
         raise ValueError("Provide at least as many labels as samples.")
 
-    return fig_kwargs_filled
+    return fig_kwargs
 
 
 def _use_deprecated_plot(
@@ -1116,7 +1116,7 @@ def _arrange_grid(
     ticks: Optional[Union[List, torch.Tensor]],
     fig: Optional[FigureBase],
     axes: Optional[Axes],
-    fig_kwargs: FigKwargs,
+    fig_kwargs: Dict,
 ) -> Tuple[FigureBase, Axes]:
     """
     Arranges the plots for any function that plots parameters either in a row of 1D
@@ -1203,7 +1203,7 @@ def _arrange_grid(
 
     # Create fig and axes if they were not passed.
     if fig is None or axes is None:
-        fig, axes = plt.subplots(rows, cols, figsize=figsize, **fig_kwargs.subplots)  # pyright: ignore reportAssignmenttype
+        fig, axes = plt.subplots(rows, cols, figsize=figsize, **fig_kwargs["subplots"])  # pyright: ignore reportAssignmenttype
     else:
         assert axes.shape == (  # pyright: ignore reportAttributeAccessIssue
             rows,
@@ -1211,8 +1211,8 @@ def _arrange_grid(
         ), f"Passed axes must match subplot shape: {rows, cols}."
 
     # Style figure
-    fig.subplots_adjust(**asdict(fig_kwargs.fig_subplots_adjust))
-    fig.suptitle(fig_kwargs.title or "", **asdict(fig_kwargs.title_format))
+    fig.subplots_adjust(**fig_kwargs["fig_subplots_adjust"])
+    fig.suptitle(fig_kwargs["title"], **fig_kwargs["title_format"])
 
     # Main Loop through all subplots, style and create the figures
     for row_idx, row in enumerate(subset_rows):
@@ -1261,12 +1261,12 @@ def _arrange_grid(
                         ax.plot(  # pyright: ignore reportOptionalMemberAccess
                             [v[:, col], v[:, col]],
                             extent,
-                            color=fig_kwargs.points_colors[n],
-                            **fig_kwargs.points_diag,
-                            label=fig_kwargs.points_labels[n],
+                            color=fig_kwargs["points_colors"][n],
+                            **fig_kwargs["points_diag"],
+                            label=fig_kwargs["points_labels"][n],
                         )
-                if fig_kwargs.legend and col == 0:
-                    ax.legend(**fig_kwargs.legend_kwargs)  # pyright: ignore reportOptionalMemberAccess
+                if fig_kwargs["legend"] and col == 0:
+                    ax.legend(**fig_kwargs["legend_kwargs"])  # pyright: ignore reportOptionalMemberAccess
 
             # Off-diagonals
 
@@ -1291,8 +1291,8 @@ def _arrange_grid(
                             ax.plot(  # pyright: ignore reportOptionalMemberAccess
                                 v[:, col],
                                 v[:, row],
-                                color=fig_kwargs.points_colors[n],
-                                **asdict(fig_kwargs.points_offdiag),
+                                color=fig_kwargs["points_colors"][n],
+                                **fig_kwargs["points_offdiag"],
                             )
             # lower
             elif current == "lower":
@@ -1315,8 +1315,8 @@ def _arrange_grid(
                             ax.plot(  # pyright: ignore reportOptionalMemberAccess
                                 v[:, col],
                                 v[:, row],
-                                color=fig_kwargs.points_colors[n],
-                                **asdict(fig_kwargs.points_offdiag),
+                                color=fig_kwargs["points_colors"][n],
+                                **fig_kwargs["points_offdiag"],
                             )
     # Add dots if we subset
     if len(subset) < dim:

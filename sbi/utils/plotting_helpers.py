@@ -4,13 +4,11 @@
 import collections
 import logging
 from dataclasses import asdict, is_dataclass
-from typing import Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 import six
 import torch
-
-from sbi.analysis.plot import KwargsType
 
 try:
     collectionsAbc = collections.abc  # type: ignore
@@ -40,7 +38,7 @@ def to_list_string(
     return x
 
 
-def to_list_kwargs(x: KwargsType, len: int) -> List[Optional[Dict]]:
+def to_list_kwargs(x: Any, len: int) -> List[Optional[Dict]]:
     """If x is not a list, make it a list of dicts of length `len`."""
 
     if not isinstance(x, list):
@@ -50,7 +48,7 @@ def to_list_kwargs(x: KwargsType, len: int) -> List[Optional[Dict]]:
     for value in x:
         if is_dataclass(value) and not isinstance(value, type):
             dict_list.append(asdict(value))
-        elif value is None or isinstance(value, Dict):
+        elif value is None or isinstance(value, dict):
             dict_list.append(value)
         else:
             raise TypeError(

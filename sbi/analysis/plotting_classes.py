@@ -1,64 +1,8 @@
-from dataclasses import asdict, dataclass, field, replace
+from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, List, Optional
 
 import matplotlib as mpl
 from matplotlib import pyplot as plt
-from typing_extensions import Self
-
-
-@dataclass(frozen=True)
-class MplKwargs:
-    color: str = field(
-        default_factory=lambda: plt.rcParams["axes.prop_cycle"].by_key()["color"][0]
-    )
-
-    def set_color(self, i: int = 0) -> Self:
-        new_color = plt.rcParams["axes.prop_cycle"].by_key()["color"][i * 2]
-        return replace(self, color=new_color)
-
-
-@dataclass(frozen=True)
-class KdeMplKwargs(MplKwargs): ...
-
-
-@dataclass(frozen=True)
-class HistMplKwargs(MplKwargs):
-    density: bool = False
-    histtype: str = "step"
-
-
-@dataclass(frozen=True)
-class ScatterMplKwargs(MplKwargs): ...
-
-
-@dataclass(frozen=True)
-class KdeOffMplKwargs:
-    cmap: str = "viridis"
-    origin: str = "lower"
-    aspect: str = "auto"
-
-
-@dataclass(frozen=True)
-class HistOffMplKwargs:
-    cmap: str = "viridis"
-    origin: str = "lower"
-    aspect: str = "auto"
-
-
-@dataclass(frozen=True)
-class ScatterOffMplKwargs(MplKwargs):
-    edgecolor: str = "white"
-    alpha: float = 0.5
-    rasterized: bool = False
-
-
-@dataclass(frozen=True)
-class ContourOffMplKwargs(MplKwargs): ...
-
-
-@dataclass(frozen=True)
-class PlotOffMplKwargs(MplKwargs):
-    aspect: str = "auto"
 
 
 @dataclass(frozen=True)
@@ -69,24 +13,33 @@ class DiagKwargs: ...
 class KdeDiagKwargs(DiagKwargs):
     bw_method: str = "scott"
     bins: int = 50
-    mpl_kwargs: KdeMplKwargs = field(default_factory=lambda: KdeMplKwargs())
+    mpl_kwargs: Dict = field(default_factory=dict)
+
+    def __post_init__(self):
+        defaults = {"color": _set_color(0)}
+        updated = {**defaults, **self.mpl_kwargs}
+        object.__setattr__(self, "mpl_kwargs", updated)
 
 
 @dataclass(frozen=True)
 class HistDiagKwargs(DiagKwargs):
     bin_heuristic: str = "Freedman-Diaconis"
-    mpl_kwargs: HistMplKwargs = field(default_factory=lambda: HistMplKwargs())
+    mpl_kwargs: Dict = field(default_factory=dict)
+
+    def __post_init__(self):
+        defaults = {"color": _set_color(0), "density": False, "histtype": "step"}
+        updated = {**defaults, **self.mpl_kwargs}
+        object.__setattr__(self, "mpl_kwargs", updated)
 
 
 @dataclass(frozen=True)
 class ScatterDiagKwargs(DiagKwargs):
-    mpl_kwargs: ScatterMplKwargs = field(default_factory=lambda: ScatterMplKwargs())
+    mpl_kwargs: Dict = field(default_factory=dict)
 
-
-@dataclass(frozen=True)
-class NpHistKwargs:
-    bins: int = 50
-    density: bool = False
+    def __post_init__(self):
+        defaults = {"color": _set_color(0)}
+        updated = {**defaults, **self.mpl_kwargs}
+        object.__setattr__(self, "mpl_kwargs", updated)
 
 
 @dataclass(frozen=True)
@@ -97,21 +50,45 @@ class OffDiagKwargs: ...
 class KdeOffDiagKwargs(OffDiagKwargs):
     bw_method: str = "scott"
     bins: int = 50
-    mpl_kwargs: KdeOffMplKwargs = field(default_factory=lambda: KdeOffMplKwargs())
+    mpl_kwargs: Dict = field(default_factory=dict)
+
+    def __post_init__(self):
+        defaults = {"cmap": "viridis", "origin": "lower", "aspect": "auto"}
+        updated = {**defaults, **self.mpl_kwargs}
+        object.__setattr__(self, "mpl_kwargs", updated)
+
+
+@dataclass(frozen=True)
+class NpHistKwargs:
+    bins: int = 50
+    density: bool = False
 
 
 @dataclass(frozen=True)
 class HistOffDiagKwargs(OffDiagKwargs):
     bin_heuristic = None
-    np_hist_kwargs: NpHistKwargs = field(default_factory=lambda: NpHistKwargs())
-    mpl_kwargs: HistOffMplKwargs = field(default_factory=lambda: HistOffMplKwargs())
+    np_hist_kwargs: NpHistKwargs = field(default_factory=NpHistKwargs)
+    mpl_kwargs: Dict = field(default_factory=dict)
+
+    def __post_init__(self):
+        defaults = {"cmap": "viridis", "origin": "lower", "aspect": "auto"}
+        updated = {**defaults, **self.mpl_kwargs}
+        object.__setattr__(self, "mpl_kwargs", updated)
 
 
 @dataclass(frozen=True)
 class ScatterOffDiagKwargs(OffDiagKwargs):
-    mpl_kwargs: ScatterOffMplKwargs = field(
-        default_factory=lambda: ScatterOffMplKwargs()
-    )
+    mpl_kwargs: Dict = field(default_factory=dict)
+
+    def __post_init__(self):
+        defaults = {
+            "color": _set_color(0),
+            "edgecolor": "white",
+            "alpha": 0.5,
+            "rasterized": False,
+        }
+        updated = {**defaults, **self.mpl_kwargs}
+        object.__setattr__(self, "mpl_kwargs", updated)
 
 
 @dataclass(frozen=True)
@@ -120,14 +97,22 @@ class ContourOffDiagKwargs(OffDiagKwargs):
     bins: int = 50
     percentile: bool = True
     levels: list = field(default_factory=lambda: [0.68, 0.95, 0.99])
-    mpl_kwargs: ContourOffMplKwargs = field(
-        default_factory=lambda: ContourOffMplKwargs()
-    )
+    mpl_kwargs: Dict = field(default_factory=dict)
+
+    def __post_init__(self):
+        defaults = {"color": _set_color(0)}
+        updated = {**defaults, **self.mpl_kwargs}
+        object.__setattr__(self, "mpl_kwargs", updated)
 
 
 @dataclass(frozen=True)
 class PlotOffDiagKwargs(OffDiagKwargs):
-    mpl_kwargs: PlotOffMplKwargs = field(default_factory=lambda: PlotOffMplKwargs())
+    mpl_kwargs: Dict = field(default_factory=dict)
+
+    def __post_init__(self):
+        defaults = {"color": _set_color(0), "aspect": "auto"}
+        updated = {**defaults, **self.mpl_kwargs}
+        object.__setattr__(self, "mpl_kwargs", updated)
 
 
 @dataclass(frozen=True)
@@ -195,6 +180,11 @@ class FigKwargs:
     square_subplots: bool = True
 
 
+def _set_color(i: int) -> str:
+    new_color = plt.rcParams["axes.prop_cycle"].by_key()["color"][i * 2]
+    return new_color
+
+
 def get_default_offdiag_kwargs(offdiag: Optional[str], i: int = 0) -> Dict:
     """Get default offdiag kwargs."""
 
@@ -203,15 +193,11 @@ def get_default_offdiag_kwargs(offdiag: Optional[str], i: int = 0) -> Dict:
     elif offdiag == "hist" or offdiag == "hist2d":
         offdiag_kwargs = HistOffDiagKwargs()
     elif offdiag == "scatter":
-        offdiag_kwargs = ScatterOffDiagKwargs(
-            mpl_kwargs=ScatterOffMplKwargs().set_color(i)
-        )
+        offdiag_kwargs = ScatterOffDiagKwargs(mpl_kwargs=dict(color=_set_color(i)))
     elif offdiag == "contour" or offdiag == "contourf":
-        offdiag_kwargs = ContourOffDiagKwargs(
-            mpl_kwargs=ContourOffMplKwargs().set_color(i)
-        )
+        offdiag_kwargs = ContourOffDiagKwargs(mpl_kwargs=dict(color=_set_color(i)))
     elif offdiag == "plot":
-        offdiag_kwargs = PlotOffDiagKwargs(mpl_kwargs=PlotOffMplKwargs().set_color(i))
+        offdiag_kwargs = PlotOffDiagKwargs(mpl_kwargs=dict(color=_set_color(i)))
     else:
         return {}
     return asdict(offdiag_kwargs)
@@ -221,11 +207,11 @@ def get_default_diag_kwargs(diag: Optional[str], i: int = 0) -> Dict:
     """Get default diag kwargs."""
 
     if diag == "kde":
-        diag_kwargs = KdeDiagKwargs(mpl_kwargs=KdeMplKwargs().set_color(i))
+        diag_kwargs = KdeDiagKwargs(mpl_kwargs=dict(color=_set_color(i)))
     elif diag == "hist":
-        diag_kwargs = HistDiagKwargs(mpl_kwargs=HistMplKwargs().set_color(i))
+        diag_kwargs = HistDiagKwargs(mpl_kwargs=dict(color=_set_color(i)))
     elif diag == "scatter":
-        diag_kwargs = ScatterDiagKwargs(mpl_kwargs=ScatterMplKwargs().set_color(i))
+        diag_kwargs = ScatterDiagKwargs(mpl_kwargs=dict(color=_set_color(i)))
     else:
         return {}
     return asdict(diag_kwargs)
