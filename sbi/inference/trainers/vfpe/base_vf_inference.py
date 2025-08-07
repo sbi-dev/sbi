@@ -500,10 +500,15 @@ class VectorFieldTrainer(NeuralInference, ABC):
     def _converged(self, epoch: int, stop_after_epochs: int) -> bool:
         """Return whether the training converged yet and save best model state so far.
 
-        Uses a statistical approach to detect convergence by tracking the running mean
-        and standard deviation of validation losses. Training is considered converged
-        when the current loss is statistically significantly worse than the best loss
-        for a sustained period, accounting for natural fluctuations in the loss.
+        Diffusion or flow matching objectives are inherently more stochastic than MLE
+        for e.g. NPE because they additionally add "noise" by construction. We hence 
+        use a statistical approach to detect convergence by tracking standard deviation 
+        of validation losses. Training is considered converged when the current loss is
+        significantly worse than the best loss for a sustained period (more than 2 std
+        deviations above best).
+
+        NOTE: The standard deviation of the `validation_loss `is computed in a running 
+            fashion over the most recent 2 × stop_after_epochs loss values.
 
         Args:
             epoch: Current epoch in training.
