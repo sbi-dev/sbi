@@ -342,7 +342,7 @@ class VectorFieldTrainer(NeuralInference, ABC):
         if isinstance(validation_times, int):
             # NOTE: We add a nugget to t_min as t_min is the boundary of the training
             # domain and hence can be "unstable" and is not a good choice for
-            # evaluation. Same for flow mathching but with t_max
+            # evaluation. Same for flow matching but with t_max
             validation_times = torch.linspace(
                 self._neural_net.t_min + 0.05,
                 self._neural_net.t_max - 0.05,
