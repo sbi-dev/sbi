@@ -68,10 +68,10 @@ class NPSE(VectorFieldTrainer):
         """
         if score_estimator is not None:
             vf_estimator = score_estimator
-            # Deprecation warning
             warnings.warn(
-                "`score_estimator` is deprecated. Use `vf_estimator` instead.",
-                DeprecationWarning,
+                "`score_estimator` is deprecated and will be removed in a future release. "
+                "Use `vf_estimator` instead.",
+                FutureWarning,
                 stacklevel=2,
             )
 
