@@ -121,6 +121,9 @@ class NPE_A(PosteriorEstimatorTrainer):
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[Dict] = None,
         component_perturbation: float = 5e-3,
+        lr_scheduler: Optional[Union[str, Dict[str, Any]]] = None,
+        lr_scheduler_kwargs: Optional[Dict[str, Any]] = None,
+        min_lr_threshold: Optional[float] = None,
     ) -> ConditionalDensityEstimator:
         r"""Return density estimator that approximates the proposal posterior.
 
