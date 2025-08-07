@@ -8,7 +8,7 @@ import torch
 from torch import Tensor, nn
 
 from sbi.neural_nets.estimators.base import ConditionalVectorFieldEstimator
-from sbi.utils.vector_field_utils import VectorFieldNet
+from sbi.neural_nets.net_builders.vector_field_nets import VectorFieldNet
 
 
 class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
