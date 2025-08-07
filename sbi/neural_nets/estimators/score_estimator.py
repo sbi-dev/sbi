@@ -661,6 +661,9 @@ class SubVPScoreEstimator(ConditionalScoreEstimator):
 class VEScoreEstimator(ConditionalScoreEstimator):
     """Class for score estimators with variance exploding SDEs (i.e., NCSN / SMLD).
 
+    The SDE defining the diffusion process is characterized by the following hyper-
+    parameters.
+
 
     Args:
        sigma_min: This defines the smallest "noise" level in the diffusion process. This
