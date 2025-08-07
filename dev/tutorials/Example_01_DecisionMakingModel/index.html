@@ -655,6 +655,7 @@ p(\text{probs}) = \text{Beta}(2, 2)
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">sbi.analysis</span><span class="w"> </span><span class="kn">import</span> <span class="n">pairplot</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference</span><span class="w"> </span><span class="kn">import</span> <span class="n">MNLE</span><span class="p">,</span> <span class="n">MCMCPosterior</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference.posteriors.posterior_parameters</span><span class="w"> </span><span class="kn">import</span> <span class="n">MCMCPosteriorParameters</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference.potentials.likelihood_based_potential</span><span class="w"> </span><span class="kn">import</span> <span class="n">LikelihoodBasedPotential</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">sbi.neural_nets</span><span class="w"> </span><span class="kn">import</span> <span class="n">likelihood_nn</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">sbi.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">BoxUniform</span><span class="p">,</span> <span class="n">MultipleIndependent</span><span class="p">,</span> <span class="n">mcmc_transform</span>
@@ -730,7 +731,7 @@ p(\text{probs}) = \text{Beta}(2, 2)
 </code></pre></div>
 
 <div class="highlight"><pre><span></span><code><span class="c1"># Build posterior from the trained estimator and prior.</span>
-<span class="n">mnle_posterior</span> <span class="o">=</span> <span class="n">trainer</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span> <span class="n">mcmc_parameters</span><span class="o">=</span><span class="n">mcmc_kwargs</span><span class="p">)</span>
+<span class="n">mnle_posterior</span> <span class="o">=</span> <span class="n">trainer</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span> <span class="n">posterior_parameters</span><span class="o">=</span><span class="n">MCMCPosteriorParameters</span><span class="p">(</span><span class="o">**</span><span class="n">mcmc_kwargs</span><span class="p">))</span>
 
 <span class="n">mnle_samples</span> <span class="o">=</span> <span class="n">mnle_posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_samples</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_o</span><span class="p">)</span>
 </code></pre></div>

@@ -655,6 +655,7 @@ Schölkopf (NeurIPS 2023) <br> <a href="https://arxiv.org/abs/2305.17161">[Paper
 <h2 id="likelihood-estimation-nle">Likelihood estimation (NLE)<a class="headerlink" href="#likelihood-estimation-nle" title="Permanent link">&para;</a></h2>
 <p><strong>Sequential neural likelihood: Fast likelihood-free inference with autoregressive flows</strong><br>by Papamakarios, Sterratt &amp; Murray (AISTATS 2019) <br><a href="http://proceedings.mlr.press/v89/papamakarios19a/papamakarios19a.pdf">[PDF]</a> <a href="https://gpapamak.github.io/bibtex/snl.bib">[BibTeX]</a></p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference</span><span class="w"> </span><span class="kn">import</span> <span class="n">NLE</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference.posteriors.posterior_parameters</span><span class="w"> </span><span class="kn">import</span> <span class="n">MCMCPosteriorParameters</span>
 
 <span class="n">inference</span> <span class="o">=</span> <span class="n">NLE</span><span class="p">(</span><span class="n">prior</span><span class="p">)</span>
 <span class="n">proposal</span> <span class="o">=</span> <span class="n">prior</span>
@@ -662,13 +663,14 @@ Schölkopf (NeurIPS 2023) <br> <a href="https://arxiv.org/abs/2305.17161">[Paper
     <span class="n">theta</span> <span class="o">=</span> <span class="n">proposal</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_sims</span><span class="p">,))</span>
     <span class="n">x</span> <span class="o">=</span> <span class="n">simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
     <span class="n">_</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
-    <span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">(</span><span class="n">mcmc_method</span><span class="o">=</span><span class="s2">&quot;slice_np_vectorized&quot;</span><span class="p">,</span>
-                                          <span class="n">mcmc_parameters</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;num_chains&quot;</span><span class="p">:</span> <span class="mi">20</span><span class="p">,</span>
-                                                           <span class="s2">&quot;thin&quot;</span><span class="p">:</span> <span class="mi">5</span><span class="p">})</span>
+    <span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">(</span><span class="n">posterior_parameters</span><span class="o">=</span><span class="n">MCMCPosteriorParameters</span><span class="p">(</span><span class="n">method</span><span class="o">=</span><span class="s2">&quot;slice_np_vectorized&quot;</span><span class="p">,</span> <span class="n">num_chains</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span>
+                                                           <span class="n">thin</span><span class="o">=</span><span class="mi">5</span><span class="p">))</span>
+
     <span class="n">proposal</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">set_default_x</span><span class="p">(</span><span class="n">x_o</span><span class="p">)</span>
 </code></pre></div>
 <p><strong>Variational methods for simulation-based inference</strong> <br> by Glöckler, Deistler, Macke (ICLR 2022) <br><a href="https://arxiv.org/abs/2203.04176">[Paper]</a></p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference</span><span class="w"> </span><span class="kn">import</span> <span class="n">NLE</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference.posteriors.posterior_parameters</span><span class="w"> </span><span class="kn">import</span> <span class="n">VIPosteriorParameters</span>
 
 <span class="n">inference</span> <span class="o">=</span> <span class="n">NLE</span><span class="p">(</span><span class="n">prior</span><span class="p">)</span>
 <span class="n">proposal</span> <span class="o">=</span> <span class="n">prior</span>
@@ -676,8 +678,7 @@ Schölkopf (NeurIPS 2023) <br> <a href="https://arxiv.org/abs/2305.17161">[Paper
     <span class="n">theta</span> <span class="o">=</span> <span class="n">proposal</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_sims</span><span class="p">,))</span>
     <span class="n">x</span> <span class="o">=</span> <span class="n">simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
     <span class="n">_</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
-    <span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">(</span><span class="n">sample_with</span><span class="o">=</span><span class="s2">&quot;vi&quot;</span><span class="p">,</span>
-                                          <span class="n">vi_method</span><span class="o">=</span><span class="s2">&quot;fKL&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">set_default_x</span><span class="p">(</span><span class="n">x_o</span><span class="p">)</span>
+    <span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">(</span><span class="n">posterior_parameters</span><span class="o">=</span><span class="n">VIPosteriorParameters</span><span class="p">(</span><span class="n">vi_method</span><span class="o">=</span><span class="s2">&quot;fKL&quot;</span><span class="p">))</span><span class="o">.</span><span class="n">set_default_x</span><span class="p">(</span><span class="n">x_o</span><span class="p">)</span>
     <span class="n">proposal</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>  <span class="c1"># Train VI posterior on given x_o.</span>
 </code></pre></div>
 <p><strong>Flexible and efficient simulation-based inference for models of decision-making</strong> <br> by Boelts, Lueckmann, Gao, Macke (Elife 2022) <br><a href="https://elifesciences.org/articles/77220">[Paper]</a></p>
@@ -702,6 +703,7 @@ Schölkopf (NeurIPS 2023) <br> <a href="https://arxiv.org/abs/2305.17161">[Paper
 </code></pre></div>
 <p><strong>On Contrastive Learning for Likelihood-free Inference</strong><br>Durkan, Murray &amp; Papamakarios (ICML 2020) <br><a href="http://proceedings.mlr.press/v119/durkan20a/durkan20a.pdf">[PDF]</a>.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference</span><span class="w"> </span><span class="kn">import</span> <span class="n">NRE</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference.posteriors.posterior_parameters</span><span class="w"> </span><span class="kn">import</span> <span class="n">MCMCPosteriorParameters</span>
 
 <span class="n">inference</span> <span class="o">=</span> <span class="n">NRE</span><span class="p">(</span><span class="n">prior</span><span class="p">)</span>
 <span class="n">proposal</span> <span class="o">=</span> <span class="n">prior</span>
@@ -709,9 +711,9 @@ Schölkopf (NeurIPS 2023) <br> <a href="https://arxiv.org/abs/2305.17161">[Paper
     <span class="n">theta</span> <span class="o">=</span> <span class="n">proposal</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_sims</span><span class="p">,))</span>
     <span class="n">x</span> <span class="o">=</span> <span class="n">simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
     <span class="n">_</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
-    <span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">(</span><span class="n">mcmc_method</span><span class="o">=</span><span class="s2">&quot;slice_np_vectorized&quot;</span><span class="p">,</span>
-                                          <span class="n">mcmc_parameters</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;num_chains&quot;</span><span class="p">:</span> <span class="mi">20</span><span class="p">,</span>
-                                                           <span class="s2">&quot;thin&quot;</span><span class="p">:</span> <span class="mi">5</span><span class="p">})</span>
+    <span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">(</span><span class="n">posterior_parameters</span><span class="o">=</span><span class="n">MCMCPosteriorParameters</span><span class="p">(</span><span class="n">method</span><span class="o">=</span><span class="s2">&quot;slice_np_vectorized&quot;</span><span class="p">,</span> <span class="n">num_chains</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span>
+                                                           <span class="n">thin</span><span class="o">=</span><span class="mi">5</span><span class="p">))</span>
+
     <span class="n">proposal</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">set_default_x</span><span class="p">(</span><span class="n">x_o</span><span class="p">)</span>
 </code></pre></div>
 <p><strong>Towards Reliable Simulation-Based Inference with Balanced Neural Ratio Estimation</strong><br>by Delaunoy, Hermans, Rozet, Wehenkel &amp; Louppe (NeurIPS 2022) <br><a href="https://arxiv.org/pdf/2208.13624.pdf">[PDF]</a></p>

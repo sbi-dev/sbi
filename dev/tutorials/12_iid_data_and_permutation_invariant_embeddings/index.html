@@ -634,6 +634,7 @@ x | \theta \sim \mathcal{N}(\theta,\; \Sigma=I) \\
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">sbi.analysis</span><span class="w"> </span><span class="kn">import</span> <span class="n">pairplot</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference</span><span class="w"> </span><span class="kn">import</span> <span class="n">NLE</span><span class="p">,</span> <span class="n">NPE</span><span class="p">,</span> <span class="n">simulate_for_sbi</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference.posteriors.posterior_parameters</span><span class="w"> </span><span class="kn">import</span> <span class="n">MCMCPosteriorParameters</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">sbi.simulators.linear_gaussian</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">linear_gaussian</span><span class="p">,</span>
     <span class="n">true_posterior_linear_gaussian_mvn_prior</span><span class="p">,</span>
@@ -723,17 +724,16 @@ x | \theta \sim \mathcal{N}(\theta,\; \Sigma=I) \\
 <span class="n">nle_samples</span> <span class="o">=</span> <span class="p">[]</span>
 <span class="n">num_samples</span> <span class="o">=</span> <span class="mi">1000</span>
 
-<span class="n">mcmc_parameters</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
+<span class="n">mcmc_parameters</span> <span class="o">=</span> <span class="n">MCMCPosteriorParameters</span><span class="p">(</span>
+    <span class="n">method</span><span class="o">=</span><span class="s2">&quot;slice_np_vectorized&quot;</span><span class="p">,</span>
     <span class="n">num_chains</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>
     <span class="n">thin</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
     <span class="n">warmup_steps</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span>
     <span class="n">init_strategy</span><span class="o">=</span><span class="s2">&quot;proposal&quot;</span><span class="p">,</span>
 <span class="p">)</span>
-<span class="n">mcmc_method</span> <span class="o">=</span> <span class="s2">&quot;slice_np_vectorized&quot;</span>
 
 <span class="n">posterior</span> <span class="o">=</span> <span class="n">inferer</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">(</span>
-    <span class="n">mcmc_method</span><span class="o">=</span><span class="n">mcmc_method</span><span class="p">,</span>
-    <span class="n">mcmc_parameters</span><span class="o">=</span><span class="n">mcmc_parameters</span><span class="p">,</span>
+    <span class="n">posterior_parameters</span><span class="o">=</span><span class="n">mcmc_parameters</span><span class="p">,</span>
 <span class="p">)</span>
 
 <span class="c1"># Generate samples with MCMC given the same set of x_os as above.</span>
