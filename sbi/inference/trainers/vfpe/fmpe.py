@@ -55,7 +55,7 @@ class FMPE(VectorFieldTrainer):
             warnings.warn(
                 "`density_estimator` is deprecated and will be removed in a future "
                 "release. Use `vf_estimator` instead.",
-                DeprecationWarning,
+                FutureWarning,
                 stacklevel=2,
             )
             vf_estimator = density_estimator
