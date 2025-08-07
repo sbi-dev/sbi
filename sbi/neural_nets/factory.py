@@ -3,7 +3,7 @@
 
 import warnings
 from enum import Enum
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, Literal, Optional, Union
 
 from torch import Tensor, nn
 
