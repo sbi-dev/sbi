@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from dataclasses import asdict
+
 import numpy as np
 import pytest
 import torch
@@ -22,6 +24,7 @@ from sbi.inference import (
     RejectionPosterior,
     posterior_estimator_based_potential,
 )
+from sbi.inference.posteriors.posterior_parameters import MCMCPosteriorParameters
 from sbi.neural_nets import posterior_nn
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
@@ -390,7 +393,7 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str):
     ),
 )
 def test_api_snpe_c_posterior_correction(
-    sample_with, mcmc_method, prior_str, mcmc_params_fast: dict
+    sample_with, mcmc_method, prior_str, mcmc_params_fast: MCMCPosteriorParameters
 ):
     """Test that leakage correction applied to sampling works, with both MCMC and
     rejection.
@@ -423,12 +426,12 @@ def test_api_snpe_c_posterior_correction(
         posterior_estimator, prior, x_o
     )
     if sample_with == "mcmc":
+        mcmc_params_fast = mcmc_params_fast.with_param(method=mcmc_method)
         posterior = MCMCPosterior(
             potential_fn=potential_fn,
             theta_transform=theta_transform,
             proposal=prior,
-            method=mcmc_method,
-            **mcmc_params_fast,
+            **asdict(mcmc_params_fast),
         )
     elif sample_with == "rejection":
         posterior = RejectionPosterior(
@@ -491,7 +494,7 @@ def test_api_force_first_round_loss(
 
 @pytest.mark.slow
 @pytest.mark.mcmc
-def test_sample_conditional(mcmc_params_accurate: dict):
+def test_sample_conditional(mcmc_params_accurate: MCMCPosteriorParameters):
     """
     Test whether sampling from the conditional gives the same results as
     evaluating.
@@ -572,8 +575,7 @@ def test_sample_conditional(mcmc_params_accurate: dict):
         potential_fn=conditioned_potential_fn,
         theta_transform=restricted_tf,
         proposal=restricted_prior,
-        method="slice_np_vectorized",
-        **mcmc_params_accurate,
+        **asdict(mcmc_params_accurate),
     )
     cond_samples = mcmc_posterior.sample((num_conditional_samples,), x=x_o)
 

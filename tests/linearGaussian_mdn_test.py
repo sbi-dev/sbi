@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from dataclasses import asdict
+
 import pytest
 import torch
 from torch import Tensor, eye, ones, zeros
@@ -15,6 +17,7 @@ from sbi.inference import (
     MCMCPosterior,
     likelihood_estimator_based_potential,
 )
+from sbi.inference.posteriors.posterior_parameters import MCMCPosteriorParameters
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
     true_posterior_linear_gaussian_mvn_prior,
@@ -25,7 +28,9 @@ from sbi.utils.metrics import check_c2st
 @pytest.mark.parametrize(
     "method", (NPE, pytest.param(NLE, marks=[pytest.mark.slow, pytest.mark.mcmc]))
 )
-def test_mdn_inference_with_different_methods(method, mcmc_params_accurate: dict):
+def test_mdn_inference_with_different_methods(
+    method, mcmc_params_accurate: MCMCPosteriorParameters
+):
     num_dim = 2
     x_o = torch.tensor([[1.0, 0.0]])
     num_samples = 500
@@ -62,8 +67,7 @@ def test_mdn_inference_with_different_methods(method, mcmc_params_accurate: dict
             potential_fn=potential_fn,
             theta_transform=theta_transform,
             proposal=prior,
-            method="slice_np_vectorized",
-            **mcmc_params_accurate,
+            **asdict(mcmc_params_accurate),
         )
 
     samples = posterior.sample((num_samples,), x=x_o)

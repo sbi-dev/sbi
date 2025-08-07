@@ -13,6 +13,7 @@ from torch.distributions import MultivariateNormal
 
 from sbi import utils
 from sbi.inference import NLE, NPE, NRE, simulate_for_sbi
+from sbi.inference.posteriors.posterior_parameters import MCMCPosteriorParameters
 from sbi.neural_nets import classifier_nn, likelihood_nn, posterior_nn
 from sbi.neural_nets.embedding_nets import (
     CNNEmbedding,
@@ -43,7 +44,7 @@ from sbi.utils.user_input_checks import (
 @pytest.mark.parametrize("num_dim", [1, 2])
 @pytest.mark.parametrize("embedding_net", ["mlp"])
 def test_embedding_net_api(
-    method, num_dim: int, embedding_net: str, mcmc_params_fast: dict
+    method, num_dim: int, embedding_net: str, mcmc_params_fast: MCMCPosteriorParameters
 ):
     """Tests the API when using a preconfigured embedding net."""
 
@@ -81,8 +82,7 @@ def test_embedding_net_api(
 
     _ = inference.append_simulations(theta, x).train(max_num_epochs=2)
     posterior = inference.build_posterior(
-        mcmc_method="slice_np_vectorized",
-        mcmc_parameters=mcmc_params_fast,
+        posterior_parameters=mcmc_params_fast
     ).set_default_x(x_o)
 
     s = posterior.sample((1,))

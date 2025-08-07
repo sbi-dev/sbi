@@ -22,6 +22,7 @@ from sbi.inference import (
     vector_field_estimator_based_potential,
 )
 from sbi.neural_nets.factory import posterior_flow_nn
+from sbi.inference.posteriors.posterior_parameters import VectorFieldPosteriorParameters
 from sbi.simulators import linear_gaussian
 from sbi.simulators.linear_gaussian import (
     samples_true_posterior_linear_gaussian_mvn_prior_different_dims,
@@ -100,9 +101,7 @@ def test_c2st_vector_field_on_linearGaussian(
         posterior = inference.build_posterior(
             vf_estimator,
             sample_with=method,
-            vectorfield_sampling_parameters={
-                "neural_ode_backend": "zuko",
-            },
+            posterior_parameters=VectorFieldPosteriorParameters(),
         )
         posterior.set_default_x(x_o)
         samples = posterior.sample((num_samples,))
