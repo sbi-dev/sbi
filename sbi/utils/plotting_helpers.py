@@ -4,7 +4,7 @@
 import collections
 import logging
 from dataclasses import asdict, is_dataclass
-from typing import Any, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Dict, List, Optional, Union
 
 import numpy as np
 import six
@@ -14,6 +14,10 @@ try:
     collectionsAbc = collections.abc  # type: ignore
 except AttributeError:
     collectionsAbc = collections
+
+# for circular import error
+if TYPE_CHECKING:
+    from sbi.analysis.plot import KwargsType
 
 
 def hex2rgb(hex: str) -> List[int]:
@@ -38,7 +42,7 @@ def to_list_string(
     return x
 
 
-def to_list_kwargs(x: Any, len: int) -> List[Optional[Dict]]:
+def to_list_kwargs(x: "KwargsType", len: int) -> List[Optional[Dict]]:
     """If x is not a list, make it a list of dicts of length `len`."""
 
     if not isinstance(x, list):
