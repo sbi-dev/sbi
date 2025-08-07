@@ -201,9 +201,9 @@ def train_and_eval_amortized_inference(
 def train_and_eval_sequential_inference(
     inference_class,
     task_name: str,
+    benchmark_num_simulations: int,
     extra_kwargs: dict,
     results_bag: ResultsBag,
-    benchmark_num_simulations: int,
 ) -> None:
     """
     Performs sequential inference evaluation.
