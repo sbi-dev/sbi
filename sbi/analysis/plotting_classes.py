@@ -146,7 +146,7 @@ class FigBgColors:
 
 @dataclass(frozen=True)
 class FigKwargs:
-    legend: Optional[str] = None
+    legend: Optional[Any] = None
     legend_kwargs: Dict[str, Any] = field(default_factory=dict)
     # labels
     points_labels: List[str] = field(
