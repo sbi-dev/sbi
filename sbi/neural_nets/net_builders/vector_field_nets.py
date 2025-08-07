@@ -2,7 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import math
-from typing import Callable, Optional, Sequence, Union
+from typing import Callable, Literal, Optional, Sequence, Union
 
 import torch
 import torch.nn as nn
