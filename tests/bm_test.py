@@ -275,9 +275,9 @@ def test_run_benchmark(
         train_and_eval_sequential_inference(
             inference_class,
             task_name,
+            benchmark_num_simulations,
             extra_kwargs,
             results_bag,
-            benchmark_num_simulations,
         )
     else:
         train_and_eval_amortized_inference(
