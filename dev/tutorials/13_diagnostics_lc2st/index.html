@@ -794,7 +794,7 @@
 <span class="c1"># sample calibration data</span>
 <span class="n">theta_cal</span> <span class="o">=</span> <span class="n">prior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">NUM_CAL</span><span class="p">,))</span>
 <span class="n">x_cal</span> <span class="o">=</span> <span class="n">simulator</span><span class="p">(</span><span class="n">theta_cal</span><span class="p">)</span>
-<span class="n">post_samples_cal</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample_batched</span><span class="p">((</span><span class="mi">1</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_cal</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+<span class="n">post_samples_cal</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample_batched</span><span class="p">((</span><span class="mi">1</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_cal</span><span class="p">,</span> <span class="n">max_sampling_batch_size</span><span class="o">=</span><span class="mi">10</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
 </code></pre></div>
 <div class="highlight"><pre><span></span><code><span class="c1"># set up the LC2ST: train the classifiers</span>
 <span class="n">lc2st</span> <span class="o">=</span> <span class="n">LC2ST</span><span class="p">(</span>
