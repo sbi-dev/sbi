@@ -465,7 +465,7 @@ def flowmatching_nn(
         "flowmatching_nn is deprecated and will be removed in a future release. "
         "Please use posterior_flow_nn or the new vector field estimator builders "
         "instead.",
-        DeprecationWarning,
+        FutureWarning,
         stacklevel=2,
     )
     implemented_models = ["mlp", "resnet"]
