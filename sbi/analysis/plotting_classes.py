@@ -6,7 +6,15 @@ from matplotlib import pyplot as plt
 
 
 @dataclass(frozen=True)
-class DiagKwargs: ...
+class DiagKwargs:
+    """
+    Base class for keyword arguments used in diagonal plots.
+
+    This class serves as a common parent for specific diagonal plot
+    configuration classes such as KDE, Histogram, and Scatter.
+    """
+
+    ...
 
 
 @dataclass(frozen=True)
@@ -15,11 +23,6 @@ class KdeDiagKwargs(DiagKwargs):
     bins: int = 50
     mpl_kwargs: Dict = field(default_factory=dict)
 
-    def __post_init__(self):
-        defaults = {"color": _set_color(0)}
-        updated = {**defaults, **self.mpl_kwargs}
-        object.__setattr__(self, "mpl_kwargs", updated)
-
 
 @dataclass(frozen=True)
 class HistDiagKwargs(DiagKwargs):
@@ -27,8 +30,11 @@ class HistDiagKwargs(DiagKwargs):
     mpl_kwargs: Dict = field(default_factory=dict)
 
     def __post_init__(self):
-        defaults = {"color": _set_color(0), "density": False, "histtype": "step"}
-        updated = {**defaults, **self.mpl_kwargs}
+        mpl_kwargs_defaults = {
+            "density": False,
+            "histtype": "step",
+        }
+        updated = {**mpl_kwargs_defaults, **self.mpl_kwargs}
         object.__setattr__(self, "mpl_kwargs", updated)
 
 
@@ -36,14 +42,17 @@ class HistDiagKwargs(DiagKwargs):
 class ScatterDiagKwargs(DiagKwargs):
     mpl_kwargs: Dict = field(default_factory=dict)
 
-    def __post_init__(self):
-        defaults = {"color": _set_color(0)}
-        updated = {**defaults, **self.mpl_kwargs}
-        object.__setattr__(self, "mpl_kwargs", updated)
-
 
 @dataclass(frozen=True)
-class OffDiagKwargs: ...
+class OffDiagKwargs:
+    """
+    Base class for keyword arguments used in off-diagonal plots.
+
+    This class serves as a common parent for off-diagonal plot types like KDE,
+    scatter, histogram, contour, and line plots.
+    """
+
+    ...
 
 
 @dataclass(frozen=True)
@@ -53,27 +62,25 @@ class KdeOffDiagKwargs(OffDiagKwargs):
     mpl_kwargs: Dict = field(default_factory=dict)
 
     def __post_init__(self):
-        defaults = {"cmap": "viridis", "origin": "lower", "aspect": "auto"}
-        updated = {**defaults, **self.mpl_kwargs}
+        mpl_kwargs_defaults = {"cmap": "viridis", "origin": "lower", "aspect": "auto"}
+        updated = {**mpl_kwargs_defaults, **self.mpl_kwargs}
         object.__setattr__(self, "mpl_kwargs", updated)
-
-
-@dataclass(frozen=True)
-class NpHistKwargs:
-    bins: int = 50
-    density: bool = False
 
 
 @dataclass(frozen=True)
 class HistOffDiagKwargs(OffDiagKwargs):
-    bin_heuristic = None
-    np_hist_kwargs: NpHistKwargs = field(default_factory=NpHistKwargs)
+    bin_heuristic: Optional[str] = None
+    np_hist_kwargs: Dict = field(default_factory=dict)
     mpl_kwargs: Dict = field(default_factory=dict)
 
     def __post_init__(self):
-        defaults = {"cmap": "viridis", "origin": "lower", "aspect": "auto"}
-        updated = {**defaults, **self.mpl_kwargs}
+        mpl_kwargs_defaults = {"cmap": "viridis", "origin": "lower", "aspect": "auto"}
+        updated = {**mpl_kwargs_defaults, **self.mpl_kwargs}
         object.__setattr__(self, "mpl_kwargs", updated)
+
+        np_hist_defaults = {"bins": 50, "density": False}
+        updated = {**np_hist_defaults, **self.np_hist_kwargs}
+        object.__setattr__(self, "np_hist_kwargs", updated)
 
 
 @dataclass(frozen=True)
@@ -81,13 +88,12 @@ class ScatterOffDiagKwargs(OffDiagKwargs):
     mpl_kwargs: Dict = field(default_factory=dict)
 
     def __post_init__(self):
-        defaults = {
-            "color": _set_color(0),
+        mpl_kwargs_defaults = {
             "edgecolor": "white",
             "alpha": 0.5,
             "rasterized": False,
         }
-        updated = {**defaults, **self.mpl_kwargs}
+        updated = {**mpl_kwargs_defaults, **self.mpl_kwargs}
         object.__setattr__(self, "mpl_kwargs", updated)
 
 
@@ -99,19 +105,14 @@ class ContourOffDiagKwargs(OffDiagKwargs):
     levels: list = field(default_factory=lambda: [0.68, 0.95, 0.99])
     mpl_kwargs: Dict = field(default_factory=dict)
 
-    def __post_init__(self):
-        defaults = {"color": _set_color(0)}
-        updated = {**defaults, **self.mpl_kwargs}
-        object.__setattr__(self, "mpl_kwargs", updated)
-
 
 @dataclass(frozen=True)
 class PlotOffDiagKwargs(OffDiagKwargs):
     mpl_kwargs: Dict = field(default_factory=dict)
 
     def __post_init__(self):
-        defaults = {"color": _set_color(0), "aspect": "auto"}
-        updated = {**defaults, **self.mpl_kwargs}
+        mpl_kwargs_defaults = {"aspect": "auto"}
+        updated = {**mpl_kwargs_defaults, **self.mpl_kwargs}
         object.__setattr__(self, "mpl_kwargs", updated)
 
 
@@ -181,6 +182,16 @@ class FigKwargs:
 
 
 def _set_color(i: int) -> str:
+    """
+    Returns a distinct color from Matplotlib's default color cycle.
+
+    Args:
+        i: Index used to select a color, spaced by 2.
+
+    Returns:
+        str: A color string from the Matplotlib color cycle.
+    """
+
     new_color = plt.rcParams["axes.prop_cycle"].by_key()["color"][i * 2]
     return new_color
 
