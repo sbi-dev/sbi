@@ -1,7 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Any, Callable, Dict, Literal, Optional, Union
+from typing import Any, Dict, Literal, Optional, Union
 
 from torch.distributions import Distribution
 
@@ -12,6 +12,7 @@ from sbi.inference.posteriors.posterior_parameters import (
     RejectionPosteriorParameters,
     VIPosteriorParameters,
 )
+from sbi.inference.trainers.base import DensityEstimatorBuilder
 from sbi.inference.trainers.nle.nle_base import LikelihoodEstimatorTrainer
 from sbi.neural_nets.estimators import MixedDensityEstimator
 from sbi.sbi_types import TensorboardSummaryWriter
@@ -33,7 +34,7 @@ class MNLE(LikelihoodEstimatorTrainer):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
-        density_estimator: Union[str, Callable] = "mnle",
+        density_estimator: Union[str, DensityEstimatorBuilder] = "mnle",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[TensorboardSummaryWriter] = None,

@@ -13,8 +13,12 @@ from torch import Tensor
 from torch.distributions import Distribution, MultivariateNormal
 
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
-from sbi.inference.trainers.npe.npe_base import PosteriorEstimatorTrainer
+from sbi.inference.trainers.npe.npe_base import (
+    DensityEstimatorBuilder,
+    PosteriorEstimatorTrainer,
+)
 from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
+from sbi.neural_nets.estimators.nflows_flow import NFlowsFlow
 from sbi.sbi_types import TensorboardSummaryWriter, TorchModule
 from sbi.utils import torchutils
 from sbi.utils.sbiutils import (
@@ -47,7 +51,9 @@ class NPE_A(PosteriorEstimatorTrainer):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
-        density_estimator: Union[str, Callable] = "mdn_snpe_a",
+        density_estimator: Union[
+            str, DensityEstimatorBuilder[NFlowsFlow]
+        ] = "mdn_snpe_a",
         num_components: int = 10,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
@@ -231,7 +237,7 @@ class NPE_A(PosteriorEstimatorTrainer):
 
     def correct_for_proposal(
         self,
-        density_estimator: Optional[TorchModule] = None,
+        density_estimator: Optional[torch.nn.Module] = None,
     ) -> "NPE_A_MDN":
         r"""Build mixture of Gaussians that approximates the posterior.
 

@@ -4,7 +4,7 @@
 import warnings
 from abc import ABC
 from copy import deepcopy
-from typing import Any, Callable, Dict, Literal, Optional, Tuple, Union
+from typing import Any, Dict, Literal, Optional, Tuple, Union
 
 import torch
 from torch import Tensor
@@ -23,7 +23,7 @@ from sbi.inference.posteriors.posterior_parameters import (
 )
 from sbi.inference.potentials import likelihood_estimator_based_potential
 from sbi.inference.potentials.likelihood_based_potential import LikelihoodBasedPotential
-from sbi.inference.trainers.base import NeuralInference
+from sbi.inference.trainers.base import DensityEstimatorBuilder, NeuralInference
 from sbi.neural_nets import likelihood_nn
 from sbi.neural_nets.estimators import ConditionalDensityEstimator
 from sbi.neural_nets.estimators.shape_handling import (
@@ -38,7 +38,7 @@ class LikelihoodEstimatorTrainer(NeuralInference, ABC):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
-        density_estimator: Union[str, Callable] = "maf",
+        density_estimator: Union[str, DensityEstimatorBuilder] = "maf",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,

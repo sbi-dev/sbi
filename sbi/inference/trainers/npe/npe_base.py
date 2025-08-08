@@ -28,9 +28,14 @@ from sbi.inference.posteriors.posterior_parameters import (
 )
 from sbi.inference.potentials import posterior_estimator_based_potential
 from sbi.inference.potentials.posterior_based_potential import PosteriorBasedPotential
-from sbi.inference.trainers.base import NeuralInference, check_if_proposal_has_default_x
+from sbi.inference.trainers.base import (
+    DensityEstimatorBuilder,
+    NeuralInference,
+    check_if_proposal_has_default_x,
+)
 from sbi.neural_nets import posterior_nn
 from sbi.neural_nets.estimators import ConditionalDensityEstimator
+from sbi.neural_nets.estimators.nflows_flow import NFlowsFlow
 from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
     reshape_to_sample_batch_event,
@@ -54,7 +59,7 @@ class PosteriorEstimatorTrainer(NeuralInference, ABC):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
-        density_estimator: Union[str, Callable] = "maf",
+        density_estimator: Union[str, DensityEstimatorBuilder[NFlowsFlow]] = "maf",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
