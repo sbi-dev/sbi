@@ -60,7 +60,10 @@ class VectorFieldTrainer(NeuralInference, ABC):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
-        vector_field_estimator_builder: Union[str, VectorFieldEstimatorBuilder] = "mlp",
+        vector_field_estimator_builder: Union[
+            Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
+            VectorFieldEstimatorBuilder,
+        ] = "mlp",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
@@ -106,7 +109,7 @@ class VectorFieldTrainer(NeuralInference, ABC):
         check_estimator_arg(vector_field_estimator_builder)
         if isinstance(vector_field_estimator_builder, str):
             self._build_neural_net = self._build_default_nn_fn(
-                vector_field_estimator_builder=vector_field_estimator_builder, **kwargs
+                model=vector_field_estimator_builder, **kwargs
             )
         else:
             self._build_neural_net = vector_field_estimator_builder
