@@ -675,11 +675,14 @@ def pairplot(
         ticks: Position of the ticks.
         offdiag: deprecated, use upper instead.
         diag_kwargs: Additional arguments to adjust the diagonal plot,
-            see the source code in `get_default_diag_kwarg()`
+            see the source code in `KdeDiagKwargs`, `HistDiagKwargs` or
+            `ScatterDiagKwargs`.
         upper_kwargs: Additional arguments to adjust the upper diagonal plot,
-            see the source code in `get_default_offdiag_kwarg()`
+            see the source code in `KdeOffDiagKwargs`, `HistOffDiagKwargs`,
+            `ScatterOffDiagKwargs`, `ContourOffDiagKwarg` or `PlotOffDiagKwargs`.
         lower_kwargs: Additional arguments to adjust the lower diagonal plot,
-            see the source code in `get_default_offdiag_kwarg()`
+            see the source code in `KdeOffDiagKwargs`, `HistOffDiagKwargs`,
+            `ScatterOffDiagKwargs`, `ContourOffDiagKwarg` or `PlotOffDiagKwargs`.
         fig_kwargs: Additional arguments to adjust the overall figure,
             see the source code in `FigKwargs`
         fig: matplotlib figure to plot on.
@@ -913,9 +916,10 @@ def marginal_plot(
         labels: List of strings specifying the names of the parameters.
         ticks: Position of the ticks.
         diag_kwargs: Additional arguments to adjust the diagonal plot,
-            see the source code in `_get_default_diag_kwarg()`
+            see the source code in `KdeDiagKwargs`, `HistDiagKwargs` or
+            `ScatterDiagKwargs`.
         fig_kwargs: Additional arguments to adjust the overall figure,
-            see the source code in `_get_default_fig_kwargs()`
+            see the source code in `FigKwargs`.
         fig: matplotlib figure to plot on.
         axes: matplotlib axes corresponding to fig.
         **kwargs: Additional arguments to adjust the plot (deprecated)
