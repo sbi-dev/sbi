@@ -13,7 +13,7 @@ from sbi.inference.posteriors.posterior_parameters import (
     RejectionPosteriorParameters,
     VIPosteriorParameters,
 )
-from sbi.inference.trainers.npe.npe_base import DensityEstimatorBuilder
+from sbi.inference.trainers.base import DensityEstimatorBuilder
 from sbi.inference.trainers.npe.npe_c import NPE_C
 from sbi.neural_nets.estimators import MixedDensityEstimator
 from sbi.neural_nets.estimators.nflows_flow import NFlowsFlow

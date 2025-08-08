@@ -8,8 +8,8 @@ from torch import Tensor
 from torch.distributions import Distribution
 
 import sbi.utils as utils
+from sbi.inference.trainers.base import DensityEstimatorBuilder
 from sbi.inference.trainers.npe.npe_base import (
-    DensityEstimatorBuilder,
     PosteriorEstimatorTrainer,
 )
 from sbi.neural_nets.estimators.nflows_flow import NFlowsFlow

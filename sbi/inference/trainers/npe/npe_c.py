@@ -10,8 +10,8 @@ from torch import Tensor, eye, ones
 from torch.distributions import Distribution, MultivariateNormal, Uniform
 
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
+from sbi.inference.trainers.base import DensityEstimatorBuilder
 from sbi.inference.trainers.npe.npe_base import (
-    DensityEstimatorBuilder,
     PosteriorEstimatorTrainer,
 )
 from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
