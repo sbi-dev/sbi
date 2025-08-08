@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import warnings
 from typing import Any, Dict, Literal, Optional, Union
 
 from torch.distributions import Distribution
@@ -8,7 +9,7 @@ from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.posteriors.posterior_parameters import VectorFieldPosteriorParameters
-from sbi.inference.trainers.npse.vector_field_inference import (
+from sbi.inference.trainers.vfpe.base_vf_inference import (
     VectorFieldEstimatorBuilder,
     VectorFieldTrainer,
 )
@@ -30,7 +31,16 @@ class NPSE(VectorFieldTrainer):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
-        score_estimator: Union[str, VectorFieldEstimatorBuilder] = "mlp",
+        vf_estimator: Union[
+            Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
+            VectorFieldEstimatorBuilder,
+        ] = "mlp",
+        score_estimator: Optional[
+            Union[
+                Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
+                VectorFieldEstimatorBuilder,
+            ]
+        ] = None,
         sde_type: Literal["vp", "ve", "subvp"] = "ve",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
@@ -42,11 +52,14 @@ class NPSE(VectorFieldTrainer):
 
         Args:
             prior: Prior distribution.
-            score_estimator: Neural network architecture for the
-                vector field estimator. Can be a string (e.g. 'mlp' or 'ada_mlp') or a
-                callable that implements the `VectorFieldEstimatorBuilder` protocol
-                with `__call__` that receives `theta` and `x` and returns a
-                `ConditionalVectorFieldEstimator`.
+            vf_estimator: Neural network architecture for the
+                vector field estimator aiming to estimate the marginal scores of the
+                target diffusion process. Can be a string (e.g. 'mlp', 'ada_mlp',
+                'transformer' or 'transformer_cross_attn') or a callable that implements
+                the `VectorFieldEstimatorBuilder` protocol with `__call__` that receives
+                `theta` and `x` and returns a `ConditionalVectorFieldEstimator`.
+            score_estimator: Deprecated, use `vf_estimator` instead. When passed,
+                a warning is raised and the new `vf_estimator` default is used.
             sde_type: Type of SDE to use. Must be one of ['vp', 've', 'subvp'].
             device: Device to run the training on.
             logging_level: Logging level for the training. Can be an integer or a
@@ -62,9 +75,18 @@ class NPSE(VectorFieldTrainer):
             - Sharrock, Louis, et al. "Sequential neural score estimation: Likelihood-
                 free inference with conditional score based diffusion models." ICML 2024
         """
+        if score_estimator is not None:
+            vf_estimator = score_estimator
+            warnings.warn(
+                "`score_estimator` is deprecated and will be removed in a future "
+                "release .Use `vf_estimator` instead.",
+                FutureWarning,
+                stacklevel=2,
+            )
+
         super().__init__(
             prior=prior,
-            vector_field_estimator_builder=score_estimator,
+            vector_field_estimator_builder=vf_estimator,
             device=device,
             logging_level=logging_level,
             summary_writer=summary_writer,
@@ -119,6 +141,9 @@ class NPSE(VectorFieldTrainer):
             posterior_parameters=posterior_parameters,
         )
 
-    def _build_default_nn_fn(self, **kwargs) -> VectorFieldEstimatorBuilder:
-        net_type = kwargs.pop("vector_field_estimator_builder", "mlp")
-        return posterior_score_nn(score_net_type=net_type, **kwargs)
+    def _build_default_nn_fn(
+        self,
+        model: Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
+        **kwargs,
+    ) -> VectorFieldEstimatorBuilder:
+        return posterior_score_nn(model=model, **kwargs)
