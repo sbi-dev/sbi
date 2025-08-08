@@ -1,10 +1,11 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Callable, Optional, Union
+from typing import Optional, Union
 
 from torch.distributions import Distribution
 
+from sbi.inference.trainers.base import DensityEstimatorBuilder
 from sbi.inference.trainers.nle.nle_base import LikelihoodEstimator
 from sbi.sbi_types import TensorboardSummaryWriter
 from sbi.utils.sbiutils import del_entries
@@ -16,7 +17,7 @@ class NLE_A(LikelihoodEstimator):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
-        density_estimator: Union[str, Callable] = "maf",
+        density_estimator: Union[str, DensityEstimatorBuilder] = "maf",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[TensorboardSummaryWriter] = None,

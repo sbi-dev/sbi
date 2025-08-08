@@ -15,6 +15,7 @@ from sbi.inference.posteriors import (
 from sbi.inference.trainers.npe.npe_base import DensityEstimatorBuilder
 from sbi.inference.trainers.npe.npe_c import NPE_C
 from sbi.neural_nets.estimators import MixedDensityEstimator
+from sbi.neural_nets.estimators.nflows_flow import NFlowsFlow
 from sbi.sbi_types import TensorboardSummaryWriter
 from sbi.utils.sbiutils import del_entries
 
@@ -23,7 +24,7 @@ class MNPE(NPE_C):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
-        density_estimator: Union[str, DensityEstimatorBuilder] = "mnpe",
+        density_estimator: Union[str, DensityEstimatorBuilder[NFlowsFlow]] = "mnpe",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[TensorboardSummaryWriter] = None,

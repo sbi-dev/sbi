@@ -2,12 +2,13 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from copy import deepcopy
-from typing import Any, Callable, Dict, Optional, Union
+from typing import Any, Dict, Optional, Union
 
 from torch.distributions import Distribution
 
 from sbi.inference.posteriors import MCMCPosterior, RejectionPosterior, VIPosterior
 from sbi.inference.potentials import likelihood_estimator_based_potential
+from sbi.inference.trainers.base import DensityEstimatorBuilder
 from sbi.inference.trainers.nle.nle_base import LikelihoodEstimator
 from sbi.neural_nets.estimators import MixedDensityEstimator
 from sbi.sbi_types import TensorboardSummaryWriter, TorchModule
@@ -19,7 +20,7 @@ class MNLE(LikelihoodEstimator):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
-        density_estimator: Union[str, Callable] = "mnle",
+        density_estimator: Union[str, DensityEstimatorBuilder] = "mnle",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[TensorboardSummaryWriter] = None,
