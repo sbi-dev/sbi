@@ -3,12 +3,15 @@
 
 from __future__ import annotations
 
+from dataclasses import asdict
+
 import pytest
 from torch import eye, ones, randn_like, tensor, zeros
 from torch.distributions import MultivariateNormal
 
 from sbi.inference import NLE_A, NPE_C, NRE_A
 from sbi.inference.posteriors import EnsemblePosterior
+from sbi.inference.posteriors.posterior_parameters import MCMCPosteriorParameters
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
     true_posterior_linear_gaussian_mvn_prior,
@@ -56,7 +59,7 @@ def test_import_before_deprecation():
     ),
 )
 def test_c2st_posterior_ensemble_on_linearGaussian(
-    inference_method, num_trials, mcmc_params_accurate: dict
+    inference_method, num_trials, mcmc_params_accurate: MCMCPosteriorParameters
 ):
     """Test whether EnsemblePosterior infers well a simple example with available
     ground truth.
@@ -103,8 +106,7 @@ def test_c2st_posterior_ensemble_on_linearGaussian(
     if isinstance(inferer, (NLE_A, NRE_A)):
         samples = posterior.sample(
             (num_samples,),
-            method="slice_np_vectorized",
-            **mcmc_params_accurate,
+            **asdict(mcmc_params_accurate),
         )
     else:
         samples = posterior.sample((num_samples,))

@@ -6,13 +6,18 @@ from typing import Optional, Union
 from torch.distributions import Distribution
 
 from sbi.inference.trainers.base import DensityEstimatorBuilder
-from sbi.inference.trainers.nle.nle_base import LikelihoodEstimator
+from sbi.inference.trainers.nle.nle_base import LikelihoodEstimatorTrainer
 from sbi.sbi_types import TensorboardSummaryWriter
 from sbi.utils.sbiutils import del_entries
 
 
-class NLE_A(LikelihoodEstimator):
-    """Neural Likelihood Estimation algorithm (NLE) as in Papamakarios et al. (2019)."""
+class NLE_A(LikelihoodEstimatorTrainer):
+    """Neural Likelihood Estimation (NLE) as in Papamakarios et al. (2019) [1].
+
+    [1] Sequential Neural Likelihood: Fast Likelihood-free Inference with
+        Autoregressive Flows, Papamakarios et al., AISTATS 2019,
+        https://arxiv.org/abs/1805.07226
+    """
 
     def __init__(
         self,
@@ -23,11 +28,7 @@ class NLE_A(LikelihoodEstimator):
         summary_writer: Optional[TensorboardSummaryWriter] = None,
         show_progress_bars: bool = True,
     ):
-        r"""Neural Likelihood Estimation [1].
-
-        [1] Sequential Neural Likelihood: Fast Likelihood-free Inference with
-        Autoregressive Flows, Papamakarios et al., AISTATS 2019,
-        https://arxiv.org/abs/1805.07226
+        r"""Initialize Neural Likelihood Estimation.
 
         Args:
             prior: A probability distribution that expresses prior knowledge about the

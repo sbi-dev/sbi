@@ -1,3 +1,6 @@
+# This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+
 from abc import ABC, abstractmethod
 from typing import Optional
 
@@ -119,7 +122,7 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         # and remember the original shape
         target_shape = input.shape
         input = input.reshape(-1, input.shape[-1])
-        condition = condition.reshape(-1, condition.shape[-1])
+        condition = condition.reshape(-1, *self.condition_shape)
         t = t.reshape(-1, t.shape[-1])
 
         # embed the input and condition

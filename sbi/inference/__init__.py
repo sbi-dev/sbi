@@ -1,3 +1,6 @@
+# This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+
 from sbi.inference.abc import MCABC, SMCABC
 from sbi.inference.trainers.base import (
     NeuralInference,  # noqa: F401
@@ -5,6 +8,7 @@ from sbi.inference.trainers.base import (
     infer,
 )
 from sbi.inference.trainers.fmpe import FMPE
+from sbi.inference.trainers.marginal import MarginalTrainer
 from sbi.inference.trainers.nle import MNLE, NLE_A
 from sbi.inference.trainers.npe import MNPE, NPE_A, NPE_B, NPE_C  # noqa: F401
 from sbi.inference.trainers.npse import NPSE

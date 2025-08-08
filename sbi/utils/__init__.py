@@ -1,3 +1,6 @@
+# This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+
 # flake8: noqa
 from sbi.utils.analysis_utils import get_1d_marginal_peaks_from_kde
 from sbi.utils.io import get_data_root, get_log_root, get_project_root

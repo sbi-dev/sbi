@@ -1,3 +1,6 @@
+# This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+
 from typing import List
 
 import numpy as np
@@ -18,6 +21,7 @@ from sbi.inference import (
     simulate_for_sbi,
     vector_field_estimator_based_potential,
 )
+from sbi.inference.posteriors.posterior_parameters import VectorFieldPosteriorParameters
 from sbi.neural_nets.factory import flowmatching_nn
 from sbi.simulators import linear_gaussian
 from sbi.simulators.linear_gaussian import (
@@ -100,7 +104,7 @@ def test_c2st_vector_field_on_linearGaussian(
         posterior = inference.build_posterior(
             score_estimator,
             sample_with=method,
-            neural_ode_backend="zuko",
+            posterior_parameters=VectorFieldPosteriorParameters(),
         )
         posterior.set_default_x(x_o)
         samples = posterior.sample((num_samples,))
