@@ -84,7 +84,6 @@ ALL_BUILDER_CASES = (
 )
 
 
-
 @pytest.mark.parametrize("builder, builder_kwargs", ALL_BUILDER_CASES)
 @pytest.mark.parametrize("time_emb_type", ["sinusoidal", "random_fourier"])
 @pytest.mark.parametrize("time_embedding_dim", [8, 16])
