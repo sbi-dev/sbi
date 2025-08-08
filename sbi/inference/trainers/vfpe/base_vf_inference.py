@@ -114,7 +114,11 @@ class VectorFieldTrainer(NeuralInference, ABC):
         self._proposal_roundwise = []
 
     @abstractmethod
-    def _build_default_nn_fn(self, model: Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"], **kwargs) -> VectorFieldEstimatorBuilder:
+    def _build_default_nn_fn(
+        self,
+        model: Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
+        **kwargs,
+    ) -> VectorFieldEstimatorBuilder:
         pass
 
     def append_simulations(
