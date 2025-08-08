@@ -4,7 +4,7 @@
 import time
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from typing import Any, Callable, Optional, Protocol, Tuple, Union
+from typing import Any, Callable, Literal, Optional, Protocol, Tuple, Union
 
 import torch
 from torch import Tensor, ones
@@ -114,7 +114,7 @@ class VectorFieldTrainer(NeuralInference, ABC):
         self._proposal_roundwise = []
 
     @abstractmethod
-    def _build_default_nn_fn(self, **kwargs) -> VectorFieldEstimatorBuilder:
+    def _build_default_nn_fn(self, model: Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"], **kwargs) -> VectorFieldEstimatorBuilder:
         pass
 
     def append_simulations(

@@ -121,6 +121,5 @@ class FMPE(VectorFieldTrainer):
             posterior_parameters=posterior_parameters,
         )
 
-    def _build_default_nn_fn(self, **kwargs) -> VectorFieldEstimatorBuilder:
-        model = kwargs.pop("vector_field_estimator_builder", "mlp")
+    def _build_default_nn_fn(self, model: Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"], **kwargs) -> VectorFieldEstimatorBuilder:
         return posterior_flow_nn(model=model, **kwargs)

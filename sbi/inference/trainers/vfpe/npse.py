@@ -141,6 +141,5 @@ class NPSE(VectorFieldTrainer):
             posterior_parameters=posterior_parameters,
         )
 
-    def _build_default_nn_fn(self, **kwargs) -> VectorFieldEstimatorBuilder:
-        net_type = kwargs.pop("vector_field_estimator_builder", "mlp")
-        return posterior_score_nn(model=net_type, **kwargs)
+    def _build_default_nn_fn(self, model: Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"], **kwargs) -> VectorFieldEstimatorBuilder:
+        return posterior_score_nn(model=model, **kwargs)
