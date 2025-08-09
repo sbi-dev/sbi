@@ -235,8 +235,8 @@ def test_c2st_simformer_on_linearGaussian(
     likelihood_cov = 0.3 * eye(num_dim, device=device)
 
     if prior_str == "gaussian":
-        prior_mean = zeros(num_dim)
-        prior_cov = eye(num_dim)
+        prior_mean = zeros(num_dim, device=device)
+        prior_cov = eye(num_dim, device=device)
         prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
         gt_posterior = true_posterior_linear_gaussian_mvn_prior(
             x_o, likelihood_shift, likelihood_cov, prior_mean, prior_cov
