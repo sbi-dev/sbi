@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 
 import numpy as np
 import pytest
@@ -28,6 +28,7 @@ from sbi.simulators.linear_gaussian import (
 )
 from sbi.utils import BoxUniform
 from sbi.utils.metrics import check_c2st
+from sbi.utils.torchutils import process_device
 from sbi.utils.user_input_checks import process_simulator
 
 from .test_utils import get_dkl_gaussian_prior
@@ -141,14 +142,68 @@ def test_c2st_vector_field_on_linearGaussian(
 
 # We always test num_dim and sample_with with defaults and mark the rests as slow.
 @pytest.mark.parametrize(
-    "vector_field_type, num_dim, prior_str, sample_with",
+    (
+        "vector_field_type, num_dim, prior_str, sample_with, num_simulations, "
+        "max_num_epochs, device"
+    ),
     [
-        ("vp", 1, "gaussian", ["sde", "ode"]),  # marsk as gpu or slow
-        ("vp", 3, "uniform", ["sde", "ode"]),  # marsk as gpu or slow
-        ("vp", 3, "gaussian", ["sde", "ode"]),  # marsk as gpu or slow
-        ("ve", 3, "uniform", ["sde", "ode"]),  # marsk as gpu or slow
-        ("ve", 3, "gaussian", ["sde", "ode"]),  # default
-        ("subvp", 3, "uniform", ["sde", "ode"]),
+        pytest.param(
+            "vp",
+            1,
+            "gaussian",
+            ["sde", "ode"],
+            5000,
+            100,
+            "cpu",
+        ),
+        pytest.param(
+            "vp",
+            3,
+            "uniform",
+            ["sde", "ode"],
+            25000,
+            None,
+            "gpu",
+            marks=[pytest.mark.gpu, pytest.mark.slow],
+        ),
+        pytest.param(
+            "vp",
+            3,
+            "gaussian",
+            ["sde", "ode"],
+            25000,
+            None,
+            "gpu",
+            marks=[pytest.mark.gpu, pytest.mark.slow],
+        ),
+        pytest.param(
+            "ve",
+            3,
+            "uniform",
+            ["sde", "ode"],
+            5000,
+            100,
+            "cpu",
+        ),
+        pytest.param(
+            "ve",
+            3,
+            "gaussian",
+            ["sde", "ode"],
+            5000,
+            100,
+            "cpu",
+        ),
+        pytest.param(
+            "subvp",
+            3,
+            "uniform",
+            ["sde", "ode"],
+            25000,
+            None,
+            "gpu",
+            marks=[pytest.mark.gpu, pytest.mark.slow],
+        ),
         # ("fmpe", 1, "gaussian", ["sde", "ode"]),
         # ("fmpe", 1, "uniform", ["sde", "ode"]),
         # ("fmpe", 3, "gaussian", ["sde", "ode"]),
@@ -156,21 +211,28 @@ def test_c2st_vector_field_on_linearGaussian(
     ],
 )
 def test_c2st_simformer_on_linearGaussian(
-    vector_field_type: str, num_dim: int, prior_str: str, sample_with: List[str]
+    vector_field_type: str,
+    num_dim: int,
+    prior_str: str,
+    sample_with: List[str],
+    num_simulations: int,
+    max_num_epochs: Optional[int],
+    device: str,
 ):
     """
     Test whether Simformer infers well a simple example with available ground truth.
     """
     num_samples = 1000
-    num_simulations = 5000
-    max_num_epochs = 100
     tol = 0.15
+    if max_num_epochs is None:
+        max_num_epochs = 2**31 - 1
+    device = process_device(device)
 
-    x_o = zeros(1, num_dim)
+    x_o = zeros(1, num_dim, device=device)
 
     # likelihood_mean will be likelihood_shift+theta
-    likelihood_shift = -1.0 * ones(num_dim)
-    likelihood_cov = 0.3 * eye(num_dim)
+    likelihood_shift = -1.0 * ones(num_dim, device=device)
+    likelihood_cov = 0.3 * eye(num_dim, device=device)
 
     if prior_str == "gaussian":
         prior_mean = zeros(num_dim)
@@ -181,7 +243,9 @@ def test_c2st_simformer_on_linearGaussian(
         )
         target_samples = gt_posterior.sample((num_samples,))
     else:
-        prior = utils.BoxUniform(-2.0 * ones(num_dim), 2.0 * ones(num_dim))
+        prior = utils.BoxUniform(
+            -2.0 * ones(num_dim), 2.0 * ones(num_dim), device=device
+        )
         target_samples = samples_true_posterior_linear_gaussian_uniform_prior(
             x_o,
             likelihood_shift,
@@ -203,10 +267,12 @@ def test_c2st_simformer_on_linearGaussian(
         show_progress_bars=True,
         posterior_latent_idx=[0],
         posterior_observed_idx=[1],
+        device=device,
     )
 
     mvf_estimator = inference.append_simulations(
         inputs=inputs,
+        data_device=device,
     ).train(max_num_epochs=max_num_epochs)
 
     for method in sample_with:
