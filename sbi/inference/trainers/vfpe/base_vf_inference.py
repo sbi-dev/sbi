@@ -1218,7 +1218,13 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
             to unconstrained space.
         """
 
-        raise NotImplementedError("...")
+        raise NotImplementedError(
+            "This method is not implemented for "
+            "MaskedVectorFieldTrainer. The trainer is designed for score-based "
+            "and flow-matching models which use ODE/SDE-based sampling, and "
+            "therefore do not require a potential function for "
+            "gradient-based MCMC methods like HMC yet. Please avoid this."
+        )
 
     def _build_conditional(
         self,

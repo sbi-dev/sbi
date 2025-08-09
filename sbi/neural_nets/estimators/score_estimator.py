@@ -322,20 +322,6 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         var = self.mean_t_fn(times) ** 2 * self.std_0**2 + self.std_fn(times) ** 2
         return torch.sqrt(var)
 
-    def mean_t_fn(self, times: Tensor) -> Tensor:
-        r"""Conditional mean function, E[xt|x0], specifying the "mean factor" at a given
-        time, which is always multiplied by x0 to get the mean of the noise distribution
-        , i.e., p(xt|x0) = N(xt; mean_t(t)*x0, std_t(t)).
-
-        Args:
-            times: SDE time variable in [0,1].
-
-        Raises:
-            NotImplementedError: This method is implemented in each individual SDE
-            classes.
-        """
-        raise NotImplementedError
-
     def mean_fn(self, x0: Tensor, times: Tensor) -> Tensor:
         r"""Mean function of the SDE, which just multiplies the specific "mean factor"
         by the original input x0, to get the mean of the noise distribution, i.e.,
@@ -349,47 +335,6 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
             Mean of the noise distribution at a given time.
         """
         return self.mean_t_fn(times) * x0
-
-    def std_fn(self, times: Tensor) -> Tensor:
-        r"""Standard deviation function of the noise distribution at a given time,
-
-        i.e., p(xt|x0) = N(xt; mean_t(t)*x0, std_t(t)).
-
-        Args:
-            times: SDE time variable in [0,1].
-
-        Raises:
-            NotImplementedError: This method is implemented in each individual SDE
-            classes.
-        """
-        raise NotImplementedError
-
-    def drift_fn(self, input: Tensor, times: Tensor) -> Tensor:
-        r"""Drift function, f(x,t), of the SDE described by dx = f(x,t)dt + g(x,t)dW.
-
-        Args:
-            input: Original data, x0.
-            times: SDE time variable in [0,1].
-
-        Raises:
-            NotImplementedError: This method is implemented in each individual SDE
-            classes.
-        """
-        raise NotImplementedError
-
-    def diffusion_fn(self, input: Tensor, times: Tensor) -> Tensor:
-        r"""Diffusion function, g(x,t), of the SDE described by
-                              dx = f(x,t)dt + g(x,t)dW.
-
-        Args:
-            input: Original data, x0.
-            times: SDE time variable in [0,1].
-
-        Raises:
-            NotImplementedError: This method is implemented in each individual SDE
-            classes.
-        """
-        raise NotImplementedError
 
     def _set_weight_fn(self, weight_fn: Union[str, Callable]):
         """Set the weight function.
@@ -912,20 +857,6 @@ class MaskedConditionalScoreEstimator(MaskedConditionalVectorFieldEstimator):
             vars = self.mean_t_fn(times) ** 2 * self.std_0**2 + self.std_fn(times) ** 2
             return torch.sqrt(vars)
 
-    def mean_t_fn(self, times: Tensor) -> Tensor:
-        r"""Conditional mean function, E[xt|x0], specifying the "mean factor" at a given
-        time, which is always multiplied by x0 to get the mean of the noise distribution
-        , i.e., p(xt|x0) = N(xt; mean_t(t)*x0, std_t(t)).
-
-        Args:
-            times: SDE time variable in [0,1].
-
-        Raises:
-            NotImplementedError: This method is implemented in each individual SDE
-            classes.
-        """
-        raise NotImplementedError
-
     def mean_fn(self, x0: Tensor, times: Tensor) -> Tensor:
         r"""Mean function of the SDE, which just multiplies the specific "mean factor"
         by the original input x0, to get the mean of the noise distribution, i.e.,
@@ -939,47 +870,6 @@ class MaskedConditionalScoreEstimator(MaskedConditionalVectorFieldEstimator):
             Mean of the noise distribution at a given time.
         """
         return self.mean_t_fn(times) * x0
-
-    def std_fn(self, times: Tensor) -> Tensor:
-        r"""Standard deviation function of the noise distribution at a given time,
-
-        i.e., p(xt|x0) = N(xt; mean_t(t)*x0, std_t(t)).
-
-        Args:
-            times: SDE time variable in [0,1].
-
-        Raises:
-            NotImplementedError: This method is implemented in each individual SDE
-            classes.
-        """
-        raise NotImplementedError
-
-    def drift_fn(self, input: Tensor, times: Tensor) -> Tensor:
-        r"""Drift function, f(x,t), of the SDE described by dx = f(x,t)dt + g(x,t)dW.
-
-        Args:
-            input: Original data, x0.
-            times: SDE time variable in [0,1].
-
-        Raises:
-            NotImplementedError: This method is implemented in each individual SDE
-            classes.
-        """
-        raise NotImplementedError
-
-    def diffusion_fn(self, input: Tensor, times: Tensor) -> Tensor:
-        r"""Diffusion function, g(x,t), of the SDE described by
-                              dx = f(x,t)dt + g(x,t)dW.
-
-        Args:
-            input: Original data, x0.
-            times: SDE time variable in [0,1].
-
-        Raises:
-            NotImplementedError: This method is implemented in each individual SDE
-            classes.
-        """
-        raise NotImplementedError
 
     def _set_weight_fn(self, weight_fn: Union[str, Callable]):
         r"""Set the weight function.

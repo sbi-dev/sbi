@@ -659,6 +659,7 @@ def simformer_score_nn(
         return build_masked_score_matching_estimator(
             batch_x=batch_inputs,
             batch_y=batch_inputs,  # Unused, only for compatibility
+            sde_type=sde_type,
             **kwargs,
         )
 
@@ -758,6 +759,7 @@ def simformer_flow_nn(
         return build_masked_flow_matching_estimator(
             batch_x=batch_inputs,
             batch_y=batch_inputs,  # Unused, only for compatibility
+            sde_type="flow",
             **kwargs,
         )
 
