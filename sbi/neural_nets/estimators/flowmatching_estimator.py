@@ -553,6 +553,32 @@ class MaskedFlowMatchingEstimator(MaskedConditionalVectorFieldEstimator):
         input_1 = torch.randn_like(input)
         input_t = (1 - times_) * input + (times_ + self.noise_scale) * input_1
 
+        B, T, F = input.shape
+
+        condition_mask = condition_mask.bool()
+        if condition_mask.dim() == 1:
+            # Shape of condition_mask is [T], I unsqueeze for broadcasting on B and F
+            input_t = torch.where(
+                # Where condition_mask is True, use input (observed)
+                condition_mask.unsqueeze(0).unsqueeze(-1).expand(B, T, F),
+                input,
+                input_t,
+            )
+        elif condition_mask.dim() == 2:
+            # Shape of condition_mask is [B, T], I unsqueeze for broadcasting on F
+            input_t = torch.where(
+                # Where condition_mask is True, use input (observed)
+                condition_mask.unsqueeze(-1).expand(B, T, F),
+                input,
+                input_t,
+            )
+        else:
+            raise ValueError(
+                f"condition_mask has incorrect dimensions: {condition_mask.shape} "
+                f"condition_mask should have shape [T] or [B, T], where T is "
+                f"the number of nodes and B is the batch size."
+            )
+
         # compute vector field at the sampled time steps
         vector_field_target = input_1 - input
 

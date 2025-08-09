@@ -304,14 +304,18 @@ class FlowMatchingSimformer(MaskedVectorFieldTrainer):
         )
 
     def set_condition_indexes(
-        self, new_latent_idx: Union[list, Tensor], new_observed_idx: Union[list, Tensor]
+        self,
+        new_posterior_latent_idx: Union[list, Tensor],
+        new_posterior_observed_idx: Union[list, Tensor],
     ):
         """Set the latent and observed condition indexes for posterior inference
         if not passed at init time, or if an update is desired"""
 
-        self.posterior_latent_idx = torch.as_tensor(new_latent_idx, dtype=torch.long)
+        self.posterior_latent_idx = torch.as_tensor(
+            new_posterior_latent_idx, dtype=torch.long
+        )
         self.posterior_observed_idx = torch.as_tensor(
-            new_observed_idx, dtype=torch.long
+            new_posterior_observed_idx, dtype=torch.long
         )
 
     def _generate_posterior_condition_mask(self):
