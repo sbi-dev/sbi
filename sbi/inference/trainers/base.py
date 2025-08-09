@@ -1123,12 +1123,12 @@ class MaskedNeuralInference(NeuralInference):
         ).bool()
 
         # Find rows that are all True or all False
-        all_same = condition_masks.all(dim=-1) | (~condition_masks.any(dim=-1))
+        all_observed = condition_masks.all(dim=-1)
 
         # If there are any such rows, flip a random element to ensure
         # there's at least one True and one False
-        if all_same.any():
-            invalid_indices = torch.where(all_same)
+        if all_observed.any():
+            invalid_indices = torch.where(all_observed)
 
             # For each invalid row, select a random column to flip
             cols_to_flip = torch.randint(
