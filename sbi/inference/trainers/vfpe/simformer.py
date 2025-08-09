@@ -14,7 +14,7 @@ from sbi.inference.trainers.vfpe.base_vf_inference import (
     MaskedVectorFieldTrainer,
 )
 from sbi.neural_nets.estimators import MaskedConditionalVectorFieldEstimator
-from sbi.neural_nets.factory import simformer_score_nn
+from sbi.neural_nets.factory import simformer_flow_nn, simformer_score_nn
 
 
 class Simformer(MaskedVectorFieldTrainer):
@@ -90,23 +90,14 @@ class Simformer(MaskedVectorFieldTrainer):
         super().__init__(
             prior=prior,
             mvf_estimator_builder=mvf_estimator,
+            posterior_latent_idx=posterior_latent_idx,
+            posterior_observed_idx=posterior_observed_idx,
             device=device,
             logging_level=logging_level,
             summary_writer=summary_writer,
             show_progress_bars=show_progress_bars,
             sde_type=sde_type,
             **kwargs,
-        )
-
-        self.posterior_latent_idx = (
-            torch.as_tensor(posterior_latent_idx, dtype=torch.long)
-            if posterior_latent_idx is not None
-            else None
-        )
-        self.posterior_observed_idx = (
-            torch.as_tensor(posterior_observed_idx, dtype=torch.long)
-            if posterior_observed_idx is not None
-            else None
         )
 
     def _build_default_nn_fn(self, **kwargs) -> MaskedVectorFieldEstimatorBuilder:
@@ -300,66 +291,31 @@ class Simformer(MaskedVectorFieldTrainer):
             **kwargs,
         )
 
-    def set_condition_indexes(
-        self,
-        new_posterior_latent_idx: Union[list, Tensor],
-        new_posterior_observed_idx: Union[list, Tensor],
-    ):
-        """Set the latent and observed condition indexes for posterior inference
-        if not passed at init time, or if an update is desired."""
 
-        self.posterior_latent_idx = torch.as_tensor(
-            new_posterior_latent_idx, dtype=torch.long
-        )
-        self.posterior_observed_idx = torch.as_tensor(
-            new_posterior_observed_idx, dtype=torch.long
-        )
+class FlowMatchingSimformer(Simformer):
+    """Flow-matching version of the Simformer as in Gloeckler et al. (2024).
 
-    def _generate_posterior_condition_mask(self):
-        if self.posterior_latent_idx is None or self.posterior_observed_idx is None:
-            raise ValueError(
-                "You did not pass latent and observed variable indexes. "
-                "sbi cannot generate a posterior or likelihood without any knowledge"
-                "of which variables are latent or observed "
-                "If you already instanciated a Masked Vector Filed Inference "
-                "and would like to update the current conditon indexes, "
-                "you can use the setter function `set_condtion_indexes()`"
-            )
-        return self.generate_condition_mask_from_idx(
-            self.posterior_latent_idx, self.posterior_observed_idx
-        )
+    Simformer enables sampling from arbitrary conditional joint distributions,
+    not just posterior or likelihood, by operating on a unified input tensor
+    that represents all variables.
 
-    @staticmethod
-    def generate_condition_mask_from_idx(
-        latent_idx: Union[list, Tensor],
-        observed_idx: Union[list, Tensor],
-    ) -> Tensor:
-        """Generates a condition mask from the idexes passed as parameters. Can be used
-        as a static method for any latent and observed index passed as parameters."""
+    The roles of variables—latent (to be inferred) or observed (to be conditioned on)—
+    are specified by a boolean mask `condition_mask`.
 
-        latent_idx = torch.as_tensor(latent_idx, dtype=torch.long)
-        observed_idx = torch.as_tensor(observed_idx, dtype=torch.long)
+    - `True` (or `1`): The variable is observed (conditioned on).
+    - `False` (or `0`): The variable is latent (to be inferred).
 
-        # Check for overlap
-        if torch.any(torch.isin(latent_idx, observed_idx)):
-            raise ValueError(
-                f"latent_idx and observed_idx must be disjoint, "
-                f"but you provided {latent_idx=} and {observed_idx=}."
-            )
+    Dependencies among variables are defined by a boolean adjacency matrix `edge_mask`.
 
-        all_idx = torch.cat([latent_idx, observed_idx])
-        unique_idx = torch.unique(all_idx)
-        num_nodes = unique_idx.numel()
-        # Check for completeness
-        if not torch.equal(torch.sort(unique_idx).values, torch.arange(num_nodes)):
-            raise ValueError(
-                f"latent_idx and observed_idx together must cover a complete range of "
-                f"integers from 0 to N-1 without gaps."
-                f"but you provided {latent_idx=} and {observed_idx=}."
-            )
+    - `True` (or `1`): An edge exists from the row variable to the column variable.
+    - `False` (or `0`): No edge exists.
 
-        # If checks pass we can generate the condition mask
-        condition_mask = torch.zeros(num_nodes, dtype=torch.bool)
-        condition_mask[latent_idx] = False
-        condition_mask[observed_idx] = True
-        return condition_mask
+    NOTE:
+        - Multi-round inference is not supported yet; the API is present for coherence
+            with sbi.
+    """
+
+    def _build_default_nn_fn(self, **kwargs) -> MaskedVectorFieldEstimatorBuilder:
+        model = kwargs.pop("vector_field_estimator_builder", "simformer")
+        kwargs.pop("sde_type", None)  # sde_type is not used in FM Simformer
+        return simformer_flow_nn(model=model, **kwargs)

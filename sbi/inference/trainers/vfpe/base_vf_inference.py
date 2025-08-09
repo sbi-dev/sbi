@@ -666,6 +666,8 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
         mvf_estimator_builder: Union[
             str, MaskedVectorFieldEstimatorBuilder
         ] = "simformer",
+        posterior_latent_idx: Optional[list | Tensor] = None,
+        posterior_observed_idx: Optional[list | Tensor] = None,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
@@ -719,6 +721,17 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
             self._build_neural_net = mvf_estimator_builder
 
         self._proposal_roundwise = []
+
+        self.posterior_latent_idx = (
+            torch.as_tensor(posterior_latent_idx, dtype=torch.long)
+            if posterior_latent_idx is not None
+            else None
+        )
+        self.posterior_observed_idx = (
+            torch.as_tensor(posterior_observed_idx, dtype=torch.long)
+            if posterior_observed_idx is not None
+            else None
+        )
 
     @abstractmethod
     def _build_default_nn_fn(self, **kwargs) -> MaskedVectorFieldEstimatorBuilder:
@@ -1294,3 +1307,67 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
 
         assert_all_finite(loss, f"{cls_name} loss")
         return calibration_kernel(inputs) * loss
+
+    def set_condition_indexes(
+        self,
+        new_posterior_latent_idx: Union[list, Tensor],
+        new_posterior_observed_idx: Union[list, Tensor],
+    ):
+        """Set the latent and observed condition indexes for posterior inference
+        if not passed at init time, or if an update is desired."""
+
+        self.posterior_latent_idx = torch.as_tensor(
+            new_posterior_latent_idx, dtype=torch.long
+        )
+        self.posterior_observed_idx = torch.as_tensor(
+            new_posterior_observed_idx, dtype=torch.long
+        )
+
+    def _generate_posterior_condition_mask(self):
+        if self.posterior_latent_idx is None or self.posterior_observed_idx is None:
+            raise ValueError(
+                "You did not pass latent and observed variable indexes. "
+                "sbi cannot generate a posterior or likelihood without any knowledge"
+                "of which variables are latent or observed "
+                "If you already instanciated a Masked Vector Filed Inference "
+                "and would like to update the current conditon indexes, "
+                "you can use the setter function `set_condtion_indexes()`"
+            )
+        return self.generate_condition_mask_from_idx(
+            self.posterior_latent_idx, self.posterior_observed_idx
+        )
+
+    @staticmethod
+    def generate_condition_mask_from_idx(
+        latent_idx: Union[list, Tensor],
+        observed_idx: Union[list, Tensor],
+    ) -> Tensor:
+        """Generates a condition mask from the idexes passed as parameters. Can be used
+        as a static method for any latent and observed index passed as parameters."""
+
+        latent_idx = torch.as_tensor(latent_idx, dtype=torch.long)
+        observed_idx = torch.as_tensor(observed_idx, dtype=torch.long)
+
+        # Check for overlap
+        if torch.any(torch.isin(latent_idx, observed_idx)):
+            raise ValueError(
+                f"latent_idx and observed_idx must be disjoint, "
+                f"but you provided {latent_idx=} and {observed_idx=}."
+            )
+
+        all_idx = torch.cat([latent_idx, observed_idx])
+        unique_idx = torch.unique(all_idx)
+        num_nodes = unique_idx.numel()
+        # Check for completeness
+        if not torch.equal(torch.sort(unique_idx).values, torch.arange(num_nodes)):
+            raise ValueError(
+                f"latent_idx and observed_idx together must cover a complete range of "
+                f"integers from 0 to N-1 without gaps."
+                f"but you provided {latent_idx=} and {observed_idx=}."
+            )
+
+        # If checks pass we can generate the condition mask
+        condition_mask = torch.zeros(num_nodes, dtype=torch.bool)
+        condition_mask[latent_idx] = False
+        condition_mask[observed_idx] = True
+        return condition_mask
