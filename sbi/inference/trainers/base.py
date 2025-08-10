@@ -859,7 +859,7 @@ class NeuralInference(ABC, BaseNeuralInference):
             )
 
 
-class MaskedNeuralInference(NeuralInference):
+class MaskedNeuralInference(ABC, BaseNeuralInference):
     """Abstract base class for masked neural inference methods."""
 
     def __init__(
@@ -1102,6 +1102,278 @@ class MaskedNeuralInference(NeuralInference):
 
             self._edge_mask_generator = generator
         return self  # Chainable
+
+    def build_posterior(
+        self,
+        estimator: Optional[Union[RatioEstimator, ConditionalEstimator]],
+        prior: Optional[Distribution],
+        sample_with: Literal[
+            "mcmc", "rejection", "vi", "importance", "direct", "sde", "ode"
+        ],
+        **kwargs,
+    ) -> NeuralPosterior:
+        r"""Method for building posteriors.
+
+        This method serves as a base method for constructing a posterior based
+        on a given estimator and prior. The posterior can be sampled using one of
+        several inference methods specified by `sample_with`.
+
+        Args:
+            estimator: The estimator that the posterior is based on.
+            prior: A probability distribution that expresses prior knowledge about the
+                parameters, e.g. which ranges are meaningful for them. Must be a PyTorch
+                distribution, see FAQ for details on how to use custom distributions.
+            sample_with: The inference method to use. Must be one of:
+                - "mcmc"
+                - "rejection"
+                - "vi"
+                - "importance"
+                - "direct"
+                - "sde"
+                - "ode"
+            **kwargs: Additional method-specific parameters.
+
+        Returns:
+            NeuralPosterior object.
+        """
+
+        prior = self._resolve_prior(prior)
+        estimator, device = self._resolve_estimator(estimator)
+
+        self._posterior = self._create_posterior(
+            estimator,
+            prior,
+            sample_with,
+            device,
+            **kwargs,
+        )
+
+        # Store models at end of each round.
+        self._model_bank.append(deepcopy(self._posterior))
+
+        return deepcopy(self._posterior)
+
+    def _resolve_prior(self, prior: Optional[Distribution]) -> Distribution:
+        """
+        Resolves the prior distribution to use.
+
+        If a prior is passed, it is validated and returned.
+        If not passed, attempts to use the stored `self._prior`.
+        Raises a ValueError if no valid prior is available.
+
+        Args:
+            prior: Optional prior distribution to resolve.
+
+        Returns:
+            A valid prior distribution.
+        """
+
+        if prior is None:
+            if self._prior is None:
+                cls_name = self.__class__.__name__
+                raise ValueError(
+                    f"""You did not pass a prior. You have to pass the prior either at
+                    initialization `inference = {cls_name}(prior)` or to `
+                    .build_posterior (prior=prior)`."""
+                )
+            prior = self._prior
+        else:
+            check_prior(prior)
+
+        return prior
+
+    def _resolve_estimator(
+        self, estimator: Optional[Union[RatioEstimator, ConditionalEstimator]]
+    ) -> Tuple[Union[RatioEstimator, ConditionalEstimator], str]:
+        """
+        Resolves the estimator and determines its device.
+
+        If no estimator is provided, the internal neural net (`self._neural_net`)
+        is used and the device is taken from `self._device`. Otherwise, validates
+        the passed estimator and infers its device.
+
+        Args:
+            estimator: Optional estimator to use.
+
+        Returns:
+            A tuple of (estimator, device).
+        """
+
+        if estimator is None:
+            assert self._neural_net is not None, (
+                "Provide an estimator or initialize self._neural_net."
+            )
+            estimator = self._neural_net
+            # If internal net is used device is defined.
+            device = self._device
+        else:
+            if not isinstance(estimator, (ConditionalEstimator, RatioEstimator)):
+                raise TypeError(
+                    "estimator must be ConditionalEstimator or RatioEstimator,"
+                    f" got {type(estimator).__name__}",
+                )
+            # Otherwise, infer it from the device of the net parameters.
+            device = str(next(estimator.parameters()).device)
+
+        return estimator, device
+
+    def _create_posterior(
+        self,
+        estimator: Union[RatioEstimator, ConditionalEstimator],
+        prior: Distribution,
+        sample_with: Literal[
+            "mcmc", "rejection", "vi", "importance", "direct", "sde", "ode"
+        ],
+        device: Union[str, torch.device],
+        **kwargs,
+    ) -> NeuralPosterior:
+        """
+        Create a posterior object using the specified inference method.
+
+        Depending on the value of `sample_with`, this method instantiates one of the
+        supported posterior inference strategies.
+
+        Args:
+            estimator: The estimator that the posterior is based on.
+            prior: A probability distribution that expresses prior knowledge about the
+                parameters, e.g. which ranges are meaningful for them. Must be a PyTorch
+                distribution, see FAQ for details on how to use custom distributions.
+            sample_with: The inference method to use. Must be one of:
+                - "mcmc"
+                - "rejection"
+                - "vi"
+                - "importance"
+                - "direct"
+                - "sde"
+                - "ode"
+            device: torch device on which to train the neural net and on which to
+                perform all posterior operations, e.g. gpu or cpu.
+            **kwargs: Additional method-specific parameters.
+
+        Returns:
+            NeuralPosterior object.
+        """
+
+        if sample_with == "direct":
+            posterior_estimator = estimator
+            assert isinstance(posterior_estimator, ConditionalDensityEstimator), (
+                f"Expected posterior_estimator to be an instance of "
+                " ConditionalDensityEstimator, "
+                f"but got {type(posterior_estimator).__name__} instead."
+            )
+            posterior = DirectPosterior(
+                posterior_estimator=posterior_estimator,
+                prior=prior,
+                device=device,
+                **(kwargs.get("direct_sampling_parameters") or {}),
+            )
+        elif sample_with in ("sde", "ode"):
+            vector_field_estimator = estimator
+            assert isinstance(
+                vector_field_estimator, ConditionalVectorFieldEstimator
+            ), (
+                f"Expected vector_field_estimator to be an instance of "
+                " ConditionalVectorFieldEstimator, "
+                f"but got {type(vector_field_estimator).__name__} instead."
+            )
+            posterior = VectorFieldPosterior(
+                vector_field_estimator,
+                prior,
+                device=device,
+                sample_with=sample_with,
+                **(kwargs.get("vectorfield_sampling_parameters") or {}),
+            )
+        else:
+            # Posteriors requiring potential_fn and theta_transform
+            potential_fn, theta_transform = self._get_potential_function(
+                prior, estimator
+            )
+            if sample_with == "mcmc":
+                posterior = MCMCPosterior(
+                    potential_fn=potential_fn,
+                    theta_transform=theta_transform,
+                    proposal=prior,
+                    method=kwargs.get("mcmc_method", "slice_np_vectorized"),
+                    device=device,
+                    **(kwargs.get("mcmc_parameters") or {}),
+                )
+            elif sample_with == "rejection":
+                posterior = RejectionPosterior(
+                    potential_fn=potential_fn,
+                    proposal=prior,
+                    device=device,
+                    **(kwargs.get("rejection_sampling_parameters") or {}),
+                )
+            elif sample_with == "vi":
+                posterior = VIPosterior(
+                    potential_fn=potential_fn,
+                    theta_transform=theta_transform,
+                    prior=prior,
+                    vi_method=kwargs.get("vi_method", "rKL"),
+                    device=device,
+                    **(kwargs.get("vi_parameters") or {}),
+                )
+            elif sample_with == "importance":
+                posterior = ImportanceSamplingPosterior(
+                    potential_fn=potential_fn,
+                    proposal=prior,
+                    device=device,
+                    **(kwargs.get("importance_sampling_parameters") or {}),
+                )
+            else:
+                raise NotImplementedError(
+                    f"Sampling method '{sample_with}' is not supported."
+                )
+
+        return posterior
+
+    def _converged(self, epoch: int, stop_after_epochs: int) -> bool:
+        """Return whether the training converged yet and save best model state so far.
+
+        Checks for improvement in validation performance over previous epochs.
+
+        Args:
+            epoch: Current epoch in training.
+            stop_after_epochs: How many fruitless epochs to let pass before stopping.
+
+        Returns:
+            Whether the training has stopped improving, i.e. has converged.
+        """
+        converged = False
+
+        assert self._neural_net is not None
+        neural_net = self._neural_net
+
+        # (Re)-start the epoch count with the first epoch or any improvement.
+        if epoch == 0 or self._val_loss < self._best_val_loss:
+            self._best_val_loss = self._val_loss
+            self._epochs_since_last_improvement = 0
+            self._best_model_state_dict = deepcopy(neural_net.state_dict())
+        else:
+            self._epochs_since_last_improvement += 1
+
+        # If no validation improvement over many epochs, stop training.
+        if self._epochs_since_last_improvement > stop_after_epochs - 1:
+            neural_net.load_state_dict(self._best_model_state_dict)
+            converged = True
+
+        return converged
+
+    def _report_convergence_at_end(
+        self, epoch: int, stop_after_epochs: int, max_num_epochs: int
+    ) -> None:
+        if self._converged(epoch, stop_after_epochs):
+            print(
+                "\r",
+                f"Neural network successfully converged after {epoch} epochs.",
+                end="",
+            )
+        elif max_num_epochs == epoch:
+            warn(
+                f"Maximum number of epochs `max_num_epochs={max_num_epochs}` reached,"
+                "but network has not yet fully converged. Consider increasing it.",
+                stacklevel=2,
+            )
 
     def _default_condition_masks_generator(self, inputs):
         """The default condition mask generator employed
