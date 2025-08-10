@@ -13,6 +13,7 @@ from sbi.analysis import conditional_potential
 from sbi.inference import (
     FMPE,
     NPSE,
+    FlowMatchingSimformer,
     MCMCPosterior,
     Simformer,
     VectorFieldPosterior,
@@ -204,10 +205,42 @@ def test_c2st_vector_field_on_linearGaussian(
             "gpu",
             marks=[pytest.mark.gpu, pytest.mark.slow],
         ),
-        # ("fmpe", 1, "gaussian", ["sde", "ode"]),
-        # ("fmpe", 1, "uniform", ["sde", "ode"]),
-        # ("fmpe", 3, "gaussian", ["sde", "ode"]),
-        # ("fmpe", 3, "uniform", ["sde", "ode"]),
+        pytest.param(
+            "flow",
+            1,
+            "gaussian",
+            ["sde", "ode"],
+            5000,
+            100,
+            "cpu",
+        ),
+        pytest.param(
+            "flow",
+            1,
+            "uniform",
+            ["sde", "ode"],
+            5000,
+            100,
+            "cpu",
+        ),
+        pytest.param(
+            "flow",
+            3,
+            "gaussian",
+            ["sde", "ode"],
+            5000,
+            100,
+            "cpu",
+        ),
+        pytest.param(
+            "flow",
+            3,
+            "uniform",
+            ["sde", "ode"],
+            5000,
+            100,
+            "cpu",
+        ),
     ],
 )
 def test_c2st_simformer_on_linearGaussian(
@@ -261,14 +294,23 @@ def test_c2st_simformer_on_linearGaussian(
     inputs = torch.stack([thetas, xs], dim=1)
 
     # Infer theta (node 0) given x (node 1)
-    inference = Simformer(
-        prior=prior,
-        sde_type=vector_field_type,  # type: ignore
-        show_progress_bars=True,
-        posterior_latent_idx=[0],
-        posterior_observed_idx=[1],
-        device=device,
-    )
+    if vector_field_type == "flow":
+        inference = FlowMatchingSimformer(
+            prior=prior,
+            show_progress_bars=True,
+            posterior_latent_idx=[0],
+            posterior_observed_idx=[1],
+            device=device,
+        )
+    else:
+        inference = Simformer(
+            prior=prior,
+            sde_type=vector_field_type,  # type: ignore
+            show_progress_bars=True,
+            posterior_latent_idx=[0],
+            posterior_observed_idx=[1],
+            device=device,
+        )
 
     mvf_estimator = inference.append_simulations(
         inputs=inputs,
