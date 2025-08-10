@@ -155,8 +155,24 @@ def check_if_proposal_has_default_x(proposal: Any):
 class BaseNeuralInference:
     "Mixin for NeuralInference objects"
 
+    # _neural_net: Optional[nn.Module]
+    # _train_loss: float
+    # _val_loss: float
     _summary_writer: SummaryWriter
     _summary: Dict[str, list]
+
+    @property
+    def summary(self):
+        return self._summary
+
+    @abstractmethod
+    def _get_potential_function(
+        self,
+        prior: Distribution,
+        estimator: Union[RatioEstimator, ConditionalEstimator],
+    ) -> Tuple[BasePotential, TorchTransform]:
+        """Subclass-specific potential creation"""
+        ...
 
     def _default_summary_writer(self) -> SummaryWriter:
         """Return summary writer logging to method- and simulator-specific directory."""
@@ -298,6 +314,50 @@ class BaseNeuralInference:
         state_dict["_summary_writer"] = self._default_summary_writer()
         self.__dict__ = state_dict
 
+    @abstractmethod
+    def append_simulations(
+        self,
+        *args,
+        **kwargs,
+    ) -> (
+        "NeuralInference | MaskedNeuralInference"
+    ):  #! Could actually return a BaseInference object
+        ...
+
+    @abstractmethod
+    def get_simulations(
+        self,
+        *args,
+        **kwargs,
+    ) -> Tuple[
+        Tensor, Tensor, Tensor
+    ]:  #! When you will adjust inf and nans management,
+        # this could become Tensor, Tensor (just 2)
+        ...
+
+    @abstractmethod
+    def get_dataloaders(
+        self,
+        *args,
+        **kwargs,
+    ) -> Tuple[data.DataLoader, data.DataLoader]: ...
+
+    @abstractmethod
+    def train(
+        self,
+        training_batch_size: int = 200,
+        learning_rate: float = 5e-4,
+        validation_fraction: float = 0.1,
+        stop_after_epochs: int = 20,
+        max_num_epochs: Optional[int] = None,
+        clip_max_norm: Optional[float] = 5.0,
+        calibration_kernel: Optional[Callable] = None,
+        exclude_invalid_x: bool = True,
+        discard_prior_samples: bool = False,
+        retrain_from_scratch: bool = False,
+        show_train_summary: bool = False,
+    ) -> NeuralPosterior: ...
+
 
 class NeuralInference(ABC, BaseNeuralInference):
     """Abstract base class for neural inference methods."""
@@ -363,11 +423,6 @@ class NeuralInference(ABC, BaseNeuralInference):
             epoch_durations_sec=[],
         )
 
-    @property
-    def summary(self):
-        return self._summary
-
-    @abstractmethod
     def append_simulations(
         self,
         theta: Tensor,
@@ -433,31 +488,6 @@ class NeuralInference(ABC, BaseNeuralInference):
         self._data_round_index.append(int(from_round))
 
         return self
-
-    @abstractmethod
-    def train(
-        self,
-        training_batch_size: int = 200,
-        learning_rate: float = 5e-4,
-        validation_fraction: float = 0.1,
-        stop_after_epochs: int = 20,
-        max_num_epochs: Optional[int] = None,
-        clip_max_norm: Optional[float] = 5.0,
-        calibration_kernel: Optional[Callable] = None,
-        exclude_invalid_x: bool = True,
-        discard_prior_samples: bool = False,
-        retrain_from_scratch: bool = False,
-        show_train_summary: bool = False,
-    ) -> NeuralPosterior: ...
-
-    @abstractmethod
-    def _get_potential_function(
-        self,
-        prior: Distribution,
-        estimator: Union[RatioEstimator, ConditionalEstimator],
-    ) -> Tuple[BasePotential, TorchTransform]:
-        """Subclass-specific potential creation"""
-        ...
 
     def get_simulations(
         self,
@@ -901,46 +931,6 @@ class MaskedNeuralInference(NeuralInference):
             training_loss=[],
             epoch_durations_sec=[],
         )
-
-    # Must be re-defined to specify the new interface using inputs
-    # rather than thetas and x
-    @abstractmethod
-    def append_simulations(
-        self,
-        inputs: Tensor,
-        exclude_invalid_x: bool = False,
-        from_round: int = 0,
-        algorithm: Optional[str] = None,
-        data_device: Optional[str] = None,
-    ) -> "MaskedNeuralInference":
-        r"""Store parameters and simulation outputs to use them for later training.
-
-        Data are stored as entries in lists for each type of variable (parameter/data).
-
-        Stores inputs, invalid_inputs_masks (indicating entires which report NaN or Inf)
-        and prior_masks (indicating if simulations are coming from the prior or not),
-        and an index indicating which round the batch of simulations came from.
-
-        Args:
-            inputs: Simulation outputs.
-            exclude_invalid_x: Whether invalid simulations are discarded during
-                training. If `False`, The inference algorithm raises an error when
-                invalid simulations are found. If `True`, nan or inf entries will be
-                forced to be latent (to be infered) in the condition_mask.
-            from_round: Which round the data stemmed from. Round 0 means from the prior.
-                With default settings, this is not used at all for the inference
-                algorithm. Only when the user later on requests
-                `.train(discard_prior_samples=True)`, we use these indices to find which
-                training data stemmed from the prior.
-            algorithm: Which algorithm is used. This is used to give a more informative
-                warning or error message when invalid simulations are found.
-            data_device: Where to store the data, default is on the same device where
-                the training is happening. If training a large dataset on a GPU with not
-                much VRAM can set to 'cpu' to store data on system memory instead.
-        Returns:
-            MaskedNeuralInference object (returned so that this function is chainable).
-        """
-        pass
 
     # Must be re-defined to specify the new interface using inputs
     # rather than thetas and x
