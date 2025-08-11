@@ -43,7 +43,7 @@ from sbi.utils.sbiutils import (
     simformer_msg_on_invalid_x,
 )
 from sbi.utils.torchutils import assert_all_finite
-from sbi.utils.user_input_checks import validate_inputs_and_masks
+from sbi.utils.user_input_checks import validate_inputs
 
 
 class VectorFieldEstimatorBuilder(Protocol):
@@ -793,27 +793,18 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
         if data_device is None:
             data_device = self._device
 
-        inputs, _, _ = validate_inputs_and_masks(
+        inputs = validate_inputs(
             inputs=inputs,
-            condition_masks=None,
-            edge_masks=None,
             data_device=data_device,
             training_device=self._device,
         )
 
-        # TODO: the following lines to manage invalid inputs could be handled
-        # more gracefuly using an handle_invalid_inputs() helper function
         _, num_nans, num_infs = handle_invalid_x(
             inputs, exclude_invalid_x=exclude_invalid_x
         )
 
-        # Differently from other sbi methods, we can still allow invalid values
-        inputs_is_nan_entries = torch.isnan(inputs).any(dim=-1)
-        inputs_is_inf_entries = torch.isinf(inputs).any(dim=-1)
-        is_valid_inputs_entries = ~inputs_is_nan_entries & ~inputs_is_inf_entries
-
-        if not exclude_invalid_x:
-            is_valid_inputs_entries = torch.ones_like(is_valid_inputs_entries)
+        # Check for problematic z-scoring
+        warn_if_zscoring_changes_data(inputs)
 
         # Warn the user if invalid inputs are found
         simformer_msg_on_invalid_x(
@@ -823,14 +814,10 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
             algorithm=f"Single-round {inference_name}",
         )
 
-        # Check for problematic z-scoring
-        warn_if_zscoring_changes_data(inputs)
-
         self._data_round_index.append(current_round)
         prior_masks = mask_sims_from_prior(int(current_round > 0), inputs.size(0))
 
         self._inputs_roundwise.append(inputs)
-        self._valid_inputs_mask_roundwise.append(is_valid_inputs_entries)
         self._prior_masks.append(prior_masks)
 
         self._proposal_roundwise.append(proposal)
@@ -961,7 +948,7 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
         # arguments, which will build the neural network.
         if self._neural_net is None or retrain_from_scratch:
             # Get theta,x to initialize NN
-            inputs, _, _ = self.get_simulations(starting_round=start_idx)
+            inputs, _ = self.get_simulations(starting_round=start_idx)
             # Use only training data for building the neural net (z-scoring transforms)
 
             self._neural_net = self._build_neural_net(
@@ -1003,22 +990,16 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
                 # Get batches on current device.
                 (
                     inputs_batch,
-                    valid_inputs_mask_batch,
                     prior_masks_batch,
                 ) = (
                     batch[0].to(self._device),
                     batch[1].to(self._device),
-                    batch[2].to(self._device),
                 )
 
                 # Generate condition and edge masks for current batch
                 condition_masks_batch = (
                     self._condition_mask_generator(inputs_batch)
-                    & valid_inputs_mask_batch
                 ).to(self._device)
-
-                # Default placeholder value to avoid inf and nan
-                inputs_batch[~valid_inputs_mask_batch] = 0.0
 
                 edge_masks_batch = self._edge_mask_generator(inputs_batch)
                 if edge_masks_batch is not None:
@@ -1070,12 +1051,10 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
                 for batch in val_loader:
                     (
                         inputs_batch_val,
-                        valid_inputs_mask_batch_val,
                         prior_masks_batch_val,
                     ) = (
                         batch[0].to(self._device),
                         batch[1].to(self._device),
-                        batch[2].to(self._device),
                     )
 
                     # For validation loss, we evaluate at a fixed set of times to reduce
@@ -1086,9 +1065,6 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
                     times_batch = validation_times.shape[0]
                     inputs_batch_val = inputs_batch_val.repeat(
                         times_batch, *([1] * (inputs_batch_val.ndim - 1))
-                    )
-                    valid_inputs_mask_batch_val = valid_inputs_mask_batch_val.repeat(
-                        times_batch, *([1] * (valid_inputs_mask_batch_val.ndim - 1))
                     )
                     prior_masks_batch_val = prior_masks_batch_val.repeat(
                         times_batch, *([1] * (prior_masks_batch_val.ndim - 1))
@@ -1103,7 +1079,6 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
                     # Generate condition and edge masks for current batch
                     condition_masks_batch_val = (
                         self._condition_mask_generator(inputs_batch_val)
-                        & valid_inputs_mask_batch_val
                     ).to(self._device)
                     edge_masks_batch_val = self._edge_mask_generator(inputs_batch_val)
                     if edge_masks_batch_val is not None:

@@ -410,7 +410,7 @@ def simformer_msg_on_invalid_x(
             logging.warning(
                 f"Found {num_nans} NaN simulations and {num_infs} Inf simulations. "
                 "Samples presenting invalid entries will be forced to be latent in "
-                "the condition mask"
+                "the condition mask."
             )
         else:
             logging.warning(

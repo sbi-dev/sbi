@@ -332,10 +332,10 @@ class BaseNeuralInference:
         self,
         *args,
         **kwargs,
-    ) -> Tuple[
-        Tensor, Tensor, Tensor
-    ]:  # ! When you will adjust inf and nans management,
-        # this could become Tensor, Tensor (just 2)
+    ) -> Tuple[Tensor, Tensor] | Tuple[Tensor, Tensor, Tensor]:
+        # TODO: this could be improved using TypeVarTuple from python >=3.11
+        # where one can enforce child classes to take either the tuple of 2 (maskedNI)
+        # or tuple of 3 (NeuralInference) (at the moment any child can return both)
         ...
 
     @abstractmethod
@@ -931,7 +931,6 @@ class MaskedNeuralInference(ABC, BaseNeuralInference):
         # Initialize roundwise (inputs, prior_masks) for storage of parameters,
         # simulations and masks indicating if simulations came from prior.
         self._inputs_roundwise = []
-        self._valid_inputs_mask_roundwise = []
         self._prior_masks = []
         self._model_bank = []
 
@@ -965,7 +964,7 @@ class MaskedNeuralInference(ABC, BaseNeuralInference):
     def get_simulations(
         self,
         starting_round: int = 0,
-    ) -> Tuple[Tensor, Tensor, Tensor]:
+    ) -> Tuple[Tensor, Tensor]:
         r"""Returns all inputs, valid_inputs_masks, prior_masks
         from rounds >= `starting_round`.
 
@@ -981,14 +980,11 @@ class MaskedNeuralInference(ABC, BaseNeuralInference):
         inputs = get_simulations_since_round(
             self._inputs_roundwise, self._data_round_index, starting_round
         )
-        valid_inputs_masks = get_simulations_since_round(
-            self._valid_inputs_mask_roundwise, self._data_round_index, starting_round
-        )
         prior_masks = get_simulations_since_round(
             self._prior_masks, self._data_round_index, starting_round
         )
 
-        return inputs, valid_inputs_masks, prior_masks
+        return inputs, prior_masks
 
     # Must be re-defined to specify the new interface using inputs
     # rather than thetas and x
@@ -1018,9 +1014,9 @@ class MaskedNeuralInference(ABC, BaseNeuralInference):
         """
 
         #
-        inputs, valid_inputs_mask, prior_masks = self.get_simulations(starting_round)
+        inputs, prior_masks = self.get_simulations(starting_round)
 
-        dataset = data.TensorDataset(inputs, valid_inputs_mask, prior_masks)
+        dataset = data.TensorDataset(inputs, prior_masks)
 
         # Get total number of training examples.
         num_examples = inputs.size(0)

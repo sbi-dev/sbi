@@ -789,13 +789,11 @@ def validate_theta_and_x(
     return theta, x
 
 
-def validate_inputs_and_masks(
+def validate_inputs(
     inputs: Any,
-    condition_masks: Any,
-    edge_masks: Any,
     data_device: str = "cpu",
     training_device: str = "cpu",
-) -> Tuple[Tensor, Tensor, Tensor]:
+) -> Tensor:
     r"""
     Checks if the passed inputs, condition_masks, and edge_masks are valid.
 
@@ -830,35 +828,7 @@ def validate_inputs_and_masks(
         inputs, "inputs", data_device, training_device, torch.float32
     )
 
-    # Check for consistent batch size across all inputs
-    batch_size = inputs.shape[0]
-    if condition_masks is not None:
-        condition_masks = _validate_tensor_properties_and_device(
-            condition_masks,
-            "condition_masks",
-            data_device,
-            training_device,
-            (torch.bool, torch.int),
-        )
-        assert condition_masks.shape[0] == batch_size, (
-            f"Batch size of condition_masks (={condition_masks.shape[0]}) must match "
-            f"batch size of inputs (={batch_size})."
-        )
-
-    if edge_masks is not None:
-        edge_masks = _validate_tensor_properties_and_device(
-            edge_masks,
-            "edge_masks",
-            data_device,
-            training_device,
-            (torch.bool, torch.int),
-        )
-        assert edge_masks.shape[0] == batch_size, (
-            f"Batch size of edge_masks (={edge_masks.shape[0]}) must match "
-            f"batch size of inputs (={batch_size})."
-        )
-
-    return inputs, condition_masks, edge_masks
+    return inputs
 
 
 def test_posterior_net_for_multi_d_x(net, theta: Tensor, x: Tensor) -> None:
