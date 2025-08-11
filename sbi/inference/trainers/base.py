@@ -173,7 +173,7 @@ class BaseNeuralInference:
     def _get_potential_function(
         self,
         prior: Distribution,
-        estimator: Union[RatioEstimator, ConditionalEstimator],
+        estimator: nn.Module,
     ) -> Tuple[BasePotential, TorchTransform]:
         """Subclass-specific potential creation"""
         ...
@@ -427,6 +427,112 @@ class BaseNeuralInference:
             device = str(next(estimator.parameters()).device)
 
         return estimator, device
+
+    def _create_posterior(
+        self,
+        estimator: nn.Module,
+        prior: Distribution,
+        sample_with: Literal[
+            "mcmc", "rejection", "vi", "importance", "direct", "sde", "ode"
+        ],
+        device: Union[str, torch.device],
+        **kwargs,
+    ) -> NeuralPosterior:
+        """
+        Create a posterior object using the specified inference method.
+
+        Depending on the value of `sample_with`, this method instantiates one of the
+        supported posterior inference strategies.
+
+        Args:
+            estimator: The estimator that the posterior is based on.
+            prior: A probability distribution that expresses prior knowledge about the
+                parameters, e.g. which ranges are meaningful for them. Must be a PyTorch
+                distribution, see FAQ for details on how to use custom distributions.
+            sample_with: The inference method to use. Must be one of:
+                - "mcmc"
+                - "rejection"
+                - "vi"
+                - "importance"
+                - "direct"
+                - "sde"
+                - "ode"
+            device: torch device on which to train the neural net and on which to
+                perform all posterior operations, e.g. gpu or cpu.
+            **kwargs: Additional method-specific parameters.
+
+        Returns:
+            NeuralPosterior object.
+        """
+
+        if sample_with == "direct":
+            posterior_estimator = estimator
+            assert isinstance(posterior_estimator, ConditionalDensityEstimator), (
+                f"Expected posterior_estimator to be an instance of "
+                " ConditionalDensityEstimator, "
+                f"but got {type(posterior_estimator).__name__} instead."
+            )
+            posterior = DirectPosterior(
+                posterior_estimator=posterior_estimator,
+                prior=prior,
+                device=device,
+                **(kwargs.get("direct_sampling_parameters") or {}),
+            )
+        elif sample_with in ("sde", "ode"):
+            vector_field_estimator = estimator
+            assert isinstance(
+                vector_field_estimator, ConditionalVectorFieldEstimator
+            ), (
+                f"Expected vector_field_estimator to be an instance of "
+                " ConditionalVectorFieldEstimator, "
+                f"but got {type(vector_field_estimator).__name__} instead."
+            )
+            posterior = VectorFieldPosterior(
+                vector_field_estimator,
+                prior,
+                device=device,
+                sample_with=sample_with,
+                **(kwargs.get("vectorfield_sampling_parameters") or {}),
+            )
+        else:
+            # Posteriors requiring potential_fn and theta_transform
+            potential_fn, theta_transform = self._get_potential_function(
+                prior, estimator
+            )
+            if sample_with == "mcmc":
+                posterior = MCMCPosterior(
+                    potential_fn=potential_fn,
+                    theta_transform=theta_transform,
+                    proposal=prior,
+                    method=kwargs.get("mcmc_method", "slice_np_vectorized"),
+                    device=device,
+                    **(kwargs.get("mcmc_parameters") or {}),
+                )
+            elif sample_with == "rejection":
+                posterior = RejectionPosterior(
+                    potential_fn=potential_fn,
+                    proposal=prior,
+                    device=device,
+                    **(kwargs.get("rejection_sampling_parameters") or {}),
+                )
+            elif sample_with == "vi":
+                posterior = VIPosterior(
+                    potential_fn=potential_fn,
+                    theta_transform=theta_transform,
+                    prior=prior,
+                    vi_method=kwargs.get("vi_method", "rKL"),
+                    device=device,
+                    **(kwargs.get("vi_parameters") or {}),
+                )
+            elif sample_with == "importance":
+                posterior = ImportanceSamplingPosterior(
+                    potential_fn=potential_fn,
+                    proposal=prior,
+                    device=device,
+                    **(kwargs.get("importance_sampling_parameters") or {}),
+                )
+
+        return posterior
 
     def _converged(self, epoch: int, stop_after_epochs: int) -> bool:
         """Return whether the training converged yet and save best model state so far.
@@ -781,112 +887,6 @@ class NeuralInference(ABC, BaseNeuralInference):
         )
         return resolved_estimator, device
 
-    def _create_posterior(
-        self,
-        estimator: Union[RatioEstimator, ConditionalEstimator],
-        prior: Distribution,
-        sample_with: Literal[
-            "mcmc", "rejection", "vi", "importance", "direct", "sde", "ode"
-        ],
-        device: Union[str, torch.device],
-        **kwargs,
-    ) -> NeuralPosterior:
-        """
-        Create a posterior object using the specified inference method.
-
-        Depending on the value of `sample_with`, this method instantiates one of the
-        supported posterior inference strategies.
-
-        Args:
-            estimator: The estimator that the posterior is based on.
-            prior: A probability distribution that expresses prior knowledge about the
-                parameters, e.g. which ranges are meaningful for them. Must be a PyTorch
-                distribution, see FAQ for details on how to use custom distributions.
-            sample_with: The inference method to use. Must be one of:
-                - "mcmc"
-                - "rejection"
-                - "vi"
-                - "importance"
-                - "direct"
-                - "sde"
-                - "ode"
-            device: torch device on which to train the neural net and on which to
-                perform all posterior operations, e.g. gpu or cpu.
-            **kwargs: Additional method-specific parameters.
-
-        Returns:
-            NeuralPosterior object.
-        """
-
-        if sample_with == "direct":
-            posterior_estimator = estimator
-            assert isinstance(posterior_estimator, ConditionalDensityEstimator), (
-                f"Expected posterior_estimator to be an instance of "
-                " ConditionalDensityEstimator, "
-                f"but got {type(posterior_estimator).__name__} instead."
-            )
-            posterior = DirectPosterior(
-                posterior_estimator=posterior_estimator,
-                prior=prior,
-                device=device,
-                **(kwargs.get("direct_sampling_parameters") or {}),
-            )
-        elif sample_with in ("sde", "ode"):
-            vector_field_estimator = estimator
-            assert isinstance(
-                vector_field_estimator, ConditionalVectorFieldEstimator
-            ), (
-                f"Expected vector_field_estimator to be an instance of "
-                " ConditionalVectorFieldEstimator, "
-                f"but got {type(vector_field_estimator).__name__} instead."
-            )
-            posterior = VectorFieldPosterior(
-                vector_field_estimator,
-                prior,
-                device=device,
-                sample_with=sample_with,
-                **(kwargs.get("vectorfield_sampling_parameters") or {}),
-            )
-        else:
-            # Posteriors requiring potential_fn and theta_transform
-            potential_fn, theta_transform = self._get_potential_function(
-                prior, estimator
-            )
-            if sample_with == "mcmc":
-                posterior = MCMCPosterior(
-                    potential_fn=potential_fn,
-                    theta_transform=theta_transform,
-                    proposal=prior,
-                    method=kwargs.get("mcmc_method", "slice_np_vectorized"),
-                    device=device,
-                    **(kwargs.get("mcmc_parameters") or {}),
-                )
-            elif sample_with == "rejection":
-                posterior = RejectionPosterior(
-                    potential_fn=potential_fn,
-                    proposal=prior,
-                    device=device,
-                    **(kwargs.get("rejection_sampling_parameters") or {}),
-                )
-            elif sample_with == "vi":
-                posterior = VIPosterior(
-                    potential_fn=potential_fn,
-                    theta_transform=theta_transform,
-                    prior=prior,
-                    vi_method=kwargs.get("vi_method", "rKL"),
-                    device=device,
-                    **(kwargs.get("vi_parameters") or {}),
-                )
-            elif sample_with == "importance":
-                posterior = ImportanceSamplingPosterior(
-                    potential_fn=potential_fn,
-                    proposal=prior,
-                    device=device,
-                    **(kwargs.get("importance_sampling_parameters") or {}),
-                )
-
-        return posterior
-
 
 class MaskedNeuralInference(ABC, BaseNeuralInference):
     """Abstract base class for masked neural inference methods."""
@@ -1171,7 +1171,7 @@ class MaskedNeuralInference(ABC, BaseNeuralInference):
             edge_mask,
         )
 
-        self._posterior = self._create_conditional(
+        self._posterior = self._create_posterior(
             vf_estimator,
             prior,
             sample_with,
@@ -1231,52 +1231,6 @@ class MaskedNeuralInference(ABC, BaseNeuralInference):
         )
 
         return unmasked_resolved_estimator, device
-
-    def _create_conditional(
-        self,
-        estimator: ConditionalEstimator,
-        prior: Distribution,
-        sample_with: Literal["sde", "ode"],
-        device: Union[str, torch.device],
-        **kwargs,
-    ) -> NeuralPosterior:
-        """
-        Create a posterior object using the specified inference method.
-
-        Depending on the value of `sample_with`, this method instantiates one of the
-        supported posterior inference strategies.
-
-        Args:
-            estimator: The estimator that the posterior is based on.
-            prior: A probability distribution that expresses prior knowledge about the
-                parameters, e.g. which ranges are meaningful for them. Must be a PyTorch
-                distribution, see FAQ for details on how to use custom distributions.
-            sample_with: The inference method to use. Must be one of:
-                - "sde"
-                - "ode"
-            device: torch device on which to train the neural net and on which to
-                perform all posterior operations, e.g. gpu or cpu.
-            **kwargs: Additional method-specific parameters.
-
-        Returns:
-            NeuralPosterior object.
-        """
-
-        vector_field_estimator = estimator
-        assert isinstance(vector_field_estimator, ConditionalVectorFieldEstimator), (
-            f"Expected vector_field_estimator to be an instance of "
-            " ConditionalVectorFieldEstimator, "
-            f"but got {type(vector_field_estimator).__name__} instead."
-        )
-        posterior = VectorFieldPosterior(
-            vector_field_estimator,
-            prior,
-            device=device,
-            sample_with=sample_with,
-            **(kwargs.get("vectorfield_sampling_parameters") or {}),
-        )
-
-        return posterior
 
     def _default_condition_masks_generator(self, inputs):
         """The default condition mask generator employed
