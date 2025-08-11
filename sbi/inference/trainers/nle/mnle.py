@@ -34,7 +34,7 @@ class MNLE(LikelihoodEstimatorTrainer):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
-        density_estimator: Union[str, DensityEstimatorBuilder] = "mnle",
+        density_estimator: Union[Literal["mnle"], DensityEstimatorBuilder] = "mnle",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[TensorboardSummaryWriter] = None,
@@ -48,12 +48,12 @@ class MNLE(LikelihoodEstimatorTrainer):
                 prior must be passed to `.build_posterior()`.
             density_estimator: If it is a string, it must be "mnle" to use the
                 preconfiugred neural nets for MNLE. Alternatively, a function
-                that builds a custom neural network can be provided. The function will
+                that builds a custom neural network, which adheres to
+                `DensityEstimatorBuilder` protocol can be provided. The function will
                 be called with the first batch of simulations (theta, x), which can
-                thus be used for shape inference and potentially for z-scoring. It
-                needs to return a PyTorch `nn.Module` implementing the density
-                estimator. The density estimator needs to provide the methods
-                `.log_prob`, `.log_prob_iid()` and `.sample()`.
+                thus be used for shape inference and potentially for z-scoring. The
+                density estimator needs to provide the methods `.log_prob` and
+                `.sample()`.
             device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.
