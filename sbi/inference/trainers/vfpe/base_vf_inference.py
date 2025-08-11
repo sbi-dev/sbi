@@ -4,7 +4,7 @@
 import time
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from typing import Any, Callable, Dict, Literal, Optional, Protocol, Tuple, Union
+from typing import Any, Callable, Optional, Protocol, Tuple, Union
 
 import torch
 from torch import Tensor, ones
@@ -18,15 +18,14 @@ from sbi.inference import MaskedNeuralInference, NeuralInference
 from sbi.inference.posteriors import (
     DirectPosterior,
 )
-from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials.vector_field_potential import (
     VectorFieldBasedPotential,
     vector_field_estimator_based_potential,
 )
 from sbi.neural_nets.estimators import (
-    ConditionalVectorFieldEstimator,
     MaskedConditionalVectorFieldEstimator,
 )
+from sbi.neural_nets.estimators.base import ConditionalVectorFieldEstimator
 from sbi.sbi_types import TorchTransform
 from sbi.utils import (
     check_estimator_arg,
@@ -48,7 +47,9 @@ from sbi.utils.user_input_checks import validate_inputs_and_masks
 class VectorFieldEstimatorBuilder(Protocol):
     """Protocol for building a vector field estimator from data."""
 
-    def __call__(self, theta: Tensor, x: Tensor) -> ConditionalVectorFieldEstimator:
+    def __call__(
+        self, theta: Tensor, x: Tensor
+    ) -> MaskedConditionalVectorFieldEstimator:
         """Build a vector field estimator from theta and x, which mainly
         inform the shape of the input and the condition to the neural network.
         Generally, it can also be used to z-score the data, but not in the case
@@ -1237,47 +1238,6 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
             "and flow-matching models which use ODE/SDE-based sampling, and "
             "therefore do not require a potential function for "
             "gradient-based MCMC methods like HMC yet. Please avoid this."
-        )
-
-    def _build_conditional(
-        self,
-        condition_mask: Tensor,
-        edge_mask: Optional[Tensor],
-        mvf_estimator: Optional[MaskedConditionalVectorFieldEstimator] = None,
-        prior: Optional[Distribution] = None,
-        sample_with: Literal['ode', 'sde'] = "sde",
-        vectorfield_sampling_parameters: Optional[Dict[str, Any]] = None,
-        **kwargs,
-    ) -> NeuralPosterior:
-        # ! This is also handled within super().build_posterior()
-        # via _resolve_estimator(),
-        # but we first need to call the Wrapper using
-        # build_conditional_vector_field_estimator() thus we must ensure it is not None.
-        # May seem dirty but the only alternative would be to
-        # refactor upsteream logic, which would require to pass
-        # condition and edge mask rather than limiting their use here;
-        # thus creating duplicate code for _create_posterior() and build_posterior()
-        # in the MaskedNeuralInference
-        if mvf_estimator is None:
-            mvf_estimator = self._neural_net
-
-        # Since sbi is hard-coded with the "posterior-paradigm" there is a conflict with
-        # Simformer which rather generalizes these concept to arbitrary conditionals.
-        # Thus, even if I call build_posterior I rather use it as a general conditional
-        # distribution, employing a wrapper `build_conditional_vector_field_estimator()`
-        # that smartly adapt the API and acts some miscellaneuos operations.
-        # For the Simformer there is no concept of "posterior", as it simply works over
-        # masks that define what is latent (to be infered) and what is not.
-        # Future work could involve generalizing further sbi interface.
-        # ! Add for "collisions" of method's name
-        return super().build_posterior(
-            estimator=mvf_estimator.build_conditional_vector_field_estimator(
-                condition_mask, edge_mask
-            ),
-            prior=prior,
-            sample_with=sample_with,
-            vectorfield_sampling_parameters=vectorfield_sampling_parameters,
-            **kwargs,
         )
 
     def _loss(

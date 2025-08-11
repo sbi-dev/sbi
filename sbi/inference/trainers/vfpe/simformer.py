@@ -3,7 +3,6 @@
 
 from typing import Any, Dict, Literal, Optional, Union
 
-import torch
 from torch import Tensor
 from torch.distributions import Distribution
 from torch.utils.tensorboard.writer import SummaryWriter
@@ -161,8 +160,7 @@ class Simformer(MaskedVectorFieldTrainer):
         """
 
         # If the condtion mask is a list we must convert it
-        condition_mask = torch.as_tensor(condition_mask)
-        return self._build_conditional(
+        return super().build_conditional(
             condition_mask=condition_mask,
             edge_mask=edge_mask,
             mvf_estimator=mvf_estimator,

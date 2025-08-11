@@ -27,6 +27,8 @@ from sbi.neural_nets.estimators.base import (
     ConditionalDensityEstimator,
     ConditionalEstimator,
     ConditionalVectorFieldEstimator,
+    MaskedConditionalEstimator,
+    MaskedConditionalVectorFieldEstimator,
 )
 from sbi.neural_nets.ratio_estimators import RatioEstimator
 from sbi.sbi_types import TorchTransform
@@ -319,10 +321,7 @@ class BaseNeuralInference:
         self,
         *args,
         **kwargs,
-    ) -> (
-        "NeuralInference | MaskedNeuralInference"
-    ):  #! Could actually return a BaseInference object
-        ...
+    ) -> "BaseNeuralInference": ...
 
     @abstractmethod
     def get_simulations(
@@ -687,7 +686,7 @@ class NeuralInference(ABC, BaseNeuralInference):
                 "Provide an estimator or initialize self._neural_net."
             )
             estimator = self._neural_net
-            # If internal net is used device is defined.
+            # If internal net is used device is defined
             device = self._device
         else:
             if not isinstance(estimator, (ConditionalEstimator, RatioEstimator)):
@@ -695,7 +694,7 @@ class NeuralInference(ABC, BaseNeuralInference):
                     "estimator must be ConditionalEstimator or RatioEstimator,"
                     f" got {type(estimator).__name__}",
                 )
-            # Otherwise, infer it from the device of the net parameters.
+            # Otherwise, infer it from the device of the net parameters
             device = str(next(estimator.parameters()).device)
 
         return estimator, device
@@ -802,10 +801,6 @@ class NeuralInference(ABC, BaseNeuralInference):
                     proposal=prior,
                     device=device,
                     **(kwargs.get("importance_sampling_parameters") or {}),
-                )
-            else:
-                raise NotImplementedError(
-                    f"Sampling method '{sample_with}' is not supported."
                 )
 
         return posterior
@@ -914,11 +909,6 @@ class MaskedNeuralInference(ABC, BaseNeuralInference):
         self._condition_mask_generator = self._default_condition_masks_generator
         self._edge_mask_generator = self._default_edge_masks_generator
 
-        # XXX We could instantiate here the Posterior for all children. Two problems:
-        #     1. We must dispatch to right PotentialProvider for mcmc based on name
-        #     2. `method_family` cannot be resolved only from `self.__class__.__name__`,
-        #         since SRE, AALR demand different handling but are both in SRE class.
-
         self._summary_writer = (
             self._default_summary_writer() if summary_writer is None else summary_writer
         )
@@ -931,6 +921,8 @@ class MaskedNeuralInference(ABC, BaseNeuralInference):
             training_loss=[],
             epoch_durations_sec=[],
         )
+
+    # ? Should implement append_simulations
 
     # Must be re-defined to specify the new interface using inputs
     # rather than thetas and x
@@ -1103,13 +1095,13 @@ class MaskedNeuralInference(ABC, BaseNeuralInference):
             self._edge_mask_generator = generator
         return self  # Chainable
 
-    def build_posterior(
+    def build_conditional(
         self,
-        estimator: Optional[Union[RatioEstimator, ConditionalEstimator]],
-        prior: Optional[Distribution],
-        sample_with: Literal[
-            "mcmc", "rejection", "vi", "importance", "direct", "sde", "ode"
-        ],
+        condition_mask: Union[Tensor, list],
+        edge_mask: Optional[Tensor] = None,
+        mvf_estimator: Optional[MaskedConditionalVectorFieldEstimator] = None,
+        prior: Optional[Distribution] = None,
+        sample_with: Literal['ode', 'sde'] = "sde",
         **kwargs,
     ) -> NeuralPosterior:
         r"""Method for building posteriors.
@@ -1124,11 +1116,6 @@ class MaskedNeuralInference(ABC, BaseNeuralInference):
                 parameters, e.g. which ranges are meaningful for them. Must be a PyTorch
                 distribution, see FAQ for details on how to use custom distributions.
             sample_with: The inference method to use. Must be one of:
-                - "mcmc"
-                - "rejection"
-                - "vi"
-                - "importance"
-                - "direct"
                 - "sde"
                 - "ode"
             **kwargs: Additional method-specific parameters.
@@ -1137,11 +1124,19 @@ class MaskedNeuralInference(ABC, BaseNeuralInference):
             NeuralPosterior object.
         """
 
-        prior = self._resolve_prior(prior)
-        estimator, device = self._resolve_estimator(estimator)
+        condition_mask = torch.as_tensor(condition_mask)
+        if edge_mask is not None:
+            edge_mask = torch.as_tensor(edge_mask)
 
-        self._posterior = self._create_posterior(
-            estimator,
+        prior = self._resolve_prior(prior)
+        vf_estimator, device = self._resolve_estimator(
+            mvf_estimator,
+            condition_mask,
+            edge_mask,
+        )
+
+        self._posterior = self._create_conditional(
+            vf_estimator,
             prior,
             sample_with,
             device,
@@ -1183,8 +1178,11 @@ class MaskedNeuralInference(ABC, BaseNeuralInference):
         return prior
 
     def _resolve_estimator(
-        self, estimator: Optional[Union[RatioEstimator, ConditionalEstimator]]
-    ) -> Tuple[Union[RatioEstimator, ConditionalEstimator], str]:
+        self,
+        estimator: Optional[MaskedConditionalEstimator],
+        fixed_condition_mask: Tensor,
+        fixed_edge_mask: Optional[Tensor],
+    ) -> Tuple[ConditionalEstimator, str]:
         """
         Resolves the estimator and determines its device.
 
@@ -1204,26 +1202,32 @@ class MaskedNeuralInference(ABC, BaseNeuralInference):
                 "Provide an estimator or initialize self._neural_net."
             )
             estimator = self._neural_net
-            # If internal net is used device is defined.
+            # If internal net is used device is defined
             device = self._device
         else:
-            if not isinstance(estimator, (ConditionalEstimator, RatioEstimator)):
-                raise TypeError(
-                    "estimator must be ConditionalEstimator or RatioEstimator,"
-                    f" got {type(estimator).__name__}",
-                )
-            # Otherwise, infer it from the device of the net parameters.
+            # Otherwise, infer it from the device of the net parameters
             device = str(next(estimator.parameters()).device)
 
-        return estimator, device
+        assert hasattr(estimator, "build_conditional_vector_field_estimator"), (
+            "The estimator provided does not implement "
+            "build_conditional_vector_field_estimator method to convert to "
+            "a un-masked equivalent. This error is probably being raised "
+            "because you tried to build_posterior, build_likelihood, "
+            "or more generally build_conditional over such estimator. "
+            "Please provide build_conditional_vector_field_estimator "
+            "to such estimator."
+        )
+        unmasked_estimator = estimator.build_conditional_vector_field_estimator(
+            fixed_condition_mask=fixed_condition_mask, fixed_edge_mask=fixed_edge_mask
+        )
 
-    def _create_posterior(
+        return unmasked_estimator, device
+
+    def _create_conditional(
         self,
-        estimator: Union[RatioEstimator, ConditionalEstimator],
+        estimator: ConditionalEstimator,
         prior: Distribution,
-        sample_with: Literal[
-            "mcmc", "rejection", "vi", "importance", "direct", "sde", "ode"
-        ],
+        sample_with: Literal["sde", "ode"],
         device: Union[str, torch.device],
         **kwargs,
     ) -> NeuralPosterior:
@@ -1239,11 +1243,6 @@ class MaskedNeuralInference(ABC, BaseNeuralInference):
                 parameters, e.g. which ranges are meaningful for them. Must be a PyTorch
                 distribution, see FAQ for details on how to use custom distributions.
             sample_with: The inference method to use. Must be one of:
-                - "mcmc"
-                - "rejection"
-                - "vi"
-                - "importance"
-                - "direct"
                 - "sde"
                 - "ode"
             device: torch device on which to train the neural net and on which to
@@ -1254,76 +1253,19 @@ class MaskedNeuralInference(ABC, BaseNeuralInference):
             NeuralPosterior object.
         """
 
-        if sample_with == "direct":
-            posterior_estimator = estimator
-            assert isinstance(posterior_estimator, ConditionalDensityEstimator), (
-                f"Expected posterior_estimator to be an instance of "
-                " ConditionalDensityEstimator, "
-                f"but got {type(posterior_estimator).__name__} instead."
-            )
-            posterior = DirectPosterior(
-                posterior_estimator=posterior_estimator,
-                prior=prior,
-                device=device,
-                **(kwargs.get("direct_sampling_parameters") or {}),
-            )
-        elif sample_with in ("sde", "ode"):
-            vector_field_estimator = estimator
-            assert isinstance(
-                vector_field_estimator, ConditionalVectorFieldEstimator
-            ), (
-                f"Expected vector_field_estimator to be an instance of "
-                " ConditionalVectorFieldEstimator, "
-                f"but got {type(vector_field_estimator).__name__} instead."
-            )
-            posterior = VectorFieldPosterior(
-                vector_field_estimator,
-                prior,
-                device=device,
-                sample_with=sample_with,
-                **(kwargs.get("vectorfield_sampling_parameters") or {}),
-            )
-        else:
-            # Posteriors requiring potential_fn and theta_transform
-            potential_fn, theta_transform = self._get_potential_function(
-                prior, estimator
-            )
-            if sample_with == "mcmc":
-                posterior = MCMCPosterior(
-                    potential_fn=potential_fn,
-                    theta_transform=theta_transform,
-                    proposal=prior,
-                    method=kwargs.get("mcmc_method", "slice_np_vectorized"),
-                    device=device,
-                    **(kwargs.get("mcmc_parameters") or {}),
-                )
-            elif sample_with == "rejection":
-                posterior = RejectionPosterior(
-                    potential_fn=potential_fn,
-                    proposal=prior,
-                    device=device,
-                    **(kwargs.get("rejection_sampling_parameters") or {}),
-                )
-            elif sample_with == "vi":
-                posterior = VIPosterior(
-                    potential_fn=potential_fn,
-                    theta_transform=theta_transform,
-                    prior=prior,
-                    vi_method=kwargs.get("vi_method", "rKL"),
-                    device=device,
-                    **(kwargs.get("vi_parameters") or {}),
-                )
-            elif sample_with == "importance":
-                posterior = ImportanceSamplingPosterior(
-                    potential_fn=potential_fn,
-                    proposal=prior,
-                    device=device,
-                    **(kwargs.get("importance_sampling_parameters") or {}),
-                )
-            else:
-                raise NotImplementedError(
-                    f"Sampling method '{sample_with}' is not supported."
-                )
+        vector_field_estimator = estimator
+        assert isinstance(vector_field_estimator, ConditionalVectorFieldEstimator), (
+            f"Expected vector_field_estimator to be an instance of "
+            " ConditionalVectorFieldEstimator, "
+            f"but got {type(vector_field_estimator).__name__} instead."
+        )
+        posterior = VectorFieldPosterior(
+            vector_field_estimator,
+            prior,
+            device=device,
+            sample_with=sample_with,
+            **(kwargs.get("vectorfield_sampling_parameters") or {}),
+        )
 
         return posterior
 
