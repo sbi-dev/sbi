@@ -324,7 +324,7 @@ class BaseNeuralInference:
         *args,
         **kwargs,
     ) -> "BaseNeuralInference":
-        # ! Maybe you can generalize some logic here?
+        # ? Maybe you can generalize some logic here?
         ...
 
     @abstractmethod
@@ -334,7 +334,7 @@ class BaseNeuralInference:
         **kwargs,
     ) -> Tuple[
         Tensor, Tensor, Tensor
-    ]:  #! When you will adjust inf and nans management,
+    ]:  # ! When you will adjust inf and nans management,
         # this could become Tensor, Tensor (just 2)
         ...
 
@@ -958,7 +958,7 @@ class MaskedNeuralInference(ABC, BaseNeuralInference):
             epoch_durations_sec=[],
         )
 
-    # ? Should implement append_simulations
+    # ? Should implement append_simulations, implement after solving NaN/Inf values
 
     # Must be re-defined to specify the new interface using inputs
     # rather than thetas and x
@@ -1218,8 +1218,8 @@ class MaskedNeuralInference(ABC, BaseNeuralInference):
             "The estimator provided does not implement "
             "build_conditional_vector_field_estimator method to convert to "
             "a un-masked equivalent. This error is probably being raised "
-            "because you tried to build_posterior, build_likelihood, "
-            "or more generally build_conditional over such estimator. "
+            "because you tried to `build_posterior`, `build_likelihood`, "
+            "or `build_conditional` over such estimator. "
             "Please provide build_conditional_vector_field_estimator "
             "to such estimator."
         )
