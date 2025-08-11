@@ -9,7 +9,7 @@ from typing import Any, Callable, Dict, Literal, Optional, Tuple, Union
 from warnings import warn
 
 import torch
-from torch import Tensor
+from torch import Tensor, nn
 from torch.distributions import Distribution
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
@@ -157,9 +157,11 @@ def check_if_proposal_has_default_x(proposal: Any):
 class BaseNeuralInference:
     "Mixin for NeuralInference objects"
 
-    # _neural_net: Optional[nn.Module]
-    # _train_loss: float
-    # _val_loss: float
+    _neural_net: Optional[nn.Module]
+    _train_loss: float
+    _val_loss: float
+    _prior: Optional[Distribution]
+    _device: str
     _summary_writer: SummaryWriter
     _summary: Dict[str, list]
 
@@ -321,7 +323,9 @@ class BaseNeuralInference:
         self,
         *args,
         **kwargs,
-    ) -> "BaseNeuralInference": ...
+    ) -> "BaseNeuralInference":
+        # ! Maybe you can generalize some logic here?
+        ...
 
     @abstractmethod
     def get_simulations(
@@ -357,9 +361,126 @@ class BaseNeuralInference:
         show_train_summary: bool = False,
     ) -> NeuralPosterior: ...
 
+    def _resolve_prior(self, prior: Optional[Distribution]) -> Distribution:
+        """
+        Resolves the prior distribution to use.
+
+        If a prior is passed, it is validated and returned.
+        If not passed, attempts to use the stored `self._prior`.
+        Raises a ValueError if no valid prior is available.
+
+        Args:
+            prior: Optional prior distribution to resolve.
+
+        Returns:
+            A valid prior distribution.
+        """
+
+        if prior is None:
+            if self._prior is None:
+                cls_name = self.__class__.__name__
+                raise ValueError(
+                    f"""You did not pass a prior. You have to pass the prior either at
+                    initialization `inference = {cls_name}(prior)` or to `
+                    .build_posterior (prior=prior)`."""
+                )
+            prior = self._prior
+        else:
+            check_prior(prior)
+
+        return prior
+
+    def _resolve_estimator(
+        self, estimator: Optional[nn.Module]
+    ) -> Tuple[nn.Module, str]:
+        """
+        Resolves the estimator and determines its device.
+
+        If no estimator is provided, the internal neural net (`self._neural_net`)
+        is used and the device is taken from `self._device`. Otherwise, validates
+        the passed estimator and infers its device.
+
+        Args:
+            estimator: Optional estimator to use.
+
+        Returns:
+            A tuple of (estimator, device).
+        """
+
+        if estimator is None:
+            assert self._neural_net is not None, (
+                "Provide an estimator or initialize self._neural_net."
+            )
+            estimator = self._neural_net
+            # If internal net is used device is defined
+            device = self._device
+        else:
+            if not isinstance(
+                estimator,
+                (ConditionalEstimator, RatioEstimator, MaskedConditionalEstimator),
+            ):
+                raise TypeError(
+                    f"`estimator` must be ConditionalEstimator, RatioEstimator "
+                    f"or MaskedConditionalEstimator, got {type(estimator).__name__}",
+                )
+            # Otherwise, infer it from the device of the net parameters
+            device = str(next(estimator.parameters()).device)
+
+        return estimator, device
+
+    def _converged(self, epoch: int, stop_after_epochs: int) -> bool:
+        """Return whether the training converged yet and save best model state so far.
+
+        Checks for improvement in validation performance over previous epochs.
+
+        Args:
+            epoch: Current epoch in training.
+            stop_after_epochs: How many fruitless epochs to let pass before stopping.
+
+        Returns:
+            Whether the training has stopped improving, i.e. has converged.
+        """
+        converged = False
+
+        assert self._neural_net is not None
+        neural_net = self._neural_net
+
+        # (Re)-start the epoch count with the first epoch or any improvement.
+        if epoch == 0 or self._val_loss < self._best_val_loss:
+            self._best_val_loss = self._val_loss
+            self._epochs_since_last_improvement = 0
+            self._best_model_state_dict = deepcopy(neural_net.state_dict())
+        else:
+            self._epochs_since_last_improvement += 1
+
+        # If no validation improvement over many epochs, stop training.
+        if self._epochs_since_last_improvement > stop_after_epochs - 1:
+            neural_net.load_state_dict(self._best_model_state_dict)
+            converged = True
+
+        return converged
+
+    def _report_convergence_at_end(
+        self, epoch: int, stop_after_epochs: int, max_num_epochs: int
+    ) -> None:
+        if self._converged(epoch, stop_after_epochs):
+            print(
+                "\r",
+                f"Neural network successfully converged after {epoch} epochs.",
+                end="",
+            )
+        elif max_num_epochs == epoch:
+            warn(
+                f"Maximum number of epochs `max_num_epochs={max_num_epochs}` reached,"
+                "but network has not yet fully converged. Consider increasing it.",
+                stacklevel=2,
+            )
+
 
 class NeuralInference(ABC, BaseNeuralInference):
     """Abstract base class for neural inference methods."""
+
+    _neural_net: Optional[RatioEstimator | ConditionalEstimator]
 
     def __init__(
         self,
@@ -635,35 +756,6 @@ class NeuralInference(ABC, BaseNeuralInference):
 
         return deepcopy(self._posterior)
 
-    def _resolve_prior(self, prior: Optional[Distribution]) -> Distribution:
-        """
-        Resolves the prior distribution to use.
-
-        If a prior is passed, it is validated and returned.
-        If not passed, attempts to use the stored `self._prior`.
-        Raises a ValueError if no valid prior is available.
-
-        Args:
-            prior: Optional prior distribution to resolve.
-
-        Returns:
-            A valid prior distribution.
-        """
-
-        if prior is None:
-            if self._prior is None:
-                cls_name = self.__class__.__name__
-                raise ValueError(
-                    f"""You did not pass a prior. You have to pass the prior either at
-                    initialization `inference = {cls_name}(prior)` or to `
-                    .build_posterior (prior=prior)`."""
-                )
-            prior = self._prior
-        else:
-            check_prior(prior)
-
-        return prior
-
     def _resolve_estimator(
         self, estimator: Optional[Union[RatioEstimator, ConditionalEstimator]]
     ) -> Tuple[Union[RatioEstimator, ConditionalEstimator], str]:
@@ -680,24 +772,14 @@ class NeuralInference(ABC, BaseNeuralInference):
         Returns:
             A tuple of (estimator, device).
         """
-
-        if estimator is None:
-            assert self._neural_net is not None, (
-                "Provide an estimator or initialize self._neural_net."
-            )
-            estimator = self._neural_net
-            # If internal net is used device is defined
-            device = self._device
-        else:
-            if not isinstance(estimator, (ConditionalEstimator, RatioEstimator)):
-                raise TypeError(
-                    "estimator must be ConditionalEstimator or RatioEstimator,"
-                    f" got {type(estimator).__name__}",
-                )
-            # Otherwise, infer it from the device of the net parameters
-            device = str(next(estimator.parameters()).device)
-
-        return estimator, device
+        resolved_estimator, device = super()._resolve_estimator(estimator)
+        assert isinstance(resolved_estimator, (RatioEstimator, ConditionalEstimator)), (
+            f"Expected `estimator` to be a RatioEstimator, ConditionalEstimator "
+            f"or None but got {type(resolved_estimator).__name__}. "
+            "Ensure that the estimator passed to NeuralInference is of the "
+            "correct type. "
+        )
+        return resolved_estimator, device
 
     def _create_posterior(
         self,
@@ -805,57 +887,11 @@ class NeuralInference(ABC, BaseNeuralInference):
 
         return posterior
 
-    def _converged(self, epoch: int, stop_after_epochs: int) -> bool:
-        """Return whether the training converged yet and save best model state so far.
-
-        Checks for improvement in validation performance over previous epochs.
-
-        Args:
-            epoch: Current epoch in training.
-            stop_after_epochs: How many fruitless epochs to let pass before stopping.
-
-        Returns:
-            Whether the training has stopped improving, i.e. has converged.
-        """
-        converged = False
-
-        assert self._neural_net is not None
-        neural_net = self._neural_net
-
-        # (Re)-start the epoch count with the first epoch or any improvement.
-        if epoch == 0 or self._val_loss < self._best_val_loss:
-            self._best_val_loss = self._val_loss
-            self._epochs_since_last_improvement = 0
-            self._best_model_state_dict = deepcopy(neural_net.state_dict())
-        else:
-            self._epochs_since_last_improvement += 1
-
-        # If no validation improvement over many epochs, stop training.
-        if self._epochs_since_last_improvement > stop_after_epochs - 1:
-            neural_net.load_state_dict(self._best_model_state_dict)
-            converged = True
-
-        return converged
-
-    def _report_convergence_at_end(
-        self, epoch: int, stop_after_epochs: int, max_num_epochs: int
-    ) -> None:
-        if self._converged(epoch, stop_after_epochs):
-            print(
-                "\r",
-                f"Neural network successfully converged after {epoch} epochs.",
-                end="",
-            )
-        elif max_num_epochs == epoch:
-            warn(
-                f"Maximum number of epochs `max_num_epochs={max_num_epochs}` reached,"
-                "but network has not yet fully converged. Consider increasing it.",
-                stacklevel=2,
-            )
-
 
 class MaskedNeuralInference(ABC, BaseNeuralInference):
     """Abstract base class for masked neural inference methods."""
+
+    _neural_net: Optional[MaskedConditionalEstimator]
 
     def __init__(
         self,
@@ -1148,35 +1184,6 @@ class MaskedNeuralInference(ABC, BaseNeuralInference):
 
         return deepcopy(self._posterior)
 
-    def _resolve_prior(self, prior: Optional[Distribution]) -> Distribution:
-        """
-        Resolves the prior distribution to use.
-
-        If a prior is passed, it is validated and returned.
-        If not passed, attempts to use the stored `self._prior`.
-        Raises a ValueError if no valid prior is available.
-
-        Args:
-            prior: Optional prior distribution to resolve.
-
-        Returns:
-            A valid prior distribution.
-        """
-
-        if prior is None:
-            if self._prior is None:
-                cls_name = self.__class__.__name__
-                raise ValueError(
-                    f"""You did not pass a prior. You have to pass the prior either at
-                    initialization `inference = {cls_name}(prior)` or to `
-                    .build_posterior (prior=prior)`."""
-                )
-            prior = self._prior
-        else:
-            check_prior(prior)
-
-        return prior
-
     def _resolve_estimator(
         self,
         estimator: Optional[MaskedConditionalEstimator],
@@ -1197,18 +1204,17 @@ class MaskedNeuralInference(ABC, BaseNeuralInference):
             A tuple of (estimator, device).
         """
 
-        if estimator is None:
-            assert self._neural_net is not None, (
-                "Provide an estimator or initialize self._neural_net."
-            )
-            estimator = self._neural_net
-            # If internal net is used device is defined
-            device = self._device
-        else:
-            # Otherwise, infer it from the device of the net parameters
-            device = str(next(estimator.parameters()).device)
+        resolved_estimator, device = super()._resolve_estimator(estimator)
+        assert isinstance(resolved_estimator, MaskedConditionalEstimator), (
+            f"Expected `estimator` to be a MaskedConditionalEstimator "
+            f"or None but got {type(resolved_estimator).__name__}. "
+            "Ensure that the estimator passed to NeuralInference is of the "
+            "correct type. "
+        )
 
-        assert hasattr(estimator, "build_conditional_vector_field_estimator"), (
+        assert hasattr(
+            resolved_estimator, "build_conditional_vector_field_estimator"
+        ), (
             "The estimator provided does not implement "
             "build_conditional_vector_field_estimator method to convert to "
             "a un-masked equivalent. This error is probably being raised "
@@ -1217,11 +1223,14 @@ class MaskedNeuralInference(ABC, BaseNeuralInference):
             "Please provide build_conditional_vector_field_estimator "
             "to such estimator."
         )
-        unmasked_estimator = estimator.build_conditional_vector_field_estimator(
-            fixed_condition_mask=fixed_condition_mask, fixed_edge_mask=fixed_edge_mask
+        unmasked_resolved_estimator = (
+            resolved_estimator.build_conditional_vector_field_estimator(
+                fixed_condition_mask=fixed_condition_mask,
+                fixed_edge_mask=fixed_edge_mask,
+            )
         )
 
-        return unmasked_estimator, device
+        return unmasked_resolved_estimator, device
 
     def _create_conditional(
         self,
@@ -1268,54 +1277,6 @@ class MaskedNeuralInference(ABC, BaseNeuralInference):
         )
 
         return posterior
-
-    def _converged(self, epoch: int, stop_after_epochs: int) -> bool:
-        """Return whether the training converged yet and save best model state so far.
-
-        Checks for improvement in validation performance over previous epochs.
-
-        Args:
-            epoch: Current epoch in training.
-            stop_after_epochs: How many fruitless epochs to let pass before stopping.
-
-        Returns:
-            Whether the training has stopped improving, i.e. has converged.
-        """
-        converged = False
-
-        assert self._neural_net is not None
-        neural_net = self._neural_net
-
-        # (Re)-start the epoch count with the first epoch or any improvement.
-        if epoch == 0 or self._val_loss < self._best_val_loss:
-            self._best_val_loss = self._val_loss
-            self._epochs_since_last_improvement = 0
-            self._best_model_state_dict = deepcopy(neural_net.state_dict())
-        else:
-            self._epochs_since_last_improvement += 1
-
-        # If no validation improvement over many epochs, stop training.
-        if self._epochs_since_last_improvement > stop_after_epochs - 1:
-            neural_net.load_state_dict(self._best_model_state_dict)
-            converged = True
-
-        return converged
-
-    def _report_convergence_at_end(
-        self, epoch: int, stop_after_epochs: int, max_num_epochs: int
-    ) -> None:
-        if self._converged(epoch, stop_after_epochs):
-            print(
-                "\r",
-                f"Neural network successfully converged after {epoch} epochs.",
-                end="",
-            )
-        elif max_num_epochs == epoch:
-            warn(
-                f"Maximum number of epochs `max_num_epochs={max_num_epochs}` reached,"
-                "but network has not yet fully converged. Consider increasing it.",
-                stacklevel=2,
-            )
 
     def _default_condition_masks_generator(self, inputs):
         """The default condition mask generator employed

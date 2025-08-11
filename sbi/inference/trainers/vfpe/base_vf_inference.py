@@ -25,7 +25,9 @@ from sbi.inference.potentials.vector_field_potential import (
 from sbi.neural_nets.estimators import (
     MaskedConditionalVectorFieldEstimator,
 )
-from sbi.neural_nets.estimators.base import ConditionalVectorFieldEstimator
+from sbi.neural_nets.estimators.base import (
+    ConditionalVectorFieldEstimator,
+)
 from sbi.sbi_types import TorchTransform
 from sbi.utils import (
     check_estimator_arg,
@@ -47,9 +49,7 @@ from sbi.utils.user_input_checks import validate_inputs_and_masks
 class VectorFieldEstimatorBuilder(Protocol):
     """Protocol for building a vector field estimator from data."""
 
-    def __call__(
-        self, theta: Tensor, x: Tensor
-    ) -> MaskedConditionalVectorFieldEstimator:
+    def __call__(self, theta: Tensor, x: Tensor) -> ConditionalVectorFieldEstimator:
         """Build a vector field estimator from theta and x, which mainly
         inform the shape of the input and the condition to the neural network.
         Generally, it can also be used to z-score the data, but not in the case
@@ -82,6 +82,8 @@ class MaskedVectorFieldEstimatorBuilder(Protocol):
 
 
 class VectorFieldTrainer(NeuralInference, ABC):
+    _neural_net: ConditionalVectorFieldEstimator
+
     def __init__(
         self,
         prior: Optional[Distribution] = None,
@@ -661,6 +663,8 @@ class VectorFieldTrainer(NeuralInference, ABC):
 
 
 class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
+    _neural_net: MaskedConditionalVectorFieldEstimator
+
     def __init__(
         self,
         prior: Optional[Distribution] = None,
