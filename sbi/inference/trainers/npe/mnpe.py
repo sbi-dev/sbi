@@ -13,9 +13,9 @@ from sbi.inference.posteriors.posterior_parameters import (
     RejectionPosteriorParameters,
     VIPosteriorParameters,
 )
-from sbi.inference.trainers.base import DensityEstimatorBuilder
 from sbi.inference.trainers.npe.npe_c import NPE_C
 from sbi.neural_nets.estimators import MixedDensityEstimator
+from sbi.neural_nets.estimators.base import DensityEstimatorBuilder
 from sbi.neural_nets.estimators.nflows_flow import NFlowsFlow
 from sbi.sbi_types import TensorboardSummaryWriter
 from sbi.utils.sbiutils import del_entries

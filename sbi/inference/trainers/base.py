@@ -14,9 +14,7 @@ from typing import (
     List,
     Literal,
     Optional,
-    Protocol,
     Tuple,
-    TypeVar,
     Union,
 )
 from warnings import warn
@@ -1070,30 +1068,3 @@ def check_if_proposal_has_default_x(proposal: Any):
             "x_o for training. Set it with "
             "`posterior.set_default_x(x_o)`."
         )
-
-
-ConditionalEstimatorType = TypeVar(
-    'ConditionalEstimatorType',
-    bound=ConditionalEstimator,
-    covariant=True,
-)
-
-
-class DensityEstimatorBuilder(Protocol[ConditionalEstimatorType]):
-    """Protocol for building a neural network from the data for the density
-    estimator."""
-
-    def __call__(self, theta: Tensor, x: Tensor) -> ConditionalEstimatorType:
-        """Build a density estimator from theta and x, which is mainly used for infering
-        shape and z-scoring. The density estimator should have the methods `.sample()`
-        and `.log_prob()`. The function should return an inheritance
-        of `ConditionalEstimator`.
-
-        Args:
-            theta: Parameter sets.
-            x: Simulation outputs.
-
-        Returns:
-            Density Estimator.
-        """
-        ...

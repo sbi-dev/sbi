@@ -8,10 +8,10 @@ from torch import Tensor
 from torch.distributions import Distribution
 
 import sbi.utils as utils
-from sbi.inference.trainers.base import DensityEstimatorBuilder
 from sbi.inference.trainers.npe.npe_base import (
     PosteriorEstimatorTrainer,
 )
+from sbi.neural_nets.estimators.base import DensityEstimatorBuilder
 from sbi.neural_nets.estimators.nflows_flow import NFlowsFlow
 from sbi.neural_nets.estimators.shape_handling import reshape_to_sample_batch_event
 from sbi.sbi_types import TensorboardSummaryWriter

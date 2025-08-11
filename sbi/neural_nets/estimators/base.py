@@ -2,10 +2,36 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from abc import ABC, abstractmethod
-from typing import Optional, Tuple
+from typing import Optional, Protocol, Tuple, TypeVar
 
 import torch
 from torch import Tensor, nn
+
+ConditionalEstimatorType = TypeVar(
+    'ConditionalEstimatorType',
+    bound="ConditionalEstimator",
+    covariant=True,
+)
+
+
+class DensityEstimatorBuilder(Protocol[ConditionalEstimatorType]):
+    """Protocol for building a neural network from the data for the density
+    estimator."""
+
+    def __call__(self, theta: Tensor, x: Tensor) -> ConditionalEstimatorType:
+        """Build a density estimator from theta and x, which is mainly used for infering
+        shape and z-scoring. The density estimator should have the methods `.sample()`
+        and `.log_prob()`. The function should return an inheritance
+        of `ConditionalEstimator`.
+
+        Args:
+            theta: Parameter sets.
+            x: Simulation outputs.
+
+        Returns:
+            Density Estimator.
+        """
+        ...
 
 
 class ConditionalEstimator(nn.Module, ABC):

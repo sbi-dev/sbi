@@ -5,8 +5,8 @@ from typing import Optional, Union
 
 from torch.distributions import Distribution
 
-from sbi.inference.trainers.base import DensityEstimatorBuilder
 from sbi.inference.trainers.nle.nle_base import LikelihoodEstimatorTrainer
+from sbi.neural_nets.estimators.base import DensityEstimatorBuilder
 from sbi.sbi_types import TensorboardSummaryWriter
 from sbi.utils.sbiutils import del_entries
 

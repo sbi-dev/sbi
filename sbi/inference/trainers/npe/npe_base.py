@@ -29,12 +29,12 @@ from sbi.inference.posteriors.posterior_parameters import (
 from sbi.inference.potentials import posterior_estimator_based_potential
 from sbi.inference.potentials.posterior_based_potential import PosteriorBasedPotential
 from sbi.inference.trainers.base import (
-    DensityEstimatorBuilder,
     NeuralInference,
     check_if_proposal_has_default_x,
 )
 from sbi.neural_nets import posterior_nn
 from sbi.neural_nets.estimators import ConditionalDensityEstimator
+from sbi.neural_nets.estimators.base import DensityEstimatorBuilder
 from sbi.neural_nets.estimators.nflows_flow import NFlowsFlow
 from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
