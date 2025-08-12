@@ -349,6 +349,31 @@ def handle_invalid_x(
     return is_valid_x, num_nans, num_infs
 
 
+def handle_invalid_inputs_for_simformer(
+    inputs: Tensor, condition_masks: Tensor, exclude_invalid_x: bool
+):
+    if exclude_invalid_x:
+        # Identify invalid inputs
+        is_invalid_inputs_entries = torch.isnan(inputs) | torch.isinf(inputs)
+
+        num_invalid = int(is_invalid_inputs_entries.sum().item())
+
+        assert (
+            num_invalid < inputs.numel()
+        ), """No valid data entries left after excluding NaNs and Infs. In case you are
+            encoding missing trials with NaNs consider setting exclude_invalid_x=False
+            and z_score_x = 'none' to disable z-scoring."""
+
+        if num_invalid > 0:
+            noise = torch.randn_like(inputs) * 1e-4  # Small noise
+            inputs = torch.where(is_invalid_inputs_entries, noise, inputs)
+
+            # We will simply force invalid inputs to be latent
+            condition_masks = condition_masks & ~is_invalid_inputs_entries.sum(dim=-1)
+
+    return inputs, condition_masks
+
+
 def npe_msg_on_invalid_x(
     num_nans: int, num_infs: int, exclude_invalid_x: bool, algorithm: str
 ) -> None:

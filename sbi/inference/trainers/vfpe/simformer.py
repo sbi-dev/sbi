@@ -111,7 +111,6 @@ class Simformer(MaskedVectorFieldTrainer):
         prior: Optional[Distribution] = None,
         sample_with: Literal['ode', 'sde'] = "sde",
         vectorfield_sampling_parameters: Optional[Dict[str, Any]] = None,
-        **kwargs,
     ) -> NeuralPosterior:
         r"""Build conditinal distribution from the masked vector field estimator
         and the given fixed condition mask and edge mask.
@@ -167,7 +166,6 @@ class Simformer(MaskedVectorFieldTrainer):
             prior=prior,
             sample_with=sample_with,
             vectorfield_sampling_parameters=vectorfield_sampling_parameters,
-            **kwargs,
         )
 
     def build_posterior(
@@ -177,7 +175,6 @@ class Simformer(MaskedVectorFieldTrainer):
         prior: Optional[Distribution] = None,
         sample_with: Literal['ode', 'sde'] = "sde",
         vectorfield_sampling_parameters: Optional[Dict[str, Any]] = None,
-        **kwargs,
     ) -> NeuralPosterior:
         r"""Build posterior from the masked vector field estimator given
         the latent and observed indexes passed at init time (or updated
@@ -225,7 +222,6 @@ class Simformer(MaskedVectorFieldTrainer):
             prior=prior,
             sample_with=sample_with,
             vectorfield_sampling_parameters=vectorfield_sampling_parameters,
-            **kwargs,
         )
 
     def build_likelihood(
@@ -235,7 +231,6 @@ class Simformer(MaskedVectorFieldTrainer):
         prior: Optional[Distribution] = None,
         sample_with: Literal['ode', 'sde'] = "sde",
         vectorfield_sampling_parameters: Optional[Dict[str, Any]] = None,
-        **kwargs,
     ) -> NeuralPosterior:
         r"""Build likelihood from the masked vector field estimator given
         the latent and observed indexes passed at init time (or updated
@@ -286,7 +281,6 @@ class Simformer(MaskedVectorFieldTrainer):
             prior=prior,
             sample_with=sample_with,
             vectorfield_sampling_parameters=vectorfield_sampling_parameters,
-            **kwargs,
         )
 
 

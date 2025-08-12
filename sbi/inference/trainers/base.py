@@ -323,9 +323,7 @@ class BaseNeuralInference:
         self,
         *args,
         **kwargs,
-    ) -> "BaseNeuralInference":
-        # ? Maybe you can generalize some logic here?
-        ...
+    ) -> "BaseNeuralInference": ...
 
     @abstractmethod
     def get_simulations(
@@ -956,8 +954,6 @@ class MaskedNeuralInference(ABC, BaseNeuralInference):
             training_loss=[],
             epoch_durations_sec=[],
         )
-
-    # ? Should implement append_simulations, implement after solving NaN/Inf values
 
     # Must be re-defined to specify the new interface using inputs
     # rather than thetas and x

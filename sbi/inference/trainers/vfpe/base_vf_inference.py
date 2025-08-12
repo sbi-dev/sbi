@@ -39,6 +39,7 @@ from sbi.utils import (
 )
 from sbi.utils.sbiutils import (
     ImproperEmpirical,
+    handle_invalid_inputs_for_simformer,
     mask_sims_from_prior,
     simformer_msg_on_invalid_x,
 )
@@ -189,6 +190,7 @@ class VectorFieldTrainer(NeuralInference, ABC):
 
         if exclude_invalid_x is None:
             exclude_invalid_x = current_round == 0
+        self._exclude_invalid_x = exclude_invalid_x
 
         if data_device is None:
             data_device = self._device
@@ -789,6 +791,7 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
 
         if exclude_invalid_x is None:
             exclude_invalid_x = current_round == 0
+        self._exclude_invalid_x = exclude_invalid_x
 
         if data_device is None:
             data_device = self._device
@@ -1001,6 +1004,15 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
                     self._condition_mask_generator(inputs_batch)
                 ).to(self._device)
 
+                # Differently from other sbi methods, we can still allow invalid values
+                inputs_batch, condition_masks_batch = (
+                    handle_invalid_inputs_for_simformer(
+                        inputs_batch,
+                        condition_masks_batch,
+                        exclude_invalid_x=self._exclude_invalid_x,
+                    )
+                )
+
                 edge_masks_batch = self._edge_mask_generator(inputs_batch)
                 if edge_masks_batch is not None:
                     edge_masks_batch = edge_masks_batch.to(self._device)
@@ -1080,6 +1092,16 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
                     condition_masks_batch_val = (
                         self._condition_mask_generator(inputs_batch_val)
                     ).to(self._device)
+
+                    # We can still allow invalid values
+                    inputs_batch_val, condition_masks_batch_val = (
+                        handle_invalid_inputs_for_simformer(
+                            inputs_batch_val,
+                            condition_masks_batch_val,
+                            exclude_invalid_x=self._exclude_invalid_x,
+                        )
+                    )
+
                     edge_masks_batch_val = self._edge_mask_generator(inputs_batch_val)
                     if edge_masks_batch_val is not None:
                         edge_masks_batch_val = edge_masks_batch_val.to(self._device)
