@@ -350,7 +350,7 @@ def handle_invalid_x(
 
 
 def handle_invalid_inputs_for_simformer(
-    inputs: Tensor, condition_masks: Tensor, exclude_invalid_x: bool
+    inputs: Tensor, condition_masks: Tensor, exclude_invalid_x: bool = True
 ):
     if exclude_invalid_x:
         # Identify invalid inputs
