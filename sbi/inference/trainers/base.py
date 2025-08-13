@@ -165,165 +165,14 @@ class BaseNeuralInference:
     _summary_writer: SummaryWriter
     _summary: Dict[str, list]
 
-    @property
-    def summary(self):
-        return self._summary
-
-    @abstractmethod
-    def _get_potential_function(
-        self,
-        prior: Distribution,
-        estimator: nn.Module,
-    ) -> Tuple[BasePotential, TorchTransform]:
-        """Subclass-specific potential creation"""
-        ...
-
-    def _default_summary_writer(self) -> SummaryWriter:
-        """Return summary writer logging to method- and simulator-specific directory."""
-
-        method = self.__class__.__name__
-        logdir = Path(
-            get_log_root(), method, datetime.now().isoformat().replace(":", "_")
-        )
-        return SummaryWriter(logdir)
-
-    def _summarize(
-        self,
-        round_: int,
-    ) -> None:
-        """Update the summary_writer with statistics for a given round.
-
-        During training several performance statistics are added to the summary, e.g.,
-        using `self._summary['key'].append(value)`. This function writes these values
-        into summary writer object.
-
-        Args:
-            round: index of round
-
-        Scalar tags:
-            - epochs_trained:
-                number of epochs trained
-            - best_validation_loss:
-                best validation loss (for each round).
-            - validation_loss:
-                validation loss for every epoch (for each round).
-            - training_loss
-                training loss for every epoch (for each round).
-            - epoch_durations_sec
-                epoch duration for every epoch (for each round)
-
-        """
-
-        # Add most recent training stats to summary writer.
-        self._summary_writer.add_scalar(
-            tag="epochs_trained",
-            scalar_value=self._summary["epochs_trained"][-1],
-            global_step=round_ + 1,
-        )
-
-        self._summary_writer.add_scalar(
-            tag="best_validation_loss",
-            scalar_value=self._summary["best_validation_loss"][-1],
-            global_step=round_ + 1,
-        )
-
-        # Add validation loss for every epoch.
-        # Offset with all previous epochs.
-        offset = (
-            torch.tensor(self._summary["epochs_trained"][:-1], dtype=torch.int)
-            .sum()
-            .item()
-        )
-        for i, vlp in enumerate(self._summary["validation_loss"][offset:]):
-            self._summary_writer.add_scalar(
-                tag="validation_loss",
-                scalar_value=vlp,
-                global_step=offset + i,
-            )
-
-        for i, tlp in enumerate(self._summary["training_loss"][offset:]):
-            self._summary_writer.add_scalar(
-                tag="training_loss",
-                scalar_value=tlp,
-                global_step=offset + i,
-            )
-
-        for i, eds in enumerate(self._summary["epoch_durations_sec"][offset:]):
-            self._summary_writer.add_scalar(
-                tag="epoch_durations_sec",
-                scalar_value=eds,
-                global_step=offset + i,
-            )
-
-        self._summary_writer.flush()
-
-    @staticmethod
-    def _describe_round(round_: int, summary: Dict[str, list]) -> str:
-        epochs = summary["epochs_trained"][-1]
-        best_validation_loss = summary["best_validation_loss"][-1]
-
-        description = f"""
-        -------------------------
-        ||||| ROUND {round_ + 1} STATS |||||:
-        -------------------------
-        Epochs trained: {epochs}
-        Best validation performance: {best_validation_loss:.4f}
-        -------------------------
-        """
-
-        return description
-
-    @staticmethod
-    def _maybe_show_progress(show: bool, epoch: int) -> None:
-        if show:
-            # end="\r" deletes the print statement when a new one appears.
-            # https://stackoverflow.com/questions/3419984/. `\r` in the beginning due
-            # to #330.
-            print("\r", f"Training neural network. Epochs trained: {epoch}", end="")
-
-    def __getstate__(self) -> Dict:
-        """Returns the state of the object that is supposed to be pickled.
-
-        Attributes that can not be serialized are set to `None`.
-
-        Returns:
-            Dictionary containing the state.
-        """
-        warn(
-            "When the inference object is pickled, the behaviour of the loaded object "
-            "changes in the following two ways: "
-            "1) `.train(..., retrain_from_scratch=True)` is not supported. "
-            "2) When the loaded object calls the `.train()` method, it generates a new "
-            "tensorboard summary writer (instead of appending to the current one).",
-            stacklevel=2,
-        )
-        dict_to_save = {}
-        unpicklable_attributes = ["_summary_writer", "_build_neural_net"]
-        for key in self.__dict__:
-            if key in unpicklable_attributes:
-                dict_to_save[key] = None
-            else:
-                dict_to_save[key] = self.__dict__[key]
-        return dict_to_save
-
-    def __setstate__(self, state_dict: Dict):
-        """Sets the state when being loaded from pickle.
-
-        Also creates a new summary writer (because the previous one was set to `None`
-        during serializing, see `__get_state__()`).
-
-        Args:
-            state_dict: State to be restored.
-        """
-        state_dict["_summary_writer"] = self._default_summary_writer()
-        self.__dict__ = state_dict
-
     @abstractmethod
     def append_simulations(
         self,
         *args,
         **kwargs,
-    ) -> "BaseNeuralInference": ...
+    ) -> "BaseNeuralInference":
+        "Abstract definition to append simulations"
+        ...
 
     @abstractmethod
     def get_simulations(
@@ -331,6 +180,7 @@ class BaseNeuralInference:
         *args,
         **kwargs,
     ) -> Tuple[Tensor, Tensor] | Tuple[Tensor, Tensor, Tensor]:
+        "Abstract definition to get appended simulations"
         # TODO: this could be improved using TypeVarTuple from python >=3.11
         # where one can enforce child classes to take either the tuple of 2 (maskedNI)
         # or tuple of 3 (NeuralInference) (at the moment any child can return both)
@@ -341,7 +191,18 @@ class BaseNeuralInference:
         self,
         *args,
         **kwargs,
-    ) -> Tuple[data.DataLoader, data.DataLoader]: ...
+    ) -> Tuple[data.DataLoader, data.DataLoader]:
+        "Abstract definition to get simulations dataloaders for training and validation"
+        ...
+
+    @abstractmethod
+    def _get_potential_function(
+        self,
+        prior: Distribution,
+        estimator: nn.Module,
+    ) -> Tuple[BasePotential, TorchTransform]:
+        """Subclass-specific potential creation"""
+        ...
 
     @abstractmethod
     def train(
@@ -357,7 +218,9 @@ class BaseNeuralInference:
         discard_prior_samples: bool = False,
         retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
-    ) -> NeuralPosterior: ...
+    ) -> NeuralPosterior:
+        "Abstract definition for estimator training"
+        ...
 
     def _resolve_prior(self, prior: Optional[Distribution]) -> Distribution:
         """
@@ -579,6 +442,150 @@ class BaseNeuralInference:
                 "but network has not yet fully converged. Consider increasing it.",
                 stacklevel=2,
             )
+
+    @property
+    def summary(self):
+        return self._summary
+
+    def _default_summary_writer(self) -> SummaryWriter:
+        """Return summary writer logging to method- and simulator-specific directory."""
+
+        method = self.__class__.__name__
+        logdir = Path(
+            get_log_root(), method, datetime.now().isoformat().replace(":", "_")
+        )
+        return SummaryWriter(logdir)
+
+    def _summarize(
+        self,
+        round_: int,
+    ) -> None:
+        """Update the summary_writer with statistics for a given round.
+
+        During training several performance statistics are added to the summary, e.g.,
+        using `self._summary['key'].append(value)`. This function writes these values
+        into summary writer object.
+
+        Args:
+            round: index of round
+
+        Scalar tags:
+            - epochs_trained:
+                number of epochs trained
+            - best_validation_loss:
+                best validation loss (for each round).
+            - validation_loss:
+                validation loss for every epoch (for each round).
+            - training_loss
+                training loss for every epoch (for each round).
+            - epoch_durations_sec
+                epoch duration for every epoch (for each round)
+
+        """
+
+        # Add most recent training stats to summary writer.
+        self._summary_writer.add_scalar(
+            tag="epochs_trained",
+            scalar_value=self._summary["epochs_trained"][-1],
+            global_step=round_ + 1,
+        )
+
+        self._summary_writer.add_scalar(
+            tag="best_validation_loss",
+            scalar_value=self._summary["best_validation_loss"][-1],
+            global_step=round_ + 1,
+        )
+
+        # Add validation loss for every epoch.
+        # Offset with all previous epochs.
+        offset = (
+            torch.tensor(self._summary["epochs_trained"][:-1], dtype=torch.int)
+            .sum()
+            .item()
+        )
+        for i, vlp in enumerate(self._summary["validation_loss"][offset:]):
+            self._summary_writer.add_scalar(
+                tag="validation_loss",
+                scalar_value=vlp,
+                global_step=offset + i,
+            )
+
+        for i, tlp in enumerate(self._summary["training_loss"][offset:]):
+            self._summary_writer.add_scalar(
+                tag="training_loss",
+                scalar_value=tlp,
+                global_step=offset + i,
+            )
+
+        for i, eds in enumerate(self._summary["epoch_durations_sec"][offset:]):
+            self._summary_writer.add_scalar(
+                tag="epoch_durations_sec",
+                scalar_value=eds,
+                global_step=offset + i,
+            )
+
+        self._summary_writer.flush()
+
+    @staticmethod
+    def _describe_round(round_: int, summary: Dict[str, list]) -> str:
+        epochs = summary["epochs_trained"][-1]
+        best_validation_loss = summary["best_validation_loss"][-1]
+
+        description = f"""
+        -------------------------
+        ||||| ROUND {round_ + 1} STATS |||||:
+        -------------------------
+        Epochs trained: {epochs}
+        Best validation performance: {best_validation_loss:.4f}
+        -------------------------
+        """
+
+        return description
+
+    @staticmethod
+    def _maybe_show_progress(show: bool, epoch: int) -> None:
+        if show:
+            # end="\r" deletes the print statement when a new one appears.
+            # https://stackoverflow.com/questions/3419984/. `\r` in the beginning due
+            # to #330.
+            print("\r", f"Training neural network. Epochs trained: {epoch}", end="")
+
+    def __getstate__(self) -> Dict:
+        """Returns the state of the object that is supposed to be pickled.
+
+        Attributes that can not be serialized are set to `None`.
+
+        Returns:
+            Dictionary containing the state.
+        """
+        warn(
+            "When the inference object is pickled, the behaviour of the loaded object "
+            "changes in the following two ways: "
+            "1) `.train(..., retrain_from_scratch=True)` is not supported. "
+            "2) When the loaded object calls the `.train()` method, it generates a new "
+            "tensorboard summary writer (instead of appending to the current one).",
+            stacklevel=2,
+        )
+        dict_to_save = {}
+        unpicklable_attributes = ["_summary_writer", "_build_neural_net"]
+        for key in self.__dict__:
+            if key in unpicklable_attributes:
+                dict_to_save[key] = None
+            else:
+                dict_to_save[key] = self.__dict__[key]
+        return dict_to_save
+
+    def __setstate__(self, state_dict: Dict):
+        """Sets the state when being loaded from pickle.
+
+        Also creates a new summary writer (because the previous one was set to `None`
+        during serializing, see `__get_state__()`).
+
+        Args:
+            state_dict: State to be restored.
+        """
+        state_dict["_summary_writer"] = self._default_summary_writer()
+        self.__dict__ = state_dict
 
 
 class NeuralInference(ABC, BaseNeuralInference):
@@ -1123,6 +1130,49 @@ class MaskedNeuralInference(ABC, BaseNeuralInference):
             self._edge_mask_generator = generator
         return self  # Chainable
 
+    def _default_condition_masks_generator(self, inputs):
+        """The default condition mask generator employed
+        if none is specified by the user. It consists on batch-wise
+        Bernoulli masks at p=0.5, with an extra check that ensures
+        at both states (Latent/Observed, i.e., False/True) are included
+        in each mask
+        """
+
+        batch_dims = inputs.shape[:-2]
+        num_nodes = inputs.shape[-2]
+
+        # Generate masks with Bernoulli
+        condition_masks = torch.bernoulli(
+            torch.full((*batch_dims, num_nodes), 0.5, device=inputs.device)
+        ).bool()
+
+        # Find rows that are all True or all False
+        all_observed = condition_masks.all(dim=-1)
+
+        # If there are any such rows, flip a random element to ensure
+        # there's at least one True and one False
+        if all_observed.any():
+            invalid_indices = torch.where(all_observed)
+
+            # For each invalid row, select a random column to flip
+            cols_to_flip = torch.randint(
+                num_nodes, (invalid_indices[0].shape[0],), device=inputs.device
+            )
+
+            # Create full indices for flipping and apply the flip
+            indices_to_flip = invalid_indices + (cols_to_flip,)
+            condition_masks[indices_to_flip] = ~condition_masks[indices_to_flip]
+        return condition_masks
+
+    def _default_edge_masks_generator(self, inputs):
+        """The default edge mask generator employed
+        if none is specified by the user. It simply pass
+        None as a full-attention masks (equivalent to a
+        full ones) in order to save memory. `input` is specified
+        for compatibility altough ignored."""
+
+        return None
+
     def build_conditional(
         self,
         condition_mask: Union[Tensor, list],
@@ -1212,8 +1262,7 @@ class MaskedNeuralInference(ABC, BaseNeuralInference):
             "a un-masked equivalent. This error is probably being raised "
             "because you tried to `build_posterior`, `build_likelihood`, "
             "or `build_conditional` over such estimator. "
-            "Please provide build_conditional_vector_field_estimator "
-            "to such estimator."
+            "Please provide a build_conditional_vector_field_estimator method."
         )
         unmasked_resolved_estimator = (
             resolved_estimator.build_conditional_vector_field_estimator(
@@ -1223,46 +1272,3 @@ class MaskedNeuralInference(ABC, BaseNeuralInference):
         )
 
         return unmasked_resolved_estimator, device
-
-    def _default_condition_masks_generator(self, inputs):
-        """The default condition mask generator employed
-        if none is specified by the user. It consists on batch-wise
-        Bernoulli masks at p=0.5, with an extra check that ensures
-        at both states (Latent/Observed, i.e., False/True) are included
-        in each mask
-        """
-
-        batch_dims = inputs.shape[:-2]
-        num_nodes = inputs.shape[-2]
-
-        # Generate masks with Bernoulli
-        condition_masks = torch.bernoulli(
-            torch.full((*batch_dims, num_nodes), 0.5, device=inputs.device)
-        ).bool()
-
-        # Find rows that are all True or all False
-        all_observed = condition_masks.all(dim=-1)
-
-        # If there are any such rows, flip a random element to ensure
-        # there's at least one True and one False
-        if all_observed.any():
-            invalid_indices = torch.where(all_observed)
-
-            # For each invalid row, select a random column to flip
-            cols_to_flip = torch.randint(
-                num_nodes, (invalid_indices[0].shape[0],), device=inputs.device
-            )
-
-            # Create full indices for flipping and apply the flip
-            indices_to_flip = invalid_indices + (cols_to_flip,)
-            condition_masks[indices_to_flip] = ~condition_masks[indices_to_flip]
-        return condition_masks
-
-    def _default_edge_masks_generator(self, inputs):
-        """The default edge mask generator employed
-        if none is specified by the user. It simply pass
-        None as a full-attention masks (equivalent to a
-        full ones) in order to save memory. `input` is specified
-        for compatibility altough ignored."""
-
-        return None
