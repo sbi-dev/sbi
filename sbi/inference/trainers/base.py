@@ -665,8 +665,13 @@ class NeuralInference(ABC):
 
         deprecated_params = deprecated_params.copy()
 
-        is_default_mcmc_method = kwargs.get("mcmc_method") == "slice_np_vectorized"
-        is_default_vi_method = kwargs.get("vi_method") == "rKL"
+        is_default_mcmc_method = (
+            kwargs.get("mcmc_method") == "slice_np_vectorized"
+            or kwargs.get("mcmc_method") is None
+        )
+        is_default_vi_method = (
+            kwargs.get("vi_method") == "rKL" or kwargs.get("vi_method") is None
+        )
 
         if not is_default_mcmc_method:
             deprecated_params.append("mcmc_method")
