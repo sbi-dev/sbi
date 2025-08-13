@@ -157,13 +157,73 @@ def check_if_proposal_has_default_x(proposal: Any):
 class BaseNeuralInference:
     "Mixin for NeuralInference objects"
 
-    _neural_net: Union[RatioEstimator, ConditionalEstimator, MaskedConditionalEstimator]
+    _neural_net: Optional[
+        Union[RatioEstimator, ConditionalEstimator, MaskedConditionalEstimator]
+    ]
     _train_loss: float
     _val_loss: float
     _prior: Optional[Distribution]
     _device: str
     _summary_writer: SummaryWriter
     _summary: Dict[str, list]
+
+    def __init__(
+        self,
+        prior: Optional[Distribution] = None,
+        device: str = "cpu",
+        logging_level: Union[int, str] = "WARNING",
+        summary_writer: Optional[SummaryWriter] = None,
+        show_progress_bars: bool = True,
+    ):
+        r"""Base class for inference methods.
+
+        Args:
+            prior: A probability distribution that expresses prior knowledge about the
+                parameters, e.g. which ranges are meaningful for them. Must be a PyTorch
+                distribution, see FAQ for details on how to use custom distributions.
+            device: torch device on which to train the neural net and on which to
+                perform all posterior operations, e.g. gpu or cpu.
+            logging_level: Minimum severity of messages to log. One of the strings
+               "INFO", "WARNING", "DEBUG", "ERROR" and "CRITICAL".
+            summary_writer: A `SummaryWriter` to control, among others, log
+                file location (default is `<current working directory>/logs`.)
+            show_progress_bars: Whether to show a progressbar during simulation and
+                sampling.
+        """
+
+        self._device = process_device(device)
+        check_prior(prior)
+        check_if_prior_on_device(self._device, prior)
+        self._prior = prior
+
+        self._posterior = None
+        self._neural_net = None
+
+        self._show_progress_bars = show_progress_bars
+
+        # Initialize roundwise prior_masks for storage of masks
+        # indicating if simulations came from prior.
+        self._prior_masks = []
+        self._model_bank = []
+
+        # Initialize list that indicates the round from which simulations were drawn.
+        self._data_round_index = []
+
+        self._round = 0
+        self._val_loss = float("Inf")
+
+        self._summary_writer = (
+            self._default_summary_writer() if summary_writer is None else summary_writer
+        )
+
+        # Logging during training (by SummaryWriter).
+        self._summary = dict(
+            epochs_trained=[],
+            best_validation_loss=[],
+            validation_loss=[],
+            training_loss=[],
+            epoch_durations_sec=[],
+        )
 
     @abstractmethod
     def append_simulations(
@@ -601,58 +661,14 @@ class NeuralInference(ABC, BaseNeuralInference):
         summary_writer: Optional[SummaryWriter] = None,
         show_progress_bars: bool = True,
     ):
-        r"""Base class for inference methods.
-
-        Args:
-            prior: A probability distribution that expresses prior knowledge about the
-                parameters, e.g. which ranges are meaningful for them. Must be a PyTorch
-                distribution, see FAQ for details on how to use custom distributions.
-            device: torch device on which to train the neural net and on which to
-                perform all posterior operations, e.g. gpu or cpu.
-            logging_level: Minimum severity of messages to log. One of the strings
-               "INFO", "WARNING", "DEBUG", "ERROR" and "CRITICAL".
-            summary_writer: A `SummaryWriter` to control, among others, log
-                file location (default is `<current working directory>/logs`.)
-            show_progress_bars: Whether to show a progressbar during simulation and
-                sampling.
-        """
-
-        self._device = process_device(device)
-        check_prior(prior)
-        check_if_prior_on_device(self._device, prior)
-        self._prior = prior
-
-        self._posterior = None
-        self._neural_net = None
-        self._x_shape = None
-
-        self._show_progress_bars = show_progress_bars
-
-        # Initialize roundwise (theta, x, prior_masks) for storage of parameters,
-        # simulations and masks indicating if simulations came from prior.
+        # Initialize roundwise (theta, x) for storage of parameters,
+        # and simulations.
+        super().__init__(
+            prior, device, logging_level, summary_writer, show_progress_bars
+        )
         self._theta_roundwise = []
         self._x_roundwise = []
-        self._prior_masks = []
-        self._model_bank = []
-
-        # Initialize list that indicates the round from which simulations were drawn.
-        self._data_round_index = []
-
-        self._round = 0
-        self._val_loss = float("Inf")
-
-        self._summary_writer = (
-            self._default_summary_writer() if summary_writer is None else summary_writer
-        )
-
-        # Logging during training (by SummaryWriter).
-        self._summary = dict(
-            epochs_trained=[],
-            best_validation_loss=[],
-            validation_loss=[],
-            training_loss=[],
-            epoch_durations_sec=[],
-        )
+        self._x_shape = None
 
     def append_simulations(
         self,
@@ -922,45 +938,21 @@ class MaskedNeuralInference(ABC, BaseNeuralInference):
                 sampling.
         """
 
-        self._device = process_device(device)
-        check_prior(prior)
-        check_if_prior_on_device(self._device, prior)
-        self._prior = prior
+        super().__init__(
+            prior, device, logging_level, summary_writer, show_progress_bars
+        )
 
-        self._joint = None
-        self._neural_net = None
-        self._inputs_shape = None
+        # self._joint = None
+        # self._posterior = None
 
-        self._show_progress_bars = show_progress_bars
-
-        # Initialize roundwise (inputs, prior_masks) for storage of parameters,
-        # simulations and masks indicating if simulations came from prior.
+        # Initialize roundwise inputs for storage of parameters and
+        # simulations.
         self._inputs_roundwise = []
-        self._prior_masks = []
-        self._model_bank = []
-
-        # Initialize list that indicates the round from which simulations were drawn.
-        self._data_round_index = []
-
-        self._round = 0
-        self._val_loss = float("Inf")
+        self._inputs_shape = None
 
         # Initialize condition and edge mask generators
         self._condition_mask_generator = self._default_condition_masks_generator
         self._edge_mask_generator = self._default_edge_masks_generator
-
-        self._summary_writer = (
-            self._default_summary_writer() if summary_writer is None else summary_writer
-        )
-
-        # Logging during training (by SummaryWriter).
-        self._summary = dict(
-            epochs_trained=[],
-            best_validation_loss=[],
-            validation_loss=[],
-            training_loss=[],
-            epoch_durations_sec=[],
-        )
 
     # Must be re-defined to specify the new interface using inputs
     # rather than thetas and x
