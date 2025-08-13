@@ -727,7 +727,7 @@ class JacCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
         std = self.vector_field_estimator.std_fn(time)
         cov0 = std**2 * jac + torch.eye(d)[None, None, :, :]
 
-        denoising_posterior_precision = m**2 / std**2 + torch.inverse(cov0)
+        denoising_posterior_precision = m**2 / std**2 * torch.inverse(cov0)
 
         return denoising_posterior_precision
 
