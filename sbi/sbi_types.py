@@ -27,7 +27,7 @@ transform_types = Optional[
     ]
 ]
 
-# Define alias types for better readability in type hints
+# Define alias types for better readability in type hints and checking.
 # See PEP 613 for the reason why we need to use TypeAlias here.
 TensorBoardSummaryWriter: TypeAlias = SummaryWriter
 TorchDistribution: TypeAlias = Distribution
