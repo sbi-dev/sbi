@@ -350,8 +350,19 @@ def handle_invalid_x(
 
 
 def handle_invalid_inputs_for_simformer(
-    inputs: Tensor, condition_masks: Tensor, exclude_invalid_x: bool = True
-):
+    inputs: Tensor,
+    condition_masks: Optional[Tensor] = None,
+    exclude_invalid_x: bool = True,
+) -> Tuple[Tensor, Optional[Tensor]]:
+    """Return a cleaned input tensor where Nan and Inf values are replaced with small
+    standard gaussian noise.
+
+    If also a condition mask is provided, it will be modified in order to set entries
+    presenting invalid values as latent (i.e., to False).
+
+    Note: If `exclude_invalid_x` is False, then nothing happens and tensors are returned
+    as is.
+    """
     if exclude_invalid_x:
         # Identify invalid inputs
         is_invalid_inputs_entries = torch.isnan(inputs) | torch.isinf(inputs)
@@ -369,7 +380,10 @@ def handle_invalid_inputs_for_simformer(
             inputs = torch.where(is_invalid_inputs_entries, noise, inputs)
 
             # We will simply force invalid inputs to be latent
-            condition_masks = condition_masks & ~is_invalid_inputs_entries.sum(dim=-1)
+            if condition_masks is not None:
+                condition_masks = condition_masks & ~is_invalid_inputs_entries.sum(
+                    dim=-1
+                )
 
     return inputs, condition_masks
 

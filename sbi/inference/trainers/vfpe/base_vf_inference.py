@@ -827,6 +827,14 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
 
         if self._prior is None or isinstance(self._prior, ImproperEmpirical):
             inputs_prior = self.get_simulations()[0].to(self._device)
+
+            # To prevent an ImproperEmpirical built over invalid values
+            # we first clean such inputs
+            # TODO: This could be simplified by allowing prior to be None
+            # as in such case we could simply allow a None prior skipping the use of
+            # ImproperEmpirical at all
+            inputs_prior, _ = handle_invalid_inputs_for_simformer(inputs_prior)
+
             self._prior = ImproperEmpirical(
                 inputs_prior, ones(inputs_prior.shape[0], device=self._device)
             )
@@ -1013,6 +1021,12 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
                     )
                 )
 
+                assert condition_masks_batch is not None, (
+                    "During training a condition mask was encountered to be None. "
+                    "This is likely due to the condition mask generator not being "
+                    "properly defined. Please fix your generator."
+                )
+
                 edge_masks_batch = self._edge_mask_generator(inputs_batch)
                 if edge_masks_batch is not None:
                     edge_masks_batch = edge_masks_batch.to(self._device)
@@ -1100,6 +1114,12 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
                             condition_masks_batch_val,
                             exclude_invalid_x=self._exclude_invalid_x,
                         )
+                    )
+
+                    assert condition_masks_batch_val is not None, (
+                        "During training a condition mask was encountered to be None. "
+                        "This is likely due to the condition mask generator not being "
+                        "properly defined. Please fix your generator."
                     )
 
                     edge_masks_batch_val = self._edge_mask_generator(inputs_batch_val)

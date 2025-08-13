@@ -157,7 +157,7 @@ def check_if_proposal_has_default_x(proposal: Any):
 class BaseNeuralInference:
     "Mixin for NeuralInference objects"
 
-    _neural_net: Optional[nn.Module]
+    _neural_net: Union[RatioEstimator, ConditionalEstimator, MaskedConditionalEstimator]
     _train_loss: float
     _val_loss: float
     _prior: Optional[Distribution]
