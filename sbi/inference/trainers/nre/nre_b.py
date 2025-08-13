@@ -1,7 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Dict, Optional, Union
+from typing import Any, Dict, Optional, Union
 
 import torch
 from torch import Tensor, nn
@@ -71,6 +71,9 @@ class NRE_B(RatioEstimatorTrainer):
         retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[Dict] = None,
+        lr_scheduler: Optional[Union[str, Dict[str, Any]]] = None,
+        lr_scheduler_kwargs: Optional[Dict[str, Any]] = None,
+        min_lr_threshold: Optional[float] = None,
     ) -> nn.Module:
         r"""Return classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
 
