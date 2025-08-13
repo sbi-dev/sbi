@@ -357,18 +357,21 @@ def test_vector_field_sde_ode_sampling_equivalence(vector_field_trained_model):
 # TODO: Currently, c2st is too high for FMPE (e.g., > 3 number of observations),
 # so some tests are skipped so far. This seems to be an issue with the
 # neural network architecture and can be addressed in PR #1501
-@pytest.mark.skip(
-    reason="c2st too high for some cases, has to be fixed in PR #1501 or #1544"
-)
 @pytest.mark.slow
 @pytest.mark.parametrize(
     "iid_method, num_trial",
     [
-        pytest.param("fnpe", 3, id="fnpe-2trials"),
+        pytest.param(
+            "fnpe",
+            3,
+            id="fnpe-3trials",
+            marks=pytest.mark.skip(reason="c2st to high, fixed in PR #1501/1544"),
+        ),
         pytest.param("gauss", 3, id="gauss-3trials"),
         pytest.param("auto_gauss", 8, id="auto_gauss-8trials"),
         pytest.param("auto_gauss", 16, id="auto_gauss-16trials"),
         pytest.param("jac_gauss", 8, id="jac_gauss-8trials"),
+        pytest.param("jac_gauss", 16, id="jac_gauss-16trials"),
     ],
 )
 def test_vector_field_iid_inference(
