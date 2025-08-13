@@ -1,7 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import NewType, Optional, Sequence, Tuple, TypeVar, Union
+from typing import Optional, Sequence, Tuple, TypeVar, Union
 
 import numpy as np
 import torch
@@ -9,7 +9,6 @@ from pyro.distributions import TransformedDistribution  # type: ignore
 from torch import Tensor
 from torch.distributions import Distribution
 from torch.distributions.transforms import Transform
-from torch.nn import Module
 from torch.utils.tensorboard.writer import SummaryWriter
 from typing_extensions import TypeAlias
 
@@ -28,24 +27,20 @@ transform_types = Optional[
     ]
 ]
 
-# Define alias types because otherwise, the documentation by mkdocs became very long and
-# made the website look ugly.
-TensorboardSummaryWriter = NewType("Writer", SummaryWriter)
-# TorchTransform = NewType("torch Transform", Transform)
-TorchModule = NewType("Module", Module)
-TorchDistribution = NewType("torch Distribution", Distribution)
+# Define alias types for better readability in type hints
 # See PEP 613 for the reason why we need to use TypeAlias here.
+TensorBoardSummaryWriter: TypeAlias = SummaryWriter
+TorchDistribution: TypeAlias = Distribution
 TorchTransform: TypeAlias = Transform
 PyroTransformedDistribution: TypeAlias = TransformedDistribution
-TorchTensor = NewType("Tensor", Tensor)
+TorchTensor: TypeAlias = Tensor
 
 __all__ = [
     "Array",
     "Shape",
     "OneOrMore",
     "ScalarFloat",
-    "TensorboardSummaryWriter",
-    "TorchModule",
+    "TensorBoardSummaryWriter",
     "TorchTransform",
     "transform_types",
     "TorchDistribution",
