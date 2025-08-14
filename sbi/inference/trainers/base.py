@@ -242,8 +242,9 @@ class BaseNeuralInference:
     ) -> Tuple[Tensor, Tensor] | Tuple[Tensor, Tensor, Tensor]:
         "Abstract definition to get appended simulations"
         # TODO: this could be improved using TypeVarTuple from python >=3.11
-        # where one can enforce child classes to take either the tuple of 2 (maskedNI)
-        # or tuple of 3 (NeuralInference) (at the moment any child can return both)
+        # where one can enforce child classes to take either the tuple of 2
+        # (maskedNuerualInference) or tuple of 3 (NeuralInference)
+        # at the moment any child can return both
         ...
 
     @abstractmethod
@@ -261,7 +262,7 @@ class BaseNeuralInference:
         prior: Distribution,
         estimator: nn.Module,
     ) -> Tuple[BasePotential, TorchTransform]:
-        """Subclass-specific potential creation"""
+        """Abstract definition for subclass-specific potential creation"""
         ...
 
     @abstractmethod
@@ -300,6 +301,8 @@ class BaseNeuralInference:
         if prior is None:
             if self._prior is None:
                 cls_name = self.__class__.__name__
+                # TODO: this could be re-designed to allow priors to be None
+                # as many methods can work without it anyway.
                 raise ValueError(
                     f"""You did not pass a prior. You have to pass the prior either at
                     initialization `inference = {cls_name}(prior)` or to `
@@ -942,9 +945,6 @@ class MaskedNeuralInference(ABC, BaseNeuralInference):
             prior, device, logging_level, summary_writer, show_progress_bars
         )
 
-        # self._joint = None
-        # self._posterior = None
-
         # Initialize roundwise inputs for storage of parameters and
         # simulations.
         self._inputs_roundwise = []
@@ -1005,7 +1005,6 @@ class MaskedNeuralInference(ABC, BaseNeuralInference):
 
         Returns:
             Tuple of dataloaders for training and validation.
-
         """
 
         #
@@ -1126,8 +1125,8 @@ class MaskedNeuralInference(ABC, BaseNeuralInference):
         """The default condition mask generator employed
         if none is specified by the user. It consists on batch-wise
         Bernoulli masks at p=0.5, with an extra check that ensures
-        at both states (Latent/Observed, i.e., False/True) are included
-        in each mask
+        that the full observed (full True) degenerate case is avoided
+        setting a random variable to latent.
         """
 
         batch_dims = inputs.shape[:-2]
@@ -1138,7 +1137,7 @@ class MaskedNeuralInference(ABC, BaseNeuralInference):
             torch.full((*batch_dims, num_nodes), 0.5, device=inputs.device)
         ).bool()
 
-        # Find rows that are all True or all False
+        # Find rows that are all True (all observed)
         all_observed = condition_masks.all(dim=-1)
 
         # If there are any such rows, flip a random element to ensure
@@ -1174,14 +1173,25 @@ class MaskedNeuralInference(ABC, BaseNeuralInference):
         sample_with: Literal['ode', 'sde'] = "sde",
         **kwargs,
     ) -> NeuralPosterior:
-        r"""Method for building posteriors.
+        r"""Method for building an arbitrary conditional.
 
-        This method serves as a base method for constructing a posterior based
-        on a given estimator and prior. The posterior can be sampled using one of
+        This method serves as a base method for constructing a conditional based
+        on a given estimator and prior. The conditional can be sampled using one of
         several inference methods specified by `sample_with`.
 
+        This method serves the NeuralPosterior object to provide the final conditional,
+        despite the name, the returned object will not (necessarely) represent a
+        posterior but the appropriate conditional defined by the fixed condition
+        mask passed.
+
         Args:
-            estimator: The estimator that the posterior is based on.
+            condition_masks: A boolean mask indicating the role of each variable.
+            Expected shape: `(batch_size, num_variables)`.
+            - `True` (or `1`): The variable at this position is observed and its
+                features will be used for conditioning.
+            - `False` (or `0`): The variable at this position is latent and its
+                features are subject to inference.
+            estimator: The estimator that the conditional is based on.
             prior: A probability distribution that expresses prior knowledge about the
                 parameters, e.g. which ranges are meaningful for them. Must be a PyTorch
                 distribution, see FAQ for details on how to use custom distributions.
@@ -1225,7 +1235,11 @@ class MaskedNeuralInference(ABC, BaseNeuralInference):
         fixed_edge_mask: Optional[Tensor],
     ) -> Tuple[ConditionalEstimator, str]:
         """
-        Resolves the estimator and determines its device.
+        Resolves the masked estimator into an un-masked version and determines its
+        device.
+
+        To extract the un-masked estimator condition and edge masks must be provided to
+        inform the role of each variable and their dependencies.
 
         If no estimator is provided, the internal neural net (`self._neural_net`)
         is used and the device is taken from `self._device`. Otherwise, validates
@@ -1233,6 +1247,21 @@ class MaskedNeuralInference(ABC, BaseNeuralInference):
 
         Args:
             estimator: Optional estimator to use.
+            fixed_condition_mask: A boolean mask indicating the role of each variable.
+                Expected shape: `(batch_size, num_variables)`.
+                - `True` (or `1`): The variable at this position is observed and its
+                    features will be used for conditioning.
+                - `False` (or `0`): The variable at this position is latent and its
+                    features are subject to inference.
+            fixed_edge_mask: A boolean mask defining the adjacency matrix of the
+                directed acyclic graph (DAG) representing dependencies among variables.
+                Expected shape: `(batch_size, num_variables, num_variables)`.
+                - `True` (or `1`): An edge exists from the row variable to the column
+                    variable.
+                - `False` (or `0`): No edge exists between these variables.
+                - if None, it will be equivalent to a full attention (i.e., full ones)
+                                mask, we suggest you to use None instead of ones
+                                to save memory resources
 
         Returns:
             A tuple of (estimator, device).
@@ -1249,7 +1278,7 @@ class MaskedNeuralInference(ABC, BaseNeuralInference):
         assert hasattr(
             resolved_estimator, "build_conditional_vector_field_estimator"
         ), (
-            "The estimator provided does not implement "
+            "The masked estimator provided does not implement "
             "build_conditional_vector_field_estimator method to convert to "
             "a un-masked equivalent. This error is probably being raised "
             "because you tried to `build_posterior`, `build_likelihood`, "
