@@ -4,7 +4,7 @@
 import warnings
 from copy import deepcopy
 from functools import partial
-from typing import Any, Callable, Dict, Optional, Union
+from typing import Any, Callable, Dict, Literal, Optional, Union
 
 import torch
 from pyknos.mdn.mdn import MultivariateGaussianMDN
@@ -16,7 +16,10 @@ from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.inference.trainers.npe.npe_base import (
     PosteriorEstimatorTrainer,
 )
-from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
+from sbi.neural_nets.estimators.base import (
+    ConditionalDensityEstimator,
+    DensityEstimatorBuilder,
+)
 from sbi.sbi_types import TensorBoardSummaryWriter
 from sbi.utils import torchutils
 from sbi.utils.sbiutils import (
@@ -49,7 +52,9 @@ class NPE_A(PosteriorEstimatorTrainer):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
-        density_estimator: Union[str, Callable] = "mdn_snpe_a",
+        density_estimator: Union[
+            Literal["mdn_snpe_a"], DensityEstimatorBuilder
+        ] = "mdn_snpe_a",
         num_components: int = 10,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
@@ -65,17 +70,17 @@ class NPE_A(PosteriorEstimatorTrainer):
                 distribution) can be used.
             density_estimator: If it is a string (only "mdn_snpe_a" is valid), use a
                 pre-configured mixture of densities network. Alternatively, a function
-                that builds a custom neural network can be provided. The function will
+                that builds a custom neural network, which adheres to
+                `DensityEstimatorBuilder` protocol can be provided. The function will
                 be called with the first batch of simulations (theta, x), which can
-                thus be used for shape inference and potentially for z-scoring. It
-                needs to return a PyTorch `nn.Module` implementing the density
-                estimator. The density estimator needs to provide the methods
-                `.log_prob` and `.sample()`. Note that until the last round only a
-                single (multivariate) Gaussian component is used for training (see
-                Algorithm 1 in [1]). In the last round, this component is replicated
-                `num_components` times, its parameters are perturbed with a very small
-                noise, and then the last training round is done with the expanded
-                Gaussian mixture as estimator for the proposal posterior.
+                thus be used for shape inference and potentially for z-scoring. The
+                density estimator needs to provide the methods `.log_prob` and
+                `.sample()`. Note that until the last round only a single (multivariate)
+                Gaussian component is used for training (seeAlgorithm 1 in [1]). In the
+                last round, this component is replicated `num_components` times, its
+                parameters are perturbed with a very small noise, and then the last
+                training round is done with the expanded Gaussian mixture as estimator
+                for the proposal posterior.
             num_components: Number of components of the mixture of Gaussians in the
                 last round. This overrides the `num_components` value passed to
                 `posterior_nn()`.
