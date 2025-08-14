@@ -21,7 +21,7 @@ from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
     reshape_to_sample_batch_event,
 )
-from sbi.sbi_types import TensorboardSummaryWriter
+from sbi.sbi_types import TensorBoardSummaryWriter
 from sbi.utils import (
     batched_mixture_mv,
     batched_mixture_vmv,
@@ -77,7 +77,7 @@ class NPE_C(PosteriorEstimatorTrainer):
         ] = "maf",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
-        summary_writer: Optional[TensorboardSummaryWriter] = None,
+        summary_writer: Optional[TensorBoardSummaryWriter] = None,
         show_progress_bars: bool = True,
     ):
         r"""Initialize NPE-C.

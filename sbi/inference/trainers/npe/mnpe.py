@@ -16,7 +16,7 @@ from sbi.inference.posteriors.posterior_parameters import (
 from sbi.inference.trainers.npe.npe_c import NPE_C
 from sbi.neural_nets.estimators import MixedDensityEstimator
 from sbi.neural_nets.estimators.base import DensityEstimatorBuilder
-from sbi.sbi_types import TensorboardSummaryWriter
+from sbi.sbi_types import TensorBoardSummaryWriter
 from sbi.utils.sbiutils import del_entries
 
 
@@ -35,7 +35,7 @@ class MNPE(NPE_C):
         density_estimator: Union[Literal["mnpe"], DensityEstimatorBuilder] = "mnpe",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
-        summary_writer: Optional[TensorboardSummaryWriter] = None,
+        summary_writer: Optional[TensorBoardSummaryWriter] = None,
         show_progress_bars: bool = True,
     ):
         r"""Initialize Mixed Neural Posterior Estimation (MNPE).

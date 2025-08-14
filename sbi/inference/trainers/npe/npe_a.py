@@ -20,7 +20,7 @@ from sbi.neural_nets.estimators.base import (
     ConditionalDensityEstimator,
     DensityEstimatorBuilder,
 )
-from sbi.sbi_types import TensorboardSummaryWriter, TorchModule
+from sbi.sbi_types import TensorBoardSummaryWriter, TorchModule
 from sbi.utils import torchutils
 from sbi.utils.sbiutils import (
     batched_mixture_mv,
@@ -58,7 +58,7 @@ class NPE_A(PosteriorEstimatorTrainer):
         num_components: int = 10,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
-        summary_writer: Optional[TensorboardSummaryWriter] = None,
+        summary_writer: Optional[TensorBoardSummaryWriter] = None,
         show_progress_bars: bool = True,
     ):
         r"""Initialize NPE-A [1].
@@ -292,7 +292,7 @@ class NPE_A(PosteriorEstimatorTrainer):
 
     def build_posterior(
         self,
-        density_estimator: Optional[TorchModule] = None,
+        density_estimator: Optional[torch.nn.Module] = None,
         prior: Optional[Distribution] = None,
         **kwargs,
     ) -> "DirectPosterior":

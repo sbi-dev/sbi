@@ -7,7 +7,7 @@ from torch.distributions import Distribution
 
 from sbi.inference.trainers.nle.nle_base import LikelihoodEstimatorTrainer
 from sbi.neural_nets.estimators.base import DensityEstimatorBuilder
-from sbi.sbi_types import TensorboardSummaryWriter
+from sbi.sbi_types import TensorBoardSummaryWriter
 from sbi.utils.sbiutils import del_entries
 
 
@@ -27,7 +27,7 @@ class NLE_A(LikelihoodEstimatorTrainer):
         ] = "maf",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
-        summary_writer: Optional[TensorboardSummaryWriter] = None,
+        summary_writer: Optional[TensorBoardSummaryWriter] = None,
         show_progress_bars: bool = True,
     ):
         r"""Initialize Neural Likelihood Estimation.

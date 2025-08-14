@@ -9,7 +9,7 @@ from torch.distributions import Distribution
 
 from sbi.inference.trainers.nre.nre_a import NRE_A
 from sbi.inference.trainers.nre.nre_base import RatioEstimatorBuilder
-from sbi.sbi_types import TensorboardSummaryWriter
+from sbi.sbi_types import TensorBoardSummaryWriter
 from sbi.utils.sbiutils import del_entries
 from sbi.utils.torchutils import assert_all_finite
 
@@ -32,7 +32,7 @@ class BNRE(NRE_A):
         classifier: Union[str, RatioEstimatorBuilder] = "resnet",
         device: str = "cpu",
         logging_level: Union[int, str] = "warning",
-        summary_writer: Optional[TensorboardSummaryWriter] = None,
+        summary_writer: Optional[TensorBoardSummaryWriter] = None,
         show_progress_bars: bool = True,
     ):
         r"""Balanced neural ratio estimation (BNRE).
