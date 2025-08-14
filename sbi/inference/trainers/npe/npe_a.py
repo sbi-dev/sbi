@@ -20,7 +20,7 @@ from sbi.neural_nets.estimators.base import (
     ConditionalDensityEstimator,
     DensityEstimatorBuilder,
 )
-from sbi.sbi_types import TensorBoardSummaryWriter, TorchModule
+from sbi.sbi_types import TensorBoardSummaryWriter
 from sbi.utils import torchutils
 from sbi.utils.sbiutils import (
     batched_mixture_mv,
