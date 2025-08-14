@@ -4,7 +4,7 @@
 import warnings
 from abc import ABC
 from copy import deepcopy
-from typing import Any, Callable, Dict, Literal, Optional, Tuple, Union
+from typing import Any, Dict, Literal, Optional, Tuple, Union
 
 import torch
 from torch import Tensor
@@ -26,6 +26,7 @@ from sbi.inference.potentials.likelihood_based_potential import LikelihoodBasedP
 from sbi.inference.trainers.base import NeuralInference
 from sbi.neural_nets import likelihood_nn
 from sbi.neural_nets.estimators import ConditionalDensityEstimator
+from sbi.neural_nets.estimators.base import DensityEstimatorBuilder
 from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
 )
@@ -38,7 +39,9 @@ class LikelihoodEstimatorTrainer(NeuralInference, ABC):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
-        density_estimator: Union[str, Callable] = "maf",
+        density_estimator: Union[
+            Literal["nsf", "maf", "mdn", "made"], DensityEstimatorBuilder
+        ] = "maf",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
@@ -53,12 +56,12 @@ class LikelihoodEstimatorTrainer(NeuralInference, ABC):
                 distribution) can be used.
             density_estimator: If it is a string, use a pre-configured network of the
                 provided type (one of nsf, maf, mdn, made). Alternatively, a function
-                that builds a custom neural network can be provided. The function will
+                that builds a custom neural network, which adheres to
+                `DensityEstimatorBuilder` protocol can be provided. The function will
                 be called with the first batch of simulations (theta, x), which can
-                thus be used for shape inference and potentially for z-scoring. It
-                needs to return a PyTorch `nn.Module` implementing the density
-                estimator. The density estimator needs to provide the methods
-                `.log_prob` and `.sample()`.
+                thus be used for shape inference and potentially for z-scoring. The
+                density estimator needs to provide the methods `.log_prob` and
+                `.sample()`.
 
         See docstring of `NeuralInference` class for all other arguments.
         """
