@@ -991,10 +991,7 @@ last round. In the last round, NPE-A can use a Mixture of Gaussians.</p>
 
               <details class="quote">
                 <summary>Source code in <code>sbi/inference/trainers/npe/npe_a.py</code></summary>
-                <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 31</span>
-<span class="normal"> 32</span>
-<span class="normal"> 33</span>
-<span class="normal"> 34</span>
+                <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 34</span>
 <span class="normal"> 35</span>
 <span class="normal"> 36</span>
 <span class="normal"> 37</span>
@@ -1336,7 +1333,12 @@ last round. In the last round, NPE-A can use a Mixture of Gaussians.</p>
 <span class="normal">373</span>
 <span class="normal">374</span>
 <span class="normal">375</span>
-<span class="normal">376</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NPE_A</span><span class="p">(</span><span class="n">PosteriorEstimatorTrainer</span><span class="p">):</span>
+<span class="normal">376</span>
+<span class="normal">377</span>
+<span class="normal">378</span>
+<span class="normal">379</span>
+<span class="normal">380</span>
+<span class="normal">381</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NPE_A</span><span class="p">(</span><span class="n">PosteriorEstimatorTrainer</span><span class="p">):</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Neural Posterior Estimation algorithm as in Papamakarios et al. (2016) [1].</span>
 
 <span class="sd">    [1] *Fast epsilon-free Inference of Simulation Models with Bayesian</span>
@@ -1357,7 +1359,9 @@ last round. In the last round, NPE-A can use a Mixture of Gaussians.</p>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;mdn_snpe_a&quot;</span><span class="p">,</span>
+        <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span>
+            <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;mdn_snpe_a&quot;</span><span class="p">],</span> <span class="n">DensityEstimatorBuilder</span>
+        <span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;mdn_snpe_a&quot;</span><span class="p">,</span>
         <span class="n">num_components</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span>
         <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
         <span class="n">logging_level</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;WARNING&quot;</span><span class="p">,</span>
@@ -1373,17 +1377,17 @@ last round. In the last round, NPE-A can use a Mixture of Gaussians.</p>
 <span class="sd">                distribution) can be used.</span>
 <span class="sd">            density_estimator: If it is a string (only &quot;mdn_snpe_a&quot; is valid), use a</span>
 <span class="sd">                pre-configured mixture of densities network. Alternatively, a function</span>
-<span class="sd">                that builds a custom neural network can be provided. The function will</span>
+<span class="sd">                that builds a custom neural network, which adheres to</span>
+<span class="sd">                `DensityEstimatorBuilder` protocol can be provided. The function will</span>
 <span class="sd">                be called with the first batch of simulations (theta, x), which can</span>
-<span class="sd">                thus be used for shape inference and potentially for z-scoring. It</span>
-<span class="sd">                needs to return a PyTorch `nn.Module` implementing the density</span>
-<span class="sd">                estimator. The density estimator needs to provide the methods</span>
-<span class="sd">                `.log_prob` and `.sample()`. Note that until the last round only a</span>
-<span class="sd">                single (multivariate) Gaussian component is used for training (see</span>
-<span class="sd">                Algorithm 1 in [1]). In the last round, this component is replicated</span>
-<span class="sd">                `num_components` times, its parameters are perturbed with a very small</span>
-<span class="sd">                noise, and then the last training round is done with the expanded</span>
-<span class="sd">                Gaussian mixture as estimator for the proposal posterior.</span>
+<span class="sd">                thus be used for shape inference and potentially for z-scoring. The</span>
+<span class="sd">                density estimator needs to provide the methods `.log_prob` and</span>
+<span class="sd">                `.sample()`. Note that until the last round only a single (multivariate)</span>
+<span class="sd">                Gaussian component is used for training (seeAlgorithm 1 in [1]). In the</span>
+<span class="sd">                last round, this component is replicated `num_components` times, its</span>
+<span class="sd">                parameters are perturbed with a very small noise, and then the last</span>
+<span class="sd">                training round is done with the expanded Gaussian mixture as estimator</span>
+<span class="sd">                for the proposal posterior.</span>
 <span class="sd">            num_components: Number of components of the mixture of Gaussians in the</span>
 <span class="sd">                last round. This overrides the `num_components` value passed to</span>
 <span class="sd">                `posterior_nn()`.</span>
@@ -1746,23 +1750,23 @@ distribution) can be used.</p>
                 <code>density_estimator</code>
             </td>
             <td>
-                  <code><span title="typing.Union">Union</span>[<span title="str">str</span>, <span title="typing.Callable">Callable</span>]</code>
+                  <code><span title="typing.Union">Union</span>[<span title="typing.Literal">Literal</span>[&#39;mdn_snpe_a&#39;], <span title="sbi.neural_nets.estimators.base.DensityEstimatorBuilder">DensityEstimatorBuilder</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
                 <p>If it is a string (only &ldquo;mdn_snpe_a&rdquo; is valid), use a
 pre-configured mixture of densities network. Alternatively, a function
-that builds a custom neural network can be provided. The function will
+that builds a custom neural network, which adheres to
+<code>DensityEstimatorBuilder</code> protocol can be provided. The function will
 be called with the first batch of simulations (theta, x), which can
-thus be used for shape inference and potentially for z-scoring. It
-needs to return a PyTorch <code>nn.Module</code> implementing the density
-estimator. The density estimator needs to provide the methods
-<code>.log_prob</code> and <code>.sample()</code>. Note that until the last round only a
-single (multivariate) Gaussian component is used for training (see
-Algorithm 1 in [1]). In the last round, this component is replicated
-<code>num_components</code> times, its parameters are perturbed with a very small
-noise, and then the last training round is done with the expanded
-Gaussian mixture as estimator for the proposal posterior.</p>
+thus be used for shape inference and potentially for z-scoring. The
+density estimator needs to provide the methods <code>.log_prob</code> and
+<code>.sample()</code>. Note that until the last round only a single (multivariate)
+Gaussian component is used for training (seeAlgorithm 1 in [1]). In the
+last round, this component is replicated <code>num_components</code> times, its
+parameters are perturbed with a very small noise, and then the last
+training round is done with the expanded Gaussian mixture as estimator
+for the proposal posterior.</p>
               </div>
             </td>
             <td>
@@ -1859,10 +1863,7 @@ file location (default is <code>&lt;current working directory&gt;/logs</code>.)<
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/trainers/npe/npe_a.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 49</span>
-<span class="normal"> 50</span>
-<span class="normal"> 51</span>
-<span class="normal"> 52</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 52</span>
 <span class="normal"> 53</span>
 <span class="normal"> 54</span>
 <span class="normal"> 55</span>
@@ -1919,10 +1920,17 @@ file location (default is <code>&lt;current working directory&gt;/logs</code>.)<
 <span class="normal">106</span>
 <span class="normal">107</span>
 <span class="normal">108</span>
-<span class="normal">109</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">109</span>
+<span class="normal">110</span>
+<span class="normal">111</span>
+<span class="normal">112</span>
+<span class="normal">113</span>
+<span class="normal">114</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;mdn_snpe_a&quot;</span><span class="p">,</span>
+    <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span>
+        <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;mdn_snpe_a&quot;</span><span class="p">],</span> <span class="n">DensityEstimatorBuilder</span>
+    <span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;mdn_snpe_a&quot;</span><span class="p">,</span>
     <span class="n">num_components</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span>
     <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
     <span class="n">logging_level</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;WARNING&quot;</span><span class="p">,</span>
@@ -1938,17 +1946,17 @@ file location (default is <code>&lt;current working directory&gt;/logs</code>.)<
 <span class="sd">            distribution) can be used.</span>
 <span class="sd">        density_estimator: If it is a string (only &quot;mdn_snpe_a&quot; is valid), use a</span>
 <span class="sd">            pre-configured mixture of densities network. Alternatively, a function</span>
-<span class="sd">            that builds a custom neural network can be provided. The function will</span>
+<span class="sd">            that builds a custom neural network, which adheres to</span>
+<span class="sd">            `DensityEstimatorBuilder` protocol can be provided. The function will</span>
 <span class="sd">            be called with the first batch of simulations (theta, x), which can</span>
-<span class="sd">            thus be used for shape inference and potentially for z-scoring. It</span>
-<span class="sd">            needs to return a PyTorch `nn.Module` implementing the density</span>
-<span class="sd">            estimator. The density estimator needs to provide the methods</span>
-<span class="sd">            `.log_prob` and `.sample()`. Note that until the last round only a</span>
-<span class="sd">            single (multivariate) Gaussian component is used for training (see</span>
-<span class="sd">            Algorithm 1 in [1]). In the last round, this component is replicated</span>
-<span class="sd">            `num_components` times, its parameters are perturbed with a very small</span>
-<span class="sd">            noise, and then the last training round is done with the expanded</span>
-<span class="sd">            Gaussian mixture as estimator for the proposal posterior.</span>
+<span class="sd">            thus be used for shape inference and potentially for z-scoring. The</span>
+<span class="sd">            density estimator needs to provide the methods `.log_prob` and</span>
+<span class="sd">            `.sample()`. Note that until the last round only a single (multivariate)</span>
+<span class="sd">            Gaussian component is used for training (seeAlgorithm 1 in [1]). In the</span>
+<span class="sd">            last round, this component is replicated `num_components` times, its</span>
+<span class="sd">            parameters are perturbed with a very small noise, and then the last</span>
+<span class="sd">            training round is done with the expanded Gaussian mixture as estimator</span>
+<span class="sd">            for the proposal posterior.</span>
 <span class="sd">        num_components: Number of components of the mixture of Gaussians in the</span>
 <span class="sd">            last round. This overrides the `num_components` value passed to</span>
 <span class="sd">            `posterior_nn()`.</span>
@@ -2075,12 +2083,7 @@ If <code>None</code>, use the latest neural density estimator that was trained.<
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/trainers/npe/npe_a.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">288</span>
-<span class="normal">289</span>
-<span class="normal">290</span>
-<span class="normal">291</span>
-<span class="normal">292</span>
-<span class="normal">293</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">293</span>
 <span class="normal">294</span>
 <span class="normal">295</span>
 <span class="normal">296</span>
@@ -2110,7 +2113,12 @@ If <code>None</code>, use the latest neural density estimator that was trained.<
 <span class="normal">320</span>
 <span class="normal">321</span>
 <span class="normal">322</span>
-<span class="normal">323</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_posterior</span><span class="p">(</span>
+<span class="normal">323</span>
+<span class="normal">324</span>
+<span class="normal">325</span>
+<span class="normal">326</span>
+<span class="normal">327</span>
+<span class="normal">328</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_posterior</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -2225,12 +2233,7 @@ If <code>None</code>, use the latest neural density estimator that was trained.<
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/trainers/npe/npe_a.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">234</span>
-<span class="normal">235</span>
-<span class="normal">236</span>
-<span class="normal">237</span>
-<span class="normal">238</span>
-<span class="normal">239</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">239</span>
 <span class="normal">240</span>
 <span class="normal">241</span>
 <span class="normal">242</span>
@@ -2277,7 +2280,12 @@ If <code>None</code>, use the latest neural density estimator that was trained.<
 <span class="normal">283</span>
 <span class="normal">284</span>
 <span class="normal">285</span>
-<span class="normal">286</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">correct_for_proposal</span><span class="p">(</span>
+<span class="normal">286</span>
+<span class="normal">287</span>
+<span class="normal">288</span>
+<span class="normal">289</span>
+<span class="normal">290</span>
+<span class="normal">291</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">correct_for_proposal</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;NPE_A_MDN&quot;</span><span class="p">:</span>
@@ -2637,12 +2645,7 @@ on the number of mixture components.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/trainers/npe/npe_a.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">111</span>
-<span class="normal">112</span>
-<span class="normal">113</span>
-<span class="normal">114</span>
-<span class="normal">115</span>
-<span class="normal">116</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">116</span>
 <span class="normal">117</span>
 <span class="normal">118</span>
 <span class="normal">119</span>
@@ -2758,7 +2761,12 @@ on the number of mixture components.</p>
 <span class="normal">229</span>
 <span class="normal">230</span>
 <span class="normal">231</span>
-<span class="normal">232</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
+<span class="normal">232</span>
+<span class="normal">233</span>
+<span class="normal">234</span>
+<span class="normal">235</span>
+<span class="normal">236</span>
+<span class="normal">237</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">final_round</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">training_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">200</span><span class="p">,</span>
@@ -2929,10 +2937,7 @@ Thus, SNPE-B is not limited to Gaussian proposal.</p>
 
               <details class="quote">
                 <summary>Source code in <code>sbi/inference/trainers/npe/npe_b.py</code></summary>
-                <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 17</span>
-<span class="normal"> 18</span>
-<span class="normal"> 19</span>
-<span class="normal"> 20</span>
+                <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 20</span>
 <span class="normal"> 21</span>
 <span class="normal"> 22</span>
 <span class="normal"> 23</span>
@@ -3046,7 +3051,12 @@ Thus, SNPE-B is not limited to Gaussian proposal.</p>
 <span class="normal">131</span>
 <span class="normal">132</span>
 <span class="normal">133</span>
-<span class="normal">134</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NPE_B</span><span class="p">(</span><span class="n">PosteriorEstimatorTrainer</span><span class="p">):</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span>
+<span class="normal">137</span>
+<span class="normal">138</span>
+<span class="normal">139</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NPE_B</span><span class="p">(</span><span class="n">PosteriorEstimatorTrainer</span><span class="p">):</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Neural Posterior Estimation algorithm (NPE-B) as in Lueckmann et al. (2017) [1].</span>
 
 <span class="sd">    [1] *Flexible statistical inference for mechanistic models of neural</span>
@@ -3065,7 +3075,9 @@ Thus, SNPE-B is not limited to Gaussian proposal.</p>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;maf&quot;</span><span class="p">,</span>
+        <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span>
+            <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;nsf&quot;</span><span class="p">,</span> <span class="s2">&quot;maf&quot;</span><span class="p">,</span> <span class="s2">&quot;mdn&quot;</span><span class="p">,</span> <span class="s2">&quot;made&quot;</span><span class="p">],</span> <span class="n">DensityEstimatorBuilder</span>
+        <span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;maf&quot;</span><span class="p">,</span>
         <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
         <span class="n">logging_level</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;WARNING&quot;</span><span class="p">,</span>
         <span class="n">summary_writer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TensorBoardSummaryWriter</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -3078,12 +3090,12 @@ Thus, SNPE-B is not limited to Gaussian proposal.</p>
 <span class="sd">                parameters, e.g. which ranges are meaningful for them.</span>
 <span class="sd">            density_estimator: If it is a string, use a pre-configured network of the</span>
 <span class="sd">                provided type (one of nsf, maf, mdn, made). Alternatively, a function</span>
-<span class="sd">                that builds a custom neural network can be provided. The function will</span>
+<span class="sd">                that builds a custom neural network, which adheres to</span>
+<span class="sd">                `DensityEstimatorBuilder` protocol can be provided. The function will</span>
 <span class="sd">                be called with the first batch of simulations (theta, x), which can</span>
-<span class="sd">                thus be used for shape inference and potentially for z-scoring. It</span>
-<span class="sd">                needs to return a PyTorch `nn.Module` implementing the density</span>
-<span class="sd">                estimator. The density estimator needs to provide the methods</span>
-<span class="sd">                `.log_prob` and `.sample()`.</span>
+<span class="sd">                thus be used for shape inference and potentially for z-scoring. The</span>
+<span class="sd">                density estimator needs to provide the methods `.log_prob` and</span>
+<span class="sd">                `.sample()`.</span>
 <span class="sd">            device: Training device, e.g., &quot;cpu&quot;, &quot;cuda&quot; or &quot;cuda:{0, 1, ...}&quot;.</span>
 <span class="sd">            logging_level: Minimum severity of messages to log. One of the strings</span>
 <span class="sd">                INFO, WARNING, DEBUG, ERROR and CRITICAL.</span>
@@ -3226,18 +3238,18 @@ parameters, e.g. which ranges are meaningful for them.</p>
                 <code>density_estimator</code>
             </td>
             <td>
-                  <code><span title="typing.Union">Union</span>[<span title="str">str</span>, <span title="typing.Callable">Callable</span>]</code>
+                  <code><span title="typing.Union">Union</span>[<span title="typing.Literal">Literal</span>[&#39;nsf&#39;, &#39;maf&#39;, &#39;mdn&#39;, &#39;made&#39;], <span title="sbi.neural_nets.estimators.base.DensityEstimatorBuilder">DensityEstimatorBuilder</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
                 <p>If it is a string, use a pre-configured network of the
 provided type (one of nsf, maf, mdn, made). Alternatively, a function
-that builds a custom neural network can be provided. The function will
+that builds a custom neural network, which adheres to
+<code>DensityEstimatorBuilder</code> protocol can be provided. The function will
 be called with the first batch of simulations (theta, x), which can
-thus be used for shape inference and potentially for z-scoring. It
-needs to return a PyTorch <code>nn.Module</code> implementing the density
-estimator. The density estimator needs to provide the methods
-<code>.log_prob</code> and <code>.sample()</code>.</p>
+thus be used for shape inference and potentially for z-scoring. The
+density estimator needs to provide the methods <code>.log_prob</code> and
+<code>.sample()</code>.</p>
               </div>
             </td>
             <td>
@@ -3316,10 +3328,7 @@ file location (default is <code>&lt;current working directory&gt;/logs</code>.)<
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/trainers/npe/npe_b.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">33</span>
-<span class="normal">34</span>
-<span class="normal">35</span>
-<span class="normal">36</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">36</span>
 <span class="normal">37</span>
 <span class="normal">38</span>
 <span class="normal">39</span>
@@ -3347,10 +3356,17 @@ file location (default is <code>&lt;current working directory&gt;/logs</code>.)<
 <span class="normal">61</span>
 <span class="normal">62</span>
 <span class="normal">63</span>
-<span class="normal">64</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">64</span>
+<span class="normal">65</span>
+<span class="normal">66</span>
+<span class="normal">67</span>
+<span class="normal">68</span>
+<span class="normal">69</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;maf&quot;</span><span class="p">,</span>
+    <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span>
+        <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;nsf&quot;</span><span class="p">,</span> <span class="s2">&quot;maf&quot;</span><span class="p">,</span> <span class="s2">&quot;mdn&quot;</span><span class="p">,</span> <span class="s2">&quot;made&quot;</span><span class="p">],</span> <span class="n">DensityEstimatorBuilder</span>
+    <span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;maf&quot;</span><span class="p">,</span>
     <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
     <span class="n">logging_level</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;WARNING&quot;</span><span class="p">,</span>
     <span class="n">summary_writer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TensorBoardSummaryWriter</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -3363,12 +3379,12 @@ file location (default is <code>&lt;current working directory&gt;/logs</code>.)<
 <span class="sd">            parameters, e.g. which ranges are meaningful for them.</span>
 <span class="sd">        density_estimator: If it is a string, use a pre-configured network of the</span>
 <span class="sd">            provided type (one of nsf, maf, mdn, made). Alternatively, a function</span>
-<span class="sd">            that builds a custom neural network can be provided. The function will</span>
+<span class="sd">            that builds a custom neural network, which adheres to</span>
+<span class="sd">            `DensityEstimatorBuilder` protocol can be provided. The function will</span>
 <span class="sd">            be called with the first batch of simulations (theta, x), which can</span>
-<span class="sd">            thus be used for shape inference and potentially for z-scoring. It</span>
-<span class="sd">            needs to return a PyTorch `nn.Module` implementing the density</span>
-<span class="sd">            estimator. The density estimator needs to provide the methods</span>
-<span class="sd">            `.log_prob` and `.sample()`.</span>
+<span class="sd">            thus be used for shape inference and potentially for z-scoring. The</span>
+<span class="sd">            density estimator needs to provide the methods `.log_prob` and</span>
+<span class="sd">            `.sample()`.</span>
 <span class="sd">        device: Training device, e.g., &quot;cpu&quot;, &quot;cuda&quot; or &quot;cuda:{0, 1, ...}&quot;.</span>
 <span class="sd">        logging_level: Minimum severity of messages to log. One of the strings</span>
 <span class="sd">            INFO, WARNING, DEBUG, ERROR and CRITICAL.</span>
@@ -3446,12 +3462,7 @@ the atomic loss.</p>
 
               <details class="quote">
                 <summary>Source code in <code>sbi/inference/trainers/npe/npe_c.py</code></summary>
-                <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 32</span>
-<span class="normal"> 33</span>
-<span class="normal"> 34</span>
-<span class="normal"> 35</span>
-<span class="normal"> 36</span>
-<span class="normal"> 37</span>
+                <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 37</span>
 <span class="normal"> 38</span>
 <span class="normal"> 39</span>
 <span class="normal"> 40</span>
@@ -4090,7 +4101,15 @@ the atomic loss.</p>
 <span class="normal">673</span>
 <span class="normal">674</span>
 <span class="normal">675</span>
-<span class="normal">676</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NPE_C</span><span class="p">(</span><span class="n">PosteriorEstimatorTrainer</span><span class="p">):</span>
+<span class="normal">676</span>
+<span class="normal">677</span>
+<span class="normal">678</span>
+<span class="normal">679</span>
+<span class="normal">680</span>
+<span class="normal">681</span>
+<span class="normal">682</span>
+<span class="normal">683</span>
+<span class="normal">684</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NPE_C</span><span class="p">(</span><span class="n">PosteriorEstimatorTrainer</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Neural Posterior Estimation algorithm (NPE-C) as in Greenberg et al. (2019). [1]</span>
 
 <span class="sd">    [1] *Automatic Posterior Transformation for Likelihood-free Inference*,</span>
@@ -4128,7 +4147,9 @@ the atomic loss.</p>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;maf&quot;</span><span class="p">,</span>
+        <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span>
+            <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;nsf&quot;</span><span class="p">,</span> <span class="s2">&quot;maf&quot;</span><span class="p">,</span> <span class="s2">&quot;mdn&quot;</span><span class="p">,</span> <span class="s2">&quot;made&quot;</span><span class="p">],</span> <span class="n">DensityEstimatorBuilder</span>
+        <span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;maf&quot;</span><span class="p">,</span>
         <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
         <span class="n">logging_level</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;WARNING&quot;</span><span class="p">,</span>
         <span class="n">summary_writer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TensorBoardSummaryWriter</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -4141,12 +4162,13 @@ the atomic loss.</p>
 <span class="sd">                parameters, e.g. which ranges are meaningful for them.</span>
 <span class="sd">            density_estimator: If it is a string, use a pre-configured network of the</span>
 <span class="sd">                provided type (one of nsf, maf, mdn, made). Alternatively, a function</span>
-<span class="sd">                that builds a custom neural network can be provided. The function will</span>
+<span class="sd">                that builds a custom neural network, which adheres to</span>
+<span class="sd">                `DensityEstimatorBuilder` protocol can be provided. The function will</span>
 <span class="sd">                be called with the first batch of simulations (theta, x), which can</span>
-<span class="sd">                thus be used for shape inference and potentially for z-scoring. It</span>
-<span class="sd">                needs to return a PyTorch ``nn.Module`` implementing the density</span>
-<span class="sd">                estimator. The density estimator needs to provide the methods</span>
-<span class="sd">                ``.log_prob`` and ``.sample()``.</span>
+<span class="sd">                thus be used for shape inference and potentially for z-scoring. The</span>
+<span class="sd">                density estimator needs to provide the methods `.log_prob` and</span>
+<span class="sd">                `.sample()`.</span>
+
 <span class="sd">            device: Training device, e.g., &quot;cpu&quot;, &quot;cuda&quot; or &quot;cuda:{0, 1, ...}&quot;.</span>
 <span class="sd">            logging_level: Minimum severity of messages to log. One of the strings</span>
 <span class="sd">                INFO, WARNING, DEBUG, ERROR and CRITICAL.</span>
@@ -4797,18 +4819,18 @@ parameters, e.g. which ranges are meaningful for them.</p>
                 <code>density_estimator</code>
             </td>
             <td>
-                  <code><span title="typing.Union">Union</span>[<span title="str">str</span>, <span title="typing.Callable">Callable</span>]</code>
+                  <code><span title="typing.Union">Union</span>[<span title="typing.Literal">Literal</span>[&#39;nsf&#39;, &#39;maf&#39;, &#39;mdn&#39;, &#39;made&#39;], <span title="sbi.neural_nets.estimators.base.DensityEstimatorBuilder">DensityEstimatorBuilder</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
                 <p>If it is a string, use a pre-configured network of the
 provided type (one of nsf, maf, mdn, made). Alternatively, a function
-that builds a custom neural network can be provided. The function will
+that builds a custom neural network, which adheres to
+<code>DensityEstimatorBuilder</code> protocol can be provided. The function will
 be called with the first batch of simulations (theta, x), which can
-thus be used for shape inference and potentially for z-scoring. It
-needs to return a PyTorch <code>nn.Module</code> implementing the density
-estimator. The density estimator needs to provide the methods
-<code>.log_prob</code> and <code>.sample()</code>.</p>
+thus be used for shape inference and potentially for z-scoring. The
+density estimator needs to provide the methods <code>.log_prob</code> and
+<code>.sample()</code>.</p>
               </div>
             </td>
             <td>
@@ -4887,41 +4909,46 @@ log file location (default is <code>&lt;current working directory&gt;/logs</code
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/trainers/npe/npe_c.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">67</span>
-<span class="normal">68</span>
-<span class="normal">69</span>
-<span class="normal">70</span>
-<span class="normal">71</span>
-<span class="normal">72</span>
-<span class="normal">73</span>
-<span class="normal">74</span>
-<span class="normal">75</span>
-<span class="normal">76</span>
-<span class="normal">77</span>
-<span class="normal">78</span>
-<span class="normal">79</span>
-<span class="normal">80</span>
-<span class="normal">81</span>
-<span class="normal">82</span>
-<span class="normal">83</span>
-<span class="normal">84</span>
-<span class="normal">85</span>
-<span class="normal">86</span>
-<span class="normal">87</span>
-<span class="normal">88</span>
-<span class="normal">89</span>
-<span class="normal">90</span>
-<span class="normal">91</span>
-<span class="normal">92</span>
-<span class="normal">93</span>
-<span class="normal">94</span>
-<span class="normal">95</span>
-<span class="normal">96</span>
-<span class="normal">97</span>
-<span class="normal">98</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 72</span>
+<span class="normal"> 73</span>
+<span class="normal"> 74</span>
+<span class="normal"> 75</span>
+<span class="normal"> 76</span>
+<span class="normal"> 77</span>
+<span class="normal"> 78</span>
+<span class="normal"> 79</span>
+<span class="normal"> 80</span>
+<span class="normal"> 81</span>
+<span class="normal"> 82</span>
+<span class="normal"> 83</span>
+<span class="normal"> 84</span>
+<span class="normal"> 85</span>
+<span class="normal"> 86</span>
+<span class="normal"> 87</span>
+<span class="normal"> 88</span>
+<span class="normal"> 89</span>
+<span class="normal"> 90</span>
+<span class="normal"> 91</span>
+<span class="normal"> 92</span>
+<span class="normal"> 93</span>
+<span class="normal"> 94</span>
+<span class="normal"> 95</span>
+<span class="normal"> 96</span>
+<span class="normal"> 97</span>
+<span class="normal"> 98</span>
+<span class="normal"> 99</span>
+<span class="normal">100</span>
+<span class="normal">101</span>
+<span class="normal">102</span>
+<span class="normal">103</span>
+<span class="normal">104</span>
+<span class="normal">105</span>
+<span class="normal">106</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;maf&quot;</span><span class="p">,</span>
+    <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span>
+        <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;nsf&quot;</span><span class="p">,</span> <span class="s2">&quot;maf&quot;</span><span class="p">,</span> <span class="s2">&quot;mdn&quot;</span><span class="p">,</span> <span class="s2">&quot;made&quot;</span><span class="p">],</span> <span class="n">DensityEstimatorBuilder</span>
+    <span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;maf&quot;</span><span class="p">,</span>
     <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
     <span class="n">logging_level</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;WARNING&quot;</span><span class="p">,</span>
     <span class="n">summary_writer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TensorBoardSummaryWriter</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -4934,12 +4961,13 @@ log file location (default is <code>&lt;current working directory&gt;/logs</code
 <span class="sd">            parameters, e.g. which ranges are meaningful for them.</span>
 <span class="sd">        density_estimator: If it is a string, use a pre-configured network of the</span>
 <span class="sd">            provided type (one of nsf, maf, mdn, made). Alternatively, a function</span>
-<span class="sd">            that builds a custom neural network can be provided. The function will</span>
+<span class="sd">            that builds a custom neural network, which adheres to</span>
+<span class="sd">            `DensityEstimatorBuilder` protocol can be provided. The function will</span>
 <span class="sd">            be called with the first batch of simulations (theta, x), which can</span>
-<span class="sd">            thus be used for shape inference and potentially for z-scoring. It</span>
-<span class="sd">            needs to return a PyTorch ``nn.Module`` implementing the density</span>
-<span class="sd">            estimator. The density estimator needs to provide the methods</span>
-<span class="sd">            ``.log_prob`` and ``.sample()``.</span>
+<span class="sd">            thus be used for shape inference and potentially for z-scoring. The</span>
+<span class="sd">            density estimator needs to provide the methods `.log_prob` and</span>
+<span class="sd">            `.sample()`.</span>
+
 <span class="sd">        device: Training device, e.g., &quot;cpu&quot;, &quot;cuda&quot; or &quot;cuda:{0, 1, ...}&quot;.</span>
 <span class="sd">        logging_level: Minimum severity of messages to log. One of the strings</span>
 <span class="sd">            INFO, WARNING, DEBUG, ERROR and CRITICAL.</span>
@@ -5269,15 +5297,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/trainers/npe/npe_c.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">100</span>
-<span class="normal">101</span>
-<span class="normal">102</span>
-<span class="normal">103</span>
-<span class="normal">104</span>
-<span class="normal">105</span>
-<span class="normal">106</span>
-<span class="normal">107</span>
-<span class="normal">108</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">108</span>
 <span class="normal">109</span>
 <span class="normal">110</span>
 <span class="normal">111</span>
@@ -5364,7 +5384,15 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 <span class="normal">192</span>
 <span class="normal">193</span>
 <span class="normal">194</span>
-<span class="normal">195</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
+<span class="normal">195</span>
+<span class="normal">196</span>
+<span class="normal">197</span>
+<span class="normal">198</span>
+<span class="normal">199</span>
+<span class="normal">200</span>
+<span class="normal">201</span>
+<span class="normal">202</span>
+<span class="normal">203</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">num_atoms</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span>
     <span class="n">training_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">200</span><span class="p">,</span>
@@ -6975,8 +7003,7 @@ VectorFieldPosterior.</p>
 
               <details class="quote">
                 <summary>Source code in <code>sbi/inference/trainers/nle/nle_a.py</code></summary>
-                <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">13</span>
-<span class="normal">14</span>
+                <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">14</span>
 <span class="normal">15</span>
 <span class="normal">16</span>
 <span class="normal">17</span>
@@ -7016,7 +7043,10 @@ VectorFieldPosterior.</p>
 <span class="normal">51</span>
 <span class="normal">52</span>
 <span class="normal">53</span>
-<span class="normal">54</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NLE_A</span><span class="p">(</span><span class="n">LikelihoodEstimatorTrainer</span><span class="p">):</span>
+<span class="normal">54</span>
+<span class="normal">55</span>
+<span class="normal">56</span>
+<span class="normal">57</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NLE_A</span><span class="p">(</span><span class="n">LikelihoodEstimatorTrainer</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Neural Likelihood Estimation (NLE) as in Papamakarios et al. (2019) [1].</span>
 
 <span class="sd">    [1] Sequential Neural Likelihood: Fast Likelihood-free Inference with</span>
@@ -7027,7 +7057,9 @@ VectorFieldPosterior.</p>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;maf&quot;</span><span class="p">,</span>
+        <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span>
+            <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;nsf&quot;</span><span class="p">,</span> <span class="s2">&quot;maf&quot;</span><span class="p">,</span> <span class="s2">&quot;mdn&quot;</span><span class="p">,</span> <span class="s2">&quot;made&quot;</span><span class="p">],</span> <span class="n">DensityEstimatorBuilder</span>
+        <span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;maf&quot;</span><span class="p">,</span>
         <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
         <span class="n">logging_level</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;WARNING&quot;</span><span class="p">,</span>
         <span class="n">summary_writer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TensorBoardSummaryWriter</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -7041,12 +7073,12 @@ VectorFieldPosterior.</p>
 <span class="sd">                prior must be passed to `.build_posterior()`.</span>
 <span class="sd">            density_estimator: If it is a string, use a pre-configured network of the</span>
 <span class="sd">                provided type (one of nsf, maf, mdn, made). Alternatively, a function</span>
-<span class="sd">                that builds a custom neural network can be provided. The function will</span>
+<span class="sd">                that builds a custom neural network, which adheres to</span>
+<span class="sd">                `DensityEstimatorBuilder` protocol can be provided. The function will</span>
 <span class="sd">                be called with the first batch of simulations (theta, x), which can</span>
-<span class="sd">                thus be used for shape inference and potentially for z-scoring. It</span>
-<span class="sd">                needs to return a PyTorch `nn.Module` implementing the density</span>
-<span class="sd">                estimator. The density estimator needs to provide the methods</span>
-<span class="sd">                `.log_prob` and `.sample()`.</span>
+<span class="sd">                thus be used for shape inference and potentially for z-scoring. The</span>
+<span class="sd">                density estimator needs to provide the methods `.log_prob` and</span>
+<span class="sd">                `.sample()`.</span>
 <span class="sd">            device: Training device, e.g., &quot;cpu&quot;, &quot;cuda&quot; or &quot;cuda:{0, 1, ...}&quot;.</span>
 <span class="sd">            logging_level: Minimum severity of messages to log. One of the strings</span>
 <span class="sd">                INFO, WARNING, DEBUG, ERROR and CRITICAL.</span>
@@ -7121,18 +7153,18 @@ prior must be passed to <code>.build_posterior()</code>.</p>
                 <code>density_estimator</code>
             </td>
             <td>
-                  <code><span title="typing.Union">Union</span>[<span title="str">str</span>, <span title="typing.Callable">Callable</span>]</code>
+                  <code><span title="typing.Union">Union</span>[<span title="typing.Literal">Literal</span>[&#39;nsf&#39;, &#39;maf&#39;, &#39;mdn&#39;, &#39;made&#39;], <span title="sbi.neural_nets.estimators.base.DensityEstimatorBuilder">DensityEstimatorBuilder</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
                 <p>If it is a string, use a pre-configured network of the
 provided type (one of nsf, maf, mdn, made). Alternatively, a function
-that builds a custom neural network can be provided. The function will
+that builds a custom neural network, which adheres to
+<code>DensityEstimatorBuilder</code> protocol can be provided. The function will
 be called with the first batch of simulations (theta, x), which can
-thus be used for shape inference and potentially for z-scoring. It
-needs to return a PyTorch <code>nn.Module</code> implementing the density
-estimator. The density estimator needs to provide the methods
-<code>.log_prob</code> and <code>.sample()</code>.</p>
+thus be used for shape inference and potentially for z-scoring. The
+density estimator needs to provide the methods <code>.log_prob</code> and
+<code>.sample()</code>.</p>
               </div>
             </td>
             <td>
@@ -7212,8 +7244,7 @@ sampling.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/trainers/nle/nle_a.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">21</span>
-<span class="normal">22</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">22</span>
 <span class="normal">23</span>
 <span class="normal">24</span>
 <span class="normal">25</span>
@@ -7245,10 +7276,15 @@ sampling.</p>
 <span class="normal">51</span>
 <span class="normal">52</span>
 <span class="normal">53</span>
-<span class="normal">54</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">54</span>
+<span class="normal">55</span>
+<span class="normal">56</span>
+<span class="normal">57</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;maf&quot;</span><span class="p">,</span>
+    <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span>
+        <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;nsf&quot;</span><span class="p">,</span> <span class="s2">&quot;maf&quot;</span><span class="p">,</span> <span class="s2">&quot;mdn&quot;</span><span class="p">,</span> <span class="s2">&quot;made&quot;</span><span class="p">],</span> <span class="n">DensityEstimatorBuilder</span>
+    <span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;maf&quot;</span><span class="p">,</span>
     <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
     <span class="n">logging_level</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;WARNING&quot;</span><span class="p">,</span>
     <span class="n">summary_writer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TensorBoardSummaryWriter</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -7262,12 +7298,12 @@ sampling.</p>
 <span class="sd">            prior must be passed to `.build_posterior()`.</span>
 <span class="sd">        density_estimator: If it is a string, use a pre-configured network of the</span>
 <span class="sd">            provided type (one of nsf, maf, mdn, made). Alternatively, a function</span>
-<span class="sd">            that builds a custom neural network can be provided. The function will</span>
+<span class="sd">            that builds a custom neural network, which adheres to</span>
+<span class="sd">            `DensityEstimatorBuilder` protocol can be provided. The function will</span>
 <span class="sd">            be called with the first batch of simulations (theta, x), which can</span>
-<span class="sd">            thus be used for shape inference and potentially for z-scoring. It</span>
-<span class="sd">            needs to return a PyTorch `nn.Module` implementing the density</span>
-<span class="sd">            estimator. The density estimator needs to provide the methods</span>
-<span class="sd">            `.log_prob` and `.sample()`.</span>
+<span class="sd">            thus be used for shape inference and potentially for z-scoring. The</span>
+<span class="sd">            density estimator needs to provide the methods `.log_prob` and</span>
+<span class="sd">            `.sample()`.</span>
 <span class="sd">        device: Training device, e.g., &quot;cpu&quot;, &quot;cuda&quot; or &quot;cuda:{0, 1, ...}&quot;.</span>
 <span class="sd">        logging_level: Minimum severity of messages to log. One of the strings</span>
 <span class="sd">            INFO, WARNING, DEBUG, ERROR and CRITICAL.</span>
