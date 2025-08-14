@@ -13,16 +13,28 @@ from torch.distributions import Distribution
 from torch.nn.utils.clip_grad import clip_grad_norm_
 from torch.optim.adam import Adam
 from torch.utils.tensorboard.writer import SummaryWriter
+from typing_extensions import Self
 
 from sbi.inference.posteriors import (
     DirectPosterior,
 )
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
+from sbi.inference.posteriors.posterior_parameters import (
+    DirectPosteriorParameters,
+    ImportanceSamplingPosteriorParameters,
+    MCMCPosteriorParameters,
+    RejectionPosteriorParameters,
+    VIPosteriorParameters,
+)
 from sbi.inference.potentials import posterior_estimator_based_potential
 from sbi.inference.potentials.posterior_based_potential import PosteriorBasedPotential
-from sbi.inference.trainers.base import NeuralInference, check_if_proposal_has_default_x
+from sbi.inference.trainers.base import (
+    NeuralInference,
+    check_if_proposal_has_default_x,
+)
 from sbi.neural_nets import posterior_nn
 from sbi.neural_nets.estimators import ConditionalDensityEstimator
+from sbi.neural_nets.estimators.base import DensityEstimatorBuilder
 from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
     reshape_to_sample_batch_event,
@@ -46,7 +58,9 @@ class PosteriorEstimatorTrainer(NeuralInference, ABC):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
-        density_estimator: Union[str, Callable] = "maf",
+        density_estimator: Union[
+            Literal["nsf", "maf", "mdn", "made"], DensityEstimatorBuilder
+        ] = "maf",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
@@ -61,12 +75,12 @@ class PosteriorEstimatorTrainer(NeuralInference, ABC):
         Args:
             density_estimator: If it is a string, use a pre-configured network of the
                 provided type (one of nsf, maf, mdn, made). Alternatively, a function
-                that builds a custom neural network can be provided. The function will
+                that builds a custom neural network, which adheres to
+                `DensityEstimatorBuilder` protocol can be provided. The function will
                 be called with the first batch of simulations (theta, x), which can
-                thus be used for shape inference and potentially for z-scoring. It
-                needs to return a PyTorch `nn.Module` implementing the density
-                estimator. The density estimator needs to provide the methods
-                `.log_prob` and `.sample()`.
+                thus be used for shape inference and potentially for z-scoring. The
+                density estimator needs to provide the methods `.log_prob` and
+                `.sample()`.
 
         See docstring of `NeuralInference` class for all other arguments.
         """
@@ -109,7 +123,7 @@ class PosteriorEstimatorTrainer(NeuralInference, ABC):
         proposal: Optional[DirectPosterior] = None,
         exclude_invalid_x: Optional[bool] = None,
         data_device: Optional[str] = None,
-    ) -> "PosteriorEstimatorTrainer":
+    ) -> Self:
         r"""Store parameters and simulation outputs to use them for later training.
 
         Data are stored as entries in lists for each type of variable (parameter/data).
@@ -464,6 +478,15 @@ class PosteriorEstimatorTrainer(NeuralInference, ABC):
         vi_parameters: Optional[Dict[str, Any]] = None,
         rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
         importance_sampling_parameters: Optional[Dict[str, Any]] = None,
+        posterior_parameters: Optional[
+            Union[
+                DirectPosteriorParameters,
+                MCMCPosteriorParameters,
+                VIPosteriorParameters,
+                RejectionPosteriorParameters,
+                ImportanceSamplingPosteriorParameters,
+            ]
+        ] = None,
     ) -> NeuralPosterior:
         r"""Build posterior from the neural density estimator.
 
@@ -499,15 +522,28 @@ class PosteriorEstimatorTrainer(NeuralInference, ABC):
                 `RejectionPosterior`.
             importance_sampling_parameters: Additional kwargs passed to
                 `ImportanceSamplingPosterior`.
+            posterior_parameters: Configuration passed to the init method for the
+                posterior. Must be one of the following
+                - `VIPosteriorParameters`
+                - `ImportanceSamplingPosteriorParameters`
+                - `MCMCPosteriorParameters`
+                - `DirectPosteriorParameters`
+                - `RejectionPosteriorParameters`
 
         Returns:
             Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods
             (the returned log-probability is unnormalized).
         """
+
+        self._check_prior_for_rejection_sampling(
+            prior, sample_with, posterior_parameters
+        )
+
         return super().build_posterior(
             density_estimator,
             prior,
             sample_with,
+            posterior_parameters,
             mcmc_method=mcmc_method,
             vi_method=vi_method,
             mcmc_parameters=mcmc_parameters,
@@ -544,6 +580,44 @@ class PosteriorEstimatorTrainer(NeuralInference, ABC):
             x_o=None,
         )
         return potential_fn, theta_transform
+
+    def _check_prior_for_rejection_sampling(
+        self,
+        prior: Optional[Distribution],
+        sample_with: Literal["mcmc", "rejection", "vi", "importance", "direct"],
+        posterior_parameters: Optional[
+            Union[
+                DirectPosteriorParameters,
+                MCMCPosteriorParameters,
+                VIPosteriorParameters,
+                RejectionPosteriorParameters,
+                ImportanceSamplingPosteriorParameters,
+            ]
+        ],
+    ) -> None:
+        """
+        Validates that when using rejection sampling, a prior distribution
+        is explicitly provided.
+
+        Args:
+            prior: Prior distribution.
+            sample_with: The sampling method used. Must be one of
+                "mcmc", "rejection", "vi", "importance", or "direct".
+            posterior_parameters: Configuration for building the posterior.
+        """
+
+        if (
+            sample_with == "rejection"
+            or isinstance(posterior_parameters, RejectionPosteriorParameters)
+        ) and prior is None:
+            raise ValueError(
+                "You indicated sampling via rejection sampling but "
+                "haven't passed a prior. As of sbi v0.23.0, you either have"
+                " to pass a prior to perform rejection sampling using the prior"
+                " as proposal, or to use the posterior as proposal, you have to"
+                " use a DirectPosterior via `sample_with='direct' or"
+                " `posterior_parameters=DirectPosteriorParameters`."
+            )
 
     def _loss(
         self,

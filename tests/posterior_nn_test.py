@@ -11,6 +11,7 @@ from torch.distributions import Independent, MultivariateNormal, Uniform
 from sbi.inference import (
     FMPE,
     NLE_A,
+    NPE,
     NPE_A,
     NPE_C,
     NPSE,
@@ -20,6 +21,10 @@ from sbi.inference import (
     NRE_C,
     DirectPosterior,
     Simformer,
+)
+from sbi.inference.posteriors.posterior_parameters import (
+    MCMCPosteriorParameters,
+    RejectionPosteriorParameters,
 )
 from sbi.simulators.linear_gaussian import (
     diagonal_linear_gaussian,
@@ -103,19 +108,19 @@ def test_importance_posterior_sample_log_prob(snplre_method: type):
 
 @pytest.mark.parametrize("snpe_method", [NPE_A, NPE_C])
 @pytest.mark.parametrize("x_o_batch_dim", (0, 1, 2))
-@pytest.mark.parametrize("prior", ("mvn", "uniform"))
+@pytest.mark.parametrize("prior_type", ("mvn", "uniform"))
 def test_batched_sample_log_prob_with_different_x(
     snpe_method: type,
     x_o_batch_dim: bool,
-    prior: str,
+    prior_type: str,
 ):
     num_dim = 2
     num_simulations = 1000
 
     # We also want to test on bounded support! Which will invoke leakage correction.
-    if prior == "mvn":
+    if prior_type == "mvn":
         prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
-    elif prior == "uniform":
+    elif prior_type == "uniform":
         prior = Independent(Uniform(-1.0 * ones(num_dim), 1.0 * ones(num_dim)), 1)
     simulator = diagonal_linear_gaussian
 
@@ -131,6 +136,12 @@ def test_batched_sample_log_prob_with_different_x(
     torch.manual_seed(0)
     samples = posterior.sample_batched((10,), x_o)
     batched_log_probs = posterior.log_prob_batched(samples, x_o)
+
+    # Test large max_sampling_batch_size to test capping warning.
+    with pytest.warns(UserWarning, match="Capping max_sampling_batch_size"):
+        posterior.sample_batched(
+            (10,), ones(3, num_dim), max_sampling_batch_size=40_000
+        )
 
     assert (
         samples.shape == (10, x_o_batch_dim, num_dim)
@@ -169,7 +180,7 @@ def test_batched_sample_log_prob_with_different_x(
 def test_batched_mcmc_sample_log_prob_with_different_x(
     snlre_method: type,
     x_o_batch_dim: bool,
-    mcmc_params_fast: dict,
+    mcmc_params_fast: MCMCPosteriorParameters,
     init_strategy: str,
     sample_shape: torch.Size,
 ):
@@ -187,11 +198,7 @@ def test_batched_mcmc_sample_log_prob_with_different_x(
 
     x_o = ones(num_dim) if x_o_batch_dim == 0 else ones(x_o_batch_dim, num_dim)
 
-    posterior = inference.build_posterior(
-        sample_with="mcmc",
-        mcmc_method="slice_np_vectorized",
-        mcmc_parameters=mcmc_params_fast,
-    )
+    posterior = inference.build_posterior(posterior_parameters=mcmc_params_fast)
 
     samples = posterior.sample_batched(
         sample_shape,
@@ -211,11 +218,7 @@ def test_batched_mcmc_sample_log_prob_with_different_x(
         assert samples.shape[1] == x_o_batch_dim, "Batch dimension wrong"
         inference = snlre_method(prior=prior)
         _ = inference.append_simulations(theta, x).train()
-        posterior = inference.build_posterior(
-            sample_with="mcmc",
-            mcmc_method="slice_np_vectorized",
-            mcmc_parameters=mcmc_params_fast,
-        )
+        posterior = inference.build_posterior(posterior_parameters=mcmc_params_fast)
 
         x_o = torch.stack([0.5 * ones(num_dim), -0.5 * ones(num_dim)], dim=0)
         # test with multiple chains to test whether correct chains are
@@ -474,3 +477,24 @@ def test_build_posterior_raises_with_invalid_estimator():
 
     inference.train(max_num_epochs=1)
     inference.build_posterior(density_estimator=nn.Module())
+
+
+@pytest.mark.xfail(
+    raises=ValueError,
+    reason="Prior must be passed through build_posterior method for rejection"
+    " sampling in NPE",
+)
+def test_build_posterior_raises_error_for_rejection_sampling():
+    def simulator(theta):
+        return 1.0 + theta + torch.randn(theta.shape, device=theta.device) * 0.1
+
+    num_dim = 3
+    prior = BoxUniform(low=-2 * torch.ones(num_dim), high=2 * torch.ones(num_dim))
+    theta = prior.sample((300,))
+    x = simulator(theta)
+
+    inference = NPE(prior=prior)
+    inference.append_simulations(theta, x)
+
+    inference.train(max_num_epochs=1)
+    inference.build_posterior(posterior_parameters=RejectionPosteriorParameters())

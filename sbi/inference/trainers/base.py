@@ -1,11 +1,22 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import warnings
 from abc import ABC, abstractmethod
 from copy import deepcopy
+from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Dict, Literal, Optional, Tuple, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Literal,
+    Optional,
+    Tuple,
+    Union,
+)
 from warnings import warn
 
 import torch
@@ -14,11 +25,21 @@ from torch.distributions import Distribution
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard.writer import SummaryWriter
+from typing_extensions import Self
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.inference.posteriors.importance_posterior import ImportanceSamplingPosterior
 from sbi.inference.posteriors.mcmc_posterior import MCMCPosterior
+from sbi.inference.posteriors.posterior_parameters import (
+    DirectPosteriorParameters,
+    ImportanceSamplingPosteriorParameters,
+    MCMCPosteriorParameters,
+    PosteriorParameters,
+    RejectionPosteriorParameters,
+    VIPosteriorParameters,
+    VectorFieldPosteriorParameters,
+)
 from sbi.inference.posteriors.rejection_posterior import RejectionPosterior
 from sbi.inference.posteriors.vector_field_posterior import VectorFieldPosterior
 from sbi.inference.posteriors.vi_posterior import VIPosterior
@@ -230,7 +251,7 @@ class BaseNeuralInference:
         self,
         *args,
         **kwargs,
-    ) -> "BaseNeuralInference":
+    ) -> Self:
         "Abstract definition to append simulations"
         ...
 
@@ -352,6 +373,228 @@ class BaseNeuralInference:
 
         return estimator, device
 
+    def _resolve_posterior_parameters(
+        self,
+        sample_with: Literal[
+            "mcmc", "rejection", "vi", "importance", "direct", "sde", "ode"
+        ],
+        posterior_parameters: Optional[PosteriorParameters],
+        **kwargs,
+    ) -> PosteriorParameters:
+        """
+        Resolve posterior parameters based on the sampling strategy.
+
+        If `posterior_parameters` is provided, it is returned directly.
+
+        If `posterior_parameters` is not provided, this method extracts
+        sampling-specific parameters from `kwargs` using predefined keys
+        to instantiate the appropriate posterior parameters dataclass.
+
+        Raises:
+            NotImplementedError: If an unsupported `sample_with` method is provided.
+            ValueError: If posterior_parameter and a configuration dictionary are passed
+                together.
+
+        Args:
+            sample_with: The posterior sampling method to use.
+            posterior_parameters: Optional preconstructed posterior parameter object.
+            **kwargs: Additional parameters to construct the posterior parameters.
+
+        Returns:
+            A dataclass instance containing the resolved posterior
+            parameters.
+        """
+
+        deprecated_params = self._resolve_deprecated_posterior_parameters(**kwargs)
+
+        if posterior_parameters is not None:
+            self._validate_no_duplicate_parameters(deprecated_params)
+            self._validate_posterior_parameters_consistency(
+                posterior_parameters, **kwargs
+            )
+        else:
+            self._raise_deprecation_warning(deprecated_params, **kwargs)
+            posterior_parameters = self._build_posterior_parameters(
+                sample_with, **kwargs
+            )
+
+        return posterior_parameters
+
+    def _build_posterior_parameters(
+        self,
+        sample_with: Literal[
+            "mcmc", "rejection", "vi", "importance", "direct", "sde", "ode"
+        ],
+        **kwargs,
+    ) -> PosteriorParameters:
+        """
+        Resolve parameters passed through kwargs and convert into a
+        subclass of PosteriorParameters.
+
+        Args:
+            sample_with: The posterior sampling method to use.
+            **kwargs: Additional parameters to construct the posterior parameters.
+        Returns
+            A dataclass instance containing the resolved posterior
+            parameters.
+        """
+
+        if sample_with == "direct":
+            params = kwargs.get("direct_sampling_parameters", {}) or {}
+            posterior_parameters = DirectPosteriorParameters(**params)
+        elif sample_with == "mcmc":
+            params = kwargs.get("mcmc_parameters", {}) or {}
+            posterior_parameters = MCMCPosteriorParameters(
+                method=kwargs.get("mcmc_method", "slice_np_vectorized"), **params
+            )
+        elif sample_with in ("ode", "sde"):
+            params = kwargs.get("vectorfield_sampling_parameters", {}) or {}
+            posterior_parameters = VectorFieldPosteriorParameters(**params)
+        elif sample_with == "rejection":
+            params = kwargs.get("rejection_sampling_parameters", {}) or {}
+            posterior_parameters = RejectionPosteriorParameters(**params)
+        elif sample_with == "vi":
+            params = kwargs.get("vi_parameters", {}) or {}
+            posterior_parameters = VIPosteriorParameters(
+                vi_method=kwargs.get("vi_method", "rKL"), **params
+            )
+        elif sample_with == "importance":
+            params = kwargs.get("importance_sampling_parameters", {}) or {}
+            posterior_parameters = ImportanceSamplingPosteriorParameters(**params)
+        else:
+            raise NotImplementedError(
+                "Posterior parameter construction not implemented for",
+                f"'{sample_with}'",
+            )
+
+        return posterior_parameters
+
+    def _resolve_deprecated_posterior_parameters(self, **kwargs) -> List[str]:
+        """
+        Identify deprecated posterior construction parameters
+        provided to the method.
+
+        Args:
+            **kwargs: Keyword arguments potentially containing deprecated
+                      posterior parameters.
+
+        Returns:
+            A list of names of deprecated posterior parameters that were provided.
+        """
+
+        deprecated_params = {
+            "direct_sampling_parameters",
+            "mcmc_parameters",
+            "vectorfield_sampling_parameters",
+            "rejection_sampling_parameters",
+            "vi_parameters",
+            "importance_sampling_parameters",
+        }
+
+        # Check if any deprecated parameters were provided
+        provided_deprecated_params = [
+            param for param in deprecated_params if kwargs.get(param) is not None
+        ]
+
+        return provided_deprecated_params
+
+    def _raise_deprecation_warning(
+        self, deprecated_params: List[str], **kwargs
+    ) -> None:
+        """
+        Raise a deprecation warning if a deprecated posterior parameters or
+        non-default arguments are used.
+
+        Args:
+            deprecated_params: List of deprecated posterior parameter names provided.
+            **kwargs: Additional keyword arguments.
+        """
+
+        deprecated_params = deprecated_params.copy()
+        default_mcmc_method = "slice_np_vectorized"
+        default_vi_method = "rKL"
+
+        # Check if deprecated parameters are used
+        if (
+            kwargs.get("mcmc_method") == default_mcmc_method
+            or kwargs.get("mcmc_method") is None
+        ):
+            deprecated_params.append("mcmc_method")
+        if (
+            kwargs.get("vi_method") == default_vi_method
+            or kwargs.get("vi_method") is None
+        ):
+            deprecated_params.append("vi_method")
+
+        if deprecated_params:
+            warnings.warn(
+                f"The following arguments are deprecated and"
+                " will be removed in a future version: "
+                f"{', '.join(deprecated_params)}. Please use `posterior_parameters`"
+                " instead. Refer to this guide for details:\n"
+                "https://sbi.readthedocs.io/en/latest/how_to_guide/19_posterior_parameters.html#",
+                FutureWarning,
+                stacklevel=2,
+            )
+
+    def _validate_no_duplicate_parameters(self, deprecated_params: List[str]) -> None:
+        """
+        Validate that deprecated and new-style posterior parameters are not used
+        together.
+
+        Args:
+            deprecated_params: List of deprecated posterior parameter names provided.
+
+        Raises:
+            ValueError: If both deprecated parameters and new-style
+                        `posterior_parameters`are used in the same call.
+        """
+
+        if deprecated_params:
+            raise ValueError(
+                f"Cannot use both old-style parameters {deprecated_params} "
+                f"and new-style posterior_parameters. Please use only one approach."
+            )
+
+    def _validate_posterior_parameters_consistency(
+        self, posterior_parameters: PosteriorParameters, **kwargs
+    ) -> None:
+        """
+        This method raises a warning for mismatches between values passed in
+        mcmc_method and MCMCPosteriorParameters.method, or vi_method and
+        VIPosteriorParameters.vi_method.
+
+        Args:
+            posterior_parameters: Configuration passed to the init method for the
+                posterior.
+            kwargs: keyword arguments passed from build_posterior method.
+        """
+
+        if not isinstance(posterior_parameters, PosteriorParameters):
+            raise TypeError(
+                "posterior_parameters must be PosteriorParameters,"
+                f" got {type(posterior_parameters).__name__}",
+            )
+        elif isinstance(posterior_parameters, MCMCPosteriorParameters):
+            mcmc_method = kwargs.get("mcmc_method")
+            if (
+                mcmc_method != "slice_np_vectorized"
+                and posterior_parameters.method != mcmc_method
+            ):
+                warnings.warn(
+                    f"Conflicting mcmc_method='{mcmc_method}' ignored in favor of "
+                    f"posterior_parameters.method='{posterior_parameters.method}'",
+                    stacklevel=2,
+                )
+        elif isinstance(posterior_parameters, VIPosteriorParameters):
+            vi_method = kwargs.get("vi_method")
+            if vi_method != "rKL" and posterior_parameters.vi_method != vi_method:
+                warnings.warn(
+                    f"Conflicting vi_method='{vi_method}' ignored in favor of "
+                    f"posterior_parameters.vi_method='{posterior_parameters.vi_method}'",
+                    stacklevel=2,
+                )
+
     def _create_posterior(
         self,
         estimator: nn.Module,
@@ -360,7 +603,7 @@ class BaseNeuralInference:
             "mcmc", "rejection", "vi", "importance", "direct", "sde", "ode"
         ],
         device: Union[str, torch.device],
-        **kwargs,
+        posterior_parameters: PosteriorParameters,
     ) -> NeuralPosterior:
         """
         Create a posterior object using the specified inference method.
@@ -383,79 +626,89 @@ class BaseNeuralInference:
                 - "ode"
             device: torch device on which to train the neural net and on which to
                 perform all posterior operations, e.g. gpu or cpu.
-            **kwargs: Additional method-specific parameters.
+            posterior_parameters: Configuration passed to the init method for the
+                posterior. Must be of type PosteriorParameters.
 
         Returns:
             NeuralPosterior object.
         """
 
-        if sample_with == "direct":
+        if isinstance(posterior_parameters, DirectPosteriorParameters):
             posterior_estimator = estimator
-            assert isinstance(posterior_estimator, ConditionalDensityEstimator), (
-                f"Expected posterior_estimator to be an instance of "
-                " ConditionalDensityEstimator, "
-                f"but got {type(posterior_estimator).__name__} instead."
-            )
+            if not isinstance(posterior_estimator, ConditionalDensityEstimator):
+                raise TypeError(
+                    f"Expected posterior_estimator to be an instance of "
+                    " ConditionalDensityEstimator, "
+                    f"but got {type(posterior_estimator).__name__} instead."
+                )
             posterior = DirectPosterior(
                 posterior_estimator=posterior_estimator,
                 prior=prior,
                 device=device,
-                **(kwargs.get("direct_sampling_parameters") or {}),
+                **asdict(posterior_parameters),
             )
-        elif sample_with in ("sde", "ode"):
+        elif isinstance(posterior_parameters, VectorFieldPosteriorParameters):
             vector_field_estimator = estimator
-            assert isinstance(
-                vector_field_estimator, ConditionalVectorFieldEstimator
-            ), (
-                f"Expected vector_field_estimator to be an instance of "
-                " ConditionalVectorFieldEstimator, "
-                f"but got {type(vector_field_estimator).__name__} instead."
-            )
+            if not isinstance(vector_field_estimator, ConditionalVectorFieldEstimator):
+                raise TypeError(
+                    f"Expected vector_field_estimator to be an instance of "
+                    " ConditionalVectorFieldEstimator, "
+                    f"but got {type(vector_field_estimator).__name__} instead."
+                )
+            if sample_with not in ("ode", "sde"):
+                raise ValueError(
+                    "`sample_with` must be either",
+                    f" 'ode' or 'sde', got '{sample_with}'",
+                )
             posterior = VectorFieldPosterior(
-                vector_field_estimator,
-                prior,
+                vector_field_estimator=vector_field_estimator,
+                prior=prior,
                 device=device,
                 sample_with=sample_with,
-                **(kwargs.get("vectorfield_sampling_parameters") or {}),
+                **asdict(posterior_parameters),
             )
         else:
             # Posteriors requiring potential_fn and theta_transform
             potential_fn, theta_transform = self._get_potential_function(
                 prior, estimator
             )
-            if sample_with == "mcmc":
+            if isinstance(posterior_parameters, MCMCPosteriorParameters):
                 posterior = MCMCPosterior(
                     potential_fn=potential_fn,
                     theta_transform=theta_transform,
                     proposal=prior,
-                    method=kwargs.get("mcmc_method", "slice_np_vectorized"),
                     device=device,
-                    **(kwargs.get("mcmc_parameters") or {}),
+                    **asdict(posterior_parameters),
                 )
-            elif sample_with == "rejection":
+            elif isinstance(posterior_parameters, RejectionPosteriorParameters):
                 posterior = RejectionPosterior(
                     potential_fn=potential_fn,
                     proposal=prior,
                     device=device,
-                    **(kwargs.get("rejection_sampling_parameters") or {}),
+                    **asdict(posterior_parameters),
                 )
-            elif sample_with == "vi":
+            elif isinstance(posterior_parameters, VIPosteriorParameters):
                 posterior = VIPosterior(
                     potential_fn=potential_fn,
                     theta_transform=theta_transform,
                     prior=prior,
-                    vi_method=kwargs.get("vi_method", "rKL"),
                     device=device,
-                    **(kwargs.get("vi_parameters") or {}),
+                    **asdict(posterior_parameters),
                 )
-            elif sample_with == "importance":
+            elif isinstance(
+                posterior_parameters, ImportanceSamplingPosteriorParameters
+            ):
                 posterior = ImportanceSamplingPosterior(
                     potential_fn=potential_fn,
                     proposal=prior,
                     device=device,
-                    **(kwargs.get("importance_sampling_parameters") or {}),
+                    **asdict(posterior_parameters),
                 )
-
+            else:
+                raise NotImplementedError(
+                    "Sampling method not implemented for",
+                    f"'{posterior_parameters}'",
+                )
         return posterior
 
     def _converged(self, epoch: int, stop_after_epochs: int) -> bool:
@@ -681,7 +934,7 @@ class NeuralInference(ABC, BaseNeuralInference):
         from_round: int = 0,
         algorithm: Optional[str] = None,
         data_device: Optional[str] = None,
-    ) -> "NeuralInference":
+    ) -> Self:
         r"""Store parameters and simulation outputs to use them for later training.
 
         Data are stored as entries in lists for each type of variable (parameter/data).

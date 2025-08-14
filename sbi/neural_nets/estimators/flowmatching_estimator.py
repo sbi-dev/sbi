@@ -1,3 +1,6 @@
+# This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+
 import warnings
 from typing import Optional
 
@@ -76,6 +79,7 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
             warnings.warn(
                 "num_freqs is deprecated and will be removed in the future. "
                 "Please use the positional_encoding_net instead.",
+                FutureWarning,
                 stacklevel=2,
             )
 

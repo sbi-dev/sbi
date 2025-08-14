@@ -4,7 +4,7 @@
 import time
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from typing import Any, Callable, Optional, Protocol, Tuple, Union
+from typing import Any, Callable, Literal, Optional, Protocol, Tuple, Union
 
 import torch
 from torch import Tensor, ones
@@ -12,6 +12,7 @@ from torch.distributions import Distribution
 from torch.nn.utils.clip_grad import clip_grad_norm_
 from torch.optim.adam import Adam
 from torch.utils.tensorboard.writer import SummaryWriter
+from typing_extensions import Self
 
 from sbi import utils as utils
 from sbi.inference import MaskedNeuralInference, NeuralInference
@@ -88,7 +89,10 @@ class VectorFieldTrainer(NeuralInference, ABC):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
-        vector_field_estimator_builder: Union[str, VectorFieldEstimatorBuilder] = "mlp",
+        vector_field_estimator_builder: Union[
+            Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
+            VectorFieldEstimatorBuilder,
+        ] = "mlp",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
@@ -134,7 +138,7 @@ class VectorFieldTrainer(NeuralInference, ABC):
         check_estimator_arg(vector_field_estimator_builder)
         if isinstance(vector_field_estimator_builder, str):
             self._build_neural_net = self._build_default_nn_fn(
-                vector_field_estimator_builder=vector_field_estimator_builder, **kwargs
+                model=vector_field_estimator_builder, **kwargs
             )
         else:
             self._build_neural_net = vector_field_estimator_builder
@@ -142,7 +146,11 @@ class VectorFieldTrainer(NeuralInference, ABC):
         self._proposal_roundwise = []
 
     @abstractmethod
-    def _build_default_nn_fn(self, **kwargs) -> VectorFieldEstimatorBuilder:
+    def _build_default_nn_fn(
+        self,
+        model: Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
+        **kwargs,
+    ) -> VectorFieldEstimatorBuilder:
         pass
 
     def append_simulations(
@@ -152,7 +160,7 @@ class VectorFieldTrainer(NeuralInference, ABC):
         proposal: Optional[DirectPosterior] = None,
         exclude_invalid_x: Optional[bool] = None,
         data_device: Optional[str] = None,
-    ) -> "VectorFieldTrainer":
+    ) -> Self:
         r"""Store parameters and simulation outputs to use them for later training.
 
         Data are stored as entries in lists for each type of variable (parameter/data).
@@ -244,6 +252,7 @@ class VectorFieldTrainer(NeuralInference, ABC):
         calibration_kernel: Optional[Callable] = None,
         ema_loss_decay: float = 0.1,
         validation_times: Union[Tensor, int] = 10,
+        validation_times_nugget: float = 0.05,
         resume_training: bool = False,
         force_first_round_loss: bool = False,
         discard_prior_samples: bool = False,
@@ -282,6 +291,9 @@ class VectorFieldTrainer(NeuralInference, ABC):
                 training and validation losses.
             validation_times: Diffusion times at which to evaluate the validation loss
                 to reduce variance of validation loss.
+            validation_times_nugget: As both diffusion and flow matching losses often
+                have high variance losses at the end, we add a small nugget to compute
+                the validation loss. Default is 0.05 i.e. t_min + 0.05 or t_max - 0.5.
             resume_training: Can be used in case training time is limited, e.g. on a
                 cluster. If `True`, the split between train and validation set, the
                 optimizer, the number of epochs, and the best validation log-prob will
@@ -369,12 +381,9 @@ class VectorFieldTrainer(NeuralInference, ABC):
         self._neural_net.to(self._device)
 
         if isinstance(validation_times, int):
-            # NOTE: We add a nugget to t_min as t_min is the boundary of the training
-            # domain and hence can be "unstable" and is not a good choice for
-            # evaluation. Same for flow mathching but with t_max
             validation_times = torch.linspace(
-                self._neural_net.t_min + 0.05,
-                self._neural_net.t_max - 0.05,
+                self._neural_net.t_min + validation_times_nugget,
+                self._neural_net.t_max - validation_times_nugget,
                 validation_times,
             )
         assert isinstance(
@@ -525,10 +534,15 @@ class VectorFieldTrainer(NeuralInference, ABC):
     def _converged(self, epoch: int, stop_after_epochs: int) -> bool:
         """Return whether the training converged yet and save best model state so far.
 
-        Uses a statistical approach to detect convergence by tracking the running mean
-        and standard deviation of validation losses. Training is considered converged
-        when the current loss is statistically significantly worse than the best loss
-        for a sustained period, accounting for natural fluctuations in the loss.
+        Diffusion or flow matching objectives are inherently more stochastic than MLE
+        for e.g. NPE because they additionally add "noise" by construction. We hence
+        use a statistical approach to detect convergence by tracking standard deviation
+        of validation losses. Training is considered converged when the current loss is
+        significantly worse than the best loss for a sustained period (more than 2 std
+        deviations above best).
+
+        NOTE: The standard deviation of the `validation_loss `is computed in a running
+            fashion over the most recent 2 × stop_after_epochs loss values.
 
         Args:
             epoch: Current epoch in training.
@@ -568,10 +582,10 @@ class VectorFieldTrainer(NeuralInference, ABC):
                     self._val_loss - self._best_val_loss
                 ) / loss_std
                 # Consider it "no improvement" if current loss is significantly
-                # worse than the best loss (more than 2.67 std deviations above best)
+                # worse than the best loss (more than 2 std deviations above best)
                 # This accounts for natural fluctuations while being sensitive to
                 # real degradation
-                if diff_to_best_normalized > 2.67:
+                if diff_to_best_normalized > 2.0:
                     self._epochs_since_last_improvement += 1
                 else:
                     # Reset counter if loss is within acceptable range

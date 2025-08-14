@@ -2,7 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import math
-from typing import Callable, Optional, Sequence, Union
+from typing import Callable, Literal, Optional, Sequence, Union
 
 import torch
 import torch.nn as nn
@@ -35,7 +35,7 @@ from sbi.utils.vector_field_utils import MaskedVectorFieldNet, VectorFieldNet
 def build_vector_field_estimator(
     batch_x: Tensor,
     batch_y: Tensor,
-    estimator_type: str = "flow",  # "flow", "score", or "masked-score"
+    estimator_type: Literal["flow", "score", "masked-flow", "masked-score"] = "flow",
     z_score_x: Optional[str] = None,
     z_score_y: Optional[str] = None,
     embedding_net: nn.Module = nn.Identity(),
@@ -45,7 +45,10 @@ def build_vector_field_estimator(
     num_layers: int = 5,
     num_heads: int = 10,
     mlp_ratio: int = 4,
-    net: Union[str, VectorFieldNet] = "mlp",
+    net: Union[
+        Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
+        VectorFieldNet,
+    ] = "mlp",
     **kwargs,
 ) -> Union[
     FlowMatchingEstimator, ConditionalScoreEstimator, MaskedConditionalScoreEstimator

@@ -14,6 +14,10 @@ from sbi.analysis import sbc_rank_plot
 from sbi.diagnostics import check_sbc, get_nltp, run_sbc
 from sbi.inference import NLE, NPE, NPSE
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
+from sbi.inference.posteriors.posterior_parameters import (
+    MCMCPosteriorParameters,
+    VIPosteriorParameters,
+)
 from sbi.simulators.linear_gaussian import linear_gaussian
 from sbi.utils import BoxUniform, MultipleIndependent
 from tests.test_utils import PosteriorPotential, TractablePosterior
@@ -77,7 +81,7 @@ def test_running_sbc(
     prior_type: str,
     reduce_fn_str: str,
     sampler: Optional[str],
-    mcmc_params_fast: dict,
+    mcmc_params_fast: MCMCPosteriorParameters,
 ):
     """Test running inference and then SBC and obtaining nltp with different methods."""
     # Setup
@@ -106,9 +110,9 @@ def test_running_sbc(
     posterior_kwargs = {}
     if method == NLE:
         posterior_kwargs = {
-            "sample_with": "mcmc" if sampler == "mcmc" else "vi",
-            "mcmc_method": "slice_np_vectorized",
-            "mcmc_parameters": mcmc_params_fast,
+            "posterior_parameters": mcmc_params_fast
+            if sampler == "mcmc"
+            else VIPosteriorParameters()
         }
 
     posterior = train_inference_method(

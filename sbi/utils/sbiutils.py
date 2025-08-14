@@ -5,7 +5,17 @@ import logging
 import random
 import warnings
 from math import pi
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Type, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Sequence,
+    Tuple,
+    Type,
+    Union,
+)
 
 import numpy as np
 import pyknos.nflows.transforms as nflows_tf
@@ -101,7 +111,9 @@ def clamp_and_warn(name: str, value: float, min_val: float, max_val: float) -> f
     return clamped_val
 
 
-def z_score_parser(z_score_flag: Optional["str"]) -> Tuple[bool, bool]:
+def z_score_parser(
+    z_score_flag: Optional[str] = None,
+) -> Tuple[bool, bool]:
     """Parses string z-score flag into booleans.
 
     Converts string flag into booleans denoting whether to z-score or not, and whether
@@ -133,11 +145,15 @@ def z_score_parser(z_score_flag: Optional["str"]) -> Tuple[bool, bool]:
         # Got one of two valid z-scoring methods.
         z_score_bool = True
         structured_data = z_score_flag == "structured"
-
+    elif z_score_flag == "transform_to_unconstrained":
+        # Dependent on the distribution, the biject_to function
+        # will provide e.g., a logit, exponential of z-scored distribution.
+        z_score_bool, structured_data = False, False
     else:
         # Return warning due to invalid option, defaults to not z-scoring.
         raise ValueError(
-            "Invalid z-scoring option. Use 'none', 'independent', or 'structured'."
+            "Invalid z-scoring option. Use 'none', 'independent' "
+            "'structured' or 'transform_to_unconstrained'."
         )
 
     return z_score_bool, structured_data
@@ -193,6 +209,35 @@ def standardizing_transform_zuko(
         AffineTransform,
         loc=-t_mean / t_std,
         scale=1 / t_std,
+        buffer=True,
+    )
+
+
+class CallableTransform:
+    """Wraps a PyTorch Transform to be used in Zuko UnconditionalTransform."""
+
+    def __init__(self, transform):
+        self.transform = transform
+
+    def __call__(self):
+        return self.transform
+
+
+def biject_transform_zuko(
+    transform: TorchTransform,
+) -> zuko.flows.UnconditionalTransform:
+    """
+    Wraps a pytorch transform in a Zuko unconditional transfrom on a bounded interval.
+
+    Args:
+        transform: a bijective transformation for Zuko, depending on the input
+        (e.g., logit, exponential or z-scored)
+
+    Returns:
+        Zuko bijective transformation
+    """
+    return zuko.flows.UnconditionalTransform(
+        CallableTransform(transform),
         buffer=True,
     )
 

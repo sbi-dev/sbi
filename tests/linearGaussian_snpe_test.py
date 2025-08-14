@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from dataclasses import asdict
+
 import numpy as np
 import pytest
 import torch
@@ -22,6 +24,7 @@ from sbi.inference import (
     RejectionPosterior,
     posterior_estimator_based_potential,
 )
+from sbi.inference.posteriors.posterior_parameters import MCMCPosteriorParameters
 from sbi.neural_nets import posterior_nn
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
@@ -390,7 +393,7 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str):
     ),
 )
 def test_api_snpe_c_posterior_correction(
-    sample_with, mcmc_method, prior_str, mcmc_params_fast: dict
+    sample_with, mcmc_method, prior_str, mcmc_params_fast: MCMCPosteriorParameters
 ):
     """Test that leakage correction applied to sampling works, with both MCMC and
     rejection.
@@ -423,12 +426,12 @@ def test_api_snpe_c_posterior_correction(
         posterior_estimator, prior, x_o
     )
     if sample_with == "mcmc":
+        mcmc_params_fast = mcmc_params_fast.with_param(method=mcmc_method)
         posterior = MCMCPosterior(
             potential_fn=potential_fn,
             theta_transform=theta_transform,
             proposal=prior,
-            method=mcmc_method,
-            **mcmc_params_fast,
+            **asdict(mcmc_params_fast),
         )
     elif sample_with == "rejection":
         posterior = RejectionPosterior(
@@ -491,7 +494,7 @@ def test_api_force_first_round_loss(
 
 @pytest.mark.slow
 @pytest.mark.mcmc
-def test_sample_conditional(mcmc_params_accurate: dict):
+def test_sample_conditional(mcmc_params_accurate: MCMCPosteriorParameters):
     """
     Test whether sampling from the conditional gives the same results as
     evaluating.
@@ -572,8 +575,7 @@ def test_sample_conditional(mcmc_params_accurate: dict):
         potential_fn=conditioned_potential_fn,
         theta_transform=restricted_tf,
         proposal=restricted_prior,
-        method="slice_np_vectorized",
-        **mcmc_params_accurate,
+        **asdict(mcmc_params_accurate),
     )
     cond_samples = mcmc_posterior.sample((num_conditional_samples,), x=x_o)
 
@@ -731,3 +733,61 @@ def test_multiround_mog_training():
         _ = inference.append_simulations(theta, x, proposal=proposal).train()
         posterior = inference.build_posterior().set_default_x(x_o)
         proposal = posterior
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize(
+    "num_dim",
+    ((2), (1)),
+)
+@pytest.mark.parametrize("npe_method", [NPE_B, NPE_C])
+@pytest.mark.parametrize(
+    "density_estimator",
+    ["zuko_maf", "zuko_nsf"],
+)
+def test_density_estimators_unconstrained_space(
+    num_dim, npe_method: type, density_estimator
+):
+    """Test NPE B/C in inconstrained space."""
+
+    x_o = zeros(1, num_dim)
+    num_samples = 1000
+    num_simulations = 2500
+
+    # likelihood_mean will be likelihood_shift+theta
+    likelihood_shift = -1.0 * ones(num_dim)
+    likelihood_cov = 0.3 * eye(num_dim)
+
+    prior = utils.BoxUniform(-2.0 * ones(num_dim), 2.0 * ones(num_dim))
+
+    target_samples = samples_true_posterior_linear_gaussian_uniform_prior(
+        x_o, likelihood_shift, likelihood_cov, prior, num_samples
+    )
+
+    def simulator(theta):
+        return linear_gaussian(theta, likelihood_shift, likelihood_cov)
+
+    # Train in unconstrained space
+
+    density_estimator_build_fun = posterior_nn(
+        model=density_estimator,
+        hidden_features=60,
+        num_transforms=3,
+        z_score_theta="transform_to_unconstrained",
+        x_dist=prior,
+    )
+
+    inference = npe_method(prior, density_estimator=density_estimator_build_fun)
+
+    theta = prior.sample((num_simulations,))
+    x = simulator(theta)
+    posterior_estimator = inference.append_simulations(theta, x).train(
+        training_batch_size=100
+    )
+    posterior = DirectPosterior(
+        prior=prior, posterior_estimator=posterior_estimator
+    ).set_default_x(x_o)
+    samples = posterior.sample((num_samples,))
+
+    # Compute the c2st and assert it is near chance level of 0.5.
+    check_c2st(samples, target_samples, alg=f"npe_{density_estimator}")

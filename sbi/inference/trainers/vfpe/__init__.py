@@ -1,3 +1,5 @@
+# This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 from sbi.inference.trainers.vfpe.fmpe import FMPE
 from sbi.inference.trainers.vfpe.npse import NPSE
 from sbi.inference.trainers.vfpe.simformer import FlowMatchingSimformer, Simformer

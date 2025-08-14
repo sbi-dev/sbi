@@ -1,5 +1,6 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+
 import re
 import shutil
 from pathlib import Path
@@ -10,6 +11,7 @@ import pytest
 import torch
 from pytest_harvest import get_session_results_df, get_xdist_worker_id, is_main_process
 
+from sbi.inference.posteriors.posterior_parameters import MCMCPosteriorParameters
 from sbi.utils.sbiutils import seed_all_backends
 
 # Seed for `set_seed` fixture. Change to random state of all seeded tests.
@@ -224,15 +226,15 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
 
 
 @pytest.fixture(scope="function")
-def mcmc_params_accurate() -> dict:
+def mcmc_params_accurate() -> MCMCPosteriorParameters:
     """Fixture for MCMC parameters for functional tests."""
-    return dict(num_chains=20, thin=2, warmup_steps=50)
+    return MCMCPosteriorParameters(num_chains=20, thin=2, warmup_steps=50)
 
 
 @pytest.fixture(scope="function")
-def mcmc_params_fast() -> dict:
+def mcmc_params_fast() -> MCMCPosteriorParameters:
     """Fixture for MCMC parameters for fast tests."""
-    return dict(num_chains=1, thin=1, warmup_steps=1)
+    return MCMCPosteriorParameters(num_chains=1, thin=1, warmup_steps=1)
 
 
 # Pytest harvest xdist support.
@@ -256,6 +258,12 @@ def pytest_sessionfinish(session):
     RESULTS_PATH.mkdir(exist_ok=True)
 
     if suffix == 'all':
-        session_results_df.to_csv('./.bm_results/results_all.csv')
+        results_file = './.bm_results/results_all.csv'
+        if Path(results_file).exists():
+            # Append without writing header
+            session_results_df.to_csv(results_file, mode='a', header=False)
+        else:
+            # Write with header if file does not exist
+            session_results_df.to_csv(results_file)
     else:
         session_results_df.to_csv('./.bm_results/results_%s.csv' % suffix)

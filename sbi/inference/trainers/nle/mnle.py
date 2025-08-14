@@ -1,14 +1,21 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Any, Callable, Dict, Literal, Optional, Union
+from typing import Any, Dict, Literal, Optional, Union
 
 from torch.distributions import Distribution
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
+from sbi.inference.posteriors.posterior_parameters import (
+    ImportanceSamplingPosteriorParameters,
+    MCMCPosteriorParameters,
+    RejectionPosteriorParameters,
+    VIPosteriorParameters,
+)
 from sbi.inference.trainers.nle.nle_base import LikelihoodEstimatorTrainer
 from sbi.neural_nets.estimators import MixedDensityEstimator
-from sbi.sbi_types import TensorboardSummaryWriter
+from sbi.neural_nets.estimators.base import DensityEstimatorBuilder
+from sbi.sbi_types import TensorBoardSummaryWriter
 from sbi.utils.sbiutils import del_entries
 
 
@@ -27,10 +34,10 @@ class MNLE(LikelihoodEstimatorTrainer):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
-        density_estimator: Union[str, Callable] = "mnle",
+        density_estimator: Union[Literal["mnle"], DensityEstimatorBuilder] = "mnle",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
-        summary_writer: Optional[TensorboardSummaryWriter] = None,
+        summary_writer: Optional[TensorBoardSummaryWriter] = None,
         show_progress_bars: bool = True,
     ):
         r"""Initialize MNLE.
@@ -41,12 +48,12 @@ class MNLE(LikelihoodEstimatorTrainer):
                 prior must be passed to `.build_posterior()`.
             density_estimator: If it is a string, it must be "mnle" to use the
                 preconfiugred neural nets for MNLE. Alternatively, a function
-                that builds a custom neural network can be provided. The function will
+                that builds a custom neural network, which adheres to
+                `DensityEstimatorBuilder` protocol can be provided. The function will
                 be called with the first batch of simulations (theta, x), which can
-                thus be used for shape inference and potentially for z-scoring. It
-                needs to return a PyTorch `nn.Module` implementing the density
-                estimator. The density estimator needs to provide the methods
-                `.log_prob`, `.log_prob_iid()` and `.sample()`.
+                thus be used for shape inference and potentially for z-scoring. The
+                density estimator needs to provide the methods `.log_prob` and
+                `.sample()`.
             device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.
@@ -105,6 +112,15 @@ class MNLE(LikelihoodEstimatorTrainer):
         mcmc_parameters: Optional[Dict[str, Any]] = None,
         vi_parameters: Optional[Dict[str, Any]] = None,
         rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
+        importance_sampling_parameters: Optional[Dict[str, Any]] = None,
+        posterior_parameters: Optional[
+            Union[
+                MCMCPosteriorParameters,
+                VIPosteriorParameters,
+                RejectionPosteriorParameters,
+                ImportanceSamplingPosteriorParameters,
+            ]
+        ] = None,
     ) -> NeuralPosterior:
         r"""Build posterior from the neural density estimator.
 
@@ -134,6 +150,14 @@ class MNLE(LikelihoodEstimatorTrainer):
             vi_parameters: Additional kwargs passed to `VIPosterior`.
             rejection_sampling_parameters: Additional kwargs passed to
                 `RejectionPosterior`.
+            importance_sampling_parameters: Additional kwargs passed to
+                `ImportanceSamplingPosterior`
+            posterior_parameters: Configuration passed to the init method for the
+                posterior. Must be one of the following
+                - `VIPosteriorParameters`
+                - `MCMCPosteriorParameters`
+                - `RejectionPosteriorParameters`
+                - `ImportanceSamplingPosteriorParameters`
 
         Returns:
             Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods
@@ -150,9 +174,11 @@ class MNLE(LikelihoodEstimatorTrainer):
             density_estimator=density_estimator,
             prior=prior,
             sample_with=sample_with,
+            posterior_parameters=posterior_parameters,
             mcmc_method=mcmc_method,
             vi_method=vi_method,
             mcmc_parameters=mcmc_parameters,
             vi_parameters=vi_parameters,
             rejection_sampling_parameters=rejection_sampling_parameters,
+            importance_sampling_parameters=importance_sampling_parameters,
         )

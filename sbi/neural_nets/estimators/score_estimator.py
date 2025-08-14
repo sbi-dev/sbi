@@ -180,7 +180,7 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         score_gaussian = (input - mean) / std**2
 
         # Score prediction by the network
-        # NOTE: To simplify, use of external networks, we will flatten the tensors
+        # NOTE: To simplify usage of external networks, we will flatten the tensors
         # batch_shape to a single batch dimension.
         input_enc = input_enc.reshape(-1, *input_enc.shape[len(batch_shape) :])
         condition_emb = condition_emb.reshape(
@@ -1016,7 +1016,27 @@ class VariancePreservingSDE:
 
 
 class VPScoreEstimator(ConditionalScoreEstimator, VariancePreservingSDE):
-    """Class for score estimators with variance preserving SDEs (i.e., DDPM)."""
+    """Class for score estimators with variance preserving SDEs (i.e., DDPM).
+
+    The SDE defining the diffusion process is characterized by the following hyper-
+    parameters.
+
+    Args:
+        beta_min: This defines the smallest noise rate (i.e. how much the input is
+            "scaled" down in contrast to how much noise is added) in the subVPSDE.
+            Ideally, this would be 0, but score matching losses as employed in most
+            diffusion models can become unstable if beta_min is zero. A small positive
+            value is chosen to stabilize training (the smaller, the closer to an ODE;
+            the larger, the easier to train but the noisier the resulting samples).
+        beta_max: This defines the largest noise rate in the variance-preserving SDE.
+            It sets the maximum variance introduced by the diffusion process; when
+            integrated over [0, T], the marginal distribution at time T should
+            approximate N(0, I).
+
+    NOTE: Together with t_min and t_max they ultimatively define the loss function.
+        Changing these might also require changing t_min and t_max to find a good
+        tradeoff between bias and variance.
+    """
 
     def __init__(
         self,
@@ -1211,7 +1231,27 @@ class SubVariancePreservingSDE:
 
 
 class SubVPScoreEstimator(ConditionalScoreEstimator, SubVariancePreservingSDE):
-    """Class for score estimators with sub-variance preserving SDEs."""
+    """Class for score estimators with sub-variance preserving SDEs.
+
+    The SDE defining the diffusion process is characterized by the following hyper-
+    parameters.
+
+    Args:
+        beta_min: This defines the smallest noise rate (i.e. how much the input is
+            "scaled" down in contrast to how much noise is added) in the subVPSDE.
+            Ideally, this would be 0, but score matching losses as employed in most
+            diffusion models can become unstable if beta_min is zero. A small positive
+            value is chosen to stabilize training (the smaller, the closer to an ODE;
+            the larger, the easier to train but the noisier the resulting samples).
+        beta_max: This defines the largest noise rate in the variance-preserving SDE.
+            It sets the maximum variance introduced by the diffusion process; when
+            integrated over [0, T], the marginal distribution at time T should
+            approximate N(0, I).
+
+    NOTE: Together with t_min and t_max they ultimatively define the loss function.
+        Changing these might also require changing t_min and t_max to find a good
+        tradeoff between bias and variance.
+    """
 
     def __init__(
         self,
@@ -1391,7 +1431,29 @@ class VarianceExplodingSDE:
 
 
 class VEScoreEstimator(ConditionalScoreEstimator, VarianceExplodingSDE):
-    """Class for score estimators with variance exploding SDEs (i.e., NCSN / SMLD)."""
+    """Class for score estimators with variance exploding SDEs (i.e., NCSN / SMLD).
+
+    The SDE defining the diffusion process is characterized by the following hyper-
+    parameters.
+
+
+    Args:
+       sigma_min: This defines the smallest "noise" level in the diffusion process. This
+           ideally would be 0., but denoising score matching losses as employed in most
+           diffusion models are ill-suited for this case as their variance explodes to
+           infinity. Hence often a "small" value is chosen (the larger, the easier to
+           learn but the "noisier" the end result if not addressed post-hoc).
+       sigma_max: This is the final standard deviation after running the full diffusion
+           process. Ideally this would approach ∞ such that x0 and xT are truly
+           independent; it should be at least chosen such that x_T ~ N(0, sigma_max) at
+           least approximately. If p(x0) for example has itself a very large variance,
+           then you might have to increase this.
+
+    NOTE: Together with t_min and t_max they ultimatively define the loss function.
+        Changing these might also require changing t_min and t_max to find a good
+        tradeoff between bias and variance.
+
+    """
 
     def __init__(
         self,

@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import warnings
 from typing import Dict, Literal, Optional, Union
 
 import torch
@@ -448,6 +449,16 @@ class VectorFieldPosterior(NeuralPosterior):
             if max_sampling_batch_size is None
             else max_sampling_batch_size
         )
+
+        # Adjust max_sampling_batch_size to avoid excessive memory usage
+        if max_sampling_batch_size * batch_size > 100_000:
+            capped = max(1, 100_000 // batch_size)
+            warnings.warn(
+                f"Capping max_sampling_batch_size from {max_sampling_batch_size} "
+                f"to {capped} to avoid excessive memory usage.",
+                stacklevel=2,
+            )
+            max_sampling_batch_size = capped
 
         if self.sample_with == "ode":
             samples = rejection.accept_reject_sample(

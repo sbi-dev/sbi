@@ -1,3 +1,6 @@
+# This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+
 import functools
 import math
 from abc import ABC, abstractmethod
@@ -724,7 +727,7 @@ class JacCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
         std = self.vector_field_estimator.std_fn(time)
         cov0 = std**2 * jac + torch.eye(d)[None, None, :, :]
 
-        denoising_posterior_precision = m**2 / std**2 + torch.inverse(cov0)
+        denoising_posterior_precision = m**2 / std**2 * torch.inverse(cov0)
 
         return denoising_posterior_precision
 

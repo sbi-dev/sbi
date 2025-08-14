@@ -1,5 +1,5 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Apache License v2.0, see <https://www.apache.org/licenses/LICENSE-2.0>.
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 
 import warnings
@@ -10,6 +10,7 @@ from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi import utils as utils
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
+from sbi.inference.posteriors.posterior_parameters import VectorFieldPosteriorParameters
 from sbi.inference.trainers.vfpe.base_vf_inference import (
     VectorFieldEstimatorBuilder,
     VectorFieldTrainer,
@@ -24,8 +25,11 @@ class FMPE(VectorFieldTrainer):
     def __init__(
         self,
         prior: Optional[Distribution],
+        vf_estimator: Union[
+            Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
+            VectorFieldEstimatorBuilder,
+        ] = "mlp",
         density_estimator: Optional[VectorFieldEstimatorBuilder] = None,
-        vf_estimator: Union[str, VectorFieldEstimatorBuilder] = "mlp",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
@@ -36,12 +40,14 @@ class FMPE(VectorFieldTrainer):
 
         Args:
             prior: Prior distribution.
-            density_estimator: Deprecated. Use `vf_estimator` instead.
             vf_estimator: Neural network architecture used to learn the
-                vector field estimator. Can be a string (e.g. 'mlp' or 'ada_mlp') or a
-                callable that implements the `VectorFieldEstimatorBuilder` protocol
-                with `__call__` that receives `theta` and `x` and returns a
+                vector field estimator. Can be a string (e.g. 'mlp', 'ada_mlp',
+                'transformer' or 'transformer_cross_attn') or a callable that
+                implements the `VectorFieldEstimatorBuilder` protocol with
+                `__call__` that receives `theta` and `x` and returns a
                 `ConditionalVectorFieldEstimator`.
+            density_estimator: Deprecated. Use `vf_estimator` instead. When passed, a
+                warning is raised and the `vf_estimator="mlp"` default is used.
             device: Device to use for training.
             logging_level: Logging level.
             summary_writer: Summary writer for tensorboard.
@@ -54,7 +60,7 @@ class FMPE(VectorFieldTrainer):
             warnings.warn(
                 "`density_estimator` is deprecated and will be removed in a future "
                 "release. Use `vf_estimator` instead.",
-                DeprecationWarning,
+                FutureWarning,
                 stacklevel=2,
             )
             vf_estimator = density_estimator
@@ -75,6 +81,7 @@ class FMPE(VectorFieldTrainer):
         prior: Optional[Distribution] = None,
         sample_with: Literal["ode", "sde"] = "ode",
         vectorfield_sampling_parameters: Optional[Dict[str, Any]] = None,
+        posterior_parameters: Optional[VectorFieldPosteriorParameters] = None,
     ) -> NeuralPosterior:
         r"""Build posterior from the flow matching estimator.
 
@@ -99,18 +106,24 @@ class FMPE(VectorFieldTrainer):
                 a numerical ODE solver.
             vectorfield_sampling_parameters: Additional keyword arguments passed to
                 `VectorFieldPosterior`.
-
+            posterior_parameters: Configuration passed to the init method for
+                VectorFieldPosterior.
 
         Returns:
             Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods.
         """
+
         return super().build_posterior(
             estimator=vector_field_estimator,
             prior=prior,
             sample_with=sample_with,
             vectorfield_sampling_parameters=vectorfield_sampling_parameters,
+            posterior_parameters=posterior_parameters,
         )
 
-    def _build_default_nn_fn(self, **kwargs) -> VectorFieldEstimatorBuilder:
-        model = kwargs.pop("vector_field_estimator_builder", "mlp")
+    def _build_default_nn_fn(
+        self,
+        model: Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
+        **kwargs,
+    ) -> VectorFieldEstimatorBuilder:
         return posterior_flow_nn(model=model, **kwargs)
