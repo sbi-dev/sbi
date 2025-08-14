@@ -581,8 +581,7 @@ def test_c2st_nle_unconstrained_space(
         proposal=prior,
         potential_fn=potential_fn,
         theta_transform=theta_transform,
-        method="slice_np_vectorized",
-        **mcmc_params_accurate,
+        **asdict(mcmc_params_accurate),
     )
 
     samples = posterior.sample(sample_shape=(num_samples,))

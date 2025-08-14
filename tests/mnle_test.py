@@ -195,7 +195,7 @@ def test_mnle_accuracy_with_different_samplers_and_trials(
     posterior = trainer.build_posterior(
         prior=prior,
         sample_with=sampler,
-        posterior_parameters=mcmc_params_accurate,
+        posterior_parameters=mcmc_params_accurate if sampler == "mcmc" else None,
     )
     posterior.set_default_x(x_o)
     if sampler == "vi":
