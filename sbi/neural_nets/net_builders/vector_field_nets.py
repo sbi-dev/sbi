@@ -51,7 +51,10 @@ def build_vector_field_estimator(
     ] = "mlp",
     **kwargs,
 ) -> Union[
-    FlowMatchingEstimator, ConditionalScoreEstimator, MaskedConditionalScoreEstimator
+    FlowMatchingEstimator,
+    ConditionalScoreEstimator,
+    MaskedConditionalScoreEstimator,
+    MaskedFlowMatchingEstimator,
 ]:
     """Builds a vector field estimator (flow matching or score matching) with the given
     network.

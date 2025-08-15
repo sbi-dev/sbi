@@ -24,10 +24,8 @@ from sbi.inference.potentials.vector_field_potential import (
     vector_field_estimator_based_potential,
 )
 from sbi.neural_nets.estimators import (
-    MaskedConditionalVectorFieldEstimator,
-)
-from sbi.neural_nets.estimators.base import (
     ConditionalVectorFieldEstimator,
+    MaskedConditionalVectorFieldEstimator,
 )
 from sbi.sbi_types import TorchTransform
 from sbi.utils import (
