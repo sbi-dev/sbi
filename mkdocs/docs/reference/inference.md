@@ -17,12 +17,12 @@
       filters: [ "!^_", "^__", "!^__class__" ]
       inherited_members: true
 
-::: sbi.inference.trainers.fmpe.fmpe.FMPE
+::: sbi.inference.trainers.vfpe.fmpe.FMPE
     selection:
       filters: [ "!^_", "^__", "!^__class__" ]
       inherited_members: true
 
-::: sbi.inference.trainers.npse.npse.NPSE
+::: sbi.inference.trainers.vfpe.npse.NPSE
     selection:
       filters: [ "!^_", "^__", "!^__class__" ]
       inherited_members: true
