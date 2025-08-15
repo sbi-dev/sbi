@@ -678,13 +678,13 @@ class NeuralInference(ABC):
 
         # Check if deprecated parameters are used
         if (
-            kwargs.get("mcmc_method") == default_mcmc_method
-            or kwargs.get("mcmc_method") is None
+            kwargs.get("mcmc_method") is not None
+            and kwargs.get("mcmc_method") != default_mcmc_method
         ):
             deprecated_params.append("mcmc_method")
         if (
-            kwargs.get("vi_method") == default_vi_method
-            or kwargs.get("vi_method") is None
+            kwargs.get("vi_method") is not None
+            and kwargs.get("vi_method") != default_vi_method
         ):
             deprecated_params.append("vi_method")
 

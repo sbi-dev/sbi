@@ -350,12 +350,7 @@ def test_vector_field_sde_ode_sampling_equivalence(vector_field_trained_model):
 @pytest.mark.parametrize(
     "iid_method, num_trial",
     [
-        pytest.param(
-            "fnpe",
-            3,
-            id="fnpe-3trials",
-            marks=pytest.mark.xfail(reason="c2st to high, fixed in PR #1501/1544"),
-        ),
+        pytest.param("fnpe", 3, id="fnpe-3trials"),
         pytest.param("gauss", 3, id="gauss-3trials"),
         pytest.param("auto_gauss", 8, id="auto_gauss-8trials"),
         pytest.param("auto_gauss", 16, id="auto_gauss-16trials"),
