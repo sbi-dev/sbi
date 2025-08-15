@@ -31,9 +31,9 @@ from torch import Tensor
 
 from sbi.analysis.conditional_density import eval_conditional_density
 from sbi.analysis.plotting_classes import (
-    DiagKwargs,
-    FigKwargs,
-    OffDiagKwargs,
+    DiagOptions,
+    FigOptions,
+    OffDiagOptions,
     get_default_diag_kwargs,
     get_default_offdiag_kwargs,
 )
@@ -642,10 +642,10 @@ def pairplot(
     labels: Optional[List[str]] = None,
     ticks: Optional[Union[List, torch.Tensor]] = None,
     offdiag: Optional[Union[List[Optional[str]], str]] = None,
-    diag_kwargs: KwargsType[DiagKwargs] = None,
-    upper_kwargs: KwargsType[OffDiagKwargs] = None,
-    lower_kwargs: KwargsType[OffDiagKwargs] = None,
-    fig_kwargs: Optional[Union[Dict, FigKwargs]] = None,
+    diag_kwargs: KwargsType[DiagOptions] = None,
+    upper_kwargs: KwargsType[OffDiagOptions] = None,
+    lower_kwargs: KwargsType[OffDiagOptions] = None,
+    fig_kwargs: Optional[Union[Dict, FigOptions]] = None,
     fig: Optional[FigureBase] = None,
     axes: Optional[Axes] = None,
     **kwargs: Optional[Any],
@@ -675,16 +675,16 @@ def pairplot(
         ticks: Position of the ticks.
         offdiag: deprecated, use upper instead.
         diag_kwargs: Additional arguments to adjust the diagonal plot,
-            see the source code in `KdeDiagKwargs`, `HistDiagKwargs` or
-            `ScatterDiagKwargs`.
+            see the source code in `KdeDiagOptions`, `HistDiagOptions` or
+            `ScatterDiagOptions`.
         upper_kwargs: Additional arguments to adjust the upper diagonal plot,
-            see the source code in `KdeOffDiagKwargs`, `HistOffDiagKwargs`,
-            `ScatterOffDiagKwargs`, `ContourOffDiagKwarg` or `PlotOffDiagKwargs`.
+            see the source code in `KdeOffDiagOptions`, `HistOffDiagOptions`,
+            `ScatterOffDiagOptions`, `ContourOffDiagKwarg` or `PlotOffDiagOptions`.
         lower_kwargs: Additional arguments to adjust the lower diagonal plot,
-            see the source code in `KdeOffDiagKwargs`, `HistOffDiagKwargs`,
-            `ScatterOffDiagKwargs`, `ContourOffDiagKwarg` or `PlotOffDiagKwargs`.
+            see the source code in `KdeOffDiagOptions`, `HistOffDiagOptions`,
+            `ScatterOffDiagOptions`, `ContourOffDiagKwarg` or `PlotOffDiagOptions`.
         fig_kwargs: Additional arguments to adjust the overall figure,
-            see the source code in `FigKwargs`
+            see the source code in `FigOptions`
         fig: matplotlib figure to plot on.
         axes: matplotlib axes corresponding to fig.
         **kwargs: Additional arguments to adjust the plot (deprecated).
@@ -804,7 +804,7 @@ def _prepare_kwargs(
 
 
 def _prepare_fig_kwargs(
-    fig_kwargs: Optional[Union[Dict, FigKwargs]],
+    fig_kwargs: Optional[Union[Dict, FigOptions]],
     samples: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
 ) -> Dict:
     """
@@ -823,11 +823,11 @@ def _prepare_fig_kwargs(
     """
 
     if fig_kwargs is None:
-        fig_kwargs = asdict(FigKwargs())
-    elif isinstance(fig_kwargs, FigKwargs):
+        fig_kwargs = asdict(FigOptions())
+    elif isinstance(fig_kwargs, FigOptions):
         fig_kwargs = asdict(fig_kwargs)
     else:
-        fig_kwargs = update(asdict(FigKwargs()), fig_kwargs)
+        fig_kwargs = update(asdict(FigOptions()), fig_kwargs)
 
     if fig_kwargs["legend"] and len(fig_kwargs["samples_labels"]) < len(samples):
         raise ValueError("Provide at least as many labels as samples.")
@@ -891,8 +891,8 @@ def marginal_plot(
     figsize: Optional[Tuple] = (10, 2),
     labels: Optional[List[str]] = None,
     ticks: Optional[Union[List, torch.Tensor]] = None,
-    diag_kwargs: KwargsType[DiagKwargs] = None,
-    fig_kwargs: Optional[Union[Dict, FigKwargs]] = None,
+    diag_kwargs: KwargsType[DiagOptions] = None,
+    fig_kwargs: Optional[Union[Dict, FigOptions]] = None,
     fig: Optional[FigureBase] = None,
     axes: Optional[Axes] = None,
     **kwargs: Optional[Any],
@@ -916,10 +916,10 @@ def marginal_plot(
         labels: List of strings specifying the names of the parameters.
         ticks: Position of the ticks.
         diag_kwargs: Additional arguments to adjust the diagonal plot,
-            see the source code in `KdeDiagKwargs`, `HistDiagKwargs` or
-            `ScatterDiagKwargs`.
+            see the source code in `KdeDiagOptions`, `HistDiagOptions` or
+            `ScatterDiagOptions`.
         fig_kwargs: Additional arguments to adjust the overall figure,
-            see the source code in `FigKwargs`.
+            see the source code in `FigOptions`.
         fig: matplotlib figure to plot on.
         axes: matplotlib axes corresponding to fig.
         **kwargs: Additional arguments to adjust the plot (deprecated)
