@@ -164,13 +164,13 @@ how to run each of these methods
   and hassle-free simulation-based inference_](https://arxiv.org/abs/2210.04815)
   (NeurIPS 2022).
 
-- [`FMPE`](https://sbi-dev.github.io/sbi/latest/reference/#sbi.inference.trainers.fmpe.fmpe.FMPE)
+- [`FMPE`](https://sbi-dev.github.io/sbi/latest/reference/#sbi.inference.trainers.vfpe.fmpe.FMPE)
   from Wildberger, J., Dax, M., Buchholz, S., Green, S., Macke, J. H., & Schölkopf, B.
   [_Flow matching for scalable simulation-based
   inference_](https://proceedings.neurips.cc/paper_files/paper/2023/hash/3663ae53ec078860bb0b9c6606e092a0-Abstract-Conference.html).
   (NeurIPS 2023).
 
-- [`NPSE`](https://sbi-dev.github.io/sbi/latest/reference/#sbi.inference.trainers.npse.npse.NPSE) from
+- [`NPSE`](https://sbi-dev.github.io/sbi/latest/reference/#sbi.inference.trainers.vfpe.npse.NPSE) from
   Geffner, T., Papamakarios, G., & Mnih, A. [_Compositional score modeling for
   simulation-based inference_](https://proceedings.mlr.press/v202/geffner23a.html).
   (ICML 2023)
