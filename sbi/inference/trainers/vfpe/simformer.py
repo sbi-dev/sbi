@@ -1,13 +1,14 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Any, Dict, Literal, Optional, Union
+from typing import Literal, Optional, Union
 
 from torch import Tensor
 from torch.distributions import Distribution
 from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
+from sbi.inference.posteriors.posterior_parameters import VectorFieldPosteriorParameters
 from sbi.inference.trainers.vfpe.base_vf_inference import (
     MaskedVectorFieldEstimatorBuilder,
     MaskedVectorFieldTrainer,
@@ -110,7 +111,7 @@ class Simformer(MaskedVectorFieldTrainer):
         mvf_estimator: Optional[MaskedConditionalVectorFieldEstimator] = None,
         prior: Optional[Distribution] = None,
         sample_with: Literal['ode', 'sde'] = "sde",
-        vectorfield_sampling_parameters: Optional[Dict[str, Any]] = None,
+        posterior_parameters: Optional[VectorFieldPosteriorParameters] = None,
     ) -> NeuralPosterior:
         r"""Build conditinal distribution from the masked vector field estimator
         and the given fixed condition mask and edge mask.
@@ -165,7 +166,7 @@ class Simformer(MaskedVectorFieldTrainer):
             mvf_estimator=mvf_estimator,
             prior=prior,
             sample_with=sample_with,
-            vectorfield_sampling_parameters=vectorfield_sampling_parameters,
+            posterior_parameters=posterior_parameters,
         )
 
     def build_posterior(
@@ -174,7 +175,7 @@ class Simformer(MaskedVectorFieldTrainer):
         mvf_estimator: Optional[MaskedConditionalVectorFieldEstimator] = None,
         prior: Optional[Distribution] = None,
         sample_with: Literal['ode', 'sde'] = "sde",
-        vectorfield_sampling_parameters: Optional[Dict[str, Any]] = None,
+        posterior_parameters: Optional[VectorFieldPosteriorParameters] = None,
     ) -> NeuralPosterior:
         r"""Build posterior from the masked vector field estimator given
         the latent and observed indexes passed at init time (or updated
@@ -221,7 +222,7 @@ class Simformer(MaskedVectorFieldTrainer):
             mvf_estimator=mvf_estimator,
             prior=prior,
             sample_with=sample_with,
-            vectorfield_sampling_parameters=vectorfield_sampling_parameters,
+            posterior_parameters=posterior_parameters,
         )
 
     def build_likelihood(
@@ -230,7 +231,7 @@ class Simformer(MaskedVectorFieldTrainer):
         mvf_estimator: Optional[MaskedConditionalVectorFieldEstimator] = None,
         prior: Optional[Distribution] = None,
         sample_with: Literal['ode', 'sde'] = "sde",
-        vectorfield_sampling_parameters: Optional[Dict[str, Any]] = None,
+        posterior_parameters: Optional[VectorFieldPosteriorParameters] = None,
     ) -> NeuralPosterior:
         r"""Build likelihood from the masked vector field estimator given
         the latent and observed indexes passed at init time (or updated
@@ -280,7 +281,7 @@ class Simformer(MaskedVectorFieldTrainer):
             mvf_estimator=mvf_estimator,
             prior=prior,
             sample_with=sample_with,
-            vectorfield_sampling_parameters=vectorfield_sampling_parameters,
+            posterior_parameters=posterior_parameters,
         )
 
 

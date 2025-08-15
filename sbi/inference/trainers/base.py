@@ -1096,6 +1096,7 @@ class NeuralInference(ABC, BaseNeuralInference):
         sample_with: Literal[
             "mcmc", "rejection", "vi", "importance", "direct", "sde", "ode"
         ],
+        posterior_parameters: Optional[PosteriorParameters],
         **kwargs,
     ) -> NeuralPosterior:
         r"""Method for building posteriors.
@@ -1126,12 +1127,16 @@ class NeuralInference(ABC, BaseNeuralInference):
         prior = self._resolve_prior(prior)
         estimator, device = self._resolve_estimator(estimator)
 
+        posterior_parameters = self._resolve_posterior_parameters(
+            sample_with, posterior_parameters, **kwargs
+        )
+
         self._posterior = self._create_posterior(
             estimator,
             prior,
             sample_with,
             device,
-            **kwargs,
+            posterior_parameters,
         )
 
         # Store models at end of each round.
@@ -1420,10 +1425,11 @@ class MaskedNeuralInference(ABC, BaseNeuralInference):
     def build_conditional(
         self,
         condition_mask: Union[Tensor, list],
-        edge_mask: Optional[Tensor] = None,
-        mvf_estimator: Optional[MaskedConditionalVectorFieldEstimator] = None,
-        prior: Optional[Distribution] = None,
-        sample_with: Literal['ode', 'sde'] = "sde",
+        edge_mask: Optional[Tensor],
+        mvf_estimator: Optional[MaskedConditionalVectorFieldEstimator],
+        prior: Optional[Distribution],
+        sample_with: Literal['ode', 'sde'],
+        posterior_parameters: Optional[PosteriorParameters],
         **kwargs,
     ) -> NeuralPosterior:
         r"""Method for building an arbitrary conditional.
@@ -1468,12 +1474,16 @@ class MaskedNeuralInference(ABC, BaseNeuralInference):
             edge_mask,
         )
 
+        posterior_parameters = self._resolve_posterior_parameters(
+            sample_with, posterior_parameters, **kwargs
+        )
+
         self._posterior = self._create_posterior(
             vf_estimator,
             prior,
             sample_with,
             device,
-            **kwargs,
+            posterior_parameters,
         )
 
         # Store models at end of each round.

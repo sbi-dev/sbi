@@ -157,7 +157,7 @@ def test_c2st_vector_field_on_linearGaussian(
             "gaussian",
             ["sde", "ode"],
             5000,
-            100,
+            1,
             "cpu",
         ),
         pytest.param(
