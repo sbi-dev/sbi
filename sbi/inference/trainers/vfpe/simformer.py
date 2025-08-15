@@ -111,7 +111,7 @@ class Simformer(MaskedVectorFieldTrainer):
         mvf_estimator: Optional[MaskedConditionalVectorFieldEstimator] = None,
         prior: Optional[Distribution] = None,
         sample_with: Literal['ode', 'sde'] = "sde",
-        posterior_parameters: Optional[VectorFieldPosteriorParameters] = None,
+        conditional_parameters: Optional[VectorFieldPosteriorParameters] = None,
     ) -> NeuralPosterior:
         r"""Build conditinal distribution from the masked vector field estimator
         and the given fixed condition mask and edge mask.
@@ -166,7 +166,7 @@ class Simformer(MaskedVectorFieldTrainer):
             mvf_estimator=mvf_estimator,
             prior=prior,
             sample_with=sample_with,
-            posterior_parameters=posterior_parameters,
+            conditional_parameters=conditional_parameters,
         )
 
     def build_posterior(
@@ -222,7 +222,7 @@ class Simformer(MaskedVectorFieldTrainer):
             mvf_estimator=mvf_estimator,
             prior=prior,
             sample_with=sample_with,
-            posterior_parameters=posterior_parameters,
+            conditional_parameters=posterior_parameters,
         )
 
     def build_likelihood(
@@ -231,7 +231,7 @@ class Simformer(MaskedVectorFieldTrainer):
         mvf_estimator: Optional[MaskedConditionalVectorFieldEstimator] = None,
         prior: Optional[Distribution] = None,
         sample_with: Literal['ode', 'sde'] = "sde",
-        posterior_parameters: Optional[VectorFieldPosteriorParameters] = None,
+        likelihood_parameters: Optional[VectorFieldPosteriorParameters] = None,
     ) -> NeuralPosterior:
         r"""Build likelihood from the masked vector field estimator given
         the latent and observed indexes passed at init time (or updated
@@ -281,7 +281,7 @@ class Simformer(MaskedVectorFieldTrainer):
             mvf_estimator=mvf_estimator,
             prior=prior,
             sample_with=sample_with,
-            posterior_parameters=posterior_parameters,
+            conditional_parameters=likelihood_parameters,
         )
 
 

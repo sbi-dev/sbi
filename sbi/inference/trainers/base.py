@@ -1429,7 +1429,7 @@ class MaskedNeuralInference(ABC, BaseNeuralInference):
         mvf_estimator: Optional[MaskedConditionalVectorFieldEstimator],
         prior: Optional[Distribution],
         sample_with: Literal['ode', 'sde'],
-        posterior_parameters: Optional[PosteriorParameters],
+        conditional_parameters: Optional[PosteriorParameters],
         **kwargs,
     ) -> NeuralPosterior:
         r"""Method for building an arbitrary conditional.
@@ -1474,8 +1474,8 @@ class MaskedNeuralInference(ABC, BaseNeuralInference):
             edge_mask,
         )
 
-        posterior_parameters = self._resolve_posterior_parameters(
-            sample_with, posterior_parameters, **kwargs
+        conditional_parameters = self._resolve_posterior_parameters(
+            sample_with, conditional_parameters, **kwargs
         )
 
         self._posterior = self._create_posterior(
@@ -1483,7 +1483,7 @@ class MaskedNeuralInference(ABC, BaseNeuralInference):
             prior,
             sample_with,
             device,
-            posterior_parameters,
+            conditional_parameters,
         )
 
         # Store models at end of each round.
