@@ -47,7 +47,7 @@ from sbi.utils.plotting_helpers import (
     update,
 )
 
-UpperLietral = Literal["hist", "scatter", "contour", "kde"]
+UpperLiteral = Literal["hist", "scatter", "contour", "kde"]
 LowerLiteral = Literal["hist", "scatter", "contour", "kde"]
 DiagLiteral = Literal["hist", "scatter", "kde"]
 K = TypeVar("K")
@@ -635,7 +635,7 @@ def pairplot(
     ] = None,
     limits: Optional[Union[List, torch.Tensor]] = None,
     subset: Optional[List[int]] = None,
-    upper: Optional[Union[List[Optional[UpperLietral]], UpperLietral]] = "hist",
+    upper: Optional[Union[List[Optional[UpperLiteral]], UpperLiteral]] = "hist",
     lower: Optional[Union[List[Optional[LowerLiteral]], LowerLiteral]] = None,
     diag: Optional[Union[List[Optional[DiagLiteral]], DiagLiteral]] = "hist",
     figsize: Tuple = (10, 10),
