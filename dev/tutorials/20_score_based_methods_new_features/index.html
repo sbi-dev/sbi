@@ -500,9 +500,9 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#training-and-improved-convergence-checks" class="md-nav__link">
+  <a href="#training" class="md-nav__link">
     <span class="md-ellipsis">
-      Training and improved convergence checks
+      Training
     </span>
   </a>
   
@@ -609,6 +609,13 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">sbi.analysis</span><span class="w"> </span><span class="kn">import</span> <span class="n">pairplot</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference</span><span class="w"> </span><span class="kn">import</span> <span class="n">NPSE</span>
 </code></pre></div>
+<div class="codehilite"><pre><span></span><code>The history saving thread hit an unexpected error (DatabaseError(&#39;database disk image is malformed&#39;)).History will not be written to the database.
+
+
+/mnt/lustre/work/macke/mgloeckler90/miniconda3/envs/sbi/lib/python3.12/site-packages/tqdm/auto.py:21: TqdmWarning: IProgress not found. Please update jupyter and ipywidgets. See https://ipywidgets.readthedocs.io/en/stable/user_install.html
+  from .autonotebook import tqdm as notebook_tqdm
+</code></pre></div>
+
 <div class="highlight"><pre><span></span><code><span class="c1"># Example toy simulator</span>
 <span class="c1"># Define the prior</span>
 <span class="n">num_dims</span> <span class="o">=</span> <span class="mi">2</span>
@@ -631,24 +638,33 @@
 <span class="n">inference</span> <span class="o">=</span> <span class="n">NPSE</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span> <span class="n">sde_type</span><span class="o">=</span><span class="s2">&quot;vp&quot;</span><span class="p">)</span>
 <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
 </code></pre></div>
+<div class="codehilite"><pre><span></span><code>&lt;sbi.inference.trainers.vfpe.npse.NPSE at 0x7fe9f96006e0&gt;
+</code></pre></div>
+
 <p>The argument <code>sde_type</code> defines whether the forward diffusion process has a noising schedule that is Variance Exploding (<code>ve</code>, i.e., <a href="https://proceedings.neurips.cc/paper/2019/hash/3001ef257407d5a371a96dcd947c7d93-Abstract.html?ref=https://githubhelp.com">SMLD</a>), Variance Preserving (<code>vp</code>, i.e., <a href="https://proceedings.neurips.cc/paper/2020/hash/4c5bcfec8584af0d967f1ab10179ca4b-Abstract.html">DDPM</a>), or sub-Variance Preserving (<code>subvp</code>) in the limit.<br />
 The current default noising schedule is <code>ve</code>. As we care more about sampling quality than sampling times in our example, we choose to work with the <code>vp</code> option.</p>
-<h3 id="training-and-improved-convergence-checks">Training and improved convergence checks<a class="headerlink" href="#training-and-improved-convergence-checks" title="Permanent link">&para;</a></h3>
+<h3 id="training">Training<a class="headerlink" href="#training" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code><span class="c1"># Train the score estimator</span>
 <span class="n">score_estimator</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 56 epochs.
+<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 140 epochs.
 </code></pre></div>
 
 <p>The method <code>train</code> calls the denoising score-matching loss corresponding to the chosen noising schedule (VE, VP, subVP). As the variance of the loss may be high, especially for times <span class="arithmatex">\(t\)</span> near <span class="arithmatex">\(0\)</span>, <strong>control variates</strong> are automatically used in the expression of the loss.  </p>
-<p>As NPSE deals with times, <strong>convergence</strong> checks have been changed during training : the validation loss is now evaluated at a <strong>fixed</strong> set of times <span class="arithmatex">\(T = \{t_0,..,t_N\}\)</span> to reduce its variance, meaning that the entire validation batch is only evaluated at all times <span class="arithmatex">\(t_i \in T\)</span>.  </p>
-<p>After training, we obtain an <strong>amortized</strong> score estimate that approximates the score of the diffused posterior distribution for all times <span class="arithmatex">\(t \in [0,t_{\max}]\)</span> and <strong>any</strong> conditional observation <span class="arithmatex">\(x\)</span>, i.e. <span class="arithmatex">\(\nabla_{\theta}\log p_t(\theta|x)\)</span>.<br />
+<p>After training, we obtain an <strong>amortized</strong> score estimator that approximates the score of the diffused posterior distribution for all times <span class="arithmatex">\(t \in [t_{\min},t_{\max}]\)</span> and <strong>any</strong> conditional observation <span class="arithmatex">\(x\)</span>, i.e. <span class="arithmatex">\(\nabla_{\theta}\log p_t(\theta|x)\)</span>.<br />
 We can use these score estimates to reverse the diffusion process and sample from the target distribution.</p>
 <h3 id="sampling-procedures">Sampling procedures<a class="headerlink" href="#sampling-procedures" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code><span class="c1"># Build the posterior using the trained score estimate, and sample with the sde option</span>
 <span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">(</span><span class="n">score_estimator</span><span class="p">,</span> <span class="n">sample_with</span><span class="o">=</span><span class="s2">&quot;sde&quot;</span><span class="p">)</span>
-<span class="n">samples</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">10000</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_o</span><span class="p">,</span> <span class="n">predictor</span><span class="o">=</span><span class="s2">&quot;euler_maruyama&quot;</span><span class="p">,</span> <span class="n">corrector</span><span class="o">=</span><span class="s2">&quot;langevin&quot;</span><span class="p">)</span>
+<span class="n">samples</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">10000</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_o</span><span class="p">,</span> <span class="n">predictor</span><span class="o">=</span><span class="s2">&quot;euler_maruyama&quot;</span><span class="p">,</span> <span class="n">corrector</span><span class="o">=</span><span class="s2">&quot;langevin&quot;</span><span class="p">,</span> <span class="n">steps</span><span class="o">=</span><span class="mi">100</span><span class="p">)</span>
 </code></pre></div>
+<div class="codehilite"><pre><span></span><code>/mnt/lustre/work/macke/mgloeckler90/sbi/sbi/inference/trainers/base.py:569: FutureWarning: The following arguments are deprecated and will be removed in a future version: mcmc_method, vi_method. Please use `posterior_parameters` instead. Refer to this guide for details:
+https://sbi.readthedocs.io/en/latest/how_to_guide/19_posterior_parameters.html#
+  self._raise_deprecation_warning(deprecated_params, **kwargs)
+Drawing 10000 posterior samples: 100%|██████████| 99/99 [00:12&lt;00:00,  7.63it/s]:00&lt;?, ?it/s]
+Drawing 10000 posterior samples for 1 observations: 100%|██████████| 10000/10000 [00:12&lt;00:00, 770.20it/s]
+</code></pre></div>
+
 <p>The argument <code>sample_with</code> allows to choose which kind of solver we want to use to reverse the diffusion equation :</p>
 <ul>
 <li>
@@ -659,19 +675,24 @@ We can use these score estimates to reverse the diffusion process and sample fro
 </li>
 </ul>
 <p>Both options contain <strong>rejection sampling</strong> steps to ensure prior coverage.<br />
-Note that in the <code>"sde"</code> option, the only available predictor is <code>"euler_maruyama"</code> and the available correctors are <code>"langevin"</code> (for <strong>Unadjusted Langevin Dynamics</strong>) and <code>"gibbs"</code>.  </p>
+Note that in the <code>"sde"</code> option, the only available predictor is <code>"euler_maruyama"</code> and the available correctors are <code>"langevin"</code> (for <strong>Unadjusted Langevin Dynamics</strong>) and <code>"gibbs"</code> (for <strong>Gibbs sampling</strong> often reffered to as &ldquo;self-recurrence&rdquo; in the literature of diffusion models).  </p>
 <p>The argument <code>x_o</code> in the <code>.sample()</code> method indicates which observation is set before sampling from the corresponding posterior and replaces the <code>.set_default()</code>method.</p>
 <h3 id="map-estimation">MAP estimation<a class="headerlink" href="#map-estimation" title="Permanent link">&para;</a></h3>
 <p>It is possible to get a Maximum A Posterior (MAP) estimate in the case of score-based methods. Note that in this case, you should <strong>first</strong> set the default observation, using the <code>set_default_x</code> method !<br />
 The optimization procedure (gradient ascent) aims at finding a maximizer <span class="arithmatex">\(\theta_{\max}\)</span> of the posterior log-probability <span class="arithmatex">\(\log p(\theta|x_0)\)</span>. <br />
 The optimization can be interrupted at any time if the user sees that the log-probability converges : the best estimate will still be saved and can be accessed with <code>.map()</code>.  </p>
 <p>The default values used by this function (e.g. number of optimization steps, number of starting positions, learning rate) might require hand-tuning from the user for the problem at hand.</p>
+<p>As it is expensive to frequently calculate the gradient of the &ldquo;density&rdquo; (as this requires the &ldquo;neural ode&rdquo; formulation), notice that the network itself will learn this gradient! So we instead use a forward pass through the network at <span class="arithmatex">\(t_{\min}\)</span></p>
 <div class="highlight"><pre><span></span><code><span class="c1"># MAP estimation</span>
 <span class="n">posterior</span><span class="o">.</span><span class="n">set_default_x</span><span class="p">(</span><span class="n">x_o</span><span class="p">)</span>
 <span class="n">map_est</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">num_iter</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;The MAP estimate is : &quot;</span><span class="p">,</span> <span class="n">map_est</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>The MAP estimate is :  tensor([[0.1307, 0.0084]])
+<div class="codehilite"><pre><span></span><code>Drawing 1000 posterior samples: 100%|██████████| 499/499 [00:01&lt;00:00, 298.02it/s]?, ?it/s]
+Drawing 1000 posterior samples for 1 observations: 100%|██████████| 1000/1000 [00:01&lt;00:00, 596.29it/s]
+
+
+The MAP estimate is :  tensor([[-0.0197,  0.1352]])
 </code></pre></div>
 
 <p>The argument <code>num_iter</code> indicates the number of optimization steps (gradient ascent) that the algorithm takes to find the MAP. In our simple example, a small number of iterations is sufficient for the the log-probability (of the posterior) to converge.</p>
@@ -687,7 +708,7 @@ The optimization can be interrupted at any time if the user sees that the log-pr
         <span class="n">points_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;markersize&quot;</span><span class="p">:</span> <span class="mi">6</span><span class="p">}</span>
     <span class="p">)</span>
 <span class="p">)</span>
-<span class="n">ax</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">legend</span><span class="p">([</span><span class="sa">r</span><span class="s2">&quot;$\theta_0$&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;$\theta_</span><span class="si">{MAP}</span><span class="s2">$&quot;</span><span class="p">],</span> <span class="n">loc</span><span class="o">=</span><span class="s2">&quot;upper right&quot;</span><span class="p">)</span><span class="c1">#, bbox_to_anchor=[2.0, 1.0, 0.0, 0.0]);</span>
+<span class="n">ax</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">legend</span><span class="p">([</span><span class="sa">r</span><span class="s2">&quot;$\theta_</span><span class="si">{MAP}</span><span class="s2">$&quot;</span><span class="p">,</span><span class="sa">r</span><span class="s2">&quot;$\theta_0$&quot;</span><span class="p">],</span> <span class="n">loc</span><span class="o">=</span><span class="s2">&quot;upper right&quot;</span><span class="p">)</span><span class="c1">#, bbox_to_anchor=[2.0, 1.0, 0.0, 0.0]);</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">sca</span><span class="p">(</span><span class="n">ax</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">]);</span>
 </code></pre></div>
 <p><img alt="png" src="../20_score_based_methods_new_features_files/20_score_based_methods_new_features_16_0.png" /></p>
@@ -701,7 +722,10 @@ The argument <code>sample_shape</code> specifies the desired number of samples f
 <span class="n">posterior_batched_samples</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample_batched</span><span class="p">(</span><span class="n">sample_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">100</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_batch</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;The size of the batched samples is : &quot;</span><span class="p">,</span> <span class="n">posterior_batched_samples</span><span class="o">.</span><span class="n">size</span><span class="p">())</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>The size of the batched samples is :  torch.Size([100, 5, 2])
+<div class="codehilite"><pre><span></span><code>Drawing 100 posterior samples: 100%|██████████| 499/499 [00:01&lt;00:00, 370.79it/s], ?it/s]
+Drawing 100 posterior samples for 5 observations: 100%|██████████| 100/100 [00:01&lt;00:00, 74.10it/s]
+
+The size of the batched samples is :  torch.Size([100, 5, 2])
 </code></pre></div>
 
 <h2 id="score-based-methods-for-iid-data">Score-based methods for i.i.d. data<a class="headerlink" href="#score-based-methods-for-iid-data" title="Permanent link">&para;</a></h2>
@@ -728,6 +752,14 @@ The argument <code>sample_shape</code> specifies the desired number of samples f
 <span class="c1"># Sample from a posterior conditioned with 20 observations</span>
 <span class="n">tall_samples_20_obs</span> <span class="o">=</span> <span class="n">tall_posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">sample_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">1000</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_iid</span><span class="p">,</span> <span class="n">iid_method</span><span class="o">=</span><span class="s2">&quot;gauss&quot;</span><span class="p">)</span>
 </code></pre></div>
+<div class="codehilite"><pre><span></span><code>Drawing 1000 posterior samples: 100%|██████████| 499/499 [00:06&lt;00:00, 73.99it/s]&lt;?, ?it/s]
+Drawing 1000 posterior samples for 1 observations: 100%|██████████| 1000/1000 [00:06&lt;00:00, 148.17it/s]
+Drawing 1000 posterior samples: 100%|██████████| 499/499 [00:13&lt;00:00, 38.12it/s]&lt;?, ?it/s]
+Drawing 1000 posterior samples for 1 observations: 100%|██████████| 1000/1000 [00:13&lt;00:00, 76.38it/s]
+Drawing 1000 posterior samples: 100%|██████████| 499/499 [00:24&lt;00:00, 20.62it/s]&lt;?, ?it/s]
+Drawing 1000 posterior samples for 1 observations: 100%|██████████| 1000/1000 [00:24&lt;00:00, 41.32it/s]
+</code></pre></div>
+
 <p>Note that the posterior object created by the <code>.build_posterior()</code> is essentially the same as in the previous section (with single observations).  </p>
 <p>To sample, we call <code>.sample()</code> as before but we now pass a <strong>batch</strong> of observations to the argument <code>x</code> : the algorithm will assume those to be i.i.d. and automatically switch to the i.i.d. setting.  </p>
 <p>The argument <code>iid_method</code> only applies when <code>x</code> is a <strong>batch</strong> of observations.<br />

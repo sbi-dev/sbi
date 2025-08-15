@@ -598,7 +598,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#sbi.inference.trainers.fmpe.fmpe.FMPE" class="md-nav__link">
+  <a href="#sbi.inference.trainers.vfpe.fmpe.FMPE" class="md-nav__link">
     <span class="md-ellipsis">
       <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;FMPE
     </span>
@@ -608,7 +608,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#sbi.inference.trainers.fmpe.fmpe.FMPE.__init__" class="md-nav__link">
+  <a href="#sbi.inference.trainers.vfpe.fmpe.FMPE.__init__" class="md-nav__link">
     <span class="md-ellipsis">
       <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;__init__
     </span>
@@ -617,7 +617,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#sbi.inference.trainers.fmpe.fmpe.FMPE.build_posterior" class="md-nav__link">
+  <a href="#sbi.inference.trainers.vfpe.fmpe.FMPE.build_posterior" class="md-nav__link">
     <span class="md-ellipsis">
       <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;build_posterior
     </span>
@@ -631,7 +631,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#sbi.inference.trainers.npse.npse.NPSE" class="md-nav__link">
+  <a href="#sbi.inference.trainers.vfpe.npse.NPSE" class="md-nav__link">
     <span class="md-ellipsis">
       <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;NPSE
     </span>
@@ -641,7 +641,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#sbi.inference.trainers.npse.npse.NPSE.__init__" class="md-nav__link">
+  <a href="#sbi.inference.trainers.vfpe.npse.NPSE.__init__" class="md-nav__link">
     <span class="md-ellipsis">
       <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;__init__
     </span>
@@ -650,7 +650,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#sbi.inference.trainers.npse.npse.NPSE.build_posterior" class="md-nav__link">
+  <a href="#sbi.inference.trainers.vfpe.npse.NPSE.build_posterior" class="md-nav__link">
     <span class="md-ellipsis">
       <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;build_posterior
     </span>
@@ -5506,16 +5506,16 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 
 
 
-<h2 id="sbi.inference.trainers.fmpe.fmpe.FMPE" class="doc doc-heading">
+<h2 id="sbi.inference.trainers.vfpe.fmpe.FMPE" class="doc doc-heading">
             <code>FMPE</code>
 
 
-<a href="#sbi.inference.trainers.fmpe.fmpe.FMPE" class="headerlink" title="Permanent link">&para;</a></h2>
+<a href="#sbi.inference.trainers.vfpe.fmpe.FMPE" class="headerlink" title="Permanent link">&para;</a></h2>
 
 
     <div class="doc doc-contents first">
             <p class="doc doc-class-bases">
-              Bases: <code><span title="sbi.inference.trainers.npse.vector_field_inference.VectorFieldTrainer">VectorFieldTrainer</span></code></p>
+              Bases: <code><span title="sbi.inference.trainers.vfpe.base_vf_inference.VectorFieldTrainer">VectorFieldTrainer</span></code></p>
 
 
         <p>Flow Matching Posterior Estimation (FMPE).</p>
@@ -5527,9 +5527,8 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 
 
               <details class="quote">
-                <summary>Source code in <code>sbi/inference/trainers/fmpe/fmpe.py</code></summary>
-                <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 21</span>
-<span class="normal"> 22</span>
+                <summary>Source code in <code>sbi/inference/trainers/vfpe/fmpe.py</code></summary>
+                <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 22</span>
 <span class="normal"> 23</span>
 <span class="normal"> 24</span>
 <span class="normal"> 25</span>
@@ -5618,13 +5617,35 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 <span class="normal">108</span>
 <span class="normal">109</span>
 <span class="normal">110</span>
-<span class="normal">111</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FMPE</span><span class="p">(</span><span class="n">VectorFieldTrainer</span><span class="p">):</span>
+<span class="normal">111</span>
+<span class="normal">112</span>
+<span class="normal">113</span>
+<span class="normal">114</span>
+<span class="normal">115</span>
+<span class="normal">116</span>
+<span class="normal">117</span>
+<span class="normal">118</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span>
+<span class="normal">122</span>
+<span class="normal">123</span>
+<span class="normal">124</span>
+<span class="normal">125</span>
+<span class="normal">126</span>
+<span class="normal">127</span>
+<span class="normal">128</span>
+<span class="normal">129</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FMPE</span><span class="p">(</span><span class="n">VectorFieldTrainer</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Flow Matching Posterior Estimation (FMPE).&quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">],</span>
-        <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">VectorFieldEstimatorBuilder</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;mlp&quot;</span><span class="p">,</span>
+        <span class="n">vf_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span>
+            <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;mlp&quot;</span><span class="p">,</span> <span class="s2">&quot;ada_mlp&quot;</span><span class="p">,</span> <span class="s2">&quot;transformer&quot;</span><span class="p">,</span> <span class="s2">&quot;transformer_cross_attn&quot;</span><span class="p">],</span>
+            <span class="n">VectorFieldEstimatorBuilder</span><span class="p">,</span>
+        <span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;mlp&quot;</span><span class="p">,</span>
+        <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">VectorFieldEstimatorBuilder</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
         <span class="n">logging_level</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;WARNING&quot;</span><span class="p">,</span>
         <span class="n">summary_writer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">SummaryWriter</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -5635,11 +5656,14 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 
 <span class="sd">        Args:</span>
 <span class="sd">            prior: Prior distribution.</span>
-<span class="sd">            density_estimator: Neural network architecture used to learn the</span>
-<span class="sd">                vector field estimator. Can be a string (e.g. &#39;mlp&#39; or &#39;ada_mlp&#39;) or a</span>
-<span class="sd">                callable that implements the `VectorFieldEstimatorBuilder` protocol</span>
-<span class="sd">                with `__call__` that receives `theta` and `x` and returns a</span>
+<span class="sd">            vf_estimator: Neural network architecture used to learn the</span>
+<span class="sd">                vector field estimator. Can be a string (e.g. &#39;mlp&#39;, &#39;ada_mlp&#39;,</span>
+<span class="sd">                &#39;transformer&#39; or &#39;transformer_cross_attn&#39;) or a callable that</span>
+<span class="sd">                implements the `VectorFieldEstimatorBuilder` protocol with</span>
+<span class="sd">                `__call__` that receives `theta` and `x` and returns a</span>
 <span class="sd">                `ConditionalVectorFieldEstimator`.</span>
+<span class="sd">            density_estimator: Deprecated. Use `vf_estimator` instead. When passed, a</span>
+<span class="sd">                warning is raised and the `vf_estimator=&quot;mlp&quot;` default is used.</span>
 <span class="sd">            device: Device to use for training.</span>
 <span class="sd">            logging_level: Logging level.</span>
 <span class="sd">            summary_writer: Summary writer for tensorboard.</span>
@@ -5648,17 +5672,24 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 <span class="sd">                `density_estimator` is a string.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
 
+        <span class="k">if</span> <span class="n">density_estimator</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                <span class="s2">&quot;`density_estimator` is deprecated and will be removed in a future &quot;</span>
+                <span class="s2">&quot;release. Use `vf_estimator` instead.&quot;</span><span class="p">,</span>
+                <span class="ne">FutureWarning</span><span class="p">,</span>
+                <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">vf_estimator</span> <span class="o">=</span> <span class="n">density_estimator</span>
+
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span>
             <span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span>
             <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span>
             <span class="n">logging_level</span><span class="o">=</span><span class="n">logging_level</span><span class="p">,</span>
             <span class="n">summary_writer</span><span class="o">=</span><span class="n">summary_writer</span><span class="p">,</span>
             <span class="n">show_progress_bars</span><span class="o">=</span><span class="n">show_progress_bars</span><span class="p">,</span>
-            <span class="n">vector_field_estimator_builder</span><span class="o">=</span><span class="n">density_estimator</span><span class="p">,</span>
+            <span class="n">vector_field_estimator_builder</span><span class="o">=</span><span class="n">vf_estimator</span><span class="p">,</span>
             <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
         <span class="p">)</span>
-        <span class="c1"># density_estimator name is kept since it is public API, but it is</span>
-        <span class="c1"># actually misleading since it is a builder for an estimator.</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">build_posterior</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -5706,9 +5737,12 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
             <span class="n">posterior_parameters</span><span class="o">=</span><span class="n">posterior_parameters</span><span class="p">,</span>
         <span class="p">)</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">_build_default_nn_fn</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">VectorFieldEstimatorBuilder</span><span class="p">:</span>
-        <span class="n">model</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;vector_field_estimator_builder&quot;</span><span class="p">,</span> <span class="s2">&quot;mlp&quot;</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">flowmatching_nn</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_build_default_nn_fn</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">model</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;mlp&quot;</span><span class="p">,</span> <span class="s2">&quot;ada_mlp&quot;</span><span class="p">,</span> <span class="s2">&quot;transformer&quot;</span><span class="p">,</span> <span class="s2">&quot;transformer_cross_attn&quot;</span><span class="p">],</span>
+        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">VectorFieldEstimatorBuilder</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">posterior_flow_nn</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -5727,10 +5761,10 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 <div class="doc doc-object doc-function">
 
 
-<h3 id="sbi.inference.trainers.fmpe.fmpe.FMPE.__init__" class="doc doc-heading">
-            <code class=" language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">prior</span><span class="p">,</span> <span class="n">density_estimator</span><span class="o">=</span><span class="s1">&#39;mlp&#39;</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="s1">&#39;cpu&#39;</span><span class="p">,</span> <span class="n">logging_level</span><span class="o">=</span><span class="s1">&#39;WARNING&#39;</span><span class="p">,</span> <span class="n">summary_writer</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
+<h3 id="sbi.inference.trainers.vfpe.fmpe.FMPE.__init__" class="doc doc-heading">
+            <code class=" language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">prior</span><span class="p">,</span> <span class="n">vf_estimator</span><span class="o">=</span><span class="s1">&#39;mlp&#39;</span><span class="p">,</span> <span class="n">density_estimator</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="s1">&#39;cpu&#39;</span><span class="p">,</span> <span class="n">logging_level</span><span class="o">=</span><span class="s1">&#39;WARNING&#39;</span><span class="p">,</span> <span class="n">summary_writer</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
 
-<a href="#sbi.inference.trainers.fmpe.fmpe.FMPE.__init__" class="headerlink" title="Permanent link">&para;</a></h3>
+<a href="#sbi.inference.trainers.vfpe.fmpe.FMPE.__init__" class="headerlink" title="Permanent link">&para;</a></h3>
 
 
     <div class="doc doc-contents ">
@@ -5767,22 +5801,40 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
           </tr>
           <tr class="doc-section-item">
             <td>
-                <code>density_estimator</code>
+                <code>vf_estimator</code>
             </td>
             <td>
-                  <code><span title="typing.Union">Union</span>[<span title="str">str</span>, <span title="sbi.inference.trainers.npse.vector_field_inference.VectorFieldEstimatorBuilder">VectorFieldEstimatorBuilder</span>]</code>
+                  <code><span title="typing.Union">Union</span>[<span title="typing.Literal">Literal</span>[&#39;mlp&#39;, &#39;ada_mlp&#39;, &#39;transformer&#39;, &#39;transformer_cross_attn&#39;], <span title="sbi.inference.trainers.vfpe.base_vf_inference.VectorFieldEstimatorBuilder">VectorFieldEstimatorBuilder</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
                 <p>Neural network architecture used to learn the
-vector field estimator. Can be a string (e.g. &lsquo;mlp&rsquo; or &lsquo;ada_mlp&rsquo;) or a
-callable that implements the <code>VectorFieldEstimatorBuilder</code> protocol
-with <code>__call__</code> that receives <code>theta</code> and <code>x</code> and returns a
+vector field estimator. Can be a string (e.g. &lsquo;mlp&rsquo;, &lsquo;ada_mlp&rsquo;,
+&lsquo;transformer&rsquo; or &lsquo;transformer_cross_attn&rsquo;) or a callable that
+implements the <code>VectorFieldEstimatorBuilder</code> protocol with
+<code>__call__</code> that receives <code>theta</code> and <code>x</code> and returns a
 <code>ConditionalVectorFieldEstimator</code>.</p>
               </div>
             </td>
             <td>
                   <code>&#39;mlp&#39;</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>density_estimator</code>
+            </td>
+            <td>
+                  <code><span title="typing.Optional">Optional</span>[<span title="sbi.inference.trainers.vfpe.base_vf_inference.VectorFieldEstimatorBuilder">VectorFieldEstimatorBuilder</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Deprecated. Use <code>vf_estimator</code> instead. When passed, a
+warning is raised and the <code>vf_estimator="mlp"</code> default is used.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
             </td>
           </tr>
           <tr class="doc-section-item">
@@ -5870,9 +5922,8 @@ with <code>__call__</code> that receives <code>theta</code> and <code>x</code> a
 
 
             <details class="quote">
-              <summary>Source code in <code>sbi/inference/trainers/fmpe/fmpe.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">24</span>
-<span class="normal">25</span>
+              <summary>Source code in <code>sbi/inference/trainers/vfpe/fmpe.py</code></summary>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">25</span>
 <span class="normal">26</span>
 <span class="normal">27</span>
 <span class="normal">28</span>
@@ -5906,10 +5957,31 @@ with <code>__call__</code> that receives <code>theta</code> and <code>x</code> a
 <span class="normal">56</span>
 <span class="normal">57</span>
 <span class="normal">58</span>
-<span class="normal">59</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">59</span>
+<span class="normal">60</span>
+<span class="normal">61</span>
+<span class="normal">62</span>
+<span class="normal">63</span>
+<span class="normal">64</span>
+<span class="normal">65</span>
+<span class="normal">66</span>
+<span class="normal">67</span>
+<span class="normal">68</span>
+<span class="normal">69</span>
+<span class="normal">70</span>
+<span class="normal">71</span>
+<span class="normal">72</span>
+<span class="normal">73</span>
+<span class="normal">74</span>
+<span class="normal">75</span>
+<span class="normal">76</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">],</span>
-    <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">VectorFieldEstimatorBuilder</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;mlp&quot;</span><span class="p">,</span>
+    <span class="n">vf_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span>
+        <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;mlp&quot;</span><span class="p">,</span> <span class="s2">&quot;ada_mlp&quot;</span><span class="p">,</span> <span class="s2">&quot;transformer&quot;</span><span class="p">,</span> <span class="s2">&quot;transformer_cross_attn&quot;</span><span class="p">],</span>
+        <span class="n">VectorFieldEstimatorBuilder</span><span class="p">,</span>
+    <span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;mlp&quot;</span><span class="p">,</span>
+    <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">VectorFieldEstimatorBuilder</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
     <span class="n">logging_level</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;WARNING&quot;</span><span class="p">,</span>
     <span class="n">summary_writer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">SummaryWriter</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -5920,11 +5992,14 @@ with <code>__call__</code> that receives <code>theta</code> and <code>x</code> a
 
 <span class="sd">    Args:</span>
 <span class="sd">        prior: Prior distribution.</span>
-<span class="sd">        density_estimator: Neural network architecture used to learn the</span>
-<span class="sd">            vector field estimator. Can be a string (e.g. &#39;mlp&#39; or &#39;ada_mlp&#39;) or a</span>
-<span class="sd">            callable that implements the `VectorFieldEstimatorBuilder` protocol</span>
-<span class="sd">            with `__call__` that receives `theta` and `x` and returns a</span>
+<span class="sd">        vf_estimator: Neural network architecture used to learn the</span>
+<span class="sd">            vector field estimator. Can be a string (e.g. &#39;mlp&#39;, &#39;ada_mlp&#39;,</span>
+<span class="sd">            &#39;transformer&#39; or &#39;transformer_cross_attn&#39;) or a callable that</span>
+<span class="sd">            implements the `VectorFieldEstimatorBuilder` protocol with</span>
+<span class="sd">            `__call__` that receives `theta` and `x` and returns a</span>
 <span class="sd">            `ConditionalVectorFieldEstimator`.</span>
+<span class="sd">        density_estimator: Deprecated. Use `vf_estimator` instead. When passed, a</span>
+<span class="sd">            warning is raised and the `vf_estimator=&quot;mlp&quot;` default is used.</span>
 <span class="sd">        device: Device to use for training.</span>
 <span class="sd">        logging_level: Logging level.</span>
 <span class="sd">        summary_writer: Summary writer for tensorboard.</span>
@@ -5933,13 +6008,22 @@ with <code>__call__</code> that receives <code>theta</code> and <code>x</code> a
 <span class="sd">            `density_estimator` is a string.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
+    <span class="k">if</span> <span class="n">density_estimator</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+            <span class="s2">&quot;`density_estimator` is deprecated and will be removed in a future &quot;</span>
+            <span class="s2">&quot;release. Use `vf_estimator` instead.&quot;</span><span class="p">,</span>
+            <span class="ne">FutureWarning</span><span class="p">,</span>
+            <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">vf_estimator</span> <span class="o">=</span> <span class="n">density_estimator</span>
+
     <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span>
         <span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span>
         <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span>
         <span class="n">logging_level</span><span class="o">=</span><span class="n">logging_level</span><span class="p">,</span>
         <span class="n">summary_writer</span><span class="o">=</span><span class="n">summary_writer</span><span class="p">,</span>
         <span class="n">show_progress_bars</span><span class="o">=</span><span class="n">show_progress_bars</span><span class="p">,</span>
-        <span class="n">vector_field_estimator_builder</span><span class="o">=</span><span class="n">density_estimator</span><span class="p">,</span>
+        <span class="n">vector_field_estimator_builder</span><span class="o">=</span><span class="n">vf_estimator</span><span class="p">,</span>
         <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
     <span class="p">)</span>
 </code></pre></div></td></tr></table></div>
@@ -5951,10 +6035,10 @@ with <code>__call__</code> that receives <code>theta</code> and <code>x</code> a
 <div class="doc doc-object doc-function">
 
 
-<h3 id="sbi.inference.trainers.fmpe.fmpe.FMPE.build_posterior" class="doc doc-heading">
+<h3 id="sbi.inference.trainers.vfpe.fmpe.FMPE.build_posterior" class="doc doc-heading">
             <code class=" language-python"><span class="n">build_posterior</span><span class="p">(</span><span class="n">vector_field_estimator</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">prior</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">sample_with</span><span class="o">=</span><span class="s1">&#39;ode&#39;</span><span class="p">,</span> <span class="n">vectorfield_sampling_parameters</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">posterior_parameters</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
-<a href="#sbi.inference.trainers.fmpe.fmpe.FMPE.build_posterior" class="headerlink" title="Permanent link">&para;</a></h3>
+<a href="#sbi.inference.trainers.vfpe.fmpe.FMPE.build_posterior" class="headerlink" title="Permanent link">&para;</a></h3>
 
 
     <div class="doc doc-contents ">
@@ -5985,7 +6069,7 @@ the following functionality over the raw neural density estimator:
                 <code>vector_field_estimator</code>
             </td>
             <td>
-                  <code><span title="typing.Optional">Optional</span>[<span title="sbi.neural_nets.estimators.ConditionalVectorFieldEstimator">ConditionalVectorFieldEstimator</span>]</code>
+                  <code><span title="typing.Optional">Optional</span>[<span title="sbi.neural_nets.estimators.base.ConditionalVectorFieldEstimator">ConditionalVectorFieldEstimator</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -6096,23 +6180,8 @@ VectorFieldPosterior.</p>
 
 
             <details class="quote">
-              <summary>Source code in <code>sbi/inference/trainers/fmpe/fmpe.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 63</span>
-<span class="normal"> 64</span>
-<span class="normal"> 65</span>
-<span class="normal"> 66</span>
-<span class="normal"> 67</span>
-<span class="normal"> 68</span>
-<span class="normal"> 69</span>
-<span class="normal"> 70</span>
-<span class="normal"> 71</span>
-<span class="normal"> 72</span>
-<span class="normal"> 73</span>
-<span class="normal"> 74</span>
-<span class="normal"> 75</span>
-<span class="normal"> 76</span>
-<span class="normal"> 77</span>
-<span class="normal"> 78</span>
+              <summary>Source code in <code>sbi/inference/trainers/vfpe/fmpe.py</code></summary>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 78</span>
 <span class="normal"> 79</span>
 <span class="normal"> 80</span>
 <span class="normal"> 81</span>
@@ -6141,7 +6210,22 @@ VectorFieldPosterior.</p>
 <span class="normal">104</span>
 <span class="normal">105</span>
 <span class="normal">106</span>
-<span class="normal">107</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_posterior</span><span class="p">(</span>
+<span class="normal">107</span>
+<span class="normal">108</span>
+<span class="normal">109</span>
+<span class="normal">110</span>
+<span class="normal">111</span>
+<span class="normal">112</span>
+<span class="normal">113</span>
+<span class="normal">114</span>
+<span class="normal">115</span>
+<span class="normal">116</span>
+<span class="normal">117</span>
+<span class="normal">118</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span>
+<span class="normal">122</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_posterior</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">vector_field_estimator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">ConditionalVectorFieldEstimator</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -6204,16 +6288,16 @@ VectorFieldPosterior.</p>
 
 
 
-<h2 id="sbi.inference.trainers.npse.npse.NPSE" class="doc doc-heading">
+<h2 id="sbi.inference.trainers.vfpe.npse.NPSE" class="doc doc-heading">
             <code>NPSE</code>
 
 
-<a href="#sbi.inference.trainers.npse.npse.NPSE" class="headerlink" title="Permanent link">&para;</a></h2>
+<a href="#sbi.inference.trainers.vfpe.npse.NPSE" class="headerlink" title="Permanent link">&para;</a></h2>
 
 
     <div class="doc doc-contents first">
             <p class="doc doc-class-bases">
-              Bases: <code><span title="sbi.inference.trainers.npse.vector_field_inference.VectorFieldTrainer">VectorFieldTrainer</span></code></p>
+              Bases: <code><span title="sbi.inference.trainers.vfpe.base_vf_inference.VectorFieldTrainer">VectorFieldTrainer</span></code></p>
 
 
         <p>Neural Posterior Score Estimation as in Geffner et al. and Sharrock et al.</p>
@@ -6231,9 +6315,8 @@ not tested yet.</p>
 
 
               <details class="quote">
-                <summary>Source code in <code>sbi/inference/trainers/npse/npse.py</code></summary>
-                <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 19</span>
-<span class="normal"> 20</span>
+                <summary>Source code in <code>sbi/inference/trainers/vfpe/npse.py</code></summary>
+                <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 20</span>
 <span class="normal"> 21</span>
 <span class="normal"> 22</span>
 <span class="normal"> 23</span>
@@ -6337,7 +6420,32 @@ not tested yet.</p>
 <span class="normal">121</span>
 <span class="normal">122</span>
 <span class="normal">123</span>
-<span class="normal">124</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NPSE</span><span class="p">(</span><span class="n">VectorFieldTrainer</span><span class="p">):</span>
+<span class="normal">124</span>
+<span class="normal">125</span>
+<span class="normal">126</span>
+<span class="normal">127</span>
+<span class="normal">128</span>
+<span class="normal">129</span>
+<span class="normal">130</span>
+<span class="normal">131</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span>
+<span class="normal">137</span>
+<span class="normal">138</span>
+<span class="normal">139</span>
+<span class="normal">140</span>
+<span class="normal">141</span>
+<span class="normal">142</span>
+<span class="normal">143</span>
+<span class="normal">144</span>
+<span class="normal">145</span>
+<span class="normal">146</span>
+<span class="normal">147</span>
+<span class="normal">148</span>
+<span class="normal">149</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NPSE</span><span class="p">(</span><span class="n">VectorFieldTrainer</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Neural Posterior Score Estimation as in Geffner et al. and Sharrock et al.</span>
 
 <span class="sd">    Instead of performing conditonal *density* estimation, NPSE methods perform</span>
@@ -6351,7 +6459,16 @@ not tested yet.</p>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">score_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">VectorFieldEstimatorBuilder</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;mlp&quot;</span><span class="p">,</span>
+        <span class="n">vf_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span>
+            <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;mlp&quot;</span><span class="p">,</span> <span class="s2">&quot;ada_mlp&quot;</span><span class="p">,</span> <span class="s2">&quot;transformer&quot;</span><span class="p">,</span> <span class="s2">&quot;transformer_cross_attn&quot;</span><span class="p">],</span>
+            <span class="n">VectorFieldEstimatorBuilder</span><span class="p">,</span>
+        <span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;mlp&quot;</span><span class="p">,</span>
+        <span class="n">score_estimator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span>
+            <span class="n">Union</span><span class="p">[</span>
+                <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;mlp&quot;</span><span class="p">,</span> <span class="s2">&quot;ada_mlp&quot;</span><span class="p">,</span> <span class="s2">&quot;transformer&quot;</span><span class="p">,</span> <span class="s2">&quot;transformer_cross_attn&quot;</span><span class="p">],</span>
+                <span class="n">VectorFieldEstimatorBuilder</span><span class="p">,</span>
+            <span class="p">]</span>
+        <span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">sde_type</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;vp&quot;</span><span class="p">,</span> <span class="s2">&quot;ve&quot;</span><span class="p">,</span> <span class="s2">&quot;subvp&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;ve&quot;</span><span class="p">,</span>
         <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
         <span class="n">logging_level</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;WARNING&quot;</span><span class="p">,</span>
@@ -6363,11 +6480,14 @@ not tested yet.</p>
 
 <span class="sd">        Args:</span>
 <span class="sd">            prior: Prior distribution.</span>
-<span class="sd">            score_estimator: Neural network architecture for the</span>
-<span class="sd">                vector field estimator. Can be a string (e.g. &#39;mlp&#39; or &#39;ada_mlp&#39;) or a</span>
-<span class="sd">                callable that implements the `VectorFieldEstimatorBuilder` protocol</span>
-<span class="sd">                with `__call__` that receives `theta` and `x` and returns a</span>
-<span class="sd">                `ConditionalVectorFieldEstimator`.</span>
+<span class="sd">            vf_estimator: Neural network architecture for the</span>
+<span class="sd">                vector field estimator aiming to estimate the marginal scores of the</span>
+<span class="sd">                target diffusion process. Can be a string (e.g. &#39;mlp&#39;, &#39;ada_mlp&#39;,</span>
+<span class="sd">                &#39;transformer&#39; or &#39;transformer_cross_attn&#39;) or a callable that implements</span>
+<span class="sd">                the `VectorFieldEstimatorBuilder` protocol with `__call__` that receives</span>
+<span class="sd">                `theta` and `x` and returns a `ConditionalVectorFieldEstimator`.</span>
+<span class="sd">            score_estimator: Deprecated, use `vf_estimator` instead. When passed,</span>
+<span class="sd">                a warning is raised and the new `vf_estimator` default is used.</span>
 <span class="sd">            sde_type: Type of SDE to use. Must be one of [&#39;vp&#39;, &#39;ve&#39;, &#39;subvp&#39;].</span>
 <span class="sd">            device: Device to run the training on.</span>
 <span class="sd">            logging_level: Logging level for the training. Can be an integer or a</span>
@@ -6383,9 +6503,18 @@ not tested yet.</p>
 <span class="sd">            - Sharrock, Louis, et al. &quot;Sequential neural score estimation: Likelihood-</span>
 <span class="sd">                free inference with conditional score based diffusion models.&quot; ICML 2024</span>
 <span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">score_estimator</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">vf_estimator</span> <span class="o">=</span> <span class="n">score_estimator</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                <span class="s2">&quot;`score_estimator` is deprecated and will be removed in a future &quot;</span>
+                <span class="s2">&quot;release .Use `vf_estimator` instead.&quot;</span><span class="p">,</span>
+                <span class="ne">FutureWarning</span><span class="p">,</span>
+                <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+            <span class="p">)</span>
+
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span>
             <span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span>
-            <span class="n">vector_field_estimator_builder</span><span class="o">=</span><span class="n">score_estimator</span><span class="p">,</span>
+            <span class="n">vector_field_estimator_builder</span><span class="o">=</span><span class="n">vf_estimator</span><span class="p">,</span>
             <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span>
             <span class="n">logging_level</span><span class="o">=</span><span class="n">logging_level</span><span class="p">,</span>
             <span class="n">summary_writer</span><span class="o">=</span><span class="n">summary_writer</span><span class="p">,</span>
@@ -6440,9 +6569,12 @@ not tested yet.</p>
             <span class="n">posterior_parameters</span><span class="o">=</span><span class="n">posterior_parameters</span><span class="p">,</span>
         <span class="p">)</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">_build_default_nn_fn</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">VectorFieldEstimatorBuilder</span><span class="p">:</span>
-        <span class="n">net_type</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;vector_field_estimator_builder&quot;</span><span class="p">,</span> <span class="s2">&quot;mlp&quot;</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">posterior_score_nn</span><span class="p">(</span><span class="n">score_net_type</span><span class="o">=</span><span class="n">net_type</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_build_default_nn_fn</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">model</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;mlp&quot;</span><span class="p">,</span> <span class="s2">&quot;ada_mlp&quot;</span><span class="p">,</span> <span class="s2">&quot;transformer&quot;</span><span class="p">,</span> <span class="s2">&quot;transformer_cross_attn&quot;</span><span class="p">],</span>
+        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">VectorFieldEstimatorBuilder</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">posterior_score_nn</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -6461,10 +6593,10 @@ not tested yet.</p>
 <div class="doc doc-object doc-function">
 
 
-<h3 id="sbi.inference.trainers.npse.npse.NPSE.__init__" class="doc doc-heading">
-            <code class=" language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">score_estimator</span><span class="o">=</span><span class="s1">&#39;mlp&#39;</span><span class="p">,</span> <span class="n">sde_type</span><span class="o">=</span><span class="s1">&#39;ve&#39;</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="s1">&#39;cpu&#39;</span><span class="p">,</span> <span class="n">logging_level</span><span class="o">=</span><span class="s1">&#39;WARNING&#39;</span><span class="p">,</span> <span class="n">summary_writer</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
+<h3 id="sbi.inference.trainers.vfpe.npse.NPSE.__init__" class="doc doc-heading">
+            <code class=" language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">vf_estimator</span><span class="o">=</span><span class="s1">&#39;mlp&#39;</span><span class="p">,</span> <span class="n">score_estimator</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">sde_type</span><span class="o">=</span><span class="s1">&#39;ve&#39;</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="s1">&#39;cpu&#39;</span><span class="p">,</span> <span class="n">logging_level</span><span class="o">=</span><span class="s1">&#39;WARNING&#39;</span><span class="p">,</span> <span class="n">summary_writer</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
 
-<a href="#sbi.inference.trainers.npse.npse.NPSE.__init__" class="headerlink" title="Permanent link">&para;</a></h3>
+<a href="#sbi.inference.trainers.vfpe.npse.NPSE.__init__" class="headerlink" title="Permanent link">&para;</a></h3>
 
 
     <div class="doc doc-contents ">
@@ -6501,22 +6633,40 @@ not tested yet.</p>
           </tr>
           <tr class="doc-section-item">
             <td>
-                <code>score_estimator</code>
+                <code>vf_estimator</code>
             </td>
             <td>
-                  <code><span title="typing.Union">Union</span>[<span title="str">str</span>, <span title="sbi.inference.trainers.npse.vector_field_inference.VectorFieldEstimatorBuilder">VectorFieldEstimatorBuilder</span>]</code>
+                  <code><span title="typing.Union">Union</span>[<span title="typing.Literal">Literal</span>[&#39;mlp&#39;, &#39;ada_mlp&#39;, &#39;transformer&#39;, &#39;transformer_cross_attn&#39;], <span title="sbi.inference.trainers.vfpe.base_vf_inference.VectorFieldEstimatorBuilder">VectorFieldEstimatorBuilder</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
                 <p>Neural network architecture for the
-vector field estimator. Can be a string (e.g. &lsquo;mlp&rsquo; or &lsquo;ada_mlp&rsquo;) or a
-callable that implements the <code>VectorFieldEstimatorBuilder</code> protocol
-with <code>__call__</code> that receives <code>theta</code> and <code>x</code> and returns a
-<code>ConditionalVectorFieldEstimator</code>.</p>
+vector field estimator aiming to estimate the marginal scores of the
+target diffusion process. Can be a string (e.g. &lsquo;mlp&rsquo;, &lsquo;ada_mlp&rsquo;,
+&lsquo;transformer&rsquo; or &lsquo;transformer_cross_attn&rsquo;) or a callable that implements
+the <code>VectorFieldEstimatorBuilder</code> protocol with <code>__call__</code> that receives
+<code>theta</code> and <code>x</code> and returns a <code>ConditionalVectorFieldEstimator</code>.</p>
               </div>
             </td>
             <td>
                   <code>&#39;mlp&#39;</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>score_estimator</code>
+            </td>
+            <td>
+                  <code><span title="typing.Optional">Optional</span>[<span title="typing.Union">Union</span>[<span title="typing.Literal">Literal</span>[&#39;mlp&#39;, &#39;ada_mlp&#39;, &#39;transformer&#39;, &#39;transformer_cross_attn&#39;], <span title="sbi.inference.trainers.vfpe.base_vf_inference.VectorFieldEstimatorBuilder">VectorFieldEstimatorBuilder</span>]]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Deprecated, use <code>vf_estimator</code> instead. When passed,
+a warning is raised and the new <code>vf_estimator</code> default is used.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
             </td>
           </tr>
           <tr class="doc-section-item">
@@ -6631,9 +6781,8 @@ string.</p>
 </details>
 
             <details class="quote">
-              <summary>Source code in <code>sbi/inference/trainers/npse/npse.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">30</span>
-<span class="normal">31</span>
+              <summary>Source code in <code>sbi/inference/trainers/vfpe/npse.py</code></summary>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">31</span>
 <span class="normal">32</span>
 <span class="normal">33</span>
 <span class="normal">34</span>
@@ -6676,10 +6825,41 @@ string.</p>
 <span class="normal">71</span>
 <span class="normal">72</span>
 <span class="normal">73</span>
-<span class="normal">74</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">74</span>
+<span class="normal">75</span>
+<span class="normal">76</span>
+<span class="normal">77</span>
+<span class="normal">78</span>
+<span class="normal">79</span>
+<span class="normal">80</span>
+<span class="normal">81</span>
+<span class="normal">82</span>
+<span class="normal">83</span>
+<span class="normal">84</span>
+<span class="normal">85</span>
+<span class="normal">86</span>
+<span class="normal">87</span>
+<span class="normal">88</span>
+<span class="normal">89</span>
+<span class="normal">90</span>
+<span class="normal">91</span>
+<span class="normal">92</span>
+<span class="normal">93</span>
+<span class="normal">94</span>
+<span class="normal">95</span>
+<span class="normal">96</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">score_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">VectorFieldEstimatorBuilder</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;mlp&quot;</span><span class="p">,</span>
+    <span class="n">vf_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span>
+        <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;mlp&quot;</span><span class="p">,</span> <span class="s2">&quot;ada_mlp&quot;</span><span class="p">,</span> <span class="s2">&quot;transformer&quot;</span><span class="p">,</span> <span class="s2">&quot;transformer_cross_attn&quot;</span><span class="p">],</span>
+        <span class="n">VectorFieldEstimatorBuilder</span><span class="p">,</span>
+    <span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;mlp&quot;</span><span class="p">,</span>
+    <span class="n">score_estimator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span>
+        <span class="n">Union</span><span class="p">[</span>
+            <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;mlp&quot;</span><span class="p">,</span> <span class="s2">&quot;ada_mlp&quot;</span><span class="p">,</span> <span class="s2">&quot;transformer&quot;</span><span class="p">,</span> <span class="s2">&quot;transformer_cross_attn&quot;</span><span class="p">],</span>
+            <span class="n">VectorFieldEstimatorBuilder</span><span class="p">,</span>
+        <span class="p">]</span>
+    <span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">sde_type</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;vp&quot;</span><span class="p">,</span> <span class="s2">&quot;ve&quot;</span><span class="p">,</span> <span class="s2">&quot;subvp&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;ve&quot;</span><span class="p">,</span>
     <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
     <span class="n">logging_level</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;WARNING&quot;</span><span class="p">,</span>
@@ -6691,11 +6871,14 @@ string.</p>
 
 <span class="sd">    Args:</span>
 <span class="sd">        prior: Prior distribution.</span>
-<span class="sd">        score_estimator: Neural network architecture for the</span>
-<span class="sd">            vector field estimator. Can be a string (e.g. &#39;mlp&#39; or &#39;ada_mlp&#39;) or a</span>
-<span class="sd">            callable that implements the `VectorFieldEstimatorBuilder` protocol</span>
-<span class="sd">            with `__call__` that receives `theta` and `x` and returns a</span>
-<span class="sd">            `ConditionalVectorFieldEstimator`.</span>
+<span class="sd">        vf_estimator: Neural network architecture for the</span>
+<span class="sd">            vector field estimator aiming to estimate the marginal scores of the</span>
+<span class="sd">            target diffusion process. Can be a string (e.g. &#39;mlp&#39;, &#39;ada_mlp&#39;,</span>
+<span class="sd">            &#39;transformer&#39; or &#39;transformer_cross_attn&#39;) or a callable that implements</span>
+<span class="sd">            the `VectorFieldEstimatorBuilder` protocol with `__call__` that receives</span>
+<span class="sd">            `theta` and `x` and returns a `ConditionalVectorFieldEstimator`.</span>
+<span class="sd">        score_estimator: Deprecated, use `vf_estimator` instead. When passed,</span>
+<span class="sd">            a warning is raised and the new `vf_estimator` default is used.</span>
 <span class="sd">        sde_type: Type of SDE to use. Must be one of [&#39;vp&#39;, &#39;ve&#39;, &#39;subvp&#39;].</span>
 <span class="sd">        device: Device to run the training on.</span>
 <span class="sd">        logging_level: Logging level for the training. Can be an integer or a</span>
@@ -6711,9 +6894,18 @@ string.</p>
 <span class="sd">        - Sharrock, Louis, et al. &quot;Sequential neural score estimation: Likelihood-</span>
 <span class="sd">            free inference with conditional score based diffusion models.&quot; ICML 2024</span>
 <span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">score_estimator</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">vf_estimator</span> <span class="o">=</span> <span class="n">score_estimator</span>
+        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+            <span class="s2">&quot;`score_estimator` is deprecated and will be removed in a future &quot;</span>
+            <span class="s2">&quot;release .Use `vf_estimator` instead.&quot;</span><span class="p">,</span>
+            <span class="ne">FutureWarning</span><span class="p">,</span>
+            <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+        <span class="p">)</span>
+
     <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span>
         <span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span>
-        <span class="n">vector_field_estimator_builder</span><span class="o">=</span><span class="n">score_estimator</span><span class="p">,</span>
+        <span class="n">vector_field_estimator_builder</span><span class="o">=</span><span class="n">vf_estimator</span><span class="p">,</span>
         <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span>
         <span class="n">logging_level</span><span class="o">=</span><span class="n">logging_level</span><span class="p">,</span>
         <span class="n">summary_writer</span><span class="o">=</span><span class="n">summary_writer</span><span class="p">,</span>
@@ -6730,10 +6922,10 @@ string.</p>
 <div class="doc doc-object doc-function">
 
 
-<h3 id="sbi.inference.trainers.npse.npse.NPSE.build_posterior" class="doc doc-heading">
+<h3 id="sbi.inference.trainers.vfpe.npse.NPSE.build_posterior" class="doc doc-heading">
             <code class=" language-python"><span class="n">build_posterior</span><span class="p">(</span><span class="n">vector_field_estimator</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">prior</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">sample_with</span><span class="o">=</span><span class="s1">&#39;sde&#39;</span><span class="p">,</span> <span class="n">vectorfield_sampling_parameters</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">posterior_parameters</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
-<a href="#sbi.inference.trainers.npse.npse.NPSE.build_posterior" class="headerlink" title="Permanent link">&para;</a></h3>
+<a href="#sbi.inference.trainers.vfpe.npse.NPSE.build_posterior" class="headerlink" title="Permanent link">&para;</a></h3>
 
 
     <div class="doc doc-contents ">
@@ -6874,30 +7066,8 @@ VectorFieldPosterior.</p>
 
 
             <details class="quote">
-              <summary>Source code in <code>sbi/inference/trainers/npse/npse.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 78</span>
-<span class="normal"> 79</span>
-<span class="normal"> 80</span>
-<span class="normal"> 81</span>
-<span class="normal"> 82</span>
-<span class="normal"> 83</span>
-<span class="normal"> 84</span>
-<span class="normal"> 85</span>
-<span class="normal"> 86</span>
-<span class="normal"> 87</span>
-<span class="normal"> 88</span>
-<span class="normal"> 89</span>
-<span class="normal"> 90</span>
-<span class="normal"> 91</span>
-<span class="normal"> 92</span>
-<span class="normal"> 93</span>
-<span class="normal"> 94</span>
-<span class="normal"> 95</span>
-<span class="normal"> 96</span>
-<span class="normal"> 97</span>
-<span class="normal"> 98</span>
-<span class="normal"> 99</span>
-<span class="normal">100</span>
+              <summary>Source code in <code>sbi/inference/trainers/vfpe/npse.py</code></summary>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">100</span>
 <span class="normal">101</span>
 <span class="normal">102</span>
 <span class="normal">103</span>
@@ -6917,7 +7087,29 @@ VectorFieldPosterior.</p>
 <span class="normal">117</span>
 <span class="normal">118</span>
 <span class="normal">119</span>
-<span class="normal">120</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_posterior</span><span class="p">(</span>
+<span class="normal">120</span>
+<span class="normal">121</span>
+<span class="normal">122</span>
+<span class="normal">123</span>
+<span class="normal">124</span>
+<span class="normal">125</span>
+<span class="normal">126</span>
+<span class="normal">127</span>
+<span class="normal">128</span>
+<span class="normal">129</span>
+<span class="normal">130</span>
+<span class="normal">131</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span>
+<span class="normal">137</span>
+<span class="normal">138</span>
+<span class="normal">139</span>
+<span class="normal">140</span>
+<span class="normal">141</span>
+<span class="normal">142</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_posterior</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">vector_field_estimator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">ConditionalVectorFieldEstimator</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>

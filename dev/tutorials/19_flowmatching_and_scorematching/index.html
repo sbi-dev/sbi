@@ -522,6 +522,15 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#vector-field-nets" class="md-nav__link">
+    <span class="md-ellipsis">
+      Vector field nets
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -562,6 +571,13 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference</span><span class="w"> </span><span class="kn">import</span> <span class="n">NPSE</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">sbi.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">BoxUniform</span>
 </code></pre></div>
+<div class="codehilite"><pre><span></span><code>The history saving thread hit an unexpected error (DatabaseError(&#39;database disk image is malformed&#39;)).History will not be written to the database.
+
+
+/mnt/lustre/work/macke/mgloeckler90/miniconda3/envs/sbi/lib/python3.12/site-packages/tqdm/auto.py:21: TqdmWarning: IProgress not found. Please update jupyter and ipywidgets. See https://ipywidgets.readthedocs.io/en/stable/user_install.html
+  from .autonotebook import tqdm as notebook_tqdm
+</code></pre></div>
+
 <div class="highlight"><pre><span></span><code><span class="c1"># Example toy simulator</span>
 <span class="c1"># Define the prior</span>
 <span class="n">num_dims</span> <span class="o">=</span> <span class="mi">3</span>
@@ -613,29 +629,35 @@ distribution requires solving the underlying ODE (compared to just doing a NN fo
 pass for normalizing flows). </p>
 <p>In the next cell, we&rsquo;ll show how to use FMPE using the <code>sbi</code> package.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference</span><span class="w"> </span><span class="kn">import</span> <span class="n">FMPE</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.neural_nets</span><span class="w"> </span><span class="kn">import</span> <span class="n">flowmatching_nn</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.neural_nets</span><span class="w"> </span><span class="kn">import</span> <span class="n">posterior_flow_nn</span>
 
 <span class="c1"># the quick way</span>
 <span class="n">trainer</span> <span class="o">=</span> <span class="n">FMPE</span><span class="p">(</span><span class="n">prior</span><span class="p">)</span>
 <span class="n">trainer</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
 <span class="n">posterior</span> <span class="o">=</span> <span class="n">trainer</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">()</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 61 epochs.
+<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 467 epochs.
+
+/mnt/lustre/work/macke/mgloeckler90/sbi/sbi/inference/trainers/base.py:569: FutureWarning: The following arguments are deprecated and will be removed in a future version: mcmc_method, vi_method. Please use `posterior_parameters` instead. Refer to this guide for details:
+https://sbi.readthedocs.io/en/latest/how_to_guide/19_posterior_parameters.html#
+  self._raise_deprecation_warning(deprecated_params, **kwargs)
 </code></pre></div>
 
 <div class="highlight"><pre><span></span><code><span class="c1"># Set up a custom vector field neural network</span>
-<span class="n">net_builder</span> <span class="o">=</span> <span class="n">flowmatching_nn</span><span class="p">(</span>
-    <span class="n">model</span><span class="o">=</span><span class="s2">&quot;resnet&quot;</span><span class="p">,</span>
-    <span class="n">num_blocks</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>
+<span class="n">net_builder</span> <span class="o">=</span> <span class="n">posterior_flow_nn</span><span class="p">(</span>
+    <span class="n">model</span><span class="o">=</span><span class="s2">&quot;mlp&quot;</span><span class="p">,</span>
+    <span class="n">num_layers</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>
     <span class="n">hidden_features</span><span class="o">=</span><span class="mi">24</span><span class="p">,</span>
     <span class="c1"># embedding_net=CNNEmbedding  # e.g., for image data.</span>
 <span class="p">)</span>
-<span class="n">trainer</span> <span class="o">=</span> <span class="n">FMPE</span><span class="p">(</span><span class="n">prior</span><span class="p">,</span> <span class="n">density_estimator</span><span class="o">=</span><span class="n">net_builder</span><span class="p">)</span>
+<span class="n">trainer</span> <span class="o">=</span> <span class="n">FMPE</span><span class="p">(</span><span class="n">prior</span><span class="p">,</span> <span class="n">vf_estimator</span><span class="o">=</span><span class="n">net_builder</span><span class="p">)</span>
 <span class="n">trainer</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">(</span><span class="n">training_batch_size</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">learning_rate</span><span class="o">=</span><span class="mf">5e-4</span><span class="p">)</span>
 <span class="n">posterior</span> <span class="o">=</span> <span class="n">trainer</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">()</span>
 <span class="n">posterior_samples</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">10000</span><span class="p">,),</span> <span class="n">x_o</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 125 epochs.
+<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 229 epochs.
+
+Drawing 10000 posterior samples for 1 observations: 10099it [00:00, 17021.84it/s]
 </code></pre></div>
 
 <div class="highlight"><pre><span></span><code><span class="c1"># plot posterior samples</span>
@@ -659,17 +681,24 @@ pass for normalizing flows). </p>
 <span class="n">inference</span> <span class="o">=</span> <span class="n">NPSE</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span> <span class="n">sde_type</span><span class="o">=</span><span class="s2">&quot;ve&quot;</span><span class="p">)</span>
 <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
 </code></pre></div>
+<div class="codehilite"><pre><span></span><code>&lt;sbi.inference.trainers.vfpe.npse.NPSE at 0x7fda4028ca70&gt;
+</code></pre></div>
+
 <p>Note the argument <code>sde_type</code>, which defines whether the forward diffusion process has a noising schedule that is Variance Exploding (<code>ve</code>, i.e., <a href="https://proceedings.neurips.cc/paper/2019/hash/3001ef257407d5a371a96dcd947c7d93-Abstract.html?ref=https://githubhelp.com">SMLD</a>), Variance Preserving (<code>vp</code>, i.e., <a href="https://proceedings.neurips.cc/paper/2020/hash/4c5bcfec8584af0d967f1ab10179ca4b-Abstract.html">DDPM</a>), or sub-Variance Preserving (<code>subvp</code>) in the limit.</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># Train the score estimator</span>
 <span class="n">score_estimator</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 365 epochs.
+<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 136 epochs.
 </code></pre></div>
 
 <div class="highlight"><pre><span></span><code><span class="c1"># Build the posterior using the trained score estimator, and sample</span>
 <span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">(</span><span class="n">score_estimator</span><span class="p">)</span>
 <span class="n">posterior_samples</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">10000</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_o</span><span class="p">)</span>
 </code></pre></div>
+<div class="codehilite"><pre><span></span><code>Drawing 10000 posterior samples: 100%|██████████| 499/499 [00:10&lt;00:00, 46.73it/s]0&lt;?, ?it/s]
+Drawing 10000 posterior samples for 1 observations: 100%|██████████| 10000/10000 [00:10&lt;00:00, 936.14it/s]
+</code></pre></div>
+
 <div class="highlight"><pre><span></span><code><span class="c1"># plot posterior samples</span>
 <span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">pairplot</span><span class="p">(</span>
     <span class="n">posterior_samples</span><span class="p">,</span> <span class="n">limits</span><span class="o">=</span><span class="p">[[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">]],</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mi">5</span><span class="p">),</span>
@@ -678,6 +707,126 @@ pass for normalizing flows). </p>
 <span class="p">)</span>
 </code></pre></div>
 <p><img alt="png" src="../19_flowmatching_and_scorematching_files/19_flowmatching_and_scorematching_13_0.png" /></p>
+<h2 id="vector-field-nets">Vector field nets<a class="headerlink" href="#vector-field-nets" title="Permanent link">&para;</a></h2>
+<p>While NPE is architecturally limited to conditional density networks, both FMPE and NPSE solve a <strong>regression problem</strong> targeting a specific <em>vector field</em> of choice (e.g., marginal scores or transport velocities). This is advantageous because it allows us to use any &ldquo;off-the-shelf&rdquo; neural network to address our problem, in contrast to NPE, which is typically restricted to normalizing flows.</p>
+<p>However, their performance can be highly dependent on the suitability of the chosen neural network for the task at hand. For instance, diffusion models achieve state-of-the-art generative performance on images only when paired with a carefully designed U-Net–like architecture.  </p>
+<p>For both FMPE and NPSE, we provide a selection of neural networks tailored to the task:<br />
+- <code>mlp</code> and <code>ada_mlp</code> (MLP with adaptive layer norm for conditioning) — MLP variants that inject time information at each layer, as is common in diffusion architectures.<br />
+- <code>transformer</code> and <code>transformer_cross_attn</code> — scalable diffusion transformers (e.g., as in <a href="https://arxiv.org/abs/2212.09748">https://arxiv.org/abs/2212.09748</a>). The cross-attention variant supports arbitrary sequence lengths for conditioning.  </p>
+<p>For certain data types, such as image-like inputs, it may still be beneficial to use a more specialized architecture.</p>
+<div class="highlight"><pre><span></span><code><span class="n">net_builder</span> <span class="o">=</span> <span class="n">posterior_flow_nn</span><span class="p">(</span>
+    <span class="n">model</span><span class="o">=</span><span class="s2">&quot;transformer&quot;</span><span class="p">,</span>
+    <span class="n">num_layers</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+    <span class="n">num_heads</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+    <span class="n">hidden_features</span><span class="o">=</span><span class="mi">64</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="c1"># Transformers do benefit from GPU acceleration way more than e.g. NPE.</span>
+<span class="n">trainer</span> <span class="o">=</span> <span class="n">FMPE</span><span class="p">(</span><span class="n">prior</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;gpu&quot;</span><span class="p">),</span> <span class="n">vf_estimator</span><span class="o">=</span><span class="n">net_builder</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span>  <span class="c1"># Or NPE</span>
+<span class="n">estimator</span> <span class="o">=</span> <span class="n">trainer</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">(</span><span class="n">training_batch_size</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">learning_rate</span><span class="o">=</span><span class="mf">5e-4</span><span class="p">)</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>/mnt/lustre/work/macke/mgloeckler90/sbi/sbi/inference/trainers/vfpe/base_vf_inference.py:176: UserWarning: Data x has device &#39;cpu&#39;. Moving x to the data_device &#39;cuda&#39;. Training will proceed on device &#39;cuda&#39;.
+  theta, x = validate_theta_and_x(
+/mnt/lustre/work/macke/mgloeckler90/sbi/sbi/inference/trainers/vfpe/base_vf_inference.py:176: UserWarning: Parameters theta has device &#39;cpu&#39;. Moving theta to the data_device &#39;cuda&#39;. Training will proceed on device &#39;cuda&#39;.
+  theta, x = validate_theta_and_x(
+
+
+ Neural network successfully converged after 241 epochs.
+</code></pre></div>
+
+<div class="highlight"><pre><span></span><code><span class="c1"># Build the posterior using the trained score estimator, and sample</span>
+<span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">(</span><span class="n">estimator</span><span class="p">)</span>
+<span class="n">posterior_samples</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">10000</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_o</span><span class="p">)</span>
+
+<span class="c1"># plot posterior samples</span>
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">pairplot</span><span class="p">(</span>
+    <span class="n">posterior_samples</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;cpu&quot;</span><span class="p">),</span> <span class="n">limits</span><span class="o">=</span><span class="p">[[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">]],</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mi">5</span><span class="p">),</span>
+    <span class="n">labels</span><span class="o">=</span><span class="p">[</span><span class="sa">r</span><span class="s2">&quot;$\theta_1$&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;$\theta_2$&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;$\theta_3$&quot;</span><span class="p">],</span>
+    <span class="n">points</span><span class="o">=</span><span class="n">theta_o</span> <span class="c1"># add ground truth thetas</span>
+<span class="p">)</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>Drawing 10000 posterior samples: 100%|██████████| 499/499 [00:01&lt;00:00, 312.45it/s]&lt;?, ?it/s]
+Drawing 10000 posterior samples for 1 observations: 100%|██████████| 10000/10000 [00:01&lt;00:00, 6157.09it/s]
+</code></pre></div>
+
+<p><img alt="png" src="../19_flowmatching_and_scorematching_files/19_flowmatching_and_scorematching_16_1.png" /></p>
+<p>A custom neural net can be an arbirary <code>torch.nn.Module</code> that follows the abstract <code>VectorFieldNet</code> protocol. You can use any of the shelf neural network implemented in pytorch and e.g. &ldquo;wrap&rdquo; it to satisfy these constraints.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.utils.vector_field_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">VectorFieldNet</span>
+
+<span class="err">?</span><span class="n">VectorFieldNet</span><span class="o">.</span><span class="n">forward</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>[31mSignature:[39m
+VectorFieldNet.forward(
+    self,
+    theta: torch.Tensor,
+    x: torch.Tensor,
+    t: torch.Tensor,
+) -&gt; torch.Tensor
+[31mDocstring:[39m
+Forward pass to compute the vector field.
+
+Args:
+    theta: Parameters
+    x: Conditioning information
+    t: Time parameter (scalar or batched)
+
+Returns:
+    Vector field evaluation at the provided points
+[31mFile:[39m      /mnt/lustre/work/macke/mgloeckler90/sbi/sbi/utils/vector_field_utils.py
+[31mType:[39m      function
+</code></pre></div>
+
+<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">CustomNetExample</span><span class="p">(</span><span class="n">VectorFieldNet</span><span class="p">):</span> <span class="c1"># This can also just be torch.nn.Module</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">in_layer1</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Conv1d</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">512</span><span class="p">,</span> <span class="n">kernel_size</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">in_layer2</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Conv1d</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">512</span><span class="p">,</span> <span class="n">kernel_size</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">time_layer</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">512</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">out_layer</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="mi">512</span><span class="p">,</span><span class="mi">3</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">t</span><span class="p">):</span>
+        <span class="c1"># Requires 3 arguments for input (i.e. theta), condition (i.e. x) and &quot;time&quot; (a scalar)</span>
+
+        <span class="c1"># Whatever weird things you want to do, you can do here.</span>
+        <span class="n">h1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">in_layer1</span><span class="p">(</span><span class="n">x</span><span class="p">[</span><span class="o">...</span><span class="p">,</span><span class="kc">None</span><span class="p">,:])</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">h2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">in_layer2</span><span class="p">(</span><span class="n">theta</span><span class="p">[</span><span class="o">...</span><span class="p">,</span><span class="kc">None</span><span class="p">,:])</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">t</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">time_layer</span><span class="p">(</span><span class="n">t</span><span class="p">[</span><span class="o">...</span><span class="p">,</span><span class="kc">None</span><span class="p">])</span>
+        <span class="n">h</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">relu</span><span class="p">(</span><span class="n">h1</span> <span class="o">+</span> <span class="n">h2</span> <span class="o">+</span> <span class="n">t</span><span class="p">)</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">out_layer</span><span class="p">(</span><span class="n">h</span><span class="p">)</span>
+
+        <span class="c1"># Output dimension must exaclty match &quot;theta.shape&quot;</span>
+        <span class="k">return</span> <span class="n">out</span>
+
+<span class="n">net_base</span> <span class="o">=</span> <span class="n">CustomNetExample</span><span class="p">()</span>
+<span class="c1"># This will still add some of `sbi` standard &quot;preconditioning&quot; for</span>
+<span class="c1"># diffusion/fmpe as well as automatic z-scoring transforms.</span>
+<span class="c1"># If you do want this you can also simple write your own builder.</span>
+<span class="n">net_builder</span> <span class="o">=</span> <span class="n">posterior_flow_nn</span><span class="p">(</span>
+    <span class="n">model</span><span class="o">=</span><span class="n">net_base</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">trainer</span> <span class="o">=</span> <span class="n">FMPE</span><span class="p">(</span><span class="n">prior</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;cpu&quot;</span><span class="p">),</span> <span class="n">vf_estimator</span><span class="o">=</span><span class="n">net_builder</span><span class="p">)</span>
+<span class="n">estimator</span> <span class="o">=</span> <span class="n">trainer</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">(</span><span class="n">training_batch_size</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">learning_rate</span><span class="o">=</span><span class="mf">5e-4</span><span class="p">)</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 470 epochs.
+</code></pre></div>
+
+<div class="highlight"><pre><span></span><code><span class="c1"># Build the posterior using the trained score estimator, and sample</span>
+<span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">(</span><span class="n">estimator</span><span class="p">)</span>
+<span class="n">posterior_samples</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">10000</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_o</span><span class="p">)</span>
+
+<span class="c1"># plot posterior samples</span>
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">pairplot</span><span class="p">(</span>
+    <span class="n">posterior_samples</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;cpu&quot;</span><span class="p">),</span> <span class="n">limits</span><span class="o">=</span><span class="p">[[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">]],</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mi">5</span><span class="p">),</span>
+    <span class="n">labels</span><span class="o">=</span><span class="p">[</span><span class="sa">r</span><span class="s2">&quot;$\theta_1$&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;$\theta_2$&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;$\theta_3$&quot;</span><span class="p">],</span>
+    <span class="n">points</span><span class="o">=</span><span class="n">theta_o</span> <span class="c1"># add ground truth thetas</span>
+<span class="p">)</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>Drawing 10000 posterior samples: 100%|██████████| 499/499 [00:16&lt;00:00, 30.90it/s]0&lt;?, ?it/s]
+Drawing 10000 posterior samples for 1 observations: 100%|██████████| 10000/10000 [00:16&lt;00:00, 619.10it/s]
+</code></pre></div>
+
+<p><img alt="png" src="../19_flowmatching_and_scorematching_files/19_flowmatching_and_scorematching_20_1.png" /></p>
 
 
 
