@@ -144,3 +144,20 @@ Other utilities
    sbi.analysis.conditional_corrcoeff
    sbi.analysis.conditional_potential
    sbi.analysis.ActiveSubspace
+
+
+Posterior Parameters
+--------------------
+
+.. currentmodule:: sbi.inference.posteriors.posterior_parameters
+
+.. autosummary::
+   :toctree: reference/_autosummary
+   :nosignatures:
+
+   DirectPosteriorParameters
+   ImportanceSamplingPosteriorParameters
+   MCMCPosteriorParameters
+   RejectionPosteriorParameters
+   VectorFieldPosteriorParameters
+   VIPosteriorParameters
