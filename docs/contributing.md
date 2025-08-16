@@ -270,33 +270,27 @@ test suite in `tests/test_bm.py`.
 
 ## Contributing to the documentation
 
-Most of the documentation for `sbi` is written in markdown and the website is generated
-using `mkdocs` with `mkdocstrings` and `mike`. The tutorials and examples are converted
-from jupyter notebooks into markdown files to be shown on the website. To work on
-improvements of the documentation, you should first  install the `doc` dependencies:
+Most of the documentation for `sbi` is written in reStructuredText and the website is
+generated using `Sphinx`. The tutorials and examples are Jupyter notebooks that are
+automatically converted during the build process. To work on improvements of the
+documentation, you should first install the `doc` dependencies:
 
 ```bash
-pip install -e ".[doc]"
+uv sync --extra doc
 ```
 
 Then, you can build the website locally by executing in the `docs` folder
 
 ```bash
-mkdocs serve
+make html
+sphinx-autobuild . _build/html
 ```
 
-This will build the website on a local host address shown in the terminal. Changes to
-the website files or a browser refresh will immediately rebuild the website.
-
-If you updated the tutorials or examples, you need to convert them to markdown first:
-
-```bash
-cd docs
-jupyter nbconvert --to markdown ../docs/tutorials/*.ipynb --output-dir docs/tutorials/
-jupyter nbconvert --to markdown ../docs/advanced_tutorials/*.ipynb --output-dir docs/tutorials/
-jupyter nbconvert --to markdown ../docs/how_to_guide/09_sampler_interface.ipynb --output-dir docs/tutorials/
-mkdocs serve
-```
+The first command will build the website in the `docs/_build/html` directory. The second
+command will start a local development server with automatic rebuilding and live reload, so
+you can open it in your browser and see changes as you edit. You can skip the first
+command if you've already built the documentation before. Changes to the documentation
+files will automatically trigger a rebuild and be displayed locally.
 
 ### Using AI Coding Assistants
 
