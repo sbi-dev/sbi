@@ -80,28 +80,8 @@ TRANSFORMER_CROSS_CASES = [
     )
 ]
 
-SIMFORMER_CASE = [
-    pytest.param(
-        build_simformer_network,
-        kw,
-        id="simformer-" + "-".join(f"{k}={v}" for k, v in kw.items()),
-    )
-    for kw in _grid(
-        hidden_features=[64, 128],
-        num_blocks=[2, 4],
-        num_heads=[4, 8],
-        mlp_ratio=[2, 4, 8],
-        time_emb_type=["sinusoidal", "random_fourier"],
-        ada_time=[True, False],
-    )
-]
-
 ALL_BUILDER_CASES = (
-    MLP_CASES
-    + ADAMLP_CASES
-    + TRANSFORMER_CASES
-    + TRANSFORMER_CROSS_CASES
-    + SIMFORMER_CASE
+    MLP_CASES + ADAMLP_CASES + TRANSFORMER_CASES + TRANSFORMER_CROSS_CASES
 )
 
 
@@ -160,36 +140,54 @@ def test_vector_field_builders_shape_and_build(
     assert out.shape == inputs.shape
 
 
-@pytest.mark.parametrize("hidden_features", [64, 128])
-@pytest.mark.parametrize("num_blocks", [2, 4])
-@pytest.mark.parametrize("num_heads", [4, 8])
-@pytest.mark.parametrize("mlp_ratio", [2, 4, 8])
-@pytest.mark.parametrize("time_emb_type", ["sinusoidal", "random_fourier"])
-@pytest.mark.parametrize("ada_time", [True, False])
-def test_simformer_network_parameters(
-    hidden_features, num_blocks, num_heads, mlp_ratio, time_emb_type, ada_time
-):
-    """Test whether simformer vector field networks can be built with different
-    parameters."""
-    batch_x = torch.randn(10, 5, 3)
-    batch_y = torch.randn(10, 5, 3)
+SIMFORMER_CASE = [
+    pytest.param(
+        build_simformer_network,
+        kw,
+        id="simformer-" + "-".join(f"{k}={v}" for k, v in kw.items()),
+    )
+    for kw in _grid(
+        hidden_features=[64, 128],
+        num_blocks=[2, 4],
+        num_heads=[4, 8],
+        mlp_ratio=[2, 4, 8],
+        ada_time=[True, False],
+    )
+]
 
-    network = build_simformer_network(
-        batch_x=batch_x,
-        batch_y=batch_y,
-        hidden_features=hidden_features,
-        num_blocks=num_blocks,
-        num_heads=num_heads,
-        mlp_ratio=mlp_ratio,
+
+@pytest.mark.parametrize("builder, builder_kwargs", SIMFORMER_CASE)
+@pytest.mark.parametrize("time_emb_type", ["sinusoidal", "random_fourier"])
+@pytest.mark.parametrize("time_embedding_dim", [8, 16])
+@pytest.mark.parametrize("batch_dim", [1, 3])
+@pytest.mark.parametrize("input_dim", [(1, 1), (2, 1), (3, 5)])
+def test_simformer_builder_shape_and_build(
+    builder,
+    builder_kwargs,
+    time_emb_type,
+    time_embedding_dim,
+    batch_dim,
+    input_dim,
+):
+    # Inputs / conditions
+    x = torch.randn(10, *input_dim)
+
+    net = builder(
+        batch_x=x,
+        batch_y=x,
+        time_embedding_dim=time_embedding_dim,
         time_emb_type=time_emb_type,
-        ada_time=ada_time,
+        **builder_kwargs,
     )
 
-    # Test a forward pass to ensure it works
-    inputs = torch.randn(10, 5, 3)
-    condition_masks = torch.bernoulli(torch.rand(10, 5))
-    edge_masks = torch.ones(10, 5, 5)
-    times = torch.rand(10)
+    # Forward pass
+    inputs = torch.randn(batch_dim, *input_dim)
+    t = torch.rand(batch_dim)
+    condition_mask = torch.ones(input_dim[0], dtype=torch.bool)
 
-    outputs = network(inputs, times, condition_masks, edge_masks)
-    assert outputs.shape == inputs.shape, "Output shape should match input shape"
+    out = net(
+        inputs,
+        t,
+        condition_mask=condition_mask,
+    )
+    assert out.shape == inputs.shape

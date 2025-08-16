@@ -1238,7 +1238,11 @@ class VectorFieldSimformer(MaskedVectorFieldNet):
         self.out_linear = nn.Linear(hidden_features, in_features)
 
     def forward(
-        self, inputs: Tensor, t: Tensor, condition_mask: Tensor, edge_mask: Tensor
+        self,
+        inputs: Tensor,
+        t: Tensor,
+        condition_mask: Tensor,
+        edge_mask: Optional[Tensor] = None,
     ) -> Tensor:
         """Forward pass through the Simfomer.
 
@@ -1264,7 +1268,8 @@ class VectorFieldSimformer(MaskedVectorFieldNet):
         Returns:
             Vector field evaluation at the provided points
         """
-        B, T, F = inputs.shape
+
+        B, T, _ = inputs.shape
         device = inputs.device
 
         # Tokenize on val
