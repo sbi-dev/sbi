@@ -1,4 +1,4 @@
-{{ fullname }}
+{{ objname }}
 {{ underline }}
 
 .. autoclass:: {{ fullname }}
