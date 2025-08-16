@@ -8,9 +8,16 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 
-from sbi.neural_nets.estimators.flowmatching_estimator import FlowMatchingEstimator
+from sbi.neural_nets.estimators.flowmatching_estimator import (
+    FlowMatchingEstimator,
+    MaskedFlowMatchingEstimator,
+)
 from sbi.neural_nets.estimators.score_estimator import (
     ConditionalScoreEstimator,
+    MaskedConditionalScoreEstimator,
+    MaskedSubVPScoreEstimator,
+    MaskedVEScoreEstimator,
+    MaskedVPScoreEstimator,
     SubVPScoreEstimator,
     VEScoreEstimator,
     VPScoreEstimator,
@@ -21,18 +28,18 @@ from sbi.utils.sbiutils import (
     z_standardization,
 )
 from sbi.utils.user_input_checks import check_data_device
-from sbi.utils.vector_field_utils import VectorFieldNet
+from sbi.utils.vector_field_utils import MaskedVectorFieldNet, VectorFieldNet
 
 
 # ==================== Building Flow/Score Matching Estimators =========================
 def build_vector_field_estimator(
     batch_x: Tensor,
     batch_y: Tensor,
-    estimator_type: Literal["flow", "score"] = "flow",
+    estimator_type: Literal["flow", "score", "masked-flow", "masked-score"] = "flow",
     z_score_x: Optional[str] = None,
     z_score_y: Optional[str] = None,
     embedding_net: nn.Module = nn.Identity(),
-    sde_type: str = "ve",  # Only used for score estimator
+    sde_type: str = "ve",
     hidden_features: Union[Sequence[int], int] = 100,
     time_embedding_dim: int = 32,
     num_layers: int = 5,
@@ -43,7 +50,12 @@ def build_vector_field_estimator(
         VectorFieldNet,
     ] = "mlp",
     **kwargs,
-) -> Union[FlowMatchingEstimator, ConditionalScoreEstimator]:
+) -> Union[
+    FlowMatchingEstimator,
+    ConditionalScoreEstimator,
+    MaskedConditionalScoreEstimator,
+    MaskedFlowMatchingEstimator,
+]:
     """Builds a vector field estimator (flow matching or score matching) with the given
     network.
 
@@ -122,6 +134,21 @@ def build_vector_field_estimator(
             embedding_net=embedding_net,
             **kwargs,
         )
+    elif net == "simformer":
+        hidden_dim = (
+            hidden_features if isinstance(hidden_features, int) else hidden_features[0]
+        )
+        vectorfield_net = build_simformer_network(
+            batch_x=batch_x,
+            batch_y=batch_y,
+            hidden_features=hidden_dim,
+            num_layers=num_layers,
+            num_heads=num_heads,
+            mlp_ratio=mlp_ratio,
+            time_embedding_dim=time_embedding_dim,
+            embedding_net=embedding_net,
+            **kwargs,
+        )
     else:
         if isinstance(net, nn.Module):
             vectorfield_net = net
@@ -140,9 +167,15 @@ def build_vector_field_estimator(
 
     if estimator_type == "flow":
         return FlowMatchingEstimator(
-            net=vectorfield_net,
+            net=vectorfield_net,  # type: ignore
             input_shape=batch_x[0].shape,
             condition_shape=batch_y[0].shape,
+            embedding_net=embedding_net_y,
+        )
+    elif estimator_type == "masked-flow":
+        return MaskedFlowMatchingEstimator(
+            net=vectorfield_net,  # type: ignore
+            input_shape=batch_x[0].shape,
             embedding_net=embedding_net_y,
         )
     elif estimator_type == "score":
@@ -157,9 +190,27 @@ def build_vector_field_estimator(
             raise ValueError(f"Unknown SDE type: {sde_type}")
 
         return estimator_cls(
-            net=vectorfield_net,
+            net=vectorfield_net,  # type: ignore
             input_shape=batch_x[0].shape,
             condition_shape=batch_y[0].shape,
+            embedding_net=embedding_net_y,
+            mean_0=mean_0,
+            std_0=std_0,
+        )
+    elif estimator_type == "masked-score":
+        # Choose the appropriate score estimator based on SDE type
+        if sde_type == "vp":
+            estimator_cls = MaskedVPScoreEstimator
+        elif sde_type == "subvp":
+            estimator_cls = MaskedSubVPScoreEstimator
+        elif sde_type == "ve":
+            estimator_cls = MaskedVEScoreEstimator
+        else:
+            raise ValueError(f"Unknown SDE type: {sde_type}")
+
+        return estimator_cls(
+            net=vectorfield_net,  # type: ignore
+            input_shape=batch_x[0].shape,
             embedding_net=embedding_net_y,
             mean_0=mean_0,
             std_0=std_0,
@@ -173,8 +224,16 @@ def build_flow_matching_estimator(*args, **kwargs):
     return build_vector_field_estimator(*args, estimator_type="flow", **kwargs)
 
 
+def build_masked_flow_matching_estimator(*args, **kwargs):
+    return build_vector_field_estimator(*args, estimator_type="masked-flow", **kwargs)
+
+
 def build_score_matching_estimator(*args, **kwargs):
     return build_vector_field_estimator(*args, estimator_type="score", **kwargs)
+
+
+def build_masked_score_matching_estimator(*args, **kwargs):
+    return build_vector_field_estimator(*args, estimator_type="masked-score", **kwargs)
 
 
 # ======= Time Embedding Shared Components =======
@@ -646,6 +705,65 @@ class VectorFieldAdaMLP(VectorFieldNet):
         return h
 
 
+class TimeAdditiveBlock(nn.Module):
+    def __init__(
+        self,
+        hidden_features: int,
+        cond_dim: int,
+        num_heads: int,
+        mlp_ratio: int = 2,
+        activation: type[nn.Module] = nn.GELU,
+    ):
+        """Initialize masked time additive transformer block.
+
+        args:
+            hidden_dim: dimension of hidden features
+            cond_dim: dimension of conditioning features
+            num_heads: number of attention heads
+            mlp_ratio: ratio for mlp hidden dimension
+            activation: activation function
+        """
+        super().__init__()
+        self.norm1 = nn.LayerNorm(hidden_features)
+        self.attn = nn.MultiheadAttention(
+            embed_dim=hidden_features, num_heads=num_heads, batch_first=True
+        )
+        self.norm2 = nn.LayerNorm(hidden_features)
+        self.mlp_fc1 = nn.Linear(hidden_features, int(hidden_features * mlp_ratio))
+        self.mlp_act = activation()
+        self.mlp_time_proj = nn.Linear(cond_dim, int(hidden_features * mlp_ratio))
+        self.mlp_fc2 = nn.Linear(int(hidden_features * mlp_ratio), hidden_features)
+
+    def forward(self, x: Tensor, cond: Tensor, mask: Optional[Tensor] = None):
+        batch_size, seq_lenght, _ = x.shape
+
+        # First LayerNorm and self-attention with masking
+        x_norm = self.norm1(x)
+
+        if mask is not None and mask.dim() == 3:
+            # mask: [B, T, T] -> [B * num_heads, T, T]
+            batch_size, seq_lenght, _ = mask.shape
+            mask = (
+                mask.unsqueeze(1)
+                .expand(batch_size, self.attn.num_heads, seq_lenght, seq_lenght)
+                .reshape(batch_size * self.attn.num_heads, seq_lenght, seq_lenght)
+            )
+
+        attn_out, _ = self.attn(query=x_norm, key=x_norm, value=x_norm, attn_mask=mask)
+        x = x + attn_out
+
+        # Second LayerNorm and MLP with time conditioning
+        x_norm = self.norm2(x)
+        x_mlp = self.mlp_fc1(x_norm)
+        time_emb = self.mlp_time_proj(cond).unsqueeze(1)
+        x_mlp = x_mlp + time_emb
+        x_mlp = self.mlp_act(x_mlp)
+        x_mlp = self.mlp_fc2(x_mlp)
+
+        x = x + x_mlp
+        return x
+
+
 class DiTBlock(nn.Module):
     """transformer block with adaptive layer norm for conditioning.
 
@@ -706,15 +824,16 @@ class DiTBlock(nn.Module):
         self.norm1 = nn.LayerNorm(hidden_features)
         self.norm2 = nn.LayerNorm(hidden_features)
 
-    def forward(self, x: Tensor, cond: Tensor) -> Tensor:
+    def forward(self, x: Tensor, cond: Tensor, mask: Optional[Tensor] = None) -> Tensor:
         """Forward pass through the block.
 
         args:
-            x: input tensor (b, d)
-            cond: conditioning tensor (b, d_cond)
+            x: input tensor
+            cond: conditioning tensor
+            mask: attention mask
 
         returns:
-            output tensor (b, d)
+            output tensor
         """
         # get adaptive ln parameters
         ada_params = self.ada_affine(cond)
@@ -739,8 +858,24 @@ class DiTBlock(nn.Module):
         x_norm = self.norm1(x)
         x_norm = x_norm * (attn_scale + 1) + attn_shift
 
+        # Prepare attention mask
+        if mask is not None:
+            if mask.dim() == 3:
+                # mask: [B, T, T] -> [B * num_heads, T, T]
+                seq_lenght = mask.shape[1]
+                mask = (
+                    mask.unsqueeze(1)
+                    .expand(batch_size, self.attn.num_heads, seq_lenght, seq_lenght)
+                    .reshape(batch_size * self.attn.num_heads, seq_lenght, seq_lenght)
+                )
+            elif mask.dim() == 2:
+                # [T, T], pass as-is
+                pass
+            else:
+                raise ValueError(f"Unsupported mask shape for DiT Block: {mask.shape}")
+
         # self-attention
-        attn_out, _ = self.attn(x_norm, x_norm, x_norm)
+        attn_out, _ = self.attn(x_norm, x_norm, x_norm, attn_mask=mask)
         x = x + attn_gate * attn_out
 
         # mlp with adaptive ln
@@ -1020,6 +1155,171 @@ class VectorFieldTransformer(VectorFieldNet):
         return h
 
 
+class VectorFieldSimformer(MaskedVectorFieldNet):
+    """Simformer for vector field estimation.
+
+    This class implements the Simformer as in Gloeckler et al. (ICML, 2024).
+    """
+
+    def __init__(
+        self,
+        in_features: int,
+        num_nodes: int,
+        dim_val: int = 64,
+        dim_id: int = 32,
+        dim_cond: int = 16,
+        time_embedding_dim: int = 16,
+        hidden_features: int = 128,
+        num_layers: int = 4,
+        num_heads: int = 4,
+        mlp_ratio: int = 2,
+        ada_time: int = False,
+        time_emb_type: str = "random_fourier",
+        sinusoidal_max_freq: float = 0.01,
+        fourier_scale: float = 30.0,
+        activation: type[nn.Module] = nn.GELU,
+    ):
+        super().__init__()
+        self.in_features = in_features  # Number of features by each node (F)
+        self.num_nodes = num_nodes  # Number of nodes in the DAG (T = m + n)
+        self.dim_val = dim_val  # Dimension of the value token
+        self.dim_id = dim_id  # Dimension of the id token
+        self.dim_cond = dim_cond  # Dimension of the conditioning token
+        self.dim_t = time_embedding_dim  # Dimension of the time embedding
+        self.dim_hidden = (
+            hidden_features  # Dimension of the latent space in the transformer blocks
+        )
+        self.num_layers = num_layers  # Number of transformer blocks to stack
+        self.num_heads = (
+            num_heads  # Number of attention heads per each transformer block
+        )
+
+        # Tokenize on val
+        self.val_linear = nn.Linear(in_features, dim_val)
+
+        # Tokenize on id
+        self.id_embedding = nn.Embedding(num_nodes, dim_id)
+
+        # Conditioning parameter
+        self.conditioning_parameter = nn.Parameter(torch.randn(1, 1, dim_cond) * 0.5)
+
+        # Time embedding
+        if isinstance(time_emb_type, str):
+            if time_emb_type == "sinusoidal":
+                self.time_embedding = SinusoidalTimeEmbedding(
+                    embed_dim=time_embedding_dim, max_freq=sinusoidal_max_freq
+                )
+            elif time_emb_type == "random_fourier":
+                self.time_embedding = RandomFourierTimeEmbedding(
+                    embed_dim=time_embedding_dim, scale=fourier_scale
+                )
+            else:
+                raise ValueError(
+                    f"Unknown time_emb_type: {time_emb_type}"
+                )  # assume already a module
+
+        # Project input tokens to hidden dim
+        self.in_proj = nn.Linear(dim_val + dim_id + dim_cond, hidden_features)
+
+        # Transformer blocks
+        Block = DiTBlock if ada_time else TimeAdditiveBlock
+        self.blocks = nn.ModuleList([
+            Block(
+                hidden_features=hidden_features,
+                cond_dim=time_embedding_dim,
+                num_heads=num_heads,
+                mlp_ratio=mlp_ratio,
+                activation=activation,
+            )
+            for _ in range(num_layers)
+        ])
+
+        # Output projection
+        self.out_linear = nn.Linear(hidden_features, in_features)
+
+    def forward(
+        self,
+        inputs: Tensor,
+        t: Tensor,
+        condition_mask: Tensor,
+        edge_mask: Optional[Tensor] = None,
+    ) -> Tensor:
+        """Forward pass through the Simfomer.
+
+        Args:
+            input: Input tensor on which the vector field is evaluated.
+            t: Time embedding.
+            condition_mask: A boolean mask indicating the role of each variable.
+                Expected shape: `(batch_size, num_variables)`.
+                    - `True` (or `1`): The variable at this position is observed and its
+                    features will be used for conditioning.
+                    - `False` (or `0`): The variable at this position is latent and its
+                    features are subject to inference.
+            edge_mask: A boolean mask defining the adjacency matrix of the directed
+                acyclic graph (DAG) representing dependencies among variables.
+                Expected shape: `(batch_size, num_variables, num_variables)`.
+                    - `True` (or `1`): An edge exists from the row variable to
+                    the column variable.
+                    - `False` (or `0`): No edge exists between these variables.
+                    - if None, it will be equivalent to a full attention
+                    (i.e., full ones) mask, we suggest you to use None instead of ones
+                    to save memory resources
+
+        Returns:
+            Vector field evaluation at the provided points
+        """
+
+        B, T, _ = inputs.shape
+        device = inputs.device
+
+        # Tokenize on val
+        val_h = self.val_linear(inputs)  # [B, T, dim_val]
+
+        # Tokenize the nodes' id
+        ids = torch.arange(T, device=device).unsqueeze(0).expand(B, -1)  # [B, T]
+        id_h = self.id_embedding(ids)  # [B, T, dim_id]
+
+        condition_mask_expanded = condition_mask.unsqueeze(-1).expand(
+            B, T, self.dim_cond
+        )  # [B, T, dim_cond]
+
+        # Conditioning
+        # conditioning_parameter: [1, 1, dim_cond]
+        conditioning_h = (
+            self.conditioning_parameter.expand(B, T, self.dim_cond)
+            * condition_mask_expanded
+        )  # [B, T, dim_cond]
+
+        # Time embedding, [B,] or []
+        if t.ndim == 0:
+            t = t.expand(B)
+        t_h = self.time_embedding(t)  # [B, dim_t]
+
+        # Concatenate tokens
+        tokens = torch.cat(
+            [val_h, id_h, conditioning_h], dim=-1
+        )  # [B, T, dim_val + dim_id + dim_cond]
+
+        # Initial projection
+        h = self.in_proj(tokens)  # [B, T, dim_hidden]
+
+        # Pass through transformer blocks
+        # Invert mask to follow Torch convention
+        # Edge mask convention:
+        #   E(i,j) = 1 for edge j depending on i,
+        #   0 otherwise
+        # Torch convention:
+        #   True for masked (no attention),
+        #   False for allowed (attention)
+        t_h = t_h.expand(B, t_h.shape[1])
+        for block in self.blocks:
+            h = block(h, t_h, (~edge_mask.bool() if edge_mask is not None else None))
+
+        # Output projection
+        out = self.out_linear(h)  # [B, T, F]
+        return out
+
+
 # ======= Factory Functions =======
 
 
@@ -1237,6 +1537,74 @@ def build_transformer_network(
         fourier_scale=fourier_scale,
         activation=activation,
         is_x_emb_seq=is_x_emb_seq,
+    )
+
+    return vectorfield_net
+
+
+def build_simformer_network(
+    batch_x: Tensor,
+    batch_y: Tensor,
+    hidden_features: int = 100,
+    num_layers: int = 5,
+    num_heads: int = 4,
+    mlp_ratio: int = 2,
+    time_embedding_dim: int = 32,
+    embedding_net: nn.Module = nn.Identity(),
+    dim_val: int = 64,
+    dim_id: int = 32,
+    dim_cond: int = 16,
+    ada_time: bool = False,
+    time_emb_type: str = "random_fourier",
+    sinusoidal_max_freq: float = 0.01,
+    fourier_scale: float = 30.0,
+    activation: type[nn.Module] = nn.GELU,
+    **kwargs,
+) -> VectorFieldSimformer:
+    """Builds a Simformer network.
+
+    Args:
+        batch_x: Batch of xs, used to infer input and node dimensions.
+        batch_y: Batch of ys, unused, kept for compatibility.
+        hidden_features: Dimension of hidden features (dim_hidden in Simformer).
+        num_blocks: Number of transformer blocks.
+        num_heads: Number of attention heads per block.
+        mlp_ratio: Ratio for MLP hidden dimension in transformer blocks.
+        time_embedding_dim: Number of dimensions for time embedding (dim_t).
+        embedding_net: Embedding network for batch_y, unused, kept for compatibility.
+        dim_val: Dimension of value token for each node.
+        dim_id: Dimension of id embedding for each node.
+        dim_cond: Dimension of conditioning token for each node.
+        ada_time: Whether to use adaptive time conditioning in transformer blocks.
+
+    Returns:
+        A Simformer vector field network.
+    """
+
+    del kwargs  # Unused
+    del batch_y  # Unused
+    del embedding_net  # Unused
+
+    in_features = batch_x.shape[-1]
+    num_nodes = batch_x.shape[1]
+
+    # Create the vector field network (Simformer)
+    vectorfield_net = VectorFieldSimformer(
+        in_features=in_features,
+        num_nodes=num_nodes,
+        dim_val=dim_val,
+        dim_id=dim_id,
+        dim_cond=dim_cond,
+        time_embedding_dim=time_embedding_dim,
+        hidden_features=hidden_features,
+        num_layers=num_layers,
+        num_heads=num_heads,
+        mlp_ratio=mlp_ratio,
+        ada_time=ada_time,
+        time_emb_type=time_emb_type,
+        sinusoidal_max_freq=sinusoidal_max_freq,
+        fourier_scale=fourier_scale,
+        activation=activation,
     )
 
     return vectorfield_net

@@ -539,7 +539,7 @@ def ensure_numpy(t: Union[np.ndarray, torch.Tensor]) -> np.ndarray:
     Used because samples_nd() can only handle np.ndarray.
     """
     if isinstance(t, torch.Tensor):
-        return t.numpy()
+        return t.cpu().numpy()
     elif not isinstance(t, np.ndarray):
         return np.array(t)
     return t

@@ -29,6 +29,8 @@ Neural nets
    sbi.neural_nets.classifier_nn
    sbi.neural_nets.flowmatching_nn
    sbi.neural_nets.posterior_score_nn
+   sbi.neural_nets.simformer_score_nn
+   sbi.neural_nets.simformer_flow_nn
    sbi.neural_nets.marginal_nn
 
 
@@ -59,6 +61,8 @@ Training
    sbi.inference.NPE_A
    sbi.inference.FMPE
    sbi.inference.NPSE
+   sbi.inference.Simformer
+   sbi.inference.FlowMatchingSimformer
    sbi.inference.NLE_A
    sbi.inference.NRE_A
    sbi.inference.NRE_B

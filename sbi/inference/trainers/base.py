@@ -20,7 +20,7 @@ from typing import (
 from warnings import warn
 
 import torch
-from torch import Tensor
+from torch import Tensor, nn
 from torch.distributions import Distribution
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
@@ -48,6 +48,8 @@ from sbi.neural_nets.estimators.base import (
     ConditionalDensityEstimator,
     ConditionalEstimator,
     ConditionalVectorFieldEstimator,
+    MaskedConditionalEstimator,
+    MaskedConditionalVectorFieldEstimator,
 )
 from sbi.neural_nets.ratio_estimators import RatioEstimator
 from sbi.sbi_types import TorchTransform
@@ -159,8 +161,32 @@ def infer(
     return posterior
 
 
-class NeuralInference(ABC):
-    """Abstract base class for neural inference methods."""
+def check_if_proposal_has_default_x(proposal: Any):
+    """Check for validity of the provided proposal distribution.
+
+    If the proposal is a `NeuralPosterior`, we check if the default_x is set and
+    if it matches the `_x_o_training_focused_on`.
+    """
+    if isinstance(proposal, NeuralPosterior) and proposal.default_x is None:
+        raise ValueError(
+            "`proposal.default_x` is None, i.e. there is no "
+            "x_o for training. Set it with "
+            "`posterior.set_default_x(x_o)`."
+        )
+
+
+class BaseNeuralInference:
+    "Mixin for NeuralInference objects"
+
+    _neural_net: Optional[
+        Union[RatioEstimator, ConditionalEstimator, MaskedConditionalEstimator]
+    ]
+    _train_loss: float
+    _val_loss: float
+    _prior: Optional[Distribution]
+    _device: str
+    _summary_writer: SummaryWriter
+    _summary: Dict[str, list]
 
     def __init__(
         self,
@@ -193,14 +219,11 @@ class NeuralInference(ABC):
 
         self._posterior = None
         self._neural_net = None
-        self._x_shape = None
 
         self._show_progress_bars = show_progress_bars
 
-        # Initialize roundwise (theta, x, prior_masks) for storage of parameters,
-        # simulations and masks indicating if simulations came from prior.
-        self._theta_roundwise = []
-        self._x_roundwise = []
+        # Initialize roundwise prior_masks for storage of masks
+        # indicating if simulations came from prior.
         self._prior_masks = []
         self._model_bank = []
 
@@ -223,76 +246,45 @@ class NeuralInference(ABC):
             epoch_durations_sec=[],
         )
 
-    @property
-    def summary(self):
-        return self._summary
-
     @abstractmethod
     def append_simulations(
         self,
-        theta: Tensor,
-        x: Tensor,
-        exclude_invalid_x: bool = False,
-        from_round: int = 0,
-        algorithm: Optional[str] = None,
-        data_device: Optional[str] = None,
+        *args,
+        **kwargs,
     ) -> Self:
-        r"""Store parameters and simulation outputs to use them for later training.
+        "Abstract definition to append simulations"
+        ...
 
-        Data are stored as entries in lists for each type of variable (parameter/data).
+    @abstractmethod
+    def get_simulations(
+        self,
+        *args,
+        **kwargs,
+    ) -> Tuple[Tensor, Tensor] | Tuple[Tensor, Tensor, Tensor]:
+        "Abstract definition to get appended simulations"
+        # TODO: this could be improved using TypeVarTuple from python >=3.11
+        # where one can enforce child classes to take either the tuple of 2
+        # (maskedNuerualInference) or tuple of 3 (NeuralInference)
+        # at the moment any child can return both
+        ...
 
-        Stores $\theta$, $x$, prior_masks (indicating if simulations are coming from the
-        prior or not) and an index indicating which round the batch of simulations came
-        from.
+    @abstractmethod
+    def get_dataloaders(
+        self,
+        *args,
+        **kwargs,
+    ) -> Tuple[data.DataLoader, data.DataLoader]:
+        "Abstract definition to get simulations dataloaders for training and validation"
+        ...
 
-        Args:
-            theta: Parameter sets.
-            x: Simulation outputs.
-            exclude_invalid_x: Whether invalid simulations are discarded during
-                training. If `False`, The inference algorithm raises an error when
-                invalid simulations are found. If `True`, invalid simulations are
-                discarded and training can proceed, but this gives systematically wrong
-                results.
-            from_round: Which round the data stemmed from. Round 0 means from the prior.
-                With default settings, this is not used at all for the inference
-                algorithm. Only when the user later on requests
-                `.train(discard_prior_samples=True)`, we use these indices to find which
-                training data stemmed from the prior.
-            algorithm: Which algorithm is used. This is used to give a more informative
-                warning or error message when invalid simulations are found.
-            data_device: Where to store the data, default is on the same device where
-                the training is happening. If training a large dataset on a GPU with not
-                much VRAM can set to 'cpu' to store data on system memory instead.
-        Returns:
-            NeuralInference object (returned so that this function is chainable).
-        """
-
-        is_valid_x, num_nans, num_infs = handle_invalid_x(x, exclude_invalid_x)
-
-        x = x[is_valid_x]
-        theta = theta[is_valid_x]
-
-        # Check for problematic z-scoring
-        warn_if_zscoring_changes_data(x)
-        nle_nre_apt_msg_on_invalid_x(
-            num_nans, num_infs, exclude_invalid_x, algorithm or type(self).__name__
-        )
-
-        if data_device is None:
-            data_device = self._device
-        theta, x = validate_theta_and_x(
-            theta, x, data_device=data_device, training_device=self._device
-        )
-
-        prior_masks = mask_sims_from_prior(int(from_round), theta.size(0))
-
-        self._theta_roundwise.append(theta)
-        self._x_roundwise.append(x)
-        self._prior_masks.append(prior_masks)
-
-        self._data_round_index.append(int(from_round))
-
-        return self
+    @abstractmethod
+    def _get_potential_function(
+        self,
+        prior: Distribution,
+        estimator: nn.Module,
+    ) -> Tuple[BasePotential, TorchTransform]:
+        """Abstract definition for subclass-specific potential creation"""
+        ...
 
     @abstractmethod
     def train(
@@ -308,168 +300,9 @@ class NeuralInference(ABC):
         discard_prior_samples: bool = False,
         retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
-    ) -> NeuralPosterior: ...
-
-    @abstractmethod
-    def _get_potential_function(
-        self,
-        prior: Distribution,
-        estimator: Union[RatioEstimator, ConditionalEstimator],
-    ) -> Tuple[BasePotential, TorchTransform]:
-        """Subclass-specific potential creation"""
-        ...
-
-    def get_simulations(
-        self,
-        starting_round: int = 0,
-    ) -> Tuple[Tensor, Tensor, Tensor]:
-        r"""Returns all $\theta$, $x$, and prior_masks from rounds >= `starting_round`.
-
-        If requested, do not return invalid data.
-
-        Args:
-            starting_round: The earliest round to return samples from (we start counting
-                from zero).
-            warn_on_invalid: Whether to give out a warning if invalid simulations were
-                found.
-
-        Returns: Parameters, simulation outputs, prior masks.
-        """
-
-        theta = get_simulations_since_round(
-            self._theta_roundwise, self._data_round_index, starting_round
-        )
-        x = get_simulations_since_round(
-            self._x_roundwise, self._data_round_index, starting_round
-        )
-        prior_masks = get_simulations_since_round(
-            self._prior_masks, self._data_round_index, starting_round
-        )
-
-        return theta, x, prior_masks
-
-    def get_dataloaders(
-        self,
-        starting_round: int = 0,
-        training_batch_size: int = 200,
-        validation_fraction: float = 0.1,
-        resume_training: bool = False,
-        dataloader_kwargs: Optional[dict] = None,
-    ) -> Tuple[data.DataLoader, data.DataLoader]:
-        """Return dataloaders for training and validation.
-
-        Args:
-            dataset: holding all theta and x, optionally masks.
-            training_batch_size: training arg of inference methods.
-            resume_training: Whether the current call is resuming training so that no
-                new training and validation indices into the dataset have to be created.
-            dataloader_kwargs: Additional or updated kwargs to be passed to the training
-                and validation dataloaders (like, e.g., a collate_fn).
-
-        Returns:
-            Tuple of dataloaders for training and validation.
-
-        """
-
-        #
-        theta, x, prior_masks = self.get_simulations(starting_round)
-
-        dataset = data.TensorDataset(theta, x, prior_masks)
-
-        # Get total number of training examples.
-        num_examples = theta.size(0)
-        # Select random train and validation splits from (theta, x) pairs.
-        num_training_examples = int((1 - validation_fraction) * num_examples)
-        num_validation_examples = num_examples - num_training_examples
-
-        if not resume_training:
-            # Separate indices for training and validation
-            permuted_indices = torch.randperm(num_examples)
-            self.train_indices, self.val_indices = (
-                permuted_indices[:num_training_examples],
-                permuted_indices[num_training_examples:],
-            )
-
-        # Create training and validation loaders using a subset sampler.
-        # Intentionally use dicts to define the default dataloader args
-        # Then, use dataloader_kwargs to override (or add to) any of these defaults
-        # https://stackoverflow.com/questions/44784577/in-method-call-args-how-to-override-keyword-argument-of-unpacked-dict
-        train_loader_kwargs = {
-            "batch_size": min(training_batch_size, num_training_examples),
-            "drop_last": True,
-            "sampler": SubsetRandomSampler(self.train_indices.tolist()),
-        }
-        val_loader_kwargs = {
-            "batch_size": min(training_batch_size, num_validation_examples),
-            "shuffle": False,
-            "drop_last": True,
-            "sampler": SubsetRandomSampler(self.val_indices.tolist()),
-        }
-        if dataloader_kwargs is not None:
-            train_loader_kwargs = dict(train_loader_kwargs, **dataloader_kwargs)
-            val_loader_kwargs = dict(val_loader_kwargs, **dataloader_kwargs)
-
-        train_loader = data.DataLoader(dataset, **train_loader_kwargs)
-        val_loader = data.DataLoader(dataset, **val_loader_kwargs)
-
-        return train_loader, val_loader
-
-    def build_posterior(
-        self,
-        estimator: Optional[Union[RatioEstimator, ConditionalEstimator]],
-        prior: Optional[Distribution],
-        sample_with: Literal[
-            "mcmc", "rejection", "vi", "importance", "direct", "sde", "ode"
-        ],
-        posterior_parameters: Optional[PosteriorParameters],
-        **kwargs,
     ) -> NeuralPosterior:
-        r"""Method for building posteriors.
-
-        This method serves as a base method for constructing a posterior based
-        on a given estimator and prior. The posterior can be sampled using one of
-        several inference methods specified by `sample_with`.
-
-        Args:
-            estimator: The estimator that the posterior is based on.
-            prior: A probability distribution that expresses prior knowledge about the
-                parameters, e.g. which ranges are meaningful for them. Must be a PyTorch
-                distribution, see FAQ for details on how to use custom distributions.
-            sample_with: The inference method to use. Must be one of:
-                - "mcmc"
-                - "rejection"
-                - "vi"
-                - "importance"
-                - "direct"
-                - "sde"
-                - "ode"
-            posterior_parameters: Configuration passed to the init method for the
-                posterior. Must be of type PosteriorParameters.
-            **kwargs: Additional method-specific parameters.
-
-        Returns:
-            NeuralPosterior object.
-        """
-
-        prior = self._resolve_prior(prior)
-        estimator, device = self._resolve_estimator(estimator)
-
-        posterior_parameters = self._resolve_posterior_parameters(
-            sample_with, posterior_parameters, **kwargs
-        )
-
-        self._posterior = self._create_posterior(
-            estimator,
-            prior,
-            sample_with,
-            device,
-            posterior_parameters,
-        )
-
-        # Store models at end of each round.
-        self._model_bank.append(deepcopy(self._posterior))
-
-        return deepcopy(self._posterior)
+        "Abstract definition for estimator training"
+        ...
 
     def _resolve_prior(self, prior: Optional[Distribution]) -> Distribution:
         """
@@ -489,6 +322,8 @@ class NeuralInference(ABC):
         if prior is None:
             if self._prior is None:
                 cls_name = self.__class__.__name__
+                # TODO: this could be re-designed to allow priors to be None
+                # as many methods can work without it anyway.
                 raise ValueError(
                     f"""You did not pass a prior. You have to pass the prior either at
                     initialization `inference = {cls_name}(prior)` or to `
@@ -501,8 +336,8 @@ class NeuralInference(ABC):
         return prior
 
     def _resolve_estimator(
-        self, estimator: Optional[Union[RatioEstimator, ConditionalEstimator]]
-    ) -> Tuple[Union[RatioEstimator, ConditionalEstimator], str]:
+        self, estimator: Optional[nn.Module]
+    ) -> Tuple[nn.Module, str]:
         """
         Resolves the estimator and determines its device.
 
@@ -522,15 +357,18 @@ class NeuralInference(ABC):
                 "Provide an estimator or initialize self._neural_net."
             )
             estimator = self._neural_net
-            # If internal net is used device is defined.
+            # If internal net is used device is defined
             device = self._device
         else:
-            if not isinstance(estimator, (ConditionalEstimator, RatioEstimator)):
+            if not isinstance(
+                estimator,
+                (ConditionalEstimator, RatioEstimator, MaskedConditionalEstimator),
+            ):
                 raise TypeError(
-                    "estimator must be ConditionalEstimator or RatioEstimator,"
-                    f" got {type(estimator).__name__}",
+                    f"`estimator` must be ConditionalEstimator, RatioEstimator "
+                    f"or MaskedConditionalEstimator, got {type(estimator).__name__}",
                 )
-            # Otherwise, infer it from the device of the net parameters.
+            # Otherwise, infer it from the device of the net parameters
             device = str(next(estimator.parameters()).device)
 
         return estimator, device
@@ -759,7 +597,7 @@ class NeuralInference(ABC):
 
     def _create_posterior(
         self,
-        estimator: Union[RatioEstimator, ConditionalEstimator],
+        estimator: nn.Module,
         prior: Distribution,
         sample_with: Literal[
             "mcmc", "rejection", "vi", "importance", "direct", "sde", "ode"
@@ -905,15 +743,6 @@ class NeuralInference(ABC):
 
         return converged
 
-    def _default_summary_writer(self) -> SummaryWriter:
-        """Return summary writer logging to method- and simulator-specific directory."""
-
-        method = self.__class__.__name__
-        logdir = Path(
-            get_log_root(), method, datetime.now().isoformat().replace(":", "_")
-        )
-        return SummaryWriter(logdir)
-
     def _report_convergence_at_end(
         self, epoch: int, stop_after_epochs: int, max_num_epochs: int
     ) -> None:
@@ -929,6 +758,19 @@ class NeuralInference(ABC):
                 "but network has not yet fully converged. Consider increasing it.",
                 stacklevel=2,
             )
+
+    @property
+    def summary(self):
+        return self._summary
+
+    def _default_summary_writer(self) -> SummaryWriter:
+        """Return summary writer logging to method- and simulator-specific directory."""
+
+        method = self.__class__.__name__
+        logdir = Path(
+            get_log_root(), method, datetime.now().isoformat().replace(":", "_")
+        )
+        return SummaryWriter(logdir)
 
     def _summarize(
         self,
@@ -1062,15 +904,655 @@ class NeuralInference(ABC):
         self.__dict__ = state_dict
 
 
-def check_if_proposal_has_default_x(proposal: Any):
-    """Check for validity of the provided proposal distribution.
+class NeuralInference(ABC, BaseNeuralInference):
+    """Abstract base class for neural inference methods."""
 
-    If the proposal is a `NeuralPosterior`, we check if the default_x is set and
-    if it matches the `_x_o_training_focused_on`.
-    """
-    if isinstance(proposal, NeuralPosterior) and proposal.default_x is None:
-        raise ValueError(
-            "`proposal.default_x` is None, i.e. there is no "
-            "x_o for training. Set it with "
-            "`posterior.set_default_x(x_o)`."
+    _neural_net: Optional[RatioEstimator | ConditionalEstimator]
+
+    def __init__(
+        self,
+        prior: Optional[Distribution] = None,
+        device: str = "cpu",
+        logging_level: Union[int, str] = "WARNING",
+        summary_writer: Optional[SummaryWriter] = None,
+        show_progress_bars: bool = True,
+    ):
+        # Initialize roundwise (theta, x) for storage of parameters,
+        # and simulations.
+        super().__init__(
+            prior, device, logging_level, summary_writer, show_progress_bars
         )
+        self._theta_roundwise = []
+        self._x_roundwise = []
+        self._x_shape = None
+
+    def append_simulations(
+        self,
+        theta: Tensor,
+        x: Tensor,
+        exclude_invalid_x: bool = False,
+        from_round: int = 0,
+        algorithm: Optional[str] = None,
+        data_device: Optional[str] = None,
+    ) -> Self:
+        r"""Store parameters and simulation outputs to use them for later training.
+
+        Data are stored as entries in lists for each type of variable (parameter/data).
+
+        Stores $\theta$, $x$, prior_masks (indicating if simulations are coming from the
+        prior or not) and an index indicating which round the batch of simulations came
+        from.
+
+        Args:
+            theta: Parameter sets.
+            x: Simulation outputs.
+            exclude_invalid_x: Whether invalid simulations are discarded during
+                training. If `False`, The inference algorithm raises an error when
+                invalid simulations are found. If `True`, invalid simulations are
+                discarded and training can proceed, but this gives systematically wrong
+                results.
+            from_round: Which round the data stemmed from. Round 0 means from the prior.
+                With default settings, this is not used at all for the inference
+                algorithm. Only when the user later on requests
+                `.train(discard_prior_samples=True)`, we use these indices to find which
+                training data stemmed from the prior.
+            algorithm: Which algorithm is used. This is used to give a more informative
+                warning or error message when invalid simulations are found.
+            data_device: Where to store the data, default is on the same device where
+                the training is happening. If training a large dataset on a GPU with not
+                much VRAM can set to 'cpu' to store data on system memory instead.
+        Returns:
+            NeuralInference object (returned so that this function is chainable).
+        """
+
+        is_valid_x, num_nans, num_infs = handle_invalid_x(x, exclude_invalid_x)
+
+        x = x[is_valid_x]
+        theta = theta[is_valid_x]
+
+        # Check for problematic z-scoring
+        warn_if_zscoring_changes_data(x)
+        nle_nre_apt_msg_on_invalid_x(
+            num_nans, num_infs, exclude_invalid_x, algorithm or type(self).__name__
+        )
+
+        if data_device is None:
+            data_device = self._device
+        theta, x = validate_theta_and_x(
+            theta, x, data_device=data_device, training_device=self._device
+        )
+
+        prior_masks = mask_sims_from_prior(int(from_round), theta.size(0))
+
+        self._theta_roundwise.append(theta)
+        self._x_roundwise.append(x)
+        self._prior_masks.append(prior_masks)
+
+        self._data_round_index.append(int(from_round))
+
+        return self
+
+    def get_simulations(
+        self,
+        starting_round: int = 0,
+    ) -> Tuple[Tensor, Tensor, Tensor]:
+        r"""Returns all $\theta$, $x$, and prior_masks from rounds >= `starting_round`.
+
+        If requested, do not return invalid data.
+
+        Args:
+            starting_round: The earliest round to return samples from (we start counting
+                from zero).
+            warn_on_invalid: Whether to give out a warning if invalid simulations were
+                found.
+
+        Returns: Parameters, simulation outputs, prior masks.
+        """
+
+        theta = get_simulations_since_round(
+            self._theta_roundwise, self._data_round_index, starting_round
+        )
+        x = get_simulations_since_round(
+            self._x_roundwise, self._data_round_index, starting_round
+        )
+        prior_masks = get_simulations_since_round(
+            self._prior_masks, self._data_round_index, starting_round
+        )
+
+        return theta, x, prior_masks
+
+    def get_dataloaders(
+        self,
+        starting_round: int = 0,
+        training_batch_size: int = 200,
+        validation_fraction: float = 0.1,
+        resume_training: bool = False,
+        dataloader_kwargs: Optional[dict] = None,
+    ) -> Tuple[data.DataLoader, data.DataLoader]:
+        r"""Return dataloaders for training and validation.
+
+        Args:
+            starting_round: round from which loading data.
+            training_batch_size: training arg of inference methods.
+            validation_fraction: float in (0, 1) indicating which fraction of data
+                should be reserved for validation.
+            resume_training: Whether the current call is resuming training so that no
+                new training and validation indices into the dataset have to be created.
+            dataloader_kwargs: Additional or updated kwargs to be passed to the training
+                and validation dataloaders (like, e.g., a collate_fn).
+
+        Returns:
+            Tuple of dataloaders for training and validation.
+
+        """
+
+        #
+        theta, x, prior_masks = self.get_simulations(starting_round)
+
+        dataset = data.TensorDataset(theta, x, prior_masks)
+
+        # Get total number of training examples.
+        num_examples = theta.size(0)
+        # Select random train and validation splits from (theta, x) pairs.
+        num_training_examples = int((1 - validation_fraction) * num_examples)
+        num_validation_examples = num_examples - num_training_examples
+
+        if not resume_training:
+            # Separate indices for training and validation
+            permuted_indices = torch.randperm(num_examples)
+            self.train_indices, self.val_indices = (
+                permuted_indices[:num_training_examples],
+                permuted_indices[num_training_examples:],
+            )
+
+        # Create training and validation loaders using a subset sampler.
+        # Intentionally use dicts to define the default dataloader args
+        # Then, use dataloader_kwargs to override (or add to) any of these defaults
+        # https://stackoverflow.com/questions/44784577/in-method-call-args-how-to-override-keyword-argument-of-unpacked-dict
+        train_loader_kwargs = {
+            "batch_size": min(training_batch_size, num_training_examples),
+            "drop_last": True,
+            "sampler": SubsetRandomSampler(self.train_indices.tolist()),
+        }
+        val_loader_kwargs = {
+            "batch_size": min(training_batch_size, num_validation_examples),
+            "shuffle": False,
+            "drop_last": True,
+            "sampler": SubsetRandomSampler(self.val_indices.tolist()),
+        }
+        if dataloader_kwargs is not None:
+            train_loader_kwargs = dict(train_loader_kwargs, **dataloader_kwargs)
+            val_loader_kwargs = dict(val_loader_kwargs, **dataloader_kwargs)
+
+        train_loader = data.DataLoader(dataset, **train_loader_kwargs)
+        val_loader = data.DataLoader(dataset, **val_loader_kwargs)
+
+        return train_loader, val_loader
+
+    def build_posterior(
+        self,
+        estimator: Optional[Union[RatioEstimator, ConditionalEstimator]],
+        prior: Optional[Distribution],
+        sample_with: Literal[
+            "mcmc", "rejection", "vi", "importance", "direct", "sde", "ode"
+        ],
+        posterior_parameters: Optional[PosteriorParameters],
+        **kwargs,
+    ) -> NeuralPosterior:
+        r"""Method for building posteriors.
+
+        This method serves as a base method for constructing a posterior based
+        on a given estimator and prior. The posterior can be sampled using one of
+        several inference methods specified by `sample_with`.
+
+        Args:
+            estimator: The estimator that the posterior is based on.
+            prior: A probability distribution that expresses prior knowledge about the
+                parameters, e.g. which ranges are meaningful for them. Must be a PyTorch
+                distribution, see FAQ for details on how to use custom distributions.
+            sample_with: The inference method to use. Must be one of:
+                - "mcmc"
+                - "rejection"
+                - "vi"
+                - "importance"
+                - "direct"
+                - "sde"
+                - "ode"
+            **kwargs: Additional method-specific parameters.
+
+        Returns:
+            NeuralPosterior object.
+        """
+
+        prior = self._resolve_prior(prior)
+        estimator, device = self._resolve_estimator(estimator)
+
+        posterior_parameters = self._resolve_posterior_parameters(
+            sample_with, posterior_parameters, **kwargs
+        )
+
+        self._posterior = self._create_posterior(
+            estimator,
+            prior,
+            sample_with,
+            device,
+            posterior_parameters,
+        )
+
+        # Store models at end of each round.
+        self._model_bank.append(deepcopy(self._posterior))
+
+        return deepcopy(self._posterior)
+
+    def _resolve_estimator(
+        self, estimator: Optional[Union[RatioEstimator, ConditionalEstimator]]
+    ) -> Tuple[Union[RatioEstimator, ConditionalEstimator], str]:
+        """
+        Resolves the estimator and determines its device.
+
+        If no estimator is provided, the internal neural net (`self._neural_net`)
+        is used and the device is taken from `self._device`. Otherwise, validates
+        the passed estimator and infers its device.
+
+        Args:
+            estimator: Optional estimator to use.
+
+        Returns:
+            A tuple of (estimator, device).
+        """
+        resolved_estimator, device = super()._resolve_estimator(estimator)
+        assert isinstance(resolved_estimator, (RatioEstimator, ConditionalEstimator)), (
+            f"Expected `estimator` to be a RatioEstimator, ConditionalEstimator "
+            f"or None but got {type(resolved_estimator).__name__}. "
+            "Ensure that the estimator passed to NeuralInference is of the "
+            "correct type. "
+        )
+        return resolved_estimator, device
+
+
+class MaskedNeuralInference(ABC, BaseNeuralInference):
+    """Abstract base class for masked neural inference methods."""
+
+    _neural_net: Optional[MaskedConditionalEstimator]
+
+    def __init__(
+        self,
+        prior: Optional[Distribution] = None,
+        device: str = "cpu",
+        logging_level: Union[int, str] = "WARNING",
+        summary_writer: Optional[SummaryWriter] = None,
+        show_progress_bars: bool = True,
+    ):
+        r"""Base class for masked inference methods.
+
+        Args:
+            prior: A probability distribution that expresses prior knowledge about the
+                parameters, e.g. which ranges are meaningful for them. Must be a PyTorch
+                distribution, see FAQ for details on how to use custom distributions.
+            device: torch device on which to train the neural net and on which to
+                perform all posterior operations, e.g. gpu or cpu.
+            logging_level: Minimum severity of messages to log. One of the strings
+               "INFO", "WARNING", "DEBUG", "ERROR" and "CRITICAL".
+            summary_writer: A `SummaryWriter` to control, among others, log
+                file location (default is `<current working directory>/logs`.)
+            show_progress_bars: Whether to show a progressbar during simulation and
+                sampling.
+        """
+
+        super().__init__(
+            prior, device, logging_level, summary_writer, show_progress_bars
+        )
+
+        # Initialize roundwise inputs for storage of parameters and
+        # simulations.
+        self._inputs_roundwise = []
+        self._inputs_shape = None
+
+        # Initialize condition and edge mask generators
+        self._condition_mask_generator = self._default_condition_masks_generator
+        self._edge_mask_generator = self._default_edge_masks_generator
+
+    # Must be re-defined to specify the new interface using inputs
+    # rather than thetas and x
+    def get_simulations(
+        self,
+        starting_round: int = 0,
+    ) -> Tuple[Tensor, Tensor]:
+        r"""Returns all inputs, valid_inputs_masks, prior_masks
+        from rounds >= `starting_round`.
+
+        Args:
+            starting_round: The earliest round to return samples from (we start counting
+                from zero).
+            warn_on_invalid: Whether to give out a warning if invalid simulations were
+                found.
+
+        Returns: simulation outputs, invalid data masks, prior masks.
+        """
+
+        inputs = get_simulations_since_round(
+            self._inputs_roundwise, self._data_round_index, starting_round
+        )
+        prior_masks = get_simulations_since_round(
+            self._prior_masks, self._data_round_index, starting_round
+        )
+
+        return inputs, prior_masks
+
+    # Must be re-defined to specify the new interface using inputs
+    # rather than thetas and x
+    def get_dataloaders(
+        self,
+        starting_round: int = 0,
+        training_batch_size: int = 200,
+        validation_fraction: float = 0.1,
+        resume_training: bool = False,
+        dataloader_kwargs: Optional[dict] = None,
+    ) -> Tuple[data.DataLoader, data.DataLoader]:
+        """Return dataloaders for training and validation.
+
+        Args:
+            starting_round: round from which loading data.
+            training_batch_size: training arg of inference methods.
+            validation_fraction: float in (0, 1) indicating which fraction of data
+                should be reserved for validation.
+            resume_training: Whether the current call is resuming training so that no
+                new training and validation indices into the dataset have to be created.
+            dataloader_kwargs: Additional or updated kwargs to be passed to the training
+                and validation dataloaders (like, e.g., a collate_fn)
+
+        Returns:
+            Tuple of dataloaders for training and validation.
+        """
+
+        #
+        inputs, prior_masks = self.get_simulations(starting_round)
+
+        dataset = data.TensorDataset(inputs, prior_masks)
+
+        # Get total number of training examples.
+        num_examples = inputs.size(0)
+        # Select random train and validation splits from (theta, x) pairs.
+        num_training_examples = int((1 - validation_fraction) * num_examples)
+        num_validation_examples = num_examples - num_training_examples
+
+        if not resume_training:
+            # Separate indices for training and validation
+            permuted_indices = torch.randperm(num_examples)
+            self.train_indices, self.val_indices = (
+                permuted_indices[:num_training_examples],
+                permuted_indices[num_training_examples:],
+            )
+
+        # Create training and validation loaders using a subset sampler.
+        # Intentionally use dicts to define the default dataloader args
+        # Then, use dataloader_kwargs to override (or add to) any of these defaults
+        # https://stackoverflow.com/questions/44784577/in-method-call-args-how-to-override-keyword-argument-of-unpacked-dict
+        train_loader_kwargs = {
+            "batch_size": min(training_batch_size, num_training_examples),
+            "drop_last": True,
+            "sampler": SubsetRandomSampler(self.train_indices.tolist()),
+        }
+        val_loader_kwargs = {
+            "batch_size": min(training_batch_size, num_validation_examples),
+            "shuffle": False,
+            "drop_last": True,
+            "sampler": SubsetRandomSampler(self.val_indices.tolist()),
+        }
+        if dataloader_kwargs is not None:
+            train_loader_kwargs = dict(train_loader_kwargs, **dataloader_kwargs)
+            val_loader_kwargs = dict(val_loader_kwargs, **dataloader_kwargs)
+
+        train_loader = data.DataLoader(dataset, **train_loader_kwargs)
+        val_loader = data.DataLoader(dataset, **val_loader_kwargs)
+
+        return train_loader, val_loader
+
+    def set_condition_masks_generator(
+        self,
+        condition_mask_generator: Union[Callable[[Tensor], Tensor], Tensor, list, set],
+    ):
+        """Set the condition mask generator.
+
+        The condition mask generator is a callable that generates the condition masks
+        thay will be employed at training time. It can otherwise also accept a fixed
+        condition mask or a set of condition masks which will be drawn uniformly.
+
+        If a callable is passed it must accept as parameter the input tensor to inform
+        it about the shapes that should be used to generate the masks.
+
+        Args:
+            condition_mask_generator: Callable that takes `inputs` and returns a
+                boolean tensor, or a fixed boolean tensor, or a list/tuple/set of
+                boolean tensors from which to randomly sample.
+
+        Returns:
+            MaskedNeuralInference object (returned so that this function is chainable).
+        """
+        if isinstance(condition_mask_generator, Callable):
+            self._condition_mask_generator = condition_mask_generator
+        elif isinstance(condition_mask_generator, Tensor):
+            self._condition_mask_generator = lambda inputs: condition_mask_generator
+        elif isinstance(condition_mask_generator, (list, tuple, set)):
+            masks_list = list(condition_mask_generator)
+
+            def generator(inputs):
+                idx = torch.randint(len(masks_list), (inputs.shape[0],))
+                masks = [masks_list[i] for i in idx]
+                return torch.stack(masks)
+
+            self._condition_mask_generator = generator
+        return self  # Chainable
+
+    def set_edge_masks_generator(
+        self, edge_mask_generator: Union[Callable[[Tensor], Tensor], Tensor, list, set]
+    ):
+        """Set the edge mask generator.
+
+        The edge mask generator is a callable that generates the edge masks
+        thay will be employed at training time. It can otherwise also accept a fixed
+        edge mask or a set of edge masks which will be drawn uniformly.
+
+        If a callable is passed it must accept as parameter the input tensor to inform
+        it about the shapes that should be used to generate the masks.
+
+        Args:
+            edge_mask_generator: Callable that takes `inputs` and returns a
+                boolean tensor, or a fixed boolean tensor, or a list/tuple/set of
+                boolean tensors from which to randomly sample.
+
+        Returns:
+            MaskedNeuralInference object (returned so that this function is chainable).
+        """
+        if isinstance(edge_mask_generator, Callable):
+            self._edge_mask_generator = edge_mask_generator
+        elif isinstance(edge_mask_generator, Tensor):
+            self._edge_mask_generator = lambda inputs: edge_mask_generator
+        elif isinstance(edge_mask_generator, (list, tuple, set)):
+            masks_list = list(edge_mask_generator)
+
+            def generator(inputs):
+                idx = torch.randint(len(masks_list), (inputs.shape[0],))
+                masks = [masks_list[i] for i in idx]
+                return torch.stack(masks)
+
+            self._edge_mask_generator = generator
+        return self  # Chainable
+
+    def _default_condition_masks_generator(self, inputs):
+        """The default condition mask generator employed
+        if none is specified by the user. It consists on batch-wise
+        Bernoulli masks at p=0.5, with an extra check that ensures
+        that the full observed (full True) degenerate case is avoided
+        setting a random variable to latent.
+        """
+
+        batch_dims = inputs.shape[:-2]
+        num_nodes = inputs.shape[-2]
+
+        # Generate masks with Bernoulli
+        condition_masks = torch.bernoulli(
+            torch.full((*batch_dims, num_nodes), 0.5, device=inputs.device)
+        ).bool()
+
+        # Find rows that are all True (all observed)
+        all_observed = condition_masks.all(dim=-1)
+
+        # If there are any such rows, flip a random element to ensure
+        # there's at least one True and one False
+        if all_observed.any():
+            invalid_indices = torch.where(all_observed)
+
+            # For each invalid row, select a random column to flip
+            cols_to_flip = torch.randint(
+                num_nodes, (invalid_indices[0].shape[0],), device=inputs.device
+            )
+
+            # Create full indices for flipping and apply the flip
+            indices_to_flip = invalid_indices + (cols_to_flip,)
+            condition_masks[indices_to_flip] = ~condition_masks[indices_to_flip]
+        return condition_masks
+
+    def _default_edge_masks_generator(self, inputs):
+        """The default edge mask generator employed
+        if none is specified by the user. It simply pass
+        None as a full-attention masks (equivalent to a
+        full ones) in order to save memory. `input` is specified
+        for compatibility altough ignored."""
+
+        return None
+
+    def build_conditional(
+        self,
+        condition_mask: Union[Tensor, list],
+        edge_mask: Optional[Tensor],
+        mvf_estimator: Optional[MaskedConditionalVectorFieldEstimator],
+        prior: Optional[Distribution],
+        sample_with: Literal['ode', 'sde'],
+        conditional_parameters: Optional[PosteriorParameters],
+        **kwargs,
+    ) -> NeuralPosterior:
+        r"""Method for building an arbitrary conditional.
+
+        This method serves as a base method for constructing a conditional based
+        on a given estimator and prior. The conditional can be sampled using one of
+        several inference methods specified by `sample_with`.
+
+        This method serves the NeuralPosterior object to provide the final conditional,
+        despite the name, the returned object will not (necessarely) represent a
+        posterior but the appropriate conditional defined by the fixed condition
+        mask passed.
+
+        Args:
+            condition_masks: A boolean mask indicating the role of each variable.
+            Expected shape: `(batch_size, num_variables)`.
+            - `True` (or `1`): The variable at this position is observed and its
+                features will be used for conditioning.
+            - `False` (or `0`): The variable at this position is latent and its
+                features are subject to inference.
+            estimator: The estimator that the conditional is based on.
+            prior: A probability distribution that expresses prior knowledge about the
+                parameters, e.g. which ranges are meaningful for them. Must be a PyTorch
+                distribution, see FAQ for details on how to use custom distributions.
+            sample_with: The inference method to use. Must be one of:
+                - "sde"
+                - "ode"
+            **kwargs: Additional method-specific parameters.
+
+        Returns:
+            NeuralPosterior object.
+        """
+
+        condition_mask = torch.as_tensor(condition_mask)
+        if edge_mask is not None:
+            edge_mask = torch.as_tensor(edge_mask)
+
+        prior = self._resolve_prior(prior)
+        vf_estimator, device = self._resolve_estimator(
+            mvf_estimator,
+            condition_mask,
+            edge_mask,
+        )
+
+        conditional_parameters = self._resolve_posterior_parameters(
+            sample_with, conditional_parameters, **kwargs
+        )
+
+        self._posterior = self._create_posterior(
+            vf_estimator,
+            prior,
+            sample_with,
+            device,
+            conditional_parameters,
+        )
+
+        # Store models at end of each round.
+        self._model_bank.append(deepcopy(self._posterior))
+
+        return deepcopy(self._posterior)
+
+    def _resolve_estimator(
+        self,
+        estimator: Optional[MaskedConditionalEstimator],
+        fixed_condition_mask: Tensor,
+        fixed_edge_mask: Optional[Tensor],
+    ) -> Tuple[ConditionalEstimator, str]:
+        """
+        Resolves the masked estimator into an un-masked version and determines its
+        device.
+
+        To extract the un-masked estimator condition and edge masks must be provided to
+        inform the role of each variable and their dependencies.
+
+        If no estimator is provided, the internal neural net (`self._neural_net`)
+        is used and the device is taken from `self._device`. Otherwise, validates
+        the passed estimator and infers its device.
+
+        Args:
+            estimator: Optional estimator to use.
+            fixed_condition_mask: A boolean mask indicating the role of each variable.
+                Expected shape: `(batch_size, num_variables)`.
+                - `True` (or `1`): The variable at this position is observed and its
+                    features will be used for conditioning.
+                - `False` (or `0`): The variable at this position is latent and its
+                    features are subject to inference.
+            fixed_edge_mask: A boolean mask defining the adjacency matrix of the
+                directed acyclic graph (DAG) representing dependencies among variables.
+                Expected shape: `(batch_size, num_variables, num_variables)`.
+                - `True` (or `1`): An edge exists from the row variable to the column
+                    variable.
+                - `False` (or `0`): No edge exists between these variables.
+                - if None, it will be equivalent to a full attention (i.e., full ones)
+                                mask, we suggest you to use None instead of ones
+                                to save memory resources
+
+        Returns:
+            A tuple of (estimator, device).
+        """
+
+        resolved_estimator, device = super()._resolve_estimator(estimator)
+        assert isinstance(resolved_estimator, MaskedConditionalEstimator), (
+            f"Expected `estimator` to be a MaskedConditionalEstimator "
+            f"or None but got {type(resolved_estimator).__name__}. "
+            "Ensure that the estimator passed to NeuralInference is of the "
+            "correct type. "
+        )
+
+        assert hasattr(
+            resolved_estimator, "build_conditional_vector_field_estimator"
+        ), (
+            "The masked estimator provided does not implement "
+            "build_conditional_vector_field_estimator method to convert to "
+            "a un-masked equivalent. This error is probably being raised "
+            "because you tried to `build_posterior`, `build_likelihood`, "
+            "or `build_conditional` over such estimator. "
+            "Please provide a build_conditional_vector_field_estimator method."
+        )
+        unmasked_resolved_estimator = (
+            resolved_estimator.build_conditional_vector_field_estimator(
+                fixed_condition_mask=fixed_condition_mask,
+                fixed_edge_mask=fixed_edge_mask,
+            )
+        )
+
+        return unmasked_resolved_estimator, device
