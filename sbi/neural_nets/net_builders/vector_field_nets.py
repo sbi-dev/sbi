@@ -1158,7 +1158,7 @@ class VectorFieldTransformer(VectorFieldNet):
 class VectorFieldSimformer(MaskedVectorFieldNet):
     """Simformer for vector field estimation.
 
-    This class implements the Simformer as in Gloeckler et al. (2024).
+    This class implements the Simformer as in Gloeckler et al. (ICML, 2024).
     """
 
     def __init__(

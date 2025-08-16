@@ -18,7 +18,7 @@ from sbi.neural_nets.factory import simformer_flow_nn, simformer_score_nn
 
 
 class Simformer(MaskedVectorFieldTrainer):
-    """Simformer as in Gloeckler et al. (2024).
+    """Simformer as in Gloeckler et al. (ICML, 2024).
 
     Simformer enables sampling from arbitrary conditional joint distributions,
     not just posterior or likelihood, by operating on a unified input tensor
@@ -26,18 +26,24 @@ class Simformer(MaskedVectorFieldTrainer):
 
     The roles of variables—latent (to be inferred) or observed (to be conditioned on)—
     are specified by a boolean mask `condition_mask`.
+
     - `True` (or `1`): The variable is observed (conditioned on).
     - `False` (or `0`): The variable is latent (to be inferred).
 
     Dependencies among variables are defined by a boolean adjacency matrix `edge_mask`.
+
     - `True` (or `1`): An edge exists from the row variable to the column variable.
     - `False` (or `0`): No edge exists.
-    - if None, it will be equivalent to a full attention (i.e., full ones)
-    mask, we suggest you to use None instead of ones to save memory resources
+    - if `None`, it will be equivalent to a full attention (i.e., full ones)
+      mask, we suggest you to use `None` instead of ones to save memory resources
 
     NOTE:
-        - Multi-round inference is not supported yet; the API is present for coherence
-          with sbi.
+        This is the score-based implementation of the Simformer, sbi also
+        provides a flow-matching one as FlowMatchingSimformer.
+
+    NOTE:
+        Multi-round inference is not supported yet; the API is present for coherence
+        with sbi.
     """
 
     def __init__(
@@ -60,15 +66,14 @@ class Simformer(MaskedVectorFieldTrainer):
 
         Args:
             prior: Prior distribution. Its primary use is for rejecting samples that
-                fall outside its defined support. For the core inference process,
-                this prior is ignored.
+            fall outside its defined support. For the core inference process,
+            this prior is ignored.
             mvf_estimator: Neural network architecture for the masked
-                vector field estimator. Can be a string (e.g., `'simformer'`)
-                or a callable that implements the `MaskedVectorFieldEstimatorBuilder`
-                protocol. If a callable, `__call__` must accept `inputs`, and return
-                a `MaskedConditionalVectorFieldEstimator`.
+            vector field estimator. Can be a string (e.g., `'simformer'`)
+            or a callable that implements the `MaskedVectorFieldEstimatorBuilder`
+            protocol. If a callable, `__call__` must accept `inputs`, and return
+            a `MaskedConditionalVectorFieldEstimator`.
             sde_type: Type of SDE to use. Must be one of ['vp', 've', 'subvp'].
-                NOTE: Only ve (variance exploding) is supported by now.
             posterior_latent_idx: List or Tensor of indexes identifying which
             variables are latent (to be infered),
             i.e, which variables identify $\theta$.
@@ -85,7 +90,7 @@ class Simformer(MaskedVectorFieldTrainer):
 
         References:
             - Gloeckler, Deistler, Weilbach, Wood, Macke.
-                "All-in-one simulation-based inference.", ICML 2024
+            "All-in-one simulation-based inference.", ICML 2024
         """
         super().__init__(
             prior=prior,
@@ -123,24 +128,28 @@ class Simformer(MaskedVectorFieldTrainer):
         Args:
             condition_mask: A boolean mask indicating the role of each variable.
                 Expected shape: `(batch_size, num_variables)`.
+
                 - `True` (or `1`): The variable at this position is observed and its
-                features will be used for conditioning.
+                  features will be used for conditioning.
                 - `False` (or `0`): The variable at this position is latent and its
-                features are subject to inference.
+                  features are subject to inference.
+
             edge_mask: A boolean mask defining the adjacency matrix of the directed
                 acyclic graph (DAG) representing dependencies among variables.
                 Expected shape: `(batch_size, num_variables, num_variables)`.
+
                 - `True` (or `1`): An edge exists from the row variable to the column
-                variable.
+                  variable.
                 - `False` (or `0`): No edge exists between these variables.
-                - if None, it will be equivalent to a full attention (i.e., full ones)
-                mask, we suggest you to use None instead of ones
-                to save memory resources
+                - if `None`, it will be equivalent to a full attention (i.e., full ones)
+                  mask, we suggest you to use `None` instead of ones
+                  to save memory resources
+
             mvf_estimator: Neural network architecture for the masked
                 vector field estimator. Can be a callable that implements
                 the `MaskedVectorFieldEstimatorBuilder` protocol.
                 If a callable, `__call__` must accept `inputs`, and return
-                a `MaskedConditionalVectorFieldEstimator`. If None uses the
+                a `MaskedConditionalVectorFieldEstimator`. If `None` uses the
                 underlying trained neural net.
             prior: Prior distribution. Its primary use is for rejecting samples that
                 fall outside its defined support. For the core inference process,
@@ -186,16 +195,16 @@ class Simformer(MaskedVectorFieldTrainer):
                 acyclic graph (DAG) representing dependencies among variables.
                 Expected shape: `(batch_size, num_variables, num_variables)`.
                 - `True` (or `1`): An edge exists from the row variable to the column
-                variable.
+                  variable.
                 - `False` (or `0`): No edge exists between these variables.
-                - if None, it will be equivalent to a full attention (i.e., full ones)
-                mask, we suggest you to use None instead of ones
-                to save memory resources
+                - if `None`, it will be equivalent to a full attention (i.e., full ones)
+                  mask, we suggest you to use `None` instead of ones
+                  to save memory resources.
             mvf_estimator: Neural network architecture for the masked
                 vector field estimator. Can be a callable that implements
                 the `MaskedVectorFieldEstimatorBuilder` protocol.
                 If a callable, `__call__` must accept `inputs`, and return
-                a `MaskedConditionalVectorFieldEstimator`. If None uses the
+                a `MaskedConditionalVectorFieldEstimator`. If `None` uses the
                 underlying trained neural net.
             prior: Prior distribution. Its primary use is for rejecting samples that
                 fall outside its defined support. For the core inference process,
@@ -244,17 +253,19 @@ class Simformer(MaskedVectorFieldTrainer):
             edge_mask: A boolean mask defining the adjacency matrix of the directed
                 acyclic graph (DAG) representing dependencies among variables.
                 Expected shape: `(batch_size, num_variables, num_variables)`.
+
                 - `True` (or `1`): An edge exists from the row variable to the column
-                variable.
+                  variable.
                 - `False` (or `0`): No edge exists between these variables.
-                - if None, it will be equivalent to a full attention (i.e., full ones)
-                mask, we suggest you to use None instead of ones
-                to save memory resources
-             mvf_estimator: Neural network architecture for the masked
+                - if `None`, it will be equivalent to a full attention (i.e., full ones)
+                  mask, we suggest you to use `None` instead of ones
+                  to save memory resources.
+
+            mvf_estimator: Neural network architecture for the masked
                 vector field estimator. Can be a callable that implements
                 the `MaskedVectorFieldEstimatorBuilder` protocol.
                 If a callable, `__call__` must accept `inputs`, and return
-                a `MaskedConditionalVectorFieldEstimator`. If None uses the
+                a `MaskedConditionalVectorFieldEstimator`. If `None` uses the
                 underlying trained neural net.
             prior: Prior distribution. Its primary use is for rejecting samples that
                 fall outside its defined support. For the core inference process,
@@ -286,7 +297,8 @@ class Simformer(MaskedVectorFieldTrainer):
 
 
 class FlowMatchingSimformer(Simformer):
-    """Flow-matching version of the Simformer as in Gloeckler et al. (2024).
+    """Flow-matching version of the Simformer [Gloeckler et al. (ICML, 2024)],
+    the original score-based implementation is available using the Simformer class.
 
     Simformer enables sampling from arbitrary conditional joint distributions,
     not just posterior or likelihood, by operating on a unified input tensor
@@ -302,10 +314,12 @@ class FlowMatchingSimformer(Simformer):
 
     - `True` (or `1`): An edge exists from the row variable to the column variable.
     - `False` (or `0`): No edge exists.
+    - if `None`, it will be equivalent to a full attention (i.e., full ones)
+      mask, we suggest you to use `None` instead of ones to save memory resources
 
     NOTE:
         - Multi-round inference is not supported yet; the API is present for coherence
-            with sbi.
+          with sbi.
     """
 
     def _build_default_nn_fn(self, **kwargs) -> MaskedVectorFieldEstimatorBuilder:

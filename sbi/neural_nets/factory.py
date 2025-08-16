@@ -633,7 +633,7 @@ def simformer_score_nn(
             builder.
     Returns:
         Callable: A function that takes batch inputs and returns a masked score
-            matching estimator.
+        matching estimator.
     """
 
     kwargs = dict(
@@ -725,7 +725,7 @@ def simformer_flow_nn(
             builder.
     Returns:
         Callable: A function that takes batch inputs and returns a masked score
-            matching estimator.
+        matching estimator.
 
     """
 
