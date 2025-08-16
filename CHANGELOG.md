@@ -1,5 +1,169 @@
 # Changelog
 
+# Changelog
+
+## v0.25.0
+
+### ✨ Highlights
+
+#### 🚀 New Inference Methods
+
+* **MNPE class similar to MNLE** by @dgedon in https://github.com/sbi-dev/sbi/pull/1362
+* **Implementing SNPE-B (#199)** by @etouron1 in https://github.com/sbi-dev/sbi/pull/1471
+
+#### 🧠 Neural Network Architectures & Embedding Networks
+
+* **Simple transformer implementation** by @NicolasRR in https://github.com/sbi-dev/sbi/pull/1494
+* **Add embedding net that uses 1D causal convolutions (#1459)** by @Aranka-S in https://github.com/sbi-dev/sbi/pull/1499
+* **Add LRU-backed embedding networks** by @famura in https://github.com/sbi-dev/sbi/pull/1512
+* **Add ResNet as embedding model** by @StefanWahl in https://github.com/sbi-dev/sbi/pull/1472
+* **Spectral convolution embedding net** by @L-in-da in https://github.com/sbi-dev/sbi/pull/1503
+
+#### ⭐ Major Features & Capabilities
+
+* **Unify flow matching and score-based models** by @StarostinV in https://github.com/sbi-dev/sbi/pull/1497
+* **Model misspecification based on MMD** by @coschroeder in https://github.com/sbi-dev/sbi/pull/1502
+* **Marginal estimator log-prob based test for misspecification** by @swag2198 in https://github.com/sbi-dev/sbi/pull/1522
+* **Adding interface for unconditional flow training** by @plcrodrigues in https://github.com/sbi-dev/sbi/pull/1470
+* **Support using trained estimators in Pyro models** by @sethaxen in https://github.com/sbi-dev/sbi/pull/1491
+* **Add util to generate mcmc samples from user defined potential (#1405)** by @hayden-johnson in https://github.com/sbi-dev/sbi/pull/1483
+* **Logit transform** by @anastasiakrouglova in https://github.com/sbi-dev/sbi/pull/1485
+
+#### 📚 Documentation & Tutorials
+
+* **Tutorial on new features for score-based methods #1392** by @touronc in https://github.com/sbi-dev/sbi/pull/1489
+* **Docs: Introduce Readthedocs website** by @michaeldeistler in https://github.com/sbi-dev/sbi/pull/1463
+
+### 🐛 Bug Fixes
+
+* z_score correct order in Zuko by @anastasiakrouglova in https://github.com/sbi-dev/sbi/pull/1492
+* Minor fix when moving thetas from GPU to CPU by @famura in https://github.com/sbi-dev/sbi/pull/1515
+* Minor fix while using unconditional density estimator and LRU embedding by @ARna06 in https://github.com/sbi-dev/sbi/pull/1556
+* fix: replace 'in' operator with '==' for proper classifier comparison by @abelaba in https://github.com/sbi-dev/sbi/pull/1550
+* flowmatching condition shape fix by @gmoss13 in https://github.com/sbi-dev/sbi/pull/1584
+* patch for torch bug in tarp, run torch.histogram with cpu-only tensor by @psteinb in https://github.com/sbi-dev/sbi/pull/1596
+* fix failing tarp test by @janfb in https://github.com/sbi-dev/sbi/pull/1628
+* fix: cap max_sampling_batch_size to prevent excessive memory by @janfb in https://github.com/sbi-dev/sbi/pull/1624
+* 1561 computation of denoising posterior precision matrix in jac method score fn iid by @manuelgloeckler in https://github.com/sbi-dev/sbi/pull/1636
+* fix xfail test, fix deprecation warnings by @janfb in https://github.com/sbi-dev/sbi/pull/1642
+
+### 🛠️ Maintenance & Improvements
+
+#### 🔧 Code Quality & Refactoring
+
+* Refactoring flow and score matching classes and nets by @manuelgloeckler in https://github.com/sbi-dev/sbi/pull/1544
+* Rename inference trainer classes by @abelaba in https://github.com/sbi-dev/sbi/pull/1605
+* Rename VectorFieldInference to VectorFieldTrainer by @abelaba in https://github.com/sbi-dev/sbi/pull/1614
+* Refactor build_posterior to Eliminate Duplication Across Trainers by @abelaba in https://github.com/sbi-dev/sbi/pull/1610
+* Refactor build posterior method arguments to use Literals by @abelaba in https://github.com/sbi-dev/sbi/pull/1606
+* Refactor build_posterior Posterior Configuration Using Dataclasses by @abelaba in https://github.com/sbi-dev/sbi/pull/1619
+* Use TypeAlias and consistent naming for sbi types by @janfb in https://github.com/sbi-dev/sbi/pull/1637
+* Add protocol for estimator builder by @abelaba in https://github.com/sbi-dev/sbi/pull/1633
+* Improve abc implementation by @janfb in https://github.com/sbi-dev/sbi/pull/1615
+
+#### 🏷️ Type Hints & API Improvements
+
+* fix: add enum for flow options to fix type hints. by @janfb in https://github.com/sbi-dev/sbi/pull/1562
+* fix LC2ST kwarg typing by @janfb in https://github.com/sbi-dev/sbi/pull/1565
+* fix: Update RatioEstimator classifier argument to use a Protocol by @abelaba in https://github.com/sbi-dev/sbi/pull/1582
+* Update append_simulations return type to Self by @abelaba in https://github.com/sbi-dev/sbi/pull/1622
+* Deprecation Warnings for build_posterior stringly typed parameters by @abelaba in https://github.com/sbi-dev/sbi/pull/1627
+
+#### 🧪 Testing & CI/CD
+
+* Testmon by @manuelgloeckler in https://github.com/sbi-dev/sbi/pull/1452
+* disable testmon for now by @manuelgloeckler in https://github.com/sbi-dev/sbi/pull/1467
+* chore: Use pytest-split plugin in ci workflow by @schroedk in https://github.com/sbi-dev/sbi/pull/1465
+* tests: refactor "not slow" tests to be not so slow by @janfb in https://github.com/sbi-dev/sbi/pull/1495
+* Test for known pytorch distribution transform issue by @dgedon in https://github.com/sbi-dev/sbi/pull/1504
+* xfail scan test on python 3.13 by @manuelgloeckler in https://github.com/sbi-dev/sbi/pull/1533
+* Gpu test for VectorFieldPosterior by @jorobledo in https://github.com/sbi-dev/sbi/pull/1542
+* set vector field iid-tests xfail by @janfb in https://github.com/sbi-dev/sbi/pull/1554
+* Changed the xfail condition for LRU tests with mode='scan' by @famura in https://github.com/sbi-dev/sbi/pull/1552
+* Fix/lru test by @Matthijspals in https://github.com/sbi-dev/sbi/pull/1568
+* refactor sbc funcs and tests by @janfb in https://github.com/sbi-dev/sbi/pull/1578
+* chore: remove testmon, add codecov test analytics by @janfb in https://github.com/sbi-dev/sbi/pull/1592
+* chore: reorder setup steps for Python and uv in CI/CD workflows by @janfb in https://github.com/sbi-dev/sbi/pull/1601
+* Fix/lc2st numpy type fixes by @janfb in https://github.com/sbi-dev/sbi/pull/1613
+* Fix failing CI on main. by @janfb in https://github.com/sbi-dev/sbi/pull/1618
+
+#### 📖 Documentation & Website
+
+* Fix tests for new docs by @michaeldeistler in https://github.com/sbi-dev/sbi/pull/1475
+* Prevent notebook execution upon doc build by @michaeldeistler in https://github.com/sbi-dev/sbi/pull/1477
+* Fix broken links on website by @michaeldeistler in https://github.com/sbi-dev/sbi/pull/1480
+* fix: Update documentation folder path by @abelaba in https://github.com/sbi-dev/sbi/pull/1510
+* fix path to contribute.md by @psteinb in https://github.com/sbi-dev/sbi/pull/1507
+* Add utils to docs by @sethaxen in https://github.com/sbi-dev/sbi/pull/1520
+* Update new Readthedocs website by @michaeldeistler in https://github.com/sbi-dev/sbi/pull/1519
+* fix broken links on new website by @michaeldeistler in https://github.com/sbi-dev/sbi/pull/1538
+* Fixups for new website landing page by @michaeldeistler in https://github.com/sbi-dev/sbi/pull/1539
+* Fix: add tutorial page to mkdocs website by @michaeldeistler in https://github.com/sbi-dev/sbi/pull/1540
+* Fix broken links in some tutorials by @michaeldeistler in https://github.com/sbi-dev/sbi/pull/1541
+* Add examples to documentation by @jorobledo in https://github.com/sbi-dev/sbi/pull/1548
+* docs: Add importance_sampling_parameters to build_posterior docstring. by @abelaba in https://github.com/sbi-dev/sbi/pull/1558
+* Add missing arguments to LikelihoodEstimator and RatioEstimator docstrings. by @abelaba in https://github.com/sbi-dev/sbi/pull/1571
+* Fixups for new RTD website by @michaeldeistler in https://github.com/sbi-dev/sbi/pull/1573
+* Tutorial with a more representative training loop by @michaeldeistler in https://github.com/sbi-dev/sbi/pull/1574
+* Fixups for rendering of HH tutorial notebook by @michaeldeistler in https://github.com/sbi-dev/sbi/pull/1575
+* fix for colors in Hodgkin-Huxley notebook by @michaeldeistler in https://github.com/sbi-dev/sbi/pull/1576
+* Add citations to how-to guide by @michaeldeistler in https://github.com/sbi-dev/sbi/pull/1579
+* Clarify fullscreen view of applications-explorer by @michaeldeistler in https://github.com/sbi-dev/sbi/pull/1580
+* Fixups for the documentation by @michaeldeistler in https://github.com/sbi-dev/sbi/pull/1585
+* fixed misrendered bullet list, tested locally by @psteinb in https://github.com/sbi-dev/sbi/pull/1594
+* Improvements to L-C2ST tutorial by @michaeldeistler in https://github.com/sbi-dev/sbi/pull/1588
+* docs: Change colortheme in light mode by @michaeldeistler in https://github.com/sbi-dev/sbi/pull/1638
+
+#### 🏗️ Infrastructure & Dependencies
+
+* Add uv support by @abelaba in https://github.com/sbi-dev/sbi/pull/1518
+* switch to numfocus code of conduct by @janfb in https://github.com/sbi-dev/sbi/pull/1560
+* Update readme with new JOSS citation by @janfb in https://github.com/sbi-dev/sbi/pull/1564
+* update numfocus code of conduct by @janfb in https://github.com/sbi-dev/sbi/pull/1602
+* Added Apache License reference comments to source files + CI bash script check by @nMaax in https://github.com/sbi-dev/sbi/pull/1599
+
+#### 👥 User Experience & Warnings
+
+* Change xfail to skipif as outcome is not consistent by @gmoss13 in https://github.com/sbi-dev/sbi/pull/1487
+* Add warning when using append_simulations with exclude_invalid_x=True by @abelaba in https://github.com/sbi-dev/sbi/pull/1486
+* Batch sampling slow without warning by @dgedon in https://github.com/sbi-dev/sbi/pull/1490
+* Clarify pbar annotation in sample_batched for DirectPosterior by @StefanWahl in https://github.com/sbi-dev/sbi/pull/1493
+
+#### 🎮 GPU Support & Device Handling
+
+* Prior to(device) by @jorobledo in https://github.com/sbi-dev/sbi/pull/1505
+* posterior.to(device) by @jorobledo in https://github.com/sbi-dev/sbi/pull/1527
+
+#### 🔧 Miscellaneous Improvements
+
+* ref: update tests, add types and docs to marginal trainer by @janfb in https://github.com/sbi-dev/sbi/pull/1516
+* integrate sbi application eplorer by @lappalainenj in https://github.com/sbi-dev/sbi/pull/1567
+* fix: update notebook references by @emmanuel-ferdman in https://github.com/sbi-dev/sbi/pull/1563
+* Update sbiutils.py to use one-dimensional batch by @vivienr in https://github.com/sbi-dev/sbi/pull/1577
+* fix: remove empty list default argument by @abelaba in https://github.com/sbi-dev/sbi/pull/1608
+* fix: throw exception on unsupported activation function by @emmanuel-ferdman in https://github.com/sbi-dev/sbi/pull/1609
+* fix: resolve logger warnings by @emmanuel-ferdman in https://github.com/sbi-dev/sbi/pull/1598
+* fix paths by @manuelgloeckler in https://github.com/sbi-dev/sbi/pull/1641
+
+### 🎉 New Contributors
+
+* @abelaba made their first contribution in https://github.com/sbi-dev/sbi/pull/1486
+* @dgedon made their first contribution in https://github.com/sbi-dev/sbi/pull/1490
+* @StefanWahl made their first contribution in https://github.com/sbi-dev/sbi/pull/1493
+* @touronc made their first contribution in https://github.com/sbi-dev/sbi/pull/1489
+* @jorobledo made their first contribution in https://github.com/sbi-dev/sbi/pull/1505
+* @hayden-johnson made their first contribution in https://github.com/sbi-dev/sbi/pull/1483
+* @sethaxen made their first contribution in https://github.com/sbi-dev/sbi/pull/1491
+* @etouron1 made their first contribution in https://github.com/sbi-dev/sbi/pull/1471
+* @Aranka-S made their first contribution in https://github.com/sbi-dev/sbi/pull/1499
+* @swag2198 made their first contribution in https://github.com/sbi-dev/sbi/pull/1522
+* @StarostinV made their first contribution in https://github.com/sbi-dev/sbi/pull/1497
+* @L-in-da made their first contribution in https://github.com/sbi-dev/sbi/pull/1503
+* @NicolasRR made their first contribution in https://github.com/sbi-dev/sbi/pull/1494
+* @vivienr made their first contribution in https://github.com/sbi-dev/sbi/pull/1577
+
+**Full Changelog**: https://github.com/sbi-dev/sbi/compare/v0.24.0...v0.25.0
+
 ## v0.24.0
 
 ### ✨ Highlights
