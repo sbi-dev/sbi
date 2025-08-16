@@ -61,29 +61,19 @@ git clone git@github.com:$USERNAME/sbi.git
 cd sbi
 ```
 
-**Step 4**: Install a recent version of Python (we currently recommend 3.10)
-for instance using [`miniforge`](https://github.com/conda-forge/miniforge). We
-strongly recommend you create a specific `conda` environment for doing
-development on `sbi` as per:
+**Step 4**: Set up your development environment. Follow the [installation
+instructions](installation.md) to install Python and create a virtual environment with
+`uv`.
+
+**Step 5**: Install `sbi` in editable mode with development dependencies:
 
 ```bash
-conda create -n sbi_dev python=3.10
-conda activate sbi_dev
+uv pip install -e ".[dev]"
 ```
 
-**Step 5**: Install `sbi` in editable mode with
-
-```bash
-pip install -e ".[dev]"
-```
-
-This installs the `sbi` package into the current environment by creating a
-link to the source code directory (instead of copying the code to pip’s `site_packages`
-directory, which is what normally happens). This means that any edits you make
-to the `sbi` source code will be reflected the next time you open a Python interpreter
-and `import sbi` (the `-e` flag of pip stands for an “editable” installation,
-and the `dev` flag installs development and testing dependencies). This requires
-at least Python 3.8.
+This installs the `sbi` package in editable mode, meaning changes to the source code
+will be immediately reflected when you import `sbi`, along with all development and
+testing dependencies.
 
 **Step 6**: Add the upstream remote. This saves a reference to the main `sbi`
 repository, which you can use to keep your repository synchronized with the latest
@@ -106,7 +96,6 @@ upstream        git@github.com:sbi-dev/sbi.git (push)
 **Step 7**: Install `pre-commit` to run code style checks before each commit:
 
 ```bash
-pip install pre-commit
 pre-commit install
 ```
 
@@ -279,18 +268,16 @@ documentation, you should first install the `doc` dependencies:
 uv sync --extra doc
 ```
 
-Then, you can build the website locally by executing in the `docs` folder
+Then, you can build and serve the website locally by executing in the `docs` folder
 
 ```bash
-make html
 sphinx-autobuild . _build/html
 ```
 
-The first command will build the website in the `docs/_build/html` directory. The second
-command will start a local development server with automatic rebuilding and live reload, so
-you can open it in your browser and see changes as you edit. You can skip the first
-command if you've already built the documentation before. Changes to the documentation
-files will automatically trigger a rebuild and be displayed locally.
+This command will automatically build the website and start a local development server with
+automatic rebuilding and live reload, so you can open it in your browser and see changes
+as you edit. Changes to the documentation files will automatically trigger a rebuild and
+be displayed locally.
 
 ### Using AI Coding Assistants
 
