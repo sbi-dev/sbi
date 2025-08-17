@@ -120,68 +120,134 @@ class PlotOffDiagOptions(OffDiagOptions):
 
 
 @dataclass(frozen=True)
-class Despine:
-    offset: int = 5
-
-
-@dataclass(frozen=True)
-class TitleFormat:
-    fontsize: int = 16
-
-
-@dataclass(frozen=True)
-class SubplotAdjust:
-    top: float = 0.9
-
-
-@dataclass(frozen=True)
-class PointsOffDiag:
-    marker: str = "."
-    markersize: int = 10
-
-
-@dataclass(frozen=True)
-class FigBgColors:
-    offdiag: Optional[Any] = None
-    diag: Optional[Any] = None
-    lower: Optional[Any] = None
-
-
-@dataclass(frozen=True)
 class FigOptions:
-    legend: Optional[Any] = None
+    """
+    Configuration options for customizing Matplotlib figures.
+
+    Each attribute corresponds to a common Matplotlib API.
+    """
+
+    legend: bool = False
+    """Whether to display the legend."""
+
     legend_kwargs: Dict[str, Any] = field(default_factory=dict)
+    """Keyword arguments passed to `Axes.legend`
+    See: https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.legend.html"""
+
     # labels
     points_labels: List[str] = field(
         default_factory=lambda: [f"points_{idx}" for idx in range(10)]
-    )  # for points
+    )
+    """Default labels for plotted points (used with `label=` argument).
+    See: https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.plot.html"""
+
     samples_labels: List[str] = field(
         default_factory=lambda: [f"samples_{idx}" for idx in range(10)]
-    )  # for samples
-    # colors: take even colors for samples, odd colors for points
+    )
+    """Default labels for plotted samples (used with `label=` argument).
+    See: https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.plot.html"""
+
     samples_colors: List[str] = field(
         default_factory=lambda: plt.rcParams["axes.prop_cycle"].by_key()["color"][0::2]
-    )  # pyright: ignore[reportOptionalMemberAccess]
+    )
+    """Colors for samples, taken from the even indices of the default color cycle.
+    See: https://matplotlib.org/stable/tutorials/introductory/customizing.html#the-default-matplotlibrc-file"""
+
     points_colors: List[str] = field(
         default_factory=lambda: plt.rcParams["axes.prop_cycle"].by_key()["color"][1::2]
-    )  # pyright: ignore[reportOptionalMemberAccess]
+    )
+    """Colors for points, taken from the odd indices of the default color cycle.
+    See: https://matplotlib.org/stable/tutorials/introductory/customizing.html#the-default-matplotlibrc-file"""
+
     # ticks
     tickformatter: Any = field(
         default_factory=lambda: mpl.ticker.FormatStrFormatter("%g")  # type: ignore
     )
+    """Set the formatter of the major ticker.
+    See: https://matplotlib.org/stable/api/ticker_api.html#tick-formatting"""
+
     tick_labels: Optional[Any] = None
+    """Optional custom tick labels for axes.
+    See: https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.set_xticklabels.html"""
+
     # formatting points (scale, markers)
     points_diag: Dict[str, Any] = field(default_factory=dict)
-    points_offdiag: PointsOffDiag = field(default_factory=PointsOffDiag)
+    """Keyword arguments for formatting points on diagonal plots.
+    See: https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.plot.html"""
+
+    points_offdiag: Dict[str, Any] = field(default_factory=dict)
+    """Keyword arguments for formatting points on off-diagonal plots.
+
+    Defaults: {"marker": ".", "markersize": 10}
+
+    See: https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.plot.html"""
+
     # other options
-    fig_bg_colors: FigBgColors = field(default_factory=FigBgColors)
-    fig_subplots_adjust: SubplotAdjust = field(default_factory=SubplotAdjust)
+    fig_bg_colors: Dict[str, Any] = field(default_factory=dict)
+    """Background colors of the subplots.
+      Keys should only be `upper`, `lower` or `diag`."""
+
+    fig_subplots_adjust: Dict[str, Any] = field(default_factory=dict)
+    """Keyword arguments for adjusting the subplot layout.
+
+    Defaults: {"top": 0.9}
+
+    See: https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.subplots_adjust.html"""
+
     subplots: Dict[str, Any] = field(default_factory=dict)
-    despine: Despine = field(default_factory=Despine)
+    """Keyword arguments passed to `plt.subplots`, besides the `figsize` argument,
+       which is set through the plotting functions.
+
+    See: https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.figure.html#matplotlib.pyplot.figure"""
+
+    despine: Dict[str, int] = field(default_factory=lambda: dict(offset=5))
+    """Options for adjusting the plot spines.
+
+    Currently, only the ``{"offset": int}`` field is supported, which specifies how far
+    to move the spine away outward from the bottom by the specified number of points.
+
+    See: https://matplotlib.org/stable/api/spines_api.html#matplotlib.spines.Spine.set_position
+    """
+
     title: Optional[str] = None
-    title_format: TitleFormat = field(default_factory=TitleFormat)
+    """Title of the figure.
+    See: https://matplotlib.org/stable/api/_as_gen/matplotlib.figure.Figure.suptitle.html"""
+
+    title_format: Dict[str, Any] = field(default_factory=dict)
+    """Formatting options for the title.
+
+    Defaults: {"fontsize": 16}
+
+    See: https://matplotlib.org/stable/api/_as_gen/matplotlib.figure.Figure.suptitle.html"""
+
     x_lim_add_eps: float = 1e-5
+    """Extra margin decreased from the left and added to the right of x-axis limits for
+        diagonal plots.
+    See: https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.set_xlim.html"""
+
     square_subplots: bool = True
+    """Whether to force subplots to be square."""
+
+    def __post_init__(self):
+        """Post-initialization method for setting default plotting options."""
+
+        # sbi plotting figure default values
+        fig_options_defaults = {
+            "title_format": {"fontsize": 16},
+            "fig_subplots_adjust": {"top": 0.9},
+            "points_offdiag": {"marker": ".", "markersize": 10},
+            "fig_bg_colors": {"upper": None, "diag": None, "lower": None},
+        }
+
+        for field_name in fig_options_defaults:
+            default_value = fig_options_defaults[field_name]
+            current_value = getattr(self, field_name)
+
+            # Merge defaults with current values
+            updated = {**default_value, **current_value}
+
+            # Update fields
+            object.__setattr__(self, field_name, updated)
 
 
 def _set_color(i: int) -> str:
