@@ -4,7 +4,7 @@
 import time
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from typing import Any, Callable, Literal, Optional, Protocol, Tuple, Union
+from typing import Any, Callable, Literal, Optional, Tuple, Union
 
 import torch
 from torch import Tensor, ones
@@ -24,6 +24,7 @@ from sbi.inference.potentials.vector_field_potential import (
     vector_field_estimator_based_potential,
 )
 from sbi.neural_nets.estimators import ConditionalVectorFieldEstimator
+from sbi.neural_nets.estimators.base import DensityEstimatorBuilder
 from sbi.sbi_types import TorchTransform
 from sbi.utils import (
     check_estimator_arg,
@@ -37,32 +38,13 @@ from sbi.utils.sbiutils import ImproperEmpirical, mask_sims_from_prior
 from sbi.utils.torchutils import assert_all_finite
 
 
-class VectorFieldEstimatorBuilder(Protocol):
-    """Protocol for building a vector field estimator from data."""
-
-    def __call__(self, theta: Tensor, x: Tensor) -> ConditionalVectorFieldEstimator:
-        """Build a vector field estimator from theta and x, which mainly
-        inform the shape of the input and the condition to the neural network.
-        Generally, it can also be used to z-score the data, but not in the case
-        of vector field estimators.
-
-        Args:
-            theta: Parameter sets.
-            x: Simulation outputs.
-
-        Returns:
-            Vector field estimator.
-        """
-        ...
-
-
 class VectorFieldTrainer(NeuralInference, ABC):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
         vector_field_estimator_builder: Union[
             Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
-            VectorFieldEstimatorBuilder,
+            DensityEstimatorBuilder[ConditionalVectorFieldEstimator],
         ] = "mlp",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
@@ -81,7 +63,7 @@ class VectorFieldTrainer(NeuralInference, ABC):
             prior: Prior distribution.
             vector_field_estimator_builder: Neural network architecture for the
                 vector field estimator. Can be a string (e.g. 'mlp' or 'ada_mlp') or a
-                callable that implements the `VectorFieldEstimatorBuilder` protocol
+                callable that implements the `DensityEstimatorBuilder` protocol
                 with `__call__` that receives `theta` and `x` and returns a
                 `ConditionalVectorFieldEstimator`.
             device: Device to run the training on.
@@ -121,7 +103,7 @@ class VectorFieldTrainer(NeuralInference, ABC):
         self,
         model: Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
         **kwargs,
-    ) -> VectorFieldEstimatorBuilder:
+    ) -> DensityEstimatorBuilder[ConditionalVectorFieldEstimator]:
         pass
 
     def append_simulations(

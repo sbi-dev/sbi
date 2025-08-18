@@ -12,10 +12,12 @@ from sbi import utils as utils
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.posteriors.posterior_parameters import VectorFieldPosteriorParameters
 from sbi.inference.trainers.vfpe.base_vf_inference import (
-    VectorFieldEstimatorBuilder,
     VectorFieldTrainer,
 )
-from sbi.neural_nets.estimators.base import ConditionalVectorFieldEstimator
+from sbi.neural_nets.estimators.base import (
+    ConditionalVectorFieldEstimator,
+    DensityEstimatorBuilder,
+)
 from sbi.neural_nets.factory import posterior_flow_nn
 
 
@@ -27,9 +29,11 @@ class FMPE(VectorFieldTrainer):
         prior: Optional[Distribution],
         vf_estimator: Union[
             Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
-            VectorFieldEstimatorBuilder,
+            DensityEstimatorBuilder[ConditionalVectorFieldEstimator],
         ] = "mlp",
-        density_estimator: Optional[VectorFieldEstimatorBuilder] = None,
+        density_estimator: Optional[
+            DensityEstimatorBuilder[ConditionalVectorFieldEstimator]
+        ] = None,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
@@ -42,10 +46,9 @@ class FMPE(VectorFieldTrainer):
             prior: Prior distribution.
             vf_estimator: Neural network architecture used to learn the
                 vector field estimator. Can be a string (e.g. 'mlp', 'ada_mlp',
-                'transformer' or 'transformer_cross_attn') or a callable that
-                implements the `VectorFieldEstimatorBuilder` protocol with
-                `__call__` that receives `theta` and `x` and returns a
-                `ConditionalVectorFieldEstimator`.
+                'transformer' or 'transformer_cross_attn') or a callable that implements
+                the `DensityEstimatorBuilder` protocol with `__call__` that receives
+                `theta` and `x` and returns a `ConditionalVectorFieldEstimator`.
             density_estimator: Deprecated. Use `vf_estimator` instead. When passed, a
                 warning is raised and the `vf_estimator="mlp"` default is used.
             device: Device to use for training.
@@ -125,5 +128,5 @@ class FMPE(VectorFieldTrainer):
         self,
         model: Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
         **kwargs,
-    ) -> VectorFieldEstimatorBuilder:
+    ) -> DensityEstimatorBuilder[ConditionalVectorFieldEstimator]:
         return posterior_flow_nn(model=model, **kwargs)
