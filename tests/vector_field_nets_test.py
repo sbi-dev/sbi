@@ -160,7 +160,7 @@ SIMFORMER_CASE = [
 @pytest.mark.parametrize("time_emb_type", ["sinusoidal", "random_fourier"])
 @pytest.mark.parametrize("time_embedding_dim", [8, 16])
 @pytest.mark.parametrize("batch_dim", [1, 3])
-@pytest.mark.parametrize("input_dim", [(1, 1), (2, 1), (3, 5)])
+@pytest.mark.parametrize("input_dim", [(1,), (3,), (1, 1), (2, 1), (3, 5)])
 def test_simformer_builder_shape_and_build(
     builder,
     builder_kwargs,

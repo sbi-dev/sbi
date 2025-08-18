@@ -1269,6 +1269,12 @@ class VectorFieldSimformer(MaskedVectorFieldNet):
             Vector field evaluation at the provided points
         """
 
+        if self.in_features == 1 and inputs.dim() == 2:
+            inputs = inputs.unsqueeze(-1)  # [B, T] -> [B, T, 1]
+            to_squeeze = True
+        else:
+            to_squeeze = False
+
         B, T, _ = inputs.shape
         device = inputs.device
 
@@ -1317,6 +1323,10 @@ class VectorFieldSimformer(MaskedVectorFieldNet):
 
         # Output projection
         out = self.out_linear(h)  # [B, T, F]
+
+        if to_squeeze:
+            out = out.squeeze(-1)
+
         return out
 
 
@@ -1585,7 +1595,7 @@ def build_simformer_network(
     del batch_y  # Unused
     del embedding_net  # Unused
 
-    in_features = batch_x.shape[-1]
+    in_features = 1 if batch_x.dim() == 2 else batch_x.shape[-1]
     num_nodes = batch_x.shape[1]
 
     # Create the vector field network (Simformer)
