@@ -1,7 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import List, Optional
+from typing import List
 
 import numpy as np
 import pytest
@@ -146,123 +146,51 @@ def test_c2st_vector_field_on_linearGaussian(
 
 # We always test num_dim and sample_with with defaults and mark the rests as slow.
 @pytest.mark.parametrize(
-    (
-        "vector_field_type, num_dim, prior_str, sample_with, num_simulations, "
-        "max_num_epochs, device"
-    ),
+    ("vector_field_type, num_dim, prior_str, is_gpu_slow"),
     [
+        pytest.param("vp", 1, "gaussian", False),
         pytest.param(
-            "vp",
-            1,
-            "gaussian",
-            ["sde", "ode"],
-            5000,
-            100,
-            "cpu",
+            "vp", 3, "uniform", True, marks=[pytest.mark.gpu, pytest.mark.slow]
         ),
         pytest.param(
-            "vp",
-            3,
-            "uniform",
-            ["sde", "ode"],
-            25000,
-            None,
-            "gpu",
-            marks=[pytest.mark.gpu, pytest.mark.slow],
+            "vp", 3, "gaussian", True, marks=[pytest.mark.gpu, pytest.mark.slow]
         ),
+        pytest.param("ve", 3, "uniform", False),
+        pytest.param("ve", 3, "gaussian", False),
         pytest.param(
-            "vp",
-            3,
-            "gaussian",
-            ["sde", "ode"],
-            25000,
-            None,
-            "gpu",
-            marks=[pytest.mark.gpu, pytest.mark.slow],
+            "subvp", 3, "uniform", True, marks=[pytest.mark.gpu, pytest.mark.slow]
         ),
-        pytest.param(
-            "ve",
-            3,
-            "uniform",
-            ["sde", "ode"],
-            5000,
-            100,
-            "cpu",
-        ),
-        pytest.param(
-            "ve",
-            3,
-            "gaussian",
-            ["sde", "ode"],
-            5000,
-            100,
-            "cpu",
-        ),
-        pytest.param(
-            "subvp",
-            3,
-            "uniform",
-            ["sde", "ode"],
-            25000,
-            None,
-            "gpu",
-            marks=[pytest.mark.gpu, pytest.mark.slow],
-        ),
-        pytest.param(
-            "flow",
-            1,
-            "gaussian",
-            ["sde", "ode"],
-            5000,
-            100,
-            "cpu",
-        ),
-        pytest.param(
-            "flow",
-            1,
-            "uniform",
-            ["sde", "ode"],
-            5000,
-            100,
-            "cpu",
-        ),
-        pytest.param(
-            "flow",
-            3,
-            "gaussian",
-            ["sde", "ode"],
-            5000,
-            100,
-            "cpu",
-        ),
-        pytest.param(
-            "flow",
-            3,
-            "uniform",
-            ["sde", "ode"],
-            5000,
-            100,
-            "cpu",
-        ),
+        pytest.param("flow", 1, "gaussian", False),
+        pytest.param("flow", 1, "uniform", False),
+        pytest.param("flow", 3, "gaussian", False),
+        pytest.param("flow", 3, "uniform", False),
     ],
 )
 def test_c2st_simformer_on_linearGaussian(
     vector_field_type: str,
     num_dim: int,
     prior_str: str,
-    sample_with: List[str],
-    num_simulations: int,
-    max_num_epochs: Optional[int],
-    device: str,
+    is_gpu_slow: bool,
 ):
     """
     Test whether Simformer infers well a simple example with available ground truth.
     """
+
+    if is_gpu_slow:
+        # Default values for slow and GPU tests
+        num_simulations = 25000
+        max_num_epochs = 2**31 - 1  # Until convergence
+        device = "gpu"
+    else:
+        # Default values for CPU and fast tests
+        num_simulations = 5000
+        max_num_epochs = 100
+        device = "cpu"
+    device = process_device(device)
+
     num_samples = 1000
     tol = 0.15
-    if max_num_epochs is None:
-        max_num_epochs = 2**31 - 1
-    device = process_device(device)
+    sample_with = ["sde", "ode"]
 
     x_o = zeros(1, num_dim, device=device)
 
