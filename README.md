@@ -9,8 +9,8 @@
 
 ## `sbi`: Simulation-Based Inference
 
-[Getting Started](https://sbi-dev.github.io/sbi/latest/tutorials/00_getting_started/) |
-[Documentation](https://sbi-dev.github.io/sbi/) | [Discord Server](https://discord.gg/eEeVPSvWKy)
+[Getting Started](https://sbi.readthedocs.io/en/latest/tutorials/00_getting_started.html) |
+[Documentation](https://sbi.readthedocs.io/en/latest/) | [Discord Server](https://discord.gg/eEeVPSvWKy)
 
 `sbi` is a Python package for simulation-based inference, designed to meet the needs of
 both researchers and practitioners. Whether you need fine-grained control or an
