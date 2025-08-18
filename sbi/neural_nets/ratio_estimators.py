@@ -6,8 +6,10 @@ from __future__ import annotations
 import torch
 from torch import Tensor, nn
 
+from sbi.neural_nets.estimators.base import ConditionalEstimator
 
-class RatioEstimator(nn.Module):
+
+class RatioEstimator(ConditionalEstimator):
     r"""Base class for ratio estimators.
 
     The ratio estimator class is a wrapper around neural networks that enables
@@ -43,48 +45,13 @@ class RatioEstimator(nn.Module):
             embedding_net_theta
             embedding_net_x
         """
-        super().__init__()
+
+        super().__init__(input_shape=theta_shape, condition_shape=x_shape)
         self.net = net
-        self.theta_shape = theta_shape
-        self.x_shape = x_shape
+        self.theta_shape = self.input_shape
+        self.x_shape = self.condition_shape
         self.embedding_net_theta = embedding_net_theta
         self.embedding_net_x = embedding_net_x
-
-    @staticmethod
-    def _check_shape_suffix(
-        y: Tensor,
-        shape: torch.Size | tuple[int, ...],
-        tensor_name: str,
-        shape_name: str,
-    ) -> None:
-        r"""This method checks whether y has the correct shape.
-
-        Args:
-            y: Tensor of shape `(*batch_shape, *y_shape)`.
-            shape: expected shape for `y_shape`
-            tensor_name: for errors
-            shape_name: for errors
-
-        Raises:
-            ValueError: If `y` has a dimensionality that does not match
-                        the expected input dimensionality.
-            ValueError: If the shape of `y` does not match the expected
-                        input dimensionality.
-        """
-        if len(y.shape) < len(shape):
-            raise ValueError(
-                f"Dimensionality of {tensor_name} is to small and does not match the \
-                expected input dimensionality {len(shape)}, as provided \
-                by {shape_name}."
-            )
-        else:
-            tensor_shape = y.shape[-len(shape) :]
-            if tuple(tensor_shape) != tuple(shape):
-                raise ValueError(
-                    f"Shape of tensor {tensor_name}={tuple(tensor_shape)} does not \
-                    match the expected input dimensionality {tuple(shape)}, as \
-                    provided by {shape_name}. Please reshape it accordingly."
-                )
 
     def _check_x_shape_suffix(self, x: Tensor) -> None:
         r"""This method checks whether x has the correct shape.
@@ -98,7 +65,7 @@ class RatioEstimator(nn.Module):
             ValueError: If the shape of the x does not match the expected
                         input dimensionality.
         """
-        return self._check_shape_suffix(x, self.x_shape, "x", "x_shape")
+        return self._check_condition_shape(x)
 
     def _check_theta_shape_suffix(self, theta: Tensor) -> None:
         r"""This method checks whether theta has the correct shape.
@@ -112,7 +79,7 @@ class RatioEstimator(nn.Module):
             ValueError: If the shape of the theta does not match the expected
                         input dimensionality.
         """
-        return self._check_shape_suffix(theta, self.theta_shape, "theta", "theta_shape")
+        return self._check_input_shape(theta)
 
     def _get_shape_prefix(
         self, theta: Tensor, x: Tensor
