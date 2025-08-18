@@ -146,40 +146,35 @@ def test_c2st_vector_field_on_linearGaussian(
 
 # We always test num_dim and sample_with with defaults and mark the rests as slow.
 @pytest.mark.parametrize(
-    ("vector_field_type, num_dim, prior_str, is_gpu_slow"),
+    ("vector_field_type, num_dim, prior_str"),
     [
-        pytest.param("vp", 1, "gaussian", False),
-        pytest.param(
-            "vp", 3, "uniform", True, marks=[pytest.mark.gpu, pytest.mark.slow]
-        ),
-        pytest.param(
-            "vp", 3, "gaussian", True, marks=[pytest.mark.gpu, pytest.mark.slow]
-        ),
-        pytest.param("ve", 3, "uniform", False),
-        pytest.param("ve", 3, "gaussian", False),
-        pytest.param(
-            "subvp", 3, "uniform", True, marks=[pytest.mark.gpu, pytest.mark.slow]
-        ),
-        pytest.param("flow", 1, "gaussian", False),
-        pytest.param("flow", 1, "uniform", False),
-        pytest.param("flow", 3, "gaussian", False),
-        pytest.param("flow", 3, "uniform", False),
+        pytest.param("ve", 1, "uniform"),
+        pytest.param("ve", 1, "gaussian"),
+        pytest.param("ve", 3, "uniform"),
+        pytest.param("ve", 3, "gaussian"),
+        pytest.param("vp", 3, "uniform", marks=[pytest.mark.gpu, pytest.mark.slow]),
+        pytest.param("vp", 3, "gaussian", marks=[pytest.mark.gpu, pytest.mark.slow]),
+        pytest.param("subvp", 3, "uniform", marks=[pytest.mark.gpu, pytest.mark.slow]),
+        pytest.param("subvp", 3, "gaussian", marks=[pytest.mark.gpu, pytest.mark.slow]),
+        pytest.param("flow", 1, "uniform"),
+        pytest.param("flow", 1, "gaussian"),
+        pytest.param("flow", 3, "uniform"),
+        pytest.param("flow", 3, "gaussian"),
     ],
 )
 def test_c2st_simformer_on_linearGaussian(
     vector_field_type: str,
     num_dim: int,
     prior_str: str,
-    is_gpu_slow: bool,
 ):
     """
     Test whether Simformer infers well a simple example with available ground truth.
     """
 
-    if is_gpu_slow:
-        # Default values for slow and GPU tests
+    if vector_field_type in {'vp', 'subvp'}:
+        # Default values for slow and GPU tests (VP and sub-VP)
         num_simulations = 25000
-        max_num_epochs = 2**31 - 1  # Until convergence
+        max_num_epochs = 500
         device = "gpu"
     else:
         # Default values for CPU and fast tests
