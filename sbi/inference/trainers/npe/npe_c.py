@@ -97,7 +97,6 @@ class NPE_C(PosteriorEstimatorTrainer):
                 density estimator needs to provide the methods `.log_prob` and
                 `.sample()` and must return either a `ConditionalVectorFieldEstimator`
                 or `ConditionalDensityEstimator`.
-
             device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.
