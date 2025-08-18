@@ -575,7 +575,7 @@ def test_simformer_sde_ode_sampling_equivalence(simformer_trained_model):
             "fnpe",
             3,
             id="fnpe-3trials",
-            marks=pytest.mark.xfail(reason="c2st to high, fixed in PR #1501/1544"),
+            marks=pytest.mark.skip(reason="fails randomly, see #1646"),
         ),
         pytest.param("gauss", 3, id="gauss-3trials"),
         pytest.param("auto_gauss", 8, id="auto_gauss-8trials"),

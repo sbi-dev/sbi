@@ -101,6 +101,21 @@ Posteriors
    sbi.inference.EnsemblePosterior
 
 
+Posterior Parameters
+--------------------
+
+.. autosummary::
+   :toctree: reference/_autosummary
+   :nosignatures:
+
+   sbi.inference.posteriors.DirectPosteriorParameters
+   sbi.inference.posteriors.ImportanceSamplingPosteriorParameters
+   sbi.inference.posteriors.MCMCPosteriorParameters
+   sbi.inference.posteriors.RejectionPosteriorParameters
+   sbi.inference.posteriors.VectorFieldPosteriorParameters
+   sbi.inference.posteriors.VIPosteriorParameters
+
+
 Diagnostics
 -----------
 
