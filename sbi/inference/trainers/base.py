@@ -907,7 +907,7 @@ class BaseNeuralInference:
 class NeuralInference(ABC, BaseNeuralInference):
     """Abstract base class for neural inference methods."""
 
-    _neural_net: Optional[RatioEstimator | ConditionalEstimator]
+    _neural_net: RatioEstimator | ConditionalEstimator
 
     def __init__(
         self,
@@ -1173,7 +1173,7 @@ class NeuralInference(ABC, BaseNeuralInference):
 class MaskedNeuralInference(ABC, BaseNeuralInference):
     """Abstract base class for masked neural inference methods."""
 
-    _neural_net: Optional[MaskedConditionalEstimator]
+    _neural_net: MaskedConditionalEstimator
 
     def __init__(
         self,
