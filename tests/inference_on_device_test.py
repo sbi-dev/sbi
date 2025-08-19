@@ -22,6 +22,7 @@ from sbi.inference import (
     NPE,
     NPE_A,
     NPE_C,
+    NPSE,
     NRE_A,
     NRE_B,
     NRE_C,
@@ -41,6 +42,7 @@ from sbi.inference.potentials.base_potential import BasePotential
 from sbi.inference.potentials.likelihood_based_potential import LikelihoodBasedPotential
 from sbi.inference.potentials.posterior_based_potential import PosteriorBasedPotential
 from sbi.inference.potentials.ratio_based_potential import RatioBasedPotential
+from sbi.inference.trainers.vfpe.base_vf_inference import VectorFieldTrainer
 from sbi.neural_nets.embedding_nets import FCEmbedding
 from sbi.neural_nets.factory import (
     classifier_nn,
@@ -721,8 +723,9 @@ def test_to_method_on_posteriors(device: str, sampling_method: str):
 @pytest.mark.parametrize(
     "iid_method", ["fnpe", "gauss", "auto_gauss", "jac_gauss", None]
 )
+@pytest.mark.parametrize("method", (FMPE, NPSE))
 def test_VectorFieldPosterior_device_handling(
-    device: str, device_inference: str, iid_method: str
+    method: VectorFieldTrainer, device: str, device_inference: str, iid_method: str
 ):
     """Test VectorFieldPosterior on different devices training and inference devices.
 
@@ -731,10 +734,11 @@ def test_VectorFieldPosterior_device_handling(
         device_inference: device to run the inference on.
         iid_method: method to sample from the posterior.
     """
+    num_trials = 2
     device = process_device(device)
     device_inference = process_device(device_inference)
     prior = BoxUniform(torch.zeros(3), torch.ones(3), device=device)
-    inference = FMPE(score_estimator="mlp", prior=prior, device=device)
+    inference = method(prior=prior, vf_estimator="mlp", device=device)
     density_estimator = inference.append_simulations(
         torch.randn((100, 3)), torch.randn((100, 2))
     ).train(max_num_epochs=1)
@@ -748,7 +752,7 @@ def test_VectorFieldPosterior_device_handling(
         f"VectorFieldPosterior is not in device {device_inference}."
     )
 
-    x_o = torch.ones(2).to(device_inference)
+    x_o = torch.ones(num_trials).to(device_inference)
     samples = posterior.sample((2,), x=x_o, iid_method=iid_method)
     assert samples.device.type == device_inference.split(":")[0], (
         f"Samples are not on device {device_inference}."
