@@ -1318,7 +1318,7 @@ class MaskedNeuralInference(ABC, BaseNeuralInference):
         thay will be employed at training time. It can otherwise also accept a fixed
         condition mask or a set of condition masks which will be drawn uniformly.
 
-        If a callable is passed it must accept as parameter the input tensor to inform
+        If a callable is passed it must accept as parameter the `input` Tensor to inform
         it about the shapes that should be used to generate the masks.
 
         Args:
@@ -1353,11 +1353,15 @@ class MaskedNeuralInference(ABC, BaseNeuralInference):
         thay will be employed at training time. It can otherwise also accept a fixed
         edge mask or a set of edge masks which will be drawn uniformly.
 
+        Usually, the edge mask is defined based on the condition_mask itself, which also
+        informs for the inputs shapes. Thus, you should pass a callable that accept
+        a condition_mask as parameter.
+
         If a callable is passed it must accept as parameter the input tensor to inform
         it about the shapes that should be used to generate the masks.
 
         Args:
-            edge_mask_generator: Callable that takes `inputs` and returns a
+            edge_mask_generator: Callable that takes `condition_mask` and returns a
                 boolean tensor, or a fixed boolean tensor, or a list/tuple/set of
                 boolean tensors from which to randomly sample.
 
@@ -1367,7 +1371,7 @@ class MaskedNeuralInference(ABC, BaseNeuralInference):
         if isinstance(edge_mask_generator, Callable):
             self._edge_mask_generator = edge_mask_generator
         elif isinstance(edge_mask_generator, Tensor):
-            self._edge_mask_generator = lambda inputs: edge_mask_generator
+            self._edge_mask_generator = lambda condition_mask: edge_mask_generator
         elif isinstance(edge_mask_generator, (list, tuple, set)):
             masks_list = list(edge_mask_generator)
 
@@ -1413,7 +1417,7 @@ class MaskedNeuralInference(ABC, BaseNeuralInference):
             condition_masks[indices_to_flip] = ~condition_masks[indices_to_flip]
         return condition_masks
 
-    def _default_edge_masks_generator(self, inputs):
+    def _default_edge_masks_generator(self, condition_mask):
         """The default edge mask generator employed
         if none is specified by the user. It simply pass
         None as a full-attention masks (equivalent to a

@@ -1039,7 +1039,7 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
                     "properly defined. Please fix your generator."
                 )
 
-                edge_masks_batch = self._edge_mask_generator(inputs_batch)
+                edge_masks_batch = self._edge_mask_generator(condition_masks_batch)
                 if edge_masks_batch is not None:
                     edge_masks_batch = edge_masks_batch.to(self._device)
 
@@ -1134,7 +1134,9 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
                         "properly defined. Please fix your generator."
                     )
 
-                    edge_masks_batch_val = self._edge_mask_generator(inputs_batch_val)
+                    edge_masks_batch_val = self._edge_mask_generator(
+                        condition_masks_batch_val
+                    )
                     if edge_masks_batch_val is not None:
                         edge_masks_batch_val = edge_masks_batch_val.to(self._device)
 
