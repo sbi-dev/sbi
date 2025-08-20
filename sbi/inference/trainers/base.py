@@ -268,14 +268,73 @@ class BaseNeuralInference:
         # at the moment any child can return both
         ...
 
-    @abstractmethod
     def get_dataloaders(
         self,
-        *args,
-        **kwargs,
+        starting_round: int = 0,
+        training_batch_size: int = 200,
+        validation_fraction: float = 0.1,
+        resume_training: bool = False,
+        dataloader_kwargs: Optional[dict] = None,
     ) -> Tuple[data.DataLoader, data.DataLoader]:
-        "Abstract definition to get simulations dataloaders for training and validation"
-        ...
+        r"""Return dataloaders for training and validation.
+
+        Args:
+            starting_round: round from which loading data.
+            training_batch_size: training arg of inference methods.
+            validation_fraction: float in (0, 1) indicating which fraction of data
+                should be reserved for validation.
+            resume_training: Whether the current call is resuming training so that no
+                new training and validation indices into the dataset have to be created.
+            dataloader_kwargs: Additional or updated kwargs to be passed to the training
+                and validation dataloaders (like, e.g., a collate_fn).
+
+        Returns:
+            Tuple of dataloaders for training and validation.
+
+        """
+
+        #
+        simulation_data = self.get_simulations(starting_round)
+
+        dataset = data.TensorDataset(*simulation_data)
+
+        # Get total number of training examples.
+        num_examples = simulation_data[0].size(0)
+        # Select random train and validation splits from (theta, x) pairs.
+        num_training_examples = int((1 - validation_fraction) * num_examples)
+        num_validation_examples = num_examples - num_training_examples
+
+        if not resume_training:
+            # Separate indices for training and validation
+            permuted_indices = torch.randperm(num_examples)
+            self.train_indices, self.val_indices = (
+                permuted_indices[:num_training_examples],
+                permuted_indices[num_training_examples:],
+            )
+
+        # Create training and validation loaders using a subset sampler.
+        # Intentionally use dicts to define the default dataloader args
+        # Then, use dataloader_kwargs to override (or add to) any of these defaults
+        # https://stackoverflow.com/questions/44784577/in-method-call-args-how-to-override-keyword-argument-of-unpacked-dict
+        train_loader_kwargs = {
+            "batch_size": min(training_batch_size, num_training_examples),
+            "drop_last": True,
+            "sampler": SubsetRandomSampler(self.train_indices.tolist()),
+        }
+        val_loader_kwargs = {
+            "batch_size": min(training_batch_size, num_validation_examples),
+            "shuffle": False,
+            "drop_last": True,
+            "sampler": SubsetRandomSampler(self.val_indices.tolist()),
+        }
+        if dataloader_kwargs is not None:
+            train_loader_kwargs = dict(train_loader_kwargs, **dataloader_kwargs)
+            val_loader_kwargs = dict(val_loader_kwargs, **dataloader_kwargs)
+
+        train_loader = data.DataLoader(dataset, **train_loader_kwargs)
+        val_loader = data.DataLoader(dataset, **val_loader_kwargs)
+
+        return train_loader, val_loader
 
     @abstractmethod
     def _get_potential_function(
@@ -714,7 +773,15 @@ class BaseNeuralInference:
     def _converged(self, epoch: int, stop_after_epochs: int) -> bool:
         """Return whether the training converged yet and save best model state so far.
 
-        Checks for improvement in validation performance over previous epochs.
+        Diffusion or flow matching objectives are inherently more stochastic than MLE
+        for e.g. NPE because they additionally add "noise" by construction. We hence
+        use a statistical approach to detect convergence by tracking standard deviation
+        of validation losses. Training is considered converged when the current loss is
+        significantly worse than the best loss for a sustained period (more than 2 std
+        deviations above best).
+
+        NOTE: The standard deviation of the `validation_loss `is computed in a running
+            fashion over the most recent 2 × stop_after_epochs loss values.
 
         Args:
             epoch: Current epoch in training.
@@ -728,17 +795,47 @@ class BaseNeuralInference:
         assert self._neural_net is not None
         neural_net = self._neural_net
 
-        # (Re)-start the epoch count with the first epoch or any improvement.
-        if epoch == 0 or self._val_loss < self._best_val_loss:
+        # Initialize tracking variables if not exists
+        if not hasattr(self, '_best_val_loss'):
+            self._best_val_loss = float('inf')
+            self._epochs_since_last_improvement = 0
+            self._best_model_state_dict = None
+
+        # Check if we have a new best loss
+        if self._val_loss < self._best_val_loss:
             self._best_val_loss = self._val_loss
             self._epochs_since_last_improvement = 0
             self._best_model_state_dict = deepcopy(neural_net.state_dict())
         else:
-            self._epochs_since_last_improvement += 1
+            # Only start statistical analysis after we have enough data
+            if len(self._summary["validation_loss"]) >= stop_after_epochs:
+                # Calculate running statistics of recent losses
+                recent_losses = torch.tensor(
+                    self._summary["validation_loss"][-stop_after_epochs * 2 :]
+                )
+                loss_std = recent_losses.std().item()
+
+                # Calculate how many standard deviations the current loss is from the
+                # best
+                diff_to_best_normalized = (
+                    self._val_loss - self._best_val_loss
+                ) / loss_std
+                # Consider it "no improvement" if current loss is significantly
+                # worse than the best loss (more than 2 std deviations above best)
+                # This accounts for natural fluctuations while being sensitive to
+                # real degradation
+                if diff_to_best_normalized > 2.0:
+                    self._epochs_since_last_improvement += 1
+                else:
+                    # Reset counter if loss is within acceptable range
+                    self._epochs_since_last_improvement = 0
+            else:
+                return False
 
         # If no validation improvement over many epochs, stop training.
         if self._epochs_since_last_improvement > stop_after_epochs - 1:
-            neural_net.load_state_dict(self._best_model_state_dict)
+            if self._best_model_state_dict is not None:
+                neural_net.load_state_dict(self._best_model_state_dict)
             converged = True
 
         return converged
@@ -1021,74 +1118,6 @@ class NeuralInference(ABC, BaseNeuralInference):
 
         return theta, x, prior_masks
 
-    def get_dataloaders(
-        self,
-        starting_round: int = 0,
-        training_batch_size: int = 200,
-        validation_fraction: float = 0.1,
-        resume_training: bool = False,
-        dataloader_kwargs: Optional[dict] = None,
-    ) -> Tuple[data.DataLoader, data.DataLoader]:
-        r"""Return dataloaders for training and validation.
-
-        Args:
-            starting_round: round from which loading data.
-            training_batch_size: training arg of inference methods.
-            validation_fraction: float in (0, 1) indicating which fraction of data
-                should be reserved for validation.
-            resume_training: Whether the current call is resuming training so that no
-                new training and validation indices into the dataset have to be created.
-            dataloader_kwargs: Additional or updated kwargs to be passed to the training
-                and validation dataloaders (like, e.g., a collate_fn).
-
-        Returns:
-            Tuple of dataloaders for training and validation.
-
-        """
-
-        #
-        theta, x, prior_masks = self.get_simulations(starting_round)
-
-        dataset = data.TensorDataset(theta, x, prior_masks)
-
-        # Get total number of training examples.
-        num_examples = theta.size(0)
-        # Select random train and validation splits from (theta, x) pairs.
-        num_training_examples = int((1 - validation_fraction) * num_examples)
-        num_validation_examples = num_examples - num_training_examples
-
-        if not resume_training:
-            # Separate indices for training and validation
-            permuted_indices = torch.randperm(num_examples)
-            self.train_indices, self.val_indices = (
-                permuted_indices[:num_training_examples],
-                permuted_indices[num_training_examples:],
-            )
-
-        # Create training and validation loaders using a subset sampler.
-        # Intentionally use dicts to define the default dataloader args
-        # Then, use dataloader_kwargs to override (or add to) any of these defaults
-        # https://stackoverflow.com/questions/44784577/in-method-call-args-how-to-override-keyword-argument-of-unpacked-dict
-        train_loader_kwargs = {
-            "batch_size": min(training_batch_size, num_training_examples),
-            "drop_last": True,
-            "sampler": SubsetRandomSampler(self.train_indices.tolist()),
-        }
-        val_loader_kwargs = {
-            "batch_size": min(training_batch_size, num_validation_examples),
-            "shuffle": False,
-            "drop_last": True,
-            "sampler": SubsetRandomSampler(self.val_indices.tolist()),
-        }
-        if dataloader_kwargs is not None:
-            train_loader_kwargs = dict(train_loader_kwargs, **dataloader_kwargs)
-            val_loader_kwargs = dict(val_loader_kwargs, **dataloader_kwargs)
-
-        train_loader = data.DataLoader(dataset, **train_loader_kwargs)
-        val_loader = data.DataLoader(dataset, **val_loader_kwargs)
-
-        return train_loader, val_loader
-
     def build_posterior(
         self,
         estimator: Optional[Union[RatioEstimator, ConditionalEstimator]],
@@ -1178,6 +1207,8 @@ class MaskedNeuralInference(ABC, BaseNeuralInference):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
+        posterior_latent_idx: Optional[list | Tensor] = None,
+        posterior_observed_idx: Optional[list | Tensor] = None,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
@@ -1212,6 +1243,18 @@ class MaskedNeuralInference(ABC, BaseNeuralInference):
         self._condition_mask_generator = self._default_condition_masks_generator
         self._edge_mask_generator = self._default_edge_masks_generator
 
+        # Initialize default posterior idxs
+        self.posterior_latent_idx = (
+            torch.as_tensor(posterior_latent_idx, dtype=torch.long)
+            if posterior_latent_idx is not None
+            else None
+        )
+        self.posterior_observed_idx = (
+            torch.as_tensor(posterior_observed_idx, dtype=torch.long)
+            if posterior_observed_idx is not None
+            else None
+        )
+
     # Must be re-defined to specify the new interface using inputs
     # rather than thetas and x
     def get_simulations(
@@ -1238,75 +1281,6 @@ class MaskedNeuralInference(ABC, BaseNeuralInference):
         )
 
         return inputs, prior_masks
-
-    # Must be re-defined to specify the new interface using inputs
-    # rather than thetas and x
-    def get_dataloaders(
-        self,
-        starting_round: int = 0,
-        training_batch_size: int = 200,
-        validation_fraction: float = 0.1,
-        resume_training: bool = False,
-        dataloader_kwargs: Optional[dict] = None,
-    ) -> Tuple[data.DataLoader, data.DataLoader]:
-        """Return dataloaders for training and validation.
-
-        Args:
-            starting_round: round from which loading data.
-            training_batch_size: training arg of inference methods.
-            validation_fraction: float in (0, 1) indicating which fraction of data
-                should be reserved for validation.
-            resume_training: Whether the current call is resuming training so that no
-                new training and validation indices into the dataset have to be created.
-            dataloader_kwargs: Additional or updated kwargs to be passed to the training
-                and validation dataloaders (like, e.g., a collate_fn)
-
-        Returns:
-            Tuple of dataloaders for training and validation.
-        """
-
-        #
-        inputs, prior_masks = self.get_simulations(starting_round)
-
-        dataset = data.TensorDataset(inputs, prior_masks)
-
-        # Get total number of training examples.
-        num_examples = inputs.size(0)
-        # Select random train and validation splits from (theta, x) pairs.
-        num_training_examples = int((1 - validation_fraction) * num_examples)
-        num_validation_examples = num_examples - num_training_examples
-
-        if not resume_training:
-            # Separate indices for training and validation
-            permuted_indices = torch.randperm(num_examples)
-            self.train_indices, self.val_indices = (
-                permuted_indices[:num_training_examples],
-                permuted_indices[num_training_examples:],
-            )
-
-        # Create training and validation loaders using a subset sampler.
-        # Intentionally use dicts to define the default dataloader args
-        # Then, use dataloader_kwargs to override (or add to) any of these defaults
-        # https://stackoverflow.com/questions/44784577/in-method-call-args-how-to-override-keyword-argument-of-unpacked-dict
-        train_loader_kwargs = {
-            "batch_size": min(training_batch_size, num_training_examples),
-            "drop_last": True,
-            "sampler": SubsetRandomSampler(self.train_indices.tolist()),
-        }
-        val_loader_kwargs = {
-            "batch_size": min(training_batch_size, num_validation_examples),
-            "shuffle": False,
-            "drop_last": True,
-            "sampler": SubsetRandomSampler(self.val_indices.tolist()),
-        }
-        if dataloader_kwargs is not None:
-            train_loader_kwargs = dict(train_loader_kwargs, **dataloader_kwargs)
-            val_loader_kwargs = dict(val_loader_kwargs, **dataloader_kwargs)
-
-        train_loader = data.DataLoader(dataset, **train_loader_kwargs)
-        val_loader = data.DataLoader(dataset, **val_loader_kwargs)
-
-        return train_loader, val_loader
 
     def set_condition_masks_generator(
         self,
@@ -1425,6 +1399,70 @@ class MaskedNeuralInference(ABC, BaseNeuralInference):
         for compatibility altough ignored."""
 
         return None
+
+    def set_condition_indexes(
+        self,
+        new_posterior_latent_idx: Union[list, Tensor],
+        new_posterior_observed_idx: Union[list, Tensor],
+    ):
+        """Set the latent and observed condition indexes for posterior inference
+        if not passed at init time, or if an update is desired."""
+
+        self.posterior_latent_idx = torch.as_tensor(
+            new_posterior_latent_idx, dtype=torch.long
+        )
+        self.posterior_observed_idx = torch.as_tensor(
+            new_posterior_observed_idx, dtype=torch.long
+        )
+
+    def _generate_posterior_condition_mask(self):
+        if self.posterior_latent_idx is None or self.posterior_observed_idx is None:
+            raise ValueError(
+                "You did not pass latent and observed variable indexes. "
+                "sbi cannot generate a posterior or likelihood without any knowledge"
+                "of which variables are latent or observed "
+                "If you already instanciated a Masked Vector Filed Inference "
+                "and would like to update the current conditon indexes, "
+                "you can use the setter function `set_condtion_indexes()`"
+            )
+        return self.generate_condition_mask_from_idx(
+            self.posterior_latent_idx, self.posterior_observed_idx
+        )
+
+    @staticmethod
+    def generate_condition_mask_from_idx(
+        latent_idx: Union[list, Tensor],
+        observed_idx: Union[list, Tensor],
+    ) -> Tensor:
+        """Generates a condition mask from the idexes passed as parameters. Can be used
+        as a static method for any latent and observed index passed as parameters."""
+
+        latent_idx = torch.as_tensor(latent_idx, dtype=torch.long)
+        observed_idx = torch.as_tensor(observed_idx, dtype=torch.long)
+
+        # Check for overlap
+        if torch.any(torch.isin(latent_idx, observed_idx)):
+            raise ValueError(
+                f"latent_idx and observed_idx must be disjoint, "
+                f"but you provided {latent_idx=} and {observed_idx=}."
+            )
+
+        all_idx = torch.cat([latent_idx, observed_idx])
+        unique_idx = torch.unique(all_idx)
+        num_nodes = unique_idx.numel()
+        # Check for completeness
+        if not torch.equal(torch.sort(unique_idx).values, torch.arange(num_nodes)):
+            raise ValueError(
+                f"latent_idx and observed_idx together must cover a complete range of "
+                f"integers from 0 to N-1 without gaps."
+                f"but you provided {latent_idx=} and {observed_idx=}."
+            )
+
+        # If checks pass we can generate the condition mask
+        condition_mask = torch.zeros(num_nodes, dtype=torch.bool)
+        condition_mask[latent_idx] = False
+        condition_mask[observed_idx] = True
+        return condition_mask
 
     def build_conditional(
         self,

@@ -19,6 +19,8 @@ from sbi.inference import MaskedNeuralInference, NeuralInference
 from sbi.inference.posteriors import (
     DirectPosterior,
 )
+from sbi.inference.posteriors.base_posterior import NeuralPosterior
+from sbi.inference.posteriors.posterior_parameters import VectorFieldPosteriorParameters
 from sbi.inference.potentials.vector_field_potential import (
     VectorFieldBasedPotential,
     vector_field_estimator_based_potential,
@@ -529,76 +531,6 @@ class VectorFieldTrainer(NeuralInference, ABC):
 
         return deepcopy(self._neural_net)
 
-    def _converged(self, epoch: int, stop_after_epochs: int) -> bool:
-        """Return whether the training converged yet and save best model state so far.
-
-        Diffusion or flow matching objectives are inherently more stochastic than MLE
-        for e.g. NPE because they additionally add "noise" by construction. We hence
-        use a statistical approach to detect convergence by tracking standard deviation
-        of validation losses. Training is considered converged when the current loss is
-        significantly worse than the best loss for a sustained period (more than 2 std
-        deviations above best).
-
-        NOTE: The standard deviation of the `validation_loss `is computed in a running
-            fashion over the most recent 2 × stop_after_epochs loss values.
-
-        Args:
-            epoch: Current epoch in training.
-            stop_after_epochs: How many fruitless epochs to let pass before stopping.
-
-        Returns:
-            Whether the training has stopped improving, i.e. has converged.
-        """
-        converged = False
-
-        assert self._neural_net is not None
-        neural_net = self._neural_net
-
-        # Initialize tracking variables if not exists
-        if not hasattr(self, '_best_val_loss'):
-            self._best_val_loss = float('inf')
-            self._epochs_since_last_improvement = 0
-            self._best_model_state_dict = None
-
-        # Check if we have a new best loss
-        if self._val_loss < self._best_val_loss:
-            self._best_val_loss = self._val_loss
-            self._epochs_since_last_improvement = 0
-            self._best_model_state_dict = deepcopy(neural_net.state_dict())
-        else:
-            # Only start statistical analysis after we have enough data
-            if len(self._summary["validation_loss"]) >= stop_after_epochs:
-                # Calculate running statistics of recent losses
-                recent_losses = torch.tensor(
-                    self._summary["validation_loss"][-stop_after_epochs * 2 :]
-                )
-                loss_std = recent_losses.std().item()
-
-                # Calculate how many standard deviations the current loss is from the
-                # best
-                diff_to_best_normalized = (
-                    self._val_loss - self._best_val_loss
-                ) / loss_std
-                # Consider it "no improvement" if current loss is significantly
-                # worse than the best loss (more than 2 std deviations above best)
-                # This accounts for natural fluctuations while being sensitive to
-                # real degradation
-                if diff_to_best_normalized > 2.0:
-                    self._epochs_since_last_improvement += 1
-                else:
-                    # Reset counter if loss is within acceptable range
-                    self._epochs_since_last_improvement = 0
-            else:
-                return False
-
-        # If no validation improvement over many epochs, stop training.
-        if self._epochs_since_last_improvement > stop_after_epochs - 1:
-            if self._best_model_state_dict is not None:
-                neural_net.load_state_dict(self._best_model_state_dict)
-            converged = True
-
-        return converged
-
     def _get_potential_function(
         self, prior: Distribution, estimator: ConditionalVectorFieldEstimator
     ) -> Tuple[VectorFieldBasedPotential, TorchTransform]:
@@ -719,6 +651,8 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
 
         super().__init__(
             prior=prior,
+            posterior_latent_idx=posterior_latent_idx,
+            posterior_observed_idx=posterior_observed_idx,
             device=device,
             logging_level=logging_level,
             summary_writer=summary_writer,
@@ -740,17 +674,6 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
             self._build_neural_net = mvf_estimator_builder
 
         self._proposal_roundwise = []
-
-        self.posterior_latent_idx = (
-            torch.as_tensor(posterior_latent_idx, dtype=torch.long)
-            if posterior_latent_idx is not None
-            else None
-        )
-        self.posterior_observed_idx = (
-            torch.as_tensor(posterior_observed_idx, dtype=torch.long)
-            if posterior_observed_idx is not None
-            else None
-        )
 
     @abstractmethod
     def _build_default_nn_fn(self, **kwargs) -> MaskedVectorFieldEstimatorBuilder:
@@ -1192,67 +1115,122 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
 
         return deepcopy(self._neural_net)
 
-    def _converged(self, epoch: int, stop_after_epochs: int) -> bool:
-        """Return whether the training converged yet and save best model state so far.
-
-        Checks for improvement in validation performance over previous epochs.
-        Uses an adaptive threshold that considers both the scale and variance of the
-        loss. The threshold is based on the exponential moving average of the loss and
-        its relative changes.
+    def build_posterior(
+        self,
+        edge_mask: Optional[Tensor] = None,
+        mvf_estimator: Optional[MaskedConditionalVectorFieldEstimator] = None,
+        prior: Optional[Distribution] = None,
+        sample_with: Literal['ode', 'sde'] = "sde",
+        posterior_parameters: Optional[VectorFieldPosteriorParameters] = None,
+    ) -> NeuralPosterior:
+        r"""Build posterior from the masked vector field estimator given
+        the latent and observed indexes passed at init time (or updated
+        later)
 
         Args:
-            epoch: Current epoch in training.
-            stop_after_epochs: How many fruitless epochs to let pass before stopping.
-
+            edge_mask: A boolean mask defining the adjacency matrix of the directed
+                acyclic graph (DAG) representing dependencies among variables.
+                Expected shape: `(batch_size, num_variables, num_variables)`.
+                - `True` (or `1`): An edge exists from the row variable to the column
+                  variable.
+                - `False` (or `0`): No edge exists between these variables.
+                - if `None`, it will be equivalent to a full attention (i.e., full ones)
+                  mask, we suggest you to use `None` instead of ones
+                  to save memory resources.
+            mvf_estimator: Neural network architecture for the masked
+                vector field estimator. Can be a callable that implements
+                the `MaskedVectorFieldEstimatorBuilder` protocol.
+                If a callable, `__call__` must accept `inputs`, and return
+                a `MaskedConditionalVectorFieldEstimator`. If `None` uses the
+                underlying trained neural net.
+            prior: Prior distribution. Its primary use is for rejecting samples that
+                fall outside its defined support. For the core inference process,
+                this prior is ignored, as the actual "prior" over which the diffusion
+                model operates is standard Gaussian noise.
+            sample_with: Method to use for sampling from the posterior. Can be one of
+                'sde' (default) or 'ode'. The 'sde' method uses the score to
+                do a Langevin diffusion step, while the 'ode' method solves a
+                probabilistic ODE with a numerical ODE solver.
+            vectorfield_sampling_parameters: Additional keyword arguments passed to
+                `VectorFieldPosterior`.
+            **kwargs: Additional keyword arguments passed to
+                `VectorFieldBasedPotential`.
         Returns:
-            Whether the training has stopped improving, i.e. has converged.
+            Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods.
         """
-        converged = False
 
-        assert self._neural_net is not None
-        neural_net = self._neural_net
+        # Indexes for condition were provided at init
+        condition_mask = self._generate_posterior_condition_mask()
 
-        # Initialize tracking of loss changes if not exists
-        if not hasattr(self, '_loss_changes'):
-            self._loss_changes = []
+        return self.build_conditional(
+            condition_mask=condition_mask,
+            edge_mask=edge_mask,
+            mvf_estimator=mvf_estimator,
+            prior=prior,
+            sample_with=sample_with,
+            conditional_parameters=posterior_parameters,
+        )
 
-        # (Re)-start the epoch count with the first epoch or any improvement.
-        if epoch == 0 or self._val_loss < self._best_val_loss:
-            self._best_val_loss = self._val_loss
-            self._epochs_since_last_improvement = 0
-            self._best_model_state_dict = deepcopy(neural_net.state_dict())
-        else:
-            # Calculate relative change in loss
-            relative_change = (self._val_loss - self._best_val_loss) / abs(
-                self._best_val_loss
-            )
+    def build_likelihood(
+        self,
+        edge_mask: Optional[Tensor] = None,
+        mvf_estimator: Optional[MaskedConditionalVectorFieldEstimator] = None,
+        prior: Optional[Distribution] = None,
+        sample_with: Literal['ode', 'sde'] = "sde",
+        likelihood_parameters: Optional[VectorFieldPosteriorParameters] = None,
+    ) -> NeuralPosterior:
+        r"""Build likelihood from the masked vector field estimator given
+        the latent and observed indexes passed at init time (or updated
+        later).
 
-            # Update loss changes history (keep last stop_after_epochs changes)
-            self._loss_changes.append(relative_change)
-            if len(self._loss_changes) > stop_after_epochs:
-                self._loss_changes.pop(0)
+        This method simply consists in calling build_posterior on the negative
+        of the condition masked generated from the latent and observed indexes.
 
-            # Calculate adaptive threshold based on recent loss changes
-            if len(self._loss_changes) >= 3:
-                # Use standard deviation of recent changes to determine threshold
-                recent_changes = torch.tensor(self._loss_changes)
-                std_changes = recent_changes.std().item()
-                mean_changes = recent_changes.mean().item()
+        Args:
+            edge_mask: A boolean mask defining the adjacency matrix of the directed
+                acyclic graph (DAG) representing dependencies among variables.
+                Expected shape: `(batch_size, num_variables, num_variables)`.
 
-                # Adaptive threshold: mean + 2*std of recent changes
-                # This means we only count as "no improvement" if the increase
-                # is significantly above the typical fluctuations
-                adaptive_threshold = mean_changes + 1.5 * std_changes
+                - `True` (or `1`): An edge exists from the row variable to the column
+                  variable.
+                - `False` (or `0`): No edge exists between these variables.
+                - if `None`, it will be equivalent to a full attention (i.e., full ones)
+                  mask, we suggest you to use `None` instead of ones
+                  to save memory resources.
 
-                if relative_change > adaptive_threshold:
-                    self._epochs_since_last_improvement += 1
+            mvf_estimator: Neural network architecture for the masked
+                vector field estimator. Can be a callable that implements
+                the `MaskedVectorFieldEstimatorBuilder` protocol.
+                If a callable, `__call__` must accept `inputs`, and return
+                a `MaskedConditionalVectorFieldEstimator`. If `None` uses the
+                underlying trained neural net.
+            prior: Prior distribution. Its primary use is for rejecting samples that
+                fall outside its defined support. For the core inference process,
+                this prior is ignored, as the actual "prior" over which the diffusion
+                model operates is standard Gaussian noise.
+            sample_with: Method to use for sampling from the posterior. Can be one of
+                'sde' (default) or 'ode'. The 'sde' method uses the score to
+                do a Langevin diffusion step, while the 'ode' method solves a
+                probabilistic ODE with a numerical ODE solver.
+            vectorfield_sampling_parameters: Additional keyword arguments passed to
+                `VectorFieldPosterior`.
+            **kwargs: Additional keyword arguments passed to
+                `VectorFieldBasedPotential`.
+        Returns:
+            Likelihood $p(x|\theta)$  with `.sample()` and `.log_prob()` methods.
+        """
 
-        # If no validation improvement over many epochs, stop training.
-        if self._epochs_since_last_improvement > stop_after_epochs - 1:
-            neural_net.load_state_dict(self._best_model_state_dict)
-            converged = True
+        # Indexes for condition were provided at init
+        condition_mask = ~self._generate_posterior_condition_mask()
 
-        return converged
+        return self.build_conditional(
+            condition_mask=condition_mask,
+            edge_mask=edge_mask,
+            mvf_estimator=mvf_estimator,
+            prior=prior,
+            sample_with=sample_with,
+            conditional_parameters=likelihood_parameters,
+        )
 
     def _get_potential_function(
         self, prior: Distribution, estimator: MaskedConditionalVectorFieldEstimator
@@ -1302,67 +1280,3 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
 
         assert_all_finite(loss, f"{cls_name} loss")
         return calibration_kernel(inputs) * loss
-
-    def set_condition_indexes(
-        self,
-        new_posterior_latent_idx: Union[list, Tensor],
-        new_posterior_observed_idx: Union[list, Tensor],
-    ):
-        """Set the latent and observed condition indexes for posterior inference
-        if not passed at init time, or if an update is desired."""
-
-        self.posterior_latent_idx = torch.as_tensor(
-            new_posterior_latent_idx, dtype=torch.long
-        )
-        self.posterior_observed_idx = torch.as_tensor(
-            new_posterior_observed_idx, dtype=torch.long
-        )
-
-    def _generate_posterior_condition_mask(self):
-        if self.posterior_latent_idx is None or self.posterior_observed_idx is None:
-            raise ValueError(
-                "You did not pass latent and observed variable indexes. "
-                "sbi cannot generate a posterior or likelihood without any knowledge"
-                "of which variables are latent or observed "
-                "If you already instanciated a Masked Vector Filed Inference "
-                "and would like to update the current conditon indexes, "
-                "you can use the setter function `set_condtion_indexes()`"
-            )
-        return self.generate_condition_mask_from_idx(
-            self.posterior_latent_idx, self.posterior_observed_idx
-        )
-
-    @staticmethod
-    def generate_condition_mask_from_idx(
-        latent_idx: Union[list, Tensor],
-        observed_idx: Union[list, Tensor],
-    ) -> Tensor:
-        """Generates a condition mask from the idexes passed as parameters. Can be used
-        as a static method for any latent and observed index passed as parameters."""
-
-        latent_idx = torch.as_tensor(latent_idx, dtype=torch.long)
-        observed_idx = torch.as_tensor(observed_idx, dtype=torch.long)
-
-        # Check for overlap
-        if torch.any(torch.isin(latent_idx, observed_idx)):
-            raise ValueError(
-                f"latent_idx and observed_idx must be disjoint, "
-                f"but you provided {latent_idx=} and {observed_idx=}."
-            )
-
-        all_idx = torch.cat([latent_idx, observed_idx])
-        unique_idx = torch.unique(all_idx)
-        num_nodes = unique_idx.numel()
-        # Check for completeness
-        if not torch.equal(torch.sort(unique_idx).values, torch.arange(num_nodes)):
-            raise ValueError(
-                f"latent_idx and observed_idx together must cover a complete range of "
-                f"integers from 0 to N-1 without gaps."
-                f"but you provided {latent_idx=} and {observed_idx=}."
-            )
-
-        # If checks pass we can generate the condition mask
-        condition_mask = torch.zeros(num_nodes, dtype=torch.bool)
-        condition_mask[latent_idx] = False
-        condition_mask[observed_idx] = True
-        return condition_mask
