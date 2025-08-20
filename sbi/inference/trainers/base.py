@@ -20,8 +20,9 @@ from typing import (
 from warnings import warn
 
 import torch
-from torch import Tensor
+from torch import Tensor, nn
 from torch.distributions import Distribution
+from torch.optim.adam import Adam
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard.writer import SummaryWriter
@@ -309,6 +310,70 @@ class NeuralInference(ABC):
         retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
     ) -> NeuralPosterior: ...
+
+    @abstractmethod
+    def _initialize_neural_network(
+        self, retrain_from_scratch: bool, start_idx: int
+    ) -> nn.Module: ...
+
+    @abstractmethod
+    def _train_for_single_epoch(
+        self, train_loader: data.DataLoader, clip_max_norm: Optional[float]
+    ) -> Tuple[float, float] | float: ...
+
+    @abstractmethod
+    def _calculate_validation_performance(
+        self, val_loader: data.DataLoader
+    ) -> None: ...
+
+    def _initialize_optimizer(
+        self,
+        resume_training: bool,
+        learning_rate: float,
+    ) -> None:
+        assert self._neural_net is not None
+
+        if not resume_training:
+            self.optimizer = Adam(
+                list(self._neural_net.parameters()),
+                lr=learning_rate,
+            )
+            self.epoch, self.val_loss = 0, float("Inf")
+
+    def _calculate_train_loss_average(
+        self, train_loss_sum: float, train_loader: data.DataLoader
+    ) -> float:
+        assert train_loader.batch_size is not None
+
+        train_loss_average = train_loss_sum / (
+            len(train_loader) * train_loader.batch_size
+        )
+
+        return train_loss_average
+
+    def _update_summary(
+        self,
+        show_train_summary: bool,
+    ) -> None:
+        # Update summary.
+        self._summary["epochs_trained"].append(self.epoch)
+        self._summary["best_validation_loss"].append(self._best_val_loss)
+
+        # Update TensorBoard and summary dict.
+        self._summarize(round_=self._round)
+
+        # Update description for progress bar.
+        if show_train_summary:
+            print(self._describe_round(self._round, self._summary))
+
+    def _get_neural_network_for_training(self):
+        assert self._neural_net is not None
+
+        # Avoid keeping the gradients in the resulting network, which can
+        # cause memory leakage when benchmarking.
+        self._neural_net.zero_grad(set_to_none=True)
+
+        return deepcopy(self._neural_net)
 
     @abstractmethod
     def _get_potential_function(
