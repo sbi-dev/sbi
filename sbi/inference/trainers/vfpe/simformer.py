@@ -149,7 +149,7 @@ class FlowMatchingSimformer(MaskedVectorFieldTrainer):
         show_progress_bars: bool = True,
         **kwargs,
     ):
-        r"""Initialize Simformer.
+        r"""Initialize Flow Matching Simformer.
 
         Args:
             prior: Prior distribution. Its primary use is for rejecting samples that
