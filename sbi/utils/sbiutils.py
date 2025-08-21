@@ -901,6 +901,26 @@ def check_transform(
     ), "Original and re-transformed parameters must be close to each other."
 
 
+class NoPrior(Distribution):
+    """
+    Explicit filler object for cases where no prior is provided.
+    Implements log_prob to always return 0 and raises an error on sample.
+    See #1635.
+    """
+
+    def __init__(self, batch_shape=torch.Size(), event_shape=torch.Size()):
+        super().__init__(batch_shape, event_shape)
+
+    def sample(self, sample_shape=torch.Size()):
+        raise RuntimeError("NoPrior cannot be sampled. Please provide a valid prior.")
+
+    def log_prob(self, value):
+        return torch.zeros(value.shape[0], device=value.device)
+
+    def rsample(self, sample_shape=torch.Size()):
+        raise RuntimeError("NoPrior cannot be sampled. Please provide a valid prior.")
+
+
 class ImproperEmpirical(Empirical):
     """
     Wrapper around pyro's `Emprirical` distribution that returns constant `log_prob()`.

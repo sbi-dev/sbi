@@ -62,7 +62,7 @@ from sbi.utils import (
     validate_theta_and_x,
     warn_if_zscoring_changes_data,
 )
-from sbi.utils.sbiutils import get_simulations_since_round
+from sbi.utils.sbiutils import NoPrior, get_simulations_since_round
 from sbi.utils.simulation_utils import simulate_for_sbi
 from sbi.utils.torchutils import check_if_prior_on_device, process_device
 from sbi.utils.user_input_checks import (
@@ -173,26 +173,6 @@ def check_if_proposal_has_default_x(proposal: Any):
             "x_o for training. Set it with "
             "`posterior.set_default_x(x_o)`."
         )
-
-
-class NoPrior(Distribution):
-    """
-    Explicit filler object for cases where no prior is provided.
-    Implements log_prob to always return 0 and raises an error on sample.
-    See #1635.
-    """
-
-    def __init__(self, batch_shape=torch.Size(), event_shape=torch.Size()):
-        super().__init__(batch_shape, event_shape)
-
-    def sample(self, sample_shape=torch.Size()):
-        raise RuntimeError("NoPrior cannot be sampled. Please provide a valid prior.")
-
-    def log_prob(self, value):
-        return torch.zeros(value.shape[0], device=value.device)
-
-    def rsample(self, sample_shape=torch.Size()):
-        raise RuntimeError("NoPrior cannot be sampled. Please provide a valid prior.")
 
 
 class BaseNeuralInference:
