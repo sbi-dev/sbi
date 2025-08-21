@@ -3,7 +3,7 @@
 
 import warnings
 from abc import ABC
-from typing import Any, Callable, Dict, Literal, Optional, Tuple, Union
+from typing import Any, Dict, Literal, Optional, Tuple, Union
 
 import torch
 from torch import Tensor
