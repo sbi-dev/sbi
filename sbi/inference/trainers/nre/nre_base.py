@@ -213,10 +213,7 @@ class RatioEstimatorTrainer(NeuralInference, ABC):
         if loss_kwargs is None:
             loss_kwargs = {}
 
-        # Load data from most recent round.
-        self._round = max(self._data_round_index)
-        # Starting index for the training set (1 = discard round-0 samples).
-        start_idx = int(discard_prior_samples and self._round > 0)
+        start_idx = self._get_start_index(discard_prior_samples=discard_prior_samples)
 
         train_loader, val_loader = self.get_dataloaders(
             start_idx,
@@ -271,6 +268,14 @@ class RatioEstimatorTrainer(NeuralInference, ABC):
         self._update_summary(show_train_summary=show_train_summary)
 
         return self._get_neural_network_for_training()
+
+    def _get_start_index(self, discard_prior_samples: bool) -> int:
+        # Load data from most recent round.
+        self._round = max(self._data_round_index)
+        # Starting index for the training set (1 = discard round-0 samples).
+        start_idx = int(discard_prior_samples and self._round > 0)
+
+        return start_idx
 
     def _get_num_atoms(
         self, training_batch_size: int, val_loader: data.DataLoader, num_atoms: int

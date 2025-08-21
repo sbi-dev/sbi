@@ -284,23 +284,6 @@ class VectorFieldTrainer(NeuralInference, ABC):
         Returns:
             Vector field estimator that approximates the posterior.
         """
-        # Load data from most recent round.
-        self._round = max(self._data_round_index)
-
-        if self._round == 0 and self._neural_net is not None:
-            assert force_first_round_loss or resume_training, (
-                "You have already trained this neural network. After you had trained "
-                "the network, you again appended simulations with `append_simulations"
-                "(theta, x)`, but you did not provide a proposal. If the new "
-                "simulations are sampled from the prior, you can set "
-                "`.train(..., force_first_round_loss=True`). However, if the new "
-                "simulations were not sampled from the prior, you should pass the "
-                "proposal, i.e. `append_simulations(theta, x, proposal)`. If "
-                "your samples are not sampled from the prior and you do not pass a "
-                "proposal and you set `force_first_round_loss=True`, the result of "
-                "NPSE will not be the true posterior. Instead, it will be the proposal "
-                "posterior, which (usually) is more narrow than the true posterior."
-            )
 
         # Calibration kernels proposed in Lueckmann, Gonçalves et al., 2017.
         if calibration_kernel is None:
@@ -310,8 +293,11 @@ class VectorFieldTrainer(NeuralInference, ABC):
 
             calibration_kernel = default_calibration_kernel
 
-        # Starting index for the training set (1 = discard round-0 samples).
-        start_idx = int(discard_prior_samples and self._round > 0)
+        start_idx = self._get_start_index(
+            discard_prior_samples=discard_prior_samples,
+            force_first_round_loss=force_first_round_loss,
+            resume_training=resume_training,
+        )
 
         # Set the proposal to the last proposal that was passed by the user. For
         # atomic SNPE, it does not matter what the proposal is. For non-atomic
@@ -388,6 +374,35 @@ class VectorFieldTrainer(NeuralInference, ABC):
         self._update_summary(show_train_summary=show_train_summary)
 
         return self._get_neural_network_for_training()
+
+    def _get_start_index(
+        self,
+        discard_prior_samples: bool,
+        force_first_round_loss: bool,
+        resume_training: bool,
+    ) -> int:
+        # Load data from most recent round.
+        self._round = max(self._data_round_index)
+
+        if self._round == 0 and self._neural_net is not None:
+            assert force_first_round_loss or resume_training, (
+                "You have already trained this neural network. After you had trained "
+                "the network, you again appended simulations with `append_simulations"
+                "(theta, x)`, but you did not provide a proposal. If the new "
+                "simulations are sampled from the prior, you can set "
+                "`.train(..., force_first_round_loss=True`). However, if the new "
+                "simulations were not sampled from the prior, you should pass the "
+                "proposal, i.e. `append_simulations(theta, x, proposal)`. If "
+                "your samples are not sampled from the prior and you do not pass a "
+                "proposal and you set `force_first_round_loss=True`, the result of "
+                "NPSE will not be the true posterior. Instead, it will be the proposal "
+                "posterior, which (usually) is more narrow than the true posterior."
+            )
+
+        # Starting index for the training set (1 = discard round-0 samples).
+        start_idx = int(discard_prior_samples and self._round > 0)
+
+        return start_idx
 
     def _get_validation_times(
         self, validation_times: Tensor | int, validation_times_nugget: float

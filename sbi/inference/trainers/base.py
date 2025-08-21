@@ -326,6 +326,9 @@ class NeuralInference(ABC):
         self, val_loader: data.DataLoader
     ) -> None: ...
 
+    @abstractmethod
+    def _get_start_index(self, discard_prior_samples: bool) -> int: ...
+
     def _initialize_optimizer(
         self,
         resume_training: bool,
