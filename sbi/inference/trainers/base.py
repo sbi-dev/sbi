@@ -1467,11 +1467,11 @@ class MaskedNeuralInference(ABC, BaseNeuralInference):
     def build_conditional(
         self,
         condition_mask: Union[Tensor, list],
-        edge_mask: Optional[Tensor],
-        mvf_estimator: Optional[MaskedConditionalVectorFieldEstimator],
-        prior: Optional[Distribution],
-        sample_with: Literal['ode', 'sde'],
-        conditional_parameters: Optional[PosteriorParameters],
+        edge_mask: Optional[Tensor] = None,
+        mvf_estimator: Optional[MaskedConditionalVectorFieldEstimator] = None,
+        prior: Optional[Distribution] = None,
+        sample_with: Literal['ode', 'sde'] = 'sde',
+        conditional_parameters: Optional[PosteriorParameters] = None,
         **kwargs,
     ) -> NeuralPosterior:
         r"""Method for building an arbitrary conditional.
