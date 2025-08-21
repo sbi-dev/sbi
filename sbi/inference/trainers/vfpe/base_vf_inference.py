@@ -613,7 +613,6 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
 
     def __init__(
         self,
-        prior: Optional[Distribution] = None,
         mvf_estimator_builder: Union[
             str, MaskedVectorFieldEstimatorBuilder
         ] = "simformer",
@@ -650,7 +649,6 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
         """
 
         super().__init__(
-            prior=prior,
             posterior_latent_idx=posterior_latent_idx,
             posterior_observed_idx=posterior_observed_idx,
             device=device,

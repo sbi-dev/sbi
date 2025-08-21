@@ -175,6 +175,26 @@ def check_if_proposal_has_default_x(proposal: Any):
         )
 
 
+class NoPrior(Distribution):
+    """
+    Explicit filler object for cases where no prior is provided.
+    Implements log_prob to always return 0 and raises an error on sample.
+    See #1635.
+    """
+
+    def __init__(self, batch_shape=torch.Size(), event_shape=torch.Size()):
+        super().__init__(batch_shape, event_shape)
+
+    def sample(self, sample_shape=torch.Size()):
+        raise RuntimeError("NoPrior cannot be sampled. Please provide a valid prior.")
+
+    def log_prob(self, value):
+        return torch.zeros(value.shape[0], device=value.device)
+
+    def rsample(self, sample_shape=torch.Size()):
+        raise RuntimeError("NoPrior cannot be sampled. Please provide a valid prior.")
+
+
 class BaseNeuralInference:
     "Mixin for NeuralInference objects"
 
@@ -369,7 +389,7 @@ class BaseNeuralInference:
 
         If a prior is passed, it is validated and returned.
         If not passed, attempts to use the stored `self._prior`.
-        Raises a ValueError if no valid prior is available.
+        If neither is available, uses NoPrior as an explicit filler (#1635).
 
         Args:
             prior: Optional prior distribution to resolve.
@@ -379,16 +399,11 @@ class BaseNeuralInference:
         """
 
         if prior is None:
-            if self._prior is None:
-                cls_name = self.__class__.__name__
-                # TODO: this could be re-designed to allow priors to be None
-                # as many methods can work without it anyway.
-                raise ValueError(
-                    f"""You did not pass a prior. You have to pass the prior either at
-                    initialization `inference = {cls_name}(prior)` or to `
-                    .build_posterior (prior=prior)`."""
-                )
-            prior = self._prior
+            # TODO: this could be re-designed to allow priors to be None natively
+            # rather than using the NoPrior() filler,
+            # as many methods can work without it.
+            # See Issue #1635
+            prior = NoPrior() if self._prior is None else self._prior
         else:
             check_prior(prior)
 
@@ -1206,7 +1221,6 @@ class MaskedNeuralInference(ABC, BaseNeuralInference):
 
     def __init__(
         self,
-        prior: Optional[Distribution] = None,
         posterior_latent_idx: Optional[list | Tensor] = None,
         posterior_observed_idx: Optional[list | Tensor] = None,
         device: str = "cpu",
@@ -1231,7 +1245,7 @@ class MaskedNeuralInference(ABC, BaseNeuralInference):
         """
 
         super().__init__(
-            prior, device, logging_level, summary_writer, show_progress_bars
+            None, device, logging_level, summary_writer, show_progress_bars
         )
 
         # Initialize roundwise inputs for storage of parameters and
