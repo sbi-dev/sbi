@@ -328,20 +328,12 @@ class ConditionalDensityEstimator(ConditionalEstimator):
         return samples, log_probs
 
 
-class ConditionalVectorFieldEstimator(ConditionalEstimator, ABC):
-    r"""Base class for vector field estimators. That primarily includes
-    score-based and flow matching models.
+class BaseConditionalVectorFieldEstimator:
+    """Mixin for conditional vector field estimators."""
 
-    The vector field estimator class is a wrapper around neural networks that allows to
-    evaluate the `vector_field`, and provide the `loss` of $\theta,x_o$ pairs. Here
-    $\theta$ would be the `input` and $x_o$ would be the `condition`.
-
-    Note:
-        We assume that the input to the density estimator is a tensor of shape
-        (sample_dim, batch_dim, *input_shape), where input_shape is the dimensionality
-        of the input. The condition is a tensor of shape (batch_dim, *condition_shape),
-        where condition_shape is the shape of the condition tensor.
-    """
+    _mean_base: Tensor
+    _std_base: Tensor
+    _embedding_net: nn.Module
 
     # When implementing custom estimators,
     # the following properties should be set:
@@ -361,375 +353,28 @@ class ConditionalVectorFieldEstimator(ConditionalEstimator, ABC):
     # It should be set to True only if mean_t_fn and std_fn are implemented.
     MARGINALS_DEFINED: bool = True
 
-    def __init__(
-        self,
-        net: nn.Module,
-        input_shape: torch.Size,
-        condition_shape: torch.Size,
-        t_min: float = 0.0,
-        t_max: float = 1.0,
-        embedding_net: Optional[nn.Module] = None,
-        mean_base: Union[float, Tensor] = 0.0,
-        std_base: Union[float, Tensor] = 1.0,
-    ) -> None:
-        r"""Base class for vector field estimators.
+    # -------------------------- BASE DISTRIBUTION METHODS --------------------------
 
-        Args:
-            net: Neural network.
-            input_shape: Shape of the input.
-            condition_shape: Shape of the condition. If not provided, it will assume a
-                            1D input.
-            t_min: Minimum time for the vector field estimator.
-            t_max: Maximum time for the vector field estimator.
-            embedding_net: Embedding network, if provided, it will be used to embed the
-                condition.
-            mean_base: Mean of the base distribution.
-            std_base: Standard deviation of the base distribution.
-        """
-        super().__init__(input_shape, condition_shape)
-        self.net = net
+    # We assume that the base distribution is a Gaussian distribution
+    # and that it is the same for ODE and SDE.
 
-        # We assume that the time range is the same for ODE and SDE.
-        self.t_min = t_min
-        self.t_max = t_max
+    @property
+    def mean_base(self) -> Tensor:
+        r"""Mean of the base distribution (the initial noise at time t=T)."""
+        return self._mean_base
 
-        # We assume that the base distribution is a Gaussian distribution
-        # and that it is the same for ODE and SDE.
-        # We store the mean and std of the base distribution in buffers
-        # to transfer them to the device automatically when the model is moved.
-        self.register_buffer(
-            "_mean_base", torch.empty(1, *self.input_shape).fill_(mean_base)
-        )
-        self.register_buffer(
-            "_std_base", torch.empty(1, *self.input_shape).fill_(std_base)
-        )
-        self._embedding_net = (
-            embedding_net if embedding_net is not None else nn.Identity()
-        )
+    @property
+    def std_base(self) -> Tensor:
+        r"""Standard deviation of the base distribution
+        (the initial noise at time t=T)."""
+        return self._std_base
 
     @property
     def embedding_net(self) -> nn.Module:
         r"""Return the embedding network if it exists."""
         return self._embedding_net
 
-    @abstractmethod
-    def forward(
-        self, input: Tensor, condition: Tensor, time: Tensor, **kwargs
-    ) -> Tensor:
-        r"""Forward pass of the score estimator.
-
-        Args:
-            input: Input variable :math:`\theta_t`.
-            condition: Conditioning variable :math:`x_o`.
-
-        Raises:
-            NotImplementedError: This method should be implemented by sub-classes.
-        """
-        ...
-
-    # -------------------------- BASE DISTRIBUTION METHODS --------------------------
-
-    # We assume that the base distribution is a Gaussian distribution
-    # and that it is the same for ODE and SDE.
-
-    @property
-    def mean_base(self) -> Tensor:
-        r"""Mean of the base distribution (the initial noise at time t=T)."""
-        return self._mean_base
-
-    @property
-    def std_base(self) -> Tensor:
-        r"""Standard deviation of the base distribution
-        (the initial noise at time t=T)."""
-        return self._std_base
-
-    # -------------------------- ODE METHODS --------------------------
-
-    @abstractmethod
-    def ode_fn(self, input: Tensor, condition: Tensor, times: Tensor) -> Tensor:
-        r"""ODE flow function :math:`v(\theta_t, t, x_o)` of the vector field estimator.
-
-        The target distribution can be sampled from by solving the following ODE:
-
-        .. math::
-            d\theta_t = v(\theta_t, t; x_o) dt
-
-        with initial :math:`\theta_1` sampled from the base distribution.
-
-        Args:
-            input: variable whose distribution is estimated.
-            condition: Conditioning variable.
-            t: Time.
-
-        Raises:
-            NotImplementedError: This method should be implemented by sub-classes.
-        """
-        ...
-
-    # -------------------------- SDE METHODS --------------------------
-
-    def score(self, input: Tensor, condition: Tensor, t: Tensor) -> Tensor:
-        r"""Time-dependent score function
-
-        .. math::
-            s(t, \theta_t; x_o) = \nabla_{\theta_t} \log p(\theta_t | x_o)
-
-        Args:
-            input: Input parameters :math:`\theta_t`.
-            condition: Conditioning variable :math:`x_o`.
-            t: Time.
-
-        Raises:
-            NotImplementedError: Score is not implemented for this estimator.
-        """
-        raise NotImplementedError("Score is not implemented for this estimator.")
-
-    def mean_t_fn(self, times: Tensor) -> Tensor:
-        r"""Linear coefficient mean_t of the perturbation kernel expectation
-        :math:`\mu_t(t) = E[\theta_t | \theta_0] = \text{mean_t}(t) \cdot \theta_0`
-        specifying the "mean factor" at a given time, which is always multiplied by
-        :math:`\theta_0` to get the mean of the noise distribution, i.e.,
-        :math:`p(\theta_t | \theta_0) = N(\theta_t;
-                \text{mean_t}(t)*\theta_0, \text{std_t}(t)).`
-
-        Args:
-            times: SDE time variable in [0,1].
-
-        Raises:
-            NotImplementedError: Mean_t is not implemented for this estimator.
-        """
-        raise NotImplementedError("Mean_t is not implemented for this estimator.")
-
-    def std_fn(self, times: Tensor) -> Tensor:
-        r"""Standard deviation function std_t(t) of the perturbation kernel at a given
-            time,
-
-        .. math::
-            p(\theta_t | \theta_0) = N(\theta_t; \text{mean_t}(t) \cdot
-            \theta_0, \text{std_t}(t)^2).
-
-        Args:
-            times: SDE time variable in [0,1].
-
-        Raises:
-            NotImplementedError: Std_t is not implemented for this estimator.
-        """
-        raise NotImplementedError("Std_t is not implemented for this estimator.")
-
-    def drift_fn(self, input: Tensor, times: Tensor) -> Tensor:
-        r"""Drift function :math:`f(t)` of the vector field estimator.
-
-        The drift function :math:`f(t)` and diffusion function :math:`\g(t)`
-        enable SDE sampling:
-
-        .. math::
-            d\theta_t = [f(t) - g(t)^2 \nabla_{\theta_t} \log p(\theta_t | x_o)]dt
-              + \g(t) dW_t
-
-        where :math:`dW_t` is the Wiener process.
-
-
-        Args:
-            input: input parameters :math:`\theta_t`.
-            times: SDE time variable in [0,1].
-
-        Raises:
-            NotImplementedError: Drift is not implemented for this estimator.
-
-        """
-        raise NotImplementedError("Drift is not implemented for this estimator.")
-
-    def diffusion_fn(self, input: Tensor, times: Tensor) -> Tensor:
-        r"""Diffusion function :math:`\g(t)` of the vector field estimator.
-
-        The drift function :math:`f(t)` and diffusion function :math:`\g(t)`
-        enable SDE sampling:
-
-        .. math::
-            d\theta_t = [f(t) - g(t)^2 \nabla_{\theta_t} \log p(\theta_t | x_o)]dt
-              + \g(t) dW_t
-
-        where :math:`dW_t` is the Wiener process.
-
-        Args:
-            input: input parameters :math:`\theta_t`.
-            times: SDE time variable in [0,1].
-
-        Raises:
-            NotImplementedError: Diffusion is not implemented for this estimator.
-        """
-        raise NotImplementedError("Diffusion is not implemented for this estimator.")
-
-
-class MaskedConditionalVectorFieldEstimator(MaskedConditionalEstimator, ABC):
-    r"""Base class for masked vector field estimators. That primarily includes
-    score-based and flow matching models.
-
-    The vector field estimator class is a wrapper around neural networks that allows to
-    evaluate the `masked_vector_field`, and provide the `loss` of inputs over masks.
-
-    Note:
-        We assume that the input to the density estimator is a tensor of shape
-        (sample_dim, batch_dim, *input_shape), where input_shape is the dimensionality
-        of the input.
-    """
-
-    # When implementing custom estimators,
-    # the following properties should be set:
-
-    # Whether the score is defined for this estimator.
-    # Required for gradient-based methods.
-    # It should be set to True only if score is implemented.
-    SCORE_DEFINED: bool = True
-
-    # Whether the SDE functions - score, drift and diffusion -
-    # are defined for this estimator.
-    # Required for SDE sampling.
-    SDE_DEFINED: bool = True
-
-    # Whether the marginals are defined for this estimator.
-    # Required for iid methods.
-    # It should be set to True only if mean_t_fn and std_fn are implemented.
-    MARGINALS_DEFINED: bool = True
-
-    def __init__(
-        self,
-        net: nn.Module,
-        input_shape: torch.Size,
-        t_min: float = 0.0,
-        t_max: float = 1.0,
-        embedding_net: Optional[nn.Module] = None,
-        mean_base: float = 0.0,
-        std_base: float = 1.0,
-    ) -> None:
-        r"""Base class for masked vector field estimators.
-
-        Args:
-            net: Neural network.
-            input_shape: Shape of the input.
-            t_min: Minimum time for the vector field estimator.
-            t_max: Maximum time for the vector field estimator.
-            mean_base: Mean of the base distribution.
-            std_base: Standard deviation of the base distribution.
-        """
-        super().__init__(input_shape)
-        self.net = net
-
-        # We assume that the time range is the same for ODE and SDE.
-        self.t_min = t_min
-        self.t_max = t_max
-
-        # We store the mean and std of the base distribution in buffers
-        # to transfer them to the device automatically when the model is moved.
-        self.register_buffer(
-            "_mean_base", torch.empty(1, *self.input_shape).fill_(mean_base)
-        )
-        self.register_buffer(
-            "_std_base", torch.empty(1, *self.input_shape).fill_(std_base)
-        )
-        self._embedding_net = (
-            embedding_net if embedding_net is not None else nn.Identity()
-        )
-
-    def build_conditional_vector_field_estimator(
-        self, fixed_condition_mask: Tensor, fixed_edge_mask: Optional[Tensor]
-    ) -> ConditionalVectorFieldEstimator:
-        """Returns a callable that behaves like a ConditionalVectorFieldEstimator
-        for a fixed condition_mask and edge_mask.
-        """
-
-        return MaskedConditionalVectorFieldEstimatorWrapper(
-            self, fixed_condition_mask, fixed_edge_mask
-        )
-
-    @abstractmethod
-    def forward(
-        self,
-        input: Tensor,
-        time: Tensor,
-        condition_mask: Tensor,
-        edge_mask: Optional[Tensor],
-        **kwargs,
-    ) -> Tensor:
-        r"""Forward pass of the masked conditional vector field estimator.
-
-        Args:
-            input: Input variables of shape (batch_dim, *input_shape).
-            time: Time variable tensor.
-            condition_mask: Mask tensor indicating observed/latent nodes.
-            edge_mask: Mask tensor indicating edges in the graph.
-            **kwargs: Additional keyword arguments.
-        """
-        ...
-
-    # -------------------------- BASE DISTRIBUTION METHODS --------------------------
-
-    # We assume that the base distribution is a Gaussian distribution
-    # and that it is the same for ODE and SDE.
-
-    @property
-    def mean_base(self) -> Tensor:
-        r"""Mean of the base distribution (the initial noise at time t=T)."""
-        return self._mean_base
-
-    @property
-    def std_base(self) -> Tensor:
-        r"""Standard deviation of the base distribution
-        (the initial noise at time t=T)."""
-        return self._std_base
-
-    # -------------------------- ODE METHODS --------------------------
-
-    @abstractmethod
-    def ode_fn(
-        self,
-        input: Tensor,
-        times: Tensor,
-        condition_mask: Tensor,
-        edge_mask: Optional[Tensor],
-    ) -> Tensor:
-        r"""ODE flow function :math:`v(\text{inputs}_t, t, x_o)`
-            of the vector field estimator.
-
-        The target distribution can be sampled from by solving the following ODE:
-
-        .. math::
-            d\text{inputs}_t = v(\text{inputs}_t, t; x_o) dt
-
-        with initial :math:`\text{inputs}_1` sampled from the base distribution.
-
-        Args:
-            input: variable whose distribution is estimated.
-            t: Time.
-
-        Raises:
-            NotImplementedError: This method should be implemented by sub-classes.
-        """
-        raise NotImplementedError("ODE is not implemented for this estimator.")
-
-    # -------------------------- SDE METHODS --------------------------
-
-    def score(
-        self,
-        input: Tensor,
-        t: Tensor,
-        condition_mask: Tensor,
-        edge_mask: Optional[Tensor],
-    ) -> Tensor:
-        r"""Time-dependent score function
-
-        .. math::
-            s(t, \text{inputs}_t; x_o) = \nabla_{\text{inputs}_t}
-                \log p(\text{inputs}_t | x_o)
-
-        Args:
-            input: Input parameters :math:`\text{inputs}_t`.
-            t: Time.
-
-        Raises:
-            NotImplementedError: Score is not implemented for this estimator.
-        """
-        raise NotImplementedError("Score is not implemented for this estimator.")
+    # -------------------------- MEAN AND STD FUNCTIONS --------------------------
 
     def mean_t_fn(self, times: Tensor) -> Tensor:
         r"""Linear coefficient mean_t of the perturbation kernel expectation
@@ -807,6 +452,265 @@ class MaskedConditionalVectorFieldEstimator(MaskedConditionalEstimator, ABC):
             NotImplementedError: Diffusion is not implemented for this estimator.
         """
         raise NotImplementedError("Diffusion is not implemented for this estimator.")
+
+
+class ConditionalVectorFieldEstimator(
+    ConditionalEstimator, BaseConditionalVectorFieldEstimator, ABC
+):
+    r"""Base class for vector field estimators. That primarily includes
+    score-based and flow matching models.
+
+    The vector field estimator class is a wrapper around neural networks that allows to
+    evaluate the `vector_field`, and provide the `loss` of $\theta,x_o$ pairs. Here
+    $\theta$ would be the `input` and $x_o$ would be the `condition`.
+
+    Note:
+        We assume that the input to the density estimator is a tensor of shape
+        (sample_dim, batch_dim, *input_shape), where input_shape is the dimensionality
+        of the input. The condition is a tensor of shape (batch_dim, *condition_shape),
+        where condition_shape is the shape of the condition tensor.
+    """
+
+    def __init__(
+        self,
+        net: nn.Module,
+        input_shape: torch.Size,
+        condition_shape: torch.Size,
+        t_min: float = 0.0,
+        t_max: float = 1.0,
+        embedding_net: Optional[nn.Module] = None,
+        mean_base: Union[float, Tensor] = 0.0,
+        std_base: Union[float, Tensor] = 1.0,
+    ) -> None:
+        r"""Base class for vector field estimators.
+
+        Args:
+            net: Neural network.
+            input_shape: Shape of the input.
+            condition_shape: Shape of the condition. If not provided, it will assume a
+                            1D input.
+            t_min: Minimum time for the vector field estimator.
+            t_max: Maximum time for the vector field estimator.
+            embedding_net: Embedding network, if provided, it will be used to embed the
+                condition.
+            mean_base: Mean of the base distribution.
+            std_base: Standard deviation of the base distribution.
+        """
+        super().__init__(input_shape, condition_shape)
+        self.net = net
+
+        # We assume that the time range is the same for ODE and SDE.
+        self.t_min = t_min
+        self.t_max = t_max
+
+        # We assume that the base distribution is a Gaussian distribution
+        # and that it is the same for ODE and SDE.
+        # We store the mean and std of the base distribution in buffers
+        # to transfer them to the device automatically when the model is moved.
+        self.register_buffer(
+            "_mean_base", torch.empty(1, *self.input_shape).fill_(mean_base)
+        )
+        self.register_buffer(
+            "_std_base", torch.empty(1, *self.input_shape).fill_(std_base)
+        )
+        self._embedding_net = (
+            embedding_net if embedding_net is not None else nn.Identity()
+        )
+
+    @abstractmethod
+    def forward(
+        self, input: Tensor, condition: Tensor, time: Tensor, **kwargs
+    ) -> Tensor:
+        r"""Forward pass of the score estimator.
+
+        Args:
+            input: Input variable :math:`\theta_t`.
+            condition: Conditioning variable :math:`x_o`.
+
+        Raises:
+            NotImplementedError: This method should be implemented by sub-classes.
+        """
+        raise NotImplementedError("forward is not implemented for this estimator.")
+
+    # -------------------------- ODE METHODS --------------------------
+
+    @abstractmethod
+    def ode_fn(self, input: Tensor, condition: Tensor, times: Tensor) -> Tensor:
+        r"""ODE flow function :math:`v(\theta_t, t, x_o)` of the vector field estimator.
+
+        The target distribution can be sampled from by solving the following ODE:
+
+        .. math::
+            d\theta_t = v(\theta_t, t; x_o) dt
+
+        with initial :math:`\theta_1` sampled from the base distribution.
+
+        Args:
+            input: variable whose distribution is estimated.
+            condition: Conditioning variable.
+            t: Time.
+
+        Raises:
+            NotImplementedError: This method should be implemented by sub-classes.
+        """
+        raise NotImplementedError("ODE is not implemented for this estimator.")
+
+    # -------------------------- SDE METHODS --------------------------
+
+    def score(self, input: Tensor, condition: Tensor, t: Tensor) -> Tensor:
+        r"""Time-dependent score function
+
+        .. math::
+            s(t, \theta_t; x_o) = \nabla_{\theta_t} \log p(\theta_t | x_o)
+
+        Args:
+            input: Input parameters :math:`\theta_t`.
+            condition: Conditioning variable :math:`x_o`.
+            t: Time.
+
+        Raises:
+            NotImplementedError: Score is not implemented for this estimator.
+        """
+        raise NotImplementedError("Score is not implemented for this estimator.")
+
+
+class MaskedConditionalVectorFieldEstimator(
+    MaskedConditionalEstimator, BaseConditionalVectorFieldEstimator, ABC
+):
+    r"""Base class for masked vector field estimators. That primarily includes
+    score-based and flow matching models.
+
+    The vector field estimator class is a wrapper around neural networks that allows to
+    evaluate the `masked_vector_field`, and provide the `loss` of inputs over masks.
+
+    Note:
+        We assume that the input to the density estimator is a tensor of shape
+        (sample_dim, batch_dim, *input_shape), where input_shape is the dimensionality
+        of the input.
+    """
+
+    def __init__(
+        self,
+        net: nn.Module,
+        input_shape: torch.Size,
+        t_min: float = 0.0,
+        t_max: float = 1.0,
+        embedding_net: Optional[nn.Module] = None,
+        mean_base: float = 0.0,
+        std_base: float = 1.0,
+    ) -> None:
+        r"""Base class for masked vector field estimators.
+
+        Args:
+            net: Neural network.
+            input_shape: Shape of the input.
+            t_min: Minimum time for the vector field estimator.
+            t_max: Maximum time for the vector field estimator.
+            mean_base: Mean of the base distribution.
+            std_base: Standard deviation of the base distribution.
+        """
+        super().__init__(input_shape)
+        self.net = net
+
+        # We assume that the time range is the same for ODE and SDE.
+        self.t_min = t_min
+        self.t_max = t_max
+
+        # We store the mean and std of the base distribution in buffers
+        # to transfer them to the device automatically when the model is moved.
+        self.register_buffer(
+            "_mean_base", torch.empty(1, *self.input_shape).fill_(mean_base)
+        )
+        self.register_buffer(
+            "_std_base", torch.empty(1, *self.input_shape).fill_(std_base)
+        )
+        self._embedding_net = (
+            embedding_net if embedding_net is not None else nn.Identity()
+        )
+
+    def build_conditional_vector_field_estimator(
+        self, fixed_condition_mask: Tensor, fixed_edge_mask: Optional[Tensor]
+    ) -> ConditionalVectorFieldEstimator:
+        """Returns a callable that behaves like a ConditionalVectorFieldEstimator
+        for a fixed condition_mask and edge_mask.
+        """
+
+        return MaskedConditionalVectorFieldEstimatorWrapper(
+            self, fixed_condition_mask, fixed_edge_mask
+        )
+
+    @abstractmethod
+    def forward(
+        self,
+        input: Tensor,
+        time: Tensor,
+        condition_mask: Tensor,
+        edge_mask: Optional[Tensor],
+        **kwargs,
+    ) -> Tensor:
+        r"""Forward pass of the masked conditional vector field estimator.
+
+        Args:
+            input: Input variables of shape (batch_dim, *input_shape).
+            time: Time variable tensor.
+            condition_mask: Mask tensor indicating observed/latent nodes.
+            edge_mask: Mask tensor indicating edges in the graph.
+            **kwargs: Additional keyword arguments.
+        """
+        raise NotImplementedError("forward is not implemented for this estimator.")
+
+    # -------------------------- ODE METHODS --------------------------
+
+    @abstractmethod
+    def ode_fn(
+        self,
+        input: Tensor,
+        times: Tensor,
+        condition_mask: Tensor,
+        edge_mask: Optional[Tensor],
+    ) -> Tensor:
+        r"""ODE flow function :math:`v(\text{inputs}_t, t, x_o)`
+            of the vector field estimator.
+
+        The target distribution can be sampled from by solving the following ODE:
+
+        .. math::
+            d\text{inputs}_t = v(\text{inputs}_t, t; x_o) dt
+
+        with initial :math:`\text{inputs}_1` sampled from the base distribution.
+
+        Args:
+            input: variable whose distribution is estimated.
+            t: Time.
+
+        Raises:
+            NotImplementedError: This method should be implemented by sub-classes.
+        """
+        raise NotImplementedError("ODE is not implemented for this estimator.")
+
+    # -------------------------- SDE METHODS --------------------------
+
+    def score(
+        self,
+        input: Tensor,
+        t: Tensor,
+        condition_mask: Tensor,
+        edge_mask: Optional[Tensor],
+    ) -> Tensor:
+        r"""Time-dependent score function
+
+        .. math::
+            s(t, \text{inputs}_t; x_o) = \nabla_{\text{inputs}_t}
+                \log p(\text{inputs}_t | x_o)
+
+        Args:
+            input: Input parameters :math:`\text{inputs}_t`.
+            t: Time.
+
+        Raises:
+            NotImplementedError: Score is not implemented for this estimator.
+        """
+        raise NotImplementedError("Score is not implemented for this estimator.")
 
 
 class MaskedConditionalVectorFieldEstimatorWrapper(ConditionalVectorFieldEstimator):
