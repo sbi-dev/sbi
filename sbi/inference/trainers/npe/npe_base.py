@@ -353,7 +353,7 @@ class PosteriorEstimatorTrainer(NeuralInference, ABC):
 
         self._report_convergence_at_end(self.epoch, stop_after_epochs, max_num_epochs)
 
-        self._update_summary(show_train_summary=show_train_summary)
+        self._update_training_summary(show_train_summary=show_train_summary)
 
         return self._get_neural_network_for_training()
 

@@ -354,7 +354,7 @@ class NeuralInference(ABC):
 
         return train_loss_average
 
-    def _update_summary(
+    def _update_training_summary(
         self,
         show_train_summary: bool,
     ) -> None:
