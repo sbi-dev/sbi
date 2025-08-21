@@ -37,7 +37,6 @@ from sbi.utils.torchutils import assert_all_finite
 
 class LikelihoodEstimatorTrainer(NeuralInference, ABC):
     _neural_net: ConditionalDensityEstimator
-    _prior: Distribution
 
     def __init__(
         self,

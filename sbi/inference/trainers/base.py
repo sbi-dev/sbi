@@ -183,7 +183,7 @@ class BaseNeuralInference:
     ]
     _train_loss: float
     _val_loss: float
-    _prior: Optional[Distribution]
+    _prior: Distribution
     _device: str
     _summary_writer: SummaryWriter
     _summary: Dict[str, list]
@@ -215,7 +215,7 @@ class BaseNeuralInference:
         self._device = process_device(device)
         check_prior(prior)
         check_if_prior_on_device(self._device, prior)
-        self._prior = prior
+        self._prior = prior if prior is not None else NoPrior()
 
         self._posterior = None
         self._neural_net = None
