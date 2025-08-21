@@ -107,7 +107,7 @@ class Simformer(MaskedVectorFieldTrainer):
         return simformer_score_nn(model=net_type, **kwargs)
 
 
-class FlowMatchingSimformer(Simformer):
+class FlowMatchingSimformer(MaskedVectorFieldTrainer):
     """Flow-matching version of the Simformer [Gloeckler et al. (ICML, 2024)],
     the original score-based implementation is available using the Simformer class.
 
@@ -132,6 +132,65 @@ class FlowMatchingSimformer(Simformer):
         - Multi-round inference is not supported yet; the API is present for coherence
           with sbi.
     """
+
+    def __init__(
+        self,
+        prior: Optional[Distribution] = None,
+        mvf_estimator: Union[
+            str,
+            MaskedVectorFieldEstimatorBuilder,
+        ] = "simformer",
+        sde_type: Literal["vp", "ve", "subvp"] = "ve",
+        posterior_latent_idx: Optional[list | Tensor] = None,
+        posterior_observed_idx: Optional[list | Tensor] = None,
+        device: str = "cpu",
+        logging_level: Union[int, str] = "WARNING",
+        summary_writer: Optional[SummaryWriter] = None,
+        show_progress_bars: bool = True,
+        **kwargs,
+    ):
+        r"""Initialize Simformer.
+
+        Args:
+            prior: Prior distribution. Its primary use is for rejecting samples that
+            fall outside its defined support. For the core inference process,
+            this prior is ignored.
+            mvf_estimator: Neural network architecture for the masked
+            vector field estimator. Can be a string (e.g., `'simformer'`)
+            or a callable that implements the `MaskedVectorFieldEstimatorBuilder`
+            protocol. If a callable, `__call__` must accept `inputs`, and return
+            a `MaskedConditionalVectorFieldEstimator`.
+            sde_type: Type of SDE to use. Must be one of ['vp', 've', 'subvp'].
+            posterior_latent_idx: List or Tensor of indexes identifying which
+            variables are latent (to be infered),
+            i.e, which variables identify $\theta$.
+            posterior_observed_idx: List or Tensor of indexes identifying which
+            variables are observed (to be infered) according to a posterior,
+            i.e, which variables identify $x$.
+            device: Device to run the training on.
+            logging_level: Logging level for the training. Can be an integer or a
+            string.
+            summary_writer: Tensorboard summary writer.
+            show_progress_bars: Whether to show progress bars during training.
+            kwargs: Additional keyword arguments passed to the default builder if
+            `score_estimator` is a string.
+
+        References:
+            - Gloeckler, Deistler, Weilbach, Wood, Macke.
+            "All-in-one simulation-based inference.", ICML 2024
+        """
+        super().__init__(
+            prior=prior,
+            mvf_estimator_builder=mvf_estimator,
+            posterior_latent_idx=posterior_latent_idx,
+            posterior_observed_idx=posterior_observed_idx,
+            device=device,
+            logging_level=logging_level,
+            summary_writer=summary_writer,
+            show_progress_bars=show_progress_bars,
+            sde_type=sde_type,
+            **kwargs,
+        )
 
     def _build_default_nn_fn(self, **kwargs) -> MaskedVectorFieldEstimatorBuilder:
         model = kwargs.pop("vector_field_estimator_builder", "simformer")
