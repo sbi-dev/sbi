@@ -40,6 +40,7 @@ from sbi.utils import (
 )
 from sbi.utils.sbiutils import (
     ImproperEmpirical,
+    NoPrior,
     handle_invalid_inputs_for_simformer,
     mask_sims_from_prior,
     simformer_msg_on_invalid_x,
@@ -757,7 +758,7 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
 
         self._proposal_roundwise.append(proposal)
 
-        if self._prior is None or isinstance(self._prior, ImproperEmpirical):
+        if self._prior is None:
             inputs_prior = self.get_simulations()[0].to(self._device)
 
             # To prevent an ImproperEmpirical built over invalid values
@@ -767,9 +768,7 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
             # ImproperEmpirical at all
             inputs_prior, _ = handle_invalid_inputs_for_simformer(inputs_prior)
 
-            self._prior = ImproperEmpirical(
-                inputs_prior, ones(inputs_prior.shape[0], device=self._device)
-            )
+            self._prior = NoPrior(event_shape=inputs_prior.shape[1:])
 
         return self
 

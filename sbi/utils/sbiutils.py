@@ -904,7 +904,7 @@ def check_transform(
 class NoPrior(Distribution):
     """
     Explicit filler object for cases where no prior is provided.
-    Implements log_prob to always return 0 and raises an error on sample.
+    Implements log_prob to always return 0 and gaussian noise on sample.
     See #1635.
     """
 
@@ -912,13 +912,12 @@ class NoPrior(Distribution):
         super().__init__(batch_shape, event_shape)
 
     def sample(self, sample_shape=torch.Size()):
-        raise RuntimeError("NoPrior cannot be sampled. Please provide a valid prior.")
+        return torch.randn(
+            torch.Size(sample_shape) + self.batch_shape + self.event_shape
+        )
 
     def log_prob(self, value):
         return torch.zeros(value.shape[0], device=value.device)
-
-    def rsample(self, sample_shape=torch.Size()):
-        raise RuntimeError("NoPrior cannot be sampled. Please provide a valid prior.")
 
 
 class ImproperEmpirical(Empirical):

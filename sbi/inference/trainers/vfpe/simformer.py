@@ -4,7 +4,6 @@
 from typing import Literal, Optional, Union
 
 from torch import Tensor
-from torch.distributions import Distribution
 from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi.inference.trainers.vfpe.base_vf_inference import (
@@ -45,7 +44,6 @@ class Simformer(MaskedVectorFieldTrainer):
 
     def __init__(
         self,
-        prior: Optional[Distribution] = None,
         mvf_estimator: Union[
             str,
             MaskedVectorFieldEstimatorBuilder,
@@ -90,7 +88,6 @@ class Simformer(MaskedVectorFieldTrainer):
             "All-in-one simulation-based inference.", ICML 2024
         """
         super().__init__(
-            prior=prior,
             mvf_estimator_builder=mvf_estimator,
             posterior_latent_idx=posterior_latent_idx,
             posterior_observed_idx=posterior_observed_idx,
@@ -135,7 +132,6 @@ class FlowMatchingSimformer(MaskedVectorFieldTrainer):
 
     def __init__(
         self,
-        prior: Optional[Distribution] = None,
         mvf_estimator: Union[
             str,
             MaskedVectorFieldEstimatorBuilder,
@@ -180,7 +176,6 @@ class FlowMatchingSimformer(MaskedVectorFieldTrainer):
             "All-in-one simulation-based inference.", ICML 2024
         """
         super().__init__(
-            prior=prior,
             mvf_estimator_builder=mvf_estimator,
             posterior_latent_idx=posterior_latent_idx,
             posterior_observed_idx=posterior_observed_idx,

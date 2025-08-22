@@ -222,7 +222,6 @@ def test_c2st_simformer_on_linearGaussian(
     # Infer theta (node 0) given x (node 1)
     if vector_field_type == "flow":
         inference = FlowMatchingSimformer(
-            prior=prior,
             show_progress_bars=True,
             posterior_latent_idx=[0],
             posterior_observed_idx=[1],
@@ -230,7 +229,6 @@ def test_c2st_simformer_on_linearGaussian(
         )
     else:
         inference = Simformer(
-            prior=prior,
             sde_type=vector_field_type,  # type: ignore
             show_progress_bars=True,
             posterior_latent_idx=[0],
@@ -247,6 +245,7 @@ def test_c2st_simformer_on_linearGaussian(
         posterior = inference.build_posterior(
             mvf_estimator=mvf_estimator,
             sample_with=method,  # type: ignore
+            prior=prior,
         ).set_default_x(x_o.squeeze(0))
 
         samples = posterior.sample((num_samples,))
