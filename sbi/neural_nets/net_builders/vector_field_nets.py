@@ -1564,7 +1564,7 @@ def build_simformer_network(
     dim_val: int = 64,
     dim_id: int = 32,
     dim_cond: int = 16,
-    ada_time: bool = False,
+    ada_time: bool = True,
     time_emb_type: str = "random_fourier",
     sinusoidal_max_freq: float = 0.01,
     fourier_scale: float = 30.0,
