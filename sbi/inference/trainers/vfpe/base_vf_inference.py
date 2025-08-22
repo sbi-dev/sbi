@@ -198,7 +198,6 @@ class VectorFieldTrainer(NeuralInference, ABC):
 
         if exclude_invalid_x is None:
             exclude_invalid_x = current_round == 0
-        self._exclude_invalid_x = exclude_invalid_x
 
         if data_device is None:
             data_device = self._device
