@@ -648,6 +648,9 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
                 `vector_field_estimator_builder` is a string.
         """
 
+        # Unused at initialization, try to catch possible mistakenly use of the user
+        kwargs.pop("prior", None)
+
         super().__init__(
             posterior_latent_idx=posterior_latent_idx,
             posterior_observed_idx=posterior_observed_idx,
