@@ -1249,6 +1249,16 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
             "gradient-based MCMC methods like HMC yet. Please avoid this."
         )
 
+    def _loss_proposal_conditional(
+        self,
+        theta: Tensor,
+        x: Tensor,
+        masks: Tensor,
+        proposal: Optional[Any],
+    ) -> Tensor:
+        cls_name = self.__class__.__name__
+        raise NotImplementedError(f"Multi-round {cls_name} is not yet implemented.")
+
     def _loss(
         self,
         inputs: Tensor,
