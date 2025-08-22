@@ -55,6 +55,9 @@ from sbi.utils.torchutils import assert_all_finite
 
 
 class PosteriorEstimatorTrainer(NeuralInference, ABC):
+    # TODO: This should also allow for Optional, but
+    # pyright raises errors (also in NRE and NLE base classes)
+    # as some of the methods need to make sure the neural net is not None
     _neural_net: ConditionalDensityEstimator
 
     def __init__(

@@ -52,6 +52,8 @@ class RatioEstimatorBuilder(Protocol):
 
 
 class RatioEstimatorTrainer(NeuralInference, ABC):
+    _neural_net: RatioEstimator
+
     def __init__(
         self,
         prior: Optional[Distribution] = None,
