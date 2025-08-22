@@ -16,7 +16,9 @@ from sbi.analysis import conditional_potential
 from sbi.inference import (
     FMPE,
     NPSE,
+    FlowMatchingSimformer,
     MCMCPosterior,
+    Simformer,
     VectorFieldPosterior,
     simulate_for_sbi,
     vector_field_estimator_based_potential,
@@ -31,6 +33,7 @@ from sbi.simulators.linear_gaussian import (
 )
 from sbi.utils import BoxUniform
 from sbi.utils.metrics import check_c2st
+from sbi.utils.torchutils import process_device
 from sbi.utils.user_input_checks import process_simulator
 
 from .test_utils import get_dkl_gaussian_prior
@@ -138,6 +141,120 @@ def test_c2st_vector_field_on_linearGaussian(
 
         assert dkl < max_dkl, (
             f"D-KL={dkl} is more than 2 stds above the average performance."
+        )
+
+
+# We always test num_dim and sample_with with defaults and mark the rests as slow.
+@pytest.mark.parametrize(
+    ("vector_field_type, num_dim, prior_str"),
+    [
+        pytest.param("ve", 1, "uniform"),
+        pytest.param("ve", 1, "gaussian"),
+        pytest.param("ve", 3, "uniform"),
+        pytest.param("ve", 3, "gaussian"),
+        pytest.param("vp", 3, "uniform", marks=[pytest.mark.gpu, pytest.mark.slow]),
+        pytest.param("vp", 3, "gaussian", marks=[pytest.mark.gpu, pytest.mark.slow]),
+        pytest.param("subvp", 3, "uniform", marks=[pytest.mark.gpu, pytest.mark.slow]),
+        pytest.param("subvp", 3, "gaussian", marks=[pytest.mark.gpu, pytest.mark.slow]),
+        pytest.param("flow", 1, "uniform"),
+        pytest.param("flow", 1, "gaussian"),
+        pytest.param("flow", 3, "uniform"),
+        pytest.param("flow", 3, "gaussian"),
+    ],
+)
+def test_c2st_simformer_on_linearGaussian(
+    vector_field_type: str,
+    num_dim: int,
+    prior_str: str,
+):
+    """
+    Test whether Simformer infers well a simple example with available ground truth.
+    """
+
+    if vector_field_type in {'vp', 'subvp'}:
+        # Default values for slow and GPU tests (VP and sub-VP)
+        num_simulations = 25000
+        max_num_epochs = 500
+        device = "gpu"
+    else:
+        # Default values for CPU and fast tests
+        num_simulations = 5000
+        max_num_epochs = 100
+        device = "cpu"
+    device = process_device(device)
+
+    num_samples = 1000
+    tol = 0.15
+    sample_with = ["sde", "ode"]
+
+    x_o = zeros(1, num_dim, device=device)
+
+    # likelihood_mean will be likelihood_shift+theta
+    likelihood_shift = -1.0 * ones(num_dim, device=device)
+    likelihood_cov = 0.3 * eye(num_dim, device=device)
+
+    if prior_str == "gaussian":
+        prior_mean = zeros(num_dim, device=device)
+        prior_cov = eye(num_dim, device=device)
+        prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
+        gt_posterior = true_posterior_linear_gaussian_mvn_prior(
+            x_o, likelihood_shift, likelihood_cov, prior_mean, prior_cov
+        )
+        target_samples = gt_posterior.sample((num_samples,))
+    else:
+        prior = utils.BoxUniform(
+            -2.0 * ones(num_dim), 2.0 * ones(num_dim), device=device
+        )
+        target_samples = samples_true_posterior_linear_gaussian_uniform_prior(
+            x_o,
+            likelihood_shift,
+            likelihood_cov,
+            prior=prior,
+            num_samples=num_samples,
+        )
+
+    # Prepare data for Simformer
+    thetas = prior.sample((num_simulations,))
+    xs = linear_gaussian(thetas, likelihood_shift, likelihood_cov)
+    # inputs shape: (num_simulations, num_nodes, num_features)
+    inputs = torch.stack([thetas, xs], dim=1)
+
+    # Infer theta (node 0) given x (node 1)
+    if vector_field_type == "flow":
+        inference = FlowMatchingSimformer(
+            show_progress_bars=True,
+            posterior_latent_idx=[0],
+            posterior_observed_idx=[1],
+            device=device,
+        )
+    else:
+        inference = Simformer(
+            sde_type=vector_field_type,  # type: ignore
+            show_progress_bars=True,
+            posterior_latent_idx=[0],
+            posterior_observed_idx=[1],
+            device=device,
+        )
+
+    mvf_estimator = inference.append_simulations(
+        inputs=inputs,
+        data_device=device,
+    ).train(max_num_epochs=max_num_epochs)
+
+    for method in sample_with:
+        posterior = inference.build_posterior(
+            mvf_estimator=mvf_estimator,
+            sample_with=method,  # type: ignore
+            prior=prior,
+        ).set_default_x(x_o.squeeze(0))
+
+        samples = posterior.sample((num_samples,))
+
+        check_c2st(
+            samples,
+            target_samples,
+            alg=f"simformer-{vector_field_type}-{prior_str}-{num_dim}D-{method}",
+            tol=tol,
         )
 
 
@@ -338,6 +455,104 @@ def test_vector_field_sde_ode_sampling_equivalence(vector_field_trained_model):
     )
 
 
+@pytest.fixture(scope="module", params=["vp", "ve", "subvp"])  # add also "fmpe"
+def simformer_vector_field_type(request):
+    """Module-scoped fixture for vector field type. (Simformer fixture)"""
+    return request.param
+
+
+@pytest.fixture(scope="module", params=["gaussian", "uniform"])
+def simformer_prior_type(request):
+    """Module-scoped fixture for prior type. (Simformer fixture)"""
+    return request.param
+
+
+@pytest.fixture(scope="module")
+def simformer_trained_model(simformer_vector_field_type, simformer_prior_type):
+    """Module-scoped fixture that trains a score estimator for Simformer tests."""
+    num_dim = 3
+    num_simulations = 10000
+
+    # likelihood_mean will be likelihood_shift+theta
+    likelihood_shift = -1.0 * ones(num_dim)
+    # The likelihood covariance is increased to make the iid inference easier,
+    # (otherwise the posterior gets too tight and the c2st is too high),
+    # but it doesn't really improve the results for both FMPE and NPSE.
+    likelihood_cov = 0.9 * eye(num_dim)
+
+    if simformer_prior_type == "gaussian":
+        prior_mean = zeros(num_dim)
+        prior_cov = eye(num_dim)
+        prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
+        thetas = prior.sample((num_simulations,))
+    elif simformer_prior_type == "uniform":
+        prior = BoxUniform(-2 * ones(num_dim), 2 * ones(num_dim))
+        thetas = prior.sample((num_simulations,))
+
+    xs = linear_gaussian(thetas, likelihood_shift, likelihood_cov)
+    # inputs shape: (num_simulations, num_nodes, num_features)
+    inputs = torch.stack([thetas, xs], dim=1)
+
+    # Create condition masks (theta latent, x observed)
+    inference = Simformer(
+        prior=prior, sde_type=simformer_vector_field_type, show_progress_bars=True
+    )
+
+    mvf_estimator = inference.append_simulations(
+        inputs=inputs,
+    ).train(max_num_epochs=100)
+
+    return {
+        "score_estimator": mvf_estimator,
+        "inference": inference,
+        "prior": prior,
+        "likelihood_shift": likelihood_shift,
+        "likelihood_cov": likelihood_cov,
+        "prior_mean": prior_mean
+        if simformer_prior_type == "gaussian" or simformer_prior_type is None
+        else None,
+        "prior_cov": prior_cov
+        if simformer_prior_type == "gaussian" or simformer_prior_type is None
+        else None,
+        "num_dim": num_dim,
+        "simformer_vector_field_type": simformer_vector_field_type,
+        "inference_condition_mask": torch.tensor([False, True]),
+    }
+
+
+@pytest.mark.slow
+def test_simformer_sde_ode_sampling_equivalence(simformer_trained_model):
+    """
+    Test whether SDE and ODE sampling are equivalent
+    for Simformer.
+    """
+    num_samples = 1000
+    x_o = zeros(1, simformer_trained_model["num_dim"])
+
+    # Build posterior for the specific task: infer theta (node 0) given x (node 1).
+
+    inference = simformer_trained_model["inference"]
+    vector_field_type = simformer_trained_model["simformer_vector_field_type"]
+    condition_mask = simformer_trained_model["inference_condition_mask"]
+    sde_posterior = inference.build_conditional(
+        condition_mask=condition_mask,
+        sample_with="sde",
+    ).set_default_x(x_o)
+    ode_posterior = inference.build_conditional(
+        condition_mask=condition_mask, sample_with="ode"
+    ).set_default_x(x_o)
+
+    sde_samples = sde_posterior.sample((num_samples,))
+    ode_samples = ode_posterior.sample((num_samples,))
+
+    check_c2st(
+        sde_samples,
+        ode_samples,
+        alg=f"sample_methods_equivalence-{vector_field_type}",
+        tol=0.07,
+    )
+
+
 # ------------------------------------------------------------------------------
 # ------------------------------- SKIPPED TESTS --------------------------------
 # ------------------------------------------------------------------------------
@@ -417,6 +632,81 @@ def test_vector_field_iid_inference(
     )
 
 
+# TODO: Needs to fine-tune hyper-parameters
+# TODO: for jac_gauss after first sampling GradTrackingTensor appear
+# which cannot be accessed as a normal tensor throuh shapes,
+# thus errors arise in the simformer wrapper
+@pytest.mark.skip(
+    reason="c2st too high for some cases, has to be fixed in PR #1501 or #1544"
+)
+@pytest.mark.slow
+@pytest.mark.parametrize(
+    "iid_method, num_trial",
+    [
+        pytest.param("fnpe", 3, id="fnpe-2trials"),
+        pytest.param("gauss", 3, id="gauss-3trials"),
+        pytest.param("auto_gauss", 8, id="auto_gauss-8trials"),
+        pytest.param("auto_gauss", 16, id="auto_gauss-16trials"),
+        pytest.param("jac_gauss", 8, id="jac_gauss-8trials"),
+    ],
+)
+def test_simformer_iid_inference(
+    simformer_trained_model,
+    iid_method,
+    num_trial,
+    simformer_prior_type,
+):
+    """
+    Test whether Simformer infers well a simple example with available ground truth.
+    """
+    num_samples = 1000
+
+    # Extract data from fixture
+    score_estimator = simformer_trained_model["score_estimator"]
+    inference = simformer_trained_model["inference"]
+    prior = simformer_trained_model["prior"]
+    likelihood_shift = simformer_trained_model["likelihood_shift"]
+    likelihood_cov = simformer_trained_model["likelihood_cov"]
+    prior_mean = simformer_trained_model["prior_mean"]
+    prior_cov = simformer_trained_model["prior_cov"]
+    num_dim = simformer_trained_model["num_dim"]
+    vector_field_type = simformer_trained_model["simformer_vector_field_type"]
+
+    condition_mask = simformer_trained_model["inference_condition_mask"]
+
+    x_o = zeros(num_trial, num_dim)
+    posterior = inference.build_conditional(
+        mvf_estimator=score_estimator, condition_mask=condition_mask, sample_with="sde"
+    ).set_default_x(x_o)
+    samples = posterior.sample((num_samples,), iid_method=iid_method)
+
+    if simformer_prior_type == "gaussian" or (simformer_prior_type is None):
+        gt_posterior = true_posterior_linear_gaussian_mvn_prior(
+            x_o, likelihood_shift, likelihood_cov, prior_mean, prior_cov
+        )
+        target_samples = gt_posterior.sample((num_samples,))
+    elif simformer_prior_type == "uniform":
+        target_samples = samples_true_posterior_linear_gaussian_uniform_prior(
+            x_o,
+            likelihood_shift,
+            likelihood_cov,
+            prior,  # type: ignore
+        )
+
+    # Compute the c2st and assert it is near chance level of 0.5.
+    # Some degradation is expected, also because posterior get tighter which
+    # usually makes the c2st worse.
+    check_c2st(
+        samples,
+        target_samples,
+        alg=(
+            f"{vector_field_type}-{simformer_prior_type}-"
+            f"{num_dim}-{iid_method}-{num_trial}iid-trials"
+        ),
+        tol=0.05 * min(num_trial, 8),
+    )
+
+
 @pytest.mark.slow
 @pytest.mark.parametrize("vector_field_type", ["npse", "fmpe"])
 def test_vector_field_map(vector_field_type):
@@ -447,6 +737,60 @@ def test_vector_field_map(vector_field_type):
 
     inference.append_simulations(theta, x).train(max_num_epochs=100)
     posterior = inference.build_posterior().set_default_x(x_o)
+
+    map_ = posterior.map(show_progress_bars=True, num_iter=5)
+
+    assert ((map_ - gt_posterior.mean) ** 2).sum() < 0.5, "MAP is not close to GT."
+
+
+@pytest.mark.slow
+def test_simformer_map():
+    num_node_features = 2
+    # num_sim_nodes = 2  # theta, x
+    num_simulations = 3000
+
+    # likelihood_mean will be likelihood_shift+theta
+    likelihood_shift = -1.0 * ones(num_node_features)
+    likelihood_cov = 0.3 * eye(num_node_features)
+
+    prior_mean = zeros(num_node_features)
+    prior_cov = eye(num_node_features)
+    prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
+
+    x_o_features = zeros(num_node_features)
+
+    # The ground truth posterior is for theta.
+    gt_posterior = true_posterior_linear_gaussian_mvn_prior(
+        x_o_features.unsqueeze(0),
+        likelihood_shift,
+        likelihood_cov,
+        prior_mean,
+        prior_cov,
+    )
+
+    def simulator(theta):
+        # theta is (batch, num_node_features)
+        return linear_gaussian(theta, likelihood_shift, likelihood_cov)
+
+    # Prepare data for Simformer
+    thetas = prior.sample((num_simulations,))
+    xs = simulator(thetas)
+    inputs = torch.stack([thetas, xs], dim=1)
+
+    inference = Simformer(prior=prior, show_progress_bars=True)
+
+    inference.append_simulations(
+        inputs=inputs,
+    ).train(max_num_epochs=100)
+
+    # Build posterior for the specific task: infer theta (node 0) given x (node 1).
+    inference_condition_mask = torch.tensor([False, True])
+
+    posterior = inference.build_conditional(
+        condition_mask=inference_condition_mask,
+    )
+
+    posterior.set_default_x(x_o_features)
 
     map_ = posterior.map(show_progress_bars=True, num_iter=5)
 
