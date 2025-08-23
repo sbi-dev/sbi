@@ -3,14 +3,12 @@
 
 import warnings
 from abc import ABC, abstractmethod
-from copy import deepcopy
 from typing import Any, Dict, Literal, Optional, Protocol, Tuple, Union
 
 import torch
 from torch import Tensor, eye, nn, ones
 from torch.distributions import Distribution
-from torch.nn.utils.clip_grad import clip_grad_norm_
-from torch.optim.adam import Adam
+from torch.utils import data
 from torch.utils.tensorboard.writer import SummaryWriter
 from typing_extensions import Self
 
@@ -211,13 +209,8 @@ class RatioEstimatorTrainer(NeuralInference, ABC):
         Returns:
             Classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
         """
-        # Load data from most recent round.
-        self._round = max(self._data_round_index)
-        # Starting index for the training set (1 = discard round-0 samples).
-        start_idx = int(discard_prior_samples and self._round > 0)
 
-        if loss_kwargs is None:
-            loss_kwargs = {}
+        start_idx = self._get_start_index(discard_prior_samples=discard_prior_samples)
 
         train_loader, val_loader = self.get_dataloaders(
             start_idx,
@@ -227,6 +220,45 @@ class RatioEstimatorTrainer(NeuralInference, ABC):
             dataloader_kwargs=dataloader_kwargs,
         )
 
+        num_atoms = self._get_num_atoms(
+            training_batch_size=training_batch_size,
+            val_loader=val_loader,
+            num_atoms=num_atoms,
+        )
+
+        self._initialize_neural_network(
+            retrain_from_scratch=retrain_from_scratch,
+            start_idx=start_idx,
+        )
+
+        if loss_kwargs is None:
+            loss_kwargs = {}
+
+        loss_kwargs["num_atoms"] = num_atoms
+
+        return self._train(
+            train_loader=train_loader,
+            val_loader=val_loader,
+            max_num_epochs=max_num_epochs,
+            stop_after_epochs=stop_after_epochs,
+            learning_rate=learning_rate,
+            resume_training=resume_training,
+            clip_max_norm=clip_max_norm,
+            show_train_summary=show_train_summary,
+            loss_kwargs=loss_kwargs,
+        )
+
+    def _get_start_index(self, discard_prior_samples: bool) -> int:
+        # Load data from most recent round.
+        self._round = max(self._data_round_index)
+        # Starting index for the training set (1 = discard round-0 samples).
+        start_idx = int(discard_prior_samples and self._round > 0)
+
+        return start_idx
+
+    def _get_num_atoms(
+        self, training_batch_size: int, val_loader: data.DataLoader, num_atoms: int
+    ) -> int:
         clipped_batch_size = min(training_batch_size, val_loader.batch_size)  # type: ignore
 
         num_atoms = int(
@@ -235,6 +267,11 @@ class RatioEstimatorTrainer(NeuralInference, ABC):
             )
         )
 
+        return num_atoms
+
+    def _initialize_neural_network(
+        self, retrain_from_scratch: bool, start_idx: int
+    ) -> None:
         # First round or if retraining from scratch:
         # Call the `self._build_neural_net` with the rounds' thetas and xs as
         # arguments, which will build the neural network
@@ -248,90 +285,29 @@ class RatioEstimatorTrainer(NeuralInference, ABC):
                 theta[self.train_indices].to("cpu"),
                 x[self.train_indices].to("cpu"),
             )
+
             del x, theta
+
         self._neural_net.to(self._device)
 
-        if not resume_training:
-            self.optimizer = Adam(
-                list(self._neural_net.parameters()),
-                lr=learning_rate,
-            )
-            self.epoch, self._val_loss = 0, float("Inf")
+    def _get_training_losses(self, batch: Any, loss_kwargs: Dict[str, Any]) -> Tensor:
+        theta_batch, x_batch = (
+            batch[0].to(self._device),
+            batch[1].to(self._device),
+        )
 
-        while self.epoch <= max_num_epochs and not self._converged(
-            self.epoch, stop_after_epochs
-        ):
-            # Train for a single epoch.
-            self._neural_net.train()
-            train_loss_sum = 0
-            for batch in train_loader:
-                self.optimizer.zero_grad()
-                theta_batch, x_batch = (
-                    batch[0].to(self._device),
-                    batch[1].to(self._device),
-                )
+        train_losses = self._loss(theta_batch, x_batch, **loss_kwargs)
 
-                train_losses = self._loss(
-                    theta_batch, x_batch, num_atoms, **loss_kwargs
-                )
-                train_loss = torch.mean(train_losses)
-                train_loss_sum += train_losses.sum().item()
+        return train_losses
 
-                train_loss.backward()
-                if clip_max_norm is not None:
-                    clip_grad_norm_(
-                        self._neural_net.parameters(),
-                        max_norm=clip_max_norm,
-                    )
-                self.optimizer.step()
+    def _get_validation_losses(self, batch: Any, loss_kwargs: Dict[str, Any]) -> Tensor:
+        theta_batch, x_batch = (
+            batch[0].to(self._device),
+            batch[1].to(self._device),
+        )
+        val_losses = self._loss(theta_batch, x_batch, **loss_kwargs)
 
-            self.epoch += 1
-
-            train_loss_average = train_loss_sum / (
-                len(train_loader) * train_loader.batch_size  # type: ignore
-            )
-            self._summary["training_loss"].append(train_loss_average)
-
-            # Calculate validation performance.
-            self._neural_net.eval()
-            val_loss_sum = 0
-            with torch.no_grad():
-                for batch in val_loader:
-                    theta_batch, x_batch = (
-                        batch[0].to(self._device),
-                        batch[1].to(self._device),
-                    )
-                    val_losses = self._loss(
-                        theta_batch, x_batch, num_atoms, **loss_kwargs
-                    )
-                    val_loss_sum += val_losses.sum().item()
-                # Take mean over all validation samples.
-                self._val_loss = val_loss_sum / (
-                    len(val_loader) * val_loader.batch_size  # type: ignore
-                )
-                # Log validation log prob for every epoch.
-                self._summary["validation_loss"].append(self._val_loss)
-
-            self._maybe_show_progress(self._show_progress_bars, self.epoch)
-
-        self._report_convergence_at_end(self.epoch, stop_after_epochs, max_num_epochs)
-
-        # Update summary.
-        self._summary["epochs_trained"].append(self.epoch)
-        self._summary["best_validation_loss"].append(self._best_val_loss)
-
-        # Update TensorBoard and summary dict.
-        self._summarize(round_=self._round)
-
-        # Update description for progress bar.
-        if show_train_summary:
-            print(self._describe_round(self._round, self._summary))
-
-        # Avoid keeping the gradients in the resulting network, which can
-        # cause memory leakage when benchmarking.
-        self._neural_net.zero_grad(set_to_none=True)
-
-        return deepcopy(self._neural_net)
+        return val_losses
 
     def build_posterior(
         self,

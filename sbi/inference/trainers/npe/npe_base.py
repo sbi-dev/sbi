@@ -1,17 +1,12 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-import time
 from abc import ABC, abstractmethod
-from copy import deepcopy
 from typing import Any, Callable, Dict, Literal, Optional, Tuple, Union
 from warnings import warn
 
-import torch
 from torch import Tensor, ones
 from torch.distributions import Distribution
-from torch.nn.utils.clip_grad import clip_grad_norm_
-from torch.optim.adam import Adam
 from torch.utils.tensorboard.writer import SummaryWriter
 from typing_extensions import Self
 
@@ -285,6 +280,64 @@ class PosteriorEstimatorTrainer(NeuralInference, ABC):
         Returns:
             Density estimator that approximates the distribution $p(\theta|x)$.
         """
+
+        # Calibration kernels proposed in Lueckmann, Gonçalves et al., 2017.
+        if calibration_kernel is None:
+
+            def default_calibration_kernel(x):
+                return ones([len(x)], device=self._device)
+
+            calibration_kernel = default_calibration_kernel
+
+        start_idx = self._get_start_index(
+            discard_prior_samples=discard_prior_samples,
+            force_first_round_loss=force_first_round_loss,
+            resume_training=resume_training,
+        )
+
+        # Set the proposal to the last proposal that was passed by the user. For
+        # atomic SNPE, it does not matter what the proposal is. For non-atomic
+        # SNPE, we only use the latest data that was passed, i.e. the one from the
+        # last proposal.
+        proposal = self._proposal_roundwise[-1]
+
+        train_loader, val_loader = self.get_dataloaders(
+            start_idx,
+            training_batch_size,
+            validation_fraction,
+            resume_training,
+            dataloader_kwargs=dataloader_kwargs,
+        )
+
+        self._initialize_neural_network(
+            retrain_from_scratch=retrain_from_scratch,
+            start_idx=start_idx,
+        )
+
+        loss_kwargs = dict(
+            proposal=proposal,
+            calibration_kernel=calibration_kernel,
+            force_first_round_loss=force_first_round_loss,
+        )
+
+        return self._train(
+            train_loader=train_loader,
+            val_loader=val_loader,
+            max_num_epochs=max_num_epochs,
+            stop_after_epochs=stop_after_epochs,
+            learning_rate=learning_rate,
+            resume_training=resume_training,
+            clip_max_norm=clip_max_norm,
+            show_train_summary=show_train_summary,
+            loss_kwargs=loss_kwargs,
+        )
+
+    def _get_start_index(
+        self,
+        discard_prior_samples: bool,
+        force_first_round_loss: bool,
+        resume_training: bool,
+    ) -> int:
         # Load data from most recent round.
         self._round = max(self._data_round_index)
 
@@ -303,14 +356,6 @@ class PosteriorEstimatorTrainer(NeuralInference, ABC):
                 "posterior, which (usually) is more narrow than the true posterior."
             )
 
-        # Calibration kernels proposed in Lueckmann, Gonçalves et al., 2017.
-        if calibration_kernel is None:
-
-            def default_calibration_kernel(x):
-                return ones([len(x)], device=self._device)
-
-            calibration_kernel = default_calibration_kernel
-
         # Starting index for the training set (1 = discard round-0 samples).
         start_idx = int(discard_prior_samples and self._round > 0)
 
@@ -321,19 +366,13 @@ class PosteriorEstimatorTrainer(NeuralInference, ABC):
         if self.use_non_atomic_loss or hasattr(self, "_ran_final_round"):
             start_idx = self._round
 
-        # Set the proposal to the last proposal that was passed by the user. For
-        # atomic SNPE, it does not matter what the proposal is. For non-atomic
-        # SNPE, we only use the latest data that was passed, i.e. the one from the
-        # last proposal.
-        proposal = self._proposal_roundwise[-1]
+        return start_idx
 
-        train_loader, val_loader = self.get_dataloaders(
-            start_idx,
-            training_batch_size,
-            validation_fraction,
-            resume_training,
-            dataloader_kwargs=dataloader_kwargs,
-        )
+    def _initialize_neural_network(
+        self,
+        retrain_from_scratch: bool,
+        start_idx: int,
+    ) -> None:
         # First round or if retraining from scratch:
         # Call the `self._build_neural_net` with the rounds' thetas and xs as
         # arguments, which will build the neural network.
@@ -360,101 +399,28 @@ class PosteriorEstimatorTrainer(NeuralInference, ABC):
         # Move entire net to device for training.
         self._neural_net.to(self._device)
 
-        if not resume_training:
-            self.optimizer = Adam(list(self._neural_net.parameters()), lr=learning_rate)
-            self.epoch, self._val_loss = 0, float("Inf")
+    def _get_training_losses(self, batch: Any, loss_kwargs: Dict[str, Any]) -> Tensor:
+        # Get batches on current device.
+        theta_batch, x_batch, masks_batch = (
+            batch[0].to(self._device),
+            batch[1].to(self._device),
+            batch[2].to(self._device),
+        )
 
-        while self.epoch <= max_num_epochs and not self._converged(
-            self.epoch, stop_after_epochs
-        ):
-            # Train for a single epoch.
-            self._neural_net.train()
-            train_loss_sum = 0
-            epoch_start_time = time.time()
-            for batch in train_loader:
-                self.optimizer.zero_grad()
-                # Get batches on current device.
-                theta_batch, x_batch, masks_batch = (
-                    batch[0].to(self._device),
-                    batch[1].to(self._device),
-                    batch[2].to(self._device),
-                )
+        train_losses = self._loss(theta_batch, x_batch, masks_batch, **loss_kwargs)
 
-                train_losses = self._loss(
-                    theta_batch,
-                    x_batch,
-                    masks_batch,
-                    proposal,
-                    calibration_kernel,
-                    force_first_round_loss=force_first_round_loss,
-                )
-                train_loss = torch.mean(train_losses)
-                train_loss_sum += train_losses.sum().item()
+        return train_losses
 
-                train_loss.backward()
-                if clip_max_norm is not None:
-                    clip_grad_norm_(
-                        self._neural_net.parameters(), max_norm=clip_max_norm
-                    )
-                self.optimizer.step()
+    def _get_validation_losses(self, batch: Any, loss_kwargs: Dict[str, Any]) -> Tensor:
+        theta_batch, x_batch, masks_batch = (
+            batch[0].to(self._device),
+            batch[1].to(self._device),
+            batch[2].to(self._device),
+        )
+        # Take negative loss here to get validation log_prob.
+        val_losses = self._loss(theta_batch, x_batch, masks_batch, **loss_kwargs)
 
-            self.epoch += 1
-
-            train_loss_average = train_loss_sum / (
-                len(train_loader) * train_loader.batch_size  # type: ignore
-            )
-            self._summary["training_loss"].append(train_loss_average)
-
-            # Calculate validation performance.
-            self._neural_net.eval()
-            val_loss_sum = 0
-
-            with torch.no_grad():
-                for batch in val_loader:
-                    theta_batch, x_batch, masks_batch = (
-                        batch[0].to(self._device),
-                        batch[1].to(self._device),
-                        batch[2].to(self._device),
-                    )
-                    # Take negative loss here to get validation log_prob.
-                    val_losses = self._loss(
-                        theta_batch,
-                        x_batch,
-                        masks_batch,
-                        proposal,
-                        calibration_kernel,
-                        force_first_round_loss=force_first_round_loss,
-                    )
-                    val_loss_sum += val_losses.sum().item()
-
-            # Take mean over all validation samples.
-            self._val_loss = val_loss_sum / (
-                len(val_loader) * val_loader.batch_size  # type: ignore
-            )
-            # Log validation loss for every epoch.
-            self._summary["validation_loss"].append(self._val_loss)
-            self._summary["epoch_durations_sec"].append(time.time() - epoch_start_time)
-
-            self._maybe_show_progress(self._show_progress_bars, self.epoch)
-
-        self._report_convergence_at_end(self.epoch, stop_after_epochs, max_num_epochs)
-
-        # Update summary.
-        self._summary["epochs_trained"].append(self.epoch)
-        self._summary["best_validation_loss"].append(self._best_val_loss)
-
-        # Update tensorboard and summary dict.
-        self._summarize(round_=self._round)
-
-        # Update description for progress bar.
-        if show_train_summary:
-            print(self._describe_round(self._round, self._summary))
-
-        # Avoid keeping the gradients in the resulting network, which can
-        # cause memory leakage when benchmarking.
-        self._neural_net.zero_grad(set_to_none=True)
-
-        return deepcopy(self._neural_net)
+        return val_losses
 
     def build_posterior(
         self,
