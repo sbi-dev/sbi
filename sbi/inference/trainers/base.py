@@ -907,7 +907,7 @@ class NeuralInference(ABC):
         loss_kwargs: Optional[Dict[str, Any]] = None,
         summarization_kwargs: Optional[Dict[str, Any]] = None,
     ):
-        """Main training pipeline using a config object."""
+        """Main training method"""
 
         if loss_kwargs is None:
             loss_kwargs = {}
