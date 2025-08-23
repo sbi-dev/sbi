@@ -906,7 +906,7 @@ class NeuralInference(ABC):
         show_train_summary: bool,
         loss_kwargs: Optional[Dict[str, Any]] = None,
         summarization_kwargs: Optional[Dict[str, Any]] = None,
-    ):
+    ) -> Any:
         """Main training method"""
 
         if loss_kwargs is None:
