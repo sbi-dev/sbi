@@ -142,3 +142,6 @@ class RatioEstimator(ConditionalEstimator):
     def forward(self, *args, **kwargs) -> Tensor:
         r"""Wraps `unnormalized_log_ratio`"""
         return self.unnormalized_log_ratio(*args, **kwargs)
+
+    def loss(self, input: Tensor, condition: Tensor, **kwargs) -> Tensor:
+        raise NotImplementedError()
