@@ -23,6 +23,7 @@ from warnings import warn
 import torch
 from torch import Tensor
 from torch.distributions import Distribution
+from torch.nn.utils.clip_grad import clip_grad_norm_
 from torch.optim.adam import Adam
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
@@ -321,29 +322,14 @@ class NeuralInference(ABC):
     def _get_start_index(self, discard_prior_samples: bool) -> int: ...
 
     @abstractmethod
-    def _train_epoch(
-        self,
-        train_loader: data.DataLoader,
-        clip_max_norm: Optional[float],
-        loss_kwargs: dict,
-    ) -> float: ...
+    def _get_training_losses(
+        self, batch: Any, loss_kwargs: Dict[str, Any]
+    ) -> Tensor: ...
 
     @abstractmethod
-    def _validate_epoch(
-        self,
-        val_loader: data.DataLoader,
-        loss_kwargs: dict,
-        validation_kwargs: dict,
-    ) -> float: ...
-
-    @abstractmethod
-    def _summarize_epoch(
-        self,
-        train_loss: float,
-        val_loss: float,
-        epoch_start_time: float,
-        summarization_kwargs: dict,
-    ) -> None: ...
+    def _get_validation_losses(
+        self, batch: Any, loss_kwargs: Dict[str, Any]
+    ) -> Tensor: ...
 
     @abstractmethod
     def _get_potential_function(
@@ -919,15 +905,13 @@ class NeuralInference(ABC):
         clip_max_norm: Optional[float],
         show_train_summary: bool,
         loss_kwargs: Optional[Dict[str, Any]] = None,
-        validation_kwargs: Optional[Dict[str, Any]] = None,
         summarization_kwargs: Optional[Dict[str, Any]] = None,
     ):
         """Main training pipeline using a config object."""
 
         if loss_kwargs is None:
             loss_kwargs = {}
-        if validation_kwargs is None:
-            validation_kwargs = {}
+
         if summarization_kwargs is None:
             summarization_kwargs = {}
 
@@ -950,7 +934,7 @@ class NeuralInference(ABC):
 
             # Calculate validation performance.
             self._neural_net.eval()
-            val_loss = self._validate_epoch(val_loader, loss_kwargs, validation_kwargs)
+            val_loss = self._validate_epoch(val_loader, loss_kwargs)
 
             self._summarize_epoch(
                 train_loss, val_loss, epoch_start_time, summarization_kwargs
@@ -977,6 +961,70 @@ class NeuralInference(ABC):
         self._neural_net.zero_grad(set_to_none=True)
 
         return deepcopy(self._neural_net)
+
+    def _train_epoch(
+        self,
+        train_loader: data.DataLoader,
+        clip_max_norm: Optional[float],
+        loss_kwargs: Dict[str, Any],
+    ) -> float:
+        assert self._neural_net is not None
+
+        train_loss_sum = 0
+        for batch in train_loader:
+            self.optimizer.zero_grad()
+            train_losses = self._get_training_losses(batch, loss_kwargs=loss_kwargs)
+            train_loss = torch.mean(train_losses)
+            train_loss_sum += train_losses.sum().item()
+
+            train_loss.backward()
+            if clip_max_norm is not None:
+                clip_grad_norm_(
+                    self._neural_net.parameters(),
+                    max_norm=clip_max_norm,
+                )
+            self.optimizer.step()
+
+        train_loss_average = train_loss_sum / (
+            len(train_loader) * train_loader.batch_size  # type: ignore
+        )
+
+        return train_loss_average
+
+    def _validate_epoch(
+        self,
+        val_loader: data.DataLoader,
+        loss_kwargs: Dict[str, Any],
+    ) -> float:
+        val_loss_sum = 0
+        with torch.no_grad():
+            for batch in val_loader:
+                val_losses = self._get_validation_losses(
+                    batch=batch,
+                    loss_kwargs=loss_kwargs,
+                )
+                val_loss_sum += val_losses.sum().item()
+
+        # Take mean over all validation samples.
+        val_loss = val_loss_sum / (
+            len(val_loader) * val_loader.batch_size  # type: ignore
+        )
+
+        return val_loss
+
+    def _summarize_epoch(
+        self,
+        train_loss: float,
+        val_loss: float,
+        epoch_start_time: float,
+        summarization_kwargs: Dict[str, Any],
+    ) -> None:
+        self._summary["training_loss"].append(train_loss)
+
+        self._val_loss = val_loss
+        # Log validation loss for every epoch.
+        self._summary["validation_loss"].append(self._val_loss)
+        self._summary["epoch_durations_sec"].append(time.time() - epoch_start_time)
 
     def _converged(self, epoch: int, stop_after_epochs: int) -> bool:
         """Return whether the training converged yet and save best model state so far.

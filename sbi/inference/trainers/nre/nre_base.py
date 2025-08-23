@@ -1,7 +1,6 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-import time
 import warnings
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Literal, Optional, Protocol, Tuple, Union
@@ -9,7 +8,6 @@ from typing import Any, Dict, Literal, Optional, Protocol, Tuple, Union
 import torch
 from torch import Tensor, eye, nn, ones
 from torch.distributions import Distribution
-from torch.nn.utils.clip_grad import clip_grad_norm_
 from torch.utils import data
 from torch.utils.tensorboard.writer import SummaryWriter
 from typing_extensions import Self
@@ -236,7 +234,7 @@ class RatioEstimatorTrainer(NeuralInference, ABC):
         if loss_kwargs is None:
             loss_kwargs = {}
 
-        loss_kwargs = dict(num_atoms=num_atoms, **loss_kwargs)
+        loss_kwargs["num_atoms"] = num_atoms
 
         return self._train(
             train_loader=train_loader,
@@ -292,73 +290,24 @@ class RatioEstimatorTrainer(NeuralInference, ABC):
 
         self._neural_net.to(self._device)
 
-    def _train_epoch(
-        self,
-        train_loader: data.DataLoader,
-        clip_max_norm: Optional[float],
-        loss_kwargs: Dict[str, Any],
-    ) -> float:
-        train_loss_sum = 0
-        for batch in train_loader:
-            self.optimizer.zero_grad()
-            theta_batch, x_batch = (
-                batch[0].to(self._device),
-                batch[1].to(self._device),
-            )
-
-            train_losses = self._loss(theta_batch, x_batch, **loss_kwargs)
-            train_loss = torch.mean(train_losses)
-            train_loss_sum += train_losses.sum().item()
-
-            train_loss.backward()
-            if clip_max_norm is not None:
-                clip_grad_norm_(
-                    self._neural_net.parameters(),
-                    max_norm=clip_max_norm,
-                )
-            self.optimizer.step()
-
-        train_loss_average = train_loss_sum / (
-            len(train_loader) * train_loader.batch_size  # type: ignore
+    def _get_training_losses(self, batch: Any, loss_kwargs: Dict[str, Any]) -> Tensor:
+        theta_batch, x_batch = (
+            batch[0].to(self._device),
+            batch[1].to(self._device),
         )
 
-        return train_loss_average
+        train_losses = self._loss(theta_batch, x_batch, **loss_kwargs)
 
-    def _validate_epoch(
-        self,
-        val_loader: data.DataLoader,
-        loss_kwargs: dict,
-        validation_kwargs: Dict[str, Any],
-    ) -> float:
-        val_loss_sum = 0
-        with torch.no_grad():
-            for batch in val_loader:
-                theta_batch, x_batch = (
-                    batch[0].to(self._device),
-                    batch[1].to(self._device),
-                )
-                val_losses = self._loss(theta_batch, x_batch, **loss_kwargs)
-                val_loss_sum += val_losses.sum().item()
-            # Take mean over all validation samples.
-            val_loss = val_loss_sum / (
-                len(val_loader) * val_loader.batch_size  # type: ignore
-            )
+        return train_losses
 
-        return val_loss
+    def _get_validation_losses(self, batch: Any, loss_kwargs: Dict[str, Any]) -> Tensor:
+        theta_batch, x_batch = (
+            batch[0].to(self._device),
+            batch[1].to(self._device),
+        )
+        val_losses = self._loss(theta_batch, x_batch, **loss_kwargs)
 
-    def _summarize_epoch(
-        self,
-        train_loss: float,
-        val_loss: float,
-        epoch_start_time: float,
-        summarization_kwargs: Dict[str, Any],
-    ) -> None:
-        self._summary["training_loss"].append(train_loss)
-
-        self._val_loss = val_loss
-        # Log validation log prob for every epoch.
-        self._summary["validation_loss"].append(self._val_loss)
-        self._summary["epoch_durations_sec"].append(time.time() - epoch_start_time)
+        return val_losses
 
     def build_posterior(
         self,

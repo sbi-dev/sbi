@@ -1,16 +1,13 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-import time
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from typing import Any, Callable, Literal, Optional, Protocol, Tuple, Union
+from typing import Any, Callable, Dict, Literal, Optional, Protocol, Tuple, Union
 
 import torch
 from torch import Tensor, ones
 from torch.distributions import Distribution
-from torch.nn.utils.clip_grad import clip_grad_norm_
-from torch.utils import data
 from torch.utils.tensorboard.writer import SummaryWriter
 from typing_extensions import Self
 
@@ -327,9 +324,9 @@ class VectorFieldTrainer(NeuralInference, ABC):
             proposal=proposal,
             calibration_kernel=calibration_kernel,
             force_first_round_loss=force_first_round_loss,
+            validation_times=validation_times,
         )
 
-        validation_kwargs = dict(validation_times=validation_times)
         summarization_kwargs = dict(ema_loss_decay=ema_loss_decay)
 
         return self._train(
@@ -342,102 +339,61 @@ class VectorFieldTrainer(NeuralInference, ABC):
             clip_max_norm=clip_max_norm,
             show_train_summary=show_train_summary,
             loss_kwargs=loss_kwargs,
-            validation_kwargs=validation_kwargs,
             summarization_kwargs=summarization_kwargs,
         )
 
-    def _train_epoch(
-        self,
-        train_loader: data.DataLoader,
-        clip_max_norm: Optional[float],
-        loss_kwargs: dict,
-    ) -> float:
-        train_loss_sum = 0
-        for batch in train_loader:
-            self.optimizer.zero_grad()
-            # Get batches on current device.
-            theta_batch, x_batch, masks_batch = (
-                batch[0].to(self._device),
-                batch[1].to(self._device),
-                batch[2].to(self._device),
-            )
+    def _get_training_losses(self, batch: Any, loss_kwargs: Dict[str, Any]) -> Tensor:
+        loss_kwargs = loss_kwargs.copy()
+        loss_kwargs.pop("validation_times")
 
-            train_losses = self._loss(
-                theta=theta_batch,
-                x=x_batch,
-                masks=masks_batch,
-                **loss_kwargs,
-            )
-
-            train_loss = torch.mean(train_losses)
-
-            train_loss_sum += train_losses.sum().item()
-
-            train_loss.backward()
-            if clip_max_norm is not None:
-                clip_grad_norm_(self._neural_net.parameters(), max_norm=clip_max_norm)
-            self.optimizer.step()
-
-        train_loss_average = train_loss_sum / (
-            len(train_loader) * train_loader.batch_size  # type: ignore
+        # Get batches on current device.
+        theta_batch, x_batch, masks_batch = (
+            batch[0].to(self._device),
+            batch[1].to(self._device),
+            batch[2].to(self._device),
         )
 
-        return train_loss_average
+        train_losses = self._loss(
+            theta=theta_batch,
+            x=x_batch,
+            masks=masks_batch,
+            **loss_kwargs,
+        )
+        return train_losses
 
-    def _validate_epoch(
-        self,
-        val_loader: data.DataLoader,
-        loss_kwargs: dict,
-        validation_kwargs: dict,
-    ) -> float:
-        validation_times = validation_kwargs.get("validation_times")
+    def _get_validation_losses(self, batch: Any, loss_kwargs: Dict[str, Any]) -> Tensor:
+        loss_kwargs = loss_kwargs.copy()
+        validation_times = loss_kwargs.pop("validation_times")
         assert validation_times is not None and isinstance(validation_times, Tensor)
 
-        val_loss_sum = 0
-
-        with torch.no_grad():
-            for batch in val_loader:
-                theta_batch, x_batch, masks_batch = (
-                    batch[0].to(self._device),
-                    batch[1].to(self._device),
-                    batch[2].to(self._device),
-                )
-
-                # For validation loss, we evaluate at a fixed set of times to reduce
-                # the variance in the validation loss, for improved convergence
-                # checks. We evaluate the entire validation batch at all times, so
-                # we repeat the batches here to match.
-                val_batch_size = theta_batch.shape[0]
-                times_batch = validation_times.shape[0]
-                theta_batch = theta_batch.repeat(
-                    times_batch, *([1] * (theta_batch.ndim - 1))
-                )
-                x_batch = x_batch.repeat(times_batch, *([1] * (x_batch.ndim - 1)))
-                masks_batch = masks_batch.repeat(
-                    times_batch, *([1] * (masks_batch.ndim - 1))
-                )
-
-                validation_times_rep = validation_times.repeat_interleave(
-                    val_batch_size, dim=0
-                )
-
-                # Take negative loss here to get validation log_prob.
-                val_losses = self._loss(
-                    theta=theta_batch,
-                    x=x_batch,
-                    masks=masks_batch,
-                    times=validation_times_rep,
-                    **loss_kwargs,
-                )
-
-                val_loss_sum += val_losses.sum().item()
-
-        # Take mean over all validation samples.
-        val_loss = val_loss_sum / (
-            len(val_loader) * val_loader.batch_size * times_batch  # type: ignore
+        theta_batch, x_batch, masks_batch = (
+            batch[0].to(self._device),
+            batch[1].to(self._device),
+            batch[2].to(self._device),
         )
 
-        return val_loss
+        # For validation loss, we evaluate at a fixed set of times to reduce
+        # the variance in the validation loss, for improved convergence
+        # checks. We evaluate the entire validation batch at all times, so
+        # we repeat the batches here to match.
+        val_batch_size = theta_batch.shape[0]
+        times_batch = validation_times.shape[0]
+        theta_batch = theta_batch.repeat(times_batch, *([1] * (theta_batch.ndim - 1)))
+        x_batch = x_batch.repeat(times_batch, *([1] * (x_batch.ndim - 1)))
+        masks_batch = masks_batch.repeat(times_batch, *([1] * (masks_batch.ndim - 1)))
+
+        validation_times_rep = validation_times.repeat_interleave(val_batch_size, dim=0)
+
+        # Take negative loss here to get validation log_prob.
+        val_losses = self._loss(
+            theta=theta_batch,
+            x=x_batch,
+            masks=masks_batch,
+            times=validation_times_rep,
+            **loss_kwargs,
+        )
+
+        return val_losses
 
     def _summarize_epoch(
         self,
@@ -452,12 +408,12 @@ class VectorFieldTrainer(NeuralInference, ABC):
         # NOTE: Due to the inherently noisy nature we do instead log a exponential
         # moving average of the training loss.
         if len(self._summary["training_loss"]) == 0:
-            self._summary["training_loss"].append(train_loss)
+            train_loss_ema = train_loss
         else:
             previous_loss = self._summary["training_loss"][-1]
-            self._summary["training_loss"].append(
-                (1.0 - ema_loss_decay) * previous_loss + ema_loss_decay * train_loss
-            )
+            train_loss_ema = (
+                1.0 - ema_loss_decay
+            ) * previous_loss + ema_loss_decay * train_loss
 
         if len(self._summary["validation_loss"]) == 0:
             val_loss_ema = val_loss
@@ -467,9 +423,12 @@ class VectorFieldTrainer(NeuralInference, ABC):
                 1 - ema_loss_decay
             ) * previous_loss + ema_loss_decay * val_loss
 
-        self._val_loss = val_loss_ema
-        self._summary["validation_loss"].append(self._val_loss)
-        self._summary["epoch_durations_sec"].append(time.time() - epoch_start_time)
+        super()._summarize_epoch(
+            train_loss=train_loss_ema,
+            val_loss=val_loss_ema,
+            epoch_start_time=epoch_start_time,
+            summarization_kwargs=summarization_kwargs,
+        )
 
     def _get_start_index(
         self,
