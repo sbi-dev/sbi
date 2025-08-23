@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import time
 import warnings
 from abc import ABC, abstractmethod
 from copy import deepcopy
@@ -20,7 +21,7 @@ from typing import (
 from warnings import warn
 
 import torch
-from torch import Tensor, nn
+from torch import Tensor
 from torch.distributions import Distribution
 from torch.optim.adam import Adam
 from torch.utils import data
@@ -314,69 +315,35 @@ class NeuralInference(ABC):
     @abstractmethod
     def _initialize_neural_network(
         self, retrain_from_scratch: bool, start_idx: int
-    ) -> nn.Module: ...
-
-    @abstractmethod
-    def _train_for_single_epoch(
-        self, train_loader: data.DataLoader, clip_max_norm: Optional[float]
-    ) -> Tuple[float, float] | float: ...
-
-    @abstractmethod
-    def _calculate_validation_performance(
-        self, val_loader: data.DataLoader
     ) -> None: ...
 
     @abstractmethod
     def _get_start_index(self, discard_prior_samples: bool) -> int: ...
 
-    def _initialize_optimizer(
+    @abstractmethod
+    def _train_epoch(
         self,
-        resume_training: bool,
-        learning_rate: float,
-    ) -> None:
-        assert self._neural_net is not None
+        train_loader: data.DataLoader,
+        clip_max_norm: Optional[float],
+        loss_kwargs: dict,
+    ) -> float: ...
 
-        if not resume_training:
-            self.optimizer = Adam(
-                list(self._neural_net.parameters()),
-                lr=learning_rate,
-            )
-            self.epoch, self.val_loss = 0, float("Inf")
-
-    def _calculate_train_loss_average(
-        self, train_loss_sum: float, train_loader: data.DataLoader
-    ) -> float:
-        assert train_loader.batch_size is not None
-
-        train_loss_average = train_loss_sum / (
-            len(train_loader) * train_loader.batch_size
-        )
-
-        return train_loss_average
-
-    def _update_training_summary(
+    @abstractmethod
+    def _validate_epoch(
         self,
-        show_train_summary: bool,
-    ) -> None:
-        # Update summary.
-        self._summary["epochs_trained"].append(self.epoch)
-        self._summary["best_validation_loss"].append(self._best_val_loss)
+        val_loader: data.DataLoader,
+        loss_kwargs: dict,
+        validation_kwargs: dict,
+    ) -> float: ...
 
-        # Update TensorBoard and summary dict.
-        self._summarize(round_=self._round)
-
-        # Update description for progress bar.
-        if show_train_summary:
-            print(self._describe_round(self._round, self._summary))
-
-    def _get_neural_network_for_training(self):
-        assert self._neural_net is not None
-
-        # Avoid keeping the gradients in the resulting network, which can
-        # cause memory leakage when benchmarking.
-        self._neural_net.zero_grad(set_to_none=True)
-
-        return deepcopy(self._neural_net)
+    @abstractmethod
+    def _summarize_epoch(
+        self,
+        train_loss: float,
+        val_loss: float,
+        epoch_start_time: float,
+        summarization_kwargs: dict,
+    ) -> None: ...
 
     @abstractmethod
     def _get_potential_function(
@@ -940,6 +907,76 @@ class NeuralInference(ABC):
                     f"'{posterior_parameters}'",
                 )
         return posterior
+
+    def _train(
+        self,
+        train_loader: data.DataLoader,
+        val_loader: data.DataLoader,
+        max_num_epochs: int,
+        stop_after_epochs: int,
+        learning_rate: float,
+        resume_training: bool,
+        clip_max_norm: Optional[float],
+        show_train_summary: bool,
+        loss_kwargs: Optional[Dict[str, Any]] = None,
+        validation_kwargs: Optional[Dict[str, Any]] = None,
+        summarization_kwargs: Optional[Dict[str, Any]] = None,
+    ):
+        """Main training pipeline using a config object."""
+
+        if loss_kwargs is None:
+            loss_kwargs = {}
+        if validation_kwargs is None:
+            validation_kwargs = {}
+        if summarization_kwargs is None:
+            summarization_kwargs = {}
+
+        assert self._neural_net is not None
+
+        if not resume_training:
+            self.optimizer = Adam(
+                list(self._neural_net.parameters()),
+                lr=learning_rate,
+            )
+            self.epoch, self.val_loss = 0, float("Inf")
+
+        while self.epoch <= max_num_epochs and not self._converged(
+            self.epoch, stop_after_epochs
+        ):
+            # Train for a single epoch.
+            self._neural_net.train()
+            epoch_start_time = time.time()
+            train_loss = self._train_epoch(train_loader, clip_max_norm, loss_kwargs)
+
+            # Calculate validation performance.
+            self._neural_net.eval()
+            val_loss = self._validate_epoch(val_loader, loss_kwargs, validation_kwargs)
+
+            self._summarize_epoch(
+                train_loss, val_loss, epoch_start_time, summarization_kwargs
+            )
+
+            self.epoch += 1
+            self._maybe_show_progress(self._show_progress_bars, self.epoch)
+
+        self._report_convergence_at_end(self.epoch, stop_after_epochs, max_num_epochs)
+
+        # Update summary.
+        self._summary["epochs_trained"].append(self.epoch)
+        self._summary["best_validation_loss"].append(self._best_val_loss)
+
+        # Update TensorBoard and summary dict.
+        self._summarize(round_=self._round)
+
+        # Update description for progress bar.
+        if show_train_summary:
+            print(self._describe_round(self._round, self._summary))
+
+        # Avoid keeping the gradients in the resulting network, which can
+        # cause memory leakage when benchmarking.
+        self._neural_net.zero_grad(set_to_none=True)
+
+        return deepcopy(self._neural_net)
 
     def _converged(self, epoch: int, stop_after_epochs: int) -> bool:
         """Return whether the training converged yet and save best model state so far.

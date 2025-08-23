@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import time
 import warnings
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Literal, Optional, Protocol, Tuple, Union
@@ -210,8 +211,6 @@ class RatioEstimatorTrainer(NeuralInference, ABC):
         Returns:
             Classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
         """
-        if loss_kwargs is None:
-            loss_kwargs = {}
 
         start_idx = self._get_start_index(discard_prior_samples=discard_prior_samples)
 
@@ -234,40 +233,22 @@ class RatioEstimatorTrainer(NeuralInference, ABC):
             start_idx=start_idx,
         )
 
-        self._initialize_optimizer(
-            resume_training=resume_training,
+        if loss_kwargs is None:
+            loss_kwargs = {}
+
+        loss_kwargs = dict(num_atoms=num_atoms, **loss_kwargs)
+
+        return self._train(
+            train_loader=train_loader,
+            val_loader=val_loader,
+            max_num_epochs=max_num_epochs,
+            stop_after_epochs=stop_after_epochs,
             learning_rate=learning_rate,
+            resume_training=resume_training,
+            clip_max_norm=clip_max_norm,
+            show_train_summary=show_train_summary,
+            loss_kwargs=loss_kwargs,
         )
-
-        while self.epoch <= max_num_epochs and not self._converged(
-            self.epoch, stop_after_epochs
-        ):
-            train_loss_sum = self._train_for_single_epoch(
-                train_loader=train_loader,
-                clip_max_norm=clip_max_norm,
-                num_atoms=num_atoms,
-                loss_kwargs=loss_kwargs,
-            )
-
-            self.epoch += 1
-
-            train_loss_average = self._calculate_train_loss_average(
-                train_loss_sum=train_loss_sum, train_loader=train_loader
-            )
-
-            self._summary["training_loss"].append(train_loss_average)
-
-            self._calculate_validation_performance(
-                val_loader=val_loader, num_atoms=num_atoms, loss_kwargs=loss_kwargs
-            )
-
-            self._maybe_show_progress(self._show_progress_bars, self.epoch)
-
-        self._report_convergence_at_end(self.epoch, stop_after_epochs, max_num_epochs)
-
-        self._update_training_summary(show_train_summary=show_train_summary)
-
-        return self._get_neural_network_for_training()
 
     def _get_start_index(self, discard_prior_samples: bool) -> int:
         # Load data from most recent round.
@@ -311,15 +292,12 @@ class RatioEstimatorTrainer(NeuralInference, ABC):
 
         self._neural_net.to(self._device)
 
-    def _train_for_single_epoch(
+    def _train_epoch(
         self,
         train_loader: data.DataLoader,
         clip_max_norm: Optional[float],
-        num_atoms: int,
         loss_kwargs: Dict[str, Any],
     ) -> float:
-        # Train for a single epoch.
-        self._neural_net.train()
         train_loss_sum = 0
         for batch in train_loader:
             self.optimizer.zero_grad()
@@ -328,7 +306,7 @@ class RatioEstimatorTrainer(NeuralInference, ABC):
                 batch[1].to(self._device),
             )
 
-            train_losses = self._loss(theta_batch, x_batch, num_atoms, **loss_kwargs)
+            train_losses = self._loss(theta_batch, x_batch, **loss_kwargs)
             train_loss = torch.mean(train_losses)
             train_loss_sum += train_losses.sum().item()
 
@@ -340,13 +318,18 @@ class RatioEstimatorTrainer(NeuralInference, ABC):
                 )
             self.optimizer.step()
 
-        return train_loss_sum
+        train_loss_average = train_loss_sum / (
+            len(train_loader) * train_loader.batch_size  # type: ignore
+        )
 
-    def _calculate_validation_performance(
-        self, val_loader: data.DataLoader, num_atoms: int, loss_kwargs: Dict[str, Any]
-    ) -> None:
-        # Calculate validation performance.
-        self._neural_net.eval()
+        return train_loss_average
+
+    def _validate_epoch(
+        self,
+        val_loader: data.DataLoader,
+        loss_kwargs: dict,
+        validation_kwargs: Dict[str, Any],
+    ) -> float:
         val_loss_sum = 0
         with torch.no_grad():
             for batch in val_loader:
@@ -354,14 +337,28 @@ class RatioEstimatorTrainer(NeuralInference, ABC):
                     batch[0].to(self._device),
                     batch[1].to(self._device),
                 )
-                val_losses = self._loss(theta_batch, x_batch, num_atoms, **loss_kwargs)
+                val_losses = self._loss(theta_batch, x_batch, **loss_kwargs)
                 val_loss_sum += val_losses.sum().item()
             # Take mean over all validation samples.
-            self._val_loss = val_loss_sum / (
+            val_loss = val_loss_sum / (
                 len(val_loader) * val_loader.batch_size  # type: ignore
             )
-            # Log validation log prob for every epoch.
-            self._summary["validation_loss"].append(self._val_loss)
+
+        return val_loss
+
+    def _summarize_epoch(
+        self,
+        train_loss: float,
+        val_loss: float,
+        epoch_start_time: float,
+        summarization_kwargs: Dict[str, Any],
+    ) -> None:
+        self._summary["training_loss"].append(train_loss)
+
+        self._val_loss = val_loss
+        # Log validation log prob for every epoch.
+        self._summary["validation_loss"].append(self._val_loss)
+        self._summary["epoch_durations_sec"].append(time.time() - epoch_start_time)
 
     def build_posterior(
         self,

@@ -318,44 +318,23 @@ class PosteriorEstimatorTrainer(NeuralInference, ABC):
             start_idx=start_idx,
         )
 
-        self._initialize_optimizer(
-            resume_training=resume_training,
-            learning_rate=learning_rate,
+        loss_kwargs = dict(
+            proposal=proposal,
+            calibration_kernel=calibration_kernel,
+            force_first_round_loss=force_first_round_loss,
         )
 
-        while self.epoch <= max_num_epochs and not self._converged(
-            self.epoch, stop_after_epochs
-        ):
-            train_loss_sum, epoch_start_time = self._train_for_single_epoch(
-                train_loader=train_loader,
-                clip_max_norm=clip_max_norm,
-                proposal=proposal,
-                calibration_kernel=calibration_kernel,
-                force_first_round_loss=force_first_round_loss,
-            )
-            self.epoch += 1
-
-            train_loss_average = self._calculate_train_loss_average(
-                train_loss_sum=train_loss_sum, train_loader=train_loader
-            )
-
-            self._summary["training_loss"].append(train_loss_average)
-
-            self._calculate_validation_performance(
-                val_loader=val_loader,
-                proposal=proposal,
-                calibration_kernel=calibration_kernel,
-                force_first_round_loss=force_first_round_loss,
-                epoch_start_time=epoch_start_time,
-            )
-
-            self._maybe_show_progress(self._show_progress_bars, self.epoch)
-
-        self._report_convergence_at_end(self.epoch, stop_after_epochs, max_num_epochs)
-
-        self._update_training_summary(show_train_summary=show_train_summary)
-
-        return self._get_neural_network_for_training()
+        return self._train(
+            train_loader=train_loader,
+            val_loader=val_loader,
+            max_num_epochs=max_num_epochs,
+            stop_after_epochs=stop_after_epochs,
+            learning_rate=learning_rate,
+            resume_training=resume_training,
+            clip_max_norm=clip_max_norm,
+            show_train_summary=show_train_summary,
+            loss_kwargs=loss_kwargs,
+        )
 
     def _get_start_index(
         self,
@@ -424,18 +403,13 @@ class PosteriorEstimatorTrainer(NeuralInference, ABC):
         # Move entire net to device for training.
         self._neural_net.to(self._device)
 
-    def _train_for_single_epoch(
+    def _train_epoch(
         self,
         train_loader: data.DataLoader,
         clip_max_norm: Optional[float],
-        proposal,
-        calibration_kernel: Callable,
-        force_first_round_loss: bool,
-    ) -> Tuple[float, float]:
-        # Train for a single epoch.
-        self._neural_net.train()
+        loss_kwargs: dict,
+    ) -> float:
         train_loss_sum = 0
-        epoch_start_time = time.time()
         for batch in train_loader:
             self.optimizer.zero_grad()
             # Get batches on current device.
@@ -445,14 +419,7 @@ class PosteriorEstimatorTrainer(NeuralInference, ABC):
                 batch[2].to(self._device),
             )
 
-            train_losses = self._loss(
-                theta_batch,
-                x_batch,
-                masks_batch,
-                proposal,
-                calibration_kernel,
-                force_first_round_loss=force_first_round_loss,
-            )
+            train_losses = self._loss(theta_batch, x_batch, masks_batch, **loss_kwargs)
             train_loss = torch.mean(train_losses)
             train_loss_sum += train_losses.sum().item()
 
@@ -461,18 +428,18 @@ class PosteriorEstimatorTrainer(NeuralInference, ABC):
                 clip_grad_norm_(self._neural_net.parameters(), max_norm=clip_max_norm)
             self.optimizer.step()
 
-        return train_loss_sum, epoch_start_time
+        train_loss_average = train_loss_sum / (
+            len(train_loader) * train_loader.batch_size  # type: ignore
+        )
 
-    def _calculate_validation_performance(
+        return train_loss_average
+
+    def _validate_epoch(
         self,
         val_loader: data.DataLoader,
-        proposal,
-        calibration_kernel: Callable,
-        force_first_round_loss: bool,
-        epoch_start_time: float,
-    ) -> None:
-        # Calculate validation performance.
-        self._neural_net.eval()
+        loss_kwargs: dict,
+        validation_kwargs: dict,
+    ) -> float:
         val_loss_sum = 0
 
         with torch.no_grad():
@@ -484,19 +451,27 @@ class PosteriorEstimatorTrainer(NeuralInference, ABC):
                 )
                 # Take negative loss here to get validation log_prob.
                 val_losses = self._loss(
-                    theta_batch,
-                    x_batch,
-                    masks_batch,
-                    proposal,
-                    calibration_kernel,
-                    force_first_round_loss=force_first_round_loss,
+                    theta_batch, x_batch, masks_batch, **loss_kwargs
                 )
                 val_loss_sum += val_losses.sum().item()
 
         # Take mean over all validation samples.
-        self._val_loss = val_loss_sum / (
+        val_loss = val_loss_sum / (
             len(val_loader) * val_loader.batch_size  # type: ignore
         )
+
+        return val_loss
+
+    def _summarize_epoch(
+        self,
+        train_loss: float,
+        val_loss: float,
+        epoch_start_time: float,
+        summarization_kwargs: dict,
+    ) -> None:
+        self._summary["training_loss"].append(train_loss)
+
+        self._val_loss = val_loss
         # Log validation loss for every epoch.
         self._summary["validation_loss"].append(self._val_loss)
         self._summary["epoch_durations_sec"].append(time.time() - epoch_start_time)

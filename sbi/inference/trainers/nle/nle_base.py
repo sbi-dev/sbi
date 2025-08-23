@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import time
 import warnings
 from abc import ABC
 from typing import Any, Dict, Literal, Optional, Tuple, Union
@@ -196,35 +197,16 @@ class LikelihoodEstimatorTrainer(NeuralInference, ABC):
             start_idx=start_idx,
         )
 
-        self._initialize_optimizer(
-            resume_training=resume_training,
+        return self._train(
+            train_loader=train_loader,
+            val_loader=val_loader,
+            max_num_epochs=max_num_epochs,
+            stop_after_epochs=stop_after_epochs,
             learning_rate=learning_rate,
+            resume_training=resume_training,
+            clip_max_norm=clip_max_norm,
+            show_train_summary=show_train_summary,
         )
-
-        while self.epoch <= max_num_epochs and not self._converged(
-            self.epoch, stop_after_epochs
-        ):
-            train_loss_sum = self._train_for_single_epoch(
-                train_loader=train_loader, clip_max_norm=clip_max_norm
-            )
-
-            self.epoch += 1
-
-            train_loss_average = self._calculate_train_loss_average(
-                train_loss_sum=train_loss_sum, train_loader=train_loader
-            )
-
-            self._summary["training_loss"].append(train_loss_average)
-
-            self._calculate_validation_performance(val_loader=val_loader)
-
-            self._maybe_show_progress(self._show_progress_bars, self.epoch)
-
-        self._report_convergence_at_end(self.epoch, stop_after_epochs, max_num_epochs)
-
-        self._update_training_summary(show_train_summary=show_train_summary)
-
-        return self._get_neural_network_for_training()
 
     def _get_start_index(self, discard_prior_samples: bool) -> int:
         # Load data from most recent round.
@@ -258,11 +240,12 @@ class LikelihoodEstimatorTrainer(NeuralInference, ABC):
             )
             del theta, x
 
-    def _train_for_single_epoch(
-        self, train_loader: data.DataLoader, clip_max_norm: Optional[float]
+    def _train_epoch(
+        self,
+        train_loader: data.DataLoader,
+        clip_max_norm: Optional[float],
+        loss_kwargs: Dict[str, Any],
     ) -> float:
-        # Train for a single epoch.
-        self._neural_net.train()
         train_loss_sum = 0
         for batch in train_loader:
             self.optimizer.zero_grad()
@@ -283,11 +266,18 @@ class LikelihoodEstimatorTrainer(NeuralInference, ABC):
                 )
             self.optimizer.step()
 
-        return train_loss_sum
+        train_loss_average = train_loss_sum / (
+            len(train_loader) * train_loader.batch_size  # type: ignore
+        )
 
-    def _calculate_validation_performance(self, val_loader: data.DataLoader) -> None:
-        # Calculate validation performance.
-        self._neural_net.eval()
+        return train_loss_average
+
+    def _validate_epoch(
+        self,
+        val_loader: data.DataLoader,
+        loss_kwargs: Dict[str, Any],
+        validation_kwargs: Dict[str, Any],
+    ) -> float:
         val_loss_sum = 0
         with torch.no_grad():
             for batch in val_loader:
@@ -300,11 +290,25 @@ class LikelihoodEstimatorTrainer(NeuralInference, ABC):
                 val_loss_sum += val_losses.sum().item()
 
         # Take mean over all validation samples.
-        self._val_loss = val_loss_sum / (
+        val_loss = val_loss_sum / (
             len(val_loader) * val_loader.batch_size  # type: ignore
         )
+
+        return val_loss
+
+    def _summarize_epoch(
+        self,
+        train_loss: float,
+        val_loss: float,
+        epoch_start_time: float,
+        summarization_kwargs: Dict[str, Any],
+    ) -> None:
+        self._summary["training_loss"].append(train_loss)
+
+        self._val_loss = val_loss
         # Log validation loss for every epoch.
         self._summary["validation_loss"].append(self._val_loss)
+        self._summary["epoch_durations_sec"].append(time.time() - epoch_start_time)
 
     def build_posterior(
         self,

@@ -586,7 +586,7 @@ def build_estimator_missing_return(theta: Tensor, x: Tensor):
             dict(density_estimator=build_estimator_missing_return),
             NLE,
             marks=pytest.mark.xfail(
-                raises=AttributeError,
+                raises=AssertionError,
                 reason="Missing return of type ConditionalEstimator"
                 " in density estimator builder.",
             ),
