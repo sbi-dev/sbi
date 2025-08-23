@@ -343,8 +343,8 @@ class VectorFieldTrainer(NeuralInference, ABC):
         )
 
     def _get_training_losses(self, batch: Any, loss_kwargs: Dict[str, Any]) -> Tensor:
-        loss_kwargs = loss_kwargs.copy()
-        loss_kwargs.pop("validation_times")
+        # Skip validation_times as it is only used in _get_validation_losses method
+        loss_kwargs = {k: v for k, v in loss_kwargs.items() if k != "validation_times"}
 
         # Get batches on current device.
         theta_batch, x_batch, masks_batch = (
@@ -362,8 +362,8 @@ class VectorFieldTrainer(NeuralInference, ABC):
         return train_losses
 
     def _get_validation_losses(self, batch: Any, loss_kwargs: Dict[str, Any]) -> Tensor:
-        loss_kwargs = loss_kwargs.copy()
-        validation_times = loss_kwargs.pop("validation_times")
+        validation_times = loss_kwargs.get("validation_times")
+
         assert validation_times is not None and isinstance(validation_times, Tensor)
 
         theta_batch, x_batch, masks_batch = (
