@@ -366,6 +366,8 @@ class VectorFieldTrainer(NeuralInference, ABC):
 
         assert validation_times is not None and isinstance(validation_times, Tensor)
 
+        loss_kwargs = {k: v for k, v in loss_kwargs.items() if k != "validation_times"}
+
         theta_batch, x_batch, masks_batch = (
             batch[0].to(self._device),
             batch[1].to(self._device),
