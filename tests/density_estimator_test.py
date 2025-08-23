@@ -12,9 +12,12 @@ from torch.distributions import HalfNormal, MultivariateNormal
 
 from sbi.inference import NLE, NPE, NRE
 from sbi.inference.trainers.base import NeuralInference
+from sbi.inference.trainers.vfpe.fmpe import FMPE
+from sbi.inference.trainers.vfpe.npse import NPSE
 from sbi.neural_nets.embedding_nets import CNNEmbedding
 from sbi.neural_nets.estimators.shape_handling import reshape_to_sample_batch_event
 from sbi.neural_nets.estimators.zuko_flow import ZukoFlow
+from sbi.neural_nets.factory import posterior_flow_nn, posterior_score_nn
 from sbi.neural_nets.net_builders import (
     build_categoricalmassestimator,
     build_flow_matching_estimator,
@@ -525,6 +528,14 @@ def build_estimator(theta, x):
     return build_mdn(theta, x)
 
 
+def build_vf_estimator_npse(theta, x):
+    return posterior_score_nn(theta, x)
+
+
+def build_vf_estimator_fmpe(theta, x):
+    return posterior_flow_nn(theta, x)
+
+
 def build_estimator_missing_args():
     pass
 
@@ -540,6 +551,8 @@ def build_estimator_missing_return(theta: Tensor, x: Tensor):
         pytest.param(dict(classifier=build_classifier), NRE),
         pytest.param(dict(density_estimator=build_estimator), NPE),
         pytest.param(dict(density_estimator=build_estimator), NLE),
+        pytest.param(dict(vf_estimator=build_vf_estimator_fmpe), FMPE),
+        pytest.param(dict(vf_estimator=build_vf_estimator_npse), NPSE),
         # Invalid builders
         pytest.param(
             dict(classifier=build_estimator_missing_args),
@@ -566,6 +579,22 @@ def build_estimator_missing_return(theta: Tensor, x: Tensor):
             ),
         ),
         pytest.param(
+            dict(classifier=build_estimator_missing_args),
+            FMPE,
+            marks=pytest.mark.xfail(
+                raises=TypeError,
+                reason="Missing required parameters in vf_estimator builder.",
+            ),
+        ),
+        pytest.param(
+            dict(classifier=build_estimator_missing_args),
+            NPSE,
+            marks=pytest.mark.xfail(
+                raises=TypeError,
+                reason="Missing required parameters in classifier builder.",
+            ),
+        ),
+        pytest.param(
             dict(classifier=build_estimator_missing_return),
             NRE,
             marks=pytest.mark.xfail(
@@ -588,6 +617,24 @@ def build_estimator_missing_return(theta: Tensor, x: Tensor):
             marks=pytest.mark.xfail(
                 raises=AttributeError,
                 reason="Missing return of type ConditionalEstimator"
+                " in density estimator builder.",
+            ),
+        ),
+        pytest.param(
+            dict(classifier=build_estimator_missing_return),
+            FMPE,
+            marks=pytest.mark.xfail(
+                raises=AttributeError,
+                reason="Missing return of type ConditionalVectorFieldEstimator"
+                " in density estimator builder.",
+            ),
+        ),
+        pytest.param(
+            dict(classifier=build_estimator_missing_return),
+            NPSE,
+            marks=pytest.mark.xfail(
+                raises=AttributeError,
+                reason="Missing return of type ConditionalVectorFieldEstimator"
                 " in density estimator builder.",
             ),
         ),
