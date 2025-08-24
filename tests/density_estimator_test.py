@@ -17,7 +17,6 @@ from sbi.inference.trainers.vfpe.npse import NPSE
 from sbi.neural_nets.embedding_nets import CNNEmbedding
 from sbi.neural_nets.estimators.shape_handling import reshape_to_sample_batch_event
 from sbi.neural_nets.estimators.zuko_flow import ZukoFlow
-from sbi.neural_nets.factory import posterior_flow_nn, posterior_score_nn
 from sbi.neural_nets.net_builders import (
     build_categoricalmassestimator,
     build_flow_matching_estimator,
@@ -529,11 +528,11 @@ def build_estimator(theta, x):
 
 
 def build_vf_estimator_npse(theta, x):
-    return posterior_score_nn(theta, x)
+    return build_score_matching_estimator(theta, x)
 
 
 def build_vf_estimator_fmpe(theta, x):
-    return posterior_flow_nn(theta, x)
+    return build_flow_matching_estimator(theta, x)
 
 
 def build_estimator_missing_args():
