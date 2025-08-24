@@ -26,7 +26,7 @@ class FMPE(VectorFieldTrainer):
 
     def __init__(
         self,
-        prior: Optional[Distribution],
+        prior: Optional[Distribution] = None,
         vf_estimator: Union[
             Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
             DensityEstimatorBuilder[ConditionalVectorFieldEstimator],
