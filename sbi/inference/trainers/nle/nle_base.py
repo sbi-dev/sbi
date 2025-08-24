@@ -27,7 +27,6 @@ from sbi.inference.trainers.base import NeuralInference
 from sbi.neural_nets import likelihood_nn
 from sbi.neural_nets.estimators import ConditionalDensityEstimator
 from sbi.neural_nets.estimators.base import (
-    ConditionalVectorFieldEstimator,
     DensityEstimatorBuilder,
 )
 from sbi.neural_nets.estimators.shape_handling import (
@@ -44,7 +43,6 @@ class LikelihoodEstimatorTrainer(NeuralInference, ABC):
         prior: Optional[Distribution] = None,
         density_estimator: Union[
             Literal["nsf", "maf", "mdn", "made"],
-            DensityEstimatorBuilder[ConditionalVectorFieldEstimator],
             DensityEstimatorBuilder[ConditionalDensityEstimator],
         ] = "maf",
         device: str = "cpu",
@@ -66,8 +64,7 @@ class LikelihoodEstimatorTrainer(NeuralInference, ABC):
                 be called with the first batch of simulations (theta, x), which can
                 thus be used for shape inference and potentially for z-scoring. The
                 density estimator needs to provide the methods `.log_prob` and
-                `.sample()` and must return either a `ConditionalVectorFieldEstimator`
-                or `ConditionalDensityEstimator`.
+                `.sample()` and must return a `ConditionalDensityEstimator`.
 
         See docstring of `NeuralInference` class for all other arguments.
         """
