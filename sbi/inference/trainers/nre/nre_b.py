@@ -8,9 +8,10 @@ from torch import Tensor, nn
 from torch.distributions import Distribution
 
 from sbi.inference.trainers.nre.nre_base import (
-    RatioEstimatorBuilder,
     RatioEstimatorTrainer,
 )
+from sbi.neural_nets.estimators.base import DensityEstimatorBuilder
+from sbi.neural_nets.ratio_estimators import RatioEstimator
 from sbi.sbi_types import TensorBoardSummaryWriter
 from sbi.utils.sbiutils import del_entries
 from sbi.utils.torchutils import assert_all_finite
@@ -26,7 +27,7 @@ class NRE_B(RatioEstimatorTrainer):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
-        classifier: Union[str, RatioEstimatorBuilder] = "resnet",
+        classifier: Union[str, DensityEstimatorBuilder[RatioEstimator]] = "resnet",
         device: str = "cpu",
         logging_level: Union[int, str] = "warning",
         summary_writer: Optional[TensorBoardSummaryWriter] = None,
@@ -41,9 +42,9 @@ class NRE_B(RatioEstimatorTrainer):
             classifier: Classifier trained to approximate likelihood ratios. If it is
                 a string, use a pre-configured network of the provided type (one of
                 linear, mlp, resnet), or a callable that implements the
-                `RatioEstimatorBuilder` protocol. The callable will be called with the
-                first batch of simulations (theta, x), which can thus be used for
-                shape inference and potentially for z-scoring. It returns a
+                `DensityEstimatorBuilder` protocol. The callable will
+                be called with the first batch of simulations (theta, x), which can thus
+                be used for shape inference and potentially for z-scoring. It returns a
                 `RatioEstimator`.
             device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
             logging_level: Minimum severity of messages to log. One of the strings

@@ -6,7 +6,11 @@ from typing import Literal, Optional, Union
 from torch.distributions import Distribution
 
 from sbi.inference.trainers.nle.nle_base import LikelihoodEstimatorTrainer
-from sbi.neural_nets.estimators.base import DensityEstimatorBuilder
+from sbi.neural_nets.estimators.base import (
+    ConditionalDensityEstimator,
+    ConditionalVectorFieldEstimator,
+    DensityEstimatorBuilder,
+)
 from sbi.sbi_types import TensorBoardSummaryWriter
 from sbi.utils.sbiutils import del_entries
 
@@ -23,7 +27,9 @@ class NLE_A(LikelihoodEstimatorTrainer):
         self,
         prior: Optional[Distribution] = None,
         density_estimator: Union[
-            Literal["nsf", "maf", "mdn", "made"], DensityEstimatorBuilder
+            Literal["nsf", "maf", "mdn", "made"],
+            DensityEstimatorBuilder[ConditionalVectorFieldEstimator],
+            DensityEstimatorBuilder[ConditionalDensityEstimator],
         ] = "maf",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
@@ -43,7 +49,8 @@ class NLE_A(LikelihoodEstimatorTrainer):
                 be called with the first batch of simulations (theta, x), which can
                 thus be used for shape inference and potentially for z-scoring. The
                 density estimator needs to provide the methods `.log_prob` and
-                `.sample()`.
+                `.sample()` and must return either a `ConditionalVectorFieldEstimator`
+                or `ConditionalDensityEstimator`.
             device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.
