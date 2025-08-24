@@ -579,7 +579,7 @@ def build_estimator_missing_return(theta: Tensor, x: Tensor):
             ),
         ),
         pytest.param(
-            dict(classifier=build_estimator_missing_args),
+            dict(vf_estimator=build_estimator_missing_args),
             FMPE,
             marks=pytest.mark.xfail(
                 raises=TypeError,
@@ -587,11 +587,11 @@ def build_estimator_missing_return(theta: Tensor, x: Tensor):
             ),
         ),
         pytest.param(
-            dict(classifier=build_estimator_missing_args),
+            dict(vf_estimator=build_estimator_missing_args),
             NPSE,
             marks=pytest.mark.xfail(
                 raises=TypeError,
-                reason="Missing required parameters in classifier builder.",
+                reason="Missing required parameters in vf_estimator builder.",
             ),
         ),
         pytest.param(
@@ -621,7 +621,7 @@ def build_estimator_missing_return(theta: Tensor, x: Tensor):
             ),
         ),
         pytest.param(
-            dict(classifier=build_estimator_missing_return),
+            dict(vf_estimator=build_estimator_missing_return),
             FMPE,
             marks=pytest.mark.xfail(
                 raises=AttributeError,
@@ -630,7 +630,7 @@ def build_estimator_missing_return(theta: Tensor, x: Tensor):
             ),
         ),
         pytest.param(
-            dict(classifier=build_estimator_missing_return),
+            dict(vf_estimator=build_estimator_missing_return),
             NPSE,
             marks=pytest.mark.xfail(
                 raises=AttributeError,
