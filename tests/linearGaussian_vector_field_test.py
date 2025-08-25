@@ -59,20 +59,22 @@ from .test_utils import get_dkl_gaussian_prior
         ("Simformer", "ve", 1, "gaussian", ["sde", "ode"]),
         ("Simformer", "ve", 3, "uniform", ["sde", "ode"]),
         ("Simformer", "ve", 3, "gaussian", ["sde", "ode"]),
-        (
+        pytest.param(
             "Simformer",
             "vp",
             3,
             "uniform",
             ["sde", "ode"],
-        ),  # marks=[pytest.mark.gpu, pytest.mark.slow])
-        (
+            marks=[pytest.mark.gpu, pytest.mark.slow],
+        ),
+        pytest.param(
             "Simformer",
             "subvp",
             3,
             "uniform",
             ["sde", "ode"],
-        ),  # marks=[pytest.mark.gpu, pytest.mark.slow])
+            marks=[pytest.mark.gpu, pytest.mark.slow],
+        ),
         ("Simformer", "flow", 1, "gaussian", ["sde", "ode"]),
         ("Simformer", "flow", 1, "uniform", ["sde", "ode"]),
         ("Simformer", "flow", 3, "gaussian", ["sde", "ode"]),
