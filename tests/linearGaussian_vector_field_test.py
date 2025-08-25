@@ -658,11 +658,14 @@ def test_simformer_iid_inference(
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize("vector_field_type", ["npse", "fmpe"])
+@pytest.mark.parametrize(
+    "vector_field_type", ["npse", "fmpe", "simformer", "flow-simformer"]
+)
 def test_vector_field_map(vector_field_type):
     num_dim = 2
     x_o = zeros(num_dim)
     num_simulations = 3000
+    max_num_epochs = 100
 
     # likelihood_mean will be likelihood_shift+theta
     likelihood_shift = -1.0 * ones(num_dim)
@@ -679,13 +682,32 @@ def test_vector_field_map(vector_field_type):
         inference = NPSE(prior, show_progress_bars=True)
     elif vector_field_type == "fmpe":
         inference = FMPE(prior, show_progress_bars=True)
+    elif vector_field_type == "simformer":
+        inference = Simformer(
+            show_progress_bars=True,
+            posterior_latent_idx=[0],
+            posterior_observed_idx=[1],
+        )
+    elif vector_field_type == "flow-simformer":
+        inference = FlowMatchingSimformer(
+            show_progress_bars=True,
+            posterior_latent_idx=[0],
+            posterior_observed_idx=[1],
+        )
     else:
         raise ValueError(f"Invalid vector field type: {vector_field_type}")
 
     theta = prior.sample((num_simulations,))
     x = linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    inference.append_simulations(theta, x).train(max_num_epochs=100)
+    if vector_field_type in {"simformer", "flow-simformer"}:
+        inputs = torch.cat([theta.unsqueeze(1), x.unsqueeze(1)], dim=1)
+        inference.append_simulations(inputs)
+    else:
+        inference.append_simulations(theta, x)
+
+    inference.train(max_num_epochs=max_num_epochs)
+
     posterior = inference.build_posterior().set_default_x(x_o)
 
     map_ = posterior.map(show_progress_bars=True, num_iter=5)
