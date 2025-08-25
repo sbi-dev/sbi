@@ -822,19 +822,7 @@ class MaskedConditionalScoreEstimator(MaskedConditionalVectorFieldEstimator):
         Returns:
             Approximate marginal mean at a given time.
         """
-        # Handle case when times has 3 dimensions during sampling
-        original_shape = times.shape
-        has_sample_dim = len(original_shape) == 3
-
-        if has_sample_dim:
-            # Flatten the first two dimensions for computing the mean
-            times = times.reshape(-1)
-            mean = self.mean_t_fn(times) * self.mean_0
-            # Reshape back to original shape
-            mean = mean.reshape(*original_shape[:-1], *mean.shape[1:])
-            return mean
-        else:
-            return self.mean_t_fn(times) * self.mean_0
+        return self.mean_t_fn(times) * self.mean_0
 
     def approx_marginal_std(self, times: Tensor) -> Tensor:
         r"""Approximate the marginal standard deviation of the target distribution at a
@@ -846,21 +834,8 @@ class MaskedConditionalScoreEstimator(MaskedConditionalVectorFieldEstimator):
         Returns:
             Approximate marginal standard deviation at a given time.
         """
-        # Handle case when times has 3 dimensions during sampling
-        original_shape = times.shape
-        has_sample_dim = len(original_shape) == 3
-
-        if has_sample_dim:
-            # Flatten the first two dimensions for computing the std
-            times = times.reshape(-1)
-            vars = self.mean_t_fn(times) ** 2 * self.std_0**2 + self.std_fn(times) ** 2
-            std = torch.sqrt(vars)
-            # Reshape back to original shape
-            std = std.reshape(*original_shape[:-1], *std.shape[1:])
-            return std
-        else:
-            vars = self.mean_t_fn(times) ** 2 * self.std_0**2 + self.std_fn(times) ** 2
-            return torch.sqrt(vars)
+        vars = self.mean_t_fn(times) ** 2 * self.std_0**2 + self.std_fn(times) ** 2
+        return torch.sqrt(vars)
 
     def mean_fn(self, x0: Tensor, times: Tensor) -> Tensor:
         r"""Mean function of the SDE, which just multiplies the specific "mean factor"
