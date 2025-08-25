@@ -258,7 +258,9 @@ def test_c2st_simformer_on_linearGaussian(
         )
 
 
-@pytest.mark.parametrize("vector_field_type", [NPSE, FMPE])
+@pytest.mark.parametrize(
+    "vector_field_type", [NPSE, FMPE, Simformer, FlowMatchingSimformer]
+)
 def test_c2st_vector_field_on_linearGaussian_different_dims(vector_field_type):
     """Test NPE on linear Gaussian with different theta and x dimensionality."""
 
@@ -268,7 +270,7 @@ def test_c2st_vector_field_on_linearGaussian_different_dims(vector_field_type):
 
     x_o = zeros(1, x_dim)
     num_samples = 1000
-    num_simulations = 2000
+    num_simulations = 2500
 
     # likelihood_mean will be likelihood_shift+theta
     likelihood_shift = -1.0 * ones(x_dim)
@@ -296,13 +298,29 @@ def test_c2st_vector_field_on_linearGaussian_different_dims(vector_field_type):
         )
 
     # Test whether prior can be `None`.
-    inference = vector_field_type(prior=None)
+    vf_params = {}
+    if vector_field_type in {NPSE, FMPE}:
+        vf_params = {
+            "prior": prior,
+        }
+    elif vector_field_type in {Simformer, FlowMatchingSimformer}:
+        vf_params = {
+            "prior": prior,
+            "posterior_latent_idx": [0, 1, 2],
+            "posterior_observed_idx": [3, 4],
+        }
+    inference = vector_field_type(**vf_params)
 
     theta = prior.sample((num_simulations,))
     x = simulator(theta)
 
     # Test whether we can stop and resume.
-    inference.append_simulations(theta, x).train()
+    if vector_field_type in {Simformer, FlowMatchingSimformer}:
+        inputs = torch.cat([theta, x], dim=1)
+        inference.append_simulations(inputs)
+    else:
+        inference.append_simulations(theta, x)
+    inference.train(max_num_epochs=100)
     posterior = inference.build_posterior().set_default_x(x_o)
     samples = posterior.sample((num_samples,))
 
