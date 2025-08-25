@@ -33,6 +33,7 @@ from sbi.simulators.linear_gaussian import (
 )
 from sbi.utils import BoxUniform
 from sbi.utils.metrics import check_c2st
+from sbi.utils.torchutils import process_device
 from sbi.utils.user_input_checks import process_simulator
 
 from .test_utils import get_dkl_gaussian_prior
@@ -91,7 +92,6 @@ def test_c2st_vector_field_on_linearGaussian(
     Test whether NPSE and FMPE infer well a simple example with available ground truth.
     """
 
-    x_o = zeros(1, num_dim)
     num_samples = 1000
     num_simulations = 5000
     max_num_epochs = 100
@@ -104,20 +104,25 @@ def test_c2st_vector_field_on_linearGaussian(
         max_num_epochs = 500
         device = "gpu"
 
+    device = process_device(device)
+    x_o = zeros(1, num_dim, device=device)
+
     # likelihood_mean will be likelihood_shift+theta
-    likelihood_shift = -1.0 * ones(num_dim)
-    likelihood_cov = 0.3 * eye(num_dim)
+    likelihood_shift = -1.0 * ones(num_dim, device=device)
+    likelihood_cov = 0.3 * eye(num_dim, device=device)
 
     if prior_str == "gaussian":
-        prior_mean = zeros(num_dim)
-        prior_cov = eye(num_dim)
+        prior_mean = zeros(num_dim, device=device)
+        prior_cov = eye(num_dim, device=device)
         prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
         gt_posterior = true_posterior_linear_gaussian_mvn_prior(
             x_o, likelihood_shift, likelihood_cov, prior_mean, prior_cov
         )
         target_samples = gt_posterior.sample((num_samples,))
     else:
-        prior = utils.BoxUniform(-2.0 * ones(num_dim), 2.0 * ones(num_dim))
+        prior = utils.BoxUniform(
+            -2.0 * ones(num_dim), 2.0 * ones(num_dim), device=device
+        )
         target_samples = samples_true_posterior_linear_gaussian_uniform_prior(
             x_o,
             likelihood_shift,
@@ -151,9 +156,9 @@ def test_c2st_vector_field_on_linearGaussian(
 
     if estimator == "Simformer":
         inputs = torch.cat([theta.unsqueeze(1), x.unsqueeze(1)], dim=1)
-        inference.append_simulations(inputs)
+        inference.append_simulations(inputs, data_device=device)
     else:
-        inference.append_simulations(theta, x)
+        inference.append_simulations(theta, x, data_device=device)
 
     _ = inference.train(max_num_epochs=max_num_epochs)
     # amortize the training when testing sample_with.
