@@ -1555,7 +1555,7 @@ def build_transformer_network(
 def build_simformer_network(
     batch_x: Tensor,
     batch_y: Tensor,
-    hidden_features: int = 100,
+    hidden_features: int = 128,
     num_layers: int = 5,
     num_heads: int = 4,
     mlp_ratio: int = 2,
