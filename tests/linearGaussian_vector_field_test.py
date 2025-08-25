@@ -45,21 +45,46 @@ from .test_utils import get_dkl_gaussian_prior
 
 # We always test num_dim and sample_with with defaults and mark the rests as slow.
 @pytest.mark.parametrize(
-    "vector_field_type, num_dim, prior_str, sample_with",
+    "estimator, vector_field_type, num_dim, prior_str, sample_with",
     [
-        ("vp", 1, "gaussian", ["sde", "ode"]),
-        ("vp", 3, "uniform", ["sde", "ode"]),
-        ("vp", 3, "gaussian", ["sde", "ode"]),
-        ("ve", 3, "uniform", ["sde", "ode"]),
-        ("subvp", 3, "uniform", ["sde", "ode"]),
-        ("fmpe", 1, "gaussian", ["sde", "ode"]),
-        ("fmpe", 1, "uniform", ["sde", "ode"]),
-        ("fmpe", 3, "gaussian", ["sde", "ode"]),
-        ("fmpe", 3, "uniform", ["sde", "ode"]),
+        ("NPE", "vp", 1, "gaussian", ["sde", "ode"]),
+        ("NPE", "vp", 3, "uniform", ["sde", "ode"]),
+        ("NPE", "vp", 3, "gaussian", ["sde", "ode"]),
+        ("NPE", "ve", 3, "uniform", ["sde", "ode"]),
+        ("NPE", "subvp", 3, "uniform", ["sde", "ode"]),
+        ("NPE", "flow", 1, "gaussian", ["sde", "ode"]),
+        ("NPE", "flow", 1, "uniform", ["sde", "ode"]),
+        ("NPE", "flow", 3, "gaussian", ["sde", "ode"]),
+        ("NPE", "flow", 3, "uniform", ["sde", "ode"]),
+        ("Simformer", "ve", 1, "gaussian", ["sde", "ode"]),
+        ("Simformer", "ve", 3, "uniform", ["sde", "ode"]),
+        ("Simformer", "ve", 3, "gaussian", ["sde", "ode"]),
+        (
+            "Simformer",
+            "vp",
+            3,
+            "uniform",
+            ["sde", "ode"],
+        ),  # marks=[pytest.mark.gpu, pytest.mark.slow])
+        (
+            "Simformer",
+            "subvp",
+            3,
+            "uniform",
+            ["sde", "ode"],
+        ),  # marks=[pytest.mark.gpu, pytest.mark.slow])
+        ("Simformer", "flow", 1, "gaussian", ["sde", "ode"]),
+        ("Simformer", "flow", 1, "uniform", ["sde", "ode"]),
+        ("Simformer", "flow", 3, "gaussian", ["sde", "ode"]),
+        ("Simformer", "flow", 3, "uniform", ["sde", "ode"]),
     ],
 )
 def test_c2st_vector_field_on_linearGaussian(
-    vector_field_type, num_dim: int, prior_str: str, sample_with: List[str]
+    estimator: str,
+    vector_field_type: str,
+    num_dim: int,
+    prior_str: str,
+    sample_with: List[str],
 ):
     """
     Test whether NPSE and FMPE infer well a simple example with available ground truth.
@@ -67,7 +92,16 @@ def test_c2st_vector_field_on_linearGaussian(
 
     x_o = zeros(1, num_dim)
     num_samples = 1000
-    num_simulations = 2500
+    num_simulations = 5000
+    max_num_epochs = 100
+    device = "cpu"
+    tol = 0.15
+
+    if estimator == "Simformer" and vector_field_type in {'vp', 'subvp'}:
+        # Default values for slow and GPU tests (VP and sub-VP)
+        num_simulations = 25000
+        max_num_epochs = 500
+        device = "gpu"
 
     # likelihood_mean will be likelihood_shift+theta
     likelihood_shift = -1.0 * ones(num_dim)
@@ -90,19 +124,41 @@ def test_c2st_vector_field_on_linearGaussian(
             prior=prior,
             num_samples=num_samples,
         )
-    if vector_field_type == "fmpe":
-        inference = FMPE(prior, show_progress_bars=True)
-    else:
-        inference = NPSE(prior, sde_type=vector_field_type, show_progress_bars=True)
+
+    if estimator == "NPE":
+        vf_params = {
+            "prior": prior,
+            "device": device,
+        }
+        if vector_field_type == "flow":
+            inference = FMPE(**vf_params)
+        else:
+            inference = NPSE(sde_type=vector_field_type, **vf_params)  # type: ignore
+    elif estimator == "Simformer":
+        vf_params = {
+            "posterior_latent_idx": [0],
+            "posterior_observed_idx": [1],
+            "device": device,
+        }
+        if vector_field_type == "flow":
+            inference = FlowMatchingSimformer(**vf_params)
+        else:
+            inference = Simformer(sde_type=vector_field_type, **vf_params)  # type: ignore
 
     theta = prior.sample((num_simulations,))
     x = linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    vf_estimator = inference.append_simulations(theta, x).train()
+    if estimator == "Simformer":
+        inputs = torch.cat([theta.unsqueeze(1), x.unsqueeze(1)], dim=1)
+        inference.append_simulations(inputs)
+    else:
+        inference.append_simulations(theta, x)
+
+    _ = inference.train(max_num_epochs=max_num_epochs)
     # amortize the training when testing sample_with.
     for method in sample_with:
         posterior = inference.build_posterior(
-            vf_estimator,
+            prior=prior,
             sample_with=method,
             posterior_parameters=VectorFieldPosteriorParameters(),
         )
@@ -114,6 +170,7 @@ def test_c2st_vector_field_on_linearGaussian(
             samples,
             target_samples,
             alg=f"vector_field-{vector_field_type}-{prior_str}-{num_dim}D-{method}",
+            tol=tol,
         )
 
     # Checks for log_prob()
