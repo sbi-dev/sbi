@@ -79,3 +79,12 @@ Visualization
    :maxdepth: 1
 
    how_to_guide/05_conditional_distributions.ipynb
+
+
+Posterior Parameters
+--------------------
+
+.. toctree::
+   :maxdepth: 1
+
+   how_to_guide/19_posterior_parameters.ipynb
