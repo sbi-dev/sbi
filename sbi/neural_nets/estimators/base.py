@@ -749,16 +749,7 @@ class MaskedConditionalVectorFieldEstimatorWrapper(ConditionalVectorFieldEstimat
                     to save memory resources
         """
 
-        original_shape = original_estimator.input_shape
-        if len(original_shape) == 2:
-            T, F = original_shape
-        elif len(original_shape) == 1:
-            T = original_shape[0]
-            F = 1
-        else:
-            raise ValueError(
-                f"Invalid input_shape {original_shape}. Expected 1D or 2D tensor."
-            )
+        T, F = original_estimator.input_shape
 
         # Input checks for fixed_condition_mask
         if fixed_condition_mask.dim() != 1:
@@ -837,17 +828,12 @@ class MaskedConditionalVectorFieldEstimatorWrapper(ConditionalVectorFieldEstimat
         self._observed_idx = (self._fixed_condition_mask == 1).nonzero(as_tuple=True)[0]
 
         # Get the mean/std for the latent nodes from the original estimator
-        # Support both 2D (batch, T) and 3D (batch, T, F) shapes
-        latent_mean_base_unflattened = (
-            original_estimator.mean_base[..., self._latent_idx]
-            if len(original_shape) == 1
-            else original_estimator.mean_base[..., self._latent_idx, :]
-        )
-        latent_std_base_unflattened = (
-            original_estimator.std_base[..., self._latent_idx]
-            if len(original_shape) == 1
-            else original_estimator.std_base[..., self._latent_idx, :]
-        )
+        latent_mean_base_unflattened = original_estimator.mean_base[
+            :, self._latent_idx, :
+        ]
+        latent_std_base_unflattened = original_estimator.std_base[
+            :, self._latent_idx, :
+        ]
 
         latent_mean_base_flattened = latent_mean_base_unflattened.flatten(start_dim=1)
         latent_std_base_flattened = latent_std_base_unflattened.flatten(start_dim=1)

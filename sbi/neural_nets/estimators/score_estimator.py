@@ -523,6 +523,7 @@ class MaskedConditionalScoreEstimator(MaskedConditionalVectorFieldEstimator):
         Returns:
             Score (gradient of the density) at a given time, matches input shape.
         """
+        B, T, F = input.shape
 
         # Compute time-dependent mean and std for z-scoring
         # Handle scalar time (ndim=0) by unsqueezing to [1] for broadcasting
@@ -533,9 +534,9 @@ class MaskedConditionalScoreEstimator(MaskedConditionalVectorFieldEstimator):
 
         # Ensure mean and std are broadcastable to input shape
         while mean.dim() < input.dim():
-            mean = mean.unsqueeze(-1)
+            mean = mean.unsqueeze(1)
         while std.dim() < input.dim():
-            std = std.unsqueeze(-1)
+            std = std.unsqueeze(1)
 
         # Z-score the input
         input_enc = (input - mean) / std
@@ -645,13 +646,13 @@ class MaskedConditionalScoreEstimator(MaskedConditionalVectorFieldEstimator):
         device = input.device
         if input.dim() == 1:
             # Input is [T], unsqueeze batch and features dimension
-            unsqueezed_input = input.unsqueeze(0).unsqueeze(-1)
+            input = input.unsqueeze(0).unsqueeze(-1)
         elif input.dim() == 2:
-            # Input is [B, T], unsqueeze features dimension
-            unsqueezed_input = input.unsqueeze(-1)
+            # Input is [T, F], unsqueeze batch dimension
+            input = input.unsqueeze(0)
         elif input.dim() == 3:
             # Already correct shape [B, T, F]
-            unsqueezed_input = input
+            pass
         else:
             raise ValueError(
                 f"input has incorrect dimensions: {input.shape}"
@@ -659,8 +660,7 @@ class MaskedConditionalScoreEstimator(MaskedConditionalVectorFieldEstimator):
                 f"but data passed had {input.dim()}"
             )
 
-        # Get final shape of unsqueezed input
-        B, T, F = unsqueezed_input.shape
+        B, T, F = input.shape
 
         # Sample times if not provided
         if times is None:
@@ -669,19 +669,14 @@ class MaskedConditionalScoreEstimator(MaskedConditionalVectorFieldEstimator):
             times = times + self.t_min  # [B,]
 
         # Sample noise
-        eps = torch.randn_like(unsqueezed_input)  # [B, T, F]
+        eps = torch.randn_like(input)  # [B, T, F]
 
         # Compute mean and std for the SDE
-        # I use the original input since the estimator was instanciated using such
-        # If I were to use the unsqueezed input, shape errors could arise
         mean_t = self.mean_fn(input, times)  # [B, T, F]
-        while mean_t.dim() < unsqueezed_input.dim():
-            mean_t = mean_t.unsqueeze(-1)
-        mean_t = mean_t.expand_as(unsqueezed_input)  # [B, T, F]
         std_t = self.std_fn(times)  # [B, 1, 1] or [B, 1] or [B]
-        while std_t.dim() < unsqueezed_input.dim():
+        while std_t.dim() < input.dim():
             std_t = std_t.unsqueeze(-1)
-        std_t = std_t.expand_as(unsqueezed_input)  # [B, T, F]
+        std_t = std_t.expand_as(input)  # [B, T, F]
 
         # Get noised input
         input_noised = mean_t + std_t * eps  # [B, T, F]
@@ -695,7 +690,7 @@ class MaskedConditionalScoreEstimator(MaskedConditionalVectorFieldEstimator):
             input_noised = torch.where(
                 # Where condition_mask is True, use input (observed)
                 condition_mask.unsqueeze(0).unsqueeze(-1).expand(B, T, F),
-                unsqueezed_input,
+                input,
                 input_noised,
             )
         elif condition_mask.dim() == 2:
@@ -703,7 +698,7 @@ class MaskedConditionalScoreEstimator(MaskedConditionalVectorFieldEstimator):
             input_noised = torch.where(
                 # Where condition_mask is True, use input (observed)
                 condition_mask.unsqueeze(-1).expand(B, T, F),
-                unsqueezed_input,
+                input,
                 input_noised,
             )
         else:

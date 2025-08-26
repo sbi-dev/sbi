@@ -1359,12 +1359,8 @@ class MaskedNeuralInference(ABC, BaseNeuralInference):
         setting a random variable to latent.
         """
 
-        if inputs.dim() <= 2:
-            batch_dims = inputs.shape[:-1]
-            num_nodes = inputs.shape[-1]
-        else:
-            batch_dims = inputs.shape[:-2]
-            num_nodes = inputs.shape[-2]
+        batch_dims = inputs.shape[:-2]
+        num_nodes = inputs.shape[-2]
 
         # Generate masks with Bernoulli
         condition_masks = torch.bernoulli(

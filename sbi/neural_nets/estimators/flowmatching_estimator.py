@@ -460,15 +460,9 @@ class MaskedFlowMatchingEstimator(MaskedConditionalVectorFieldEstimator):
             The estimated vector field.
         """
         # Continue with standard processing (broadcast shapes etc.)
-        if len(self.input_shape) == 1:
-            batch_shape = input.shape[:-2]
-        else:
-            batch_shape = input.shape[: -len(self.input_shape)]
+        batch_shape = input.shape[: -len(self.input_shape)]
 
-        new_shape_for_input = batch_shape + self.input_shape
-        if len(self.input_shape) == 1:
-            new_shape_for_input = new_shape_for_input + (1,)
-        input = torch.broadcast_to(input, new_shape_for_input)
+        input = torch.broadcast_to(input, batch_shape + self.input_shape)
         time = torch.broadcast_to(time, batch_shape)
 
         # NOTE: To simplify use of external networks, we will flatten the tensors
@@ -478,7 +472,7 @@ class MaskedFlowMatchingEstimator(MaskedConditionalVectorFieldEstimator):
 
         # call the network to get the estimated vector field
         v = self.net(input, time, condition_mask, edge_mask)
-        # v = v.reshape(*batch_shape + self.input_shape)
+        v = v.reshape(*batch_shape + self.input_shape)
 
         return v
 
@@ -553,36 +547,17 @@ class MaskedFlowMatchingEstimator(MaskedConditionalVectorFieldEstimator):
         Returns:
             Loss value.
         """
-        if input.dim() == 1:
-            # Input is [T], unsqueeze batch and features dimension
-            unsqueezed_input = input.unsqueeze(0).unsqueeze(-1)
-        elif input.dim() == 2:
-            # Input is [B, T], unsqueeze features dimension
-            unsqueezed_input = input.unsqueeze(-1)
-        elif input.dim() == 3:
-            # Already correct shape [B, T, F]
-            unsqueezed_input = input
-        else:
-            raise ValueError(
-                f"input has incorrect dimensions: {input.shape}"
-                f"input should have at most 3 dimensions "
-                f"but data passed had {input.dim()}"
-            )
-
         # randomly sample the time steps to compare the vector field at
         # different time steps
         if times is None:
-            batch_dims = unsqueezed_input.shape[:-2]
-            times = torch.rand(batch_dims, device=input.device, dtype=input.dtype)
+            times = torch.rand(input.shape[:-2], device=input.device, dtype=input.dtype)
         times_ = times[..., None, None]
 
         # sample from probability path at time t
-        input_1 = torch.randn_like(unsqueezed_input)
-        input_t = (1 - times_) * unsqueezed_input + (
-            times_ + self.noise_scale
-        ) * input_1
+        input_1 = torch.randn_like(input)
+        input_t = (1 - times_) * input + (times_ + self.noise_scale) * input_1
 
-        B, T, F = unsqueezed_input.shape
+        B, T, F = input.shape
 
         condition_mask = condition_mask.bool()
         if condition_mask.dim() == 1:
@@ -590,7 +565,7 @@ class MaskedFlowMatchingEstimator(MaskedConditionalVectorFieldEstimator):
             input_t = torch.where(
                 # Where condition_mask is True, use input (observed)
                 condition_mask.unsqueeze(0).unsqueeze(-1).expand(B, T, F),
-                unsqueezed_input,
+                input,
                 input_t,
             )
         elif condition_mask.dim() == 2:
@@ -598,7 +573,7 @@ class MaskedFlowMatchingEstimator(MaskedConditionalVectorFieldEstimator):
             input_t = torch.where(
                 # Where condition_mask is True, use input (observed)
                 condition_mask.unsqueeze(-1).expand(B, T, F),
-                unsqueezed_input,
+                input,
                 input_t,
             )
         else:
@@ -609,7 +584,7 @@ class MaskedFlowMatchingEstimator(MaskedConditionalVectorFieldEstimator):
             )
 
         # compute vector field at the sampled time steps
-        vector_field_target = input_1 - unsqueezed_input
+        vector_field_target = input_1 - input
 
         # Get the predicted vector field from the network
         # Pass masks to the forward method
