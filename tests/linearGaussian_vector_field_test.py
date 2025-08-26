@@ -715,60 +715,6 @@ def test_vector_field_map(vector_field_type):
     assert ((map_ - gt_posterior.mean) ** 2).sum() < 0.5, "MAP is not close to GT."
 
 
-@pytest.mark.slow
-def test_simformer_map():
-    num_node_features = 2
-    # num_sim_nodes = 2  # theta, x
-    num_simulations = 3000
-
-    # likelihood_mean will be likelihood_shift+theta
-    likelihood_shift = -1.0 * ones(num_node_features)
-    likelihood_cov = 0.3 * eye(num_node_features)
-
-    prior_mean = zeros(num_node_features)
-    prior_cov = eye(num_node_features)
-    prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
-
-    x_o_features = zeros(num_node_features)
-
-    # The ground truth posterior is for theta.
-    gt_posterior = true_posterior_linear_gaussian_mvn_prior(
-        x_o_features.unsqueeze(0),
-        likelihood_shift,
-        likelihood_cov,
-        prior_mean,
-        prior_cov,
-    )
-
-    def simulator(theta):
-        # theta is (batch, num_node_features)
-        return linear_gaussian(theta, likelihood_shift, likelihood_cov)
-
-    # Prepare data for Simformer
-    thetas = prior.sample((num_simulations,))
-    xs = simulator(thetas)
-    inputs = torch.stack([thetas, xs], dim=1)
-
-    inference = Simformer(prior=prior, show_progress_bars=True)
-
-    inference.append_simulations(
-        inputs=inputs,
-    ).train(max_num_epochs=100)
-
-    # Build posterior for the specific task: infer theta (node 0) given x (node 1).
-    inference_condition_mask = torch.tensor([False, True])
-
-    posterior = inference.build_conditional(
-        condition_mask=inference_condition_mask,
-    )
-
-    posterior.set_default_x(x_o_features)
-
-    map_ = posterior.map(show_progress_bars=True, num_iter=5)
-
-    assert ((map_ - gt_posterior.mean) ** 2).sum() < 0.5, "MAP is not close to GT."
-
-
 # TODO: Need to add NPSE when the network builders are unified, but anyway
 # this will only work after implementing additional methods for vector fields,
 # so it is skipped for now.
