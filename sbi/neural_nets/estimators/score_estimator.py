@@ -523,7 +523,6 @@ class MaskedConditionalScoreEstimator(MaskedConditionalVectorFieldEstimator):
         Returns:
             Score (gradient of the density) at a given time, matches input shape.
         """
-        B, T, F = input.shape
 
         # Compute time-dependent mean and std for z-scoring
         # Handle scalar time (ndim=0) by unsqueezing to [1] for broadcasting
