@@ -547,41 +547,67 @@ class MaskedFlowMatchingEstimator(MaskedConditionalVectorFieldEstimator):
         Returns:
             Loss value.
         """
+
+        input_shape = input.shape
+        B = input_shape[0]  # Batch size
+        T = input_shape[1]  # Variables (nodes)
+
         # randomly sample the time steps to compare the vector field at
         # different time steps
         if times is None:
             times = torch.rand(input.shape[:-2], device=input.device, dtype=input.dtype)
-        times_ = times[..., None, None]
+
+        # Ensure compatible dimensions
+        times_ = times
+        while times_.dim() < input.dim():
+            times_ = times_.unsqueeze(-1)
 
         # sample from probability path at time t
         input_1 = torch.randn_like(input)
         input_t = (1 - times_) * input + (times_ + self.noise_scale) * input_1
 
-        B, T, F = input.shape
-
         condition_mask = condition_mask.bool()
+        # Ensure condition_mask is broadcastable to input shape
+        # input: [B, T] or [B, T, F]
+        # condition_mask: [T] or [B, T]
+        # We want to broadcast condition_mask to [B, T] for masking
+
+        # Always ensure condition_mask is [B, T]
         if condition_mask.dim() == 1:
-            # Shape of condition_mask is [T], I unsqueeze for broadcasting on B and F
-            input_t = torch.where(
-                # Where condition_mask is True, use input (observed)
-                condition_mask.unsqueeze(0).unsqueeze(-1).expand(B, T, F),
-                input,
-                input_t,
-            )
+            # [T] -> [B, T]
+            condition_mask_broadcast = condition_mask.unsqueeze(0).expand(B, T)
         elif condition_mask.dim() == 2:
-            # Shape of condition_mask is [B, T], I unsqueeze for broadcasting on F
-            input_t = torch.where(
-                # Where condition_mask is True, use input (observed)
-                condition_mask.unsqueeze(-1).expand(B, T, F),
-                input,
-                input_t,
-            )
+            # [B, T]
+            condition_mask_broadcast = condition_mask
         else:
             raise ValueError(
                 f"condition_mask has incorrect dimensions: {condition_mask.shape} "
                 f"condition_mask should have shape [T] or [B, T], where T is "
                 f"the number of nodes and B is the batch size."
             )
+
+        # Now broadcast to input shape
+        if input.dim() == 2:
+            # [B, T]
+            pass
+        elif input.dim() == 3:
+            # [B, T, F]
+            condition_mask_broadcast = condition_mask_broadcast.unsqueeze(-1).expand_as(
+                input
+            )
+        else:
+            raise ValueError(
+                f"input has incorrect dimensions: {input.shape} "
+                f"input should have shape [B, T] or [B, T, F]"
+            )
+
+        # Shape of condition_mask is [B, T], I unsqueeze for broadcasting on F
+        input_t = torch.where(
+            # Where condition_mask is True, use input (observed)
+            condition_mask_broadcast,
+            input,
+            input_t,
+        )
 
         # compute vector field at the sampled time steps
         vector_field_target = input_1 - input
@@ -594,12 +620,15 @@ class MaskedFlowMatchingEstimator(MaskedConditionalVectorFieldEstimator):
         loss = (predicted_vector_field - vector_field_target) ** 2.0
 
         # Apply condition mask: loss is only computed for latent variables
-        # condition_mask is (..., T), expand to (..., T, F) to match loss shape
-        condition_mask_expanded = condition_mask.bool().unsqueeze(-1).expand_as(loss)
-        loss = torch.where(condition_mask_expanded, torch.zeros_like(loss), loss)
+        loss = torch.where(condition_mask_broadcast, torch.zeros_like(loss), loss)
 
-        # Sum over T and F dimensions to get loss per batch item (shape (...,))
-        loss = loss.sum(dim=(-2, -1))
+        # Since sbi expects loss-per-batch, I sum on both T and F
+        if loss.dim() == 3:
+            loss = loss.sum(dim=(-2, -1), keepdim=True)  # [B, 1, 1]
+        elif loss.dim() == 2:
+            loss = loss.sum(dim=-1, keepdim=True)  # [B, 1]
+        else:
+            raise ValueError(f"Unexpected loss shape: {loss.shape}")
 
         # Rebalance loss if desired (similar to MaskedConditionalScoreEstimator)
         if rebalance_loss:
