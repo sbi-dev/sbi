@@ -646,7 +646,7 @@ class MaskedConditionalScoreEstimator(MaskedConditionalVectorFieldEstimator):
 
         input_shape = input.shape
         B = input_shape[0]  # Batch size
-        T = input_shape[1]
+        T = input_shape[1]  # Variables (nodes)
 
         # Sample times if not provided
         if times is None:
@@ -801,11 +801,7 @@ class MaskedConditionalScoreEstimator(MaskedConditionalVectorFieldEstimator):
         if rebalance_loss:
             # Count number of unobserved (latent) elements per batch
             num_elements = (~condition_mask).sum(dim=-1, keepdim=True).clamp(min=1)
-            loss = (
-                loss / num_elements.unsqueeze(-1)
-                if loss.dim() == 3
-                else loss / num_elements
-            )
+            loss = loss / num_elements
 
         # Compute weights
         weights = self.weight_fn(times)
