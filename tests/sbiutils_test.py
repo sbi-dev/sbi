@@ -512,8 +512,6 @@ def test_z_scoring_structured(z_x, z_theta, builder):
             "zuko_naf",
             "zuko_unaf",
             "zuko_gf",
-            "mlp_flowmatcher",
-            "resnet_flowmatcher",
         ]:
             net = builder(
                 model,

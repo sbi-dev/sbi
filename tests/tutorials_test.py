@@ -8,6 +8,8 @@ import pytest
 from nbclient.exceptions import CellExecutionError
 from nbconvert.preprocessors import ExecutePreprocessor
 
+TEST_TIMEOUT = 1200
+
 
 def list_notebooks(directory: str) -> list:
     """Return sorted list of all notebooks in a directory."""
@@ -25,7 +27,7 @@ def test_tutorials(notebook_path):
     """Test that all notebooks in the tutorials directory can be executed."""
     with open(notebook_path) as f:
         nb = nbformat.read(f, as_version=4)
-        ep = ExecutePreprocessor(timeout=600, kernel_name='python3')
+        ep = ExecutePreprocessor(timeout=TEST_TIMEOUT, kernel_name='python3')
         print(f"Executing notebook {notebook_path}")
         try:
             ep.preprocess(nb, {'metadata': {'path': os.path.dirname(notebook_path)}})

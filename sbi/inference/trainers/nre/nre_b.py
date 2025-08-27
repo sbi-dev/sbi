@@ -11,7 +11,7 @@ from sbi.inference.trainers.nre.nre_base import (
     RatioEstimatorBuilder,
     RatioEstimatorTrainer,
 )
-from sbi.sbi_types import TensorboardSummaryWriter
+from sbi.sbi_types import TensorBoardSummaryWriter
 from sbi.utils.sbiutils import del_entries
 from sbi.utils.torchutils import assert_all_finite
 
@@ -29,7 +29,7 @@ class NRE_B(RatioEstimatorTrainer):
         classifier: Union[str, RatioEstimatorBuilder] = "resnet",
         device: str = "cpu",
         logging_level: Union[int, str] = "warning",
-        summary_writer: Optional[TensorboardSummaryWriter] = None,
+        summary_writer: Optional[TensorBoardSummaryWriter] = None,
         show_progress_bars: bool = True,
     ):
         r"""Initialize NRE_B.

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import sys
+from dataclasses import asdict
 from typing import Tuple, Union
 
 import pymc
@@ -33,6 +34,9 @@ from sbi.inference.posteriors.ensemble_posterior import (
 )
 from sbi.inference.posteriors.importance_posterior import ImportanceSamplingPosterior
 from sbi.inference.posteriors.mcmc_posterior import MCMCPosterior
+from sbi.inference.posteriors.posterior_parameters import (
+    MCMCPosteriorParameters,
+)
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.inference.potentials.likelihood_based_potential import LikelihoodBasedPotential
 from sbi.inference.potentials.posterior_based_potential import PosteriorBasedPotential
@@ -111,7 +115,7 @@ def test_training_and_mcmc_on_device(
     training_device,
     prior_device,
     prior_type,
-    mcmc_params_fast: dict,
+    mcmc_params_fast: MCMCPosteriorParameters,
 ):
     """Test training on devices.
 
@@ -129,7 +133,7 @@ def test_training_and_mcmc_on_device(
     num_rounds = 2  # test proposal sampling in round 2.
     num_simulations_per_round = [200, num_samples]
     # use more warmup steps to avoid Infs during MCMC in round two.
-    mcmc_params_fast["warmup_steps"] = 20
+    mcmc_params_fast = mcmc_params_fast.with_param(warmup_steps=20)
 
     x_o = zeros(1, num_dim).to(data_device)
     likelihood_shift = -1.0 * ones(num_dim).to(prior_device)
@@ -190,9 +194,7 @@ def test_training_and_mcmc_on_device(
         # mcmc cases
         if sampling_method in ["slice_np", "slice_np_vectorized", "nuts_pymc"]:
             posterior = inferer.build_posterior(
-                sample_with="mcmc",
-                mcmc_method=sampling_method,
-                mcmc_parameters=mcmc_params_fast,
+                posterior_parameters=mcmc_params_fast.with_param(method=sampling_method)
             )
         elif sampling_method in ["rejection", "direct"]:
             # all other cases: rejection, direct
@@ -501,7 +503,9 @@ def test_multiround_mdn_training_on_device(method: Union[NPE_A, NPE_C], device: 
     "training_device, inference_device", [("cpu", "gpu"), ("gpu", "cpu")]
 )
 def test_conditioned_posterior_on_gpu(
-    training_device: str, inference_device: str, mcmc_params_fast: dict
+    training_device: str,
+    inference_device: str,
+    mcmc_params_fast: MCMCPosteriorParameters,
 ):
     """Test that training and sampling device can be interchanged
 
@@ -510,7 +514,7 @@ def test_conditioned_posterior_on_gpu(
     Args:
         training_device: device for trainig
         inference_device: device for inference
-        mcmc_params_fast: dictionary for mcmc posterior
+        mcmc_params_fast: MCMCPosteriorParameters dataclass for mcmc posterior
     """
 
     # Training.
@@ -558,7 +562,7 @@ def test_conditioned_posterior_on_gpu(
         theta_transform=prior_transform,
         proposal=prior,
         device=inference_device,
-        **mcmc_params_fast,
+        **asdict(mcmc_params_fast),
     ).set_default_x(x_o)
 
     conditional_posterior.to(inference_device)

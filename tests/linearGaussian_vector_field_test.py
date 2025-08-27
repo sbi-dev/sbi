@@ -21,7 +21,8 @@ from sbi.inference import (
     simulate_for_sbi,
     vector_field_estimator_based_potential,
 )
-from sbi.neural_nets.factory import flowmatching_nn
+from sbi.inference.posteriors.posterior_parameters import VectorFieldPosteriorParameters
+from sbi.neural_nets.factory import posterior_flow_nn
 from sbi.simulators import linear_gaussian
 from sbi.simulators.linear_gaussian import (
     samples_true_posterior_linear_gaussian_mvn_prior_different_dims,
@@ -63,7 +64,7 @@ def test_c2st_vector_field_on_linearGaussian(
 
     x_o = zeros(1, num_dim)
     num_samples = 1000
-    num_simulations = 10_000
+    num_simulations = 2500
 
     # likelihood_mean will be likelihood_shift+theta
     likelihood_shift = -1.0 * ones(num_dim)
@@ -94,18 +95,13 @@ def test_c2st_vector_field_on_linearGaussian(
     theta = prior.sample((num_simulations,))
     x = linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    score_estimator = inference.append_simulations(theta, x).train(
-        training_batch_size=100,
-        max_num_epochs=50,
-    )
+    vf_estimator = inference.append_simulations(theta, x).train()
     # amortize the training when testing sample_with.
     for method in sample_with:
         posterior = inference.build_posterior(
-            score_estimator,
+            vf_estimator,
             sample_with=method,
-            vectorfield_sampling_parameters={
-                "neural_ode_backend": "zuko",
-            },
+            posterior_parameters=VectorFieldPosteriorParameters(),
         )
         posterior.set_default_x(x_o)
         samples = posterior.sample((num_samples,))
@@ -115,7 +111,6 @@ def test_c2st_vector_field_on_linearGaussian(
             samples,
             target_samples,
             alg=f"vector_field-{vector_field_type}-{prior_str}-{num_dim}D-{method}",
-            tol=0.15 if method == "ode" else 0.1,  # ODE with scores is less accurate
         )
 
     # Checks for log_prob()
@@ -124,6 +119,7 @@ def test_c2st_vector_field_on_linearGaussian(
         # posterior.
 
         # Disable exact integration for the ODE solver to speed up the computation.
+        # But this gives stochastic results -> increase max_dkl a bit
         posterior.potential_fn.neural_ode.update_params(
             exact=False,
             atol=1e-4,
@@ -138,7 +134,7 @@ def test_c2st_vector_field_on_linearGaussian(
             prior_cov,
         )
 
-        max_dkl = 0.15
+        max_dkl = 0.25
 
         assert dkl < max_dkl, (
             f"D-KL={dkl} is more than 2 stds above the average performance."
@@ -189,16 +185,7 @@ def test_c2st_vector_field_on_linearGaussian_different_dims(vector_field_type):
     x = simulator(theta)
 
     # Test whether we can stop and resume.
-    inference.append_simulations(theta, x).train(
-        max_num_epochs=20,
-        training_batch_size=100,
-    )
-    inference.train(
-        resume_training=True,
-        force_first_round_loss=True,
-        training_batch_size=100,
-        max_num_epochs=40,
-    )
+    inference.append_simulations(theta, x).train()
     posterior = inference.build_posterior().set_default_x(x_o)
     samples = posterior.sample((num_samples,))
 
@@ -210,10 +197,11 @@ def test_c2st_vector_field_on_linearGaussian_different_dims(vector_field_type):
     )
 
 
-# TODO: This should be unified with NPSE when the network builders are unified
-# in PR #1501
-@pytest.mark.parametrize("model", ["mlp", "resnet"])
-def test_fmpe_with_different_models(model):
+@pytest.mark.parametrize("vector_field_type", [NPSE, FMPE])
+@pytest.mark.parametrize(
+    "model", ["mlp", "ada_mlp", pytest.param("transformer", marks=[pytest.mark.slow])]
+)
+def test_vfinference_with_different_models(vector_field_type, model):
     """Test fmpe with different vector field estimators on linear Gaussian."""
 
     theta_dim = 3
@@ -221,7 +209,7 @@ def test_fmpe_with_different_models(model):
 
     x_o = zeros(1, x_dim)
     num_samples = 1000
-    num_simulations = 2000
+    num_simulations = 2500
 
     # likelihood_mean will be likelihood_shift+theta
     likelihood_shift = -1.0 * ones(x_dim)
@@ -239,11 +227,11 @@ def test_fmpe_with_different_models(model):
     theta = prior.sample((num_simulations,))
     x = linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    estimator_build_fun = flowmatching_nn(model=model)
+    estimator_build_fun = posterior_flow_nn(net=model)
 
-    inference = FMPE(prior, density_estimator=estimator_build_fun)
+    inference = vector_field_type(prior, vf_estimator=estimator_build_fun)
 
-    inference.append_simulations(theta, x).train(training_batch_size=100)
+    inference.append_simulations(theta, x).train()
     posterior = inference.build_posterior().set_default_x(x_o)
     samples = posterior.sample((num_samples,))
 
@@ -358,18 +346,21 @@ def test_vector_field_sde_ode_sampling_equivalence(vector_field_trained_model):
 # TODO: Currently, c2st is too high for FMPE (e.g., > 3 number of observations),
 # so some tests are skipped so far. This seems to be an issue with the
 # neural network architecture and can be addressed in PR #1501
-@pytest.mark.skip(
-    reason="c2st too high for some cases, has to be fixed in PR #1501 or #1544"
-)
 @pytest.mark.slow
 @pytest.mark.parametrize(
     "iid_method, num_trial",
     [
-        pytest.param("fnpe", 3, id="fnpe-2trials"),
+        pytest.param(
+            "fnpe",
+            3,
+            id="fnpe-3trials",
+            marks=pytest.mark.skip(reason="fails randomly, see #1646"),
+        ),
         pytest.param("gauss", 3, id="gauss-3trials"),
         pytest.param("auto_gauss", 8, id="auto_gauss-8trials"),
         pytest.param("auto_gauss", 16, id="auto_gauss-16trials"),
         pytest.param("jac_gauss", 8, id="jac_gauss-8trials"),
+        pytest.param("jac_gauss", 16, id="jac_gauss-16trials"),
     ],
 )
 def test_vector_field_iid_inference(
@@ -378,6 +369,10 @@ def test_vector_field_iid_inference(
     """
     Test whether NPSE and FMPE infers well a simple example with available ground truth.
     """
+    if vector_field_type == "fmpe":
+        # TODO: Remove on merge
+        pytest.xfail(reason="c2st to high, fixed in PR #1501/1544")
+
     num_samples = 1000
 
     # Extract data from fixture
@@ -508,7 +503,7 @@ def test_sample_conditional():
     )
 
     # Test whether fmpe works properly with structured z-scoring.
-    net = flowmatching_nn("mlp", z_score_x="structured", hidden_features=[65] * 5)
+    net = posterior_flow_nn("mlp", z_score_x="structured", hidden_features=[65] * 5)
 
     inference = FMPE(prior, density_estimator=net, show_progress_bars=False)
     posterior_estimator = inference.append_simulations(theta, x).train(

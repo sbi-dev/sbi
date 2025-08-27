@@ -1,6 +1,6 @@
 [![PyPI version](https://badge.fury.io/py/sbi.svg)](https://badge.fury.io/py/sbi)
 [![Conda Version](https://img.shields.io/conda/vn/conda-forge/sbi.svg)](https://github.com/conda-forge/sbi-feedstock)
-[![Contributions welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat)](https://github.com/sbi-dev/sbi/blob/master/CONTRIBUTING.md)
+[![Contributions welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat)](https://sbi.readthedocs.io/en/latest/contributing.html)
 [![Tests](https://github.com/sbi-dev/sbi/actions/workflows/ci.yml/badge.svg)](https://github.com/sbi-dev/sbi/actions)
 [![codecov](https://codecov.io/gh/sbi-dev/sbi/branch/main/graph/badge.svg)](https://codecov.io/gh/sbi-dev/sbi)
 [![GitHub license](https://img.shields.io/github/license/sbi-dev/sbi)](https://github.com/sbi-dev/sbi/blob/master/LICENSE.txt)
@@ -9,8 +9,8 @@
 
 ## `sbi`: Simulation-Based Inference
 
-[Getting Started](https://sbi-dev.github.io/sbi/latest/tutorials/00_getting_started/) |
-[Documentation](https://sbi-dev.github.io/sbi/) | [Discord Server](https://discord.gg/eEeVPSvWKy)
+[Getting Started](https://sbi.readthedocs.io/en/latest/tutorials/00_getting_started.html) |
+[Documentation](https://sbi.readthedocs.io/en/latest/) | [Discord Server](https://discord.gg/eEeVPSvWKy)
 
 `sbi` is a Python package for simulation-based inference, designed to meet the needs of
 both researchers and practitioners. Whether you need fine-grained control or an
@@ -164,13 +164,13 @@ how to run each of these methods
   and hassle-free simulation-based inference_](https://arxiv.org/abs/2210.04815)
   (NeurIPS 2022).
 
-- [`FMPE`](https://sbi-dev.github.io/sbi/latest/reference/#sbi.inference.trainers.fmpe.fmpe.FMPE)
+- [`FMPE`](https://sbi-dev.github.io/sbi/latest/reference/#sbi.inference.trainers.vfpe.fmpe.FMPE)
   from Wildberger, J., Dax, M., Buchholz, S., Green, S., Macke, J. H., & Schölkopf, B.
   [_Flow matching for scalable simulation-based
   inference_](https://proceedings.neurips.cc/paper_files/paper/2023/hash/3663ae53ec078860bb0b9c6606e092a0-Abstract-Conference.html).
   (NeurIPS 2023).
 
-- [`NPSE`](https://sbi-dev.github.io/sbi/latest/reference/#sbi.inference.trainers.npse.npse.NPSE) from
+- [`NPSE`](https://sbi-dev.github.io/sbi/latest/reference/#sbi.inference.trainers.vfpe.npse.NPSE) from
   Geffner, T., Papamakarios, G., & Mnih, A. [_Compositional score modeling for
   simulation-based inference_](https://proceedings.mlr.press/v202/geffner23a.html).
   (ICML 2023)
