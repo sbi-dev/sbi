@@ -533,9 +533,9 @@ class MaskedConditionalScoreEstimator(MaskedConditionalVectorFieldEstimator):
 
         # Ensure mean and std are broadcastable to input shape
         while mean.dim() < input.dim():
-            mean = mean.unsqueeze(1)
+            mean = mean.unsqueeze(-1)
         while std.dim() < input.dim():
-            std = std.unsqueeze(1)
+            std = std.unsqueeze(-1)
 
         # Z-score the input
         input_enc = (input - mean) / std
@@ -643,23 +643,10 @@ class MaskedConditionalScoreEstimator(MaskedConditionalVectorFieldEstimator):
 
         """
         device = input.device
-        if input.dim() == 1:
-            # Input is [T], unsqueeze batch and features dimension
-            input = input.unsqueeze(0).unsqueeze(-1)
-        elif input.dim() == 2:
-            # Input is [T, F], unsqueeze batch dimension
-            input = input.unsqueeze(0)
-        elif input.dim() == 3:
-            # Already correct shape [B, T, F]
-            pass
-        else:
-            raise ValueError(
-                f"input has incorrect dimensions: {input.shape}"
-                f"input should have at most 3 dimensions "
-                f"but data passed had {input.dim()}"
-            )
 
-        B, T, F = input.shape
+        input_shape = input.shape
+        B = input_shape[0]  # Batch size
+        T = input_shape[1]
 
         # Sample times if not provided
         if times is None:
@@ -672,6 +659,8 @@ class MaskedConditionalScoreEstimator(MaskedConditionalVectorFieldEstimator):
 
         # Compute mean and std for the SDE
         mean_t = self.mean_fn(input, times)  # [B, T, F]
+        while mean_t.dim() < input.dim():
+            mean_t = mean_t.unsqueeze(-1)
         std_t = self.std_fn(times)  # [B, 1, 1] or [B, 1] or [B]
         while std_t.dim() < input.dim():
             std_t = std_t.unsqueeze(-1)
@@ -684,28 +673,42 @@ class MaskedConditionalScoreEstimator(MaskedConditionalVectorFieldEstimator):
         score_target = -eps / std_t
 
         condition_mask = condition_mask.bool()
+        # Ensure condition_mask is broadcastable to input shape
+        # input: [B, T] or [B, T, F]
+        # condition_mask: [T] or [B, T]
+        # We want to broadcast condition_mask to [B, T] for masking
+
+        # Always ensure condition_mask is [B, T]
         if condition_mask.dim() == 1:
-            # Shape of condition_mask is [T], I unsqueeze for broadcasting on B and F
-            input_noised = torch.where(
-                # Where condition_mask is True, use input (observed)
-                condition_mask.unsqueeze(0).unsqueeze(-1).expand(B, T, F),
-                input,
-                input_noised,
-            )
+            # [T] -> [B, T]
+            condition_mask_broadcast = condition_mask.unsqueeze(0).expand(B, T)
         elif condition_mask.dim() == 2:
-            # Shape of condition_mask is [B, T], I unsqueeze for broadcasting on F
-            input_noised = torch.where(
-                # Where condition_mask is True, use input (observed)
-                condition_mask.unsqueeze(-1).expand(B, T, F),
-                input,
-                input_noised,
-            )
+            # [B, T]
+            condition_mask_broadcast = condition_mask
         else:
             raise ValueError(
                 f"condition_mask has incorrect dimensions: {condition_mask.shape} "
                 f"condition_mask should have shape [T] or [B, T], where T is "
                 f"the number of nodes and B is the batch size."
             )
+
+        # Now broadcast to input shape
+        if input.dim() == 2:
+            # [B, T]
+            pass
+        elif input.dim() == 3:
+            # [B, T, F]
+            condition_mask_broadcast = condition_mask_broadcast.unsqueeze(-1).expand_as(
+                input
+            )
+        else:
+            raise ValueError(
+                f"input has incorrect dimensions: {input.shape} "
+                f"input should have shape [B, T] or [B, T, F]"
+            )
+
+        # Where mask is True (observed), use input; else use input_noised
+        input_noised = torch.where(condition_mask_broadcast, input, input_noised)
 
         if edge_mask is not None:
             edge_mask = edge_mask.bool()
@@ -732,10 +735,15 @@ class MaskedConditionalScoreEstimator(MaskedConditionalVectorFieldEstimator):
 
         # Compute MSE loss, mask out observed entries
         loss = (score_pred - score_target) ** 2.0
-        loss = torch.where(condition_mask.unsqueeze(-1), torch.zeros_like(loss), loss)
+        loss = torch.where(condition_mask_broadcast, torch.zeros_like(loss), loss)
 
         # Since sbi expects loss-per-batch, I sum on both T and F
-        loss = loss.sum(dim=(-2, -1), keepdim=True)  # [B, 1, 1]
+        if loss.dim() == 3:
+            loss = loss.sum(dim=(-2, -1), keepdim=True)  # [B, 1, 1]
+        elif loss.dim() == 2:
+            loss = loss.sum(dim=-1, keepdim=True)  # [B, 1]
+        else:
+            raise ValueError(f"Unexpected loss shape: {loss.shape}")
 
         # For times -> 0 this loss has high variance; a standard method to reduce the
         # variance is to use a control variate, i.e., a term that has zero expectation
@@ -751,37 +759,41 @@ class MaskedConditionalScoreEstimator(MaskedConditionalVectorFieldEstimator):
                 mean_t, times, condition_mask, edge_mask
             )  # [B, T, F]
 
-            # Squeeze std_t for broadcasting
-            s = std_t
-
             # Compute terms for control variate
             # Only apply to unobserved (latent) nodes
-            mask_f = ~condition_mask.bool().unsqueeze(-1).expand_as(eps)  # [B, T, F]
+            mask_f = ~condition_mask_broadcast.expand_as(eps)  # [B, T, F]
 
             # D: number of features per node
             D = eps.shape[-1]
 
             # term 1: 2/s * sum(eps * score_mean_pred) over F, masked
             term1 = (
-                2 / s * torch.sum(eps * score_mean_pred * mask_f, dim=-1).unsqueeze(-1)
+                2
+                / std_t
+                * torch.sum(eps * score_mean_pred * mask_f, dim=-1).unsqueeze(-1)
             )
             # term 2: sum(eps^2) over F, masked, divided by s^2
-            term2 = torch.sum((eps**2) * mask_f, dim=-1).unsqueeze(-1) / (s**2)
+            term2 = torch.sum((eps**2) * mask_f, dim=-1).unsqueeze(-1) / (std_t**2)
             # term 3: D / s^2, but only for unobserved nodes
-            term3 = mask_f * (D / (s**2))
+            term3 = mask_f * (D / (std_t**2))
 
             # Sum over features, keep [B, T]
             control_variate_term = term3 - term1 - term2
 
             # Only apply control variate where std is small
             control_variate_term = torch.where(
-                s < control_variate_threshold,
+                std_t < control_variate_threshold,
                 control_variate_term,
                 torch.zeros_like(control_variate_term),
             )
 
             # Sum over T and F to match loss shape [B, 1, 1]
-            control_variate_term = control_variate_term.sum(dim=(-2, -1), keepdim=True)
+            if control_variate_term.dim() == 3:
+                control_variate_term = control_variate_term.sum(
+                    dim=(-2, -1), keepdim=True
+                )
+            else:
+                control_variate_term = control_variate_term.sum(dim=-1, keepdim=True)
 
             # Add to loss
             loss = loss + control_variate_term  # [B, 1, 1]
@@ -789,7 +801,11 @@ class MaskedConditionalScoreEstimator(MaskedConditionalVectorFieldEstimator):
         if rebalance_loss:
             # Count number of unobserved (latent) elements per batch
             num_elements = (~condition_mask).sum(dim=-1, keepdim=True).clamp(min=1)
-            loss = loss / num_elements.unsqueeze(-1)
+            loss = (
+                loss / num_elements.unsqueeze(-1)
+                if loss.dim() == 3
+                else loss / num_elements
+            )
 
         # Compute weights
         weights = self.weight_fn(times)
@@ -803,7 +819,12 @@ class MaskedConditionalScoreEstimator(MaskedConditionalVectorFieldEstimator):
         # Scale loss by weights
         loss = weights.clone().detach() * loss
 
-        loss = loss.squeeze(dim=(-2, -1))
+        if loss.dim() == 3:
+            loss = loss.squeeze(dim=(-2, -1))
+        elif loss.dim() == 2:
+            loss = loss.squeeze(dim=-1)
+        else:
+            raise ValueError(f"Unexpected loss shape: {loss.shape}")
 
         return loss
 

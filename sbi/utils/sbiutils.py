@@ -426,9 +426,14 @@ def handle_invalid_inputs_for_simformer(
 
             # We will simply force invalid inputs to be latent
             if condition_masks is not None:
-                condition_masks = condition_masks & ~is_invalid_inputs_entries.sum(
-                    dim=-1
-                )
+                # Only reshape if shapes do not agree
+                if is_invalid_inputs_entries.shape != condition_masks.shape:
+                    reshaped_is_invalid_inputs_entries = is_invalid_inputs_entries.sum(
+                        dim=-1
+                    )
+                else:
+                    reshaped_is_invalid_inputs_entries = is_invalid_inputs_entries
+                condition_masks = condition_masks & ~reshaped_is_invalid_inputs_entries
 
     return inputs, condition_masks
 
