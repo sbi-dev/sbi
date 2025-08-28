@@ -8,6 +8,7 @@ from typing import Optional, Tuple
 import pytest
 import torch
 
+from sbi.inference.trainers.base import MaskedNeuralInference
 from sbi.neural_nets.embedding_nets import CNNEmbedding
 from sbi.neural_nets.net_builders import (
     build_flow_matching_estimator,
@@ -200,8 +201,8 @@ def _build_vector_field_estimator_and_tensors(
 
 
 @pytest.mark.parametrize("sde_type", ["ve", "vp", "subvp", "flow"])
-@pytest.mark.parametrize("input_sample_dim", (1, 2))
-@pytest.mark.parametrize("input_event_shape", ((3, 5), (3, 1)))
+@pytest.mark.parametrize("input_sample_dim", (1, 2, 3))
+@pytest.mark.parametrize("input_event_shape", ((1,), (4,), (3, 5), (3, 1)))
 @pytest.mark.parametrize("batch_dim", (1, 10))
 @pytest.mark.parametrize("score_net", ["simformer"])
 def test_masked_vector_field_estimator_loss_shapes(
@@ -268,8 +269,8 @@ def test_masked_vector_field_estimator_on_device(sde_type, device, score_net):
 
 
 @pytest.mark.parametrize("sde_type", ["ve", "vp", "subvp", "flow"])
-@pytest.mark.parametrize("input_sample_dim", (1, 2))
-@pytest.mark.parametrize("input_event_shape", ((5, 1), (5, 4)))
+@pytest.mark.parametrize("input_sample_dim", (1, 2, 3))
+@pytest.mark.parametrize("input_event_shape", ((1,), (4,), (3, 5), (3, 1)))
 @pytest.mark.parametrize("batch_dim", (1, 10))
 @pytest.mark.parametrize("score_net", ["simformer"])
 def test_masked_vector_field_estimator_forward_shapes(
@@ -324,8 +325,9 @@ def _build_masked_vector_field_estimator_and_tensors(
     Helper function for all tests that deal with shapes of masked score estimators.
     """
 
-    num_nodes, num_features = input_event_shape
-    building_inputs = torch.randn((batch_dim, num_nodes, num_features))
+    num_nodes = input_event_shape[0]
+
+    building_inputs = torch.randn((batch_dim, *input_event_shape))
 
     if sde_type == "flow":
         score_estimator = build_masked_flow_matching_estimator(
@@ -342,9 +344,13 @@ def _build_masked_vector_field_estimator_and_tensors(
         )
 
     inputs = building_inputs[:batch_dim]
-    condition_masks = torch.bernoulli(torch.rand(batch_dim, num_nodes))
-    condition_masks[:, 0] = 0  # Force at least one variable to be latent
-    condition_masks[:, 1] = 1  # Force at least one variable to be observed
+    # Generate condition mask: latent indices are 0, observed are 1
+    latent_idx = torch.arange(num_nodes)  # All nodes are latent by default
+    observed_idx = torch.tensor([], dtype=torch.long)  # No observed nodes by default
+    condition_masks = MaskedNeuralInference.generate_condition_mask_from_idx(
+        latent_idx=latent_idx,
+        observed_idx=observed_idx,
+    )
     edge_masks = torch.ones(batch_dim, num_nodes, num_nodes)
 
     inputs = inputs.unsqueeze(0)
@@ -361,8 +367,8 @@ def _build_masked_vector_field_estimator_and_tensors(
 
 
 @pytest.mark.parametrize("sde_type", ["ve", "vp", "subvp"])
-@pytest.mark.parametrize("input_sample_dim", (1, 2))
-@pytest.mark.parametrize("input_event_shape", ((3, 5), (3, 1)))
+@pytest.mark.parametrize("input_sample_dim", (1, 2, 3))
+@pytest.mark.parametrize("input_event_shape", ((1,), (4,), (3, 5), (3, 1)))
 @pytest.mark.parametrize("batch_dim", (1, 10))
 @pytest.mark.parametrize("score_net", ["simformer"])
 def test_unmasked_wrapper_vector_field_estimator_loss_shapes(
@@ -422,8 +428,8 @@ def test_unmasked_wrapper_vector_field_estimator_on_device(sde_type, device, sco
 
 
 @pytest.mark.parametrize("sde_type", ["ve", "vp", "subvp"])
-@pytest.mark.parametrize("input_sample_dim", (1, 2))
-@pytest.mark.parametrize("input_event_shape", ((3, 5), (3, 1)))
+@pytest.mark.parametrize("input_sample_dim", (1, 2, 3))
+@pytest.mark.parametrize("input_event_shape", ((1,), (4,), (3, 5), (3, 1)))
 @pytest.mark.parametrize("batch_dim", (1, 10))
 @pytest.mark.parametrize("score_net", ["simformer"])
 def test_unmasked_wrapper_vector_field_estimator_forward_shapes(
