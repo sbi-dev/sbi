@@ -801,7 +801,10 @@ class MaskedConditionalScoreEstimator(MaskedConditionalVectorFieldEstimator):
         if rebalance_loss:
             # Count number of unobserved (latent) elements per batch
             num_elements = (~condition_mask).sum(dim=-1, keepdim=True).clamp(min=1)
-            loss = loss / num_elements
+            if loss.dim() == 3:
+                loss = loss / num_elements.unsqueeze(-1)
+            else:
+                loss = loss / num_elements
 
         # Compute weights
         weights = self.weight_fn(times)
