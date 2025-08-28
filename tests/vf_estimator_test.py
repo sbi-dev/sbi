@@ -11,6 +11,7 @@ import torch
 from sbi.neural_nets.embedding_nets import CNNEmbedding
 from sbi.neural_nets.net_builders import (
     build_flow_matching_estimator,
+    build_masked_flow_matching_estimator,
     build_masked_score_matching_estimator,
     build_score_matching_estimator,
 )
@@ -198,7 +199,7 @@ def _build_vector_field_estimator_and_tensors(
 # *** ======== Masked Estimator ======== *** #
 
 
-@pytest.mark.parametrize("sde_type", ["ve", "vp", "subvp"])
+@pytest.mark.parametrize("sde_type", ["ve", "vp", "subvp", "flow"])
 @pytest.mark.parametrize("input_sample_dim", (1, 2))
 @pytest.mark.parametrize("input_event_shape", ((3, 5), (3, 1)))
 @pytest.mark.parametrize("batch_dim", (1, 10))
@@ -231,17 +232,25 @@ def test_masked_vector_field_estimator_loss_shapes(
 
 
 @pytest.mark.gpu
-@pytest.mark.parametrize("sde_type", ["ve", "vp", "subvp"])
+@pytest.mark.parametrize("sde_type", ["ve", "vp", "subvp", "flow"])
 @pytest.mark.parametrize("device", ["cpu", "cuda"])
 @pytest.mark.parametrize("score_net", ["simformer"])
 def test_masked_vector_field_estimator_on_device(sde_type, device, score_net):
     """Test whether MaskedScoreEstimator can be moved to the device."""
-    score_estimator = build_masked_score_matching_estimator(
-        torch.randn(100, 5, 1),
-        torch.randn(100, 5, 1),
-        sde_type=sde_type,
-        net=score_net,
-    )
+
+    if sde_type == "flow":
+        score_estimator = build_masked_flow_matching_estimator(
+            torch.randn(100, 5, 1),
+            torch.randn(100, 5, 1),
+            net=score_net,
+        )
+    else:
+        score_estimator = build_masked_score_matching_estimator(
+            torch.randn(100, 5, 1),
+            torch.randn(100, 5, 1),
+            sde_type=sde_type,
+            net=score_net,
+        )
     score_estimator.to(device)
 
     # Test forward
@@ -258,7 +267,7 @@ def test_masked_vector_field_estimator_on_device(sde_type, device, score_net):
     assert str(loss.device).split(":")[0] == device, "Loss device mismatch."
 
 
-@pytest.mark.parametrize("sde_type", ["ve", "vp", "subvp"])
+@pytest.mark.parametrize("sde_type", ["ve", "vp", "subvp", "flow"])
 @pytest.mark.parametrize("input_sample_dim", (1, 2))
 @pytest.mark.parametrize("input_event_shape", ((5, 1), (5, 4)))
 @pytest.mark.parametrize("batch_dim", (1, 10))
@@ -318,12 +327,19 @@ def _build_masked_vector_field_estimator_and_tensors(
     num_nodes, num_features = input_event_shape
     building_inputs = torch.randn((batch_dim, num_nodes, num_features))
 
-    score_estimator = build_masked_score_matching_estimator(
-        building_inputs,
-        building_inputs,  # not used
-        sde_type=sde_type,
-        **kwargs,
-    )
+    if sde_type == "flow":
+        score_estimator = build_masked_flow_matching_estimator(
+            building_inputs,
+            building_inputs,  # not used
+            **kwargs,
+        )
+    else:
+        score_estimator = build_masked_score_matching_estimator(
+            building_inputs,
+            building_inputs,  # not used
+            sde_type=sde_type,
+            **kwargs,
+        )
 
     inputs = building_inputs[:batch_dim]
     condition_masks = torch.bernoulli(torch.rand(batch_dim, num_nodes))
