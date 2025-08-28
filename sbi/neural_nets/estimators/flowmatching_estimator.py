@@ -634,8 +634,18 @@ class MaskedFlowMatchingEstimator(MaskedConditionalVectorFieldEstimator):
         if rebalance_loss:
             # Count number of unobserved (latent) elements per batch
             # (~condition_mask) computes the boolean negation
-            num_elements = (~condition_mask.bool()).sum(dim=-1).clamp(min=1)
-            loss = loss / num_elements
+            num_elements = (~condition_mask).sum(dim=-1, keepdim=True).clamp(min=1)
+            if loss.dim() == 3:
+                loss = loss / num_elements.unsqueeze(-1)
+            else:
+                loss = loss / num_elements
+
+        if loss.dim() == 3:
+            loss = loss.squeeze(dim=(-2, -1))
+        elif loss.dim() == 2:
+            loss = loss.squeeze(dim=-1)
+        else:
+            raise ValueError(f"Unexpected loss shape: {loss.shape}")
 
         return loss
 
