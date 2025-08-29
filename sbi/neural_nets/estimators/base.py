@@ -749,7 +749,13 @@ class MaskedConditionalVectorFieldEstimatorWrapper(ConditionalVectorFieldEstimat
                     to save memory resources
         """
 
-        T, F = original_estimator.input_shape
+        T = original_estimator.input_shape[0]
+        if len(original_estimator.input_shape) == 2:
+            F = original_estimator.input_shape[1]
+            self.is_features_dim_missing = False
+        else:
+            F = 1
+            self.is_features_dim_missing = True
 
         # Input checks for fixed_condition_mask
         if fixed_condition_mask.dim() != 1:
@@ -786,10 +792,10 @@ class MaskedConditionalVectorFieldEstimatorWrapper(ConditionalVectorFieldEstimat
                     "for all entries."
                 )
 
+        # Count number of latent and observed nodes
         num_latent = int(torch.sum(fixed_condition_mask == 0).item())
         num_observed = int(torch.sum(fixed_condition_mask == 1).item())
 
-        # Count number of latent and observed nodes
         self._new_input_shape = torch.Size((num_latent * F,))
         self._new_condition_shape = torch.Size((num_observed * F,))
 
@@ -828,12 +834,20 @@ class MaskedConditionalVectorFieldEstimatorWrapper(ConditionalVectorFieldEstimat
         self._observed_idx = (self._fixed_condition_mask == 1).nonzero(as_tuple=True)[0]
 
         # Get the mean/std for the latent nodes from the original estimator
-        latent_mean_base_unflattened = original_estimator.mean_base[
-            :, self._latent_idx, :
-        ]
-        latent_std_base_unflattened = original_estimator.std_base[
-            :, self._latent_idx, :
-        ]
+        if len(original_estimator.input_shape) == 1:
+            latent_mean_base_unflattened = original_estimator.mean_base[
+                :, self._latent_idx
+            ]
+            latent_std_base_unflattened = original_estimator.std_base[
+                :, self._latent_idx
+            ]
+        else:
+            latent_mean_base_unflattened = original_estimator.mean_base[
+                :, self._latent_idx, :
+            ]
+            latent_std_base_unflattened = original_estimator.std_base[
+                :, self._latent_idx, :
+            ]
 
         latent_mean_base_flattened = latent_mean_base_unflattened.flatten(start_dim=1)
         latent_std_base_flattened = latent_std_base_unflattened.flatten(start_dim=1)
@@ -1000,26 +1014,47 @@ class MaskedConditionalVectorFieldEstimatorWrapper(ConditionalVectorFieldEstimat
         B = int(torch.prod(torch.tensor(input.shape[:-1])).item())
         C = int(torch.prod(torch.tensor(condition.shape[:-1])).item())
 
-        input_part_unflattened = input.reshape(B, self._num_latent, self._original_F)
-        condition_part_unflattened = condition.reshape(
-            -1, self._num_observed, self._original_F
-        ).repeat(B // C, 1, 1)
+        if self.is_features_dim_missing:
+            input_part_unflattened = input.reshape(B, self._num_latent)
+            condition_part_unflattened = condition.reshape(
+                -1, self._num_observed
+            ).repeat(B // C, 1, 1)
 
-        full_inputs = torch.zeros(
-            B,
-            self._original_T,
-            self._original_F,
-            dtype=input.dtype,
-            device=input.device,
-        )
-        # Place unflattened parts into the correct positions
-        full_inputs[:, self._latent_idx, :] = input_part_unflattened
-        full_inputs[:, self._observed_idx, :] = condition_part_unflattened
+            full_inputs = torch.zeros(
+                B,
+                self._original_T,
+                dtype=input.dtype,
+                device=input.device,
+            )
+            # Place unflattened parts into the correct positions
+            full_inputs[:, self._latent_idx] = input_part_unflattened
+            full_inputs[:, self._observed_idx] = condition_part_unflattened
+        else:
+            input_part_unflattened = input.reshape(
+                B, self._num_latent, self._original_F
+            )
+            condition_part_unflattened = condition.reshape(
+                -1, self._num_observed, self._original_F
+            ).repeat(B // C, 1, 1)
+
+            full_inputs = torch.zeros(
+                B,
+                self._original_T,
+                self._original_F,
+                dtype=input.dtype,
+                device=input.device,
+            )
+            # Place unflattened parts into the correct positions
+            full_inputs[:, self._latent_idx, :] = input_part_unflattened
+            full_inputs[:, self._observed_idx, :] = condition_part_unflattened
 
         return full_inputs
 
     def _disassemble_full_outputs(self, full_outputs, original_latent_tensor):
-        latent_part = full_outputs[:, self._latent_idx, :]  # (B, num_latent, F)
+        if self.is_features_dim_missing:
+            latent_part = full_outputs[:, self._latent_idx]  # (B, num_latent)
+        else:
+            latent_part = full_outputs[:, self._latent_idx, :]  # (B, num_latent, F)
 
         return latent_part.reshape_as(original_latent_tensor)
 
