@@ -215,7 +215,7 @@ class BaseNeuralInference:
         self._device = process_device(device)
         check_prior(prior)
         check_if_prior_on_device(self._device, prior)
-        self._prior = prior if prior is not None else NoPrior()
+        self._prior = prior if prior is not None else NoPrior(device=self._device)
 
         self._posterior = None
         self._neural_net = None
@@ -383,7 +383,7 @@ class BaseNeuralInference:
             # rather than using the NoPrior() filler,
             # as many methods can work without it.
             # See Issue #1635
-            prior = NoPrior() if self._prior is None else self._prior
+            prior = NoPrior(device=self._device) if self._prior is None else self._prior
         else:
             check_prior(prior)
 

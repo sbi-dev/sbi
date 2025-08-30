@@ -35,7 +35,7 @@ from torch.distributions import (
 from torch.optim.adam import Adam
 
 from sbi.sbi_types import TorchTransform
-from sbi.utils.torchutils import atleast_2d
+from sbi.utils.torchutils import atleast_2d, process_device
 
 
 def warn_if_zscoring_changes_data(x: Tensor, duplicate_tolerance: float = 0.1) -> None:
@@ -913,12 +913,16 @@ class NoPrior(Distribution):
     See #1635.
     """
 
-    def __init__(self, batch_shape=torch.Size(), event_shape=torch.Size()):
+    def __init__(
+        self, batch_shape=torch.Size(), event_shape=torch.Size(), device: str = 'cpu'
+    ):
         super().__init__(batch_shape, event_shape)
+        self.device = process_device(device)
 
     def sample(self, sample_shape=torch.Size()):
         return torch.randn(
-            torch.Size(sample_shape) + self.batch_shape + self.event_shape
+            torch.Size(sample_shape) + self.batch_shape + self.event_shape,
+            device=self.device,
         )
 
     def log_prob(self, value):
