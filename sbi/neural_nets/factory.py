@@ -608,7 +608,7 @@ def simformer_score_nn(
     **kwargs: Any,
 ) -> Callable:
     r"""Returns a function that builds a Score based Simformer
-    for learning arbitrary distributions.
+    for learning arbitrary conditionals.
 
     The returned function is to be passed to the inference class when using the flexible
     interface.
@@ -700,7 +700,7 @@ def simformer_flow_nn(
 ) -> Callable:
     r"""
     Returns a function that builds a Flow Matching Simformer
-    for learning arbitrary distributions.
+    for learning arbitrary conditionals.
 
     The returned function is to be passed to the inference class when using the flexible
     interface.

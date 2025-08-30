@@ -16,7 +16,7 @@ from sbi.neural_nets.factory import simformer_flow_nn, simformer_score_nn
 class Simformer(MaskedVectorFieldTrainer):
     """Simformer as in Gloeckler et al. (ICML, 2024).
 
-    Simformer enables sampling from arbitrary conditional joint distributions,
+    Simformer enables sampling from arbitrary conditional distributions,
     not just posterior or likelihood, by operating on a unified input tensor
     that represents all variables.
 
@@ -40,6 +40,10 @@ class Simformer(MaskedVectorFieldTrainer):
     NOTE:
         Multi-round inference is not supported yet; the API is present for coherence
         with sbi.
+
+    References:
+        - [1] All-in-one simulation-based inference, Gloeckler M. et al., ICML 2024,
+          https://arxiv.org/abs/2404.09636
     """
 
     def __init__(
@@ -82,10 +86,6 @@ class Simformer(MaskedVectorFieldTrainer):
             show_progress_bars: Whether to show progress bars during training.
             kwargs: Additional keyword arguments passed to the default builder if
             `score_estimator` is a string.
-
-        References:
-            - Gloeckler, Deistler, Weilbach, Wood, Macke.
-            "All-in-one simulation-based inference.", ICML 2024
         """
         super().__init__(
             mvf_estimator_builder=mvf_estimator,
@@ -107,7 +107,7 @@ class Simformer(MaskedVectorFieldTrainer):
 class FlowMatchingSimformer(MaskedVectorFieldTrainer):
     """Flow-matching version of the Simformer, Gloeckler et al. (ICML, 2024).
 
-    Simformer enables sampling from arbitrary conditional joint distributions,
+    Simformer enables sampling from arbitrary conditional distributions,
     not just posterior or likelihood, by operating on a unified input tensor
     that represents all variables.
 
@@ -127,6 +127,10 @@ class FlowMatchingSimformer(MaskedVectorFieldTrainer):
     NOTE:
         - Multi-round inference is not supported yet; the API is present for coherence
           with sbi.
+
+    References:
+        - [1] All-in-one simulation-based inference, Gloeckler M. et al., ICML 2024,
+          https://arxiv.org/abs/2404.09636
     """
 
     def __init__(
@@ -169,10 +173,6 @@ class FlowMatchingSimformer(MaskedVectorFieldTrainer):
             show_progress_bars: Whether to show progress bars during training.
             kwargs: Additional keyword arguments passed to the default builder if
             `score_estimator` is a string.
-
-        References:
-            - Gloeckler, Deistler, Weilbach, Wood, Macke.
-            "All-in-one simulation-based inference.", ICML 2024
         """
         super().__init__(
             mvf_estimator_builder=mvf_estimator,
