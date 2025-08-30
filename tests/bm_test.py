@@ -196,7 +196,7 @@ def train_and_eval_amortized_inference(
             new_posterior_latent_idx=torch.arange(0, num_theta),
             new_posterior_observed_idx=torch.arange(num_theta, num_theta + num_x),
         )
-        inputs = torch.cat([thetas.unsqueeze(-1), xs.unsqueeze(-1)], dim=1)
+        inputs = torch.cat([thetas, xs], dim=1)
         inference.append_simulations(
             inputs,
         )
