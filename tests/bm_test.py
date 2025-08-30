@@ -30,7 +30,7 @@ VF_ESTIMATORS = ["mlp", "ada_mlp", "transformer"]
 
 # Benchmarking method groups i.e. what to run for different --bm-mode
 METHOD_GROUPS = {
-    "none": [NPE, NRE, NLE, FMPE, NPSE],
+    "none": [NPE, NRE, NLE, FMPE, NPSE, Simformer, FlowMatchingSimformer],
     "npe": [NPE],
     "nle": [NLE],
     "nre": [NRE_A, NRE_B, NRE_C, BNRE],
