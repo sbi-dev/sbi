@@ -710,7 +710,6 @@ def simformer_flow_nn(
 
     Args:
         model (str): Name of the model architecture to use. Default is "simformer".
-        sde_type (str): Type of stochastic differential equation (SDE) to use.
         hidden_features (int): Number of hidden features in each layer. Default is 100.
         num_heads (int): Number of attention heads in the transformer layers.
         num_layers (int): Number of transformer layers. Default is 8.

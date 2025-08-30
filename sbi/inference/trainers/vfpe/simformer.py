@@ -139,7 +139,6 @@ class FlowMatchingSimformer(MaskedVectorFieldTrainer):
             str,
             MaskedVectorFieldEstimatorBuilder,
         ] = "simformer",
-        sde_type: Literal["vp", "ve", "subvp"] = "ve",
         posterior_latent_idx: Optional[list | Tensor] = None,
         posterior_observed_idx: Optional[list | Tensor] = None,
         device: str = "cpu",
@@ -159,7 +158,6 @@ class FlowMatchingSimformer(MaskedVectorFieldTrainer):
             or a callable that implements the `MaskedVectorFieldEstimatorBuilder`
             protocol. If a callable, `__call__` must accept `inputs`, and return
             a `MaskedConditionalVectorFieldEstimator`.
-            sde_type: Type of SDE to use. Must be one of ['vp', 've', 'subvp'].
             posterior_latent_idx: List or Tensor of indexes identifying which
             variables are latent (to be infered),
             i.e, which variables identify $\theta$.
@@ -182,7 +180,6 @@ class FlowMatchingSimformer(MaskedVectorFieldTrainer):
             logging_level=logging_level,
             summary_writer=summary_writer,
             show_progress_bars=show_progress_bars,
-            sde_type=sde_type,
             **kwargs,
         )
 
