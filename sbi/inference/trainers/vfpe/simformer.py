@@ -105,8 +105,7 @@ class Simformer(MaskedVectorFieldTrainer):
 
 
 class FlowMatchingSimformer(MaskedVectorFieldTrainer):
-    """Flow-matching version of the Simformer [Gloeckler et al. (ICML, 2024)],
-    the original score-based implementation is available using the Simformer class.
+    """Flow-matching version of the Simformer, Gloeckler et al. (ICML, 2024).
 
     Simformer enables sampling from arbitrary conditional joint distributions,
     not just posterior or likelihood, by operating on a unified input tensor
