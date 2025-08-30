@@ -38,8 +38,7 @@ class Simformer(MaskedVectorFieldTrainer):
         provides a flow-matching one as FlowMatchingSimformer.
 
     NOTE:
-        Multi-round inference is not supported yet; the API is present for coherence
-        with sbi.
+        Multi-round inference is not supported yet.
 
     References:
         - [1] All-in-one simulation-based inference, Gloeckler M. et al., ICML 2024,
@@ -125,8 +124,7 @@ class FlowMatchingSimformer(MaskedVectorFieldTrainer):
       mask, we suggest you to use `None` instead of ones to save memory resources
 
     NOTE:
-        - Multi-round inference is not supported yet; the API is present for coherence
-          with sbi.
+        - Multi-round inference is not supported yet.
 
     References:
         - [1] All-in-one simulation-based inference, Gloeckler M. et al., ICML 2024,
