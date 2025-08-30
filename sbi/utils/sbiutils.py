@@ -926,6 +926,7 @@ class NoPrior(Distribution):
         )
 
     def log_prob(self, value):
+        value = atleast_2d(value)
         return torch.zeros(value.shape[0], device=value.device)
 
 
