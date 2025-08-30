@@ -748,7 +748,8 @@ class MaskedConditionalVectorFieldEstimatorWrapper(ConditionalVectorFieldEstimat
                     mask, we suggest you to use None instead of ones
                     to save memory resources
         """
-
+        # Obtain dimensinality of trailing dimensions
+        # and check wheter the feature dimension (F) was provided
         T = original_estimator.input_shape[0]
         if len(original_estimator.input_shape) == 2:
             F = original_estimator.input_shape[1]
@@ -811,6 +812,7 @@ class MaskedConditionalVectorFieldEstimatorWrapper(ConditionalVectorFieldEstimat
         self.SDE_DEFINED = original_estimator.SDE_DEFINED
         self.MARGINALS_DEFINED = original_estimator.MARGINALS_DEFINED
 
+        # Save helpful attributes for later
         self._original_T = T
         self._original_F = F
         self._num_latent = num_latent
@@ -818,7 +820,7 @@ class MaskedConditionalVectorFieldEstimatorWrapper(ConditionalVectorFieldEstimat
 
         self._original_estimator = original_estimator
 
-        # Move masks to the correct device and register them as buffers.
+        # Move masks to the correct device and register them as buffers
         self.register_buffer(
             "_fixed_condition_mask",
             fixed_condition_mask.clone().detach(),
@@ -849,6 +851,7 @@ class MaskedConditionalVectorFieldEstimatorWrapper(ConditionalVectorFieldEstimat
                 :, self._latent_idx, :
             ]
 
+        # And adapt them for its use in the Wrapper
         latent_mean_base_flattened = latent_mean_base_unflattened.flatten(start_dim=1)
         latent_std_base_flattened = latent_std_base_unflattened.flatten(start_dim=1)
 
@@ -856,6 +859,7 @@ class MaskedConditionalVectorFieldEstimatorWrapper(ConditionalVectorFieldEstimat
         self.register_buffer("_mean_base", latent_mean_base_flattened.clone().detach())
         self.register_buffer("_std_base", latent_std_base_flattened.clone().detach())
 
+        # Get device and move this instance there
         device = next(original_estimator.net.parameters()).device
         self.to(device)
 
@@ -863,7 +867,7 @@ class MaskedConditionalVectorFieldEstimatorWrapper(ConditionalVectorFieldEstimat
         self, input: Tensor, condition: Tensor, time: Tensor, **kwargs
     ) -> Tensor:
         # Assemble full input from give input and condition
-        # Take (..., T*F) and returns (..., T, F)
+        # Take (..., T*F) and returns (..., T, F) or (..., T) if not required
 
         # Check shapes are correct
         if input.shape[-1] != self._num_latent * self._original_F:
@@ -906,6 +910,7 @@ class MaskedConditionalVectorFieldEstimatorWrapper(ConditionalVectorFieldEstimat
         # Assemble full input from given input and condition
         full_inputs_tensor = self._assemble_full_inputs(input, condition)
 
+        # Prepare condition and edge masks
         B = full_inputs_tensor.shape[0]
         expanded_cond_mask = self._fixed_condition_mask.unsqueeze(0).expand(B, -1)
         if self._fixed_edge_mask is not None:
@@ -922,7 +927,7 @@ class MaskedConditionalVectorFieldEstimatorWrapper(ConditionalVectorFieldEstimat
             **kwargs,
         )
 
-        # Take B, T, F and return (B, num_latent*F) and (B, num_observed*F)
+        # Take (B, T, F) or (B, T) and return (B, num_latent*F) and (B, num_observed*F)
         latent_out = self._disassemble_full_outputs(full_outputs, input)
         return latent_out
 
@@ -932,6 +937,7 @@ class MaskedConditionalVectorFieldEstimatorWrapper(ConditionalVectorFieldEstimat
         condition: Tensor,
         **kwargs,
     ) -> Tensor:
+        # This is not supposed to be used, tho it is needed for compatibility
         raise NotImplementedError(
             "The loss method of the MaskedConditionalVectorFieldEstimator "
             "is not intended to be used directly. If you want to use "
@@ -943,7 +949,10 @@ class MaskedConditionalVectorFieldEstimatorWrapper(ConditionalVectorFieldEstimat
     # -------------------------- ODE METHODS --------------------------
 
     def ode_fn(self, input: Tensor, condition: Tensor, times: Tensor) -> Tensor:
-        full_inputs_tensor = self._assemble_full_inputs(input, condition)  # (B, T, F)
+        # Assemble full input from given input and condition
+        full_inputs_tensor = self._assemble_full_inputs(input, condition)
+
+        # Prepare condition and edge masks
         B = full_inputs_tensor.shape[0]
         expanded_cond_mask = self._fixed_condition_mask.unsqueeze(0).expand(B, -1)
         if self._fixed_edge_mask is not None:
@@ -951,7 +960,7 @@ class MaskedConditionalVectorFieldEstimatorWrapper(ConditionalVectorFieldEstimat
         else:
             expanded_edge_mask = None
 
-        # original_estimator.ode_fn returns (B, T, F)
+        # Call original estimator ode
         full_outputs_ode = self._original_estimator.ode_fn(
             full_inputs_tensor,
             times,
@@ -975,7 +984,7 @@ class MaskedConditionalVectorFieldEstimatorWrapper(ConditionalVectorFieldEstimat
         # input: (B, num_latent * F), condition: (B, num_observed * F)
         full_inputs_tensor = self._assemble_full_inputs(input, condition)
 
-        # Call the original estimator's loss
+        # Prepare condition and edge masks
         B = full_inputs_tensor.shape[0]
         expanded_cond_mask = self._fixed_condition_mask.unsqueeze(0).expand(B, -1)
         if self._fixed_edge_mask is not None:
@@ -983,6 +992,7 @@ class MaskedConditionalVectorFieldEstimatorWrapper(ConditionalVectorFieldEstimat
         else:
             expanded_edge_mask = None
 
+        # Call the original estimator's score
         full_score_outputs = self._original_estimator.score(
             full_inputs_tensor,
             t,
@@ -990,7 +1000,7 @@ class MaskedConditionalVectorFieldEstimatorWrapper(ConditionalVectorFieldEstimat
             expanded_edge_mask,
         )
 
-        # Take B, T, F and return (B, num_latent*F) and (B, num_observed*F)
+        # Take B, T, F or B, T and return (B, num_latent*F) and (B, num_observed*F)
         latent_score = self._disassemble_full_outputs(full_score_outputs, input)
         # Returns (B, num_latent * F)
         return latent_score
