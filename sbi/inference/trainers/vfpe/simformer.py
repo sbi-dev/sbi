@@ -14,7 +14,7 @@ from sbi.neural_nets.factory import simformer_flow_nn, simformer_score_nn
 
 
 class Simformer(MaskedVectorFieldTrainer):
-    """Simformer as in Gloeckler et al. (ICML, 2024).
+    """Simformer as in Gloeckler et al. (ICML, 2024) [1].
 
     Simformer enables sampling from arbitrary conditional distributions,
     not just posterior or likelihood, by operating on a unified input tensor
@@ -105,7 +105,7 @@ class Simformer(MaskedVectorFieldTrainer):
 
 
 class FlowMatchingSimformer(MaskedVectorFieldTrainer):
-    """Flow-matching version of the Simformer, Gloeckler et al. (ICML, 2024).
+    """Flow-matching version of the Simformer, Gloeckler et al. (ICML, 2024) [1].
 
     Simformer enables sampling from arbitrary conditional distributions,
     not just posterior or likelihood, by operating on a unified input tensor
