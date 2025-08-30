@@ -1018,7 +1018,7 @@ class MaskedConditionalVectorFieldEstimatorWrapper(ConditionalVectorFieldEstimat
             input_part_unflattened = input.reshape(B, self._num_latent)
             condition_part_unflattened = condition.reshape(
                 -1, self._num_observed
-            ).repeat(B // C, 1, 1)
+            ).repeat(B // C, 1)
 
             full_inputs = torch.zeros(
                 B,
