@@ -1427,8 +1427,8 @@ class MaskedNeuralInference(ABC, BaseNeuralInference):
             self.posterior_latent_idx, self.posterior_observed_idx
         )
 
-    @staticmethod
     def generate_condition_mask_from_idx(
+        self,
         latent_idx: Union[list, Tensor],
         observed_idx: Union[list, Tensor],
     ) -> Tensor:
@@ -1457,7 +1457,7 @@ class MaskedNeuralInference(ABC, BaseNeuralInference):
             )
 
         # If checks pass we can generate the condition mask
-        condition_mask = torch.zeros(num_nodes, dtype=torch.bool)
+        condition_mask = torch.zeros(num_nodes, dtype=torch.bool, device=self._device)
         condition_mask[latent_idx] = False
         condition_mask[observed_idx] = True
         return condition_mask
