@@ -57,7 +57,7 @@ METHOD_PARAMS = {
     "snpe": [{}],
     "snle": [{}],
     "snre": [{}],
-    "simformer": [],
+    "simformer": [{}],
 }
 
 
@@ -187,8 +187,6 @@ def train_and_eval_amortized_inference(
     thetas, xs = task.get_data(benchmark_num_simulations)
     prior = task.get_prior()
 
-    device = extra_kwargs['device']
-
     if inference_class in {Simformer, FlowMatchingSimformer}:
         # Get dimensions of thetas and xs, and set latent and observed idx
         inference = inference_class(**extra_kwargs)
@@ -199,13 +197,15 @@ def train_and_eval_amortized_inference(
             new_posterior_observed_idx=torch.arange(num_theta, num_theta + num_x),
         )
         inputs = torch.cat([thetas.unsqueeze(-1), xs.unsqueeze(-1)], dim=1)
-        inference.append_simulations(inputs, data_device=device)
+        inference.append_simulations(
+            inputs,
+        )
     else:
         inference = inference_class(prior, **extra_kwargs)
-        inference.append_simulations(thetas, xs, data_device=device)
+        inference.append_simulations(thetas, xs)
     inference.train(**TRAIN_KWARGS)
 
-    posterior = inference.build_posterior(prior=prior)
+    posterior = inference.build_posterior()
 
     mean_c2st = standard_eval_c2st_loop(posterior, task)
 
