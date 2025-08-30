@@ -290,7 +290,16 @@ def accept_reject_sample(
         are_accepted = accept_reject_fn(candidates)
         # Reshape necessary in certain cases which do not follow the shape conventions
         # of the "DensityEstimator" class.
-        are_accepted = are_accepted.reshape(sampling_batch_size, num_xos)
+        if are_accepted.numel() == sampling_batch_size * num_xos:
+            are_accepted = are_accepted.reshape(sampling_batch_size, num_xos)
+        elif are_accepted.numel() == sampling_batch_size:
+            are_accepted = are_accepted.unsqueeze(1).repeat(1, num_xos)
+        else:
+            raise ValueError(
+                f"Unexpected shape for are_accepted: {are_accepted.shape}. "
+                f"Expected {sampling_batch_size * num_xos} or {sampling_batch_size} "
+                f"elements."
+            )
         candidates_to_reject = candidates.reshape(
             sampling_batch_size, num_xos, *candidates.shape[candidates.ndim - 1 :]
         )
