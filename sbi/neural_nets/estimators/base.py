@@ -1010,16 +1010,31 @@ class MaskedConditionalVectorFieldEstimatorWrapper(ConditionalVectorFieldEstimat
     # ------------------------- UTILITIES ------------------------------
 
     def _assemble_full_inputs(self, input, condition):
-        # Get batch shape and feature dimension
+        # Get batch shape of input and condition, until nodes dimension
         B = int(torch.prod(torch.tensor(input.shape[:-1])).item())
         C = int(torch.prod(torch.tensor(condition.shape[:-1])).item())
 
+        # If the Wrapper is working with tensors missing feature dimension
+        # (B, num_latent) instead of (B, num_latent, F)
         if self.is_features_dim_missing:
+            # Reshape input
             input_part_unflattened = input.reshape(B, self._num_latent)
+            # Adapt condition tensor to a compatible number of entries with the input
+            # Since condition is usually provided with a lower number of samples w.r.t.
+            # batch dimension
+            # we need to repeat it so that we can assemble a full input tensor
+            # where both these will fill in
+            # e.g. if one provides input as shape [10000, 3], condition as shape [5, 2]
+            # then we need to repeat condition 10000/5 = 2000 times so to obtain a
+            # condition tensor which will be 10000 on batch dim too: [10000, 2]
+            # thus, we can merge input ([10000, 3]) and condition ([10000, 2])
+            # to obtain full input ([10000, 5])
             condition_part_unflattened = condition.reshape(
                 -1, self._num_observed
             ).repeat(B // C, 1)
 
+            # Prepare full inputs tensor (will be filled with latent and condition)
+            # Note: "condition" means "observed"
             full_inputs = torch.zeros(
                 B,
                 self._original_T,
@@ -1030,13 +1045,18 @@ class MaskedConditionalVectorFieldEstimatorWrapper(ConditionalVectorFieldEstimat
             full_inputs[:, self._latent_idx] = input_part_unflattened
             full_inputs[:, self._observed_idx] = condition_part_unflattened
         else:
+            # Reshape input
             input_part_unflattened = input.reshape(
                 B, self._num_latent, self._original_F
             )
+            # Adapt condition tensor to a compatible number of entries with the input
+            # Same reasoning as above, but with an extra feature dimension at the end
             condition_part_unflattened = condition.reshape(
                 -1, self._num_observed, self._original_F
             ).repeat(B // C, 1, 1)
 
+            # Prepare full inputs tensor (will be filled with latent and condition)
+            # Note: "condition" means "observed"
             full_inputs = torch.zeros(
                 B,
                 self._original_T,
@@ -1051,6 +1071,8 @@ class MaskedConditionalVectorFieldEstimatorWrapper(ConditionalVectorFieldEstimat
         return full_inputs
 
     def _disassemble_full_outputs(self, full_outputs, original_latent_tensor):
+        # We only care about the latent part of the tensor
+        # (i.e., thetas for the posterior)
         if self.is_features_dim_missing:
             latent_part = full_outputs[:, self._latent_idx]  # (B, num_latent)
         else:
