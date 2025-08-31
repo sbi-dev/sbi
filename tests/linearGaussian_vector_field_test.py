@@ -1,7 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import List
+from typing import List, cast
 
 import numpy as np
 import pytest
@@ -45,7 +45,7 @@ from .test_utils import get_dkl_gaussian_prior
 
 # We always test num_dim and sample_with with defaults and mark the rests as slow.
 @pytest.mark.parametrize(
-    "estimator, vector_field_type, num_dim, prior_str, sample_with",
+    "vf_estimator, vector_field_type, num_dim, prior_str, sample_with",
     [
         ("NPE", "vp", 1, "gaussian", ["sde", "ode"]),
         ("NPE", "vp", 3, "uniform", ["sde", "ode"]),
@@ -112,7 +112,7 @@ from .test_utils import get_dkl_gaussian_prior
     ],
 )
 def test_c2st_vector_field_on_linearGaussian(
-    estimator: str,
+    vf_estimator: str,
     vector_field_type: str,
     num_dim: int,
     prior_str: str,
@@ -128,7 +128,7 @@ def test_c2st_vector_field_on_linearGaussian(
     device = "cpu"
     tol = 0.15
 
-    if estimator == "Simformer" and vector_field_type in {'vp', 'subvp'}:
+    if vf_estimator == "Simformer" and vector_field_type in {'vp', 'subvp'}:
         # Default values for slow and GPU tests (VP and sub-VP)
         num_simulations = 25000
         max_num_epochs = 500
@@ -161,7 +161,7 @@ def test_c2st_vector_field_on_linearGaussian(
             num_samples=num_samples,
         )
 
-    if estimator == "NPE":
+    if vf_estimator == "NPE":
         vf_params = {
             "prior": prior,
             "device": device,
@@ -170,7 +170,7 @@ def test_c2st_vector_field_on_linearGaussian(
             inference = FMPE(**vf_params)
         else:
             inference = NPSE(sde_type=vector_field_type, **vf_params)  # type: ignore
-    elif estimator == "Simformer":
+    elif vf_estimator == "Simformer":
         vf_params = {
             "posterior_latent_idx": [0],
             "posterior_observed_idx": [1],
@@ -184,18 +184,25 @@ def test_c2st_vector_field_on_linearGaussian(
     theta = prior.sample((num_simulations,))
     x = linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    if estimator == "Simformer":
+    if vf_estimator == "Simformer":
+        # Cast object to help pyright recognize the right type
+        # This will avoid some warnings below
+        inference = cast(Simformer | FlowMatchingSimformer, inference)
+        # First unsqueeze to make the feature dimension appear (F), then concat
         inputs = torch.cat([theta.unsqueeze(1), x.unsqueeze(1)], dim=1)
-        inference.append_simulations(inputs, data_device=device)
+        inference.append_simulations(inputs)
     else:
-        inference.append_simulations(theta, x, data_device=device)
+        inference = cast(NPSE | FMPE, inference)
+        inference.append_simulations(theta, x)
 
+    # Train for max_num_epochs
     _ = inference.train(max_num_epochs=max_num_epochs)
-    # amortize the training when testing sample_with.
+
+    # Amortize the training when testing sample_with.
     for method in sample_with:
         posterior = inference.build_posterior(
             prior=prior,
-            sample_with=method,
+            sample_with=method,  # type: ignore
             posterior_parameters=VectorFieldPosteriorParameters(),
         )
         posterior.set_default_x(x_o)
@@ -210,14 +217,14 @@ def test_c2st_vector_field_on_linearGaussian(
         )
 
     # Checks for log_prob()
-    # TODO: Fails to converge with Simformer and VE SDE
-    if prior_str == "gaussian" and estimator == "NPE":
+    # TODO: Fails to converge with (Simformer + VE SDE)
+    if prior_str == "gaussian" and vf_estimator == "NPE":
         # For the Gaussian prior, we compute the KLd between ground truth and
         # posterior.
 
         # Disable exact integration for the ODE solver to speed up the computation.
         # But this gives stochastic results -> increase max_dkl a bit
-        posterior.potential_fn.neural_ode.update_params(
+        posterior.potential_fn.neural_ode.update_params(  # type: ignore
             exact=False,
             atol=1e-4,
             rtol=1e-4,
@@ -378,11 +385,9 @@ def vector_field_trained_model(vector_field_type, prior_type):
     # This check that our method to handle "general" priors works.
     # i.e. if NPSE does not get a proper passed by the user.
     if vector_field_type == "fmpe":
-        inference = FMPE(prior_npse, show_progress_bars=True)
+        inference = FMPE(prior=prior_npse)
     else:
-        inference = NPSE(
-            prior_npse, show_progress_bars=True, sde_type=vector_field_type
-        )
+        inference = NPSE(prior=prior_npse, sde_type=vector_field_type)
 
     theta = prior.sample((num_simulations,))
     x = linear_gaussian(theta, likelihood_shift, likelihood_cov)
@@ -435,7 +440,7 @@ def test_vector_field_sde_ode_sampling_equivalence(vector_field_trained_model):
     )
 
 
-@pytest.fixture(scope="module", params=["vp", "ve", "subvp"])  # add also "fmpe"
+@pytest.fixture(scope="module", params=["vp", "ve", "subvp", "flow"])
 def simformer_vector_field_type(request):
     """Module-scoped fixture for vector field type. (Simformer fixture)"""
     return request.param
@@ -474,9 +479,10 @@ def simformer_trained_model(simformer_vector_field_type, simformer_prior_type):
     inputs = torch.stack([thetas, xs], dim=1)
 
     # Create condition masks (theta latent, x observed)
-    inference = Simformer(
-        prior=prior, sde_type=simformer_vector_field_type, show_progress_bars=True
-    )
+    if simformer_vector_field_type == "flow":
+        inference = FlowMatchingSimformer()
+    else:
+        inference = Simformer(sde_type=simformer_vector_field_type)
 
     mvf_estimator = inference.append_simulations(
         inputs=inputs,
@@ -595,7 +601,7 @@ def test_vector_field_iid_inference(
             x_o,
             likelihood_shift,
             likelihood_cov,
-            prior,  # type: ignore
+            prior,
         )
 
     # Compute the c2st and assert it is near chance level of 0.5.
@@ -670,7 +676,7 @@ def test_simformer_iid_inference(
             x_o,
             likelihood_shift,
             likelihood_cov,
-            prior,  # type: ignore
+            prior,
         )
 
     # Compute the c2st and assert it is near chance level of 0.5.
@@ -709,18 +715,16 @@ def test_vector_field_map(vector_field_type):
     )
 
     if vector_field_type == "npse":
-        inference = NPSE(prior, show_progress_bars=True)
+        inference = NPSE(prior=prior)
     elif vector_field_type == "fmpe":
-        inference = FMPE(prior, show_progress_bars=True)
+        inference = FMPE(prior=prior)
     elif vector_field_type == "simformer":
         inference = Simformer(
-            show_progress_bars=True,
             posterior_latent_idx=[0],
             posterior_observed_idx=[1],
         )
     elif vector_field_type == "flow-simformer":
         inference = FlowMatchingSimformer(
-            show_progress_bars=True,
             posterior_latent_idx=[0],
             posterior_observed_idx=[1],
         )
@@ -731,9 +735,11 @@ def test_vector_field_map(vector_field_type):
     x = linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     if vector_field_type in {"simformer", "flow-simformer"}:
+        inference = cast(Simformer | FlowMatchingSimformer, inference)
         inputs = torch.cat([theta.unsqueeze(1), x.unsqueeze(1)], dim=1)
         inference.append_simulations(inputs)
     else:
+        inference = cast(NPSE | FMPE, inference)
         inference.append_simulations(theta, x)
 
     inference.train(max_num_epochs=max_num_epochs)
@@ -795,7 +801,7 @@ def test_sample_conditional():
     )
 
     # Test whether fmpe works properly with structured z-scoring.
-    net = posterior_flow_nn("mlp", z_score_x="structured", hidden_features=[65] * 5)
+    net = posterior_flow_nn("mlp", z_score_x="structured", hidden_features=[65] * 5)  # type: ignore
 
     inference = FMPE(prior, density_estimator=net, show_progress_bars=False)
     posterior_estimator = inference.append_simulations(theta, x).train(
@@ -828,7 +834,7 @@ def test_sample_conditional():
         potential_fn=conditioned_potential_fn,
         theta_transform=restricted_tf,
         proposal=restricted_prior,
-        **mcmc_parameters,
+        **mcmc_parameters,  # type: ignore
     )
     mcmc_posterior.set_default_x(x_o)  # TODO: This test has a bug? Needed to add this
     cond_samples = mcmc_posterior.sample((num_conditional_samples,))
