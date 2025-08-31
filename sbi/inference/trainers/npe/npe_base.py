@@ -320,7 +320,7 @@ class PosteriorEstimatorTrainer(NeuralInference, ABC):
             force_first_round_loss=force_first_round_loss,
         )
 
-        return self._train(
+        return self._run_training_loop(  # type: ignore
             train_loader=train_loader,
             val_loader=val_loader,
             max_num_epochs=max_num_epochs,
@@ -331,96 +331,6 @@ class PosteriorEstimatorTrainer(NeuralInference, ABC):
             show_train_summary=show_train_summary,
             loss_kwargs=loss_kwargs,
         )
-
-    def _get_start_index(
-        self,
-        discard_prior_samples: bool,
-        force_first_round_loss: bool,
-        resume_training: bool,
-    ) -> int:
-        # Load data from most recent round.
-        self._round = max(self._data_round_index)
-
-        if self._round == 0 and self._neural_net is not None:
-            assert force_first_round_loss or resume_training, (
-                "You have already trained this neural network. After you had trained "
-                "the network, you again appended simulations with `append_simulations"
-                "(theta, x)`, but you did not provide a proposal. If the new "
-                "simulations are sampled from the prior, you can set "
-                "`.train(..., force_first_round_loss=True`). However, if the new "
-                "simulations were not sampled from the prior, you should pass the "
-                "proposal, i.e. `append_simulations(theta, x, proposal)`. If "
-                "your samples are not sampled from the prior and you do not pass a "
-                "proposal and you set `force_first_round_loss=True`, the result of "
-                "SNPE will not be the true posterior. Instead, it will be the proposal "
-                "posterior, which (usually) is more narrow than the true posterior."
-            )
-
-        # Starting index for the training set (1 = discard round-0 samples).
-        start_idx = int(discard_prior_samples and self._round > 0)
-
-        # For non-atomic loss, we can not reuse samples from previous rounds as of now.
-        # SNPE-A can, by construction of the algorithm, only use samples from the last
-        # round. SNPE-A is the only algorithm that has an attribute `_ran_final_round`,
-        # so this is how we check for whether or not we are using SNPE-A.
-        if self.use_non_atomic_loss or hasattr(self, "_ran_final_round"):
-            start_idx = self._round
-
-        return start_idx
-
-    def _initialize_neural_network(
-        self,
-        retrain_from_scratch: bool,
-        start_idx: int,
-    ) -> None:
-        # First round or if retraining from scratch:
-        # Call the `self._build_neural_net` with the rounds' thetas and xs as
-        # arguments, which will build the neural network.
-        # This is passed into NeuralPosterior, to create a neural posterior which
-        # can `sample()` and `log_prob()`. The network is accessible via `.net`.
-        if self._neural_net is None or retrain_from_scratch:
-            # Get theta,x to initialize NN
-            theta, x, _ = self.get_simulations(starting_round=start_idx)
-            # Use only training data for building the neural net (z-scoring transforms)
-
-            self._neural_net = self._build_neural_net(
-                theta[self.train_indices].to("cpu"),
-                x[self.train_indices].to("cpu"),
-            )
-
-            theta = reshape_to_sample_batch_event(
-                theta.to("cpu"), self._neural_net.input_shape
-            )
-            x = reshape_to_batch_event(x.to("cpu"), self._neural_net.condition_shape)
-            test_posterior_net_for_multi_d_x(self._neural_net, theta, x)
-
-            del theta, x
-
-        # Move entire net to device for training.
-        self._neural_net.to(self._device)
-
-    def _get_training_losses(self, batch: Any, loss_kwargs: Dict[str, Any]) -> Tensor:
-        # Get batches on current device.
-        theta_batch, x_batch, masks_batch = (
-            batch[0].to(self._device),
-            batch[1].to(self._device),
-            batch[2].to(self._device),
-        )
-
-        train_losses = self._loss(theta_batch, x_batch, masks_batch, **loss_kwargs)
-
-        return train_losses
-
-    def _get_validation_losses(self, batch: Any, loss_kwargs: Dict[str, Any]) -> Tensor:
-        theta_batch, x_batch, masks_batch = (
-            batch[0].to(self._device),
-            batch[1].to(self._device),
-            batch[2].to(self._device),
-        )
-        # Take negative loss here to get validation log_prob.
-        val_losses = self._loss(theta_batch, x_batch, masks_batch, **loss_kwargs)
-
-        return val_losses
 
     def build_posterior(
         self,
@@ -661,3 +571,126 @@ class PosteriorEstimatorTrainer(NeuralInference, ABC):
                 "were sampled from the prior, single-round inference can be performed "
                 "with `append_simulations(..., proprosal=None)`."
             )
+
+    def _get_start_index(
+        self,
+        discard_prior_samples: bool,
+        force_first_round_loss: bool,
+        resume_training: bool,
+    ) -> int:
+        # Load data from most recent round.
+        self._round = max(self._data_round_index)
+
+        if self._round == 0 and self._neural_net is not None:
+            assert force_first_round_loss or resume_training, (
+                "You have already trained this neural network. After you had trained "
+                "the network, you again appended simulations with `append_simulations"
+                "(theta, x)`, but you did not provide a proposal. If the new "
+                "simulations are sampled from the prior, you can set "
+                "`.train(..., force_first_round_loss=True`). However, if the new "
+                "simulations were not sampled from the prior, you should pass the "
+                "proposal, i.e. `append_simulations(theta, x, proposal)`. If "
+                "your samples are not sampled from the prior and you do not pass a "
+                "proposal and you set `force_first_round_loss=True`, the result of "
+                "SNPE will not be the true posterior. Instead, it will be the proposal "
+                "posterior, which (usually) is more narrow than the true posterior."
+            )
+
+        # Starting index for the training set (1 = discard round-0 samples).
+        start_idx = int(discard_prior_samples and self._round > 0)
+
+        # For non-atomic loss, we can not reuse samples from previous rounds as of now.
+        # SNPE-A can, by construction of the algorithm, only use samples from the last
+        # round. SNPE-A is the only algorithm that has an attribute `_ran_final_round`,
+        # so this is how we check for whether or not we are using SNPE-A.
+        if self.use_non_atomic_loss or hasattr(self, "_ran_final_round"):
+            start_idx = self._round
+
+        return start_idx
+
+    def _initialize_neural_network(
+        self,
+        retrain_from_scratch: bool,
+        start_idx: int,
+    ) -> None:
+        """
+        Initialize the neural network if it is None or retraining from scratch.
+
+        Args:
+            retrain_from_scratch: Whether to retrain the conditional density
+                estimator for the posterior from scratch each round.
+            start_idx: The index of the first round to retrieve simulation data from.
+        """
+
+        # First round or if retraining from scratch:
+        # Call the `self._build_neural_net` with the rounds' thetas and xs as
+        # arguments, which will build the neural network.
+        # This is passed into NeuralPosterior, to create a neural posterior which
+        # can `sample()` and `log_prob()`. The network is accessible via `.net`.
+        if self._neural_net is None or retrain_from_scratch:
+            # Get theta,x to initialize NN
+            theta, x, _ = self.get_simulations(starting_round=start_idx)
+            # Use only training data for building the neural net (z-scoring transforms)
+
+            self._neural_net = self._build_neural_net(
+                theta[self.train_indices].to("cpu"),
+                x[self.train_indices].to("cpu"),
+            )
+
+            theta = reshape_to_sample_batch_event(
+                theta.to("cpu"), self._neural_net.input_shape
+            )
+            x = reshape_to_batch_event(x.to("cpu"), self._neural_net.condition_shape)
+            test_posterior_net_for_multi_d_x(self._neural_net, theta, x)
+
+            del theta, x
+
+        # Move entire net to device for training.
+        self._neural_net.to(self._device)
+
+    def _get_training_losses(self, batch: Any, loss_kwargs: Dict[str, Any]) -> Tensor:
+        """
+        Compute training losses for a batch of data.
+
+        Args:
+            batch: A batch of data, where batch[0] is theta and batch[1] is x.
+            loss_kwargs: Additional keyword arguments passed to self._loss fn.
+
+        Returns:
+            A tensor containing the computed training losses for each sample
+            in the batch.
+        """
+
+        # Get batches on current device.
+        theta_batch, x_batch, masks_batch = (
+            batch[0].to(self._device),
+            batch[1].to(self._device),
+            batch[2].to(self._device),
+        )
+
+        train_losses = self._loss(theta_batch, x_batch, masks_batch, **loss_kwargs)
+
+        return train_losses
+
+    def _get_validation_losses(self, batch: Any, loss_kwargs: Dict[str, Any]) -> Tensor:
+        """
+        Compute validation losses for a batch of data.
+
+        Args:
+            batch: A batch of data, where batch[0] is theta and batch[1] is x.
+            loss_kwargs: Additional keyword arguments passed to self._loss fn.
+
+        Returns:
+            A tensor containing the computed validation losses for each sample
+            in the batch.
+        """
+
+        theta_batch, x_batch, masks_batch = (
+            batch[0].to(self._device),
+            batch[1].to(self._device),
+            batch[2].to(self._device),
+        )
+        # Take negative loss here to get validation log_prob.
+        val_losses = self._loss(theta_batch, x_batch, masks_batch, **loss_kwargs)
+
+        return val_losses

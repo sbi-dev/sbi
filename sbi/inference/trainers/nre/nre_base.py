@@ -8,7 +8,6 @@ from typing import Any, Dict, Literal, Optional, Protocol, Tuple, Union
 import torch
 from torch import Tensor, eye, nn, ones
 from torch.distributions import Distribution
-from torch.utils import data
 from torch.utils.tensorboard.writer import SummaryWriter
 from typing_extensions import Self
 
@@ -220,10 +219,12 @@ class RatioEstimatorTrainer(NeuralInference, ABC):
             dataloader_kwargs=dataloader_kwargs,
         )
 
-        num_atoms = self._get_num_atoms(
-            training_batch_size=training_batch_size,
-            val_loader=val_loader,
-            num_atoms=num_atoms,
+        clipped_batch_size = min(training_batch_size, val_loader.batch_size)  # type: ignore
+
+        num_atoms = int(
+            clamp_and_warn(
+                "num_atoms", num_atoms, min_val=2, max_val=clipped_batch_size
+            )
         )
 
         self._initialize_neural_network(
@@ -236,7 +237,7 @@ class RatioEstimatorTrainer(NeuralInference, ABC):
 
         loss_kwargs["num_atoms"] = num_atoms
 
-        return self._train(
+        return self._run_training_loop(
             train_loader=train_loader,
             val_loader=val_loader,
             max_num_epochs=max_num_epochs,
@@ -247,67 +248,6 @@ class RatioEstimatorTrainer(NeuralInference, ABC):
             show_train_summary=show_train_summary,
             loss_kwargs=loss_kwargs,
         )
-
-    def _get_start_index(self, discard_prior_samples: bool) -> int:
-        # Load data from most recent round.
-        self._round = max(self._data_round_index)
-        # Starting index for the training set (1 = discard round-0 samples).
-        start_idx = int(discard_prior_samples and self._round > 0)
-
-        return start_idx
-
-    def _get_num_atoms(
-        self, training_batch_size: int, val_loader: data.DataLoader, num_atoms: int
-    ) -> int:
-        clipped_batch_size = min(training_batch_size, val_loader.batch_size)  # type: ignore
-
-        num_atoms = int(
-            clamp_and_warn(
-                "num_atoms", num_atoms, min_val=2, max_val=clipped_batch_size
-            )
-        )
-
-        return num_atoms
-
-    def _initialize_neural_network(
-        self, retrain_from_scratch: bool, start_idx: int
-    ) -> None:
-        # First round or if retraining from scratch:
-        # Call the `self._build_neural_net` with the rounds' thetas and xs as
-        # arguments, which will build the neural network
-        # This is passed into NeuralPosterior, to create a neural posterior which
-        # can `sample()` and `log_prob()`. The network is accessible via `.net`.
-        if self._neural_net is None or retrain_from_scratch:
-            # Get theta,x to initialize NN
-            theta, x, _ = self.get_simulations(starting_round=start_idx)
-            # Use only training data for building the neural net (z-scoring transforms)
-            self._neural_net = self._build_neural_net(
-                theta[self.train_indices].to("cpu"),
-                x[self.train_indices].to("cpu"),
-            )
-
-            del x, theta
-
-        self._neural_net.to(self._device)
-
-    def _get_training_losses(self, batch: Any, loss_kwargs: Dict[str, Any]) -> Tensor:
-        theta_batch, x_batch = (
-            batch[0].to(self._device),
-            batch[1].to(self._device),
-        )
-
-        train_losses = self._loss(theta_batch, x_batch, **loss_kwargs)
-
-        return train_losses
-
-    def _get_validation_losses(self, batch: Any, loss_kwargs: Dict[str, Any]) -> Tensor:
-        theta_batch, x_batch = (
-            batch[0].to(self._device),
-            batch[1].to(self._device),
-        )
-        val_losses = self._loss(theta_batch, x_batch, **loss_kwargs)
-
-        return val_losses
 
     def build_posterior(
         self,
@@ -438,3 +378,97 @@ class RatioEstimatorTrainer(NeuralInference, ABC):
         )
 
         return potential_fn, theta_transform
+
+    def _get_start_index(self, discard_prior_samples: bool) -> int:
+        """
+        Determine the starting index for training based on previous rounds.
+
+        Args:
+            discard_prior_samples: Whether to discard samples simulated in round 1, i.e.
+                from the prior.
+
+        Returns:
+            If `discard_prior_samples` is True and previous rounds exist,
+            the method will return 1 to skip samples from round 0; otherwise,
+            it returns 0.
+        """
+
+        # Load data from most recent round.
+        self._round = max(self._data_round_index)
+        # Starting index for the training set (1 = discard round-0 samples).
+        start_idx = int(discard_prior_samples and self._round > 0)
+
+        return start_idx
+
+    def _initialize_neural_network(
+        self, retrain_from_scratch: bool, start_idx: int
+    ) -> None:
+        """
+        Initialize the neural network if it is None or retraining from scratch.
+
+        Args:
+            retrain_from_scratch: Whether to retrain the conditional density
+                estimator for the posterior from scratch each round.
+            start_idx: The index of the first round to retrieve simulation data from.
+        """
+
+        # First round or if retraining from scratch:
+        # Call the `self._build_neural_net` with the rounds' thetas and xs as
+        # arguments, which will build the neural network
+        # This is passed into NeuralPosterior, to create a neural posterior which
+        # can `sample()` and `log_prob()`. The network is accessible via `.net`.
+        if self._neural_net is None or retrain_from_scratch:
+            # Get theta,x to initialize NN
+            theta, x, _ = self.get_simulations(starting_round=start_idx)
+            # Use only training data for building the neural net (z-scoring transforms)
+            self._neural_net = self._build_neural_net(
+                theta[self.train_indices].to("cpu"),
+                x[self.train_indices].to("cpu"),
+            )
+
+            del x, theta
+
+        self._neural_net.to(self._device)
+
+    def _get_training_losses(self, batch: Any, loss_kwargs: Dict[str, Any]) -> Tensor:
+        """
+        Compute training losses for a batch of data.
+
+        Args:
+            batch: A batch of data.
+            loss_kwargs: Additional keyword arguments passed to self._loss fn.
+
+        Returns:
+            A tensor containing the computed training losses for each sample
+            in the batch.
+        """
+
+        theta_batch, x_batch = (
+            batch[0].to(self._device),
+            batch[1].to(self._device),
+        )
+
+        train_losses = self._loss(theta_batch, x_batch, **loss_kwargs)
+
+        return train_losses
+
+    def _get_validation_losses(self, batch: Any, loss_kwargs: Dict[str, Any]) -> Tensor:
+        """
+        Compute validation losses for a batch of data.
+
+        Args:
+            batch: A batch of data.
+            loss_kwargs: Additional keyword arguments passed to self._loss fn.
+
+        Returns:
+            A tensor containing the computed validation losses for each sample
+            in the batch.
+        """
+
+        theta_batch, x_batch = (
+            batch[0].to(self._device),
+            batch[1].to(self._device),
+        )
+        val_losses = self._loss(theta_batch, x_batch, **loss_kwargs)
+
+        return val_losses

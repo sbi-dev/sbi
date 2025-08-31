@@ -21,7 +21,7 @@ from typing import (
 from warnings import warn
 
 import torch
-from torch import Tensor
+from torch import Tensor, nn
 from torch.distributions import Distribution
 from torch.nn.utils.clip_grad import clip_grad_norm_
 from torch.optim.adam import Adam
@@ -894,7 +894,7 @@ class NeuralInference(ABC):
                 )
         return posterior
 
-    def _train(
+    def _run_training_loop(
         self,
         train_loader: data.DataLoader,
         val_loader: data.DataLoader,
@@ -906,8 +906,31 @@ class NeuralInference(ABC):
         show_train_summary: bool,
         loss_kwargs: Optional[Dict[str, Any]] = None,
         summarization_kwargs: Optional[Dict[str, Any]] = None,
-    ) -> Any:
-        """Main training method"""
+    ) -> nn.Module:
+        """
+        Run the main training loop for the neural network, including epoch-wise
+        training, validation, and convergence checking.
+
+        Args:
+            train_loader: Dataloader for training.
+            val_loader: Dataloader for validation.
+            learning_rate: Learning rate for Adam optimizer.
+            stop_after_epochs: The number of epochs to wait for improvement on the
+                validation set before terminating training.
+            max_num_epochs: Maximum number of epochs to run. If reached, we stop
+                training even when the validation loss is still decreasing. Otherwise,
+                we train until validation loss increases (see also `stop_after_epochs`).
+            clip_max_norm: Value at which to clip the total gradient norm in order to
+                prevent exploding gradients. Use None for no clipping.
+            resume_training: Can be used in case training time is limited, e.g. on a
+                cluster. If `True`, the split between train and validation set, the
+                optimizer, the number of epochs, and the best validation log-prob will
+                be restored from the last time `.train()` was called.
+            show_train_summary: Whether to print the number of epochs and validation
+                loss after the training.
+            loss_kwargs: Additional or updated kwargs to be passed to the self._loss fn.
+            summarization_kwargs: Additional kwargs passed to self._summarize_epoch fn.
+        """
 
         if loss_kwargs is None:
             loss_kwargs = {}
@@ -968,6 +991,19 @@ class NeuralInference(ABC):
         clip_max_norm: Optional[float],
         loss_kwargs: Dict[str, Any],
     ) -> float:
+        """
+        Perform a single training epoch over the provided training data.
+
+        Args:
+            train_loader: Dataloader for training.
+            clip_max_norm: Value at which to clip the total gradient norm in order to
+                prevent exploding gradients. Use None for no clipping.
+            loss_kwargs: Additional or updated kwargs to be passed to the self._loss fn.
+
+        Returns:
+            The average training loss over all samples in the epoch.
+        """
+
         assert self._neural_net is not None
 
         train_loss_sum = 0
@@ -996,6 +1032,17 @@ class NeuralInference(ABC):
         val_loader: data.DataLoader,
         loss_kwargs: Dict[str, Any],
     ) -> float:
+        """
+        Perform a single validation epoch over the provided validation data.
+
+        Args:
+            val_loader: Dataloader for validation.
+            loss_kwargs: Additional or updated kwargs to be passed to the self._loss fn.
+
+        Returns:
+            The average validation loss over all samples in the epoch.
+        """
+
         val_loss_sum = 0
         with torch.no_grad():
             for batch in val_loader:
@@ -1019,6 +1066,21 @@ class NeuralInference(ABC):
         epoch_start_time: float,
         summarization_kwargs: Dict[str, Any],
     ) -> None:
+        """
+        Update internal summaries after a single training epoch.
+
+        Records training and validation losses, as well as the duration of the epoch,
+        in `self._summary` dictionary.
+
+        Args:
+            train_loss: The average training loss for the epoch.
+            val_loss: The average validation loss for the epoch.
+            epoch_start_time: Timestamp when the epoch started, used to compute
+                duration.
+            summarization_kwargs: Additional keyword arguments for customizing
+                the summarization.
+        """
+
         self._summary["training_loss"].append(train_loss)
 
         self._val_loss = val_loss
