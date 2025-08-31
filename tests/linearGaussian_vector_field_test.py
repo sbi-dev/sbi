@@ -457,21 +457,24 @@ def simformer_trained_model(simformer_vector_field_type, simformer_prior_type):
     """Module-scoped fixture that trains a score estimator for Simformer tests."""
     num_dim = 3
     num_simulations = 10000
+    device = process_device("gpu")
 
     # likelihood_mean will be likelihood_shift+theta
-    likelihood_shift = -1.0 * ones(num_dim)
+    likelihood_shift = -1.0 * ones(num_dim, device=device)
     # The likelihood covariance is increased to make the iid inference easier,
     # (otherwise the posterior gets too tight and the c2st is too high),
     # but it doesn't really improve the results for both FMPE and NPSE.
-    likelihood_cov = 0.9 * eye(num_dim)
+    likelihood_cov = 0.9 * eye(num_dim, device=device)
 
     if simformer_prior_type == "gaussian":
-        prior_mean = zeros(num_dim)
-        prior_cov = eye(num_dim)
+        prior_mean = zeros(num_dim, device=device)
+        prior_cov = eye(num_dim, device=device)
         prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
         thetas = prior.sample((num_simulations,))
     elif simformer_prior_type == "uniform":
-        prior = BoxUniform(-2 * ones(num_dim), 2 * ones(num_dim))
+        prior = BoxUniform(
+            -2 * ones(num_dim, device=device), 2 * ones(num_dim, device=device)
+        )
         thetas = prior.sample((num_simulations,))
 
     xs = linear_gaussian(thetas, likelihood_shift, likelihood_cov)
@@ -480,9 +483,9 @@ def simformer_trained_model(simformer_vector_field_type, simformer_prior_type):
 
     # Create condition masks (theta latent, x observed)
     if simformer_vector_field_type == "flow":
-        inference = FlowMatchingSimformer()
+        inference = FlowMatchingSimformer(device=device)
     else:
-        inference = Simformer(sde_type=simformer_vector_field_type)
+        inference = Simformer(sde_type=simformer_vector_field_type, device=device)
 
     mvf_estimator = inference.append_simulations(
         inputs=inputs,
@@ -503,20 +506,25 @@ def simformer_trained_model(simformer_vector_field_type, simformer_prior_type):
         "num_dim": num_dim,
         "simformer_vector_field_type": simformer_vector_field_type,
         "inference_condition_mask": torch.tensor([False, True]),
+        "device": device,
     }
 
 
 @pytest.mark.slow
+@pytest.mark.gpu
 def test_simformer_sde_ode_sampling_equivalence(simformer_trained_model):
     """
     Test whether SDE and ODE sampling are equivalent
     for Simformer.
     """
+
+    # Get device to locally move data to the gpu
+    device = simformer_trained_model["device"]
+
     num_samples = 1000
-    x_o = zeros(1, simformer_trained_model["num_dim"])
+    x_o = zeros(1, simformer_trained_model["num_dim"], device=device)
 
-    # Build posterior for the specific task: infer theta (node 0) given x (node 1).
-
+    # Build posterior for the specific task: infer theta (node 0) given x (node 1)
     inference = simformer_trained_model["inference"]
     vector_field_type = simformer_trained_model["simformer_vector_field_type"]
     condition_mask = simformer_trained_model["inference_condition_mask"]
