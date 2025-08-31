@@ -319,7 +319,6 @@ class PosteriorEstimatorTrainer(NeuralInference, ABC):
             calibration_kernel=calibration_kernel,
             force_first_round_loss=force_first_round_loss,
         )
-
         return self._run_training_loop(  # type: ignore
             train_loader=train_loader,
             val_loader=val_loader,
@@ -644,9 +643,6 @@ class PosteriorEstimatorTrainer(NeuralInference, ABC):
             test_posterior_net_for_multi_d_x(self._neural_net, theta, x)
 
             del theta, x
-
-        # Move entire net to device for training.
-        self._neural_net.to(self._device)
 
     def _get_training_losses(self, batch: Any, loss_kwargs: Dict[str, Any]) -> Tensor:
         """

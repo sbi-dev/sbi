@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, Literal, Optional, Protocol, Tuple, Union
 
 import torch
-from torch import Tensor, eye, nn, ones
+from torch import Tensor, eye, ones
 from torch.distributions import Distribution
 from torch.utils.tensorboard.writer import SummaryWriter
 from typing_extensions import Self
@@ -175,7 +175,7 @@ class RatioEstimatorTrainer(NeuralInference, ABC):
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[Dict] = None,
         loss_kwargs: Optional[Dict[str, Any]] = None,
-    ) -> nn.Module:
+    ) -> RatioEstimator:
         r"""Return classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
 
         Args:
@@ -237,7 +237,7 @@ class RatioEstimatorTrainer(NeuralInference, ABC):
 
         loss_kwargs["num_atoms"] = num_atoms
 
-        return self._run_training_loop(
+        return self._run_training_loop(  # type: ignore
             train_loader=train_loader,
             val_loader=val_loader,
             max_num_epochs=max_num_epochs,
@@ -427,8 +427,6 @@ class RatioEstimatorTrainer(NeuralInference, ABC):
             )
 
             del x, theta
-
-        self._neural_net.to(self._device)
 
     def _get_training_losses(self, batch: Any, loss_kwargs: Dict[str, Any]) -> Tensor:
         """

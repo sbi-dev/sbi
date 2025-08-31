@@ -21,7 +21,7 @@ from typing import (
 from warnings import warn
 
 import torch
-from torch import Tensor, nn
+from torch import Tensor
 from torch.distributions import Distribution
 from torch.nn.utils.clip_grad import clip_grad_norm_
 from torch.optim.adam import Adam
@@ -311,7 +311,7 @@ class NeuralInference(ABC):
         discard_prior_samples: bool = False,
         retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
-    ) -> NeuralPosterior: ...
+    ) -> Union[ConditionalEstimator, RatioEstimator]: ...
 
     @abstractmethod
     def _initialize_neural_network(
@@ -906,7 +906,7 @@ class NeuralInference(ABC):
         show_train_summary: bool,
         loss_kwargs: Optional[Dict[str, Any]] = None,
         summarization_kwargs: Optional[Dict[str, Any]] = None,
-    ) -> nn.Module:
+    ) -> Union[ConditionalEstimator, RatioEstimator]:
         """
         Run the main training loop for the neural network, including epoch-wise
         training, validation, and convergence checking.
@@ -939,6 +939,9 @@ class NeuralInference(ABC):
             summarization_kwargs = {}
 
         assert self._neural_net is not None
+
+        # Move entire net to device for training.
+        self._neural_net.to(self._device)
 
         if not resume_training:
             self.optimizer = Adam(

@@ -667,6 +667,3 @@ class VectorFieldTrainer(NeuralInference, ABC):
             )
 
             del theta, x
-
-        # Move entire net to device for training.
-        self._neural_net.to(self._device)
