@@ -256,7 +256,10 @@ class VectorFieldBasedPotential(BasePotential):
 
                 iid_method = get_iid_method(self.iid_method)
                 score_fn_iid = iid_method(
-                    self.vector_field_estimator, self.prior, **(self.iid_params or {})
+                    self.vector_field_estimator,
+                    self.prior,
+                    device=self.device,
+                    **(self.iid_params or {}),
                 )
 
                 score = score_fn_iid(theta, self.x_o, time)

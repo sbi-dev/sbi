@@ -483,9 +483,18 @@ def simformer_trained_model(simformer_vector_field_type, simformer_prior_type):
 
     # Create condition masks (theta latent, x observed)
     if simformer_vector_field_type == "flow":
-        inference = FlowMatchingSimformer(device=device)
+        inference = FlowMatchingSimformer(
+            posterior_latent_idx=[0],
+            posterior_observed_idx=[1],
+            device=device,
+        )
     else:
-        inference = Simformer(sde_type=simformer_vector_field_type, device=device)
+        inference = Simformer(
+            posterior_latent_idx=[0],
+            posterior_observed_idx=[1],
+            sde_type=simformer_vector_field_type,
+            device=device,
+        )
 
     mvf_estimator = inference.append_simulations(
         inputs=inputs,
@@ -505,7 +514,6 @@ def simformer_trained_model(simformer_vector_field_type, simformer_prior_type):
         else None,
         "num_dim": num_dim,
         "simformer_vector_field_type": simformer_vector_field_type,
-        "inference_condition_mask": torch.tensor([False, True]),
         "device": device,
     }
 
@@ -527,14 +535,8 @@ def test_simformer_sde_ode_sampling_equivalence(simformer_trained_model):
     # Build posterior for the specific task: infer theta (node 0) given x (node 1)
     inference = simformer_trained_model["inference"]
     vector_field_type = simformer_trained_model["simformer_vector_field_type"]
-    condition_mask = simformer_trained_model["inference_condition_mask"]
-    sde_posterior = inference.build_conditional(
-        condition_mask=condition_mask,
-        sample_with="sde",
-    ).set_default_x(x_o)
-    ode_posterior = inference.build_conditional(
-        condition_mask=condition_mask, sample_with="ode"
-    ).set_default_x(x_o)
+    sde_posterior = inference.build_posterior(sample_with="sde").set_default_x(x_o)
+    ode_posterior = inference.build_posterior(sample_with="ode").set_default_x(x_o)
 
     sde_samples = sde_posterior.sample((num_samples,))
     ode_samples = ode_posterior.sample((num_samples,))
@@ -634,6 +636,7 @@ def test_vector_field_iid_inference(
     reason="c2st too high for some cases, has to be fixed in PR #1501 or #1544"
 )
 @pytest.mark.slow
+@pytest.mark.gpu
 @pytest.mark.parametrize(
     "iid_method, num_trial",
     [
@@ -656,7 +659,6 @@ def test_simformer_iid_inference(
     num_samples = 1000
 
     # Extract data from fixture
-    score_estimator = simformer_trained_model["score_estimator"]
     inference = simformer_trained_model["inference"]
     prior = simformer_trained_model["prior"]
     likelihood_shift = simformer_trained_model["likelihood_shift"]
@@ -665,13 +667,12 @@ def test_simformer_iid_inference(
     prior_cov = simformer_trained_model["prior_cov"]
     num_dim = simformer_trained_model["num_dim"]
     vector_field_type = simformer_trained_model["simformer_vector_field_type"]
+    device = simformer_trained_model["device"]
 
-    condition_mask = simformer_trained_model["inference_condition_mask"]
-
-    x_o = zeros(num_trial, num_dim)
-    posterior = inference.build_conditional(
-        mvf_estimator=score_estimator, condition_mask=condition_mask, sample_with="sde"
-    ).set_default_x(x_o)
+    x_o = zeros(num_trial, num_dim, device=device)
+    posterior = inference.build_posterior(prior=prior, sample_with="sde").set_default_x(
+        x_o
+    )
     samples = posterior.sample((num_samples,), iid_method=iid_method)
 
     if simformer_prior_type == "gaussian" or (simformer_prior_type is None):
