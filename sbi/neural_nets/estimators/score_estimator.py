@@ -1402,7 +1402,7 @@ class VarianceExplodingSDE:
         Returns:
             Drift function at a given time.
         """
-        return torch.tensor([0.0])
+        return torch.tensor([0.0], device=input.device)
 
     def diffusion_fn(self, input: Tensor, times: Tensor) -> Tensor:
         """Diffusion function for variance exploding SDEs.
