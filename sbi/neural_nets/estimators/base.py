@@ -1045,6 +1045,7 @@ class MaskedConditionalVectorFieldEstimatorWrapper(ConditionalVectorFieldEstimat
         if self.is_features_dim_missing:
             # Reshape input
             input_part_unflattened = input.reshape(B, self._num_latent)
+
             # Adapt condition tensor to a compatible number of entries with the input
             # Since condition is usually provided with a lower number of samples w.r.t.
             # batch dimension
@@ -1055,9 +1056,17 @@ class MaskedConditionalVectorFieldEstimatorWrapper(ConditionalVectorFieldEstimat
             # condition tensor which will be 10000 on batch dim too: [10000, 2]
             # thus, we can merge input ([10000, 3]) and condition ([10000, 2])
             # to obtain full input ([10000, 5])
-            condition_part_unflattened = condition.reshape(
-                -1, self._num_observed
-            ).repeat(B // C, 1)
+            if self._num_observed == 0:
+                # Handle degenerate case where there are no observed nodes
+                # it can actually happen when using the Simformer in "full latent"
+                # (i.e., as a data generator)
+                condition_part_unflattened = torch.empty(
+                    B, 0, dtype=condition.dtype, device=condition.device
+                )
+            else:
+                condition_part_unflattened = condition.reshape(
+                    -1, self._num_observed
+                ).repeat(B // C, 1)
 
             # Prepare full inputs tensor (will be filled with latent and condition)
             # Note: "condition" means "observed"
@@ -1075,11 +1084,22 @@ class MaskedConditionalVectorFieldEstimatorWrapper(ConditionalVectorFieldEstimat
             input_part_unflattened = input.reshape(
                 B, self._num_latent, self._original_F
             )
+
             # Adapt condition tensor to a compatible number of entries with the input
             # Same reasoning as above, but with an extra feature dimension at the end
-            condition_part_unflattened = condition.reshape(
-                -1, self._num_observed, self._original_F
-            ).repeat(B // C, 1, 1)
+            if self._num_observed == 0:
+                # Handle degenerate case where there are no observed nodes
+                condition_part_unflattened = torch.empty(
+                    B,
+                    0,
+                    self._original_F,
+                    dtype=condition.dtype,
+                    device=condition.device,
+                )
+            else:
+                condition_part_unflattened = condition.reshape(
+                    -1, self._num_observed, self._original_F
+                ).repeat(B // C, 1, 1)
 
             # Prepare full inputs tensor (will be filled with latent and condition)
             # Note: "condition" means "observed"
