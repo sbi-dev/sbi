@@ -723,6 +723,18 @@ class MaskedConditionalVectorFieldEstimatorWrapper(ConditionalVectorFieldEstimat
     by the masked estimator, calls the masked estimator, and then disassembles the
     output to return only the relevant latent part. This allows using a masked estimator
     as if it were a standard conditional estimator for a fixed mask configuration.
+
+    More specifically, this Wrapper:
+        1. Flatten inputs removing the trailing feature dimension (if present)
+            - Remind that here we are assuming tensors of shape (B, T, F) meaning
+              (batch_dim, num_nodes, features) or (B, T) (where F is assumed to be 1)
+            - More generally, of shape (..., T, F) and (..., T) if other than batch_dim
+              we also have others such as sample_dim.
+        2. Assembles the full input tensor expected by the masked estimator
+            by placing the provided latent inputs and observed conditions
+            in a single tensor compatible with the masked estimator.
+        3. Disassembles the output tensor from the masked estimator to return
+            only the relevant latent part.
     """
 
     def __init__(
@@ -797,6 +809,10 @@ class MaskedConditionalVectorFieldEstimatorWrapper(ConditionalVectorFieldEstimat
         num_latent = int(torch.sum(fixed_condition_mask == 0).item())
         num_observed = int(torch.sum(fixed_condition_mask == 1).item())
 
+        # Since the rest of sbi interface is not designed to handle
+        # the trailing F dimension, we flatten the input and condition tensors
+        # Indeed, one of the tasks of this class is to return tensors that lose
+        # such trailing dimension F (if present) so that sbi can handle them
         self._new_input_shape = torch.Size((num_latent * F,))
         self._new_condition_shape = torch.Size((num_observed * F,))
 
