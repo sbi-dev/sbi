@@ -2,6 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import math
+import warnings
 from typing import Callable, Literal, Optional, Sequence, Union
 
 import torch
@@ -1276,7 +1277,22 @@ class VectorFieldSimformer(MaskedVectorFieldNet):
             to_squeeze = False
 
         B, T, _ = inputs.shape
+
         device = inputs.device
+        if condition_mask.device != device:
+            warnings.warn(
+                f"condition_mask device ({condition_mask.device}) != inputs device"
+                f"({device}), moving condition_mask to {device}.",
+                stacklevel=2,
+            )
+            condition_mask = condition_mask.to(device)
+        if edge_mask is not None and edge_mask.device != device:
+            warnings.warn(
+                f"edge_mask device ({edge_mask.device}) != inputs device"
+                f"({device}), moving edge_mask to {device}.",
+                stacklevel=2,
+            )
+            edge_mask = edge_mask.to(device)
 
         # Tokenize on val
         val_h = self.val_linear(inputs)  # [B, T, dim_val]
