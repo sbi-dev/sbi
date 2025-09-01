@@ -378,46 +378,24 @@ class LikelihoodEstimatorTrainer(NeuralInference, ABC):
             )
             del theta, x
 
-    def _get_training_losses(self, batch: Any, loss_kwargs: Dict[str, Any]) -> Tensor:
+    def _get_losses(self, batch: Any, loss_kwargs: Dict[str, Any]) -> Tensor:
         """
-        Compute training losses for a batch of data.
+        Compute losses for a batch of data.
 
         Args:
             batch: A batch of data.
             loss_kwargs: Additional keyword arguments passed to self._loss fn.
 
         Returns:
-            A tensor containing the computed training losses for each sample
-            in the batch.
+            A tensor containing the computed losses for each sample in the batch.
         """
 
+        # Get batches on current device.
         theta_batch, x_batch = (
             batch[0].to(self._device),
             batch[1].to(self._device),
         )
-        # Evaluate on x with theta as context.
-        train_losses = self._loss(theta=theta_batch, x=x_batch)
 
-        return train_losses
+        losses = self._loss(theta_batch, x_batch)
 
-    def _get_validation_losses(self, batch: Any, loss_kwargs: Dict[str, Any]) -> Tensor:
-        """
-        Compute validation losses for a batch of data.
-
-        Args:
-            batch: A batch of data.
-            loss_kwargs: Additional keyword arguments passed to self._loss fn.
-
-        Returns:
-            A tensor containing the computed validation losses for each sample
-            in the batch.
-        """
-
-        theta_batch, x_batch = (
-            batch[0].to(self._device),
-            batch[1].to(self._device),
-        )
-        # Evaluate on x with theta as context.
-        val_losses = self._loss(theta=theta_batch, x=x_batch)
-
-        return val_losses
+        return losses

@@ -322,14 +322,7 @@ class NeuralInference(ABC):
     def _get_start_index(self, discard_prior_samples: bool) -> int: ...
 
     @abstractmethod
-    def _get_training_losses(
-        self, batch: Any, loss_kwargs: Dict[str, Any]
-    ) -> Tensor: ...
-
-    @abstractmethod
-    def _get_validation_losses(
-        self, batch: Any, loss_kwargs: Dict[str, Any]
-    ) -> Tensor: ...
+    def _get_losses(self, batch: Any, loss_kwargs: Dict[str, Any]) -> Tensor: ...
 
     @abstractmethod
     def _get_potential_function(
@@ -1013,7 +1006,7 @@ class NeuralInference(ABC):
         train_loss_sum = 0
         for batch in train_loader:
             self.optimizer.zero_grad()
-            train_losses = self._get_training_losses(batch, loss_kwargs=loss_kwargs)
+            train_losses = self._get_losses(batch=batch, loss_kwargs=loss_kwargs)
             train_loss = torch.mean(train_losses)
             train_loss_sum += train_losses.sum().item()
 
@@ -1050,10 +1043,7 @@ class NeuralInference(ABC):
         val_loss_sum = 0
         with torch.no_grad():
             for batch in val_loader:
-                val_losses = self._get_validation_losses(
-                    batch=batch,
-                    loss_kwargs=loss_kwargs,
-                )
+                val_losses = self._get_losses(batch=batch, loss_kwargs=loss_kwargs)
                 val_loss_sum += val_losses.sum().item()
 
         # Take mean over all validation samples.

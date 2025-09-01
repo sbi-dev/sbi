@@ -8,6 +8,7 @@ from typing import Any, Callable, Dict, Literal, Optional, Protocol, Tuple, Unio
 import torch
 from torch import Tensor, ones
 from torch.distributions import Distribution
+from torch.utils import data
 from torch.utils.tensorboard.writer import SummaryWriter
 from typing_extensions import Self
 
@@ -326,7 +327,7 @@ class VectorFieldTrainer(NeuralInference, ABC):
             proposal=proposal,
             calibration_kernel=calibration_kernel,
             force_first_round_loss=force_first_round_loss,
-            validation_times=validation_times,
+            times=validation_times,
         )
 
         summarization_kwargs = dict(ema_loss_decay=ema_loss_decay)
@@ -490,21 +491,48 @@ class VectorFieldTrainer(NeuralInference, ABC):
         assert_all_finite(loss, f"{cls_name} loss")
         return calibration_kernel(x) * loss
 
-    def _get_training_losses(self, batch: Any, loss_kwargs: Dict[str, Any]) -> Tensor:
+    def _get_losses(self, batch: Any, loss_kwargs: Dict[str, Any]) -> Tensor:
         """
-        Compute training losses for a batch of data.
+        Compute losses for a batch of data.
 
         Args:
             batch: A batch of data.
             loss_kwargs: Additional keyword arguments passed to self._loss fn.
 
         Returns:
-            A tensor containing the computed training losses for each sample
-            in the batch.
+            A tensor containing the computed losses for each sample in the batch.
         """
 
-        # Skip validation_times as it is only used in _get_validation_losses method
-        loss_kwargs = {k: v for k, v in loss_kwargs.items() if k != "validation_times"}
+        validation_times = loss_kwargs.get("times")
+
+        if validation_times is not None and isinstance(validation_times, Tensor):
+            loss_kwargs = loss_kwargs.copy()
+
+            theta_batch, x_batch, masks_batch = (
+                batch[0].to(self._device),
+                batch[1].to(self._device),
+                batch[2].to(self._device),
+            )
+
+            # For validation loss, we evaluate at a fixed set of times to reduce
+            # the variance in the validation loss, for improved convergence
+            # checks. We evaluate the entire validation batch at all times, so
+            # we repeat the batches here to match.
+            val_batch_size = theta_batch.shape[0]
+            times_batch = validation_times.shape[0]
+            theta_batch = theta_batch.repeat(
+                times_batch, *([1] * (theta_batch.ndim - 1))
+            )
+            x_batch = x_batch.repeat(times_batch, *([1] * (x_batch.ndim - 1)))
+            masks_batch = masks_batch.repeat(
+                times_batch, *([1] * (masks_batch.ndim - 1))
+            )
+
+            validation_times_rep = validation_times.repeat_interleave(
+                val_batch_size, dim=0
+            )
+
+            loss_kwargs["times"] = validation_times_rep
 
         # Get batches on current device.
         theta_batch, x_batch, masks_batch = (
@@ -513,61 +541,42 @@ class VectorFieldTrainer(NeuralInference, ABC):
             batch[2].to(self._device),
         )
 
-        train_losses = self._loss(
+        losses = self._loss(
             theta=theta_batch,
             x=x_batch,
             masks=masks_batch,
             **loss_kwargs,
         )
-        return train_losses
+        return losses
 
-    def _get_validation_losses(self, batch: Any, loss_kwargs: Dict[str, Any]) -> Tensor:
+    def _train_epoch(
+        self,
+        train_loader: data.DataLoader,
+        clip_max_norm: Optional[float],
+        loss_kwargs: Dict[str, Any],
+    ) -> float:
         """
-        Compute validation losses for a batch of data.
+        Override the parent method for performing a single training epoch over the
+        provided training data to remove times from `loss_kwargs` as it is only used
+        when calculating the validation loss.
 
         Args:
-            batch: A batch of data.
-            loss_kwargs: Additional keyword arguments passed to self._loss fn.
+            train_loader: Dataloader for training.
+            clip_max_norm: Value at which to clip the total gradient norm in order to
+                prevent exploding gradients. Use None for no clipping.
+            loss_kwargs: Additional or updated kwargs to be passed to the self._loss fn.
 
         Returns:
-            A tensor containing the computed validation losses for each sample
-            in the batch.
+            The average training loss over all samples in the epoch.
         """
 
-        validation_times = loss_kwargs.get("validation_times")
+        loss_kwargs = {k: v for k, v in loss_kwargs.items() if k != "times"}
 
-        assert validation_times is not None and isinstance(validation_times, Tensor)
-
-        loss_kwargs = {k: v for k, v in loss_kwargs.items() if k != "validation_times"}
-
-        theta_batch, x_batch, masks_batch = (
-            batch[0].to(self._device),
-            batch[1].to(self._device),
-            batch[2].to(self._device),
+        return super()._train_epoch(
+            train_loader=train_loader,
+            clip_max_norm=clip_max_norm,
+            loss_kwargs=loss_kwargs,
         )
-
-        # For validation loss, we evaluate at a fixed set of times to reduce
-        # the variance in the validation loss, for improved convergence
-        # checks. We evaluate the entire validation batch at all times, so
-        # we repeat the batches here to match.
-        val_batch_size = theta_batch.shape[0]
-        times_batch = validation_times.shape[0]
-        theta_batch = theta_batch.repeat(times_batch, *([1] * (theta_batch.ndim - 1)))
-        x_batch = x_batch.repeat(times_batch, *([1] * (x_batch.ndim - 1)))
-        masks_batch = masks_batch.repeat(times_batch, *([1] * (masks_batch.ndim - 1)))
-
-        validation_times_rep = validation_times.repeat_interleave(val_batch_size, dim=0)
-
-        # Take negative loss here to get validation log_prob.
-        val_losses = self._loss(
-            theta=theta_batch,
-            x=x_batch,
-            masks=masks_batch,
-            times=validation_times_rep,
-            **loss_kwargs,
-        )
-
-        return val_losses
 
     def _summarize_epoch(
         self,
