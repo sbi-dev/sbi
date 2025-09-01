@@ -960,10 +960,11 @@ class NeuralInference(ABC):
 
             # Calculate validation performance.
             self._neural_net.eval()
-            val_loss = self._validate_epoch(val_loader, loss_kwargs)
+
+            self._val_loss = self._validate_epoch(val_loader, loss_kwargs)
 
             self._summarize_epoch(
-                train_loss, val_loss, epoch_start_time, summarization_kwargs
+                train_loss, self._val_loss, epoch_start_time, summarization_kwargs
             )
 
             self.epoch += 1
@@ -1085,10 +1086,8 @@ class NeuralInference(ABC):
         """
 
         self._summary["training_loss"].append(train_loss)
-
-        self._val_loss = val_loss
         # Log validation loss for every epoch.
-        self._summary["validation_loss"].append(self._val_loss)
+        self._summary["validation_loss"].append(val_loss)
         self._summary["epoch_durations_sec"].append(time.time() - epoch_start_time)
 
     def _converged(self, epoch: int, stop_after_epochs: int) -> bool:
