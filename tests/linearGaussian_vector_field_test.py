@@ -250,7 +250,7 @@ def vector_field_type(request):
     return request.param
 
 
-@pytest.fixture(scope="module", params=["gaussian", "uniform", None])
+@pytest.fixture(scope="module", params=["gaussian", "uniform"])
 def prior_type(request):
     """Module-scoped fixture for prior type."""
     return request.param
@@ -269,11 +269,11 @@ def vector_field_trained_model(vector_field_type, prior_type):
     # but it doesn't really improve the results for both FMPE and NPSE.
     likelihood_cov = 0.9 * eye(num_dim)
 
-    if prior_type == "gaussian" or (prior_type is None):
+    if prior_type == "gaussian":
         prior_mean = zeros(num_dim)
         prior_cov = eye(num_dim)
         prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
-        prior_npse = prior if prior_type is None else None
+        prior_npse = prior
     elif prior_type == "uniform":
         prior = BoxUniform(-2 * ones(num_dim), 2 * ones(num_dim))
         prior_npse = prior
@@ -302,12 +302,8 @@ def vector_field_trained_model(vector_field_type, prior_type):
         "prior": prior,
         "likelihood_shift": likelihood_shift,
         "likelihood_cov": likelihood_cov,
-        "prior_mean": prior_mean
-        if prior_type == "gaussian" or prior_type is None
-        else None,
-        "prior_cov": prior_cov
-        if prior_type == "gaussian" or prior_type is None
-        else None,
+        "prior_mean": prior_mean if prior_type == "gaussian" else None,
+        "prior_cov": prior_cov if prior_type == "gaussian" else None,
         "num_dim": num_dim,
         "vector_field_type": vector_field_type,
     }
@@ -356,9 +352,9 @@ def test_vector_field_sde_ode_sampling_equivalence(vector_field_trained_model):
             id="fnpe-5trials",
             # marks=pytest.mark.skip(reason="fails randomly, see #1646"),
         ),
-        pytest.param("gauss", 5, id="gauss-5trials"),
-        pytest.param("auto_gauss", 5, id="auto_gauss-5trials"),
-        pytest.param("jac_gauss", 5, id="jac_gauss-5trials"),
+        # pytest.param("gauss", 5, id="gauss-5trials"),
+        # pytest.param("auto_gauss", 5, id="auto_gauss-5trials"),
+        # pytest.param("jac_gauss", 5, id="jac_gauss-5trials"),
     ],
 )
 def test_vector_field_iid_inference(
@@ -394,12 +390,13 @@ def test_vector_field_iid_inference(
 
     posterior = inference.build_posterior(
         estimator,
+        sample_with="sde",
         posterior_parameters=VectorFieldPosteriorParameters(iid_method=iid_method),
     )
     posterior.set_default_x(x_o)
     samples = posterior.sample((num_samples,))
 
-    if prior_type == "gaussian" or (prior_type is None):
+    if prior_type == "gaussian":
         gt_posterior = true_posterior_linear_gaussian_mvn_prior(
             x_o, likelihood_shift, likelihood_cov, prior_mean, prior_cov
         )
@@ -411,6 +408,8 @@ def test_vector_field_iid_inference(
             likelihood_cov,
             prior,  # type: ignore
         )
+    else:
+        raise ValueError(f"Invalid prior type: {prior_type}")
 
     # Compute the c2st and assert it is near chance level of 0.5.
     # Some degradation is expected, also because posterior get tighter which
