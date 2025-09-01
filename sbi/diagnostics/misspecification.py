@@ -156,7 +156,10 @@ def calc_misspecification_mmd(
                 stacklevel=2,
             )
         if inference._neural_net.embedding_net is None:
-            raise AttributeError("embedding_net attribute is None but is required for misspecification detection.")
+            raise AttributeError(
+                "embedding_net attribute is None but is required for misspecification"
+                " detection."
+            )
 
         z_obs = inference._neural_net.embedding_net(x_obs).detach()
         z = inference._neural_net.embedding_net(x).detach()
