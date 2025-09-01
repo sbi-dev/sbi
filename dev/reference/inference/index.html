@@ -14,7 +14,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.17">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.18">
     
     
       
@@ -31,6 +31,8 @@
   
   
     
+      
+      
     
   
   
@@ -989,6 +991,7 @@ last round. In the last round, NPE-A can use a Mixture of Gaussians.</p>
 
 
 
+
               <details class="quote">
                 <summary>Source code in <code>sbi/inference/trainers/npe/npe_a.py</code></summary>
                 <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 34</span>
@@ -1692,6 +1695,7 @@ last round. In the last round, NPE-A can use a Mixture of Gaussians.</p>
 
 
   <div class="doc doc-children">
+
 
 
 
@@ -2935,6 +2939,7 @@ Thus, SNPE-B is not limited to Gaussian proposal.</p>
 
 
 
+
               <details class="quote">
                 <summary>Source code in <code>sbi/inference/trainers/npe/npe_b.py</code></summary>
                 <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 20</span>
@@ -3182,6 +3187,7 @@ Thus, SNPE-B is not limited to Gaussian proposal.</p>
 
 
   <div class="doc doc-children">
+
 
 
 
@@ -3453,6 +3459,7 @@ following criteria are fulfilled:</p>
 <p>Note that custom implementations of any of these densities (or estimators) will
 not trigger the non-atomic loss, and the algorithm will fall back onto using
 the atomic loss.</p>
+
 
 
 
@@ -4772,6 +4779,7 @@ the atomic loss.</p>
 
 
 
+
 <div class="doc doc-object doc-function">
 
 
@@ -5526,6 +5534,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 
 
 
+
               <details class="quote">
                 <summary>Source code in <code>sbi/inference/trainers/vfpe/fmpe.py</code></summary>
                 <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 22</span>
@@ -5749,6 +5758,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 
 
   <div class="doc doc-children">
+
 
 
 
@@ -6314,6 +6324,7 @@ not tested yet.</p>
 
 
 
+
               <details class="quote">
                 <summary>Source code in <code>sbi/inference/trainers/vfpe/npse.py</code></summary>
                 <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 20</span>
@@ -6581,6 +6592,7 @@ not tested yet.</p>
 
 
   <div class="doc doc-children">
+
 
 
 
@@ -7193,6 +7205,7 @@ VectorFieldPosterior.</p>
 
 
 
+
               <details class="quote">
                 <summary>Source code in <code>sbi/inference/trainers/nle/nle_a.py</code></summary>
                 <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">14</span>
@@ -7288,6 +7301,7 @@ VectorFieldPosterior.</p>
 
 
   <div class="doc doc-children">
+
 
 
 
@@ -7547,6 +7561,7 @@ sampling.</p>
 
 
 
+
               <details class="quote">
                 <summary>Source code in <code>sbi/inference/trainers/nre/nre_a.py</code></summary>
                 <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 19</span>
@@ -7790,6 +7805,7 @@ sampling.</p>
 
 
   <div class="doc doc-children">
+
 
 
 
@@ -8407,6 +8423,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 
 
 
+
               <details class="quote">
                 <summary>Source code in <code>sbi/inference/trainers/nre/nre_b.py</code></summary>
                 <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 19</span>
@@ -8646,6 +8663,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 
 
   <div class="doc doc-children">
+
 
 
 
@@ -9268,6 +9286,7 @@ will be estimated only up to a function (normalizing constant) of the data
 
 
 
+
               <details class="quote">
                 <summary>Source code in <code>sbi/inference/trainers/nre/nre_c.py</code></summary>
                 <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 19</span>
@@ -9671,6 +9690,7 @@ will be estimated only up to a function (normalizing constant) of the data
 
 
   <div class="doc doc-children">
+
 
 
 
@@ -10351,6 +10371,7 @@ NeurIPS 2022. <a href="https://arxiv.org/abs/2208.13624">https://arxiv.org/abs/2
 
 
 
+
               <details class="quote">
                 <summary>Source code in <code>sbi/inference/trainers/nre/bnre.py</code></summary>
                 <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 17</span>
@@ -10630,6 +10651,7 @@ NeurIPS 2022. <a href="https://arxiv.org/abs/2208.13624">https://arxiv.org/abs/2
 
 
   <div class="doc doc-children">
+
 
 
 
@@ -11032,6 +11054,7 @@ dataloader_kwargs: Additional or updated kwargs to be passed to the training
 
 
         <p>Monte-Carlo Approximate Bayesian Computation (Rejection ABC).</p>
+
 
 
 
@@ -11480,6 +11503,7 @@ dataloader_kwargs: Additional or updated kwargs to be passed to the training
 
 
   <div class="doc doc-children">
+
 
 
 
@@ -12412,6 +12436,7 @@ all simulations at the same time.</p>
 
 
         <p>Sequential Monte Carlo Approximate Bayesian Computation.</p>
+
 
 
 
@@ -13984,6 +14009,7 @@ all simulations at the same time.</p>
 
 
   <div class="doc doc-children">
+
 
 
 
@@ -16258,7 +16284,8 @@ simulator = process_simulator(simulator, prior, prior_returns_numpy)
   
 </div>
       
-        <div class="md-social">
+        
+<div class="md-social">
   
     
     
