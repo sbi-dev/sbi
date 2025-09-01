@@ -19,7 +19,6 @@ from sbi.inference.trainers.npe.npe_base import (
 from sbi.neural_nets.estimators.base import (
     ConditionalDensityEstimator,
     ConditionalEstimatorBuilder,
-    ConditionalVectorFieldEstimator,
 )
 from sbi.sbi_types import TensorBoardSummaryWriter
 from sbi.utils import torchutils
@@ -55,7 +54,6 @@ class NPE_A(PosteriorEstimatorTrainer):
         prior: Optional[Distribution] = None,
         density_estimator: Union[
             Literal["mdn_snpe_a"],
-            ConditionalEstimatorBuilder[ConditionalVectorFieldEstimator],
             ConditionalEstimatorBuilder[ConditionalDensityEstimator],
         ] = "mdn_snpe_a",
         num_components: int = 10,
@@ -78,13 +76,13 @@ class NPE_A(PosteriorEstimatorTrainer):
                 will be called with the first batch of simulations (theta, x), which can
                 thus be used for shape inference and potentially for z-scoring. The
                 density estimator needs to provide the methods `.log_prob` and
-                `.sample()` and must return either a `ConditionalVectorFieldEstimator`
-                or `ConditionalDensityEstimator`. Note that until the last round only
-                a single (multivariate) Gaussian component is used for training
-                (seeAlgorithm 1 in [1]). In the last round, this component is replicated
-                `num_components` times, its parameters are perturbed with a very small
-                noise, and then the last training round is done with the expanded
-                Gaussian mixture as estimator for the proposal posterior.
+                `.sample()` and must return a `ConditionalDensityEstimator`.
+                Note that until the last round only a single (multivariate) Gaussian
+                component is used for training (seeAlgorithm 1 in [1]). In the last
+                round, this component is replicated `num_components` times,
+                its parameters are perturbed with a very small noise, and then the last
+                training round is done with the expanded Gaussian mixture as estimator
+                for the proposal posterior.
             num_components: Number of components of the mixture of Gaussians in the
                 last round. This overrides the `num_components` value passed to
                 `posterior_nn()`.

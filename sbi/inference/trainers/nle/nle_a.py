@@ -9,7 +9,6 @@ from sbi.inference.trainers.nle.nle_base import LikelihoodEstimatorTrainer
 from sbi.neural_nets.estimators.base import (
     ConditionalDensityEstimator,
     ConditionalEstimatorBuilder,
-    ConditionalVectorFieldEstimator,
 )
 from sbi.sbi_types import TensorBoardSummaryWriter
 from sbi.utils.sbiutils import del_entries
@@ -28,7 +27,6 @@ class NLE_A(LikelihoodEstimatorTrainer):
         prior: Optional[Distribution] = None,
         density_estimator: Union[
             Literal["nsf", "maf", "mdn", "made"],
-            ConditionalEstimatorBuilder[ConditionalVectorFieldEstimator],
             ConditionalEstimatorBuilder[ConditionalDensityEstimator],
         ] = "maf",
         device: str = "cpu",
@@ -49,8 +47,7 @@ class NLE_A(LikelihoodEstimatorTrainer):
                 will be called with the first batch of simulations (theta, x), which can
                 thus be used for shape inference and potentially for z-scoring. The
                 density estimator needs to provide the methods `.log_prob` and
-                `.sample()` and must return either a `ConditionalVectorFieldEstimator`
-                or `ConditionalDensityEstimator`.
+                `.sample()` and must return a `ConditionalDensityEstimator`.
             device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.
