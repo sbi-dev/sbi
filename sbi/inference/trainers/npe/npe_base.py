@@ -577,6 +577,19 @@ class PosteriorEstimatorTrainer(NeuralInference, ABC):
         force_first_round_loss: bool,
         resume_training: bool,
     ) -> int:
+        """
+        Determine the starting index for training based on previous rounds.
+
+        Args:
+            discard_prior_samples: Whether to discard samples simulated in round 1, i.e.
+                from the prior.
+
+        Returns:
+            If `discard_prior_samples` is True and previous rounds exist,
+            the method will return 1 to skip samples from round 0; otherwise,
+            it returns 0.
+        """
+
         # Load data from most recent round.
         self._round = max(self._data_round_index)
 

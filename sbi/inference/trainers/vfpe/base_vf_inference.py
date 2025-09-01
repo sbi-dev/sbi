@@ -503,17 +503,15 @@ class VectorFieldTrainer(NeuralInference, ABC):
             A tensor containing the computed losses for each sample in the batch.
         """
 
+        # Get batches on current device.
+        theta_batch, x_batch, masks_batch = (
+            batch[0].to(self._device),
+            batch[1].to(self._device),
+            batch[2].to(self._device),
+        )
+
         validation_times = loss_kwargs.get("times")
-
         if validation_times is not None and isinstance(validation_times, Tensor):
-            loss_kwargs = loss_kwargs.copy()
-
-            theta_batch, x_batch, masks_batch = (
-                batch[0].to(self._device),
-                batch[1].to(self._device),
-                batch[2].to(self._device),
-            )
-
             # For validation loss, we evaluate at a fixed set of times to reduce
             # the variance in the validation loss, for improved convergence
             # checks. We evaluate the entire validation batch at all times, so
@@ -532,14 +530,8 @@ class VectorFieldTrainer(NeuralInference, ABC):
                 val_batch_size, dim=0
             )
 
+            loss_kwargs = loss_kwargs.copy()
             loss_kwargs["times"] = validation_times_rep
-
-        # Get batches on current device.
-        theta_batch, x_batch, masks_batch = (
-            batch[0].to(self._device),
-            batch[1].to(self._device),
-            batch[2].to(self._device),
-        )
 
         losses = self._loss(
             theta=theta_batch,
@@ -583,8 +575,22 @@ class VectorFieldTrainer(NeuralInference, ABC):
         train_loss: float,
         val_loss: float,
         epoch_start_time: float,
-        summarization_kwargs: dict,
+        summarization_kwargs: Dict[str, Any],
     ) -> None:
+        """
+        Override base class method to pass additional arguments through
+        summarization_kwargs and log exponential moving average for the validation
+        and training losses.
+
+        Args:
+            train_loss: The average training loss for the epoch.
+            val_loss: The average validation loss for the epoch.
+            epoch_start_time: Timestamp when the epoch started, used to compute
+                duration.
+            summarization_kwargs: Additional keyword arguments for customizing
+                the summarization.
+        """
+
         ema_loss_decay = summarization_kwargs.get("ema_loss_decay")
         assert ema_loss_decay is not None and isinstance(ema_loss_decay, float)
 
@@ -619,6 +625,19 @@ class VectorFieldTrainer(NeuralInference, ABC):
         force_first_round_loss: bool,
         resume_training: bool,
     ) -> int:
+        """
+        Determine the starting index for training based on previous rounds.
+
+        Args:
+            discard_prior_samples: Whether to discard samples simulated in round 1, i.e.
+                from the prior.
+
+        Returns:
+            If `discard_prior_samples` is True and previous rounds exist,
+            the method will return 1 to skip samples from round 0; otherwise,
+            it returns 0.
+        """
+
         # Load data from most recent round.
         self._round = max(self._data_round_index)
 
