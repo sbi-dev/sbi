@@ -40,7 +40,8 @@ METHOD_GROUPS = {
     "snpe": [NPE_C],  # NPE_B not implemented, NPE_A need Gaussian prior
     "snle": [NLE],
     "snre": [NRE_A, NRE_B, NRE_C, BNRE],
-    "simformer": [Simformer, FlowMatchingSimformer],
+    "simformer": [Simformer],
+    "flow-simformer": [FlowMatchingSimformer],
 }
 METHOD_PARAMS = {
     "none": [{}],
@@ -58,6 +59,7 @@ METHOD_PARAMS = {
     "snle": [{}],
     "snre": [{}],
     "simformer": [{}],
+    "flow-simformer": [{}],
 }
 
 
