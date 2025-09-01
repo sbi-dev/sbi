@@ -14,10 +14,7 @@ from sbi.inference.posteriors.posterior_parameters import (
 )
 from sbi.inference.trainers.nle.nle_base import LikelihoodEstimatorTrainer
 from sbi.neural_nets.estimators import MixedDensityEstimator
-from sbi.neural_nets.estimators.base import (
-    ConditionalDensityEstimator,
-    ConditionalEstimatorBuilder,
-)
+from sbi.neural_nets.estimators.base import ConditionalEstimatorBuilder
 from sbi.sbi_types import TensorBoardSummaryWriter
 from sbi.utils.sbiutils import del_entries
 
@@ -39,7 +36,7 @@ class MNLE(LikelihoodEstimatorTrainer):
         prior: Optional[Distribution] = None,
         density_estimator: Union[
             Literal["mnle"],
-            ConditionalEstimatorBuilder[ConditionalDensityEstimator],
+            ConditionalEstimatorBuilder[MixedDensityEstimator],
         ] = "mnle",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
@@ -59,7 +56,7 @@ class MNLE(LikelihoodEstimatorTrainer):
                 will be called with the first batch of simulations (theta, x), which can
                 thus be used for shape inference and potentially for z-scoring. The
                 density estimator needs to provide the methods `.log_prob` and
-                `.sample()` and must return a `ConditionalDensityEstimator`.
+                `.sample()` and must return a `MixedDensityEstimator`.
             device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.
