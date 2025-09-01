@@ -66,6 +66,17 @@ def reshape_to_batch_event(theta_or_x: Tensor, event_shape: torch.Size) -> Tenso
     Returns:
         A tensor of shape `(batch, event)`.
     """
+    # Check for degenerate case, it is used by the Simformer
+    # when the user requires a full latent tensor, i.e., the user
+    # is effectively using the Simformer as a "data generator"
+    if event_shape == torch.Size([0]):
+        if theta_or_x.numel() == 0:
+            return theta_or_x
+        else:
+            raise ValueError(
+                "event_shape is torch.Size([0]) but theta_or_x is not an empty tensor."
+            )
+
     # `2` for image data, `3` for video data, ...
     event_shape_dim = len(event_shape)
 

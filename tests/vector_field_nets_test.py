@@ -12,6 +12,7 @@ import torch.nn as nn
 from sbi.neural_nets.embedding_nets import CNNEmbedding
 from sbi.neural_nets.net_builders.vector_field_nets import (
     build_adamlp_network,
+    build_simformer_network,
     build_standard_mlp_network,
     build_transformer_network,
 )
@@ -135,5 +136,58 @@ def test_vector_field_builders_shape_and_build(
         inputs,
         conditions if embedding_net is nn.Identity else embedding_net(conditions),
         t,
+    )
+    assert out.shape == inputs.shape
+
+
+SIMFORMER_CASE = [
+    pytest.param(
+        build_simformer_network,
+        kw,
+        id="simformer-" + "-".join(f"{k}={v}" for k, v in kw.items()),
+    )
+    for kw in _grid(
+        hidden_features=[64, 128],
+        num_blocks=[2, 4],
+        num_heads=[4, 8],
+        mlp_ratio=[2, 4, 8],
+        ada_time=[True, False],
+    )
+]
+
+
+@pytest.mark.parametrize("builder, builder_kwargs", SIMFORMER_CASE)
+@pytest.mark.parametrize("time_emb_type", ["sinusoidal", "random_fourier"])
+@pytest.mark.parametrize("time_embedding_dim", [8, 16])
+@pytest.mark.parametrize("batch_dim", [1, 3])
+@pytest.mark.parametrize("input_dim", [(1,), (3,), (1, 1), (2, 1), (3, 5)])
+def test_simformer_builder_shape_and_build(
+    builder,
+    builder_kwargs,
+    time_emb_type,
+    time_embedding_dim,
+    batch_dim,
+    input_dim,
+):
+    # Inputs / conditions
+    x = torch.randn(10, *input_dim)
+
+    net = builder(
+        batch_x=x,
+        batch_y=x,
+        time_embedding_dim=time_embedding_dim,
+        time_emb_type=time_emb_type,
+        **builder_kwargs,
+    )
+
+    # Forward pass
+    inputs = torch.randn(batch_dim, *input_dim)
+    t = torch.rand(batch_dim)
+    condition_mask = torch.ones(input_dim[0], dtype=torch.bool)
+
+    out = net(
+        inputs,
+        t,
+        condition_mask=condition_mask,
     )
     assert out.shape == inputs.shape
