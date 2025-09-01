@@ -26,9 +26,7 @@ from sbi.inference.potentials.likelihood_based_potential import LikelihoodBasedP
 from sbi.inference.trainers.base import NeuralInference
 from sbi.neural_nets import likelihood_nn
 from sbi.neural_nets.estimators import ConditionalDensityEstimator
-from sbi.neural_nets.estimators.base import (
-    ConditionalEstimatorBuilder,
-)
+from sbi.neural_nets.estimators.base import ConditionalEstimatorBuilder
 from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
 )
