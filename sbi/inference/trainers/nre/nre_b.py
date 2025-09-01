@@ -10,7 +10,7 @@ from torch.distributions import Distribution
 from sbi.inference.trainers.nre.nre_base import (
     RatioEstimatorTrainer,
 )
-from sbi.neural_nets.estimators.base import DensityEstimatorBuilder
+from sbi.neural_nets.estimators.base import ConditionalEstimatorBuilder
 from sbi.neural_nets.ratio_estimators import RatioEstimator
 from sbi.sbi_types import TensorBoardSummaryWriter
 from sbi.utils.sbiutils import del_entries
@@ -27,7 +27,7 @@ class NRE_B(RatioEstimatorTrainer):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
-        classifier: Union[str, DensityEstimatorBuilder[RatioEstimator]] = "resnet",
+        classifier: Union[str, ConditionalEstimatorBuilder[RatioEstimator]] = "resnet",
         device: str = "cpu",
         logging_level: Union[int, str] = "warning",
         summary_writer: Optional[TensorBoardSummaryWriter] = None,
@@ -42,7 +42,7 @@ class NRE_B(RatioEstimatorTrainer):
             classifier: Classifier trained to approximate likelihood ratios. If it is
                 a string, use a pre-configured network of the provided type (one of
                 linear, mlp, resnet), or a callable that implements the
-                `DensityEstimatorBuilder` protocol. The callable will
+                `ConditionalEstimatorBuilder` protocol. The callable will
                 be called with the first batch of simulations (theta, x), which can thus
                 be used for shape inference and potentially for z-scoring. It returns a
                 `RatioEstimator`.

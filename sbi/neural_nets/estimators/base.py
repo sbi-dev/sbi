@@ -14,7 +14,7 @@ ConditionalEstimatorType = TypeVar(
 )
 
 
-class DensityEstimatorBuilder(Protocol[ConditionalEstimatorType]):
+class ConditionalEstimatorBuilder(Protocol[ConditionalEstimatorType]):
     """Protocol for building a neural network from the data for the density
     estimator."""
 

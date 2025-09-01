@@ -25,7 +25,7 @@ from sbi.inference.potentials import ratio_estimator_based_potential
 from sbi.inference.potentials.ratio_based_potential import RatioBasedPotential
 from sbi.inference.trainers.base import NeuralInference
 from sbi.neural_nets import classifier_nn
-from sbi.neural_nets.estimators.base import DensityEstimatorBuilder
+from sbi.neural_nets.estimators.base import ConditionalEstimatorBuilder
 from sbi.neural_nets.ratio_estimators import RatioEstimator
 from sbi.sbi_types import TorchTransform
 from sbi.utils import (
@@ -39,7 +39,7 @@ class RatioEstimatorTrainer(NeuralInference, ABC):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
-        classifier: Union[str, DensityEstimatorBuilder[RatioEstimator]] = "resnet",
+        classifier: Union[str, ConditionalEstimatorBuilder[RatioEstimator]] = "resnet",
         device: str = "cpu",
         logging_level: Union[int, str] = "warning",
         summary_writer: Optional[SummaryWriter] = None,
@@ -66,7 +66,7 @@ class RatioEstimatorTrainer(NeuralInference, ABC):
             classifier: Classifier trained to approximate likelihood ratios. If it is
                 a string, use a pre-configured network of the provided type (one of
                 linear, mlp, resnet), or a callable that implements the
-                `DensityEstimatorBuilder` protocol. The callable will
+                `ConditionalEstimatorBuilder` protocol. The callable will
                 be called with the first batch of simulations (theta, x), which can thus
                 be used for shape inference and potentially for z-scoring. It returns a
                 `RatioEstimator`.

@@ -24,7 +24,7 @@ from sbi.inference.potentials.vector_field_potential import (
     vector_field_estimator_based_potential,
 )
 from sbi.neural_nets.estimators import ConditionalVectorFieldEstimator
-from sbi.neural_nets.estimators.base import DensityEstimatorBuilder
+from sbi.neural_nets.estimators.base import ConditionalEstimatorBuilder
 from sbi.sbi_types import TorchTransform
 from sbi.utils import (
     check_estimator_arg,
@@ -44,7 +44,7 @@ class VectorFieldTrainer(NeuralInference, ABC):
         prior: Optional[Distribution] = None,
         vector_field_estimator_builder: Union[
             Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
-            DensityEstimatorBuilder[ConditionalVectorFieldEstimator],
+            ConditionalEstimatorBuilder[ConditionalVectorFieldEstimator],
         ] = "mlp",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
@@ -63,7 +63,7 @@ class VectorFieldTrainer(NeuralInference, ABC):
             prior: Prior distribution.
             vector_field_estimator_builder: Neural network architecture for the
                 vector field estimator. Can be a string (e.g. 'mlp' or 'ada_mlp') or a
-                callable that implements the `DensityEstimatorBuilder` protocol
+                callable that implements the `ConditionalEstimatorBuilder` protocol
                 with `__call__` that receives `theta` and `x` and returns a
                 `ConditionalVectorFieldEstimator`.
             device: Device to run the training on.
@@ -103,7 +103,7 @@ class VectorFieldTrainer(NeuralInference, ABC):
         self,
         model: Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
         **kwargs,
-    ) -> DensityEstimatorBuilder[ConditionalVectorFieldEstimator]:
+    ) -> ConditionalEstimatorBuilder[ConditionalVectorFieldEstimator]:
         pass
 
     def append_simulations(

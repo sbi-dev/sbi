@@ -13,7 +13,7 @@ from sbi.inference.trainers.vfpe.base_vf_inference import (
     VectorFieldTrainer,
 )
 from sbi.neural_nets.estimators import ConditionalVectorFieldEstimator
-from sbi.neural_nets.estimators.base import DensityEstimatorBuilder
+from sbi.neural_nets.estimators.base import ConditionalEstimatorBuilder
 from sbi.neural_nets.factory import posterior_score_nn
 
 
@@ -33,12 +33,12 @@ class NPSE(VectorFieldTrainer):
         prior: Optional[Distribution] = None,
         vf_estimator: Union[
             Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
-            DensityEstimatorBuilder[ConditionalVectorFieldEstimator],
+            ConditionalEstimatorBuilder[ConditionalVectorFieldEstimator],
         ] = "mlp",
         score_estimator: Optional[
             Union[
                 Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
-                DensityEstimatorBuilder[ConditionalVectorFieldEstimator],
+                ConditionalEstimatorBuilder[ConditionalVectorFieldEstimator],
             ]
         ] = None,
         sde_type: Literal["vp", "ve", "subvp"] = "ve",
@@ -56,7 +56,7 @@ class NPSE(VectorFieldTrainer):
                 vector field estimator aiming to estimate the marginal scores of the
                 target diffusion process. Can be a string (e.g. 'mlp', 'ada_mlp',
                 'transformer' or 'transformer_cross_attn') or a callable that implements
-                the `DensityEstimatorBuilder` protocol with `__call__` that receives
+                the `ConditionalEstimatorBuilder` protocol with `__call__` that receives
                 `theta` and `x` and returns a `ConditionalVectorFieldEstimator`.
             score_estimator: Deprecated, use `vf_estimator` instead. When passed,
                 a warning is raised and the new `vf_estimator` default is used.
@@ -145,5 +145,5 @@ class NPSE(VectorFieldTrainer):
         self,
         model: Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
         **kwargs,
-    ) -> DensityEstimatorBuilder[ConditionalVectorFieldEstimator]:
+    ) -> ConditionalEstimatorBuilder[ConditionalVectorFieldEstimator]:
         return posterior_score_nn(model=model, **kwargs)

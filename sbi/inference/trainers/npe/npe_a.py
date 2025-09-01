@@ -18,8 +18,8 @@ from sbi.inference.trainers.npe.npe_base import (
 )
 from sbi.neural_nets.estimators.base import (
     ConditionalDensityEstimator,
+    ConditionalEstimatorBuilder,
     ConditionalVectorFieldEstimator,
-    DensityEstimatorBuilder,
 )
 from sbi.sbi_types import TensorBoardSummaryWriter
 from sbi.utils import torchutils
@@ -55,8 +55,8 @@ class NPE_A(PosteriorEstimatorTrainer):
         prior: Optional[Distribution] = None,
         density_estimator: Union[
             Literal["mdn_snpe_a"],
-            DensityEstimatorBuilder[ConditionalVectorFieldEstimator],
-            DensityEstimatorBuilder[ConditionalDensityEstimator],
+            ConditionalEstimatorBuilder[ConditionalVectorFieldEstimator],
+            ConditionalEstimatorBuilder[ConditionalDensityEstimator],
         ] = "mdn_snpe_a",
         num_components: int = 10,
         device: str = "cpu",
@@ -74,8 +74,8 @@ class NPE_A(PosteriorEstimatorTrainer):
             density_estimator: If it is a string (only "mdn_snpe_a" is valid), use a
                 pre-configured mixture of densities network. Alternatively, a function
                 that builds a custom neural network, which adheres to
-                `DensityEstimatorBuilder` protocol can be provided. The function will
-                be called with the first batch of simulations (theta, x), which can
+                `ConditionalEstimatorBuilder` protocol can be provided. The function
+                will be called with the first batch of simulations (theta, x), which can
                 thus be used for shape inference and potentially for z-scoring. The
                 density estimator needs to provide the methods `.log_prob` and
                 `.sample()` and must return either a `ConditionalVectorFieldEstimator`
