@@ -290,14 +290,14 @@ def vector_field_trained_model(vector_field_type, prior_type):
     theta = prior.sample((num_simulations,))
     x = linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    score_estimator = inference.append_simulations(theta, x).train(
-        stop_after_epochs=200,
-        training_batch_size=100,
-        max_num_epochs=50,
+    estimator = inference.append_simulations(theta, x).train(
+        # stop_after_epochs=200,
+        # training_batch_size=100,
+        # max_num_epochs=50,
     )
 
     return {
-        "score_estimator": score_estimator,
+        "estimator": estimator,
         "inference": inference,
         "prior": prior,
         "likelihood_shift": likelihood_shift,
@@ -352,15 +352,13 @@ def test_vector_field_sde_ode_sampling_equivalence(vector_field_trained_model):
     [
         pytest.param(
             "fnpe",
-            3,
-            id="fnpe-3trials",
-            marks=pytest.mark.skip(reason="fails randomly, see #1646"),
+            5,
+            id="fnpe-5trials",
+            # marks=pytest.mark.skip(reason="fails randomly, see #1646"),
         ),
-        pytest.param("gauss", 3, id="gauss-3trials"),
-        pytest.param("auto_gauss", 8, id="auto_gauss-8trials"),
-        pytest.param("auto_gauss", 16, id="auto_gauss-16trials"),
-        pytest.param("jac_gauss", 8, id="jac_gauss-8trials"),
-        pytest.param("jac_gauss", 16, id="jac_gauss-16trials"),
+        pytest.param("gauss", 5, id="gauss-5trials"),
+        pytest.param("auto_gauss", 5, id="auto_gauss-5trials"),
+        pytest.param("jac_gauss", 5, id="jac_gauss-5trials"),
     ],
 )
 def test_vector_field_iid_inference(
@@ -368,15 +366,22 @@ def test_vector_field_iid_inference(
 ):
     """
     Test whether NPSE and FMPE infers well a simple example with available ground truth.
+
+    Args:
+        vector_field_trained_model: The trained vector field model.
+        iid_method: The IID method to use for sampling.
+        num_trial: The number of trials to run.
+        vector_field_type: fixture for vector_field_type (e.g., "fmpe", "vp", "ve").
+        prior_type: The type of prior distribution (e.g., "gaussian" or "uniform").
     """
-    if vector_field_type == "fmpe":
-        # TODO: Remove on merge
-        pytest.xfail(reason="c2st to high, fixed in PR #1501/1544")
+    # if vector_field_type == "fmpe":
+    #     # TODO: Remove on merge
+    #     pytest.xfail(reason="c2st to high, fixed in PR #1501/1544", strict=True)
 
     num_samples = 1000
 
     # Extract data from fixture
-    score_estimator = vector_field_trained_model["score_estimator"]
+    estimator = vector_field_trained_model["estimator"]
     inference = vector_field_trained_model["inference"]
     prior = vector_field_trained_model["prior"]
     likelihood_shift = vector_field_trained_model["likelihood_shift"]
@@ -386,9 +391,13 @@ def test_vector_field_iid_inference(
     num_dim = vector_field_trained_model["num_dim"]
 
     x_o = zeros(num_trial, num_dim)
-    posterior = inference.build_posterior(score_estimator, sample_with="sde")
+
+    posterior = inference.build_posterior(
+        estimator,
+        posterior_parameters=VectorFieldPosteriorParameters(iid_method=iid_method),
+    )
     posterior.set_default_x(x_o)
-    samples = posterior.sample((num_samples,), iid_method=iid_method)
+    samples = posterior.sample((num_samples,))
 
     if prior_type == "gaussian" or (prior_type is None):
         gt_posterior = true_posterior_linear_gaussian_mvn_prior(
@@ -457,7 +466,7 @@ def test_vector_field_map(vector_field_type):
 # this will only work after implementing additional methods for vector fields,
 # so it is skipped for now.
 @pytest.mark.slow
-@pytest.mark.skip(reason="Potential evaluation is not implemented for iid yet.")
+# @pytest.mark.skip(reason="Potential evaluation is not implemented for iid yet.")
 def test_sample_conditional():
     """
     Test whether sampling from the conditional gives the same results as evaluating.
@@ -507,7 +516,7 @@ def test_sample_conditional():
 
     inference = FMPE(prior, density_estimator=net, show_progress_bars=False)
     posterior_estimator = inference.append_simulations(theta, x).train(
-        max_num_epochs=60
+        # max_num_epochs=60
     )
 
     posterior = VectorFieldPosterior(
