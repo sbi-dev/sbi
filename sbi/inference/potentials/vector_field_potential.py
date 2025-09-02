@@ -237,6 +237,8 @@ class VectorFieldBasedPotential(BasePotential):
                 "is not defined for this vector field estimator."
             )
 
+        device = theta.device
+
         if time is None:
             time = torch.tensor([self.vector_field_estimator.t_min])
 
@@ -249,14 +251,17 @@ class VectorFieldBasedPotential(BasePotential):
         with torch.set_grad_enabled(track_gradients):
             if not self.x_is_iid or self._x_o.shape[0] == 1:
                 score = self.vector_field_estimator.score(
-                    input=theta, condition=self.x_o, t=time
+                    input=theta, condition=self.x_o, t=time.to(device)
                 )
             else:
                 assert self.prior is not None, "Prior is required for iid methods."
 
                 iid_method = get_iid_method(self.iid_method)
                 score_fn_iid = iid_method(
-                    self.vector_field_estimator, self.prior, **(self.iid_params or {})
+                    self.vector_field_estimator,
+                    self.prior,
+                    device=device,
+                    **(self.iid_params or {}),
                 )
 
                 score = score_fn_iid(theta, self.x_o, time)
