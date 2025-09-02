@@ -52,7 +52,6 @@ from sbi.neural_nets.estimators.base import (
     ConditionalEstimator,
     ConditionalVectorFieldEstimator,
 )
-from sbi.neural_nets.ratio_estimators import RatioEstimator
 from sbi.sbi_types import TorchTransform
 from sbi.utils import (
     check_prior,
@@ -328,7 +327,7 @@ class NeuralInference(ABC):
     def _get_potential_function(
         self,
         prior: Distribution,
-        estimator: Union[RatioEstimator, ConditionalEstimator],
+        estimator: ConditionalEstimator,
     ) -> Tuple[BasePotential, TorchTransform]:
         """Subclass-specific potential creation"""
         ...
@@ -430,7 +429,7 @@ class NeuralInference(ABC):
 
     def build_posterior(
         self,
-        estimator: Optional[Union[RatioEstimator, ConditionalEstimator]],
+        estimator: Optional[ConditionalEstimator],
         prior: Optional[Distribution],
         sample_with: Literal[
             "mcmc", "rejection", "vi", "importance", "direct", "sde", "ode"
@@ -515,8 +514,8 @@ class NeuralInference(ABC):
         return prior
 
     def _resolve_estimator(
-        self, estimator: Optional[Union[RatioEstimator, ConditionalEstimator]]
-    ) -> Tuple[Union[RatioEstimator, ConditionalEstimator], str]:
+        self, estimator: Optional[ConditionalEstimator]
+    ) -> Tuple[ConditionalEstimator, str]:
         """
         Resolves the estimator and determines its device.
 
@@ -539,9 +538,9 @@ class NeuralInference(ABC):
             # If internal net is used device is defined.
             device = self._device
         else:
-            if not isinstance(estimator, (ConditionalEstimator, RatioEstimator)):
+            if not isinstance(estimator, ConditionalEstimator):
                 raise TypeError(
-                    "estimator must be ConditionalEstimator or RatioEstimator,"
+                    "estimator must be ConditionalEstimator,"
                     f" got {type(estimator).__name__}",
                 )
             # Otherwise, infer it from the device of the net parameters.
@@ -773,7 +772,7 @@ class NeuralInference(ABC):
 
     def _create_posterior(
         self,
-        estimator: Union[RatioEstimator, ConditionalEstimator],
+        estimator: ConditionalEstimator,
         prior: Distribution,
         sample_with: Literal[
             "mcmc", "rejection", "vi", "importance", "direct", "sde", "ode"

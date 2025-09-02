@@ -22,7 +22,7 @@ from sbi.inference.potentials.likelihood_based_potential import LikelihoodBasedP
 from sbi.inference.trainers.base import NeuralInference
 from sbi.neural_nets import likelihood_nn
 from sbi.neural_nets.estimators import ConditionalDensityEstimator
-from sbi.neural_nets.estimators.base import DensityEstimatorBuilder
+from sbi.neural_nets.estimators.base import ConditionalEstimatorBuilder
 from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
 )
@@ -36,7 +36,8 @@ class LikelihoodEstimatorTrainer(NeuralInference, ABC):
         self,
         prior: Optional[Distribution] = None,
         density_estimator: Union[
-            Literal["nsf", "maf", "mdn", "made"], DensityEstimatorBuilder
+            Literal["nsf", "maf", "mdn", "made"],
+            ConditionalEstimatorBuilder[ConditionalDensityEstimator],
         ] = "maf",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
@@ -53,11 +54,11 @@ class LikelihoodEstimatorTrainer(NeuralInference, ABC):
             density_estimator: If it is a string, use a pre-configured network of the
                 provided type (one of nsf, maf, mdn, made). Alternatively, a function
                 that builds a custom neural network, which adheres to
-                `DensityEstimatorBuilder` protocol can be provided. The function will
-                be called with the first batch of simulations (theta, x), which can
+                `ConditionalEstimatorBuilder` protocol can be provided. The function
+                will be called with the first batch of simulations (theta, x), which can
                 thus be used for shape inference and potentially for z-scoring. The
                 density estimator needs to provide the methods `.log_prob` and
-                `.sample()`.
+                `.sample()` and must return a `ConditionalDensityEstimator`.
 
         See docstring of `NeuralInference` class for all other arguments.
         """

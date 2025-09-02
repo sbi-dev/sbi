@@ -6,7 +6,10 @@ from typing import Literal, Optional, Union
 from torch.distributions import Distribution
 
 from sbi.inference.trainers.nle.nle_base import LikelihoodEstimatorTrainer
-from sbi.neural_nets.estimators.base import DensityEstimatorBuilder
+from sbi.neural_nets.estimators.base import (
+    ConditionalDensityEstimator,
+    ConditionalEstimatorBuilder,
+)
 from sbi.sbi_types import TensorBoardSummaryWriter
 from sbi.utils.sbiutils import del_entries
 
@@ -23,7 +26,8 @@ class NLE_A(LikelihoodEstimatorTrainer):
         self,
         prior: Optional[Distribution] = None,
         density_estimator: Union[
-            Literal["nsf", "maf", "mdn", "made"], DensityEstimatorBuilder
+            Literal["nsf", "maf", "mdn", "made"],
+            ConditionalEstimatorBuilder[ConditionalDensityEstimator],
         ] = "maf",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
@@ -39,11 +43,11 @@ class NLE_A(LikelihoodEstimatorTrainer):
             density_estimator: If it is a string, use a pre-configured network of the
                 provided type (one of nsf, maf, mdn, made). Alternatively, a function
                 that builds a custom neural network, which adheres to
-                `DensityEstimatorBuilder` protocol can be provided. The function will
-                be called with the first batch of simulations (theta, x), which can
+                `ConditionalEstimatorBuilder` protocol can be provided. The function
+                will be called with the first batch of simulations (theta, x), which can
                 thus be used for shape inference and potentially for z-scoring. The
                 density estimator needs to provide the methods `.log_prob` and
-                `.sample()`.
+                `.sample()` and must return a `ConditionalDensityEstimator`.
             device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.
