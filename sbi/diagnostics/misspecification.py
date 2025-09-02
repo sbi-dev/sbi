@@ -155,6 +155,12 @@ def calc_misspecification_mmd(
                 "in that case the MMD is computed in the x-space.",
                 stacklevel=2,
             )
+        if inference._neural_net.embedding_net is None:
+            raise AttributeError(
+                "embedding_net attribute is None but is required for misspecification"
+                " detection."
+            )
+
         z_obs = inference._neural_net.embedding_net(x_obs).detach()
         z = inference._neural_net.embedding_net(x).detach()
     else:
