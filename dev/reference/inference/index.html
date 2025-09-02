@@ -1341,7 +1341,9 @@ last round. In the last round, NPE-A can use a Mixture of Gaussians.</p>
 <span class="normal">378</span>
 <span class="normal">379</span>
 <span class="normal">380</span>
-<span class="normal">381</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NPE_A</span><span class="p">(</span><span class="n">PosteriorEstimatorTrainer</span><span class="p">):</span>
+<span class="normal">381</span>
+<span class="normal">382</span>
+<span class="normal">383</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NPE_A</span><span class="p">(</span><span class="n">PosteriorEstimatorTrainer</span><span class="p">):</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Neural Posterior Estimation algorithm as in Papamakarios et al. (2016) [1].</span>
 
 <span class="sd">    [1] *Fast epsilon-free Inference of Simulation Models with Bayesian</span>
@@ -1363,7 +1365,8 @@ last round. In the last round, NPE-A can use a Mixture of Gaussians.</p>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span>
-            <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;mdn_snpe_a&quot;</span><span class="p">],</span> <span class="n">DensityEstimatorBuilder</span>
+            <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;mdn_snpe_a&quot;</span><span class="p">],</span>
+            <span class="n">ConditionalEstimatorBuilder</span><span class="p">[</span><span class="n">ConditionalDensityEstimator</span><span class="p">],</span>
         <span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;mdn_snpe_a&quot;</span><span class="p">,</span>
         <span class="n">num_components</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span>
         <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
@@ -1381,14 +1384,15 @@ last round. In the last round, NPE-A can use a Mixture of Gaussians.</p>
 <span class="sd">            density_estimator: If it is a string (only &quot;mdn_snpe_a&quot; is valid), use a</span>
 <span class="sd">                pre-configured mixture of densities network. Alternatively, a function</span>
 <span class="sd">                that builds a custom neural network, which adheres to</span>
-<span class="sd">                `DensityEstimatorBuilder` protocol can be provided. The function will</span>
-<span class="sd">                be called with the first batch of simulations (theta, x), which can</span>
+<span class="sd">                `ConditionalEstimatorBuilder` protocol can be provided. The function</span>
+<span class="sd">                will be called with the first batch of simulations (theta, x), which can</span>
 <span class="sd">                thus be used for shape inference and potentially for z-scoring. The</span>
 <span class="sd">                density estimator needs to provide the methods `.log_prob` and</span>
-<span class="sd">                `.sample()`. Note that until the last round only a single (multivariate)</span>
-<span class="sd">                Gaussian component is used for training (seeAlgorithm 1 in [1]). In the</span>
-<span class="sd">                last round, this component is replicated `num_components` times, its</span>
-<span class="sd">                parameters are perturbed with a very small noise, and then the last</span>
+<span class="sd">                `.sample()` and must return a `ConditionalDensityEstimator`.</span>
+<span class="sd">                Note that until the last round only a single (multivariate) Gaussian</span>
+<span class="sd">                component is used for training (seeAlgorithm 1 in [1]). In the last</span>
+<span class="sd">                round, this component is replicated `num_components` times,</span>
+<span class="sd">                its parameters are perturbed with a very small noise, and then the last</span>
 <span class="sd">                training round is done with the expanded Gaussian mixture as estimator</span>
 <span class="sd">                for the proposal posterior.</span>
 <span class="sd">            num_components: Number of components of the mixture of Gaussians in the</span>
@@ -1754,21 +1758,22 @@ distribution) can be used.</p>
                 <code>density_estimator</code>
             </td>
             <td>
-                  <code><span title="typing.Union">Union</span>[<span title="typing.Literal">Literal</span>[&#39;mdn_snpe_a&#39;], <span title="sbi.neural_nets.estimators.base.DensityEstimatorBuilder">DensityEstimatorBuilder</span>]</code>
+                  <code><span title="typing.Union">Union</span>[<span title="typing.Literal">Literal</span>[&#39;mdn_snpe_a&#39;], <span title="sbi.neural_nets.estimators.base.ConditionalEstimatorBuilder">ConditionalEstimatorBuilder</span>[<a class="autorefs autorefs-internal" title="ConditionalDensityEstimator (sbi.neural_nets.estimators.base.ConditionalDensityEstimator)" href="../models/#sbi.neural_nets.estimators.ConditionalDensityEstimator">ConditionalDensityEstimator</a>]]</code>
             </td>
             <td>
               <div class="doc-md-description">
                 <p>If it is a string (only &ldquo;mdn_snpe_a&rdquo; is valid), use a
 pre-configured mixture of densities network. Alternatively, a function
 that builds a custom neural network, which adheres to
-<code>DensityEstimatorBuilder</code> protocol can be provided. The function will
-be called with the first batch of simulations (theta, x), which can
+<code>ConditionalEstimatorBuilder</code> protocol can be provided. The function
+will be called with the first batch of simulations (theta, x), which can
 thus be used for shape inference and potentially for z-scoring. The
 density estimator needs to provide the methods <code>.log_prob</code> and
-<code>.sample()</code>. Note that until the last round only a single (multivariate)
-Gaussian component is used for training (seeAlgorithm 1 in [1]). In the
-last round, this component is replicated <code>num_components</code> times, its
-parameters are perturbed with a very small noise, and then the last
+<code>.sample()</code> and must return a <code>ConditionalDensityEstimator</code>.
+Note that until the last round only a single (multivariate) Gaussian
+component is used for training (seeAlgorithm 1 in [1]). In the last
+round, this component is replicated <code>num_components</code> times,
+its parameters are perturbed with a very small noise, and then the last
 training round is done with the expanded Gaussian mixture as estimator
 for the proposal posterior.</p>
               </div>
@@ -1929,11 +1934,14 @@ file location (default is <code>&lt;current working directory&gt;/logs</code>.)<
 <span class="normal">111</span>
 <span class="normal">112</span>
 <span class="normal">113</span>
-<span class="normal">114</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">114</span>
+<span class="normal">115</span>
+<span class="normal">116</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span>
-        <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;mdn_snpe_a&quot;</span><span class="p">],</span> <span class="n">DensityEstimatorBuilder</span>
+        <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;mdn_snpe_a&quot;</span><span class="p">],</span>
+        <span class="n">ConditionalEstimatorBuilder</span><span class="p">[</span><span class="n">ConditionalDensityEstimator</span><span class="p">],</span>
     <span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;mdn_snpe_a&quot;</span><span class="p">,</span>
     <span class="n">num_components</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span>
     <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
@@ -1951,14 +1959,15 @@ file location (default is <code>&lt;current working directory&gt;/logs</code>.)<
 <span class="sd">        density_estimator: If it is a string (only &quot;mdn_snpe_a&quot; is valid), use a</span>
 <span class="sd">            pre-configured mixture of densities network. Alternatively, a function</span>
 <span class="sd">            that builds a custom neural network, which adheres to</span>
-<span class="sd">            `DensityEstimatorBuilder` protocol can be provided. The function will</span>
-<span class="sd">            be called with the first batch of simulations (theta, x), which can</span>
+<span class="sd">            `ConditionalEstimatorBuilder` protocol can be provided. The function</span>
+<span class="sd">            will be called with the first batch of simulations (theta, x), which can</span>
 <span class="sd">            thus be used for shape inference and potentially for z-scoring. The</span>
 <span class="sd">            density estimator needs to provide the methods `.log_prob` and</span>
-<span class="sd">            `.sample()`. Note that until the last round only a single (multivariate)</span>
-<span class="sd">            Gaussian component is used for training (seeAlgorithm 1 in [1]). In the</span>
-<span class="sd">            last round, this component is replicated `num_components` times, its</span>
-<span class="sd">            parameters are perturbed with a very small noise, and then the last</span>
+<span class="sd">            `.sample()` and must return a `ConditionalDensityEstimator`.</span>
+<span class="sd">            Note that until the last round only a single (multivariate) Gaussian</span>
+<span class="sd">            component is used for training (seeAlgorithm 1 in [1]). In the last</span>
+<span class="sd">            round, this component is replicated `num_components` times,</span>
+<span class="sd">            its parameters are perturbed with a very small noise, and then the last</span>
 <span class="sd">            training round is done with the expanded Gaussian mixture as estimator</span>
 <span class="sd">            for the proposal posterior.</span>
 <span class="sd">        num_components: Number of components of the mixture of Gaussians in the</span>
@@ -2087,9 +2096,7 @@ If <code>None</code>, use the latest neural density estimator that was trained.<
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/trainers/npe/npe_a.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">293</span>
-<span class="normal">294</span>
-<span class="normal">295</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">295</span>
 <span class="normal">296</span>
 <span class="normal">297</span>
 <span class="normal">298</span>
@@ -2122,7 +2129,9 @@ If <code>None</code>, use the latest neural density estimator that was trained.<
 <span class="normal">325</span>
 <span class="normal">326</span>
 <span class="normal">327</span>
-<span class="normal">328</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_posterior</span><span class="p">(</span>
+<span class="normal">328</span>
+<span class="normal">329</span>
+<span class="normal">330</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_posterior</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -2237,9 +2246,7 @@ If <code>None</code>, use the latest neural density estimator that was trained.<
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/trainers/npe/npe_a.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">239</span>
-<span class="normal">240</span>
-<span class="normal">241</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">241</span>
 <span class="normal">242</span>
 <span class="normal">243</span>
 <span class="normal">244</span>
@@ -2289,7 +2296,9 @@ If <code>None</code>, use the latest neural density estimator that was trained.<
 <span class="normal">288</span>
 <span class="normal">289</span>
 <span class="normal">290</span>
-<span class="normal">291</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">correct_for_proposal</span><span class="p">(</span>
+<span class="normal">291</span>
+<span class="normal">292</span>
+<span class="normal">293</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">correct_for_proposal</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;NPE_A_MDN&quot;</span><span class="p">:</span>
@@ -2649,9 +2658,7 @@ on the number of mixture components.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/trainers/npe/npe_a.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">116</span>
-<span class="normal">117</span>
-<span class="normal">118</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">118</span>
 <span class="normal">119</span>
 <span class="normal">120</span>
 <span class="normal">121</span>
@@ -2770,7 +2777,9 @@ on the number of mixture components.</p>
 <span class="normal">234</span>
 <span class="normal">235</span>
 <span class="normal">236</span>
-<span class="normal">237</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
+<span class="normal">237</span>
+<span class="normal">238</span>
+<span class="normal">239</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">final_round</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">training_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">200</span><span class="p">,</span>
@@ -2942,10 +2951,7 @@ Thus, SNPE-B is not limited to Gaussian proposal.</p>
 
               <details class="quote">
                 <summary>Source code in <code>sbi/inference/trainers/npe/npe_b.py</code></summary>
-                <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 20</span>
-<span class="normal"> 21</span>
-<span class="normal"> 22</span>
-<span class="normal"> 23</span>
+                <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 23</span>
 <span class="normal"> 24</span>
 <span class="normal"> 25</span>
 <span class="normal"> 26</span>
@@ -3061,7 +3067,11 @@ Thus, SNPE-B is not limited to Gaussian proposal.</p>
 <span class="normal">136</span>
 <span class="normal">137</span>
 <span class="normal">138</span>
-<span class="normal">139</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NPE_B</span><span class="p">(</span><span class="n">PosteriorEstimatorTrainer</span><span class="p">):</span>
+<span class="normal">139</span>
+<span class="normal">140</span>
+<span class="normal">141</span>
+<span class="normal">142</span>
+<span class="normal">143</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NPE_B</span><span class="p">(</span><span class="n">PosteriorEstimatorTrainer</span><span class="p">):</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Neural Posterior Estimation algorithm (NPE-B) as in Lueckmann et al. (2017) [1].</span>
 
 <span class="sd">    [1] *Flexible statistical inference for mechanistic models of neural</span>
@@ -3081,7 +3091,8 @@ Thus, SNPE-B is not limited to Gaussian proposal.</p>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span>
-            <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;nsf&quot;</span><span class="p">,</span> <span class="s2">&quot;maf&quot;</span><span class="p">,</span> <span class="s2">&quot;mdn&quot;</span><span class="p">,</span> <span class="s2">&quot;made&quot;</span><span class="p">],</span> <span class="n">DensityEstimatorBuilder</span>
+            <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;nsf&quot;</span><span class="p">,</span> <span class="s2">&quot;maf&quot;</span><span class="p">,</span> <span class="s2">&quot;mdn&quot;</span><span class="p">,</span> <span class="s2">&quot;made&quot;</span><span class="p">],</span>
+            <span class="n">ConditionalEstimatorBuilder</span><span class="p">[</span><span class="n">ConditionalDensityEstimator</span><span class="p">],</span>
         <span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;maf&quot;</span><span class="p">,</span>
         <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
         <span class="n">logging_level</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;WARNING&quot;</span><span class="p">,</span>
@@ -3096,11 +3107,11 @@ Thus, SNPE-B is not limited to Gaussian proposal.</p>
 <span class="sd">            density_estimator: If it is a string, use a pre-configured network of the</span>
 <span class="sd">                provided type (one of nsf, maf, mdn, made). Alternatively, a function</span>
 <span class="sd">                that builds a custom neural network, which adheres to</span>
-<span class="sd">                `DensityEstimatorBuilder` protocol can be provided. The function will</span>
-<span class="sd">                be called with the first batch of simulations (theta, x), which can</span>
+<span class="sd">                `ConditionalEstimatorBuilder` protocol can be provided. The function</span>
+<span class="sd">                will be called with the first batch of simulations (theta, x), which can</span>
 <span class="sd">                thus be used for shape inference and potentially for z-scoring. The</span>
 <span class="sd">                density estimator needs to provide the methods `.log_prob` and</span>
-<span class="sd">                `.sample()`.</span>
+<span class="sd">                `.sample()` and must return a `ConditionalDensityEstimator`.</span>
 <span class="sd">            device: Training device, e.g., &quot;cpu&quot;, &quot;cuda&quot; or &quot;cuda:{0, 1, ...}&quot;.</span>
 <span class="sd">            logging_level: Minimum severity of messages to log. One of the strings</span>
 <span class="sd">                INFO, WARNING, DEBUG, ERROR and CRITICAL.</span>
@@ -3244,18 +3255,18 @@ parameters, e.g. which ranges are meaningful for them.</p>
                 <code>density_estimator</code>
             </td>
             <td>
-                  <code><span title="typing.Union">Union</span>[<span title="typing.Literal">Literal</span>[&#39;nsf&#39;, &#39;maf&#39;, &#39;mdn&#39;, &#39;made&#39;], <span title="sbi.neural_nets.estimators.base.DensityEstimatorBuilder">DensityEstimatorBuilder</span>]</code>
+                  <code><span title="typing.Union">Union</span>[<span title="typing.Literal">Literal</span>[&#39;nsf&#39;, &#39;maf&#39;, &#39;mdn&#39;, &#39;made&#39;], <span title="sbi.neural_nets.estimators.base.ConditionalEstimatorBuilder">ConditionalEstimatorBuilder</span>[<a class="autorefs autorefs-internal" title="ConditionalDensityEstimator (sbi.neural_nets.estimators.base.ConditionalDensityEstimator)" href="../models/#sbi.neural_nets.estimators.ConditionalDensityEstimator">ConditionalDensityEstimator</a>]]</code>
             </td>
             <td>
               <div class="doc-md-description">
                 <p>If it is a string, use a pre-configured network of the
 provided type (one of nsf, maf, mdn, made). Alternatively, a function
 that builds a custom neural network, which adheres to
-<code>DensityEstimatorBuilder</code> protocol can be provided. The function will
-be called with the first batch of simulations (theta, x), which can
+<code>ConditionalEstimatorBuilder</code> protocol can be provided. The function
+will be called with the first batch of simulations (theta, x), which can
 thus be used for shape inference and potentially for z-scoring. The
 density estimator needs to provide the methods <code>.log_prob</code> and
-<code>.sample()</code>.</p>
+<code>.sample()</code> and must return a <code>ConditionalDensityEstimator</code>.</p>
               </div>
             </td>
             <td>
@@ -3334,10 +3345,7 @@ file location (default is <code>&lt;current working directory&gt;/logs</code>.)<
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/trainers/npe/npe_b.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">36</span>
-<span class="normal">37</span>
-<span class="normal">38</span>
-<span class="normal">39</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">39</span>
 <span class="normal">40</span>
 <span class="normal">41</span>
 <span class="normal">42</span>
@@ -3367,11 +3375,16 @@ file location (default is <code>&lt;current working directory&gt;/logs</code>.)<
 <span class="normal">66</span>
 <span class="normal">67</span>
 <span class="normal">68</span>
-<span class="normal">69</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">69</span>
+<span class="normal">70</span>
+<span class="normal">71</span>
+<span class="normal">72</span>
+<span class="normal">73</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span>
-        <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;nsf&quot;</span><span class="p">,</span> <span class="s2">&quot;maf&quot;</span><span class="p">,</span> <span class="s2">&quot;mdn&quot;</span><span class="p">,</span> <span class="s2">&quot;made&quot;</span><span class="p">],</span> <span class="n">DensityEstimatorBuilder</span>
+        <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;nsf&quot;</span><span class="p">,</span> <span class="s2">&quot;maf&quot;</span><span class="p">,</span> <span class="s2">&quot;mdn&quot;</span><span class="p">,</span> <span class="s2">&quot;made&quot;</span><span class="p">],</span>
+        <span class="n">ConditionalEstimatorBuilder</span><span class="p">[</span><span class="n">ConditionalDensityEstimator</span><span class="p">],</span>
     <span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;maf&quot;</span><span class="p">,</span>
     <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
     <span class="n">logging_level</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;WARNING&quot;</span><span class="p">,</span>
@@ -3386,11 +3399,11 @@ file location (default is <code>&lt;current working directory&gt;/logs</code>.)<
 <span class="sd">        density_estimator: If it is a string, use a pre-configured network of the</span>
 <span class="sd">            provided type (one of nsf, maf, mdn, made). Alternatively, a function</span>
 <span class="sd">            that builds a custom neural network, which adheres to</span>
-<span class="sd">            `DensityEstimatorBuilder` protocol can be provided. The function will</span>
-<span class="sd">            be called with the first batch of simulations (theta, x), which can</span>
+<span class="sd">            `ConditionalEstimatorBuilder` protocol can be provided. The function</span>
+<span class="sd">            will be called with the first batch of simulations (theta, x), which can</span>
 <span class="sd">            thus be used for shape inference and potentially for z-scoring. The</span>
 <span class="sd">            density estimator needs to provide the methods `.log_prob` and</span>
-<span class="sd">            `.sample()`.</span>
+<span class="sd">            `.sample()` and must return a `ConditionalDensityEstimator`.</span>
 <span class="sd">        device: Training device, e.g., &quot;cpu&quot;, &quot;cuda&quot; or &quot;cuda:{0, 1, ...}&quot;.</span>
 <span class="sd">        logging_level: Minimum severity of messages to log. One of the strings</span>
 <span class="sd">            INFO, WARNING, DEBUG, ERROR and CRITICAL.</span>
@@ -4155,7 +4168,8 @@ the atomic loss.</p>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span>
-            <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;nsf&quot;</span><span class="p">,</span> <span class="s2">&quot;maf&quot;</span><span class="p">,</span> <span class="s2">&quot;mdn&quot;</span><span class="p">,</span> <span class="s2">&quot;made&quot;</span><span class="p">],</span> <span class="n">DensityEstimatorBuilder</span>
+            <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;nsf&quot;</span><span class="p">,</span> <span class="s2">&quot;maf&quot;</span><span class="p">,</span> <span class="s2">&quot;mdn&quot;</span><span class="p">,</span> <span class="s2">&quot;made&quot;</span><span class="p">],</span>
+            <span class="n">ConditionalEstimatorBuilder</span><span class="p">[</span><span class="n">ConditionalDensityEstimator</span><span class="p">],</span>
         <span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;maf&quot;</span><span class="p">,</span>
         <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
         <span class="n">logging_level</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;WARNING&quot;</span><span class="p">,</span>
@@ -4170,12 +4184,11 @@ the atomic loss.</p>
 <span class="sd">            density_estimator: If it is a string, use a pre-configured network of the</span>
 <span class="sd">                provided type (one of nsf, maf, mdn, made). Alternatively, a function</span>
 <span class="sd">                that builds a custom neural network, which adheres to</span>
-<span class="sd">                `DensityEstimatorBuilder` protocol can be provided. The function will</span>
-<span class="sd">                be called with the first batch of simulations (theta, x), which can</span>
+<span class="sd">                `ConditionalEstimatorBuilder` protocol can be provided. The function</span>
+<span class="sd">                will be called with the first batch of simulations (theta, x), which can</span>
 <span class="sd">                thus be used for shape inference and potentially for z-scoring. The</span>
 <span class="sd">                density estimator needs to provide the methods `.log_prob` and</span>
-<span class="sd">                `.sample()`.</span>
-
+<span class="sd">                `.sample()` and must return a `ConditionalDensityEstimator`.</span>
 <span class="sd">            device: Training device, e.g., &quot;cpu&quot;, &quot;cuda&quot; or &quot;cuda:{0, 1, ...}&quot;.</span>
 <span class="sd">            logging_level: Minimum severity of messages to log. One of the strings</span>
 <span class="sd">                INFO, WARNING, DEBUG, ERROR and CRITICAL.</span>
@@ -4827,18 +4840,18 @@ parameters, e.g. which ranges are meaningful for them.</p>
                 <code>density_estimator</code>
             </td>
             <td>
-                  <code><span title="typing.Union">Union</span>[<span title="typing.Literal">Literal</span>[&#39;nsf&#39;, &#39;maf&#39;, &#39;mdn&#39;, &#39;made&#39;], <span title="sbi.neural_nets.estimators.base.DensityEstimatorBuilder">DensityEstimatorBuilder</span>]</code>
+                  <code><span title="typing.Union">Union</span>[<span title="typing.Literal">Literal</span>[&#39;nsf&#39;, &#39;maf&#39;, &#39;mdn&#39;, &#39;made&#39;], <span title="sbi.neural_nets.estimators.base.ConditionalEstimatorBuilder">ConditionalEstimatorBuilder</span>[<a class="autorefs autorefs-internal" title="ConditionalDensityEstimator (sbi.neural_nets.estimators.base.ConditionalDensityEstimator)" href="../models/#sbi.neural_nets.estimators.ConditionalDensityEstimator">ConditionalDensityEstimator</a>]]</code>
             </td>
             <td>
               <div class="doc-md-description">
                 <p>If it is a string, use a pre-configured network of the
 provided type (one of nsf, maf, mdn, made). Alternatively, a function
 that builds a custom neural network, which adheres to
-<code>DensityEstimatorBuilder</code> protocol can be provided. The function will
-be called with the first batch of simulations (theta, x), which can
+<code>ConditionalEstimatorBuilder</code> protocol can be provided. The function
+will be called with the first batch of simulations (theta, x), which can
 thus be used for shape inference and potentially for z-scoring. The
 density estimator needs to provide the methods <code>.log_prob</code> and
-<code>.sample()</code>.</p>
+<code>.sample()</code> and must return a <code>ConditionalDensityEstimator</code>.</p>
               </div>
             </td>
             <td>
@@ -4955,7 +4968,8 @@ log file location (default is <code>&lt;current working directory&gt;/logs</code
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span>
-        <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;nsf&quot;</span><span class="p">,</span> <span class="s2">&quot;maf&quot;</span><span class="p">,</span> <span class="s2">&quot;mdn&quot;</span><span class="p">,</span> <span class="s2">&quot;made&quot;</span><span class="p">],</span> <span class="n">DensityEstimatorBuilder</span>
+        <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;nsf&quot;</span><span class="p">,</span> <span class="s2">&quot;maf&quot;</span><span class="p">,</span> <span class="s2">&quot;mdn&quot;</span><span class="p">,</span> <span class="s2">&quot;made&quot;</span><span class="p">],</span>
+        <span class="n">ConditionalEstimatorBuilder</span><span class="p">[</span><span class="n">ConditionalDensityEstimator</span><span class="p">],</span>
     <span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;maf&quot;</span><span class="p">,</span>
     <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
     <span class="n">logging_level</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;WARNING&quot;</span><span class="p">,</span>
@@ -4970,12 +4984,11 @@ log file location (default is <code>&lt;current working directory&gt;/logs</code
 <span class="sd">        density_estimator: If it is a string, use a pre-configured network of the</span>
 <span class="sd">            provided type (one of nsf, maf, mdn, made). Alternatively, a function</span>
 <span class="sd">            that builds a custom neural network, which adheres to</span>
-<span class="sd">            `DensityEstimatorBuilder` protocol can be provided. The function will</span>
-<span class="sd">            be called with the first batch of simulations (theta, x), which can</span>
+<span class="sd">            `ConditionalEstimatorBuilder` protocol can be provided. The function</span>
+<span class="sd">            will be called with the first batch of simulations (theta, x), which can</span>
 <span class="sd">            thus be used for shape inference and potentially for z-scoring. The</span>
 <span class="sd">            density estimator needs to provide the methods `.log_prob` and</span>
-<span class="sd">            `.sample()`.</span>
-
+<span class="sd">            `.sample()` and must return a `ConditionalDensityEstimator`.</span>
 <span class="sd">        device: Training device, e.g., &quot;cpu&quot;, &quot;cuda&quot; or &quot;cuda:{0, 1, ...}&quot;.</span>
 <span class="sd">        logging_level: Minimum severity of messages to log. One of the strings</span>
 <span class="sd">            INFO, WARNING, DEBUG, ERROR and CRITICAL.</span>
@@ -5537,9 +5550,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 
               <details class="quote">
                 <summary>Source code in <code>sbi/inference/trainers/vfpe/fmpe.py</code></summary>
-                <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 22</span>
-<span class="normal"> 23</span>
-<span class="normal"> 24</span>
+                <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 24</span>
 <span class="normal"> 25</span>
 <span class="normal"> 26</span>
 <span class="normal"> 27</span>
@@ -5644,17 +5655,22 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 <span class="normal">126</span>
 <span class="normal">127</span>
 <span class="normal">128</span>
-<span class="normal">129</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FMPE</span><span class="p">(</span><span class="n">VectorFieldTrainer</span><span class="p">):</span>
+<span class="normal">129</span>
+<span class="normal">130</span>
+<span class="normal">131</span>
+<span class="normal">132</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FMPE</span><span class="p">(</span><span class="n">VectorFieldTrainer</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Flow Matching Posterior Estimation (FMPE).&quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
-        <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">],</span>
+        <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">vf_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span>
             <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;mlp&quot;</span><span class="p">,</span> <span class="s2">&quot;ada_mlp&quot;</span><span class="p">,</span> <span class="s2">&quot;transformer&quot;</span><span class="p">,</span> <span class="s2">&quot;transformer_cross_attn&quot;</span><span class="p">],</span>
-            <span class="n">VectorFieldEstimatorBuilder</span><span class="p">,</span>
+            <span class="n">ConditionalEstimatorBuilder</span><span class="p">[</span><span class="n">ConditionalVectorFieldEstimator</span><span class="p">],</span>
         <span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;mlp&quot;</span><span class="p">,</span>
-        <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">VectorFieldEstimatorBuilder</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span>
+            <span class="n">ConditionalEstimatorBuilder</span><span class="p">[</span><span class="n">ConditionalVectorFieldEstimator</span><span class="p">]</span>
+        <span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
         <span class="n">logging_level</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;WARNING&quot;</span><span class="p">,</span>
         <span class="n">summary_writer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">SummaryWriter</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -5667,10 +5683,9 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 <span class="sd">            prior: Prior distribution.</span>
 <span class="sd">            vf_estimator: Neural network architecture used to learn the</span>
 <span class="sd">                vector field estimator. Can be a string (e.g. &#39;mlp&#39;, &#39;ada_mlp&#39;,</span>
-<span class="sd">                &#39;transformer&#39; or &#39;transformer_cross_attn&#39;) or a callable that</span>
-<span class="sd">                implements the `VectorFieldEstimatorBuilder` protocol with</span>
-<span class="sd">                `__call__` that receives `theta` and `x` and returns a</span>
-<span class="sd">                `ConditionalVectorFieldEstimator`.</span>
+<span class="sd">                &#39;transformer&#39; or &#39;transformer_cross_attn&#39;) or a callable that implements</span>
+<span class="sd">                the `ConditionalEstimatorBuilder` protocol with `__call__` that receives</span>
+<span class="sd">                `theta` and `x` and returns a `ConditionalVectorFieldEstimator`.</span>
 <span class="sd">            density_estimator: Deprecated. Use `vf_estimator` instead. When passed, a</span>
 <span class="sd">                warning is raised and the `vf_estimator=&quot;mlp&quot;` default is used.</span>
 <span class="sd">            device: Device to use for training.</span>
@@ -5750,7 +5765,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">model</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;mlp&quot;</span><span class="p">,</span> <span class="s2">&quot;ada_mlp&quot;</span><span class="p">,</span> <span class="s2">&quot;transformer&quot;</span><span class="p">,</span> <span class="s2">&quot;transformer_cross_attn&quot;</span><span class="p">],</span>
         <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">VectorFieldEstimatorBuilder</span><span class="p">:</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ConditionalEstimatorBuilder</span><span class="p">[</span><span class="n">ConditionalVectorFieldEstimator</span><span class="p">]:</span>
         <span class="k">return</span> <span class="n">posterior_flow_nn</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -5772,7 +5787,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 
 
 <h3 id="sbi.inference.trainers.vfpe.fmpe.FMPE.__init__" class="doc doc-heading">
-            <code class=" language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">prior</span><span class="p">,</span> <span class="n">vf_estimator</span><span class="o">=</span><span class="s1">&#39;mlp&#39;</span><span class="p">,</span> <span class="n">density_estimator</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="s1">&#39;cpu&#39;</span><span class="p">,</span> <span class="n">logging_level</span><span class="o">=</span><span class="s1">&#39;WARNING&#39;</span><span class="p">,</span> <span class="n">summary_writer</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
+            <code class=" language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">vf_estimator</span><span class="o">=</span><span class="s1">&#39;mlp&#39;</span><span class="p">,</span> <span class="n">density_estimator</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="s1">&#39;cpu&#39;</span><span class="p">,</span> <span class="n">logging_level</span><span class="o">=</span><span class="s1">&#39;WARNING&#39;</span><span class="p">,</span> <span class="n">summary_writer</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
 
 <a href="#sbi.inference.trainers.vfpe.fmpe.FMPE.__init__" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -5806,7 +5821,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
               </div>
             </td>
             <td>
-                <em>required</em>
+                  <code>None</code>
             </td>
           </tr>
           <tr class="doc-section-item">
@@ -5814,16 +5829,15 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
                 <code>vf_estimator</code>
             </td>
             <td>
-                  <code><span title="typing.Union">Union</span>[<span title="typing.Literal">Literal</span>[&#39;mlp&#39;, &#39;ada_mlp&#39;, &#39;transformer&#39;, &#39;transformer_cross_attn&#39;], <span title="sbi.inference.trainers.vfpe.base_vf_inference.VectorFieldEstimatorBuilder">VectorFieldEstimatorBuilder</span>]</code>
+                  <code><span title="typing.Union">Union</span>[<span title="typing.Literal">Literal</span>[&#39;mlp&#39;, &#39;ada_mlp&#39;, &#39;transformer&#39;, &#39;transformer_cross_attn&#39;], <span title="sbi.neural_nets.estimators.base.ConditionalEstimatorBuilder">ConditionalEstimatorBuilder</span>[<span title="sbi.neural_nets.estimators.base.ConditionalVectorFieldEstimator">ConditionalVectorFieldEstimator</span>]]</code>
             </td>
             <td>
               <div class="doc-md-description">
                 <p>Neural network architecture used to learn the
 vector field estimator. Can be a string (e.g. &lsquo;mlp&rsquo;, &lsquo;ada_mlp&rsquo;,
-&lsquo;transformer&rsquo; or &lsquo;transformer_cross_attn&rsquo;) or a callable that
-implements the <code>VectorFieldEstimatorBuilder</code> protocol with
-<code>__call__</code> that receives <code>theta</code> and <code>x</code> and returns a
-<code>ConditionalVectorFieldEstimator</code>.</p>
+&lsquo;transformer&rsquo; or &lsquo;transformer_cross_attn&rsquo;) or a callable that implements
+the <code>ConditionalEstimatorBuilder</code> protocol with <code>__call__</code> that receives
+<code>theta</code> and <code>x</code> and returns a <code>ConditionalVectorFieldEstimator</code>.</p>
               </div>
             </td>
             <td>
@@ -5835,7 +5849,7 @@ implements the <code>VectorFieldEstimatorBuilder</code> protocol with
                 <code>density_estimator</code>
             </td>
             <td>
-                  <code><span title="typing.Optional">Optional</span>[<span title="sbi.inference.trainers.vfpe.base_vf_inference.VectorFieldEstimatorBuilder">VectorFieldEstimatorBuilder</span>]</code>
+                  <code><span title="typing.Optional">Optional</span>[<span title="sbi.neural_nets.estimators.base.ConditionalEstimatorBuilder">ConditionalEstimatorBuilder</span>[<span title="sbi.neural_nets.estimators.base.ConditionalVectorFieldEstimator">ConditionalVectorFieldEstimator</span>]]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -5933,9 +5947,7 @@ warning is raised and the <code>vf_estimator="mlp"</code> default is used.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/trainers/vfpe/fmpe.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">25</span>
-<span class="normal">26</span>
-<span class="normal">27</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">27</span>
 <span class="normal">28</span>
 <span class="normal">29</span>
 <span class="normal">30</span>
@@ -5984,14 +5996,19 @@ warning is raised and the <code>vf_estimator="mlp"</code> default is used.</p>
 <span class="normal">73</span>
 <span class="normal">74</span>
 <span class="normal">75</span>
-<span class="normal">76</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">76</span>
+<span class="normal">77</span>
+<span class="normal">78</span>
+<span class="normal">79</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
-    <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">],</span>
+    <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">vf_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span>
         <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;mlp&quot;</span><span class="p">,</span> <span class="s2">&quot;ada_mlp&quot;</span><span class="p">,</span> <span class="s2">&quot;transformer&quot;</span><span class="p">,</span> <span class="s2">&quot;transformer_cross_attn&quot;</span><span class="p">],</span>
-        <span class="n">VectorFieldEstimatorBuilder</span><span class="p">,</span>
+        <span class="n">ConditionalEstimatorBuilder</span><span class="p">[</span><span class="n">ConditionalVectorFieldEstimator</span><span class="p">],</span>
     <span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;mlp&quot;</span><span class="p">,</span>
-    <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">VectorFieldEstimatorBuilder</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span>
+        <span class="n">ConditionalEstimatorBuilder</span><span class="p">[</span><span class="n">ConditionalVectorFieldEstimator</span><span class="p">]</span>
+    <span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
     <span class="n">logging_level</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;WARNING&quot;</span><span class="p">,</span>
     <span class="n">summary_writer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">SummaryWriter</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -6004,10 +6021,9 @@ warning is raised and the <code>vf_estimator="mlp"</code> default is used.</p>
 <span class="sd">        prior: Prior distribution.</span>
 <span class="sd">        vf_estimator: Neural network architecture used to learn the</span>
 <span class="sd">            vector field estimator. Can be a string (e.g. &#39;mlp&#39;, &#39;ada_mlp&#39;,</span>
-<span class="sd">            &#39;transformer&#39; or &#39;transformer_cross_attn&#39;) or a callable that</span>
-<span class="sd">            implements the `VectorFieldEstimatorBuilder` protocol with</span>
-<span class="sd">            `__call__` that receives `theta` and `x` and returns a</span>
-<span class="sd">            `ConditionalVectorFieldEstimator`.</span>
+<span class="sd">            &#39;transformer&#39; or &#39;transformer_cross_attn&#39;) or a callable that implements</span>
+<span class="sd">            the `ConditionalEstimatorBuilder` protocol with `__call__` that receives</span>
+<span class="sd">            `theta` and `x` and returns a `ConditionalVectorFieldEstimator`.</span>
 <span class="sd">        density_estimator: Deprecated. Use `vf_estimator` instead. When passed, a</span>
 <span class="sd">            warning is raised and the `vf_estimator=&quot;mlp&quot;` default is used.</span>
 <span class="sd">        device: Device to use for training.</span>
@@ -6191,10 +6207,7 @@ VectorFieldPosterior.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/trainers/vfpe/fmpe.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 78</span>
-<span class="normal"> 79</span>
-<span class="normal"> 80</span>
-<span class="normal"> 81</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 81</span>
 <span class="normal"> 82</span>
 <span class="normal"> 83</span>
 <span class="normal"> 84</span>
@@ -6235,7 +6248,10 @@ VectorFieldPosterior.</p>
 <span class="normal">119</span>
 <span class="normal">120</span>
 <span class="normal">121</span>
-<span class="normal">122</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_posterior</span><span class="p">(</span>
+<span class="normal">122</span>
+<span class="normal">123</span>
+<span class="normal">124</span>
+<span class="normal">125</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_posterior</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">vector_field_estimator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">ConditionalVectorFieldEstimator</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -6472,12 +6488,12 @@ not tested yet.</p>
         <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">vf_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span>
             <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;mlp&quot;</span><span class="p">,</span> <span class="s2">&quot;ada_mlp&quot;</span><span class="p">,</span> <span class="s2">&quot;transformer&quot;</span><span class="p">,</span> <span class="s2">&quot;transformer_cross_attn&quot;</span><span class="p">],</span>
-            <span class="n">VectorFieldEstimatorBuilder</span><span class="p">,</span>
+            <span class="n">ConditionalEstimatorBuilder</span><span class="p">[</span><span class="n">ConditionalVectorFieldEstimator</span><span class="p">],</span>
         <span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;mlp&quot;</span><span class="p">,</span>
         <span class="n">score_estimator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span>
             <span class="n">Union</span><span class="p">[</span>
                 <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;mlp&quot;</span><span class="p">,</span> <span class="s2">&quot;ada_mlp&quot;</span><span class="p">,</span> <span class="s2">&quot;transformer&quot;</span><span class="p">,</span> <span class="s2">&quot;transformer_cross_attn&quot;</span><span class="p">],</span>
-                <span class="n">VectorFieldEstimatorBuilder</span><span class="p">,</span>
+                <span class="n">ConditionalEstimatorBuilder</span><span class="p">[</span><span class="n">ConditionalVectorFieldEstimator</span><span class="p">],</span>
             <span class="p">]</span>
         <span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">sde_type</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;vp&quot;</span><span class="p">,</span> <span class="s2">&quot;ve&quot;</span><span class="p">,</span> <span class="s2">&quot;subvp&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;ve&quot;</span><span class="p">,</span>
@@ -6495,7 +6511,7 @@ not tested yet.</p>
 <span class="sd">                vector field estimator aiming to estimate the marginal scores of the</span>
 <span class="sd">                target diffusion process. Can be a string (e.g. &#39;mlp&#39;, &#39;ada_mlp&#39;,</span>
 <span class="sd">                &#39;transformer&#39; or &#39;transformer_cross_attn&#39;) or a callable that implements</span>
-<span class="sd">                the `VectorFieldEstimatorBuilder` protocol with `__call__` that receives</span>
+<span class="sd">                the `ConditionalEstimatorBuilder` protocol with `__call__` that receives</span>
 <span class="sd">                `theta` and `x` and returns a `ConditionalVectorFieldEstimator`.</span>
 <span class="sd">            score_estimator: Deprecated, use `vf_estimator` instead. When passed,</span>
 <span class="sd">                a warning is raised and the new `vf_estimator` default is used.</span>
@@ -6584,7 +6600,7 @@ not tested yet.</p>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">model</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;mlp&quot;</span><span class="p">,</span> <span class="s2">&quot;ada_mlp&quot;</span><span class="p">,</span> <span class="s2">&quot;transformer&quot;</span><span class="p">,</span> <span class="s2">&quot;transformer_cross_attn&quot;</span><span class="p">],</span>
         <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">VectorFieldEstimatorBuilder</span><span class="p">:</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ConditionalEstimatorBuilder</span><span class="p">[</span><span class="n">ConditionalVectorFieldEstimator</span><span class="p">]:</span>
         <span class="k">return</span> <span class="n">posterior_score_nn</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -6648,7 +6664,7 @@ not tested yet.</p>
                 <code>vf_estimator</code>
             </td>
             <td>
-                  <code><span title="typing.Union">Union</span>[<span title="typing.Literal">Literal</span>[&#39;mlp&#39;, &#39;ada_mlp&#39;, &#39;transformer&#39;, &#39;transformer_cross_attn&#39;], <span title="sbi.inference.trainers.vfpe.base_vf_inference.VectorFieldEstimatorBuilder">VectorFieldEstimatorBuilder</span>]</code>
+                  <code><span title="typing.Union">Union</span>[<span title="typing.Literal">Literal</span>[&#39;mlp&#39;, &#39;ada_mlp&#39;, &#39;transformer&#39;, &#39;transformer_cross_attn&#39;], <span title="sbi.neural_nets.estimators.base.ConditionalEstimatorBuilder">ConditionalEstimatorBuilder</span>[<span title="sbi.neural_nets.estimators.ConditionalVectorFieldEstimator">ConditionalVectorFieldEstimator</span>]]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -6656,7 +6672,7 @@ not tested yet.</p>
 vector field estimator aiming to estimate the marginal scores of the
 target diffusion process. Can be a string (e.g. &lsquo;mlp&rsquo;, &lsquo;ada_mlp&rsquo;,
 &lsquo;transformer&rsquo; or &lsquo;transformer_cross_attn&rsquo;) or a callable that implements
-the <code>VectorFieldEstimatorBuilder</code> protocol with <code>__call__</code> that receives
+the <code>ConditionalEstimatorBuilder</code> protocol with <code>__call__</code> that receives
 <code>theta</code> and <code>x</code> and returns a <code>ConditionalVectorFieldEstimator</code>.</p>
               </div>
             </td>
@@ -6669,7 +6685,7 @@ the <code>VectorFieldEstimatorBuilder</code> protocol with <code>__call__</code>
                 <code>score_estimator</code>
             </td>
             <td>
-                  <code><span title="typing.Optional">Optional</span>[<span title="typing.Union">Union</span>[<span title="typing.Literal">Literal</span>[&#39;mlp&#39;, &#39;ada_mlp&#39;, &#39;transformer&#39;, &#39;transformer_cross_attn&#39;], <span title="sbi.inference.trainers.vfpe.base_vf_inference.VectorFieldEstimatorBuilder">VectorFieldEstimatorBuilder</span>]]</code>
+                  <code><span title="typing.Optional">Optional</span>[<span title="typing.Union">Union</span>[<span title="typing.Literal">Literal</span>[&#39;mlp&#39;, &#39;ada_mlp&#39;, &#39;transformer&#39;, &#39;transformer_cross_attn&#39;], <span title="sbi.neural_nets.estimators.base.ConditionalEstimatorBuilder">ConditionalEstimatorBuilder</span>[<span title="sbi.neural_nets.estimators.ConditionalVectorFieldEstimator">ConditionalVectorFieldEstimator</span>]]]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -6864,12 +6880,12 @@ string.</p>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">vf_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span>
         <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;mlp&quot;</span><span class="p">,</span> <span class="s2">&quot;ada_mlp&quot;</span><span class="p">,</span> <span class="s2">&quot;transformer&quot;</span><span class="p">,</span> <span class="s2">&quot;transformer_cross_attn&quot;</span><span class="p">],</span>
-        <span class="n">VectorFieldEstimatorBuilder</span><span class="p">,</span>
+        <span class="n">ConditionalEstimatorBuilder</span><span class="p">[</span><span class="n">ConditionalVectorFieldEstimator</span><span class="p">],</span>
     <span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;mlp&quot;</span><span class="p">,</span>
     <span class="n">score_estimator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span>
         <span class="n">Union</span><span class="p">[</span>
             <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;mlp&quot;</span><span class="p">,</span> <span class="s2">&quot;ada_mlp&quot;</span><span class="p">,</span> <span class="s2">&quot;transformer&quot;</span><span class="p">,</span> <span class="s2">&quot;transformer_cross_attn&quot;</span><span class="p">],</span>
-            <span class="n">VectorFieldEstimatorBuilder</span><span class="p">,</span>
+            <span class="n">ConditionalEstimatorBuilder</span><span class="p">[</span><span class="n">ConditionalVectorFieldEstimator</span><span class="p">],</span>
         <span class="p">]</span>
     <span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">sde_type</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;vp&quot;</span><span class="p">,</span> <span class="s2">&quot;ve&quot;</span><span class="p">,</span> <span class="s2">&quot;subvp&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;ve&quot;</span><span class="p">,</span>
@@ -6887,7 +6903,7 @@ string.</p>
 <span class="sd">            vector field estimator aiming to estimate the marginal scores of the</span>
 <span class="sd">            target diffusion process. Can be a string (e.g. &#39;mlp&#39;, &#39;ada_mlp&#39;,</span>
 <span class="sd">            &#39;transformer&#39; or &#39;transformer_cross_attn&#39;) or a callable that implements</span>
-<span class="sd">            the `VectorFieldEstimatorBuilder` protocol with `__call__` that receives</span>
+<span class="sd">            the `ConditionalEstimatorBuilder` protocol with `__call__` that receives</span>
 <span class="sd">            `theta` and `x` and returns a `ConditionalVectorFieldEstimator`.</span>
 <span class="sd">        score_estimator: Deprecated, use `vf_estimator` instead. When passed,</span>
 <span class="sd">            a warning is raised and the new `vf_estimator` default is used.</span>
@@ -7208,10 +7224,7 @@ VectorFieldPosterior.</p>
 
               <details class="quote">
                 <summary>Source code in <code>sbi/inference/trainers/nle/nle_a.py</code></summary>
-                <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">14</span>
-<span class="normal">15</span>
-<span class="normal">16</span>
-<span class="normal">17</span>
+                <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">17</span>
 <span class="normal">18</span>
 <span class="normal">19</span>
 <span class="normal">20</span>
@@ -7251,7 +7264,11 @@ VectorFieldPosterior.</p>
 <span class="normal">54</span>
 <span class="normal">55</span>
 <span class="normal">56</span>
-<span class="normal">57</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NLE_A</span><span class="p">(</span><span class="n">LikelihoodEstimatorTrainer</span><span class="p">):</span>
+<span class="normal">57</span>
+<span class="normal">58</span>
+<span class="normal">59</span>
+<span class="normal">60</span>
+<span class="normal">61</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NLE_A</span><span class="p">(</span><span class="n">LikelihoodEstimatorTrainer</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Neural Likelihood Estimation (NLE) as in Papamakarios et al. (2019) [1].</span>
 
 <span class="sd">    [1] Sequential Neural Likelihood: Fast Likelihood-free Inference with</span>
@@ -7263,7 +7280,8 @@ VectorFieldPosterior.</p>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span>
-            <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;nsf&quot;</span><span class="p">,</span> <span class="s2">&quot;maf&quot;</span><span class="p">,</span> <span class="s2">&quot;mdn&quot;</span><span class="p">,</span> <span class="s2">&quot;made&quot;</span><span class="p">],</span> <span class="n">DensityEstimatorBuilder</span>
+            <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;nsf&quot;</span><span class="p">,</span> <span class="s2">&quot;maf&quot;</span><span class="p">,</span> <span class="s2">&quot;mdn&quot;</span><span class="p">,</span> <span class="s2">&quot;made&quot;</span><span class="p">],</span>
+            <span class="n">ConditionalEstimatorBuilder</span><span class="p">[</span><span class="n">ConditionalDensityEstimator</span><span class="p">],</span>
         <span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;maf&quot;</span><span class="p">,</span>
         <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
         <span class="n">logging_level</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;WARNING&quot;</span><span class="p">,</span>
@@ -7279,11 +7297,11 @@ VectorFieldPosterior.</p>
 <span class="sd">            density_estimator: If it is a string, use a pre-configured network of the</span>
 <span class="sd">                provided type (one of nsf, maf, mdn, made). Alternatively, a function</span>
 <span class="sd">                that builds a custom neural network, which adheres to</span>
-<span class="sd">                `DensityEstimatorBuilder` protocol can be provided. The function will</span>
-<span class="sd">                be called with the first batch of simulations (theta, x), which can</span>
+<span class="sd">                `ConditionalEstimatorBuilder` protocol can be provided. The function</span>
+<span class="sd">                will be called with the first batch of simulations (theta, x), which can</span>
 <span class="sd">                thus be used for shape inference and potentially for z-scoring. The</span>
 <span class="sd">                density estimator needs to provide the methods `.log_prob` and</span>
-<span class="sd">                `.sample()`.</span>
+<span class="sd">                `.sample()` and must return a `ConditionalDensityEstimator`.</span>
 <span class="sd">            device: Training device, e.g., &quot;cpu&quot;, &quot;cuda&quot; or &quot;cuda:{0, 1, ...}&quot;.</span>
 <span class="sd">            logging_level: Minimum severity of messages to log. One of the strings</span>
 <span class="sd">                INFO, WARNING, DEBUG, ERROR and CRITICAL.</span>
@@ -7359,18 +7377,18 @@ prior must be passed to <code>.build_posterior()</code>.</p>
                 <code>density_estimator</code>
             </td>
             <td>
-                  <code><span title="typing.Union">Union</span>[<span title="typing.Literal">Literal</span>[&#39;nsf&#39;, &#39;maf&#39;, &#39;mdn&#39;, &#39;made&#39;], <span title="sbi.neural_nets.estimators.base.DensityEstimatorBuilder">DensityEstimatorBuilder</span>]</code>
+                  <code><span title="typing.Union">Union</span>[<span title="typing.Literal">Literal</span>[&#39;nsf&#39;, &#39;maf&#39;, &#39;mdn&#39;, &#39;made&#39;], <span title="sbi.neural_nets.estimators.base.ConditionalEstimatorBuilder">ConditionalEstimatorBuilder</span>[<a class="autorefs autorefs-internal" title="ConditionalDensityEstimator (sbi.neural_nets.estimators.base.ConditionalDensityEstimator)" href="../models/#sbi.neural_nets.estimators.ConditionalDensityEstimator">ConditionalDensityEstimator</a>]]</code>
             </td>
             <td>
               <div class="doc-md-description">
                 <p>If it is a string, use a pre-configured network of the
 provided type (one of nsf, maf, mdn, made). Alternatively, a function
 that builds a custom neural network, which adheres to
-<code>DensityEstimatorBuilder</code> protocol can be provided. The function will
-be called with the first batch of simulations (theta, x), which can
+<code>ConditionalEstimatorBuilder</code> protocol can be provided. The function
+will be called with the first batch of simulations (theta, x), which can
 thus be used for shape inference and potentially for z-scoring. The
 density estimator needs to provide the methods <code>.log_prob</code> and
-<code>.sample()</code>.</p>
+<code>.sample()</code> and must return a <code>ConditionalDensityEstimator</code>.</p>
               </div>
             </td>
             <td>
@@ -7450,10 +7468,7 @@ sampling.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/trainers/nle/nle_a.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">22</span>
-<span class="normal">23</span>
-<span class="normal">24</span>
-<span class="normal">25</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">25</span>
 <span class="normal">26</span>
 <span class="normal">27</span>
 <span class="normal">28</span>
@@ -7485,11 +7500,16 @@ sampling.</p>
 <span class="normal">54</span>
 <span class="normal">55</span>
 <span class="normal">56</span>
-<span class="normal">57</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">57</span>
+<span class="normal">58</span>
+<span class="normal">59</span>
+<span class="normal">60</span>
+<span class="normal">61</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span>
-        <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;nsf&quot;</span><span class="p">,</span> <span class="s2">&quot;maf&quot;</span><span class="p">,</span> <span class="s2">&quot;mdn&quot;</span><span class="p">,</span> <span class="s2">&quot;made&quot;</span><span class="p">],</span> <span class="n">DensityEstimatorBuilder</span>
+        <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;nsf&quot;</span><span class="p">,</span> <span class="s2">&quot;maf&quot;</span><span class="p">,</span> <span class="s2">&quot;mdn&quot;</span><span class="p">,</span> <span class="s2">&quot;made&quot;</span><span class="p">],</span>
+        <span class="n">ConditionalEstimatorBuilder</span><span class="p">[</span><span class="n">ConditionalDensityEstimator</span><span class="p">],</span>
     <span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;maf&quot;</span><span class="p">,</span>
     <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
     <span class="n">logging_level</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;WARNING&quot;</span><span class="p">,</span>
@@ -7505,11 +7525,11 @@ sampling.</p>
 <span class="sd">        density_estimator: If it is a string, use a pre-configured network of the</span>
 <span class="sd">            provided type (one of nsf, maf, mdn, made). Alternatively, a function</span>
 <span class="sd">            that builds a custom neural network, which adheres to</span>
-<span class="sd">            `DensityEstimatorBuilder` protocol can be provided. The function will</span>
-<span class="sd">            be called with the first batch of simulations (theta, x), which can</span>
+<span class="sd">            `ConditionalEstimatorBuilder` protocol can be provided. The function</span>
+<span class="sd">            will be called with the first batch of simulations (theta, x), which can</span>
 <span class="sd">            thus be used for shape inference and potentially for z-scoring. The</span>
 <span class="sd">            density estimator needs to provide the methods `.log_prob` and</span>
-<span class="sd">            `.sample()`.</span>
+<span class="sd">            `.sample()` and must return a `ConditionalDensityEstimator`.</span>
 <span class="sd">        device: Training device, e.g., &quot;cpu&quot;, &quot;cuda&quot; or &quot;cuda:{0, 1, ...}&quot;.</span>
 <span class="sd">        logging_level: Minimum severity of messages to log. One of the strings</span>
 <span class="sd">            INFO, WARNING, DEBUG, ERROR and CRITICAL.</span>
@@ -7564,8 +7584,7 @@ sampling.</p>
 
               <details class="quote">
                 <summary>Source code in <code>sbi/inference/trainers/nre/nre_a.py</code></summary>
-                <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 19</span>
-<span class="normal"> 20</span>
+                <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 20</span>
 <span class="normal"> 21</span>
 <span class="normal"> 22</span>
 <span class="normal"> 23</span>
@@ -7681,7 +7700,8 @@ sampling.</p>
 <span class="normal">133</span>
 <span class="normal">134</span>
 <span class="normal">135</span>
-<span class="normal">136</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NRE_A</span><span class="p">(</span><span class="n">RatioEstimatorTrainer</span><span class="p">):</span>
+<span class="normal">136</span>
+<span class="normal">137</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NRE_A</span><span class="p">(</span><span class="n">RatioEstimatorTrainer</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;AALR, here known as Neural Ratio Estimation algorithm (NRE-A) [1].</span>
 
 <span class="sd">    [1] *Likelihood-free MCMC with Amortized Approximate Likelihood Ratios*, Hermans</span>
@@ -7691,7 +7711,7 @@ sampling.</p>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">classifier</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">RatioEstimatorBuilder</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;resnet&quot;</span><span class="p">,</span>
+        <span class="n">classifier</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">ConditionalEstimatorBuilder</span><span class="p">[</span><span class="n">RatioEstimator</span><span class="p">]]</span> <span class="o">=</span> <span class="s2">&quot;resnet&quot;</span><span class="p">,</span>
         <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
         <span class="n">logging_level</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;warning&quot;</span><span class="p">,</span>
         <span class="n">summary_writer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TensorBoardSummaryWriter</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -7706,10 +7726,10 @@ sampling.</p>
 <span class="sd">            classifier: Classifier trained to approximate likelihood ratios. If it is</span>
 <span class="sd">                a string, use a pre-configured network of the provided type (one of</span>
 <span class="sd">                linear, mlp, resnet), or a callable that implements the</span>
-<span class="sd">                `RatioEstimatorBuilder` protocol. The callable will be called with the</span>
-<span class="sd">                first batch of simulations (theta, x), which can thus be used for</span>
-<span class="sd">                shape inference and potentially for z-scoring. It returns a</span>
-<span class="sd">                `RatioEstimator`.</span>
+<span class="sd">                `ConditionalEstimatorBuilder` protocol. The callable will</span>
+<span class="sd">                be called with the first batch of simulations (theta, x), which can</span>
+<span class="sd">                thus be used for shape inference and potentially for z-scoring. It</span>
+<span class="sd">                returns a `RatioEstimator`.</span>
 <span class="sd">            device: Training device, e.g., &quot;cpu&quot;, &quot;cuda&quot; or &quot;cuda:{0, 1, ...}&quot;.</span>
 <span class="sd">            logging_level: Minimum severity of messages to log. One of the strings</span>
 <span class="sd">                INFO, WARNING, DEBUG, ERROR and CRITICAL.</span>
@@ -7863,17 +7883,17 @@ prior must be passed to <code>.build_posterior()</code>.</p>
                 <code>classifier</code>
             </td>
             <td>
-                  <code><span title="typing.Union">Union</span>[<span title="str">str</span>, <span title="sbi.inference.trainers.nre.nre_base.RatioEstimatorBuilder">RatioEstimatorBuilder</span>]</code>
+                  <code><span title="typing.Union">Union</span>[<span title="str">str</span>, <span title="sbi.neural_nets.estimators.base.ConditionalEstimatorBuilder">ConditionalEstimatorBuilder</span>[<span title="sbi.neural_nets.ratio_estimators.RatioEstimator">RatioEstimator</span>]]</code>
             </td>
             <td>
               <div class="doc-md-description">
                 <p>Classifier trained to approximate likelihood ratios. If it is
 a string, use a pre-configured network of the provided type (one of
 linear, mlp, resnet), or a callable that implements the
-<code>RatioEstimatorBuilder</code> protocol. The callable will be called with the
-first batch of simulations (theta, x), which can thus be used for
-shape inference and potentially for z-scoring. It returns a
-<code>RatioEstimator</code>.</p>
+<code>ConditionalEstimatorBuilder</code> protocol. The callable will
+be called with the first batch of simulations (theta, x), which can
+thus be used for shape inference and potentially for z-scoring. It
+returns a <code>RatioEstimator</code>.</p>
               </div>
             </td>
             <td>
@@ -7953,8 +7973,7 @@ sampling.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/trainers/nre/nre_a.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">26</span>
-<span class="normal">27</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">27</span>
 <span class="normal">28</span>
 <span class="normal">29</span>
 <span class="normal">30</span>
@@ -7985,10 +8004,11 @@ sampling.</p>
 <span class="normal">55</span>
 <span class="normal">56</span>
 <span class="normal">57</span>
-<span class="normal">58</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">58</span>
+<span class="normal">59</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">classifier</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">RatioEstimatorBuilder</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;resnet&quot;</span><span class="p">,</span>
+    <span class="n">classifier</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">ConditionalEstimatorBuilder</span><span class="p">[</span><span class="n">RatioEstimator</span><span class="p">]]</span> <span class="o">=</span> <span class="s2">&quot;resnet&quot;</span><span class="p">,</span>
     <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
     <span class="n">logging_level</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;warning&quot;</span><span class="p">,</span>
     <span class="n">summary_writer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TensorBoardSummaryWriter</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -8003,10 +8023,10 @@ sampling.</p>
 <span class="sd">        classifier: Classifier trained to approximate likelihood ratios. If it is</span>
 <span class="sd">            a string, use a pre-configured network of the provided type (one of</span>
 <span class="sd">            linear, mlp, resnet), or a callable that implements the</span>
-<span class="sd">            `RatioEstimatorBuilder` protocol. The callable will be called with the</span>
-<span class="sd">            first batch of simulations (theta, x), which can thus be used for</span>
-<span class="sd">            shape inference and potentially for z-scoring. It returns a</span>
-<span class="sd">            `RatioEstimator`.</span>
+<span class="sd">            `ConditionalEstimatorBuilder` protocol. The callable will</span>
+<span class="sd">            be called with the first batch of simulations (theta, x), which can</span>
+<span class="sd">            thus be used for shape inference and potentially for z-scoring. It</span>
+<span class="sd">            returns a `RatioEstimator`.</span>
 <span class="sd">        device: Training device, e.g., &quot;cpu&quot;, &quot;cuda&quot; or &quot;cuda:{0, 1, ...}&quot;.</span>
 <span class="sd">        logging_level: Minimum severity of messages to log. One of the strings</span>
 <span class="sd">            INFO, WARNING, DEBUG, ERROR and CRITICAL.</span>
@@ -8282,8 +8302,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/trainers/nre/nre_a.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 60</span>
-<span class="normal"> 61</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 61</span>
 <span class="normal"> 62</span>
 <span class="normal"> 63</span>
 <span class="normal"> 64</span>
@@ -8332,7 +8351,8 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 <span class="normal">107</span>
 <span class="normal">108</span>
 <span class="normal">109</span>
-<span class="normal">110</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
+<span class="normal">110</span>
+<span class="normal">111</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">training_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">200</span><span class="p">,</span>
     <span class="n">learning_rate</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">5e-4</span><span class="p">,</span>
@@ -8426,8 +8446,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 
               <details class="quote">
                 <summary>Source code in <code>sbi/inference/trainers/nre/nre_b.py</code></summary>
-                <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 19</span>
-<span class="normal"> 20</span>
+                <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 20</span>
 <span class="normal"> 21</span>
 <span class="normal"> 22</span>
 <span class="normal"> 23</span>
@@ -8541,7 +8560,8 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 <span class="normal">131</span>
 <span class="normal">132</span>
 <span class="normal">133</span>
-<span class="normal">134</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NRE_B</span><span class="p">(</span><span class="n">RatioEstimatorTrainer</span><span class="p">):</span>
+<span class="normal">134</span>
+<span class="normal">135</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NRE_B</span><span class="p">(</span><span class="n">RatioEstimatorTrainer</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;SRE, here known as Neural Ratio Estimation algorithm (NRE-B) [1].</span>
 
 <span class="sd">    [1] *On Contrastive Learning for Likelihood-free Inference*, Durkan et al.,</span>
@@ -8551,7 +8571,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">classifier</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">RatioEstimatorBuilder</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;resnet&quot;</span><span class="p">,</span>
+        <span class="n">classifier</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">ConditionalEstimatorBuilder</span><span class="p">[</span><span class="n">RatioEstimator</span><span class="p">]]</span> <span class="o">=</span> <span class="s2">&quot;resnet&quot;</span><span class="p">,</span>
         <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
         <span class="n">logging_level</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;warning&quot;</span><span class="p">,</span>
         <span class="n">summary_writer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TensorBoardSummaryWriter</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -8566,9 +8586,9 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 <span class="sd">            classifier: Classifier trained to approximate likelihood ratios. If it is</span>
 <span class="sd">                a string, use a pre-configured network of the provided type (one of</span>
 <span class="sd">                linear, mlp, resnet), or a callable that implements the</span>
-<span class="sd">                `RatioEstimatorBuilder` protocol. The callable will be called with the</span>
-<span class="sd">                first batch of simulations (theta, x), which can thus be used for</span>
-<span class="sd">                shape inference and potentially for z-scoring. It returns a</span>
+<span class="sd">                `ConditionalEstimatorBuilder` protocol. The callable will</span>
+<span class="sd">                be called with the first batch of simulations (theta, x), which can thus</span>
+<span class="sd">                be used for shape inference and potentially for z-scoring. It returns a</span>
 <span class="sd">                `RatioEstimator`.</span>
 <span class="sd">            device: Training device, e.g., &quot;cpu&quot;, &quot;cuda&quot; or &quot;cuda:{0, 1, ...}&quot;.</span>
 <span class="sd">            logging_level: Minimum severity of messages to log. One of the strings</span>
@@ -8721,16 +8741,16 @@ prior must be passed to <code>.build_posterior()</code>.</p>
                 <code>classifier</code>
             </td>
             <td>
-                  <code><span title="typing.Union">Union</span>[<span title="str">str</span>, <span title="sbi.inference.trainers.nre.nre_base.RatioEstimatorBuilder">RatioEstimatorBuilder</span>]</code>
+                  <code><span title="typing.Union">Union</span>[<span title="str">str</span>, <span title="sbi.neural_nets.estimators.base.ConditionalEstimatorBuilder">ConditionalEstimatorBuilder</span>[<span title="sbi.neural_nets.ratio_estimators.RatioEstimator">RatioEstimator</span>]]</code>
             </td>
             <td>
               <div class="doc-md-description">
                 <p>Classifier trained to approximate likelihood ratios. If it is
 a string, use a pre-configured network of the provided type (one of
 linear, mlp, resnet), or a callable that implements the
-<code>RatioEstimatorBuilder</code> protocol. The callable will be called with the
-first batch of simulations (theta, x), which can thus be used for
-shape inference and potentially for z-scoring. It returns a
+<code>ConditionalEstimatorBuilder</code> protocol. The callable will
+be called with the first batch of simulations (theta, x), which can thus
+be used for shape inference and potentially for z-scoring. It returns a
 <code>RatioEstimator</code>.</p>
               </div>
             </td>
@@ -8811,8 +8831,7 @@ sampling.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/trainers/nre/nre_b.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">26</span>
-<span class="normal">27</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">27</span>
 <span class="normal">28</span>
 <span class="normal">29</span>
 <span class="normal">30</span>
@@ -8843,10 +8862,11 @@ sampling.</p>
 <span class="normal">55</span>
 <span class="normal">56</span>
 <span class="normal">57</span>
-<span class="normal">58</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">58</span>
+<span class="normal">59</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">classifier</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">RatioEstimatorBuilder</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;resnet&quot;</span><span class="p">,</span>
+    <span class="n">classifier</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">ConditionalEstimatorBuilder</span><span class="p">[</span><span class="n">RatioEstimator</span><span class="p">]]</span> <span class="o">=</span> <span class="s2">&quot;resnet&quot;</span><span class="p">,</span>
     <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
     <span class="n">logging_level</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;warning&quot;</span><span class="p">,</span>
     <span class="n">summary_writer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TensorBoardSummaryWriter</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -8861,9 +8881,9 @@ sampling.</p>
 <span class="sd">        classifier: Classifier trained to approximate likelihood ratios. If it is</span>
 <span class="sd">            a string, use a pre-configured network of the provided type (one of</span>
 <span class="sd">            linear, mlp, resnet), or a callable that implements the</span>
-<span class="sd">            `RatioEstimatorBuilder` protocol. The callable will be called with the</span>
-<span class="sd">            first batch of simulations (theta, x), which can thus be used for</span>
-<span class="sd">            shape inference and potentially for z-scoring. It returns a</span>
+<span class="sd">            `ConditionalEstimatorBuilder` protocol. The callable will</span>
+<span class="sd">            be called with the first batch of simulations (theta, x), which can thus</span>
+<span class="sd">            be used for shape inference and potentially for z-scoring. It returns a</span>
 <span class="sd">            `RatioEstimator`.</span>
 <span class="sd">        device: Training device, e.g., &quot;cpu&quot;, &quot;cuda&quot; or &quot;cuda:{0, 1, ...}&quot;.</span>
 <span class="sd">        logging_level: Minimum severity of messages to log. One of the strings</span>
@@ -9140,8 +9160,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/trainers/nre/nre_b.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 60</span>
-<span class="normal"> 61</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 61</span>
 <span class="normal"> 62</span>
 <span class="normal"> 63</span>
 <span class="normal"> 64</span>
@@ -9187,7 +9206,8 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 <span class="normal">104</span>
 <span class="normal">105</span>
 <span class="normal">106</span>
-<span class="normal">107</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
+<span class="normal">107</span>
+<span class="normal">108</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">num_atoms</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span>
     <span class="n">training_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">200</span><span class="p">,</span>
@@ -9289,8 +9309,7 @@ will be estimated only up to a function (normalizing constant) of the data
 
               <details class="quote">
                 <summary>Source code in <code>sbi/inference/trainers/nre/nre_c.py</code></summary>
-                <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 19</span>
-<span class="normal"> 20</span>
+                <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 20</span>
 <span class="normal"> 21</span>
 <span class="normal"> 22</span>
 <span class="normal"> 23</span>
@@ -9486,7 +9505,8 @@ will be estimated only up to a function (normalizing constant) of the data
 <span class="normal">213</span>
 <span class="normal">214</span>
 <span class="normal">215</span>
-<span class="normal">216</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NRE_C</span><span class="p">(</span><span class="n">RatioEstimatorTrainer</span><span class="p">):</span>
+<span class="normal">216</span>
+<span class="normal">217</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NRE_C</span><span class="p">(</span><span class="n">RatioEstimatorTrainer</span><span class="p">):</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;NRE-C [1] is a generalization of amortized versions of NRE_A and NRE_B.</span>
 
 <span class="sd">    NRE-C:</span>
@@ -9510,7 +9530,7 @@ will be estimated only up to a function (normalizing constant) of the data
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">classifier</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">RatioEstimatorBuilder</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;resnet&quot;</span><span class="p">,</span>
+        <span class="n">classifier</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">ConditionalEstimatorBuilder</span><span class="p">[</span><span class="n">RatioEstimator</span><span class="p">]]</span> <span class="o">=</span> <span class="s2">&quot;resnet&quot;</span><span class="p">,</span>
         <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
         <span class="n">logging_level</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;warning&quot;</span><span class="p">,</span>
         <span class="n">summary_writer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TensorBoardSummaryWriter</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -9525,9 +9545,9 @@ will be estimated only up to a function (normalizing constant) of the data
 <span class="sd">            classifier: Classifier trained to approximate likelihood ratios. If it is</span>
 <span class="sd">                a string, use a pre-configured network of the provided type (one of</span>
 <span class="sd">                linear, mlp, resnet), or a callable that implements the</span>
-<span class="sd">                `RatioEstimatorBuilder` protocol. The callable will be called with the</span>
-<span class="sd">                first batch of simulations (theta, x), which can thus be used for</span>
-<span class="sd">                shape inference and potentially for z-scoring. It returns a</span>
+<span class="sd">                `ConditionalEstimatorBuilder` protocol. The callable will</span>
+<span class="sd">                be called with the first batch of simulations (theta, x), which can thus</span>
+<span class="sd">                be used for shape inference and potentially for z-scoring. It returns a</span>
 <span class="sd">                `RatioEstimator`.</span>
 <span class="sd">            device: Training device, e.g., &quot;cpu&quot;, &quot;cuda&quot; or &quot;cuda:{0, 1, ...}&quot;.</span>
 <span class="sd">            logging_level: Minimum severity of messages to log. One of the strings</span>
@@ -9748,16 +9768,16 @@ prior must be passed to <code>.build_posterior()</code>.</p>
                 <code>classifier</code>
             </td>
             <td>
-                  <code><span title="typing.Union">Union</span>[<span title="str">str</span>, <span title="sbi.inference.trainers.nre.nre_base.RatioEstimatorBuilder">RatioEstimatorBuilder</span>]</code>
+                  <code><span title="typing.Union">Union</span>[<span title="str">str</span>, <span title="sbi.neural_nets.estimators.base.ConditionalEstimatorBuilder">ConditionalEstimatorBuilder</span>[<span title="sbi.neural_nets.ratio_estimators.RatioEstimator">RatioEstimator</span>]]</code>
             </td>
             <td>
               <div class="doc-md-description">
                 <p>Classifier trained to approximate likelihood ratios. If it is
 a string, use a pre-configured network of the provided type (one of
 linear, mlp, resnet), or a callable that implements the
-<code>RatioEstimatorBuilder</code> protocol. The callable will be called with the
-first batch of simulations (theta, x), which can thus be used for
-shape inference and potentially for z-scoring. It returns a
+<code>ConditionalEstimatorBuilder</code> protocol. The callable will
+be called with the first batch of simulations (theta, x), which can thus
+be used for shape inference and potentially for z-scoring. It returns a
 <code>RatioEstimator</code>.</p>
               </div>
             </td>
@@ -9838,8 +9858,7 @@ sampling.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/trainers/nre/nre_c.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">40</span>
-<span class="normal">41</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">41</span>
 <span class="normal">42</span>
 <span class="normal">43</span>
 <span class="normal">44</span>
@@ -9870,10 +9889,11 @@ sampling.</p>
 <span class="normal">69</span>
 <span class="normal">70</span>
 <span class="normal">71</span>
-<span class="normal">72</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">72</span>
+<span class="normal">73</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">classifier</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">RatioEstimatorBuilder</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;resnet&quot;</span><span class="p">,</span>
+    <span class="n">classifier</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">ConditionalEstimatorBuilder</span><span class="p">[</span><span class="n">RatioEstimator</span><span class="p">]]</span> <span class="o">=</span> <span class="s2">&quot;resnet&quot;</span><span class="p">,</span>
     <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
     <span class="n">logging_level</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;warning&quot;</span><span class="p">,</span>
     <span class="n">summary_writer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TensorBoardSummaryWriter</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -9888,9 +9908,9 @@ sampling.</p>
 <span class="sd">        classifier: Classifier trained to approximate likelihood ratios. If it is</span>
 <span class="sd">            a string, use a pre-configured network of the provided type (one of</span>
 <span class="sd">            linear, mlp, resnet), or a callable that implements the</span>
-<span class="sd">            `RatioEstimatorBuilder` protocol. The callable will be called with the</span>
-<span class="sd">            first batch of simulations (theta, x), which can thus be used for</span>
-<span class="sd">            shape inference and potentially for z-scoring. It returns a</span>
+<span class="sd">            `ConditionalEstimatorBuilder` protocol. The callable will</span>
+<span class="sd">            be called with the first batch of simulations (theta, x), which can thus</span>
+<span class="sd">            be used for shape inference and potentially for z-scoring. It returns a</span>
 <span class="sd">            `RatioEstimator`.</span>
 <span class="sd">        device: Training device, e.g., &quot;cpu&quot;, &quot;cuda&quot; or &quot;cuda:{0, 1, ...}&quot;.</span>
 <span class="sd">        logging_level: Minimum severity of messages to log. One of the strings</span>
@@ -10206,8 +10226,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/trainers/nre/nre_c.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 74</span>
-<span class="normal"> 75</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 75</span>
 <span class="normal"> 76</span>
 <span class="normal"> 77</span>
 <span class="normal"> 78</span>
@@ -10266,7 +10285,8 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 <span class="normal">131</span>
 <span class="normal">132</span>
 <span class="normal">133</span>
-<span class="normal">134</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
+<span class="normal">134</span>
+<span class="normal">135</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">num_classes</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">5</span><span class="p">,</span>
     <span class="n">gamma</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span>
@@ -10374,8 +10394,7 @@ NeurIPS 2022. <a href="https://arxiv.org/abs/2208.13624">https://arxiv.org/abs/2
 
               <details class="quote">
                 <summary>Source code in <code>sbi/inference/trainers/nre/bnre.py</code></summary>
-                <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 17</span>
-<span class="normal"> 18</span>
+                <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 18</span>
 <span class="normal"> 19</span>
 <span class="normal"> 20</span>
 <span class="normal"> 21</span>
@@ -10509,7 +10528,8 @@ NeurIPS 2022. <a href="https://arxiv.org/abs/2208.13624">https://arxiv.org/abs/2
 <span class="normal">149</span>
 <span class="normal">150</span>
 <span class="normal">151</span>
-<span class="normal">152</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">BNRE</span><span class="p">(</span><span class="n">NRE_A</span><span class="p">):</span>
+<span class="normal">152</span>
+<span class="normal">153</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">BNRE</span><span class="p">(</span><span class="n">NRE_A</span><span class="p">):</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Balanced neural ratio estimation (BNRE) as in Delaunoy et al. (2022) [1].</span>
 
 <span class="sd">    BNRE is a variation of NRE aiming to produce more conservative posterior</span>
@@ -10524,7 +10544,7 @@ NeurIPS 2022. <a href="https://arxiv.org/abs/2208.13624">https://arxiv.org/abs/2
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">classifier</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">RatioEstimatorBuilder</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;resnet&quot;</span><span class="p">,</span>
+        <span class="n">classifier</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">ConditionalEstimatorBuilder</span><span class="p">[</span><span class="n">RatioEstimator</span><span class="p">]]</span> <span class="o">=</span> <span class="s2">&quot;resnet&quot;</span><span class="p">,</span>
         <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
         <span class="n">logging_level</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;warning&quot;</span><span class="p">,</span>
         <span class="n">summary_writer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TensorBoardSummaryWriter</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -10539,9 +10559,9 @@ NeurIPS 2022. <a href="https://arxiv.org/abs/2208.13624">https://arxiv.org/abs/2
 <span class="sd">            classifier: Classifier trained to approximate likelihood ratios. If it is</span>
 <span class="sd">                a string, use a pre-configured network of the provided type (one of</span>
 <span class="sd">                linear, mlp, resnet), or a callable that implements the</span>
-<span class="sd">                `RatioEstimatorBuilder` protocol. The callable will be called with the</span>
-<span class="sd">                first batch of simulations (theta, x), which can thus be used for</span>
-<span class="sd">                shape inference and potentially for z-scoring. It returns a</span>
+<span class="sd">                `ConditionalEstimatorBuilder` protocol. The callable will</span>
+<span class="sd">                be called with the first batch of simulations (theta, x), which can thus</span>
+<span class="sd">                be used for shape inference and potentially for z-scoring. It returns a</span>
 <span class="sd">                `RatioEstimator`.</span>
 <span class="sd">            device: Training device, e.g., &quot;cpu&quot;, &quot;cuda&quot; or &quot;cuda:{0, 1, ...}&quot;.</span>
 <span class="sd">            logging_level: Minimum severity of messages to log. One of the strings</span>
@@ -10709,16 +10729,16 @@ prior must be passed to <code>.build_posterior()</code>.</p>
                 <code>classifier</code>
             </td>
             <td>
-                  <code><span title="typing.Union">Union</span>[<span title="str">str</span>, <span title="sbi.inference.trainers.nre.nre_base.RatioEstimatorBuilder">RatioEstimatorBuilder</span>]</code>
+                  <code><span title="typing.Union">Union</span>[<span title="str">str</span>, <span title="sbi.neural_nets.estimators.base.ConditionalEstimatorBuilder">ConditionalEstimatorBuilder</span>[<span title="sbi.neural_nets.ratio_estimators.RatioEstimator">RatioEstimator</span>]]</code>
             </td>
             <td>
               <div class="doc-md-description">
                 <p>Classifier trained to approximate likelihood ratios. If it is
 a string, use a pre-configured network of the provided type (one of
 linear, mlp, resnet), or a callable that implements the
-<code>RatioEstimatorBuilder</code> protocol. The callable will be called with the
-first batch of simulations (theta, x), which can thus be used for
-shape inference and potentially for z-scoring. It returns a
+<code>ConditionalEstimatorBuilder</code> protocol. The callable will
+be called with the first batch of simulations (theta, x), which can thus
+be used for shape inference and potentially for z-scoring. It returns a
 <code>RatioEstimator</code>.</p>
               </div>
             </td>
@@ -10799,8 +10819,7 @@ sampling.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/trainers/nre/bnre.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">29</span>
-<span class="normal">30</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">30</span>
 <span class="normal">31</span>
 <span class="normal">32</span>
 <span class="normal">33</span>
@@ -10831,10 +10850,11 @@ sampling.</p>
 <span class="normal">58</span>
 <span class="normal">59</span>
 <span class="normal">60</span>
-<span class="normal">61</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">61</span>
+<span class="normal">62</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">classifier</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">RatioEstimatorBuilder</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;resnet&quot;</span><span class="p">,</span>
+    <span class="n">classifier</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">ConditionalEstimatorBuilder</span><span class="p">[</span><span class="n">RatioEstimator</span><span class="p">]]</span> <span class="o">=</span> <span class="s2">&quot;resnet&quot;</span><span class="p">,</span>
     <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
     <span class="n">logging_level</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;warning&quot;</span><span class="p">,</span>
     <span class="n">summary_writer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TensorBoardSummaryWriter</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -10849,9 +10869,9 @@ sampling.</p>
 <span class="sd">        classifier: Classifier trained to approximate likelihood ratios. If it is</span>
 <span class="sd">            a string, use a pre-configured network of the provided type (one of</span>
 <span class="sd">            linear, mlp, resnet), or a callable that implements the</span>
-<span class="sd">            `RatioEstimatorBuilder` protocol. The callable will be called with the</span>
-<span class="sd">            first batch of simulations (theta, x), which can thus be used for</span>
-<span class="sd">            shape inference and potentially for z-scoring. It returns a</span>
+<span class="sd">            `ConditionalEstimatorBuilder` protocol. The callable will</span>
+<span class="sd">            be called with the first batch of simulations (theta, x), which can thus</span>
+<span class="sd">            be used for shape inference and potentially for z-scoring. It returns a</span>
 <span class="sd">            `RatioEstimator`.</span>
 <span class="sd">        device: Training device, e.g., &quot;cpu&quot;, &quot;cuda&quot; or &quot;cuda:{0, 1, ...}&quot;.</span>
 <span class="sd">        logging_level: Minimum severity of messages to log. One of the strings</span>
@@ -10918,8 +10938,7 @@ dataloader_kwargs: Additional or updated kwargs to be passed to the training
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/trainers/nre/bnre.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 63</span>
-<span class="normal"> 64</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 64</span>
 <span class="normal"> 65</span>
 <span class="normal"> 66</span>
 <span class="normal"> 67</span>
@@ -10970,7 +10989,8 @@ dataloader_kwargs: Additional or updated kwargs to be passed to the training
 <span class="normal">112</span>
 <span class="normal">113</span>
 <span class="normal">114</span>
-<span class="normal">115</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
+<span class="normal">115</span>
+<span class="normal">116</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">regularization_strength</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">100.0</span><span class="p">,</span>
     <span class="n">training_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">200</span><span class="p">,</span>
