@@ -3,7 +3,7 @@
 
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from typing import Any, Callable, Dict, Literal, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Literal, Optional, Sequence, Tuple, Union
 
 import torch
 from torch import Tensor, ones
@@ -471,7 +471,9 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator], ABC):
         assert_all_finite(loss, f"{cls_name} loss")
         return calibration_kernel(x) * loss
 
-    def _get_losses(self, batch: Any, loss_kwargs: Dict[str, Any]) -> Tensor:
+    def _get_losses(
+        self, batch: Sequence[Tensor], loss_kwargs: Dict[str, Any]
+    ) -> Tensor:
         """
         Compute losses for a batch of data.
 

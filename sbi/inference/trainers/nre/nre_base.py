@@ -3,7 +3,7 @@
 
 import warnings
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Literal, Optional, Tuple, Union
+from typing import Any, Dict, Literal, Optional, Sequence, Tuple, Union
 
 import torch
 from torch import Tensor, eye, ones
@@ -412,7 +412,9 @@ class RatioEstimatorTrainer(NeuralInference[RatioEstimator], ABC):
 
             del x, theta
 
-    def _get_losses(self, batch: Any, loss_kwargs: Dict[str, Any]) -> Tensor:
+    def _get_losses(
+        self, batch: Sequence[Tensor], loss_kwargs: Dict[str, Any]
+    ) -> Tensor:
         """
         Compute losses for a batch of data.
 

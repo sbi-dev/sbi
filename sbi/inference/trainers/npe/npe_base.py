@@ -2,7 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Dict, Literal, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Literal, Optional, Sequence, Tuple, Union
 from warnings import warn
 
 from torch import Tensor, ones
@@ -656,7 +656,9 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
 
             del theta, x
 
-    def _get_losses(self, batch: Any, loss_kwargs: Dict[str, Any]) -> Tensor:
+    def _get_losses(
+        self, batch: Sequence[Tensor], loss_kwargs: Dict[str, Any]
+    ) -> Tensor:
         """
         Compute losses for a batch of data.
 

@@ -3,7 +3,7 @@
 
 import warnings
 from abc import ABC
-from typing import Any, Dict, Literal, Optional, Tuple, Union
+from typing import Any, Dict, Literal, Optional, Sequence, Tuple, Union
 
 from torch import Tensor
 from torch.distributions import Distribution
@@ -379,7 +379,9 @@ class LikelihoodEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], A
             )
             del theta, x
 
-    def _get_losses(self, batch: Any, loss_kwargs: Dict[str, Any]) -> Tensor:
+    def _get_losses(
+        self, batch: Sequence[Tensor], loss_kwargs: Dict[str, Any]
+    ) -> Tensor:
         """
         Compute losses for a batch of data.
 

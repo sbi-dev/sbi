@@ -16,6 +16,7 @@ from typing import (
     List,
     Literal,
     Optional,
+    Sequence,
     Tuple,
     Union,
 )
@@ -323,7 +324,9 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
     def _get_start_index(self, discard_prior_samples: bool) -> int: ...
 
     @abstractmethod
-    def _get_losses(self, batch: Any, loss_kwargs: Dict[str, Any]) -> Tensor: ...
+    def _get_losses(
+        self, batch: Sequence[Tensor], loss_kwargs: Dict[str, Any]
+    ) -> Tensor: ...
 
     @abstractmethod
     def _get_potential_function(
