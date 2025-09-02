@@ -167,20 +167,19 @@ class Diffuser:
             # Apply predictor step
             samples = self.predictor(samples, t_current, t_next)
 
-            # Check for NaN values after predictor
-            if torch.isnan(samples).any():
-                raise RuntimeError(
-                    f"NaN values detected after predictor step "
-                    f"{time_step_idx}/{total_time_steps}. "
-                    f"This may indicate numerical instability in the vector field."
-                )
-
             # Apply corrector step if available
             if self.corrector is not None:
                 samples = self.corrector(samples, t_next, t_current)
 
             if save_intermediate:
                 intermediate_samples.append(samples)
+
+        # Check for NaN values after predictor
+        if torch.isnan(samples).any():
+            raise RuntimeError(
+                "NaN values detected after diffusion sampling "
+                "This may indicate numerical instability in the vector field."
+            )
 
         if save_intermediate:
             return torch.cat(intermediate_samples, dim=0)
