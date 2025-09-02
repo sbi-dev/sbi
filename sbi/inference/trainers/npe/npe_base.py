@@ -47,7 +47,7 @@ from sbi.utils.sbiutils import ImproperEmpirical, mask_sims_from_prior
 from sbi.utils.torchutils import assert_all_finite
 
 
-class PosteriorEstimatorTrainer(NeuralInference, ABC):
+class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], ABC):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
@@ -318,7 +318,7 @@ class PosteriorEstimatorTrainer(NeuralInference, ABC):
             calibration_kernel=calibration_kernel,
             force_first_round_loss=force_first_round_loss,
         )
-        return self._run_training_loop(  # type: ignore
+        return self._run_training_loop(
             train_loader=train_loader,
             val_loader=val_loader,
             max_num_epochs=max_num_epochs,

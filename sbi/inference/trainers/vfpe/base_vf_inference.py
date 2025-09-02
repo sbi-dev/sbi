@@ -14,9 +14,7 @@ from typing_extensions import Self
 
 from sbi import utils as utils
 from sbi.inference import NeuralInference
-from sbi.inference.posteriors import (
-    DirectPosterior,
-)
+from sbi.inference.posteriors import DirectPosterior
 from sbi.inference.potentials.vector_field_potential import (
     VectorFieldBasedPotential,
     vector_field_estimator_based_potential,
@@ -36,7 +34,7 @@ from sbi.utils.sbiutils import ImproperEmpirical, mask_sims_from_prior
 from sbi.utils.torchutils import assert_all_finite
 
 
-class VectorFieldTrainer(NeuralInference, ABC):
+class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator], ABC):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
@@ -314,7 +312,7 @@ class VectorFieldTrainer(NeuralInference, ABC):
 
         summarization_kwargs = dict(ema_loss_decay=ema_loss_decay)
 
-        return self._run_training_loop(  # type: ignore
+        return self._run_training_loop(
             train_loader=train_loader,
             val_loader=val_loader,
             max_num_epochs=max_num_epochs,

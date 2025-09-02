@@ -31,7 +31,7 @@ from sbi.utils import check_estimator_arg, x_shape_from_simulation
 from sbi.utils.torchutils import assert_all_finite
 
 
-class LikelihoodEstimatorTrainer(NeuralInference, ABC):
+class LikelihoodEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], ABC):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
@@ -194,7 +194,7 @@ class LikelihoodEstimatorTrainer(NeuralInference, ABC):
             start_idx=start_idx,
         )
 
-        return self._run_training_loop(  # type: ignore
+        return self._run_training_loop(
             train_loader=train_loader,
             val_loader=val_loader,
             max_num_epochs=max_num_epochs,

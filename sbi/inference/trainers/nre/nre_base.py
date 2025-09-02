@@ -32,7 +32,7 @@ from sbi.utils import (
 from sbi.utils.torchutils import repeat_rows
 
 
-class RatioEstimatorTrainer(NeuralInference, ABC):
+class RatioEstimatorTrainer(NeuralInference[RatioEstimator], ABC):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
@@ -221,7 +221,7 @@ class RatioEstimatorTrainer(NeuralInference, ABC):
 
         loss_kwargs["num_atoms"] = num_atoms
 
-        return self._run_training_loop(  # type: ignore
+        return self._run_training_loop(
             train_loader=train_loader,
             val_loader=val_loader,
             max_num_epochs=max_num_epochs,

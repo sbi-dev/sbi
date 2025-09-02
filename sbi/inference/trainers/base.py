@@ -12,6 +12,7 @@ from typing import (
     Any,
     Callable,
     Dict,
+    Generic,
     List,
     Literal,
     Optional,
@@ -50,6 +51,7 @@ from sbi.inference.potentials.base_potential import BasePotential
 from sbi.neural_nets.estimators.base import (
     ConditionalDensityEstimator,
     ConditionalEstimator,
+    ConditionalEstimatorType,
     ConditionalVectorFieldEstimator,
 )
 from sbi.sbi_types import TorchTransform
@@ -161,7 +163,7 @@ def infer(
     return posterior
 
 
-class NeuralInference(ABC):
+class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
     """Abstract base class for neural inference methods."""
 
     def __init__(
@@ -310,7 +312,7 @@ class NeuralInference(ABC):
         discard_prior_samples: bool = False,
         retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
-    ) -> Union[ConditionalEstimator, RatioEstimator]: ...
+    ) -> ConditionalEstimatorType: ...
 
     @abstractmethod
     def _initialize_neural_network(
@@ -898,7 +900,7 @@ class NeuralInference(ABC):
         show_train_summary: bool,
         loss_kwargs: Optional[Dict[str, Any]] = None,
         summarization_kwargs: Optional[Dict[str, Any]] = None,
-    ) -> Union[ConditionalEstimator, RatioEstimator]:
+    ) -> ConditionalEstimatorType:
         """
         Run the main training loop for the neural network, including epoch-wise
         training, validation, and convergence checking.
