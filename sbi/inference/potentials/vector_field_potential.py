@@ -21,42 +21,6 @@ from sbi.utils.sbiutils import mcmc_transform, within_support
 from sbi.utils.torchutils import ensure_theta_batched
 
 
-def vector_field_estimator_based_potential(
-    vector_field_estimator: ConditionalVectorFieldEstimator,
-    prior: Optional[Distribution],
-    x_o: Optional[Tensor],
-    enable_transform: bool = True,
-    **kwargs,
-) -> Tuple["VectorFieldBasedPotential", TorchTransform]:
-    r"""Returns the potential function gradient for vector field estimators.
-
-    Args:
-        vector_field_estimator: The neural network modelling the vector field.
-        prior: The prior distribution.
-        x_o: The observed data at which to evaluate the vector field.
-        enable_transform: Whether to enable transforms. Not supported yet.
-        **kwargs: Additional keyword arguments passed to
-            `VectorFieldBasedPotential`.
-    Returns:
-        The potential function and a transformation that maps
-        to unconstrained space.
-    """
-    device = str(next(vector_field_estimator.parameters()).device)
-
-    potential_fn = VectorFieldBasedPotential(
-        vector_field_estimator, prior, x_o, device=device, **kwargs
-    )
-
-    if prior is not None:
-        theta_transform = mcmc_transform(
-            prior, device=device, enable_transform=enable_transform
-        )
-    else:
-        theta_transform = torch.distributions.transforms.identity_transform
-
-    return potential_fn, theta_transform
-
-
 class VectorFieldBasedPotential(BasePotential):
     def __init__(
         self,
@@ -130,7 +94,7 @@ class VectorFieldBasedPotential(BasePotential):
         self,
         x_o: Optional[Tensor],
         x_is_iid: Optional[bool] = False,
-        iid_method: Literal["fnpe", "gauss", "auto_gauss", "jac_gauss"] = "auto_gauss",
+        iid_method: Optional[str] = None,
         iid_params: Optional[Dict[str, Any]] = None,
         **ode_kwargs,
     ):
@@ -149,7 +113,7 @@ class VectorFieldBasedPotential(BasePotential):
             ode_kwargs: Additional keyword arguments for the neural ODE.
         """
         super().set_x(x_o, x_is_iid)
-        self.iid_method = iid_method
+        self.iid_method = iid_method or self.iid_method
         self.iid_params = iid_params
         # NOTE: Once IID potential evaluation is supported. This needs to be adapted.
         # See #1450.
@@ -279,6 +243,42 @@ class VectorFieldBasedPotential(BasePotential):
 
         flow = self.neural_ode(x_density_estimator, **kwargs)
         return flow
+
+
+def vector_field_estimator_based_potential(
+    vector_field_estimator: ConditionalVectorFieldEstimator,
+    prior: Optional[Distribution],
+    x_o: Optional[Tensor],
+    enable_transform: bool = True,
+    **kwargs,
+) -> Tuple[VectorFieldBasedPotential, TorchTransform]:
+    r"""Returns the potential function gradient for vector field estimators.
+
+    Args:
+        vector_field_estimator: The neural network modelling the vector field.
+        prior: The prior distribution.
+        x_o: The observed data at which to evaluate the vector field.
+        enable_transform: Whether to enable transforms. Not supported yet.
+        **kwargs: Additional keyword arguments passed to
+            `VectorFieldBasedPotential`.
+    Returns:
+        The potential function and a transformation that maps
+        to unconstrained space.
+    """
+    device = str(next(vector_field_estimator.parameters()).device)
+
+    potential_fn = VectorFieldBasedPotential(
+        vector_field_estimator, prior, x_o, device=device, **kwargs
+    )
+
+    if prior is not None:
+        theta_transform = mcmc_transform(
+            prior, device=device, enable_transform=enable_transform
+        )
+    else:
+        theta_transform = torch.distributions.transforms.identity_transform
+
+    return potential_fn, theta_transform
 
 
 class DifferentiablePotentialFunction(torch.autograd.Function):

@@ -658,7 +658,7 @@ class AutoGaussCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
                 precision_est_budget = min(int(prior.event_shape[0] * 1000), 5000)
 
         thetas = posterior.sample_batched(
-            torch.Size([precision_est_budget]),
+            sample_shape=torch.Size([precision_est_budget]),
             x=conditions,
             show_progress_bars=False,
             steps=precision_initial_sampler_steps,
@@ -737,7 +737,7 @@ def ensure_lam_positive_definite(
     denoising_posterior_precision: torch.Tensor,
     N: int,
     precision_nugget: float = 0.1,
-) -> (torch.Tensor, torch.Tensor):
+) -> tuple[torch.Tensor, torch.Tensor]:
     r"""
     Ensure that the matrix is positive definite.
 

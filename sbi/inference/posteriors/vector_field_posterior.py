@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import math
 import warnings
 from typing import Dict, Literal, Optional, Union
 
@@ -150,7 +151,9 @@ class VectorFieldPosterior(NeuralPosterior):
         corrector_params: Optional[Dict] = None,
         steps: int = 500,
         ts: Optional[Tensor] = None,
-        iid_method: Literal["fnpe", "gauss", "auto_gauss", "jac_gauss"] = "auto_gauss",
+        iid_method: Optional[
+            Literal["fnpe", "gauss", "auto_gauss", "jac_gauss"]
+        ] = None,
         iid_params: Optional[Dict] = None,
         max_sampling_batch_size: int = 10_000,
         sample_with: Optional[str] = None,
@@ -201,19 +204,22 @@ class VectorFieldPosterior(NeuralPosterior):
         x = reshape_to_batch_event(x, self.vector_field_estimator.condition_shape)
         is_iid = x.shape[0] > 1
         self.potential_fn.set_x(
-            x, x_is_iid=is_iid, iid_method=iid_method, iid_params=iid_params
+            x,
+            x_is_iid=is_iid,
+            iid_method=iid_method or self.potential_fn.iid_method,
+            iid_params=iid_params,
         )
 
         num_samples = torch.Size(sample_shape).numel()
 
         if sample_with == "ode":
-            samples = rejection.accept_reject_sample(
+            samples, _ = rejection.accept_reject_sample(
                 proposal=self.sample_via_ode,
                 accept_reject_fn=lambda theta: within_support(self.prior, theta),
                 num_samples=num_samples,
                 show_progress_bars=show_progress_bars,
                 max_sampling_batch_size=max_sampling_batch_size,
-            )[0]
+            )
         elif sample_with == "sde":
             proposal_sampling_kwargs = {
                 "predictor": predictor,
@@ -225,14 +231,14 @@ class VectorFieldPosterior(NeuralPosterior):
                 "max_sampling_batch_size": max_sampling_batch_size,
                 "show_progress_bars": show_progress_bars,
             }
-            samples = rejection.accept_reject_sample(
+            samples, _ = rejection.accept_reject_sample(
                 proposal=self._sample_via_diffusion,
                 accept_reject_fn=lambda theta: within_support(self.prior, theta),
                 num_samples=num_samples,
                 show_progress_bars=show_progress_bars,
                 max_sampling_batch_size=max_sampling_batch_size,
                 proposal_sampling_kwargs=proposal_sampling_kwargs,
-            )[0]
+            )
         else:
             raise ValueError(
                 f"Expected sample_with to be 'ode' or 'sde', but got {sample_with}."
@@ -282,13 +288,16 @@ class VectorFieldPosterior(NeuralPosterior):
                 "The vector field estimator does not support the 'sde' sampling method."
             )
 
-        num_samples = torch.Size(sample_shape).numel()
+        total_samples_needed = torch.Size(sample_shape).numel()
 
-        max_sampling_batch_size = (
+        # Determine effective batch size for sampling
+        effective_batch_size = (
             self.max_sampling_batch_size
             if max_sampling_batch_size is None
             else max_sampling_batch_size
         )
+        # Ensure we don't use larger batches than total samples needed
+        effective_batch_size = min(effective_batch_size, total_samples_needed)
 
         # TODO: the time schedule should be provided by the estimator, see issue #1437
         if ts is None:
@@ -297,6 +306,7 @@ class VectorFieldPosterior(NeuralPosterior):
             ts = torch.linspace(t_max, t_min, steps)
         ts = ts.to(self.device)
 
+        # Initialize the diffusion sampler
         diffuser = Diffuser(
             self.potential_fn,
             predictor=predictor,
@@ -304,21 +314,39 @@ class VectorFieldPosterior(NeuralPosterior):
             predictor_params=predictor_params,
             corrector_params=corrector_params,
         )
-        max_sampling_batch_size = min(max_sampling_batch_size, num_samples)
-        samples = []
-        num_iter = num_samples // max_sampling_batch_size
-        num_iter = (
-            num_iter + 1 if (num_samples % max_sampling_batch_size) != 0 else num_iter
-        )
-        for _ in range(num_iter):
-            samples.append(
-                diffuser.run(
-                    num_samples=max_sampling_batch_size,
-                    ts=ts,
-                    show_progress_bars=show_progress_bars,
-                )
+
+        # Calculate how many batches we need
+        num_batches = math.ceil(total_samples_needed / effective_batch_size)
+
+        # Generate samples in batches
+        all_samples = []
+        samples_generated = 0
+
+        for _ in range(num_batches):
+            # Calculate how many samples to generate in this batch
+            remaining_samples = total_samples_needed - samples_generated
+            current_batch_size = min(effective_batch_size, remaining_samples)
+
+            # Generate samples for this batch
+            batch_samples = diffuser.run(
+                num_samples=current_batch_size,
+                ts=ts,
+                show_progress_bars=show_progress_bars,
             )
-        samples = torch.cat(samples, dim=0)[:num_samples]
+
+            all_samples.append(batch_samples)
+            samples_generated += current_batch_size
+
+        # Concatenate all batches and ensure we return exactly the requested number
+        samples = torch.cat(all_samples, dim=0)[:total_samples_needed]
+
+        # Check for NaN values
+        if torch.isnan(samples).any():
+            raise RuntimeError(
+                "NaN values detected during diffusion sampling. This may indicate"
+                " numerical instability in the vector field or improper time "
+                "scheduling."
+            )
 
         return samples
 
@@ -443,14 +471,14 @@ class VectorFieldPosterior(NeuralPosterior):
             max_sampling_batch_size = capped
 
         if self.sample_with == "ode":
-            samples = rejection.accept_reject_sample(
+            samples, _ = rejection.accept_reject_sample(
                 proposal=self.sample_via_ode,
                 accept_reject_fn=lambda theta: within_support(self.prior, theta),
                 num_samples=num_samples,
                 num_xos=batch_size,
                 show_progress_bars=show_progress_bars,
                 max_sampling_batch_size=max_sampling_batch_size,
-            )[0]
+            )
             samples = samples.reshape(
                 sample_shape + batch_shape + self.vector_field_estimator.input_shape
             )
@@ -465,7 +493,7 @@ class VectorFieldPosterior(NeuralPosterior):
                 "max_sampling_batch_size": max_sampling_batch_size,
                 "show_progress_bars": show_progress_bars,
             }
-            samples = rejection.accept_reject_sample(
+            samples, _ = rejection.accept_reject_sample(
                 proposal=self._sample_via_diffusion,
                 accept_reject_fn=lambda theta: within_support(self.prior, theta),
                 num_samples=num_samples,
@@ -473,7 +501,7 @@ class VectorFieldPosterior(NeuralPosterior):
                 show_progress_bars=show_progress_bars,
                 max_sampling_batch_size=max_sampling_batch_size,
                 proposal_sampling_kwargs=proposal_sampling_kwargs,
-            )[0]
+            )
             samples = samples.reshape(
                 sample_shape + batch_shape + self.vector_field_estimator.input_shape
             )
