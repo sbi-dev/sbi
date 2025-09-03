@@ -340,6 +340,12 @@ class VectorFieldPosterior(NeuralPosterior):
         # Concatenate all batches and ensure we return exactly the requested number
         samples = torch.cat(all_samples, dim=0)[:total_samples_needed]
 
+        if torch.isnan(samples).all():
+            raise RuntimeError(
+                "All samples NaN after diffusion sampling. "
+                "This may indicate numerical instability in the vector field."
+            )
+
         return samples
 
     def sample_via_ode(

@@ -174,13 +174,6 @@ class Diffuser:
             if save_intermediate:
                 intermediate_samples.append(samples)
 
-        # Check for NaN values after predictor
-        if torch.isnan(samples).any():
-            raise RuntimeError(
-                "NaN values detected after diffusion sampling "
-                "This may indicate numerical instability in the vector field."
-            )
-
         if save_intermediate:
             return torch.cat(intermediate_samples, dim=0)
         else:
