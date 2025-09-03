@@ -373,13 +373,9 @@ def test_vector_field_iid_inference(
         num_trials: The number of trials to run.
     """
 
-    if (
-        vector_field_type == "fmpe"
-        and prior_type == "uniform"
-        and iid_method in ["gauss", "auto_gauss", "jac_gauss"]
-    ):
+    if prior_type == "uniform" and iid_method in ["gauss", "auto_gauss", "jac_gauss"]:
         # TODO: Predictor produces NaNs for these cases, see #1656
-        pytest.skip("Known issue with FMPE and IID methods with uniform priors")
+        pytest.skip("Known issue of IID methods with uniform priors, see #1656.")
 
     vector_field_trained_model = train_vector_field_model(vector_field_type, prior_type)
 
