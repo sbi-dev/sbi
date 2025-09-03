@@ -537,7 +537,7 @@ class VPScoreEstimator(ConditionalScoreEstimator):
         Returns:
             Drift function at a given time.
         """
-        phi = -0.5 * self._beta_schedule(times).to(input.device)
+        phi = -0.5 * self._beta_schedule(times)
         while len(phi.shape) < len(input.shape):
             phi = phi.unsqueeze(-1)
         return phi * input
