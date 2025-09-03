@@ -15,20 +15,7 @@ from torch import eye, ones, zeros
 from torch.distributions import MultivariateNormal
 
 from sbi import utils as utils
-from sbi.inference import (
-    ABC,
-    FMPE,
-    NLE,
-    NPE,
-    NPE_A,
-    NPE_C,
-    NRE_A,
-    NRE_B,
-    NRE_C,
-    VIPosterior,
-    likelihood_estimator_based_potential,
-    ratio_estimator_based_potential,
-)
+from sbi.inference.abc import MCABC as ABC
 from sbi.inference.posteriors.ensemble_posterior import (
     EnsemblePotential,
 )
@@ -37,10 +24,21 @@ from sbi.inference.posteriors.mcmc_posterior import MCMCPosterior
 from sbi.inference.posteriors.posterior_parameters import (
     MCMCPosteriorParameters,
 )
+from sbi.inference.posteriors.vi_posterior import VIPosterior
 from sbi.inference.potentials.base_potential import BasePotential
-from sbi.inference.potentials.likelihood_based_potential import LikelihoodBasedPotential
+from sbi.inference.potentials.likelihood_based_potential import (
+    LikelihoodBasedPotential,
+    likelihood_estimator_based_potential,
+)
 from sbi.inference.potentials.posterior_based_potential import PosteriorBasedPotential
-from sbi.inference.potentials.ratio_based_potential import RatioBasedPotential
+from sbi.inference.potentials.ratio_based_potential import (
+    RatioBasedPotential,
+    ratio_estimator_based_potential,
+)
+from sbi.inference.trainers.nle import NLE
+from sbi.inference.trainers.npe import NPE, NPE_A, NPE_C
+from sbi.inference.trainers.nre import NRE_A, NRE_B, NRE_C
+from sbi.inference.trainers.vfpe import FMPE, NPSE
 from sbi.neural_nets.embedding_nets import FCEmbedding
 from sbi.neural_nets.factory import (
     classifier_nn,
@@ -48,17 +46,11 @@ from sbi.neural_nets.factory import (
     likelihood_nn,
     posterior_nn,
 )
-from sbi.simulators import diagonal_linear_gaussian, linear_gaussian
-from sbi.utils.torchutils import (
-    BoxUniform,
-    gpu_available,
-    process_device,
-)
-from sbi.utils.user_input_checks import (
-    validate_theta_and_x,
-)
+from sbi.simulators.linear_gaussian import diagonal_linear_gaussian, linear_gaussian
+from sbi.utils import BoxUniform
+from sbi.utils.torchutils import gpu_available, process_device
+from sbi.utils.user_input_checks import validate_theta_and_x
 
-# tests in this file are skipped if there is GPU device available
 pytestmark = pytest.mark.skipif(
     not gpu_available(), reason="No CUDA or MPS device available."
 )
@@ -718,27 +710,43 @@ def test_to_method_on_posteriors(device: str, sampling_method: str):
 @pytest.mark.gpu
 @pytest.mark.parametrize("device", ["cpu", "gpu"])
 @pytest.mark.parametrize("device_inference", ["cpu", "gpu"])
-@pytest.mark.parametrize(
-    "iid_method", ["fnpe", "gauss", "auto_gauss", "jac_gauss", None]
-)
-def test_VectorFieldPosterior_device_handling(
-    device: str, device_inference: str, iid_method: str
+@pytest.mark.parametrize("num_trials", [1, 2])
+@pytest.mark.parametrize("vf_trainer", [FMPE, NPSE])
+def test_vector_field_methods_device_handling(
+    vf_trainer, device: str, device_inference: str, num_trials: int
 ):
     """Test VectorFieldPosterior on different devices training and inference devices.
 
+    Tests both ode and sde sampling for both FMPE and NPSE.
+
+    Tests iid methods for num_trials = 2.
+
     Args:
+        vf_trainer: vector field trainer class to use.
         device: device to train the model on.
         device_inference: device to run the inference on.
         iid_method: method to sample from the posterior.
     """
+
+    num_dims = 2
+    num_simulations = 1000
+    if vf_trainer == NPSE:
+        iid_methods = ["fnpe", "gauss", "auto_gauss", "jac_gauss"]
+    else:
+        iid_methods = ["fnpe"]
+
     device = process_device(device)
     device_inference = process_device(device_inference)
-    prior = BoxUniform(torch.zeros(3), torch.ones(3), device=device)
-    inference = FMPE(score_estimator="mlp", prior=prior, device=device)
-    density_estimator = inference.append_simulations(
-        torch.randn((100, 3)), torch.randn((100, 2))
-    ).train(max_num_epochs=1)
-    posterior = inference.build_posterior(density_estimator, prior)
+
+    prior = BoxUniform(torch.zeros(num_dims), torch.ones(num_dims), device=device)
+    theta = prior.sample((num_simulations,))
+    x = theta + 0.1 * torch.randn_like(theta)
+
+    inference = vf_trainer(prior=prior, device=device)
+    _ = inference.append_simulations(theta, x).train(max_num_epochs=10)
+    posterior = inference.build_posterior(
+        sample_with="sde" if num_trials > 1 else "ode"
+    )
 
     # faster but inaccurate log_prob computation
     posterior.potential_fn.neural_ode.update_params(exact=False, atol=1e-4, rtol=1e-4)
@@ -748,13 +756,23 @@ def test_VectorFieldPosterior_device_handling(
         f"VectorFieldPosterior is not in device {device_inference}."
     )
 
-    x_o = torch.ones(2).to(device_inference)
-    samples = posterior.sample((2,), x=x_o, iid_method=iid_method)
-    assert samples.device.type == device_inference.split(":")[0], (
-        f"Samples are not on device {device_inference}."
-    )
+    x_o = torch.ones(num_trials, num_dims).to(device_inference)
+    if num_trials > 1:
+        for iid_method in iid_methods:
+            samples = posterior.sample((2,), x=x_o, iid_method=iid_method)
+            assert samples.device.type == device_inference.split(":")[0], (
+                f"Samples are not on device {device_inference}. "
+                f"{vf_trainer.__name__} with {iid_method}"
+            )
+    else:
+        samples = posterior.sample((2,), x=x_o)
+        assert samples.device.type == device_inference.split(":")[0], (
+            f"Samples are not on device {device_inference}. "
+            f"{vf_trainer.__name__} with {iid_method}"
+        )
 
-    log_probs = posterior.log_prob(samples, x=x_o)
-    assert log_probs.device.type == device_inference.split(":")[0], (
-        f"log_prob was not correctly moved to {device_inference}."
-    )
+        log_probs = posterior.log_prob(samples, x=x_o)
+        assert log_probs.device.type == device_inference.split(":")[0], (
+            f"log_prob was not correctly moved to {device_inference}. "
+            f"{vf_trainer.__name__} with {iid_method}"
+        )

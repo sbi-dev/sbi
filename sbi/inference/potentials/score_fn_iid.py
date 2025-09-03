@@ -108,6 +108,7 @@ class IIDScoreFunction(ABC):
 
         self.vector_field_estimator = vector_field_estimator.to(device).eval()
         self.prior = prior
+        self.device = device
 
     def to(self, device: Union[str, torch.device]) -> None:
         """
@@ -332,9 +333,9 @@ class BaseGaussCorrectedScoreFunction(IIDScoreFunction):
         std = self.vector_field_estimator.std_fn(time)
 
         if precisions_posteriors.ndim == 4:
-            Ident = torch.eye(precisions_posteriors.shape[-1])
+            Ident = torch.eye(precisions_posteriors.shape[-1], device=self.device)
         else:
-            Ident = torch.ones_like(precisions_posteriors)
+            Ident = torch.ones_like(precisions_posteriors, device=self.device)
 
         marginal_precisions = m**2 / std**2 * Ident + precisions_posteriors
         return marginal_precisions
@@ -649,7 +650,9 @@ class AutoGaussCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
         # NOTE: To avoid circular imports :(
         from sbi.inference.posteriors.vector_field_posterior import VectorFieldPosterior
 
-        posterior = VectorFieldPosterior(vector_field_estimator, prior)
+        posterior = VectorFieldPosterior(
+            vector_field_estimator, prior, device=conditions.device
+        )
 
         if precision_est_budget is None:
             if precision_est_only_diag:
@@ -725,7 +728,7 @@ class JacCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
 
         m = self.vector_field_estimator.mean_t_fn(time)
         std = self.vector_field_estimator.std_fn(time)
-        cov0 = std**2 * jac + torch.eye(d)[None, None, :, :]
+        cov0 = std**2 * jac + torch.eye(d, device=self.device)[None, None, :, :]
 
         denoising_posterior_precision = m**2 / std**2 * torch.inverse(cov0)
 

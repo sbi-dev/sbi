@@ -662,7 +662,7 @@ class SubVPScoreEstimator(ConditionalScoreEstimator):
         Returns:
             Drift function at a given time.
         """
-        phi = -0.5 * self._beta_schedule(times)
+        phi = -0.5 * self._beta_schedule(times).to(input.device)
 
         while len(phi.shape) < len(input.shape):
             phi = phi.unsqueeze(-1)
@@ -800,7 +800,7 @@ class VEScoreEstimator(ConditionalScoreEstimator):
         Returns:
             Drift function at a given time.
         """
-        return torch.tensor([0.0])
+        return torch.tensor([0.0], device=input.device)
 
     def diffusion_fn(self, input: Tensor, times: Tensor) -> Tensor:
         """Diffusion function for variance exploding SDEs.
@@ -819,4 +819,4 @@ class VEScoreEstimator(ConditionalScoreEstimator):
         while len(g.shape) < len(input.shape):
             g = g.unsqueeze(-1)
 
-        return g
+        return g.to(input.device)
