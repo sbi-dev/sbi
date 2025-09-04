@@ -175,6 +175,6 @@ class Diffuser:
                 intermediate_samples.append(samples)
 
         if save_intermediate:
-            return torch.cat(intermediate_samples, dim=0)
+            return torch.cat(intermediate_samples, dim=1)
         else:
             return samples
