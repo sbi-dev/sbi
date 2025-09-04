@@ -254,6 +254,7 @@ class VectorFieldPosterior(NeuralPosterior):
         ts: Optional[Tensor] = None,
         max_sampling_batch_size: int = 10_000,
         show_progress_bars: bool = True,
+        save_intermediate: bool = False,
     ) -> Tensor:
         r"""Return samples from posterior distribution $p(\theta|x)$.
 
@@ -275,6 +276,9 @@ class VectorFieldPosterior(NeuralPosterior):
             sample_with: Deprecated - use `.build_posterior(sample_with=...)` prior to
                 `.sample()`.
             show_progress_bars: Whether to show a progress bar during sampling.
+            save_intermediate: Whether to save intermediate results of the diffusion
+                process. If True, the returned tensor has shape
+                `(*sample_shape, steps, *input_shape)`.
         """
 
         if not self.vector_field_estimator.SCORE_DEFINED:
@@ -316,9 +320,10 @@ class VectorFieldPosterior(NeuralPosterior):
                     num_samples=max_sampling_batch_size,
                     ts=ts,
                     show_progress_bars=show_progress_bars,
+                    save_intermediate=save_intermediate,
                 )
             )
-        samples = torch.cat(samples, dim=0)[:num_samples]
+        samples = torch.cat(samples, dim=0)#[:num_samples]
 
         return samples
 
