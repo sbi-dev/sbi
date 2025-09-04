@@ -143,22 +143,34 @@ class Diffuser:
         Returns:
             Tensor: Samples from the distribution(s).
         """
+        # Initialize samples from the base distribution
         samples = self.initialize(num_samples).to(ts.device)
+
+        # Set up progress bar for time-stepping through the diffusion process
+        total_time_steps = ts.numel() - 1  # We skip the first time point
         pbar = tqdm(
             range(1, ts.numel()),
             disable=not show_progress_bars,
-            desc=f"Drawing {num_samples} posterior samples",
+            desc=f"Generating {num_samples} posterior samples in {total_time_steps} "
+            "diffusion steps.",
         )
 
         if save_intermediate:
             intermediate_samples = [samples]
 
-        for i in pbar:
-            t1 = ts[i - 1]
-            t0 = ts[i]
-            samples = self.predictor(samples, t1, t0)
+        # Step through the diffusion process from t_max to t_min
+        for time_step_idx in pbar:
+            # Get current and next time points (going backwards in time)
+            t_current = ts[time_step_idx - 1]  # Previous time point
+            t_next = ts[time_step_idx]  # Current time point
+
+            # Apply predictor step
+            samples = self.predictor(samples, t_current, t_next)
+
+            # Apply corrector step if available
             if self.corrector is not None:
-                samples = self.corrector(samples, t0, t1)
+                samples = self.corrector(samples, t_next, t_current)
+
             if save_intermediate:
                 intermediate_samples.append(samples)
 
