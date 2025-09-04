@@ -2,13 +2,13 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import math
-from math import pi
 from typing import Callable, Optional, Union
 
 import torch
 from torch import Tensor, nn
 
 from sbi.neural_nets.estimators.base import ConditionalVectorFieldEstimator
+from sbi.utils.vector_field_utils import VectorFieldNet
 
 
 class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
@@ -26,49 +26,72 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
     where mean_t(t) and std_t(t) are the conditional mean and standard deviation at a
     given time t, respectively.
 
-    Relevant literature:
-    - Score-based generative modeling through SDE: https://arxiv.org/abs/2011.13456
-    - Denoising diffusion probabilistic models: https://arxiv.org/abs/2006.11239
-    - Noise conditional score networks: https://arxiv.org/abs/1907.05600
+    References
+    ----------
+    .. [1] Song, Y., Sohl-Dickstein, J., Kingma, D. P., Kumar, A., Ermon, S.,
+           & Poole, B. (2020).
+           "Score-based generative modeling through stochastic differential equations"
+           *Advances in Neural Information Processing Systems*
+           https://arxiv.org/abs/2011.13456
+
+    .. [2] Ho, J., Jain, A., & Abbeel, P. (2020).
+           "Denoising diffusion probabilistic models"
+           *Advances in Neural Information Processing Systems, 33, 6840-6851*
+           https://arxiv.org/abs/2006.11239
+
+    .. [3] Song, Y., & Ermon, S. (2019).
+           "Generative modeling by estimating gradients of the data distribution"
+           *Advances in Neural Information Processing Systems, 32*
+           https://arxiv.org/abs/1907.05600
 
     NOTE: This will follow the "noise matching" approach, we could also train a
     "denoising" network aiming to predict the original input given the noised input. We
     can still approx. the score by Tweedie's formula, but training might be easier.
     """
 
+    # Whether the score is defined for this estimator.
+    # Required for gradient-based methods.
+    SCORE_DEFINED: bool = True
+    # Whether the SDE functions - score, drift and diffusion -
+    #  are defined for this estimator.
+    SDE_DEFINED: bool = True
+    # Whether the marginals are defined for this estimator.
+    # Required for iid methods.
+    MARGINALS_DEFINED: bool = True
+
     def __init__(
         self,
-        net: nn.Module,
+        net: VectorFieldNet,
         input_shape: torch.Size,
         condition_shape: torch.Size,
+        embedding_net: Optional[nn.Module] = None,
         weight_fn: Union[str, Callable] = "max_likelihood",
         mean_0: Union[Tensor, float] = 0.0,
         std_0: Union[Tensor, float] = 1.0,
         t_min: float = 1e-3,
         t_max: float = 1.0,
     ) -> None:
-        r"""Score estimator class that estimates the conditional score function, i.e.,
+        r"""Score estimator class that estimates the
+        conditional score function, i.e.,
         gradient of the density p(xt|x0).
 
         Args:
             net: Score estimator neural network with call signature: input, condition,
                 and time (in [0,1])].
+            input_shape: Shape of the input, i.e., the parameters.
             condition_shape: Shape of the conditioning variable.
+            embedding_net: Network to embed the conditioning variable before passing it
+                to the score network. If None, the identity function is used.
             weight_fn: Function to compute the weights over time. Can be one of the
                 following:
                 - "identity": constant weights (1.),
                 - "max_likelihood": weights proportional to the diffusion function, or
                 - a custom function that returns a Callable.
-
+            mean_0: Starting mean of the target distribution.
+            std_0: Starting standard deviation of the target distribution.
+            t_min: Minimum time for diffusion (0 can be numerically unstable).
+            t_max: Maximum time for diffusion.
         """
-        super().__init__(net, input_shape, condition_shape)
-
-        # Set lambdas (variance weights) function.
-        self._set_weight_fn(weight_fn)
-
-        # Min time for diffusion (0 can be numerically unstable).
-        self.t_min = t_min
-        self.t_max = t_max
 
         # Starting mean and std of the target distribution (otherwise assumes 0,1).
         # This will be used to precondition the score network to improve training.
@@ -77,34 +100,65 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         if not isinstance(std_0, Tensor):
             std_0 = torch.tensor([std_0])
 
+        super().__init__(
+            net,
+            input_shape,
+            condition_shape,
+            mean_base=0.0,  # Will be updated after initialization
+            std_base=1.0,  # Will be updated after initialization
+            embedding_net=embedding_net,
+            t_min=t_min,
+            t_max=t_max,
+        )
+
+        # Set lambdas (variance weights) function.
+        self._set_weight_fn(weight_fn)
         self.register_buffer("mean_0", mean_0.clone().detach())
         self.register_buffer("std_0", std_0.clone().detach())
 
-        # We estimate the mean and std of the source distribution at time t_max.
+        # Now that input_shape and mean_0, std_0 is set, we can compute the proper mean
+        # and std for the "base" distribution.
         mean_t = self.approx_marginal_mean(torch.tensor([t_max]))
         std_t = self.approx_marginal_std(torch.tensor([t_max]))
-        self.register_buffer("mean_t", mean_t)
-        self.register_buffer("std_t", std_t)
+        mean_t = torch.broadcast_to(mean_t, (1, *input_shape))
+        std_t = torch.broadcast_to(std_t, (1, *input_shape))
+
+        # Update the base distribution parameters
+        self._mean_base = mean_t
+        self._std_base = std_t
 
     def forward(self, input: Tensor, condition: Tensor, time: Tensor) -> Tensor:
-        r"""Forward pass of the score estimator network to compute the conditional score
+        r"""Forward pass of the score estimator
+        network to compute the conditional score
         at a given time.
 
         Args:
-            input: Original data, x0. (input_batch_shape, *input_shape)
-            condition: Conditioning variable. (condition_batch_shape, *condition_shape)
-            times: SDE time variable in [0,1].
+            input: Inputs to evaluate the score estimator on of shape
+                    `(sample_dim_input, batch_dim_input, *event_shape_input)`.
+            condition: Conditions of shape
+                `(batch_dim_condition, *event_shape_condition)`.
+            time: Time variable in [0,1] of shape
+                `(batch_dim_time, *event_shape_time)`.
 
         Returns:
             Score (gradient of the density) at a given time, matches input shape.
         """
+
+        # Continue with standard processing (broadcast shapes etc.)
+        batch_shape_input = input.shape[: -len(self.input_shape)]
+        batch_shape_cond = condition.shape[: -len(self.condition_shape)]
         batch_shape = torch.broadcast_shapes(
-            input.shape[: -len(self.input_shape)],
-            condition.shape[: -len(self.condition_shape)],
+            batch_shape_input,
+            batch_shape_cond,
         )
 
+        # embed the conditioning variable
+        condition_emb = self._embedding_net(condition)
+
         input = torch.broadcast_to(input, batch_shape + self.input_shape)
-        condition = torch.broadcast_to(condition, batch_shape + self.condition_shape)
+        condition_emb = torch.broadcast_to(
+            condition_emb, batch_shape + condition_emb.shape[len(batch_shape_cond) :]
+        )
         time = torch.broadcast_to(time, batch_shape)
 
         # Time dependent mean and std of the target distribution to z-score the input
@@ -123,7 +177,15 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         score_gaussian = (input - mean) / std**2
 
         # Score prediction by the network
-        score_pred = self.net(input_enc, condition, time_enc)
+        # NOTE: To simplify usage of external networks, we will flatten the tensors
+        # batch_shape to a single batch dimension.
+        input_enc = input_enc.reshape(-1, *input_enc.shape[len(batch_shape) :])
+        condition_emb = condition_emb.reshape(
+            -1, *condition_emb.shape[len(batch_shape) :]
+        )
+        time_enc = time_enc.reshape(-1)
+        score_pred = self.net(input_enc, condition_emb, time_enc)
+        score_pred = score_pred.reshape(*batch_shape, *score_pred.shape[1:])
 
         # Output pre-conditioned score
         # The learnable part will be largly scaled at the beginning of the diffusion
@@ -134,13 +196,26 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
 
         return output_score
 
+    def score(self, input: Tensor, condition: Tensor, t: Tensor) -> Tensor:
+        """Score function of the score estimator.
+
+        Args:
+            input: variable whose distribution is estimated.
+            condition: Conditioning variable.
+            t: Time.
+
+        Returns:
+            Score function value.
+        """
+        return self(input=input, condition=condition, time=t)
+
     def loss(
         self,
         input: Tensor,
         condition: Tensor,
         times: Optional[Tensor] = None,
         control_variate=True,
-        control_variate_threshold=torch.inf,
+        control_variate_threshold=0.3,
     ) -> Tensor:
         r"""Defines the denoising score matching loss (e.g., from Song et al., ICLR
         2021). A random diffusion time is sampled from [0,1], and the network is trained
@@ -155,7 +230,9 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
             control_variate: Whether to use a control variate to reduce the variance of
                 the stochastic loss estimator.
             control_variate_threshold: Threshold for the control variate. If the std
-                exceeds this threshold, the control variate is not used.
+                exceeds this threshold, the control variate is not used. This is because
+                the control variate assumes a Taylor expansion of the score around the
+                mean, which is not valid for large std.
 
         Returns:
             MSE between target score and network output, scaled by the weight function.
@@ -168,7 +245,6 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
                 * (self.t_max - self.t_min)
                 + self.t_min
             )
-
         # Sample noise.
         eps = torch.randn_like(input)
 
@@ -240,8 +316,8 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         Returns:
             Approximate marginal standard deviation at a given time.
         """
-        vars = self.mean_t_fn(times) ** 2 * self.std_0**2 + self.std_fn(times) ** 2
-        return torch.sqrt(vars)
+        var = self.mean_t_fn(times) ** 2 * self.std_0**2 + self.std_fn(times) ** 2
+        return torch.sqrt(var)
 
     def mean_t_fn(self, times: Tensor) -> Tensor:
         r"""Conditional mean function, E[xt|x0], specifying the "mean factor" at a given
@@ -338,21 +414,61 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         else:
             raise ValueError(f"Weight function {weight_fn} not recognized.")
 
+    def ode_fn(self, input: Tensor, condition: Tensor, times: Tensor) -> Tensor:
+        """ODE flow function of the score estimator.
+
+        For reference, see Equation 13 in [1]_.
+
+        Args:
+            input: variable whose distribution is estimated.
+            condition: Conditioning variable.
+            t: Time.
+
+        Returns:
+            ODE flow function value at a given time.
+        """
+        score = self.score(input=input, condition=condition, t=times)
+        f = self.drift_fn(input, times)
+        g = self.diffusion_fn(input, times)
+        v = f - 0.5 * g**2 * score
+        return v
+
 
 class VPScoreEstimator(ConditionalScoreEstimator):
-    """Class for score estimators with variance preserving SDEs (i.e., DDPM)."""
+    """Class for score estimators with variance preserving SDEs (i.e., DDPM).
+
+    The SDE defining the diffusion process is characterized by the following hyper-
+    parameters.
+
+    Args:
+        beta_min: This defines the smallest noise rate (i.e. how much the input is
+            "scaled" down in contrast to how much noise is added) in the subVPSDE.
+            Ideally, this would be 0, but score matching losses as employed in most
+            diffusion models can become unstable if beta_min is zero. A small positive
+            value is chosen to stabilize training (the smaller, the closer to an ODE;
+            the larger, the easier to train but the noisier the resulting samples).
+        beta_max: This defines the largest noise rate in the variance-preserving SDE.
+            It sets the maximum variance introduced by the diffusion process; when
+            integrated over [0, T], the marginal distribution at time T should
+            approximate N(0, I).
+
+    NOTE: Together with t_min and t_max they ultimatively define the loss function.
+        Changing these might also require changing t_min and t_max to find a good
+        tradeoff between bias and variance.
+    """
 
     def __init__(
         self,
-        net: nn.Module,
+        net: VectorFieldNet,
         input_shape: torch.Size,
         condition_shape: torch.Size,
+        embedding_net: Optional[nn.Module] = None,
         weight_fn: Union[str, Callable] = "max_likelihood",
         beta_min: float = 0.01,
         beta_max: float = 10.0,
         mean_0: Union[Tensor, float] = 0.0,
         std_0: Union[Tensor, float] = 1.0,
-        t_min: float = 1e-5,
+        t_min: float = 1e-3,
         t_max: float = 1.0,
     ) -> None:
         self.beta_min = beta_min
@@ -361,9 +477,10 @@ class VPScoreEstimator(ConditionalScoreEstimator):
             net,
             input_shape,
             condition_shape,
+            embedding_net=embedding_net,
+            weight_fn=weight_fn,
             mean_0=mean_0,
             std_0=std_0,
-            weight_fn=weight_fn,
             t_min=t_min,
             t_max=t_max,
         )
@@ -442,13 +559,34 @@ class VPScoreEstimator(ConditionalScoreEstimator):
 
 
 class SubVPScoreEstimator(ConditionalScoreEstimator):
-    """Class for score estimators with sub-variance preserving SDEs."""
+    """Class for score estimators with sub-variance preserving SDEs.
+
+    The SDE defining the diffusion process is characterized by the following hyper-
+    parameters.
+
+    Args:
+        beta_min: This defines the smallest noise rate (i.e. how much the input is
+            "scaled" down in contrast to how much noise is added) in the subVPSDE.
+            Ideally, this would be 0, but score matching losses as employed in most
+            diffusion models can become unstable if beta_min is zero. A small positive
+            value is chosen to stabilize training (the smaller, the closer to an ODE;
+            the larger, the easier to train but the noisier the resulting samples).
+        beta_max: This defines the largest noise rate in the variance-preserving SDE.
+            It sets the maximum variance introduced by the diffusion process; when
+            integrated over [0, T], the marginal distribution at time T should
+            approximate N(0, I).
+
+    NOTE: Together with t_min and t_max they ultimatively define the loss function.
+        Changing these might also require changing t_min and t_max to find a good
+        tradeoff between bias and variance.
+    """
 
     def __init__(
         self,
-        net: nn.Module,
+        net: VectorFieldNet,
         input_shape: torch.Size,
         condition_shape: torch.Size,
+        embedding_net: Optional[nn.Module] = None,
         weight_fn: Union[str, Callable] = "max_likelihood",
         beta_min: float = 0.01,
         beta_max: float = 10.0,
@@ -463,6 +601,7 @@ class SubVPScoreEstimator(ConditionalScoreEstimator):
             net,
             input_shape,
             condition_shape,
+            embedding_net=embedding_net,
             weight_fn=weight_fn,
             mean_0=mean_0,
             std_0=std_0,
@@ -523,7 +662,7 @@ class SubVPScoreEstimator(ConditionalScoreEstimator):
         Returns:
             Drift function at a given time.
         """
-        phi = -0.5 * self._beta_schedule(times)
+        phi = -0.5 * self._beta_schedule(times).to(input.device)
 
         while len(phi.shape) < len(input.shape):
             phi = phi.unsqueeze(-1)
@@ -560,18 +699,43 @@ class SubVPScoreEstimator(ConditionalScoreEstimator):
 
 
 class VEScoreEstimator(ConditionalScoreEstimator):
-    """Class for score estimators with variance exploding SDEs (i.e., NCSN / SMLD)."""
+    """Class for score estimators with variance exploding SDEs (i.e., NCSN / SMLD).
+
+    The SDE defining the diffusion process is characterized by the following hyper-
+    parameters.
+
+
+    Args:
+       sigma_min: This defines the smallest "noise" level in the diffusion process. This
+           ideally would be 0., but denoising score matching losses as employed in most
+           diffusion models are ill-suited for this case as their variance explodes to
+           infinity. Hence often a "small" value is chosen (the larger, the easier to
+           learn but the "noisier" the end result if not addressed post-hoc).
+       sigma_max: This is the final standard deviation after running the full diffusion
+           process. Ideally this would approach ∞ such that x0 and xT are truly
+           independent; it should be at least chosen such that x_T ~ N(0, sigma_max) at
+           least approximately. If p(x0) for example has itself a very large variance,
+           then you might have to increase this.
+
+    NOTE: Together with t_min and t_max they ultimatively define the loss function.
+        Changing these might also require changing t_min and t_max to find a good
+        tradeoff between bias and variance.
+
+    """
 
     def __init__(
         self,
-        net: nn.Module,
+        net: VectorFieldNet,
         input_shape: torch.Size,
         condition_shape: torch.Size,
+        embedding_net: Optional[nn.Module] = None,
         weight_fn: Union[str, Callable] = "max_likelihood",
-        sigma_min: float = 1e-5,
-        sigma_max: float = 5.0,
+        sigma_min: float = 1e-4,
+        sigma_max: float = 10.0,
         mean_0: float = 0.0,
         std_0: float = 1.0,
+        t_min: float = 1e-3,
+        t_max: float = 1.0,
     ) -> None:
         self.sigma_min = sigma_min
         self.sigma_max = sigma_max
@@ -579,9 +743,12 @@ class VEScoreEstimator(ConditionalScoreEstimator):
             net,
             input_shape,
             condition_shape,
+            embedding_net=embedding_net,
             weight_fn=weight_fn,
             mean_0=mean_0,
             std_0=std_0,
+            t_min=t_min,
+            t_max=t_max,
         )
 
     def mean_t_fn(self, times: Tensor) -> Tensor:
@@ -633,7 +800,7 @@ class VEScoreEstimator(ConditionalScoreEstimator):
         Returns:
             Drift function at a given time.
         """
-        return torch.tensor([0.0])
+        return torch.tensor([0.0], device=input.device)
 
     def diffusion_fn(self, input: Tensor, times: Tensor) -> Tensor:
         """Diffusion function for variance exploding SDEs.
@@ -652,21 +819,4 @@ class VEScoreEstimator(ConditionalScoreEstimator):
         while len(g.shape) < len(input.shape):
             g = g.unsqueeze(-1)
 
-        return g
-
-
-class GaussianFourierTimeEmbedding(nn.Module):
-    """Gaussian random features for encoding time steps.
-
-    This is to be used as a utility for score-matching."""
-
-    def __init__(self, embed_dim=256, scale=30.0):
-        super().__init__()
-        # Randomly sample weights during initialization. These weights are fixed
-        # during optimization and are not trainable.
-        self.W = nn.Parameter(torch.randn(embed_dim // 2) * scale, requires_grad=False)
-
-    def forward(self, times: Tensor):
-        times_proj = times[:, None] * self.W[None, :] * 2 * pi
-        embedding = torch.cat([torch.sin(times_proj), torch.cos(times_proj)], dim=-1)
-        return torch.squeeze(embedding, dim=1)
+        return g.to(input.device)

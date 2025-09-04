@@ -1,55 +1,66 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Any, Callable, Optional, Union
+from typing import Any, Literal, Optional, Union
 
 import torch
 from torch import Tensor
 from torch.distributions import Distribution
 
 import sbi.utils as utils
-from sbi.inference.trainers.npe.npe_base import PosteriorEstimator
+from sbi.inference.trainers.npe.npe_base import (
+    PosteriorEstimatorTrainer,
+)
+from sbi.neural_nets.estimators.base import (
+    ConditionalDensityEstimator,
+    ConditionalEstimatorBuilder,
+)
 from sbi.neural_nets.estimators.shape_handling import reshape_to_sample_batch_event
-from sbi.sbi_types import TensorboardSummaryWriter
+from sbi.sbi_types import TensorBoardSummaryWriter
 from sbi.utils.sbiutils import del_entries
 
 
-class NPE_B(PosteriorEstimator):
+class NPE_B(PosteriorEstimatorTrainer):
+    r"""Neural Posterior Estimation algorithm (NPE-B) as in Lueckmann et al. (2017) [1].
+
+    [1] *Flexible statistical inference for mechanistic models of neural
+        dynamics*, Lueckmann, Gonçalves et al., NeurIPS 2017. https://arxiv.org/abs/171
+
+    Like all NPE methods, this method trains a deep neural density estimator to
+    directly approximate the posterior. Also like all other NPE methods, in the
+    first round, this density estimator is trained with a maximum-likelihood loss.
+
+    This class implements NPE-B. NPE-B trains across multiple rounds with a
+    an importance-weighted log-loss. Unlike NPE-A the loss will make training
+    directly converge to the true posterior.
+    Thus, SNPE-B is not limited to Gaussian proposal.
+    """
+
     def __init__(
         self,
         prior: Optional[Distribution] = None,
-        density_estimator: Union[str, Callable] = "maf",
+        density_estimator: Union[
+            Literal["nsf", "maf", "mdn", "made"],
+            ConditionalEstimatorBuilder[ConditionalDensityEstimator],
+        ] = "maf",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
-        summary_writer: Optional[TensorboardSummaryWriter] = None,
+        summary_writer: Optional[TensorBoardSummaryWriter] = None,
         show_progress_bars: bool = True,
     ):
-        r"""NPE-B [1].
-
-        [1] _Flexible statistical inference for mechanistic models of neural dynamics_,
-            Lueckmann, Gonçalves et al., NeurIPS 2017,
-            https://arxiv.org/abs/1711.01861.
-
-        Like all NPE methods, this method trains a deep neural density estimator to
-        directly approximate the posterior. Also like all other NPE methods, in the
-        first round, this density estimator is trained with a maximum-likelihood loss.
-
-        This class implements NPE-B. NPE-B trains across multiple rounds with a
-        an importance-weighted log-loss. Unlike NPE-A the loss will make training
-        directly converge to the true posterior.
-        Thus, SNPE-B is not limited to Gaussian proposal.
+        r"""Initialize NPE-B.
 
         Args:
             prior: A probability distribution that expresses prior knowledge about the
                 parameters, e.g. which ranges are meaningful for them.
             density_estimator: If it is a string, use a pre-configured network of the
                 provided type (one of nsf, maf, mdn, made). Alternatively, a function
-                that builds a custom neural network can be provided. The function will
-                be called with the first batch of simulations (theta, x), which can
-                thus be used for shape inference and potentially for z-scoring. It
-                needs to return a PyTorch `nn.Module` implementing the density
-                estimator. The density estimator needs to provide the methods
-                `.log_prob` and `.sample()`.
+                that builds a custom neural network, which adheres to
+                `ConditionalEstimatorBuilder` protocol can be provided. The function
+                will be called with the first batch of simulations (theta, x), which can
+                thus be used for shape inference and potentially for z-scoring. The
+                density estimator needs to provide the methods `.log_prob` and
+                `.sample()` and must return a `ConditionalDensityEstimator`.
             device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.

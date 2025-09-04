@@ -5,7 +5,7 @@ import warnings
 from copy import deepcopy
 from functools import partial
 from math import ceil
-from typing import Any, Callable, Dict, Optional, Union
+from typing import Any, Callable, Dict, Literal, Optional, Union
 from warnings import warn
 
 import arviz as az
@@ -39,7 +39,8 @@ from sbi.utils.torchutils import ensure_theta_batched, tensor2numpy
 
 
 class MCMCPosterior(NeuralPosterior):
-    r"""Provides MCMC to sample from the posterior.<br/><br/>
+    r"""Provides MCMC to sample from the posterior.
+
     SNLE or SNRE train neural networks to approximate the likelihood(-ratios).
     `MCMCPosterior` allows to sample from the posterior with MCMC.
     """
@@ -49,16 +50,24 @@ class MCMCPosterior(NeuralPosterior):
         potential_fn: Union[Callable, BasePotential],
         proposal: Any,
         theta_transform: Optional[TorchTransform] = None,
-        method: str = "slice_np_vectorized",
+        method: Literal[
+            "slice_np",
+            "slice_np_vectorized",
+            "hmc_pyro",
+            "nuts_pyro",
+            "slice_pymc",
+            "hmc_pymc",
+            "nuts_pymc",
+        ] = "slice_np_vectorized",
         thin: int = -1,
         warmup_steps: int = 200,
         num_chains: int = 20,
-        init_strategy: str = "resample",
+        init_strategy: Literal["proposal", "sir", "resample"] = "resample",
         init_strategy_parameters: Optional[Dict[str, Any]] = None,
         init_strategy_num_candidates: Optional[int] = None,
         num_workers: int = 1,
-        mp_context: str = "spawn",
-        device: Optional[str] = None,
+        mp_context: Literal["fork", "spawn"] = "spawn",
+        device: Optional[Union[str, torch.device]] = None,
         x_shape: Optional[torch.Size] = None,
     ):
         """
@@ -135,6 +144,7 @@ class MCMCPosterior(NeuralPosterior):
         self._posterior_sampler = None
         # Hardcode parameter name to reduce clutter kwargs.
         self.param_name = "theta"
+        self.x_shape = x_shape
 
         if init_strategy_num_candidates is not None:
             warn(
@@ -153,6 +163,34 @@ class MCMCPosterior(NeuralPosterior):
             "It provides MCMC to .sample() from the posterior and "
             "can evaluate the _unnormalized_ posterior density with .log_prob()."
         )
+
+    def to(self, device: Union[str, torch.device]) -> None:
+        """Moves potential_fn, proposal, x_o and theta_transform to the
+
+        specified device. Reinstantiates the posterior and resets the default x_o.
+
+        Args:
+            device: Device to move the posterior to.
+        """
+        self.device = device
+        self.potential_fn.to(device)  # type: ignore
+        self.proposal.to(device)
+        x_o = None
+        if hasattr(self, "_x") and (self._x is not None):
+            x_o = self._x.to(device)
+
+        self.theta_transform = mcmc_transform(self.proposal, device=device)
+
+        super().__init__(
+            self.potential_fn,
+            theta_transform=self.theta_transform,
+            device=device,
+            x_shape=self.x_shape,
+        )
+        # super().__init__ erases the self._x, so we need to set it again
+        if x_o is not None:
+            self.set_default_x(x_o)
+        self.potential_ = self._prepare_potential(self.method)
 
     @property
     def mcmc_method(self) -> str:
@@ -265,9 +303,9 @@ class MCMCPosterior(NeuralPosterior):
         )
         if init_strategy_num_candidates is not None:
             warn(
-                "Passing `init_strategy_num_candidates` is deprecated as of sbi "
-                "v0.19.0. Instead, use e.g., "
-                f"`init_strategy_parameters={'num_candidate_samples': 1000}`",
+                f"Passing `init_strategy_num_candidates` is deprecated as of sbi \
+                v0.19.0. Instead, use e.g., \
+                `init_strategy_parameters={'num_candidate_samples': 1000}`",
                 stacklevel=2,
             )
             self.init_strategy_parameters["num_candidate_samples"] = (

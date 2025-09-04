@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import sys
+from dataclasses import asdict
 
 import numpy as np
 import pymc
@@ -18,6 +19,7 @@ from sbi.inference import (
     likelihood_estimator_based_potential,
 )
 from sbi.inference.posteriors.mcmc_posterior import build_from_potential
+from sbi.inference.posteriors.posterior_parameters import MCMCPosteriorParameters
 from sbi.neural_nets import likelihood_nn
 from sbi.samplers.mcmc.pymc_wrapper import PyMCSampler
 from sbi.samplers.mcmc.slice_numpy import (
@@ -30,8 +32,8 @@ from sbi.simulators.linear_gaussian import (
     true_posterior_linear_gaussian_mvn_prior,
 )
 from sbi.utils import BoxUniform
+from sbi.utils.metrics import check_c2st
 from sbi.utils.user_input_checks import process_prior
-from tests.test_utils import check_c2st
 
 
 @pytest.mark.mcmc
@@ -78,7 +80,10 @@ def test_c2st_slice_np_on_Gaussian(
 @pytest.mark.parametrize("slice_sampler", (SliceSamplerVectorized, SliceSamplerSerial))
 @pytest.mark.parametrize("num_workers", (1, 2))
 def test_c2st_slice_np_vectorized_parallelized_on_Gaussian(
-    num_dim: int, slice_sampler, num_workers: int, mcmc_params_accurate: dict
+    num_dim: int,
+    slice_sampler,
+    num_workers: int,
+    mcmc_params_accurate: MCMCPosteriorParameters,
 ):
     """Test MCMC on Gaussian, comparing to ground truth target via c2st.
 
@@ -86,13 +91,13 @@ def test_c2st_slice_np_vectorized_parallelized_on_Gaussian(
         num_dim: parameter dimension of the gaussian model
     """
     num_samples = 1000
-    warmup = mcmc_params_accurate["warmup_steps"]
+    warmup = mcmc_params_accurate.warmup_steps
     num_chains = (
-        mcmc_params_accurate["num_chains"]
+        mcmc_params_accurate.num_chains
         if slice_sampler is SliceSamplerVectorized
         else 1
     )
-    thin = mcmc_params_accurate["thin"]
+    thin = mcmc_params_accurate.thin
 
     likelihood_shift = -5.0 * ones(num_dim)
     likelihood_cov = 0.3 * eye(num_dim)
@@ -201,7 +206,9 @@ def test_c2st_pymc_sampler_on_Gaussian(
         "slice_np_vectorized",
     ),
 )
-def test_getting_inference_diagnostics(method, mcmc_params_fast: dict):
+def test_getting_inference_diagnostics(
+    method, mcmc_params_fast: MCMCPosteriorParameters
+):
     num_simulations = 100
     num_samples = 10
     num_dim = 2
@@ -230,7 +237,7 @@ def test_getting_inference_diagnostics(method, mcmc_params_fast: dict):
         proposal=prior,
         potential_fn=potential_fn,
         theta_transform=theta_transform,
-        **mcmc_params_fast,
+        **asdict(mcmc_params_fast),
     )
     posterior.sample(
         sample_shape=(num_samples,),
@@ -244,7 +251,7 @@ def test_getting_inference_diagnostics(method, mcmc_params_fast: dict):
         f"but found only {list(idata.keys())}"
     )
     samples = getattr(idata.posterior, posterior.param_name).data
-    samples = samples.reshape(-1, samples.shape[-1])[:: mcmc_params_fast["thin"]][
+    samples = samples.reshape(-1, samples.shape[-1])[:: mcmc_params_fast.thin][
         :num_samples
     ]
     assert samples.shape == (

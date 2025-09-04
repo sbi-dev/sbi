@@ -197,7 +197,7 @@ def to_pyro_distribution(
 
     Args:
         estimator: A trained `sbi` estimator. Either a `ConditionalDensityEstimator` or
-        a `RatioEstimator`.
+            a `RatioEstimator`.
         condition: The conditioning parameter for the estimator.
 
     Returns:
@@ -205,7 +205,7 @@ def to_pyro_distribution(
 
     Raises:
         ValueError: If `estimator` is not a `ConditionalDensityEstimator` or
-        `RatioEstimator`.
+            `RatioEstimator`.
 
     Note:
         If `estimator` input has discrete or mixed support (e.g.

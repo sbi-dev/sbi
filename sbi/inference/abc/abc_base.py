@@ -6,13 +6,13 @@
 import logging
 from typing import Callable, Dict, Optional, Union
 
-import numpy as np
 import torch
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import PolynomialFeatures
+from torch import Tensor
 
-from sbi.inference.abc.distances import Distance
 from sbi.simulators.simutils import simulate_in_batches
+from sbi.utils.metrics import Distance
 
 
 class ABCBASE:
@@ -84,12 +84,12 @@ class ABCBASE:
         self.logger = logging.getLogger(__name__)
 
     @staticmethod
-    def get_sass_transform(
-        theta: torch.Tensor,
-        x: torch.Tensor,
+    def _get_sass_transform(
+        theta: Tensor,
+        x: Tensor,
         expansion_degree: int = 1,
-        sample_weight=None,
-    ) -> Callable:
+        sample_weight: Optional[Tensor] = None,
+    ) -> Callable[[Tensor], Tensor]:
         """Return semi-automatic summary statitics function.
 
         Running weighted linear regressin as in
@@ -102,17 +102,18 @@ class ABCBASE:
         """
         expansion = PolynomialFeatures(degree=expansion_degree, include_bias=False)
         # Transform x, remove intercept.
-        x_expanded = expansion.fit_transform(x)
-        sumstats_map = np.zeros((x_expanded.shape[1], theta.shape[1]))
+        x_expanded = expansion.fit_transform(x.numpy())
 
-        for parameter_idx in range(theta.shape[1]):
-            regression_model = LinearRegression(fit_intercept=True)
-            regression_model.fit(
-                X=x_expanded, y=theta[:, parameter_idx], sample_weight=sample_weight
-            )
-            sumstats_map[:, parameter_idx] = regression_model.coef_
+        # Fit a single multi-output regression model for all parameters at once
+        regression_model = LinearRegression(fit_intercept=True)
+        regression_model.fit(
+            X=x_expanded,
+            y=theta.numpy(),  # All parameters at once
+            sample_weight=sample_weight.numpy() if sample_weight is not None else None,
+        )
 
-        sumstats_map = torch.tensor(sumstats_map, dtype=torch.float32)
+        # Get coefficients for all parameters (shape: [n_features, n_parameters])
+        sumstats_map = torch.tensor(regression_model.coef_.T, dtype=torch.float32)
 
         def sumstats_transform(x):
             x_expanded = torch.tensor(expansion.fit_transform(x), dtype=torch.float32)
@@ -121,28 +122,30 @@ class ABCBASE:
         return sumstats_transform
 
     @staticmethod
-    def run_lra(
-        theta: torch.Tensor,
-        x: torch.Tensor,
-        observation: torch.Tensor,
-        sample_weight=None,
-    ) -> torch.Tensor:
+    def _run_lra(
+        theta: Tensor,
+        x: Tensor,
+        observation: Tensor,
+        sample_weight: Optional[Tensor] = None,
+    ) -> Tensor:
         """Return parameters adjusted with linear regression adjustment.
 
         Implementation as in Beaumont et al. 2002: https://arxiv.org/abs/1707.01254
         """
 
-        theta_adjusted = theta
-        for parameter_idx in range(theta.shape[1]):
-            regression_model = LinearRegression(fit_intercept=True)
-            regression_model.fit(
-                X=x,
-                y=theta[:, parameter_idx],
-                sample_weight=sample_weight,
-            )
-            theta_adjusted[:, parameter_idx] += regression_model.predict(
-                observation.reshape(1, -1)
-            )
-            theta_adjusted[:, parameter_idx] -= regression_model.predict(x)
+        # Fit a single multi-output regression model
+        regression_model = LinearRegression(fit_intercept=True)
+        regression_model.fit(
+            X=x.numpy(),
+            y=theta.numpy(),  # All parameters at once
+            sample_weight=sample_weight.numpy() if sample_weight is not None else None,
+        )
+
+        # Predict for observation and simulated data
+        pred_obs = regression_model.predict(observation.reshape(1, -1).numpy())
+        pred_sim = regression_model.predict(x.numpy())
+
+        # Apply adjustment: theta + m(x_o) - m(x)
+        theta_adjusted = theta + torch.from_numpy(pred_obs - pred_sim)
 
         return theta_adjusted

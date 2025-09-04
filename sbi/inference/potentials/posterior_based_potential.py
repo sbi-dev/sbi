@@ -1,8 +1,9 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+
 from __future__ import annotations
 
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Union
 
 import torch
 from torch import Tensor
@@ -62,9 +63,9 @@ class PosteriorBasedPotential(BasePotential):
     def __init__(
         self,
         posterior_estimator: ConditionalDensityEstimator,
-        prior: Distribution,
+        prior: Distribution,  # type: ignore
         x_o: Optional[Tensor] = None,
-        device: str = "cpu",
+        device: Union[str, torch.device] = "cpu",
     ):
         r"""Returns the potential for posterior-based methods.
 
@@ -82,6 +83,23 @@ class PosteriorBasedPotential(BasePotential):
         super().__init__(prior, x_o, device)
         self.posterior_estimator = posterior_estimator
         self.posterior_estimator.eval()
+
+    def to(self, device: Union[str, torch.device]) -> None:
+        """
+        Move posterior_estimator, prior and x_o to the given device.
+
+        It also set the device attribute to the given device.
+
+        Args:
+            device: Device to move the posterior_estimator, prior and x_o to.
+        """
+
+        self.device = device
+        self.posterior_estimator.to(device)
+        if self.prior is not None:
+            self.prior.to(device)  # type: ignore
+        if self._x_o is not None:
+            self._x_o = self._x_o.to(device)
 
     def set_x(self, x_o: Optional[Tensor], x_is_iid: Optional[bool] = False):
         """

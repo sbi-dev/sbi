@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import sys
+from dataclasses import asdict
 from typing import Tuple, Union
 
 import pymc
@@ -14,20 +15,30 @@ from torch import eye, ones, zeros
 from torch.distributions import MultivariateNormal
 
 from sbi import utils as utils
-from sbi.inference import (
-    NLE,
-    NPE_A,
-    NPE_C,
-    NRE_A,
-    NRE_B,
-    NRE_C,
-    VIPosterior,
-    likelihood_estimator_based_potential,
-    ratio_estimator_based_potential,
+from sbi.inference.abc import MCABC as ABC
+from sbi.inference.posteriors.ensemble_posterior import (
+    EnsemblePotential,
 )
 from sbi.inference.posteriors.importance_posterior import ImportanceSamplingPosterior
 from sbi.inference.posteriors.mcmc_posterior import MCMCPosterior
+from sbi.inference.posteriors.posterior_parameters import (
+    MCMCPosteriorParameters,
+)
+from sbi.inference.posteriors.vi_posterior import VIPosterior
 from sbi.inference.potentials.base_potential import BasePotential
+from sbi.inference.potentials.likelihood_based_potential import (
+    LikelihoodBasedPotential,
+    likelihood_estimator_based_potential,
+)
+from sbi.inference.potentials.posterior_based_potential import PosteriorBasedPotential
+from sbi.inference.potentials.ratio_based_potential import (
+    RatioBasedPotential,
+    ratio_estimator_based_potential,
+)
+from sbi.inference.trainers.nle import NLE
+from sbi.inference.trainers.npe import NPE, NPE_A, NPE_C
+from sbi.inference.trainers.nre import NRE_A, NRE_B, NRE_C
+from sbi.inference.trainers.vfpe import FMPE, NPSE
 from sbi.neural_nets.embedding_nets import FCEmbedding
 from sbi.neural_nets.factory import (
     classifier_nn,
@@ -35,17 +46,11 @@ from sbi.neural_nets.factory import (
     likelihood_nn,
     posterior_nn,
 )
-from sbi.simulators import diagonal_linear_gaussian, linear_gaussian
-from sbi.utils.torchutils import (
-    BoxUniform,
-    gpu_available,
-    process_device,
-)
-from sbi.utils.user_input_checks import (
-    validate_theta_and_x,
-)
+from sbi.simulators.linear_gaussian import diagonal_linear_gaussian, linear_gaussian
+from sbi.utils import BoxUniform
+from sbi.utils.torchutils import gpu_available, process_device
+from sbi.utils.user_input_checks import validate_theta_and_x
 
-# tests in this file are skipped if there is GPU device available
 pytestmark = pytest.mark.skipif(
     not gpu_available(), reason="No CUDA or MPS device available."
 )
@@ -102,7 +107,7 @@ def test_training_and_mcmc_on_device(
     training_device,
     prior_device,
     prior_type,
-    mcmc_params_fast: dict,
+    mcmc_params_fast: MCMCPosteriorParameters,
 ):
     """Test training on devices.
 
@@ -120,7 +125,7 @@ def test_training_and_mcmc_on_device(
     num_rounds = 2  # test proposal sampling in round 2.
     num_simulations_per_round = [200, num_samples]
     # use more warmup steps to avoid Infs during MCMC in round two.
-    mcmc_params_fast["warmup_steps"] = 20
+    mcmc_params_fast = mcmc_params_fast.with_param(warmup_steps=20)
 
     x_o = zeros(1, num_dim).to(data_device)
     likelihood_shift = -1.0 * ones(num_dim).to(prior_device)
@@ -181,19 +186,15 @@ def test_training_and_mcmc_on_device(
         # mcmc cases
         if sampling_method in ["slice_np", "slice_np_vectorized", "nuts_pymc"]:
             posterior = inferer.build_posterior(
-                sample_with="mcmc",
-                mcmc_method=sampling_method,
-                mcmc_parameters=mcmc_params_fast,
+                posterior_parameters=mcmc_params_fast.with_param(method=sampling_method)
             )
         elif sampling_method in ["rejection", "direct"]:
             # all other cases: rejection, direct
             posterior = inferer.build_posterior(
+                prior=prior
+                if sampling_method == "rejection" and method == NPE_C
+                else None,
                 sample_with=sampling_method,
-                rejection_sampling_parameters=(
-                    {"proposal": prior}
-                    if sampling_method == "rejection" and method == NPE_C
-                    else {}
-                ),
             )
         else:
             # build potential for NLE or NRE and construct ImportanceSamplingPosterior
@@ -490,46 +491,288 @@ def test_multiround_mdn_training_on_device(method: Union[NPE_A, NPE_C], device: 
 
 
 @pytest.mark.gpu
-@pytest.mark.parametrize("device", ["cpu", "gpu"])
-def test_conditioned_posterior_on_gpu(device: str, mcmc_params_fast: dict):
-    device = process_device(device)
+@pytest.mark.parametrize(
+    "training_device, inference_device", [("cpu", "gpu"), ("gpu", "cpu")]
+)
+def test_conditioned_posterior_on_gpu(
+    training_device: str,
+    inference_device: str,
+    mcmc_params_fast: MCMCPosteriorParameters,
+):
+    """Test that training and sampling device can be interchanged
+
+    for conditional posteriors.
+
+    Args:
+        training_device: device for trainig
+        inference_device: device for inference
+        mcmc_params_fast: MCMCPosteriorParameters dataclass for mcmc posterior
+    """
+
+    # Training.
+    training_device = process_device(training_device)
     num_dims = 3
 
     proposal = BoxUniform(
-        low=-torch.ones(num_dims, device=device),
-        high=torch.ones(num_dims, device=device),
+        low=-torch.ones(num_dims), high=torch.ones(num_dims), device=training_device
     )
 
-    inference = NPE_C(device=device, show_progress_bars=False)
+    trainer = NPE_C(device=training_device, show_progress_bars=False)
 
     num_simulations = 100
     theta = proposal.sample((num_simulations,))
     x = torch.randn_like(theta)
-    x_o = torch.zeros(1, num_dims).to(device)
-    inference = inference.append_simulations(theta, x)
+    x_o = torch.zeros(1, num_dims).to(training_device)
+    trainer = trainer.append_simulations(theta, x)
 
-    estimator = inference.train(max_num_epochs=2)
+    estimator = trainer.train(max_num_epochs=2)
 
-    # condition on one dim of theta
-    condition_o = torch.ones(1, 1).to(device)
+    # Inference.
+    inference_device = process_device(inference_device)
+    condition_o = torch.ones(1, 1, device=inference_device)
+    estimator.to(inference_device)
+    proposal.to(inference_device)
     prior = BoxUniform(
-        low=-torch.ones(num_dims - 1, device=device),
-        high=torch.ones(num_dims - 1, device=device),
+        low=-torch.ones(num_dims - 1),
+        high=torch.ones(num_dims - 1),
+        device=inference_device,
     )
-    prior_transform = utils.mcmc_transform(prior, device=device)
 
-    potential_fn, _ = likelihood_estimator_based_potential(estimator, proposal, x_o)
+    potential_fn, prior_transform = likelihood_estimator_based_potential(
+        estimator,
+        proposal,
+        x_o.to(inference_device),
+    )
     conditioned_potential_fn = potential_fn.condition_on_theta(
         condition_o, dims_global_theta=[0, 1]
     )
+
+    prior_transform = utils.mcmc_transform(prior, device=inference_device)
 
     conditional_posterior = MCMCPosterior(
         potential_fn=conditioned_potential_fn,
         theta_transform=prior_transform,
         proposal=prior,
-        device=device,
-        **mcmc_params_fast,
+        device=inference_device,
+        **asdict(mcmc_params_fast),
     ).set_default_x(x_o)
-    samples = conditional_posterior.sample((1,), x=x_o)
+
+    conditional_posterior.to(inference_device)
+    samples = conditional_posterior.sample((1,), x=x_o.to(inference_device))
+    assert str(samples.device).split(":")[0] == inference_device.split(":")[0], (
+        "Samples are not on the correct device"
+    )
     conditional_posterior.potential_fn(samples)
-    conditional_posterior.map()
+    map_ = conditional_posterior.map()
+    assert str(map_.device).split(":")[0] == inference_device.split(":")[0], (
+        "MAP is not on the correct device"
+    )
+
+
+@pytest.mark.gpu
+@pytest.mark.parametrize("device", ["cpu", "gpu"])
+@pytest.mark.parametrize("device_inference", ["cpu", "gpu"])
+def test_direct_posterior_on_gpu(device: str, device_inference: str):
+    """Test that training and sampling device can be interchanged.
+
+    Args:
+        device: device to train the model on.
+        device_inference: device to run the inference on.
+    """
+    device = process_device(device)
+    num_dims = 3
+
+    prior = BoxUniform(
+        low=-torch.ones(num_dims, device=device),
+        high=torch.ones(num_dims, device=device),
+    )
+    x_o = torch.zeros(1, num_dims).to(device)
+
+    inference = NPE()
+    estimator = inference.append_simulations(
+        torch.randn((100, num_dims)), torch.randn((100, num_dims))
+    ).train(max_num_epochs=1)
+    posterior = inference.build_posterior(
+        density_estimator=estimator, prior=prior, sample_with="direct"
+    )
+    posterior.set_default_x(x_o)
+
+    device_inference = process_device(device_inference)
+    posterior.to(device_inference)
+    sample = posterior.sample((1,), x=x_o.to(device_inference))
+    assert str(sample.device).split(":")[0] == device_inference.split(":")[0], (
+        "Samples are not on the correct device."
+    )
+
+
+@pytest.mark.gpu
+@pytest.mark.parametrize("device", ["cpu", "gpu"])
+@pytest.mark.parametrize(
+    "potential",
+    [
+        LikelihoodBasedPotential,
+        PosteriorBasedPotential,
+        RatioBasedPotential,
+        EnsemblePotential,
+    ],
+)
+def test_to_method_on_potentials(device: str, potential: Union[ABC, BasePotential]):
+    """Test .to() method on potential.
+
+    Args:
+        device: device where to move the model.
+        potential: potential to train the model on.
+    """
+
+    device = process_device(device)
+    prior = BoxUniform(torch.tensor([1.0]), torch.tensor([1.0]))
+    inference = NPE()
+    estimator = inference.append_simulations(
+        torch.randn((100, 3)), torch.randn((100, 2))
+    ).train(max_num_epochs=1)
+
+    x_o = torch.tensor([0.1]).to(device)
+    if potential == EnsemblePotential:
+        potential_fn = potential(
+            [
+                RatioBasedPotential(estimator, prior),
+                PosteriorBasedPotential(estimator, prior),
+            ],
+            prior=prior,
+            x_o=x_o,
+            weights=torch.tensor([0.1, 0.9]),
+        )
+    else:
+        potential_fn = potential(estimator, prior)
+    potential_fn.to(device)
+
+    assert str(potential_fn.device).split(":")[0] == device.split(":")[0], (
+        "Device attribute of potential_fn is not correct"
+    )
+    if hasattr("potential", "prior"):
+        assert str(potential_fn).split(":")[0].prior == device.split(":")[0], (
+            "Device attribute of potential_fn.prior is not vcorrect"
+        )
+
+
+@pytest.mark.slow
+@pytest.mark.gpu
+@pytest.mark.parametrize("device", ["cpu", "gpu"])
+@pytest.mark.parametrize(
+    "sampling_method", ["rejection", "importance", "mcmc", "direct"]
+)
+def test_to_method_on_posteriors(device: str, sampling_method: str):
+    """Test .to() method on posteriors.
+
+    Args:
+        device: device to train and sample the model on.
+        sampling_method: method to sample from the posterior.
+    """
+    device = process_device(device)
+    prior = BoxUniform(torch.zeros(3), torch.ones(3))
+    inference = NPE()
+    x_o = torch.zeros(2).to(device)
+    estimator = inference.append_simulations(
+        torch.randn((100, 3)), torch.randn((100, 2))
+    ).train(max_num_epochs=1)
+    if sampling_method == "rejection":
+        posterior = inference.build_posterior(
+            density_estimator=estimator,
+            prior=prior,
+            sample_with=sampling_method,
+        )
+    else:
+        posterior = inference.build_posterior(
+            density_estimator=estimator, prior=prior, sample_with=sampling_method
+        )
+    posterior.set_default_x(x_o)
+    posterior.to(device)
+
+    assert (posterior.device).split(":")[0] == device.split(":")[0], (
+        ".to() should change the device attribute"
+    )
+    sample_device = posterior.sample((10,), x=x_o)
+    assert sample_device.device.type == device.split(":")[0], (
+        f"sample was not correctly moved to {device}."
+    )
+    log_probs = posterior.log_prob(sample_device)
+    assert log_probs.device.type == device.split(":")[0], (
+        f"log_prob was not correctly moved to {device}."
+    )
+
+    for trasnf in posterior.theta_transform._inv.base_transform.parts:
+        assert (
+            str(trasnf(torch.tensor([0.0], device=device)).device).strip(":0")
+            == device.split(":")[0]
+        ), "Prior transform is on the correct device."
+
+
+@pytest.mark.gpu
+@pytest.mark.parametrize("device", ["cpu", "gpu"])
+@pytest.mark.parametrize("device_inference", ["cpu", "gpu"])
+@pytest.mark.parametrize("num_trials", [1, 2])
+@pytest.mark.parametrize("vf_trainer", [FMPE, NPSE])
+def test_vector_field_methods_device_handling(
+    vf_trainer, device: str, device_inference: str, num_trials: int
+):
+    """Test VectorFieldPosterior on different devices training and inference devices.
+
+    Tests both ode and sde sampling for both FMPE and NPSE.
+
+    Tests iid methods for num_trials = 2.
+
+    Args:
+        vf_trainer: vector field trainer class to use.
+        device: device to train the model on.
+        device_inference: device to run the inference on.
+        iid_method: method to sample from the posterior.
+    """
+
+    num_dims = 2
+    num_simulations = 1000
+    if vf_trainer == NPSE:
+        iid_methods = ["fnpe", "gauss", "auto_gauss", "jac_gauss"]
+    else:
+        iid_methods = ["fnpe"]
+
+    device = process_device(device)
+    device_inference = process_device(device_inference)
+
+    prior = BoxUniform(torch.zeros(num_dims), torch.ones(num_dims), device=device)
+    theta = prior.sample((num_simulations,))
+    x = theta + 0.1 * torch.randn_like(theta)
+
+    inference = vf_trainer(prior=prior, device=device)
+    _ = inference.append_simulations(theta, x).train(max_num_epochs=10)
+    posterior = inference.build_posterior(
+        sample_with="sde" if num_trials > 1 else "ode"
+    )
+
+    # faster but inaccurate log_prob computation
+    posterior.potential_fn.neural_ode.update_params(exact=False, atol=1e-4, rtol=1e-4)
+
+    posterior.to(device_inference)
+    assert posterior.device == device_inference, (
+        f"VectorFieldPosterior is not in device {device_inference}."
+    )
+
+    x_o = torch.ones(num_trials, num_dims).to(device_inference)
+    if num_trials > 1:
+        for iid_method in iid_methods:
+            samples = posterior.sample((2,), x=x_o, iid_method=iid_method)
+            assert samples.device.type == device_inference.split(":")[0], (
+                f"Samples are not on device {device_inference}. "
+                f"{vf_trainer.__name__} with {iid_method}"
+            )
+    else:
+        samples = posterior.sample((2,), x=x_o)
+        assert samples.device.type == device_inference.split(":")[0], (
+            f"Samples are not on device {device_inference}. "
+            f"{vf_trainer.__name__} with {iid_method}"
+        )
+
+        log_probs = posterior.log_prob(samples, x=x_o)
+        assert log_probs.device.type == device_inference.split(":")[0], (
+            f"log_prob was not correctly moved to {device_inference}. "
+            f"{vf_trainer.__name__} with {iid_method}"
+        )

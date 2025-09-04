@@ -1,3 +1,6 @@
+# This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+
 """
 Implementation taken from Lemos et al, 'Sampling-Based Accuracy Testing of
 Posterior Estimators for General Inference' https://arxiv.org/abs/2302.03026
@@ -138,6 +141,7 @@ def _run_tarp(
 
     """
     num_posterior_samples, num_tarp_samples, _ = posterior_samples.shape
+    input_device = posterior_samples.device
 
     assert references.shape == thetas.shape, (
         "references must have the same shape as thetas"
@@ -162,11 +166,20 @@ def _run_tarp(
     coverage_values = (
         torch.sum(sample_dists < theta_dists, dim=0) / num_posterior_samples
     )
-    hist, alpha_grid = torch.histogram(coverage_values, density=True, bins=num_bins)
+
+    # enforce execution on the CPU due to
+    # https://github.com/pytorch/pytorch/issues/69519
+    hist, alpha_grid = torch.histogram(
+        coverage_values.cpu(), density=True, bins=num_bins
+    )
+
+    # return all tensors to input_device to keep contract valid
+    hist, alpha_grid = hist.to(input_device), alpha_grid.to(input_device)
+
     # calculate empirical CDF via cumsum and normalize
     ecp = torch.cumsum(hist, dim=0) / hist.sum()
     # add 0 to the beginning of the ecp curve to match the alpha grid
-    ecp = torch.cat([Tensor([0]), ecp])
+    ecp = torch.cat([torch.zeros((1,), device=input_device), ecp])
 
     return ecp, alpha_grid
 

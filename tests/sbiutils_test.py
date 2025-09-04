@@ -20,6 +20,7 @@ from sbi.inference import NPE, NPE_A
 from sbi.inference.trainers.npe.npe_a import NPE_A_MDN
 from sbi.neural_nets import classifier_nn, likelihood_nn, posterior_nn
 from sbi.utils import BoxUniform, get_kde
+from sbi.utils.sbiutils import z_score_parser
 
 
 def test_conditional_density_1d():
@@ -406,10 +407,79 @@ def test_kde(bandwidth, transform, sample_weights):
 
 
 @pytest.mark.parametrize(
-    "z_x", [True, False, None, "none", "independent", "structured"]
+    "z_x",
+    [
+        True,
+        False,
+        None,
+        "none",
+        "independent",
+        "structured",
+        "transform_to_unconstrained",
+        pytest.param(
+            "invalid_value",
+            marks=pytest.mark.xfail(
+                raises=ValueError,
+                reason="Invalid z-scoring option should raise ValueError.",
+            ),
+        ),
+    ],
 )
 @pytest.mark.parametrize(
-    "z_theta", [True, False, None, "none", "independent", "structured"]
+    "z_theta",
+    [
+        True,
+        False,
+        None,
+        "none",
+        "independent",
+        "structured",
+        "transform_to_unconstrained",
+        pytest.param(
+            "invalid_value",
+            marks=pytest.mark.xfail(
+                raises=ValueError,
+                reason="Invalid z-scoring option should raise ValueError.",
+            ),
+        ),
+    ],
+)
+def test_z_score_parser(z_x, z_theta):
+    """Test the z_score_parser function."""
+    if z_x is bool or z_theta is bool:
+        with pytest.warns(
+            UserWarning,
+            match="Boolean values for z-scoring are deprecated and will",
+        ):
+            z_score_parser(z_x)
+            z_score_parser(z_theta)
+
+    result_x = z_score_parser(z_x)
+    result_theta = z_score_parser(z_theta)
+
+    assert result_x is not None, f"z_score_parser({z_x}) returned None"
+    assert result_theta is not None, f"z_score_parser({z_theta}) returned None"
+
+
+@pytest.mark.parametrize(
+    "z_x",
+    [
+        None,
+        "none",
+        "independent",
+        "structured",
+        "transform_to_unconstrained",
+    ],
+)
+@pytest.mark.parametrize(
+    "z_theta",
+    [
+        None,
+        "none",
+        "independent",
+        "structured",
+        "transform_to_unconstrained",
+    ],
 )
 @pytest.mark.parametrize("builder", [likelihood_nn, posterior_nn, classifier_nn])
 def test_z_scoring_structured(z_x, z_theta, builder):
@@ -417,19 +487,39 @@ def test_z_scoring_structured(z_x, z_theta, builder):
     Test that z-scoring string args don't break API.
     """
     # Generate some signals for test.
-    t = torch.arange(0, 1, 0.001)
+    t = torch.arange(0, 1, 0.1)
     x_sin = torch.sin(t * 2 * torch.pi * 5)
     t_batch = torch.stack([(x_sin * (i + 1)) + (i * 2) for i in range(10)])
 
+    num_dim = t_batch.shape[1]
+    x_dist = BoxUniform(low=-2 * torch.ones(num_dim), high=2 * torch.ones(num_dim))
+
     # API tests
+    # TODO: Test breaks at "mnle"
     if builder in [likelihood_nn, posterior_nn]:
-        for model in ["mdn", "made", "maf", "nsf"]:
+        for model in [
+            "mdn",
+            "made",
+            "maf",
+            "nsf",
+            "zuko_nice",
+            "zuko_nsf",
+            "zuko_maf",
+            "zuko_ncsf",
+            "zuko_bpf",
+            "maf_rqs",
+            "zuko_sospf",
+            "zuko_naf",
+            "zuko_unaf",
+            "zuko_gf",
+        ]:
             net = builder(
                 model,
                 z_score_theta=z_theta,
                 z_score_x=z_x,
                 hidden_features=2,
                 num_transforms=1,
+                x_dist=x_dist,
             )
             assert net(t_batch, t_batch)
     else:

@@ -21,14 +21,13 @@ from sbi.simulators.linear_gaussian import (
     samples_true_posterior_linear_gaussian_uniform_prior,
 )
 from sbi.utils import RestrictionEstimator
+from sbi.utils.metrics import check_c2st
 from sbi.utils.sbiutils import handle_invalid_x
 from sbi.utils.user_input_checks import (
     check_sbi_inputs,
     process_prior,
     process_simulator,
 )
-
-from .test_utils import check_c2st
 
 
 @pytest.mark.parametrize(
