@@ -591,7 +591,7 @@ def test_sample_conditional():
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize("vector_field_type", ["ve", "fmpe"])
+@pytest.mark.parametrize("vector_field_type", ["ve", "vp", "fmpe"])
 @pytest.mark.parametrize("prior_type", ["gaussian"])
 @pytest.mark.parametrize("iid_batch_size", [1, 2])
 def test_iid_log_prob(vector_field_type, prior_type, iid_batch_size):
@@ -624,7 +624,7 @@ def test_iid_log_prob(vector_field_type, prior_type, iid_batch_size):
 
     # Prior Gaussian
     prior = vector_field_trained_model["prior"]
-    vf_estimator = vector_field_trained_model["score_estimator"]
+    vf_estimator = vector_field_trained_model["estimator"]
     inference = vector_field_trained_model["inference"]
     likelihood_shift = vector_field_trained_model["likelihood_shift"]
     likelihood_cov = vector_field_trained_model["likelihood_cov"]
@@ -644,9 +644,7 @@ def test_iid_log_prob(vector_field_type, prior_type, iid_batch_size):
         x_o, likelihood_shift, likelihood_cov, prior_mean, prior_cov
     )
 
-    proposal_posterior = inference.build_posterior(
-        vf_estimator=vf_estimator, prior=prior
-    )
+    proposal_posterior = inference.build_posterior(vf_estimator, prior=prior)
 
     proposal_posterior.set_default_x(x_o)
     proposal_samples = proposal_posterior.sample((num_posterior_samples,))
