@@ -1,6 +1,8 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+# NOTE: the entire file was drafted by GPT-5 in GH Copilot, then editied by janfb.
+
 from typing import Tuple
 
 import pytest
@@ -154,7 +156,7 @@ def test_build_input_output_layer_shapes_and_types(
 
 
 # ------------------------
-# ActiveSubspace.add_property tests
+# ActiveSubspace tests
 # ------------------------
 
 
@@ -222,11 +224,6 @@ def test_train_reuses_existing_net(toy_theta_property, posterior_stub) -> None:
     assert id(a._regression_net) == first_id  # net is reused, not rebuilt
 
 
-# ------------------------
-# ActiveSubspace.find_directions tests
-# ------------------------
-
-
 @pytest.mark.parametrize("norm_gradients", [True, False])
 def test_find_directions_with_regression_net(
     norm_gradients, toy_theta_property, posterior_stub
@@ -274,11 +271,6 @@ def test_find_directions_raises_without_property(posterior_stub) -> None:
         _ = a.find_directions(
             posterior_log_prob_as_property=False, num_monte_carlo_samples=8
         )
-
-
-# ------------------------
-# ActiveSubspace.project tests
-# ------------------------
 
 
 @pytest.mark.parametrize("norm_gradients", [True, False])
