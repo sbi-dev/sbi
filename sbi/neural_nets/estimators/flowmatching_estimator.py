@@ -243,7 +243,9 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         score = (-(1 - t) * v - input) / (t + self.noise_scale)
         return score
 
-    def drift_fn(self, input: Tensor, times: Tensor) -> Tensor:
+    def drift_fn(
+        self, input: Tensor, times: Tensor, effective_t_max: float = 0.99
+    ) -> Tensor:
         r"""Drift function for the flow matching estimator.
 
         The drift function is calculated based on [3]_ (see Equation 7):
@@ -263,16 +265,22 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         Args:
             input: Parameters :math:`\theta_t`.
             times: SDE time variable in [0,1].
+            effective_t_max: Upper bound on time to avoid numerical issues at t=1.
+                This effectively prevents and explosion of the SDE in the beginning.
+                Note that this does not affect the ODE sampling, which always uses
+                times in [0,1].
 
         Returns:
             Drift function at a given time.
         """
         # analytical f(t) does not depend on noise_scale and is undefined at t = 1.
-        # NOTE: We bound the singularity to avoid numerical issues i.e. 1 - t > 0.01
-        # this effectively prevents and explosion of the SDE in the beginning.
-        return -input / torch.maximum(1 - times, torch.tensor(1e-2).to(input))
+        return -input / torch.maximum(
+            1 - times, torch.tensor(1 - effective_t_max).to(input)
+        )
 
-    def diffusion_fn(self, input: Tensor, times: Tensor) -> Tensor:
+    def diffusion_fn(
+        self, input: Tensor, times: Tensor, effective_t_max: float = 0.99
+    ) -> Tensor:
         r"""Diffusion function for the flow matching estimator.
 
         The diffusion function is calculated based on [3]_ (see Equation 7):
@@ -290,17 +298,19 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         Args:
             input: Parameters :math:`\theta_t`.
             times: SDE time variable in [0,1].
+            effective_t_max: Upper bound on time to avoid numerical issues at t=1.
+                This effectively prevents and explosion of the SDE in the beginning.
+                Note that this does not affect the ODE sampling, which always uses
+                times in [0,1].
 
         Returns:
             Diffusion function at a given time.
         """
         # analytical g(t) is undefined at t = 1.
-        # NOTE: We bound the singularity to avoid numerical issues i.e. 1 - t > 0.01
-        # this effectively prevents and explosion of the SDE in the beginning.
         return torch.sqrt(
             2
             * (times + self.noise_scale)
-            / torch.maximum(1 - times, torch.tensor(1e-2).to(times))
+            / torch.maximum(1 - times, torch.tensor(1 - effective_t_max).to(times))
         )
 
     def mean_t_fn(self, times: Tensor) -> Tensor:
