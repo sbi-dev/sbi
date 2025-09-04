@@ -1,19 +1,17 @@
 # Changelog
 
-# Changelog
-
 ## v0.25.0
 
 ### ✨ Highlights
 
 #### 🚀 New Inference Methods
 
-* **MNPE class similar to MNLE** by @dgedon in https://github.com/sbi-dev/sbi/pull/1362
-* **Implementing SNPE-B (#199)** by @etouron1 in https://github.com/sbi-dev/sbi/pull/1471
+* **MNPE class mixed parameter (similar to MNLE)** by @dgedon in https://github.com/sbi-dev/sbi/pull/1362
+* **Implementation of SNPE-B (#199)** by @etouron1 in https://github.com/sbi-dev/sbi/pull/1471
 
 #### 🧠 Neural Network Architectures & Embedding Networks
 
-* **Simple transformer implementation** by @NicolasRR in https://github.com/sbi-dev/sbi/pull/1494
+* **Add transformer embedding net** by @NicolasRR in https://github.com/sbi-dev/sbi/pull/1494
 * **Add embedding net that uses 1D causal convolutions (#1459)** by @Aranka-S in https://github.com/sbi-dev/sbi/pull/1499
 * **Add LRU-backed embedding networks** by @famura in https://github.com/sbi-dev/sbi/pull/1512
 * **Add ResNet as embedding model** by @StefanWahl in https://github.com/sbi-dev/sbi/pull/1472
@@ -22,7 +20,7 @@
 #### ⭐ Major Features & Capabilities
 
 * **Unify flow matching and score-based models** by @StarostinV in https://github.com/sbi-dev/sbi/pull/1497
-* **Model misspecification based on MMD** by @coschroeder in https://github.com/sbi-dev/sbi/pull/1502
+* **Model misspecification detection based on MMD** by @coschroeder in https://github.com/sbi-dev/sbi/pull/1502
 * **Marginal estimator log-prob based test for misspecification** by @swag2198 in https://github.com/sbi-dev/sbi/pull/1522
 * **Adding interface for unconditional flow training** by @plcrodrigues in https://github.com/sbi-dev/sbi/pull/1470
 * **Support using trained estimators in Pyro models** by @sethaxen in https://github.com/sbi-dev/sbi/pull/1491
@@ -46,6 +44,7 @@
 * fix: cap max_sampling_batch_size to prevent excessive memory by @janfb in https://github.com/sbi-dev/sbi/pull/1624
 * 1561 computation of denoising posterior precision matrix in jac method score fn iid by @manuelgloeckler in https://github.com/sbi-dev/sbi/pull/1636
 * fix xfail test, fix deprecation warnings by @janfb in https://github.com/sbi-dev/sbi/pull/1642
+* fix: iid-score device handling by @janfb in https://github.com/sbi-dev/sbi/pull/1650
 
 ### 🛠️ Maintenance & Improvements
 
@@ -60,6 +59,7 @@
 * Use TypeAlias and consistent naming for sbi types by @janfb in https://github.com/sbi-dev/sbi/pull/1637
 * Add protocol for estimator builder by @abelaba in https://github.com/sbi-dev/sbi/pull/1633
 * Improve abc implementation by @janfb in https://github.com/sbi-dev/sbi/pull/1615
+* Refactor RatioEstimator to subclass ConditionalEstimator @abelaba in https://github.com/sbi-dev/sbi/pull/1652
 
 #### 🏷️ Type Hints & API Improvements
 
@@ -86,6 +86,7 @@
 * chore: reorder setup steps for Python and uv in CI/CD workflows by @janfb in https://github.com/sbi-dev/sbi/pull/1601
 * Fix/lc2st numpy type fixes by @janfb in https://github.com/sbi-dev/sbi/pull/1613
 * Fix failing CI on main. by @janfb in https://github.com/sbi-dev/sbi/pull/1618
+* Fix slow vector field tests by @janfb in https://github.com/sbi-dev/sbi/pull/1657
 
 #### 📖 Documentation & Website
 
@@ -113,6 +114,9 @@
 * fixed misrendered bullet list, tested locally by @psteinb in https://github.com/sbi-dev/sbi/pull/1594
 * Improvements to L-C2ST tutorial by @michaeldeistler in https://github.com/sbi-dev/sbi/pull/1588
 * docs: Change colortheme in light mode by @michaeldeistler in https://github.com/sbi-dev/sbi/pull/1638
+* Posterior parameters doc by @abelaba in https://github.com/sbi-dev/sbi/pull/1644
+* fix contributing links by @janfb in https://github.com/sbi-dev/sbi/pull/1647
+* docs: add posterior parameters dataclass how to guide by @abelaba in https://github.com/sbi-dev/sbi/pull/1654
 
 #### 🏗️ Infrastructure & Dependencies
 
