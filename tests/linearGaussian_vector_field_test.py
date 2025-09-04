@@ -591,8 +591,10 @@ def test_sample_conditional():
 
 
 @pytest.mark.slow
+@pytest.mark.parametrize("vector_field_type", ["ve", "fmpe"])
+@pytest.mark.parametrize("prior_type", ["gaussian"])
 @pytest.mark.parametrize("iid_batch_size", [1, 2])
-def test_score_fn_log_prob(npse_trained_model, prior_type, sde_type, iid_batch_size):
+def test_iid_log_prob(vector_field_type, prior_type, iid_batch_size):
     '''
     Tests the log-probability computation of the score-based posterior.
 
@@ -617,19 +619,18 @@ def test_score_fn_log_prob(npse_trained_model, prior_type, sde_type, iid_batch_s
         AssertionError: If the ESS is less than half the number of posterior samples,
         indicating poor recovery of the true posterior.
     '''
-    if prior_type != "gaussian":
-        pytest.skip("Skipping test for non-gaussian priors")
-    if sde_type == "ve":
-        pytest.xfail("VE is not expected to perform well with log_probs")
+
+    vector_field_trained_model = train_vector_field_model(vector_field_type, prior_type)
+
     # Prior Gaussian
-    prior = npse_trained_model["prior"]
-    score_estimator = npse_trained_model["score_estimator"]
-    inference = npse_trained_model["inference"]
-    likelihood_shift = npse_trained_model["likelihood_shift"]
-    likelihood_cov = npse_trained_model["likelihood_cov"]
-    prior_mean = npse_trained_model["prior_mean"]
-    prior_cov = npse_trained_model["prior_cov"]
-    num_dim = npse_trained_model["num_dim"]
+    prior = vector_field_trained_model["prior"]
+    vf_estimator = vector_field_trained_model["score_estimator"]
+    inference = vector_field_trained_model["inference"]
+    likelihood_shift = vector_field_trained_model["likelihood_shift"]
+    likelihood_cov = vector_field_trained_model["likelihood_cov"]
+    prior_mean = vector_field_trained_model["prior_mean"]
+    prior_cov = vector_field_trained_model["prior_cov"]
+    num_dim = vector_field_trained_model["num_dim"]
     num_posterior_samples = 1000
 
     # Ground truth theta
@@ -644,7 +645,7 @@ def test_score_fn_log_prob(npse_trained_model, prior_type, sde_type, iid_batch_s
     )
 
     proposal_posterior = inference.build_posterior(
-        score_estimator=score_estimator, prior=prior
+        vf_estimator=vf_estimator, prior=prior
     )
 
     proposal_posterior.set_default_x(x_o)
@@ -653,8 +654,8 @@ def test_score_fn_log_prob(npse_trained_model, prior_type, sde_type, iid_batch_s
     true_prob = true_posterior.log_prob(proposal_samples)
 
     importance_weights = true_prob - proposal_prob
-    norm_weights = softmax(importance_weights, dim=0)
-    ess = 1 / torch_sum(square(norm_weights))
+    norm_weights = torch.softmax(importance_weights, dim=0)
+    ess = 1 / torch.sum(torch.square(norm_weights))
     assert ess > num_posterior_samples / 5, (
         f"Effective sample size : {ess} too low \
             for number of samples {num_posterior_samples}"
