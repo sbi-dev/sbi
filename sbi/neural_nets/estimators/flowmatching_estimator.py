@@ -266,7 +266,7 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
             input: Parameters :math:`\theta_t`.
             times: SDE time variable in [0,1].
             effective_t_max: Upper bound on time to avoid numerical issues at t=1.
-                This effectively prevents and explosion of the SDE in the beginning.
+                This effectively prevents an explosion of the SDE in the beginning.
                 Note that this does not affect the ODE sampling, which always uses
                 times in [0,1].
 
@@ -299,7 +299,7 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
             input: Parameters :math:`\theta_t`.
             times: SDE time variable in [0,1].
             effective_t_max: Upper bound on time to avoid numerical issues at t=1.
-                This effectively prevents and explosion of the SDE in the beginning.
+                This effectively prevents an explosion of the SDE in the beginning.
                 Note that this does not affect the ODE sampling, which always uses
                 times in [0,1].
 
