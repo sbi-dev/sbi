@@ -598,26 +598,6 @@ def test_iid_log_prob(vector_field_type, prior_type, iid_batch_size):
     '''
     Tests the log-probability computation of the score-based posterior.
 
-    This test evaluates the ability of the score-based posterior to recover the
-    true posterior with log probabilities as importance weights. It compares whether
-    the effective sample size (ESS) is sufficiently high in comparision to the number
-    of samples drawn from the proposal posterior.
-
-    For more details about ESS refer :
-    https://www.nowozin.net/sebastian/blog/effective-sample-size-in-importance-sampling.html
-
-    Args:
-        iid_batch_size (int): The number of independent and identically distributed(IID)
-        observations in the batch. iid_batch_size=1 corresponds to a single observation.
-
-    Steps:
-        1. Gaussian prior and simulator are assumed to construct true posterior.
-        2. Build a proposal posterior and sample from it from trained model.
-        3. Calculate the ESS with importance weights based on log probabilities.
-
-    Raises:
-        AssertionError: If the ESS is less than half the number of posterior samples,
-        indicating poor recovery of the true posterior.
     '''
 
     vector_field_trained_model = train_vector_field_model(vector_field_type, prior_type)
@@ -644,17 +624,13 @@ def test_iid_log_prob(vector_field_type, prior_type, iid_batch_size):
         x_o, likelihood_shift, likelihood_cov, prior_mean, prior_cov
     )
 
-    proposal_posterior = inference.build_posterior(vf_estimator, prior=prior)
+    approx_posterior = inference.build_posterior(vf_estimator, prior=prior)
+    posterior_samples = true_posterior.sample((num_posterior_samples,))
+    true_prob = true_posterior.log_prob(posterior_samples)
+    approx_prob = approx_posterior.log_prob(posterior_samples, x=x_o)
 
-    proposal_posterior.set_default_x(x_o)
-    proposal_samples = proposal_posterior.sample((num_posterior_samples,))
-    proposal_prob = proposal_posterior.log_prob(proposal_samples)
-    true_prob = true_posterior.log_prob(proposal_samples)
-
-    importance_weights = true_prob - proposal_prob
-    norm_weights = torch.softmax(importance_weights, dim=0)
-    ess = 1 / torch.sum(torch.square(norm_weights))
-    assert ess > num_posterior_samples / 5, (
-        f"Effective sample size : {ess} too low \
+    diff = torch.abs(true_prob - approx_prob)
+    assert diff.mean() < 0.2, (
+        f"Probs diff: {diff.mean()} too big \
             for number of samples {num_posterior_samples}"
     )
