@@ -268,7 +268,9 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
             Drift function at a given time.
         """
         # analytical f(t) does not depend on noise_scale and is undefined at t = 1.
-        return -input / torch.maximum(1 - times, torch.tensor(1e-6).to(input))
+        # NOTE: We bound the singularity to avoid numerical issues i.e. 1 - t > 0.01
+        # this effectively prevents and explosion of the SDE in the beginning.
+        return -input / torch.maximum(1 - times, torch.tensor(1e-2).to(input))
 
     def diffusion_fn(self, input: Tensor, times: Tensor) -> Tensor:
         r"""Diffusion function for the flow matching estimator.
@@ -293,10 +295,12 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
             Diffusion function at a given time.
         """
         # analytical g(t) is undefined at t = 1.
+        # NOTE: We bound the singularity to avoid numerical issues i.e. 1 - t > 0.01
+        # this effectively prevents and explosion of the SDE in the beginning.
         return torch.sqrt(
             2
             * (times + self.noise_scale)
-            / torch.maximum(1 - times, torch.tensor(1e-6).to(times))
+            / torch.maximum(1 - times, torch.tensor(1e-2).to(times))
         )
 
     def mean_t_fn(self, times: Tensor) -> Tensor:
