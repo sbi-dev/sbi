@@ -115,8 +115,6 @@ class VectorFieldBasedPotential(BasePotential):
         super().set_x(x_o, x_is_iid)
         self.iid_method = iid_method or self.iid_method
         self.iid_params = iid_params
-        # NOTE: Once IID potential evaluation is supported. This needs to be adapted.
-        # See #1450.
         if not x_is_iid and (self._x_o is not None):
             self.flow = self.rebuild_flow(**ode_kwargs)
         elif self._x_o is not None:
@@ -163,6 +161,8 @@ class VectorFieldBasedPotential(BasePotential):
                     ),
                     dim=0,
                 )
+                # Apply the adjustment for iid observations i.e. we have to subtract
+                # (n-1) times the log prior.
                 log_probs = iid_posteriors_prob - (n - 1) * self.prior.log_prob(
                     theta_density_estimator
                 ).squeeze(-1)
