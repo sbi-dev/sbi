@@ -26,6 +26,7 @@
 * **Support using trained estimators in Pyro models** by @sethaxen in https://github.com/sbi-dev/sbi/pull/1491
 * **Add util to generate mcmc samples from user defined potential (#1405)** by @hayden-johnson in https://github.com/sbi-dev/sbi/pull/1483
 * **Logit transform** by @anastasiakrouglova in https://github.com/sbi-dev/sbi/pull/1485
+* **Log-prob for iid data for score estimators** by @Kartik-Sama in https://github.com/sbi-dev/sbi/pull/1508
 
 #### 📚 Documentation & Tutorials
 
@@ -45,6 +46,7 @@
 * 1561 computation of denoising posterior precision matrix in jac method score fn iid by @manuelgloeckler in https://github.com/sbi-dev/sbi/pull/1636
 * fix xfail test, fix deprecation warnings by @janfb in https://github.com/sbi-dev/sbi/pull/1642
 * fix: iid-score device handling by @janfb in https://github.com/sbi-dev/sbi/pull/1650
+* fix: fmpe singularity on sde sampling by @manuelgloeckler in https://github.com/sbi-dev/sbi/pull/1661
 
 ### 🛠️ Maintenance & Improvements
 
@@ -87,6 +89,7 @@
 * Fix/lc2st numpy type fixes by @janfb in https://github.com/sbi-dev/sbi/pull/1613
 * Fix failing CI on main. by @janfb in https://github.com/sbi-dev/sbi/pull/1618
 * Fix slow vector field tests by @janfb in https://github.com/sbi-dev/sbi/pull/1657
+* Add tests for sensitivity analysis by @janfb in https://github.com/sbi-dev/sbi/pull/1662
 
 #### 📖 Documentation & Website
 
