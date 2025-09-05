@@ -4,12 +4,13 @@
 from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 import torch
-from torch import Tensor
+from torch import Tensor, ge
 from torch.distributions import Distribution
 from zuko.distributions import NormalizingFlow
 
 from sbi.inference.potentials.base_potential import BasePotential
-from sbi.inference.potentials.score_fn_iid import get_iid_method
+from sbi.inference.potentials.score_fn_util import get_iid_method
+from sbi.inference.potentials.score_fn_util import get_guidance_method, get_iid_method
 from sbi.neural_nets.estimators import ConditionalVectorFieldEstimator
 from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
@@ -96,6 +97,8 @@ class VectorFieldBasedPotential(BasePotential):
         x_is_iid: Optional[bool] = False,
         iid_method: Optional[str] = None,
         iid_params: Optional[Dict[str, Any]] = None,
+        guidance_method: Optional[str] = None,
+        guidance_params: Optional[Dict[str, Any]] = None,
         **ode_kwargs,
     ):
         """
@@ -115,6 +118,8 @@ class VectorFieldBasedPotential(BasePotential):
         super().set_x(x_o, x_is_iid)
         self.iid_method = iid_method or self.iid_method
         self.iid_params = iid_params
+        self.guidance_method = guidance_method
+        self.guidance_params = guidance_params
         if not x_is_iid and (self._x_o is not None):
             self.flow = self.rebuild_flow(**ode_kwargs)
         elif self._x_o is not None:
@@ -135,6 +140,11 @@ class VectorFieldBasedPotential(BasePotential):
         Returns:
             The potential function, i.e., the log probability of the posterior.
         """
+
+        if self.guidance_method is not None:
+            raise NotImplementedError(
+                "Potential evaluation for guidance is not supported yet."
+            )
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
         theta_density_estimator = reshape_to_sample_batch_event(
@@ -216,9 +226,21 @@ class VectorFieldBasedPotential(BasePotential):
                 "the potential or manually set self._x_o."
             )
 
+        if self.guidance_method is not None:
+            score_wrapper, cfg = get_guidance_method(self.guidance_method)
+            cfg_params = cfg(**(self.guidance_params or {}))
+            vf_estimator = score_wrapper(
+                self.vector_field_estimator,
+                self.prior,
+                device=device,
+                **cfg_params,
+            )
+        else:
+            vf_estimator = self.vector_field_estimator
+
         with torch.set_grad_enabled(track_gradients):
             if not self.x_is_iid or self._x_o.shape[0] == 1:
-                score = self.vector_field_estimator.score(
+                score = vf_estimator.score(
                     input=theta, condition=self.x_o, t=time.to(device)
                 )
             else:
@@ -226,7 +248,7 @@ class VectorFieldBasedPotential(BasePotential):
 
                 iid_method = get_iid_method(self.iid_method)
                 score_fn_iid = iid_method(
-                    self.vector_field_estimator,
+                    vf_estimator,
                     self.prior,
                     device=device,
                     **(self.iid_params or {}),
