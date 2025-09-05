@@ -13317,7 +13317,10 @@ the ODE to compute the log-probability.</p>
 <span class="normal">602</span>
 <span class="normal">603</span>
 <span class="normal">604</span>
-<span class="normal">605</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">VectorFieldPosterior</span><span class="p">(</span><span class="n">NeuralPosterior</span><span class="p">):</span>
+<span class="normal">605</span>
+<span class="normal">606</span>
+<span class="normal">607</span>
+<span class="normal">608</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">VectorFieldPosterior</span><span class="p">(</span><span class="n">NeuralPosterior</span><span class="p">):</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Posterior based on flow- or score-matching estimators.</span>
 
 <span class="sd">    This posterior samples from the vector field model - typically a score-based or a</span>
@@ -13692,7 +13695,10 @@ the ODE to compute the log-probability.</p>
 <span class="sd">            `(len(θ),)`-shaped log posterior probability $\log p(\theta|x)$ for θ in the</span>
 <span class="sd">            support of the prior, -∞ (corresponding to 0 probability) outside.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">potential_fn</span><span class="o">.</span><span class="n">set_x</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_x_else_default_x</span><span class="p">(</span><span class="n">x</span><span class="p">),</span> <span class="o">**</span><span class="p">(</span><span class="n">ode_kwargs</span> <span class="ow">or</span> <span class="p">{}))</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_x_else_default_x</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">reshape_to_batch_event</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">vector_field_estimator</span><span class="o">.</span><span class="n">condition_shape</span><span class="p">)</span>
+        <span class="n">is_iid</span> <span class="o">=</span> <span class="n">x</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">1</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">potential_fn</span><span class="o">.</span><span class="n">set_x</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">x_is_iid</span><span class="o">=</span><span class="n">is_iid</span><span class="p">,</span> <span class="o">**</span><span class="p">(</span><span class="n">ode_kwargs</span> <span class="ow">or</span> <span class="p">{}))</span>
 
         <span class="n">theta</span> <span class="o">=</span> <span class="n">ensure_theta_batched</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">as_tensor</span><span class="p">(</span><span class="n">theta</span><span class="p">))</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">potential_fn</span><span class="p">(</span>
@@ -14333,7 +14339,10 @@ consumption.</p>
 <span class="normal">410</span>
 <span class="normal">411</span>
 <span class="normal">412</span>
-<span class="normal">413</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">log_prob</span><span class="p">(</span>
+<span class="normal">413</span>
+<span class="normal">414</span>
+<span class="normal">415</span>
+<span class="normal">416</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">log_prob</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">theta</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -14356,7 +14365,10 @@ consumption.</p>
 <span class="sd">        `(len(θ),)`-shaped log posterior probability $\log p(\theta|x)$ for θ in the</span>
 <span class="sd">        support of the prior, -∞ (corresponding to 0 probability) outside.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">potential_fn</span><span class="o">.</span><span class="n">set_x</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_x_else_default_x</span><span class="p">(</span><span class="n">x</span><span class="p">),</span> <span class="o">**</span><span class="p">(</span><span class="n">ode_kwargs</span> <span class="ow">or</span> <span class="p">{}))</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_x_else_default_x</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="n">reshape_to_batch_event</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">vector_field_estimator</span><span class="o">.</span><span class="n">condition_shape</span><span class="p">)</span>
+    <span class="n">is_iid</span> <span class="o">=</span> <span class="n">x</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">1</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">potential_fn</span><span class="o">.</span><span class="n">set_x</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">x_is_iid</span><span class="o">=</span><span class="n">is_iid</span><span class="p">,</span> <span class="o">**</span><span class="p">(</span><span class="n">ode_kwargs</span> <span class="ow">or</span> <span class="p">{}))</span>
 
     <span class="n">theta</span> <span class="o">=</span> <span class="n">ensure_theta_batched</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">as_tensor</span><span class="p">(</span><span class="n">theta</span><span class="p">))</span>
     <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">potential_fn</span><span class="p">(</span>
@@ -14589,10 +14601,7 @@ have a cached value.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/vector_field_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">514</span>
-<span class="normal">515</span>
-<span class="normal">516</span>
-<span class="normal">517</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">517</span>
 <span class="normal">518</span>
 <span class="normal">519</span>
 <span class="normal">520</span>
@@ -14680,7 +14689,10 @@ have a cached value.</p>
 <span class="normal">602</span>
 <span class="normal">603</span>
 <span class="normal">604</span>
-<span class="normal">605</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">map</span><span class="p">(</span>
+<span class="normal">605</span>
+<span class="normal">606</span>
+<span class="normal">607</span>
+<span class="normal">608</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">map</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">num_iter</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">,</span>
@@ -15463,10 +15475,7 @@ linear grid between t_max and t_min is used.</p>
 
             <details class="quote">
               <summary>Source code in <code>sbi/inference/posteriors/vector_field_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">415</span>
-<span class="normal">416</span>
-<span class="normal">417</span>
-<span class="normal">418</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">418</span>
 <span class="normal">419</span>
 <span class="normal">420</span>
 <span class="normal">421</span>
@@ -15560,7 +15569,10 @@ linear grid between t_max and t_min is used.</p>
 <span class="normal">509</span>
 <span class="normal">510</span>
 <span class="normal">511</span>
-<span class="normal">512</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">sample_batched</span><span class="p">(</span>
+<span class="normal">512</span>
+<span class="normal">513</span>
+<span class="normal">514</span>
+<span class="normal">515</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">sample_batched</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">sample_shape</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">,</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
