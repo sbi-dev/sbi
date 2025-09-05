@@ -150,7 +150,7 @@ class VectorFieldBasedPotential(BasePotential):
                 assert self.flows is not None, (
                     "Flows for each iid x are required for evaluating log_prob."
                 )
-                n = self.x_o.shape[0]  # number of iid samples
+                num_iid = self.x_o.shape[0]  # number of iid samples
                 iid_posteriors_prob = torch.sum(
                     torch.stack(
                         [
@@ -162,8 +162,8 @@ class VectorFieldBasedPotential(BasePotential):
                     dim=0,
                 )
                 # Apply the adjustment for iid observations i.e. we have to subtract
-                # (n-1) times the log prior.
-                log_probs = iid_posteriors_prob - (n - 1) * self.prior.log_prob(
+                # (num_iid-1) times the log prior.
+                log_probs = iid_posteriors_prob - (num_iid - 1) * self.prior.log_prob(
                     theta_density_estimator
                 ).squeeze(-1)
             else:
@@ -243,8 +243,8 @@ class VectorFieldBasedPotential(BasePotential):
         """
         if self._x_o is None:
             raise ValueError(
-                "No observed data x_o is available. Please reinitialize \
-                the potential or manually set self._x_o."
+                "No observed data x_o is available. Please reinitialize"
+                "the potential or manually set self._x_o."
             )
         x_density_estimator = reshape_to_batch_event(
             self.x_o, event_shape=self.vector_field_estimator.condition_shape
@@ -253,17 +253,15 @@ class VectorFieldBasedPotential(BasePotential):
         flow = self.neural_ode(x_density_estimator, **kwargs)
         return flow
 
-    def rebuild_flows_for_batch(
-        self, atol: float = 1e-5, rtol: float = 1e-6, exact: bool = True
-    ) -> List[NormalizingFlow]:
+    def rebuild_flows_for_batch(self, **kwargs) -> List[NormalizingFlow]:
         """
         Rebuilds the continuous normalizing flows for each iid in x_o. This is used when
         a new default x_o is set, or to evaluate the log probs at higher precision.
         """
         if self._x_o is None:
             raise ValueError(
-                "No observed data x_o is available. Please reinitialize \
-                the potential or manually set self._x_o."
+                "No observed data x_o is available. Please reinitialize "
+                "the potential or manually set self._x_o."
             )
         flows = []
         for i in range(self._x_o.shape[0]):
@@ -272,9 +270,7 @@ class VectorFieldBasedPotential(BasePotential):
                 iid_x, event_shape=self.vector_field_estimator.condition_shape
             )
 
-            flow = self.neural_ode(
-                condition=x_density_estimator, atol=atol, rtol=rtol, exact=exact
-            )
+            flow = self.neural_ode(x_density_estimator, **kwargs)
             flows.append(flow)
         return flows
 

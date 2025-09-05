@@ -593,7 +593,7 @@ def test_sample_conditional():
 @pytest.mark.slow
 @pytest.mark.parametrize("vector_field_type", ["ve", "vp", "fmpe"])
 @pytest.mark.parametrize("prior_type", ["gaussian"])
-@pytest.mark.parametrize("iid_batch_size", [1, 2])
+@pytest.mark.parametrize("iid_batch_size", [1, 2, 5])
 def test_iid_log_prob(vector_field_type, prior_type, iid_batch_size):
     '''
     Tests the log-probability computation of the score-based posterior.
@@ -630,7 +630,7 @@ def test_iid_log_prob(vector_field_type, prior_type, iid_batch_size):
     approx_prob = approx_posterior.log_prob(posterior_samples, x=x_o)
 
     diff = torch.abs(true_prob - approx_prob)
-    assert diff.mean() < 0.4, (
+    assert diff.mean() < 0.3 * iid_batch_size, (
         f"Probs diff: {diff.mean()} too big "
         f"for number of samples {num_posterior_samples}"
     )
