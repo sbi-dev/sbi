@@ -1,7 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Any, Dict, Literal, Optional, Tuple, Union, List
+from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 import torch
 from torch import Tensor
