@@ -72,7 +72,7 @@ class NRE_A(RatioEstimatorTrainer):
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[Dict] = None,
         loss_kwargs: Optional[Dict[str, Any]] = None,
-    ) -> nn.Module:
+    ) -> RatioEstimator:
         r"""Return classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
 
         Args:
