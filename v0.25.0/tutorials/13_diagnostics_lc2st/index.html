@@ -1,0 +1,1259 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://sbi-dev.github.io/sbi/v0.25.0/tutorials/13_diagnostics_lc2st/">
+      
+      
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.18">
+    
+    
+      
+        <title>Local Classifier Two-Sample Tests (L-C2ST) - sbi</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.7e37652d.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+  
+  
+    
+      
+      
+    
+  
+  
+  <style>:root{--md-admonition-icon--note:url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2016%2016%22%3E%3Cpath%20d%3D%22M1%207.775V2.75C1%201.784%201.784%201%202.75%201h5.025c.464%200%20.91.184%201.238.513l6.25%206.25a1.75%201.75%200%200%201%200%202.474l-5.026%205.026a1.75%201.75%200%200%201-2.474%200l-6.25-6.25A1.75%201.75%200%200%201%201%207.775m1.5%200c0%20.066.026.13.073.177l6.25%206.25a.25.25%200%200%200%20.354%200l5.025-5.025a.25.25%200%200%200%200-.354l-6.25-6.25a.25.25%200%200%200-.177-.073H2.75a.25.25%200%200%200-.25.25ZM6%205a1%201%200%201%201%200%202%201%201%200%200%201%200-2%22/%3E%3C/svg%3E');}</style>
+
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../static/global.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#local-classifier-two-sample-tests-l-c2st" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="sbi" class="md-header__button md-logo" aria-label="sbi" data-md-component="logo">
+      
+  <img src="../../static/logo.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            sbi
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Local Classifier Two-Sample Tests (L-C2ST)
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="http://github.com/sbi-dev/sbi" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path fill="currentColor" d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    sbi-dev/sbi
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="sbi" class="md-nav__button md-logo" aria-label="sbi" data-md-component="logo">
+      
+  <img src="../../static/logo.svg" alt="logo">
+
+    </a>
+    sbi
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="http://github.com/sbi-dev/sbi" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path fill="currentColor" d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    sbi-dev/sbi
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Home
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Tutorials and Examples
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    API Reference
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    FAQ
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Contributing
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Contributing
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contribute/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    How to contribute
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../code_of_conduct/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Code of Conduct
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../citation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Citation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../credits/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Credits
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#in-a-nutshell" class="md-nav__link">
+    <span class="md-ellipsis">
+      In a nutshell
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="In a nutshell">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#key-ideas-behind-ell-c2st" class="md-nav__link">
+    <span class="md-ellipsis">
+      Key ideas behind \(\ell\)-C2ST
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-can-ell-c2st-diagnose" class="md-nav__link">
+    <span class="md-ellipsis">
+      What can \(\ell\)-C2ST diagnose?
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#illustration-on-a-benchmark-sbi-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      Illustration on a benchmark SBI example
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Illustration on a benchmark SBI example">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#sbi-task" class="md-nav__link">
+    <span class="md-ellipsis">
+      SBI Task
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#posterior-inference" class="md-nav__link">
+    <span class="md-ellipsis">
+      Posterior Inference
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#evaluate-the-posterior-estimator" class="md-nav__link">
+    <span class="md-ellipsis">
+      Evaluate the posterior estimator
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#classifier-choice-and-calibration-data-size-how-to-ensure-meaningful-test-results" class="md-nav__link">
+    <span class="md-ellipsis">
+      Classifier choice and calibration data size: how to ensure meaningful test results
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Classifier choice and calibration data size: how to ensure meaningful test results">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#choice-of-the-classifier" class="md-nav__link">
+    <span class="md-ellipsis">
+      Choice of the classifier
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#number-of-calibration-samples" class="md-nav__link">
+    <span class="md-ellipsis">
+      Number of calibration samples
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reducing-the-variance-of-the-test-results" class="md-nav__link">
+    <span class="md-ellipsis">
+      Reducing the variance of the test results
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-case-of-normalizing-flows-ell-c2st-nf" class="md-nav__link">
+    <span class="md-ellipsis">
+      The case of Normalizing Flows (\(\ell\)-C2ST-NF)
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The case of Normalizing Flows (\(\ell\)-C2ST-NF)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#set-up-ell-c2st-nf" class="md-nav__link">
+    <span class="md-ellipsis">
+      Set up \(\ell\)-C2ST-NF
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="local-classifier-two-sample-tests-l-c2st">Local Classifier Two-Sample Tests (L-C2ST)<a class="headerlink" href="#local-classifier-two-sample-tests-l-c2st" title="Permanent link">&para;</a></h1>
+<p>After a density estimator has been trained with simulated data to obtain a posterior, the estimator should be made subject to several diagnostic tests. This diagnostic should be performed before the posterior is used for inference given the actual observed data. </p>
+<p><em>Posterior Predictive Checks</em> (see <a href="https://sbi.readthedocs.io/en/latest/advanced_tutorials/10_diagnostics_posterior_predictive_checks.html">this tutorial</a>) provide one way to &ldquo;critique&rdquo; a trained estimator via its predictive performance. </p>
+<p>Another approach is <em>Simulation-Based Calibration</em> (SBC, see <a href="https://sbi.readthedocs.io/en/latest/how_to_guide/16_sbc.html">this tutorial</a>). SBC evaluates whether the estimated posterior is balanced, i.e., neither over-confident nor under-confident. These checks are performed <strong><em>in expectation (on average) over the observation space</em></strong>, i.e. they are performed on a set of <span class="arithmatex">\((\theta,x)\)</span> pairs sampled from the joint distribution over simulator parameters <span class="arithmatex">\(\theta\)</span> and corresponding observations <span class="arithmatex">\(x\)</span>. As such, SBC is a <strong><em>global validation method</em></strong> that can be viewed as a necessary condition (but not sufficient) for a valid inference algorithm: If SBC checks fail, this tells you that your inference is invalid. If SBC checks pass, <em>this is no guarantee that the posterior estimation is working</em>.</p>
+<p><strong>Local Classifier Two-Sample Tests</strong> (<span class="arithmatex">\(\ell\)</span>-C2ST) as developed by <a href="https://arxiv.org/abs/2306.03580">Linhart et al, 2023</a> present a new <strong><em>local validation method</em></strong> that allows to evaluate the correctness of the posterior estimator <strong><em>at a fixed observation</em></strong>, i.e. they work on a single <span class="arithmatex">\((\theta,x)\)</span> pair. They provide necessary <em>and sufficient</em> conditions for the validity of the SBI algorithm, as well as easy-to-interpret qualitative and quantitative diagnostics. </p>
+<p>If global checks (like SBC) fail, <span class="arithmatex">\(\ell\)</span>-C2ST allows to further investigate where (for which observation) and why (bias, overdispersion, etc.) the posterior estimator fails. If global validation checks pass, <span class="arithmatex">\(\ell\)</span>-C2ST allows to guarantee whether the inference is correct for a specific observation.</p>
+<h2 id="in-a-nutshell">In a nutshell<a class="headerlink" href="#in-a-nutshell" title="Permanent link">&para;</a></h2>
+<p>Suppose you have an &ldquo;amortized&rdquo; posterior estimator <span class="arithmatex">\(q_\phi(\theta\mid x)\)</span>, meaning that we can quickly get samples for any new observation <span class="arithmatex">\(x\)</span>. The goal is to test the <em>local consistency</em> of our estimator at a fixed observation <span class="arithmatex">\(x_\mathrm{o}\)</span>, i.e. whether the following null hypothesis holds about <span class="arithmatex">\(q_\phi(\theta\mid x)\)</span> and the true posterior <span class="arithmatex">\(p(\theta\mid x)\)</span>:</p>
+<div class="arithmatex">\[\mathcal{H}_0(x_\mathrm{o}) := q_\phi(\theta\mid x_\mathrm{o}) = p(\theta \mid x_\mathrm{o}), \quad \forall \theta \in \mathbb{R}^m\]</div>
+<p>To run <span class="arithmatex">\(\ell\)</span>-C2ST, </p>
+<ol>
+<li>we sample <strong>new</strong> parameters from the prior of the problem at hand: <span class="arithmatex">\(\Theta_i \sim p(\theta)\)</span></li>
+<li>we simulate corresponding &ldquo;observations&rdquo;: <span class="arithmatex">\(X_i = \mathrm{Simulator}(\Theta_i) \sim p(x\mid \Theta_i)\)</span></li>
+<li>we sample the estimated posterior at each observation: <span class="arithmatex">\(Q_i \sim q_\phi(\theta \mid X_i)\)</span></li>
+</ol>
+<p>This creates a calibration dataset of samples from the &ldquo;estimated&rdquo; and true joint distributions on which we train a binary classifier <span class="arithmatex">\(d(\theta, x)\)</span> to distinguish between the estimated joint <span class="arithmatex">\(q(\theta \mid x)p(x)\)</span> (class <span class="arithmatex">\(C=0\)</span>) and the true joint distribution <span class="arithmatex">\(p(\theta)p(x\mid\theta)\)</span> (class <span class="arithmatex">\(C=1\)</span>):</p>
+<div class="arithmatex">\[\mathcal{D}_\mathrm{cal} = \left \{\underbrace{(Q_i, X_i)}_{(C=0)} \cup \underbrace{(\Theta_i, X_i)}_{(C=1)} \right \}_{i=1}^{N_\mathrm{cal}}\]</div>
+<blockquote>
+<p>Note: <span class="arithmatex">\(D_\mathrm{cal}\)</span> contains data from the joint distribution (over prior and simulator) that have to be <strong>different from the data used to train the posterior estimator</strong>. <span class="arithmatex">\(N_\mathrm{cal}\)</span> is typically smaller than <span class="arithmatex">\(N_\mathrm{train}\)</span>, the number of training samples for the posterior estimator, but has to be sufficiently large to allow the convergence of the classifier. For a fixed simulation budget, a rule of thumb is to use <span class="arithmatex">\(90\%\)</span> for the posterior estimation and <span class="arithmatex">\(10\%\)</span> for the calibration.</p>
+</blockquote>
+<p>Once the classifier is trained, we evaluate it for a given observation <span class="arithmatex">\(x^\star\)</span> and multiple samples <span class="arithmatex">\(Q^\star_i \sim q_\phi(\theta \mid x^\star)\)</span>. This gives us a set of predicted probabilities <span class="arithmatex">\(\left\{d(Q^\star_i, x^\star)\right\}_{i=1}^{N_\mathrm{eval}}\)</span> that are then used to compute the different diagnostics. This proceedure can be repeated for several different observations, without having to retrain the classifiers, which allows to perform an efficient and thorough analysis of the failure modes of the posterior estimator.</p>
+<blockquote>
+<p>Note: The number of evaluation samples can be arbitrarily large (typically we use <span class="arithmatex">\(N_\mathrm{eval} = 10\,000\)</span>), because we suppose our posterior estimator to be amortized. </p>
+</blockquote>
+<h3 id="key-ideas-behind-ell-c2st">Key ideas behind <span class="arithmatex">\(\ell\)</span>-C2ST<a class="headerlink" href="#key-ideas-behind-ell-c2st" title="Permanent link">&para;</a></h3>
+<p><span class="arithmatex">\(\ell\)</span>-C2ST allows to evaluate the correctness your posterior estimator <em>without requiring access to samples from the true posterior</em>. It is built on the following two key ideas:</p>
+<ol>
+<li>
+<p><strong>Train the classifier on the joint:</strong> this allows to implicitly learn the distance between the true and estimated posterior for any observation (we could call this step &ldquo;amortized&rdquo; C2ST training). </p>
+</li>
+<li>
+<p><strong>Local evaluation on data from one class only:</strong> we use a metric that, as opposed to the accuracy (used in C2ST) does not require samples from the true posterior, only the estimator. It consists in the Mean Squared Error (MSE) between the predicted probabilities for samples from the estimator evaluated at the given observation and one half.</p>
+</li>
+</ol>
+<blockquote>
+<p>Note: A predicted probability of one half corresponds to the chance level or total uncertainty of the classifier, that is unable to distinguish between the two data classes.</p>
+</blockquote>
+<p>The MSE metric is used as a test statistic for a hypothesis test that gives us theoretical guarantees on the correctness of the posterior estimator (at the considered observation), as well as easy-to-interpret diagnostics that allow to investigate its failure modes.</p>
+<blockquote>
+<p><strong>Quick reminder on hypothesis tests.</strong> Additionaly to the observed test statistic <span class="arithmatex">\(T^\star\)</span>, evaluating the test requires to
+1. compute the test statistics <span class="arithmatex">\(T_h\)</span> under the null hyposthesis (H0) of equal (true and estimated) distributions over multiple trials <span class="arithmatex">\(h\)</span>.
+2. compute the p-value <span class="arithmatex">\(p_v = \frac{1}{H}\sum_{h=1}^H \mathbb{I}(T_h &gt; T^\star)\)</span>: <em>&ldquo;How many times is the observed test statistic &ldquo;better&rdquo; (i.e. below) the test statistic computed under H0?&rdquo;</em>
+3. choose a significance level <span class="arithmatex">\(\alpha\)</span> (typically <span class="arithmatex">\(0.05\)</span>) that defines the rejection threshold and evaluate the test:
+- <strong>quantitatively:</strong> a p-value below this level indicates the rejection of the null hypothesis, meaning the detection of significant differences between the true and the estimated posterior. 
+- <strong>qualitatively:</strong> P-P plots: visually check whether the distribution of <span class="arithmatex">\(T^\star\)</span> falls into the <span class="arithmatex">\(1-\alpha\)</span> confidence region, computed by taking the corresponding quantiles of <span class="arithmatex">\((T_1,\dots, T_H)\)</span>.</p>
+</blockquote>
+<h3 id="what-can-ell-c2st-diagnose">What can <span class="arithmatex">\(\ell\)</span>-C2ST diagnose?<a class="headerlink" href="#what-can-ell-c2st-diagnose" title="Permanent link">&para;</a></h3>
+<ul>
+<li>
+<p><strong>Quantitatively:</strong> the MSE metric (or test statistic) gives us a distance measure between the estimated and true posterior that can be quickly evaluated for any new observation <span class="arithmatex">\(x^\star\)</span>. Comparing it to the values of the null-distribution gives us the p-values that are used to check how significant their differences are. If the check passes (no significant differences), this tells us that we can be confident about the correctness of the estimator, but only upto to a certain confidence level (typically <span class="arithmatex">\(95\%\)</span>). </p>
+</li>
+<li>
+<p><strong>Qualitatively:</strong> we can choose to look at the predicted probabilities used to compute the MSE metric. P-P plots allow to evaluate a general trend of over or under confidence, by comparing theire distribution to the confidence region (obtained for probabilities predicted under H0). We can go further and map these predicted probabilities to a pairplot of the samples they were evaluated on, shows us the regions of over and underconfidence of the estimator. This allows us to investigate the nature of the inconsistencies, such as positive/negative bias or under/over dispersion.</p>
+</li>
+</ul>
+<blockquote>
+<p>Note: High (resp. low) predicted probability indicates that the classifier is confident about the fact that the sample belongs to the estimated posterior (resp. to the true posterior). This means that the estimator associates too much (resp. not enough) mass to this sample. In other words it is &ldquo;over-confident&rdquo; (resp. &ldquo;under-confident&rdquo;). </p>
+</blockquote>
+<p>To summarize <span class="arithmatex">\(\ell\)</span>-C2ST can:</p>
+<ul>
+<li>tell you whether your posterior estimator is valid for a given observation (with a guaranteed confidence)</li>
+<li>show you where (for which observation) and why (bais, overdispersion, etc.) it fails </li>
+</ul>
+<h2 id="illustration-on-a-benchmark-sbi-example">Illustration on a benchmark SBI example<a class="headerlink" href="#illustration-on-a-benchmark-sbi-example" title="Permanent link">&para;</a></h2>
+<p>We consider the Gaussian Mixture SBI task from <a href="https://arxiv.org/abs/2101.04653">Lueckmann et al, 2021</a>. It consists of inferring the common mean of a mixture of two 2D Gaussian distributions, one with much broader covariance than the other:</p>
+<ul>
+<li>Prior: <span class="arithmatex">\(p(\theta) = \mathcal{U}(-10,10)\)</span></li>
+<li>Simulator: <span class="arithmatex">\(p(x|\theta) = 0.5 \mathcal{N}(\theta, \mathbf{I}_2)+ 0.5 \mathcal{N}(\theta, 0.1 \times \mathbf{I}_2)\)</span></li>
+<li>Dimensionality: <span class="arithmatex">\(\theta \in \mathbb{R}^2\)</span>, <span class="arithmatex">\(x \in \mathbb{R}^2\)</span></li>
+</ul>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+</code></pre></div>
+<h3 id="sbi-task">SBI Task<a class="headerlink" href="#sbi-task" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.simulators.gaussian_mixture</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">gaussian_mixture</span><span class="p">,</span>
+    <span class="n">uniform_prior_gaussian_mixture</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="c1"># SBI task: prior and simualtor</span>
+<span class="n">dim</span> <span class="o">=</span> <span class="mi">2</span>
+<span class="n">prior</span> <span class="o">=</span> <span class="n">uniform_prior_gaussian_mixture</span><span class="p">(</span><span class="n">dim</span><span class="o">=</span><span class="n">dim</span><span class="p">)</span>
+<span class="n">simulator</span> <span class="o">=</span> <span class="n">gaussian_mixture</span>
+
+<span class="c1"># Number of samples for training, calibration and evaluation</span>
+<span class="n">NUM_TRAIN</span> <span class="o">=</span> <span class="mi">10_000</span>
+<span class="n">NUM_CAL</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="mf">0.1</span> <span class="o">*</span> <span class="n">NUM_TRAIN</span><span class="p">)</span> <span class="c1"># 10% of the training data</span>
+<span class="n">NUM_EVAL</span> <span class="o">=</span> <span class="mi">10_000</span>
+</code></pre></div>
+<h3 id="posterior-inference">Posterior Inference<a class="headerlink" href="#posterior-inference" title="Permanent link">&para;</a></h3>
+<p>We use neural posterior estimation as our SBI-algorithm with a MAF as underlying density estimator. </p>
+<blockquote>
+<p>Note: Here you could use any other SBI algorithm of your own choosing (e.g. NRE, NLE, etc.). IMPORTANT: make sure it is amortized (which corresponds to sequential methods with a signle round), so sampling the posterior can be performed quickly.</p>
+</blockquote>
+<p>We train the estimator on a small training set (<code>small_num_train=1000</code>) over a small number of epochs (<code>max_num_epochs=10</code>), which means that it doesn&rsquo;t converge. Therefore the diagnostics should detect major differences between the estimated and the true posterior, i.e. the null hypothesis is rejected.</p>
+<blockquote>
+<p>Note: You can play with the number of training samples or epochs to see whether this influences the quality of the posterior estimator and how it is reflected in the diagnostics.</p>
+</blockquote>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference</span><span class="w"> </span><span class="kn">import</span> <span class="n">NPE</span>
+
+<span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="mi">42</span><span class="p">)</span> <span class="c1"># seed for reproducibility</span>
+
+<span class="c1"># Sample training data for the density estimator</span>
+<span class="n">small_num_train</span> <span class="o">=</span> <span class="mi">1000</span>
+<span class="n">theta_train</span> <span class="o">=</span> <span class="n">prior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">NUM_TRAIN</span><span class="p">,))[:</span><span class="n">small_num_train</span><span class="p">]</span>
+<span class="n">x_train</span> <span class="o">=</span> <span class="n">simulator</span><span class="p">(</span><span class="n">theta_train</span><span class="p">)[:</span><span class="n">small_num_train</span><span class="p">]</span>
+
+<span class="c1"># Train the neural posterior estimators</span>
+<span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="mi">42</span><span class="p">)</span> <span class="c1"># seed for reproducibility</span>
+<span class="n">inference</span> <span class="o">=</span> <span class="n">NPE</span><span class="p">(</span><span class="n">prior</span><span class="p">,</span> <span class="n">density_estimator</span><span class="o">=</span><span class="s1">&#39;maf&#39;</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="s1">&#39;cpu&#39;</span><span class="p">)</span>
+<span class="n">inference</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="o">=</span><span class="n">theta_train</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="n">x_train</span><span class="p">)</span>
+<span class="n">npe</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">train</span><span class="p">(</span><span class="n">training_batch_size</span><span class="o">=</span><span class="mi">256</span><span class="p">,</span> <span class="n">max_num_epochs</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+<span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">()</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code> Training neural network. Epochs trained: 11
+</code></pre></div>
+
+<h3 id="evaluate-the-posterior-estimator">Evaluate the posterior estimator<a class="headerlink" href="#evaluate-the-posterior-estimator" title="Permanent link">&para;</a></h3>
+<p>We choose to evaluate the posterior estimator at three different observations, simulated from parameters independently sampled from the prior: 
+<span class="arithmatex">\(<span class="arithmatex">\(\theta^\star_i \sim p(\theta) \quad \rightarrow \quad x^\star_i \sim p(x\mid \theta_i), \quad i=1,2,3~.\)</span>\)</span></p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.simulators.gaussian_mixture</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">samples_true_posterior_gaussian_mixture_uniform_prior</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="c1"># get reference observations</span>
+<span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span> <span class="c1"># seed for reproducibility</span>
+<span class="n">thetas_star</span> <span class="o">=</span> <span class="n">prior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">3</span><span class="p">,))</span>
+<span class="n">xs_star</span> <span class="o">=</span> <span class="n">simulator</span><span class="p">(</span><span class="n">thetas_star</span><span class="p">)</span>
+
+<span class="c1"># Sample from the true and estimated posterior</span>
+<span class="n">ref_samples_star</span> <span class="o">=</span> <span class="p">{}</span>
+<span class="k">for</span> <span class="n">i</span><span class="p">,</span><span class="n">x</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">xs_star</span><span class="p">):</span>
+    <span class="n">ref_samples_star</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">samples_true_posterior_gaussian_mixture_uniform_prior</span><span class="p">(</span>
+        <span class="n">x_o</span><span class="o">=</span><span class="n">x</span><span class="p">[</span><span class="kc">None</span><span class="p">,:],</span>
+        <span class="n">num_samples</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>
+    <span class="p">)</span>
+<span class="n">post_samples_star</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample_batched</span><span class="p">((</span><span class="mi">10000</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">xs_star</span><span class="p">)</span><span class="o">.</span><span class="n">permute</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">2</span><span class="p">)</span>
+</code></pre></div>
+<h4 id="set-up-ell-c2st">Set-up <span class="arithmatex">\(\ell\)</span>-C2ST<a class="headerlink" href="#set-up-ell-c2st" title="Permanent link">&para;</a></h4>
+<p>To setup the hypothesis test, we train the classifiers on the calibration dataset in two settings:
+- <code>train_under_null_hypothesis</code>: uses the permutation method to train the classifiers under the nulll hypothesis over several trials
+- <code>train_on_observed_data</code>: train the the classifier once on the observed data.</p>
+<p>For any new observation <code>x_o</code>, this allows to quickly compute (without having to retrain the classifiers) the test statistics <code>T_null</code> under the null hypothesis and <code>T_data</code> on the observed data. They will be used to compute the diagnostics (p-value or P-P plots).</p>
+<blockquote>
+<p>Note: we choose the default configuration with a MLP classifier (<code>classifier='mlp'</code>). You can also choose to use the default Random Forest classifier (<code>classifier='random_forest'</code>) or use your own custom <code>sklearn</code> classifier by specifying <code>clf_class</code> and <code>clf_kwargs</code> during the initialization of the <code>LC2ST</code> class. You can also use an ensemble classifier by setting <code>num_ensemble</code> &gt; 1 for more stable classifier predictions (see the <code>EnsembleClassifier</code> class in <code>sbi/diagnostics/lc2st.py</code>).</p>
+</blockquote>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.diagnostics.lc2st</span><span class="w"> </span><span class="kn">import</span> <span class="n">LC2ST</span>
+
+<span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="mi">42</span><span class="p">)</span> <span class="c1"># seed for reproducibility</span>
+
+<span class="c1"># sample calibration data</span>
+<span class="n">theta_cal</span> <span class="o">=</span> <span class="n">prior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">NUM_CAL</span><span class="p">,))</span>
+<span class="n">x_cal</span> <span class="o">=</span> <span class="n">simulator</span><span class="p">(</span><span class="n">theta_cal</span><span class="p">)</span>
+<span class="n">post_samples_cal</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample_batched</span><span class="p">((</span><span class="mi">1</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_cal</span><span class="p">,</span> <span class="n">max_sampling_batch_size</span><span class="o">=</span><span class="mi">10</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="c1"># set up the LC2ST: train the classifiers</span>
+<span class="n">lc2st</span> <span class="o">=</span> <span class="n">LC2ST</span><span class="p">(</span>
+    <span class="n">thetas</span><span class="o">=</span><span class="n">theta_cal</span><span class="p">,</span>
+    <span class="n">xs</span><span class="o">=</span><span class="n">x_cal</span><span class="p">,</span>
+    <span class="n">posterior_samples</span><span class="o">=</span><span class="n">post_samples_cal</span><span class="p">,</span>
+    <span class="n">classifier</span><span class="o">=</span><span class="s2">&quot;mlp&quot;</span><span class="p">,</span>
+    <span class="n">num_ensemble</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="c1"># number of classifiers for the ensemble</span>
+<span class="p">)</span>
+<span class="n">_</span> <span class="o">=</span> <span class="n">lc2st</span><span class="o">.</span><span class="n">train_under_null_hypothesis</span><span class="p">()</span> <span class="c1"># over 100 trials under (H0)</span>
+<span class="n">_</span> <span class="o">=</span> <span class="n">lc2st</span><span class="o">.</span><span class="n">train_on_observed_data</span><span class="p">()</span> <span class="c1"># on observed data</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="c1"># Define significance level for diagnostics</span>
+<span class="n">conf_alpha</span> <span class="o">=</span> <span class="mf">0.05</span>
+</code></pre></div>
+<h4 id="quantitative-diagnostics">Quantitative diagnostics<a class="headerlink" href="#quantitative-diagnostics" title="Permanent link">&para;</a></h4>
+<p>We here compute the test statistics and p-values for three different observations <code>x_o</code> (as mentioned above, this is done in an amortized way without having to retrain the classifiers). </p>
+<blockquote>
+<p>Note: The p-value associated to the test corresponds to the proportion of times the L-C2ST statistic under the null hypothesis <span class="arithmatex">\(\{T_h\}_{h=1}^H\)</span> is greater than the L-C2ST statistic <span class="arithmatex">\(T_\mathrm{o}\)</span> at the observation <code>x_o</code>. It is computed by taking the empirical mean over statistics computed on several trials under the null hypothesis: <span class="arithmatex">\(<span class="arithmatex">\(\text{p-value}(x_\mathrm{o}) = \frac{1}{H} \sum_{h=1}^{H} I(T_h &lt; T_o)~.\)</span>\)</span></p>
+</blockquote>
+<div class="highlight"><pre><span></span><code><span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="nb">len</span><span class="p">(</span><span class="n">thetas_star</span><span class="p">),</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">12</span><span class="p">,</span><span class="mi">3</span><span class="p">))</span>
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">thetas_star</span><span class="p">)):</span>
+    <span class="n">probs</span><span class="p">,</span> <span class="n">scores</span> <span class="o">=</span> <span class="n">lc2st</span><span class="o">.</span><span class="n">get_scores</span><span class="p">(</span>
+        <span class="n">theta_o</span><span class="o">=</span><span class="n">post_samples_star</span><span class="p">[</span><span class="n">i</span><span class="p">],</span>
+        <span class="n">x_o</span><span class="o">=</span><span class="n">xs_star</span><span class="p">[</span><span class="n">i</span><span class="p">],</span>
+        <span class="n">return_probs</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">trained_clfs</span><span class="o">=</span><span class="n">lc2st</span><span class="o">.</span><span class="n">trained_clfs</span>
+    <span class="p">)</span>
+    <span class="n">T_data</span> <span class="o">=</span> <span class="n">lc2st</span><span class="o">.</span><span class="n">get_statistic_on_observed_data</span><span class="p">(</span>
+        <span class="n">theta_o</span><span class="o">=</span><span class="n">post_samples_star</span><span class="p">[</span><span class="n">i</span><span class="p">],</span>
+        <span class="n">x_o</span><span class="o">=</span><span class="n">xs_star</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+    <span class="p">)</span>
+    <span class="n">T_null</span> <span class="o">=</span> <span class="n">lc2st</span><span class="o">.</span><span class="n">get_statistics_under_null_hypothesis</span><span class="p">(</span>
+        <span class="n">theta_o</span><span class="o">=</span><span class="n">post_samples_star</span><span class="p">[</span><span class="n">i</span><span class="p">],</span>
+        <span class="n">x_o</span><span class="o">=</span><span class="n">xs_star</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+    <span class="p">)</span>
+    <span class="n">p_value</span> <span class="o">=</span> <span class="n">lc2st</span><span class="o">.</span><span class="n">p_value</span><span class="p">(</span><span class="n">post_samples_star</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">xs_star</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+    <span class="n">reject</span> <span class="o">=</span> <span class="n">lc2st</span><span class="o">.</span><span class="n">reject_test</span><span class="p">(</span><span class="n">post_samples_star</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">xs_star</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">alpha</span><span class="o">=</span><span class="n">conf_alpha</span><span class="p">)</span>
+
+    <span class="c1"># plot 95% confidence interval</span>
+    <span class="n">quantiles</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">quantile</span><span class="p">(</span><span class="n">T_null</span><span class="p">,</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="o">-</span><span class="n">conf_alpha</span><span class="p">])</span>
+    <span class="n">axes</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">hist</span><span class="p">(</span><span class="n">T_null</span><span class="p">,</span> <span class="n">bins</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">density</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Null&quot;</span><span class="p">)</span>
+    <span class="n">axes</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="n">T_data</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;red&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Observed&quot;</span><span class="p">)</span>
+    <span class="n">axes</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="n">quantiles</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;black&quot;</span><span class="p">,</span> <span class="n">linestyle</span><span class="o">=</span><span class="s2">&quot;--&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;95% CI&quot;</span><span class="p">)</span>
+    <span class="n">axes</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="n">quantiles</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;black&quot;</span><span class="p">,</span> <span class="n">linestyle</span><span class="o">=</span><span class="s2">&quot;--&quot;</span><span class="p">)</span>
+    <span class="n">axes</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s2">&quot;Test statistic&quot;</span><span class="p">)</span>
+    <span class="n">axes</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">&quot;Density&quot;</span><span class="p">)</span>
+    <span class="n">axes</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">set_xlim</span><span class="p">(</span><span class="o">-</span><span class="mf">0.01</span><span class="p">,</span><span class="mf">0.25</span><span class="p">)</span>
+    <span class="n">axes</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">&quot;observation </span><span class="si">{</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="si">}</span><span class="s2"> </span><span class="se">\n</span><span class="s2"> p-value = </span><span class="si">{</span><span class="n">p_value</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">, reject = </span><span class="si">{</span><span class="n">reject</span><span class="si">}</span><span class="s2">&quot;</span>
+    <span class="p">)</span>
+<span class="n">axes</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">bbox_to_anchor</span><span class="o">=</span><span class="p">(</span><span class="mf">1.1</span><span class="p">,</span> <span class="mf">.5</span><span class="p">),</span> <span class="n">loc</span><span class="o">=</span><span class="s1">&#39;center left&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</code></pre></div>
+<p><img alt="png" src="../13_diagnostics_lc2st_files/13_diagnostics_lc2st_15_0.png" /></p>
+<p><strong>Results:</strong> the plots show the test statistics under the null hypothesis <code>T_null</code> (in blue) defining the <span class="arithmatex">\(95\%\)</span> (<code>1 - conf_alpha</code>) confidence region (black dotted lines). The test statistic correponding to the observed data <code>T_data</code> (red) is outside of the confidence region, indicating the <strong>rejection of the null hypothesis</strong> and therefore a <strong>&ldquo;bad&rdquo; posterior estimator</strong>.</p>
+<h4 id="qualitative-diagnostics">Qualitative diagnostics<a class="headerlink" href="#qualitative-diagnostics" title="Permanent link">&para;</a></h4>
+<h5 id="p-p-plots">P-P plots<a class="headerlink" href="#p-p-plots" title="Permanent link">&para;</a></h5>
+<p>P-P plots allow to evaluate a general trend of over- or under- confidence, by comparing the predicted probabilities of belonging to the estimated posterior (class 0). If the red curve is not fully contained in the gray confidence region, this means that the test rejects the null hypothesis and that a significant discrepancy from the true posterior is detected. Here two scenarios are possible:
+- <strong>over-confidence</strong>: the red curve is mostly on the <strong>right side</strong> of the gray CR (high probabilities are predominant)
+- <strong>under-confidence</strong>: the red curve is mostly on the <strong>left side</strong> of the gray CR (low probabilities are predominant)</p>
+<blockquote>
+<p>Note: The predominance of high (resp. low) probabilities indicates a classifier that is mostly confident about predicting the class corresponding to the estimated (resp. true) posterior. This in turn means that the estimator associates too much (resp. not enough) mass to the evaluation space, i.e. is overall over confident (resp. under confident).</p>
+</blockquote>
+<div class="highlight"><pre><span></span><code><span class="c1"># P-P plots</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.analysis.plot</span><span class="w"> </span><span class="kn">import</span> <span class="n">pp_plot_lc2st</span>
+
+<span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="nb">len</span><span class="p">(</span><span class="n">thetas_star</span><span class="p">),</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">12</span><span class="p">,</span><span class="mi">3</span><span class="p">))</span>
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">thetas_star</span><span class="p">)):</span>
+    <span class="n">probs_data</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">lc2st</span><span class="o">.</span><span class="n">get_scores</span><span class="p">(</span>
+        <span class="n">theta_o</span><span class="o">=</span><span class="n">post_samples_star</span><span class="p">[</span><span class="n">i</span><span class="p">],</span>
+        <span class="n">x_o</span><span class="o">=</span><span class="n">xs_star</span><span class="p">[</span><span class="n">i</span><span class="p">],</span>
+        <span class="n">return_probs</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">trained_clfs</span><span class="o">=</span><span class="n">lc2st</span><span class="o">.</span><span class="n">trained_clfs</span>
+    <span class="p">)</span>
+    <span class="n">probs_null</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">lc2st</span><span class="o">.</span><span class="n">get_statistics_under_null_hypothesis</span><span class="p">(</span>
+        <span class="n">theta_o</span><span class="o">=</span><span class="n">post_samples_star</span><span class="p">[</span><span class="n">i</span><span class="p">],</span>
+        <span class="n">x_o</span><span class="o">=</span><span class="n">xs_star</span><span class="p">[</span><span class="n">i</span><span class="p">],</span>
+        <span class="n">return_probs</span><span class="o">=</span><span class="kc">True</span>
+    <span class="p">)</span>
+
+    <span class="n">pp_plot_lc2st</span><span class="p">(</span>
+        <span class="n">probs</span><span class="o">=</span><span class="p">[</span><span class="n">probs_data</span><span class="p">],</span>
+        <span class="n">probs_null</span><span class="o">=</span><span class="n">probs_null</span><span class="p">,</span>
+        <span class="n">conf_alpha</span><span class="o">=</span><span class="n">conf_alpha</span><span class="p">,</span>
+        <span class="n">labels</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;Classifier probabilities </span><span class="se">\n</span><span class="s2"> on observed data&quot;</span><span class="p">],</span>
+        <span class="n">colors</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;red&quot;</span><span class="p">],</span>
+        <span class="n">ax</span><span class="o">=</span><span class="n">axes</span><span class="p">[</span><span class="n">i</span><span class="p">],</span>
+    <span class="p">)</span>
+    <span class="n">axes</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;PP-plot for observation </span><span class="si">{</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="n">axes</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">bbox_to_anchor</span><span class="o">=</span><span class="p">(</span><span class="mf">1.1</span><span class="p">,</span> <span class="mf">.5</span><span class="p">),</span> <span class="n">loc</span><span class="o">=</span><span class="s1">&#39;center left&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</code></pre></div>
+<p><img alt="png" src="../13_diagnostics_lc2st_files/13_diagnostics_lc2st_19_0.png" /></p>
+<p><strong>Results:</strong> the plots below show a general trend of overconfident behavior (red curves on the right side of the black dots).</p>
+<h5 id="pairplot-with-heatmap-of-classifier-probabilities">Pairplot with heatmap of classifier probabilities<a class="headerlink" href="#pairplot-with-heatmap-of-classifier-probabilities" title="Permanent link">&para;</a></h5>
+<p>We can go further and map these predicted probabilities to a pairplot of the samples they were evaluated on, which shows us the regions of over and underconfidence of the estimator. This allows us to investigate the nature of the inconsistencies, such as positive/negative bias or under/over dispersion.</p>
+<blockquote>
+<p>Note: High (resp. low) predicted probability indicates that the classifier is confident about the fact that the sample belongs to the estimated posterior (resp. to the true posterior). This means that the estimator associates too much (resp. not enough) mass to this sample. In other words it is &ldquo;over-confident&rdquo; (resp. &ldquo;under-confident&rdquo;). </p>
+</blockquote>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.analysis.plot</span><span class="w"> </span><span class="kn">import</span> <span class="n">marginal_plot_with_probs_intensity</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.utils.analysis_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_probs_per_marginal</span>
+
+<span class="n">label</span> <span class="o">=</span> <span class="s2">&quot;Probabilities (class 0)&quot;</span>
+<span class="c1"># label = r&quot;$\hat{p}(\Theta\sim q_{\phi}(\theta \mid x_0) \mid x_0)$&quot;</span>
+
+<span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">thetas_star</span><span class="p">),</span> <span class="mi">3</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">9</span><span class="p">,</span><span class="mi">6</span><span class="p">),</span> <span class="n">constrained_layout</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">thetas_star</span><span class="p">)):</span>
+    <span class="n">probs_data</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">lc2st</span><span class="o">.</span><span class="n">get_scores</span><span class="p">(</span>
+        <span class="n">theta_o</span><span class="o">=</span><span class="n">post_samples_star</span><span class="p">[</span><span class="n">i</span><span class="p">][:</span><span class="mi">1000</span><span class="p">],</span>
+        <span class="n">x_o</span><span class="o">=</span><span class="n">xs_star</span><span class="p">[</span><span class="n">i</span><span class="p">],</span>
+        <span class="n">return_probs</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">trained_clfs</span><span class="o">=</span><span class="n">lc2st</span><span class="o">.</span><span class="n">trained_clfs</span>
+    <span class="p">)</span>
+    <span class="n">dict_probs_marginals</span> <span class="o">=</span> <span class="n">get_probs_per_marginal</span><span class="p">(</span>
+        <span class="n">probs_data</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+        <span class="n">post_samples_star</span><span class="p">[</span><span class="n">i</span><span class="p">][:</span><span class="mi">1000</span><span class="p">]</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span>
+    <span class="p">)</span>
+    <span class="c1"># 2d histogram</span>
+    <span class="n">marginal_plot_with_probs_intensity</span><span class="p">(</span>
+        <span class="n">dict_probs_marginals</span><span class="p">[</span><span class="s1">&#39;0_1&#39;</span><span class="p">],</span>
+        <span class="n">marginal_dim</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+        <span class="n">ax</span><span class="o">=</span><span class="n">axes</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span>
+        <span class="n">n_bins</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>
+        <span class="n">label</span><span class="o">=</span><span class="n">label</span>
+    <span class="p">)</span>
+    <span class="n">axes</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span>
+        <span class="n">ref_samples_star</span><span class="p">[</span><span class="n">i</span><span class="p">][:,</span><span class="mi">0</span><span class="p">],</span>
+        <span class="n">ref_samples_star</span><span class="p">[</span><span class="n">i</span><span class="p">][:,</span><span class="mi">1</span><span class="p">],</span>
+        <span class="n">alpha</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span>
+        <span class="n">color</span><span class="o">=</span><span class="s2">&quot;gray&quot;</span><span class="p">,</span>
+        <span class="n">label</span><span class="o">=</span><span class="s2">&quot;True posterior&quot;</span>
+    <span class="p">)</span>
+
+    <span class="c1"># marginal 1</span>
+    <span class="n">marginal_plot_with_probs_intensity</span><span class="p">(</span>
+        <span class="n">dict_probs_marginals</span><span class="p">[</span><span class="s1">&#39;0&#39;</span><span class="p">],</span>
+        <span class="n">marginal_dim</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+        <span class="n">ax</span><span class="o">=</span><span class="n">axes</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="mi">1</span><span class="p">],</span>
+        <span class="n">n_bins</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>
+        <span class="n">label</span><span class="o">=</span><span class="n">label</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">axes</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">hist</span><span class="p">(</span>
+        <span class="n">ref_samples_star</span><span class="p">[</span><span class="n">i</span><span class="p">][:,</span><span class="mi">0</span><span class="p">],</span>
+        <span class="n">density</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">bins</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+        <span class="n">alpha</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span>
+        <span class="n">label</span><span class="o">=</span><span class="s2">&quot;True Posterior&quot;</span><span class="p">,</span>
+        <span class="n">color</span><span class="o">=</span><span class="s2">&quot;gray&quot;</span>
+    <span class="p">)</span>
+
+    <span class="c1"># marginal 2</span>
+    <span class="n">marginal_plot_with_probs_intensity</span><span class="p">(</span>
+        <span class="n">dict_probs_marginals</span><span class="p">[</span><span class="s1">&#39;1&#39;</span><span class="p">],</span>
+        <span class="n">marginal_dim</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+        <span class="n">ax</span><span class="o">=</span><span class="n">axes</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="mi">2</span><span class="p">],</span>
+        <span class="n">n_bins</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>
+        <span class="n">label</span><span class="o">=</span><span class="n">label</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">axes</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">hist</span><span class="p">(</span>
+        <span class="n">ref_samples_star</span><span class="p">[</span><span class="n">i</span><span class="p">][:,</span><span class="mi">1</span><span class="p">],</span>
+        <span class="n">density</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">bins</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+        <span class="n">alpha</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span>
+        <span class="n">label</span><span class="o">=</span><span class="s2">&quot;True posterior&quot;</span><span class="p">,</span>
+        <span class="n">color</span><span class="o">=</span><span class="s2">&quot;gray&quot;</span>
+    <span class="p">)</span>
+
+<span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">&quot;marginal 1&quot;</span><span class="p">)</span>
+<span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">&quot;marginal 2&quot;</span><span class="p">)</span>
+
+<span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+    <span class="n">axes</span><span class="p">[</span><span class="n">j</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;observation </span><span class="si">{</span><span class="n">j</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</code></pre></div>
+<p><img alt="png" src="../13_diagnostics_lc2st_files/13_diagnostics_lc2st_22_0.png" /></p>
+<p><strong>Results</strong>: the plots below indicate <strong>over dispersion</strong> of our estimator at all three considered observations. Indeed, the 2D histograms display a small blue-green region at the center where the estimator is &ldquo;underconfident&rdquo;, surrounded by a yellow region of &ldquo;equal probability&rdquo;, and the rest of the estimated posterior samlpes correspond to the red regions of &ldquo;overconfidence&rdquo;. </p>
+<p><strong>Validation</strong> of the diagnostic tool: we verify the statement of over dispersion by plotting the true posterior samples (in grey) and are happy to see that they fall into the underconfident region of the estimator. </p>
+<h2 id="classifier-choice-and-calibration-data-size-how-to-ensure-meaningful-test-results">Classifier choice and calibration data size: how to ensure meaningful test results<a class="headerlink" href="#classifier-choice-and-calibration-data-size-how-to-ensure-meaningful-test-results" title="Permanent link">&para;</a></h2>
+<h3 id="choice-of-the-classifier">Choice of the classifier<a class="headerlink" href="#choice-of-the-classifier" title="Permanent link">&para;</a></h3>
+<p>If you are not sure about which classifier architecture is best for your data, you can do a quick check by looking at the variance of the results over different random state initializations of the classifier: For <code>i=1,2,...</code> 
+1. train the ith classifier: run <code>lc2st.train_on_observed_data(seed=i)</code> 
+2. compute the corresponding test statistic for a dataset <code>theta_o, x_o</code>: <code>T_i = lc2st.get_statistic_on_observed_data(theta_o, x_o)</code></p>
+<p>For different classifier architectures, you should choose the one with the smallest variance. </p>
+<h3 id="number-of-calibration-samples">Number of calibration samples<a class="headerlink" href="#number-of-calibration-samples" title="Permanent link">&para;</a></h3>
+<p>A similar check can also be performed via cross-validation: set the <code>num_folds</code> parameter of your <code>LC2ST</code> object, train on observed data and call <code>lc2st.get_scores(theta_o, x_o, lc2st.trained_clfs)</code>. This outputs the test statistics obtained for each cv-fold. You should choose the smallest calibration set size that gives you a small enough variance over the test statistics. </p>
+<blockquote>
+<p>Note: Ideally, these checks should be performed in a <strong>separable data setting</strong>, i.e. for a dataset <code>theta_o, x_o</code> coming from a sub-optimal estimator: the classifier is supposed to be able to discriminate between the two classes; the test is supposed to be rejected; the variance is supposed to be small. In other words, we are ensuring a <strong>high statistical power</strong> (our true positive rate) of our test. If you want to be really rigurous, you should also check the type I error (or false positive rate), that should be controlled by the significance level of your test (cf. Figure 2 in <a href="https://arxiv.org/abs/2306.03580">[Linhart et al., 2023]</a>).</p>
+</blockquote>
+<h3 id="reducing-the-variance-of-the-test-results">Reducing the variance of the test results<a class="headerlink" href="#reducing-the-variance-of-the-test-results" title="Permanent link">&para;</a></h3>
+<p>To ensure more stable results, you can play with the following <code>LC2ST</code> parameters:
+- <code>num_ensemble</code>: number of classifiers used for ensembling. An ensemble classifier is a set of classifiers initialized with different <code>random_state</code>s and whose predicted class probalility is the mean probability over all classifiers. It reduces the variance coming from the classifier itself.
+- <code>num_folds</code>: number of folds used for cross-validation. It reduces the variance coming from the data.</p>
+<p>As these numbers increase the results become more stable (less variance) and the test becomes more disciminative (smaller confidence region).
+Both can be combined (i.e. you can perform cross-validation on an ensemble classifier). </p>
+<blockquote>
+<p>Note: Be careful, you don&rsquo;t want your test to be too discriminative!</p>
+</blockquote>
+<h2 id="the-case-of-normalizing-flows-ell-c2st-nf">The case of Normalizing Flows (<span class="arithmatex">\(\ell\)</span>-C2ST-NF)<a class="headerlink" href="#the-case-of-normalizing-flows-ell-c2st-nf" title="Permanent link">&para;</a></h2>
+<p><span class="arithmatex">\(\ell\)</span>-C2ST can also be specialized for normalizing flows,leading to improved test performance. The idea is to train and evaluate the classifiers in the space of the base distribution of the normalizing flow, instead of the parameter space that can be highly structured. 
+Following Theorem 4 of <a href="https://arxiv.org/abs/2306.03580">[Linhart et al., 2023]</a>, the null hypothesis <span class="arithmatex">\(\mathcal{H}_0(x_\mathrm{o}) := q_\phi(\theta\mid x_\mathrm{o}) = p(\theta \mid x_\mathrm{o})\)</span> of <em>local consistency</em> holds if, and only if, the inverse flow transformation applied to the target distribution recovers the base distribution. This gives us the following new null hypothesis for posterior estimators based on normalizing flows (cf. Eq. 17 in <a href="https://arxiv.org/abs/2306.03580">[Linhart et al., 2023]</a>):</p>
+<div class="arithmatex">\[\mathcal{H}_0(x_\mathrm{o}) := p(T_\phi^{-1}(\theta ; x_\mathrm{o}) \mid x_\mathrm{o}) = \mathcal{N}(0, \mathbf{I}_m), \quad \forall \theta \in \mathbb{R}^m~,\]</div>
+<p>which leads to a new binary classification framework to discriminate between the joint distributions <span class="arithmatex">\(\mathcal{N}(0, \mathbf{I}_m)p(x)\)</span> (class <span class="arithmatex">\(C=0\)</span>) and <span class="arithmatex">\(p(T_\phi^{-1}(\theta ; x_\mathrm{o}), x_\mathrm{o})\)</span> (class <span class="arithmatex">\(C=1\)</span>).</p>
+<p>This results in two main advantages leading to a statistically more performant and flexible test: 
+- <strong>easier classification task:</strong> it is easier to discriminate samples w.r.t. a simple Gaussian than a complex (e.g. multimodal) posterior. 
+- <strong>an analytically known null distribution:</strong> it consists of the base distribution of the flow, which is <strong>independant of <span class="arithmatex">\(x\)</span> and the posterior estimator</strong>. This also allows to pre-compute the null distribution and re-use it for any new posterior estimator you whish to evaluate. </p>
+<blockquote>
+<p>Remember that the original <span class="arithmatex">\(\ell\)</span>-C2ST relies on a permutation method to approximate the null distribution.</p>
+</blockquote>
+<p>The new method is implemented within the <code>LC2ST_NF</code> class, built on the <code>LC2ST</code> class with following major changes:
+- no evaluation samples <code>theta_o</code> have to be passed to the evaluation methods (e.g. <code>get_scores_on_observed_data</code>, <code>get_statistic_on_observed_data</code>, <code>p_value</code>, etc.)
+- the precomputed <code>trained_clfs_null</code> can be passed at initialization
+- no permutation method is used inside <code>train_under_null_hypothesis</code></p>
+<blockquote>
+<p>Note: <strong>Quick reminder on Normalizing Flows.</strong> We consider a <strong>conditional Normalizing Flow</strong> <span class="arithmatex">\(q_{\phi}(\theta \mid x)\)</span> with base distribution <span class="arithmatex">\(p(z) = \mathcal{N}(0,\mathbf{1}_m)\)</span> and bijective transormation <span class="arithmatex">\(T_{\phi}(.; x)\)</span> defined on <span class="arithmatex">\(\mathbb{R}^2\)</span> and for all <span class="arithmatex">\(x \in \mathbb{R}^2\)</span> for our example problem in 2D. Sampling from the normalizing flow consists of applying the forward transformation <span class="arithmatex">\(T_\phi\)</span>:
+<span class="arithmatex">\(<span class="arithmatex">\(\theta = T_{\phi}(z; x) \sim q_{\phi}(\theta \mid x), \quad z\sim p(z)~.\)</span>\)</span>
+<strong>Characterization of the null hypothesis.</strong> Comparing the estimated and true posterior distributions is equivalent to comparing the base distribution to the inversely transformed prior samples: 
+$$ p(\theta \mid x) = q_{\phi}(\theta \mid x) \iff p(T_{\phi}^{-1}(\theta; x)\mid x) = p(T_{\phi}^{-1}(T_{\phi}(z; x); x)) = p(z) = \mathcal{N}(0,\mathbf{1}_m)$$</p>
+</blockquote>
+<h3 id="set-up-ell-c2st-nf">Set up <span class="arithmatex">\(\ell\)</span>-C2ST-NF<a class="headerlink" href="#set-up-ell-c2st-nf" title="Permanent link">&para;</a></h3>
+<p>The setup of the NF version is the same as for the original <span class="arithmatex">\(\ell\)</span>-C2ST, but the trained classifiers can be used to compute test results and diagnostics for any new observation <strong>and new posterior estimator</strong>.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.diagnostics.lc2st</span><span class="w"> </span><span class="kn">import</span> <span class="n">LC2ST_NF</span>
+
+<span class="n">flow_inverse_transform</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">npe</span><span class="o">.</span><span class="n">net</span><span class="o">.</span><span class="n">_transform</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">context</span><span class="o">=</span><span class="n">x</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+<span class="n">flow_base_dist</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">distributions</span><span class="o">.</span><span class="n">MultivariateNormal</span><span class="p">(</span>
+    <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">2</span><span class="p">),</span> <span class="n">torch</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+<span class="p">)</span> <span class="c1"># same as npe.net._distribution</span>
+
+<span class="n">lc2st_nf</span> <span class="o">=</span> <span class="n">LC2ST_NF</span><span class="p">(</span>
+    <span class="n">thetas</span><span class="o">=</span><span class="n">theta_cal</span><span class="p">,</span>
+    <span class="n">xs</span><span class="o">=</span><span class="n">x_cal</span><span class="p">,</span>
+    <span class="n">posterior_samples</span><span class="o">=</span><span class="n">post_samples_cal</span><span class="p">,</span>
+    <span class="n">flow_inverse_transform</span><span class="o">=</span><span class="n">flow_inverse_transform</span><span class="p">,</span>
+    <span class="n">flow_base_dist</span><span class="o">=</span><span class="n">flow_base_dist</span><span class="p">,</span>
+    <span class="n">num_ensemble</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">_</span> <span class="o">=</span> <span class="n">lc2st_nf</span><span class="o">.</span><span class="n">train_under_null_hypothesis</span><span class="p">()</span>
+<span class="n">_</span> <span class="o">=</span> <span class="n">lc2st_nf</span><span class="o">.</span><span class="n">train_on_observed_data</span><span class="p">()</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="c1"># Define significance level</span>
+<span class="n">conf_alpha</span> <span class="o">=</span> <span class="mf">0.05</span>
+</code></pre></div>
+<h4 id="quantitative-diagnostics_1">Quantitative diagnostics<a class="headerlink" href="#quantitative-diagnostics_1" title="Permanent link">&para;</a></h4>
+<p>Same as before: we compute test statistics, confidence regions and p-values.</p>
+<div class="highlight"><pre><span></span><code><span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="nb">len</span><span class="p">(</span><span class="n">thetas_star</span><span class="p">),</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">12</span><span class="p">,</span><span class="mi">3</span><span class="p">))</span>
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">thetas_star</span><span class="p">)):</span>
+    <span class="n">probs</span><span class="p">,</span> <span class="n">scores</span> <span class="o">=</span> <span class="n">lc2st_nf</span><span class="o">.</span><span class="n">get_scores</span><span class="p">(</span>
+        <span class="n">x_o</span><span class="o">=</span><span class="n">xs_star</span><span class="p">[</span><span class="n">i</span><span class="p">],</span>
+        <span class="n">return_probs</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">trained_clfs</span><span class="o">=</span><span class="n">lc2st_nf</span><span class="o">.</span><span class="n">trained_clfs</span>
+    <span class="p">)</span>
+    <span class="n">T_data</span> <span class="o">=</span> <span class="n">lc2st_nf</span><span class="o">.</span><span class="n">get_statistic_on_observed_data</span><span class="p">(</span><span class="n">x_o</span><span class="o">=</span><span class="n">xs_star</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+    <span class="n">T_null</span> <span class="o">=</span> <span class="n">lc2st_nf</span><span class="o">.</span><span class="n">get_statistics_under_null_hypothesis</span><span class="p">(</span><span class="n">x_o</span><span class="o">=</span><span class="n">xs_star</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+    <span class="n">p_value</span> <span class="o">=</span> <span class="n">lc2st_nf</span><span class="o">.</span><span class="n">p_value</span><span class="p">(</span><span class="n">xs_star</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+    <span class="n">reject</span> <span class="o">=</span> <span class="n">lc2st_nf</span><span class="o">.</span><span class="n">reject_test</span><span class="p">(</span><span class="n">xs_star</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">alpha</span><span class="o">=</span><span class="n">conf_alpha</span><span class="p">)</span>
+
+    <span class="c1"># plot 95% confidence interval</span>
+    <span class="n">quantiles</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">quantile</span><span class="p">(</span><span class="n">T_null</span><span class="p">,</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="o">-</span><span class="n">conf_alpha</span><span class="p">])</span>
+    <span class="n">axes</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">hist</span><span class="p">(</span><span class="n">T_null</span><span class="p">,</span> <span class="n">bins</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">density</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Null&quot;</span><span class="p">)</span>
+    <span class="n">axes</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="n">T_data</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;red&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Observed&quot;</span><span class="p">)</span>
+    <span class="n">axes</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="n">quantiles</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;black&quot;</span><span class="p">,</span> <span class="n">linestyle</span><span class="o">=</span><span class="s2">&quot;--&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;95% CI&quot;</span><span class="p">)</span>
+    <span class="n">axes</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="n">quantiles</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;black&quot;</span><span class="p">,</span> <span class="n">linestyle</span><span class="o">=</span><span class="s2">&quot;--&quot;</span><span class="p">)</span>
+    <span class="n">axes</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s2">&quot;Test statistic&quot;</span><span class="p">)</span>
+    <span class="n">axes</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">&quot;Density&quot;</span><span class="p">)</span>
+    <span class="n">axes</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">set_xlim</span><span class="p">(</span><span class="o">-</span><span class="mf">0.01</span><span class="p">,</span><span class="mf">0.25</span><span class="p">)</span>
+    <span class="n">axes</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">&quot;observation </span><span class="si">{</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="si">}</span><span class="s2"> </span><span class="se">\n</span><span class="s2"> p-value = </span><span class="si">{</span><span class="n">p_value</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">, reject = </span><span class="si">{</span><span class="n">reject</span><span class="si">}</span><span class="s2">&quot;</span>
+    <span class="p">)</span>
+<span class="n">axes</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">bbox_to_anchor</span><span class="o">=</span><span class="p">(</span><span class="mf">1.1</span><span class="p">,</span> <span class="mf">.5</span><span class="p">),</span> <span class="n">loc</span><span class="o">=</span><span class="s1">&#39;center left&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</code></pre></div>
+<p><img alt="png" src="../13_diagnostics_lc2st_files/13_diagnostics_lc2st_30_0.png" /></p>
+<p><strong>Results:</strong> Again the test hypothesis is rejected for all three observations.</p>
+<h4 id="qualitative-diagnostics_1">Qualitative diagnostics<a class="headerlink" href="#qualitative-diagnostics_1" title="Permanent link">&para;</a></h4>
+<h5 id="p-p-plots_1">P-P plots<a class="headerlink" href="#p-p-plots_1" title="Permanent link">&para;</a></h5>
+<p><strong>Results:</strong> As before, the plots below show a general trend of overconfident behavior (red curves on the right side of the black dots).</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># P-P plots</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.analysis.plot</span><span class="w"> </span><span class="kn">import</span> <span class="n">pp_plot_lc2st</span>
+
+<span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="nb">len</span><span class="p">(</span><span class="n">thetas_star</span><span class="p">),</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">12</span><span class="p">,</span><span class="mi">3</span><span class="p">))</span>
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">thetas_star</span><span class="p">)):</span>
+    <span class="n">probs_data</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">lc2st_nf</span><span class="o">.</span><span class="n">get_scores</span><span class="p">(</span>
+        <span class="n">x_o</span><span class="o">=</span><span class="n">xs_star</span><span class="p">[</span><span class="n">i</span><span class="p">],</span>
+        <span class="n">return_probs</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">trained_clfs</span><span class="o">=</span><span class="n">lc2st_nf</span><span class="o">.</span><span class="n">trained_clfs</span>
+    <span class="p">)</span>
+    <span class="n">probs_null</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">lc2st_nf</span><span class="o">.</span><span class="n">get_statistics_under_null_hypothesis</span><span class="p">(</span>
+        <span class="n">x_o</span><span class="o">=</span><span class="n">xs_star</span><span class="p">[</span><span class="n">i</span><span class="p">],</span>
+        <span class="n">return_probs</span><span class="o">=</span><span class="kc">True</span>
+    <span class="p">)</span>
+
+    <span class="n">pp_plot_lc2st</span><span class="p">(</span>
+        <span class="n">probs</span><span class="o">=</span><span class="p">[</span><span class="n">probs_data</span><span class="p">],</span>
+        <span class="n">probs_null</span><span class="o">=</span><span class="n">probs_null</span><span class="p">,</span>
+        <span class="n">conf_alpha</span><span class="o">=</span><span class="n">conf_alpha</span><span class="p">,</span>
+        <span class="n">labels</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;Classifier probabilities </span><span class="se">\n</span><span class="s2"> on observed data&quot;</span><span class="p">],</span>
+        <span class="n">colors</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;red&quot;</span><span class="p">],</span>
+        <span class="n">ax</span><span class="o">=</span><span class="n">axes</span><span class="p">[</span><span class="n">i</span><span class="p">],</span>
+    <span class="p">)</span>
+    <span class="n">axes</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;PP-plot for observation </span><span class="si">{</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="n">axes</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">bbox_to_anchor</span><span class="o">=</span><span class="p">(</span><span class="mf">1.1</span><span class="p">,</span> <span class="mf">.5</span><span class="p">),</span> <span class="n">loc</span><span class="o">=</span><span class="s1">&#39;center left&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</code></pre></div>
+<p><img alt="png" src="../13_diagnostics_lc2st_files/13_diagnostics_lc2st_34_0.png" /></p>
+<h5 id="heatmap-of-classifier-probabilities">Heatmap of classifier probabilities<a class="headerlink" href="#heatmap-of-classifier-probabilities" title="Permanent link">&para;</a></h5>
+<p>For the NF case and as displayed in the plots below, we can choose to plot the heatmap of predicted classifier probabilities in the base distribution space, instead of the parameter space, which can be easier to interpret if the posterior space is highly structured.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.analysis.plot</span><span class="w"> </span><span class="kn">import</span> <span class="n">marginal_plot_with_probs_intensity</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.utils.analysis_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_probs_per_marginal</span>
+
+<span class="n">label</span> <span class="o">=</span> <span class="s2">&quot;Probabilities (class 0)&quot;</span>
+<span class="c1"># label = r&quot;$\hat{p}(Z\sim\mathcal{N}(0,1)\mid x_0)$&quot;</span>
+
+<span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">thetas_star</span><span class="p">),</span> <span class="mi">3</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">9</span><span class="p">,</span><span class="mi">6</span><span class="p">),</span> <span class="n">constrained_layout</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">thetas_star</span><span class="p">)):</span>
+    <span class="n">inv_ref_samples</span> <span class="o">=</span> <span class="n">lc2st_nf</span><span class="o">.</span><span class="n">flow_inverse_transform</span><span class="p">(</span>
+        <span class="n">ref_samples_star</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">xs_star</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+    <span class="p">)</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span>
+    <span class="n">probs_data</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">lc2st_nf</span><span class="o">.</span><span class="n">get_scores</span><span class="p">(</span>
+        <span class="n">x_o</span><span class="o">=</span><span class="n">xs_star</span><span class="p">[</span><span class="n">i</span><span class="p">],</span>
+        <span class="n">return_probs</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">trained_clfs</span><span class="o">=</span><span class="n">lc2st_nf</span><span class="o">.</span><span class="n">trained_clfs</span>
+    <span class="p">)</span>
+    <span class="n">marginal_probs</span> <span class="o">=</span> <span class="n">get_probs_per_marginal</span><span class="p">(</span>
+        <span class="n">probs_data</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+        <span class="n">lc2st_nf</span><span class="o">.</span><span class="n">theta_o</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span>
+    <span class="p">)</span>
+    <span class="c1"># 2d histogram</span>
+    <span class="n">marginal_plot_with_probs_intensity</span><span class="p">(</span>
+        <span class="n">marginal_probs</span><span class="p">[</span><span class="s1">&#39;0_1&#39;</span><span class="p">],</span>
+        <span class="n">marginal_dim</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+        <span class="n">ax</span><span class="o">=</span><span class="n">axes</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span>
+        <span class="n">n_bins</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>
+        <span class="n">label</span><span class="o">=</span><span class="n">label</span>
+    <span class="p">)</span>
+    <span class="n">axes</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span>
+        <span class="n">inv_ref_samples</span><span class="p">[:,</span><span class="mi">0</span><span class="p">],</span>
+        <span class="n">inv_ref_samples</span><span class="p">[:,</span><span class="mi">1</span><span class="p">],</span>
+        <span class="n">alpha</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;gray&quot;</span><span class="p">,</span>
+        <span class="n">label</span><span class="o">=</span><span class="s2">&quot;True posterior&quot;</span>
+    <span class="p">)</span>
+
+    <span class="c1"># marginal 1</span>
+    <span class="n">marginal_plot_with_probs_intensity</span><span class="p">(</span>
+        <span class="n">marginal_probs</span><span class="p">[</span><span class="s1">&#39;0&#39;</span><span class="p">],</span>
+        <span class="n">marginal_dim</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+        <span class="n">ax</span><span class="o">=</span><span class="n">axes</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="mi">1</span><span class="p">],</span>
+        <span class="n">n_bins</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>
+        <span class="n">label</span><span class="o">=</span><span class="n">label</span>
+    <span class="p">)</span>
+    <span class="n">axes</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">hist</span><span class="p">(</span>
+        <span class="n">inv_ref_samples</span><span class="p">[:,</span><span class="mi">0</span><span class="p">],</span>
+        <span class="n">density</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">bins</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+        <span class="n">alpha</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span>
+        <span class="n">label</span><span class="o">=</span><span class="s2">&quot;True Posterior&quot;</span><span class="p">,</span>
+        <span class="n">color</span><span class="o">=</span><span class="s2">&quot;gray&quot;</span>
+    <span class="p">)</span>
+
+    <span class="c1"># marginal 2</span>
+    <span class="n">marginal_plot_with_probs_intensity</span><span class="p">(</span>
+        <span class="n">marginal_probs</span><span class="p">[</span><span class="s1">&#39;1&#39;</span><span class="p">],</span>
+        <span class="n">marginal_dim</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+        <span class="n">ax</span><span class="o">=</span><span class="n">axes</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="mi">2</span><span class="p">],</span>
+        <span class="n">n_bins</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>
+        <span class="n">label</span><span class="o">=</span><span class="n">label</span>
+    <span class="p">)</span>
+    <span class="n">axes</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">hist</span><span class="p">(</span>
+        <span class="n">inv_ref_samples</span><span class="p">[:,</span><span class="mi">1</span><span class="p">],</span>
+        <span class="n">density</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">bins</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+        <span class="n">alpha</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span>
+        <span class="n">label</span><span class="o">=</span><span class="s2">&quot;True posterior&quot;</span><span class="p">,</span>
+        <span class="n">color</span><span class="o">=</span><span class="s2">&quot;gray&quot;</span>
+    <span class="p">)</span>
+
+<span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">&quot;marginal 1&quot;</span><span class="p">)</span>
+<span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">&quot;marginal 2&quot;</span><span class="p">)</span>
+
+<span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+    <span class="n">axes</span><span class="p">[</span><span class="n">j</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;observation </span><span class="si">{</span><span class="n">j</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</code></pre></div>
+<p><img alt="png" src="../13_diagnostics_lc2st_files/13_diagnostics_lc2st_36_0.png" /></p>
+<p><strong>Results:</strong> Again, the plots below confirm that the true posterior samples (in grey) correspond to regions of &ldquo;underconfidence&rdquo; (blue-green) or &ldquo;equal probability&rdquo; (yellow), indicating over dispersion of our posterior esimator.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/sbi-dev/sbi" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path fill="currentColor" d="M202.1 328.7c0 20.9-10.9 55.1-36.7 55.1s-36.7-34.2-36.7-55.1 10.9-55.1 36.7-55.1 36.7 34.2 36.7 55.1M496 278.2c0 31.9-3.2 65.7-17.5 95-37.9 76.6-142.1 74.8-216.7 74.8-75.8 0-186.2 2.7-225.6-74.8-14.6-29-20.2-63.1-20.2-95 0-41.9 13.9-81.5 41.5-113.6-5.2-15.8-7.7-32.4-7.7-48.8 0-21.5 4.9-32.3 14.6-51.8 45.3 0 74.3 9 108.8 36 29-6.9 58.8-10 88.7-10 27 0 54.2 2.9 80.4 9.2 34-26.7 63-35.2 107.8-35.2 9.8 19.5 14.6 30.3 14.6 51.8 0 16.4-2.6 32.7-7.7 48.2 27.5 32.4 39 72.3 39 114.2m-64.3 50.5c0-43.9-26.7-82.6-73.5-82.6-18.9 0-37 3.4-56 6-14.9 2.3-29.8 3.2-45.1 3.2-15.2 0-30.1-.9-45.1-3.2-18.7-2.6-37-6-56-6-46.8 0-73.5 38.7-73.5 82.6 0 87.8 80.4 101.3 150.4 101.3h48.2c70.3 0 150.6-13.4 150.6-101.3m-82.6-55.1c-25.8 0-36.7 34.2-36.7 55.1s10.9 55.1 36.7 55.1 36.7-34.2 36.7-55.1-10.9-55.1-36.7-55.1"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      <script id="__config" type="application/json">{"base": "../..", "features": ["content.code.copy"], "search": "../../assets/javascripts/workers/search.973d3a69.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.92b07e13.min.js"></script>
+      
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-MML-AM_CHTML"></script>
+      
+    
+  </body>
+</html>

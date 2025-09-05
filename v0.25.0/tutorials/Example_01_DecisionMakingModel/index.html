@@ -1,0 +1,1094 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://sbi-dev.github.io/sbi/v0.25.0/tutorials/Example_01_DecisionMakingModel/">
+      
+      
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.18">
+    
+    
+      
+        <title>SBI for decision-making models - sbi</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.7e37652d.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+  
+  
+    
+      
+      
+    
+  
+  
+  <style>:root{--md-admonition-icon--note:url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2016%2016%22%3E%3Cpath%20d%3D%22M1%207.775V2.75C1%201.784%201.784%201%202.75%201h5.025c.464%200%20.91.184%201.238.513l6.25%206.25a1.75%201.75%200%200%201%200%202.474l-5.026%205.026a1.75%201.75%200%200%201-2.474%200l-6.25-6.25A1.75%201.75%200%200%201%201%207.775m1.5%200c0%20.066.026.13.073.177l6.25%206.25a.25.25%200%200%200%20.354%200l5.025-5.025a.25.25%200%200%200%200-.354l-6.25-6.25a.25.25%200%200%200-.177-.073H2.75a.25.25%200%200%200-.25.25ZM6%205a1%201%200%201%201%200%202%201%201%200%200%201%200-2%22/%3E%3C/svg%3E');}</style>
+
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../static/global.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#sbi-for-decision-making-models" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="sbi" class="md-header__button md-logo" aria-label="sbi" data-md-component="logo">
+      
+  <img src="../../static/logo.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            sbi
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              SBI for decision-making models
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="http://github.com/sbi-dev/sbi" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path fill="currentColor" d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    sbi-dev/sbi
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="sbi" class="md-nav__button md-logo" aria-label="sbi" data-md-component="logo">
+      
+  <img src="../../static/logo.svg" alt="logo">
+
+    </a>
+    sbi
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="http://github.com/sbi-dev/sbi" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path fill="currentColor" d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    sbi-dev/sbi
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Home
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Tutorials and Examples
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    API Reference
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    FAQ
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Contributing
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Contributing
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contribute/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    How to contribute
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../code_of_conduct/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Code of Conduct
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../citation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Citation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../credits/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Credits
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#trial-based-sbi-with-mixed-data-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      Trial-based SBI with mixed data types
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#toy-problem-for-mnle" class="md-nav__link">
+    <span class="md-ellipsis">
+      Toy problem for MNLE
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Toy problem for MNLE">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#obtain-reference-posterior-samples-via-analytical-likelihood-and-mcmc" class="md-nav__link">
+    <span class="md-ellipsis">
+      Obtain reference-posterior samples via analytical likelihood and MCMC
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#train-mnle-and-generate-samples-via-mcmc" class="md-nav__link">
+    <span class="md-ellipsis">
+      Train MNLE and generate samples via MCMC
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#compare-mnle-and-reference-posterior" class="md-nav__link">
+    <span class="md-ellipsis">
+      Compare MNLE and reference posterior
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#repeat-inference-with-different-x_o-that-contains-more-trials" class="md-nav__link">
+    <span class="md-ellipsis">
+      Repeat inference with different x_o that contains more trials
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mnle-with-experimental-conditions" class="md-nav__link">
+    <span class="md-ellipsis">
+      MNLE with experimental conditions
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="MNLE with experimental conditions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#obtain-ground-truth-posterior-via-mcmc" class="md-nav__link">
+    <span class="md-ellipsis">
+      Obtain ground truth posterior via MCMC
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#train-mnle-including-experimental-conditions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Train MNLE including experimental conditions
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#construct-conditional-potential-function" class="md-nav__link">
+    <span class="md-ellipsis">
+      Construct conditional potential function
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#inference-with-multiple-subjects-trials-and-conditions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Inference with multiple subjects, trials, and conditions
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="sbi-for-decision-making-models">SBI for decision-making models<a class="headerlink" href="#sbi-for-decision-making-models" title="Permanent link">&para;</a></h1>
+<p>In <a href="https://sbi.readthedocs.io/en/latest/advanced_tutorials/12_iid_data_and_permutation_invariant_embeddings.html">this
+tutorial</a>,
+we showed how to use SBI with trial-based iid data. Such scenarios can arise,
+for example, in models of perceptual decision making. In addition to trial-based
+iid data points, these models often come with mixed data types and varying
+experimental conditions. Here, we show how <code>sbi</code> can be used to perform
+inference in such models with the <code>MNLE</code> method.</p>
+<p>Note, you find the original version of this notebook in the <code>sbi</code> repository under
+<a href="https://github.com/sbi-dev/sbi/blob/main/docs/tutorials/Example_01_DecisionMakingModel.ipynb">docs/tutorials/Example_01_DecisionMakingModel.ipynb</a>.</p>
+<h2 id="trial-based-sbi-with-mixed-data-types">Trial-based SBI with mixed data types<a class="headerlink" href="#trial-based-sbi-with-mixed-data-types" title="Permanent link">&para;</a></h2>
+<p>In some cases, models with trial-based data additionally return data with mixed data types, e.g., continous and discrete data. For example, most computational models of decision-making have continuous reaction times and discrete choices as output.</p>
+<p>This can induce a problem when performing trial-based SBI that relies on learning a neural likelihood: It is challenging for most density estimators to handle both, continuous and discrete data at the same time.
+However, there is a recent SBI method for solving this problem, it&rsquo;s called <strong>Mixed Neural Likelihood Estimation</strong> (MNLE). It works just like NLE, but with mixed data types. The trick is that it learns two separate density estimators, one for the discrete part of the data, and one for the continuous part, and combines the two to obtain the final neural likelihood. Crucially, the continuous density estimator is trained conditioned on the output of the discrete one, such that statistical dependencies between the discrete and continuous data (e.g., between choices and reaction times) are modeled as well. The interested reader is referred to the original paper available <a href="https://elifesciences.org/articles/77220">here</a>.</p>
+<p>MNLE was recently added to <code>sbi</code> (see this <a href="https://github.com/mackelab/sbi/pull/638">PR</a> and also <a href="https://github.com/mackelab/sbi/issues/845">issue</a>) and follows the same API as <code>SNLE</code>.</p>
+<p>In this tutorial we will show how to apply <code>MNLE</code> to mixed data, and how to deal with varying experimental conditions.</p>
+<h2 id="toy-problem-for-mnle">Toy problem for <code>MNLE</code><a class="headerlink" href="#toy-problem-for-mnle" title="Permanent link">&para;</a></h2>
+<p>To illustrate <code>MNLE</code> we set up a toy simulator that outputs mixed data and for which we know the likelihood such we can obtain reference posterior samples via MCMC.</p>
+<p><strong>Simulator</strong>: To simulate mixed data we do the following</p>
+<ul>
+<li>Sample reaction time from <code>inverse Gamma</code></li>
+<li>Sample choices from <code>Binomial</code></li>
+<li>Return reaction time <span class="arithmatex">\(rt \in (0, \infty)\)</span> and choice index <span class="arithmatex">\(c \in \{0, 1\}\)</span></li>
+</ul>
+<div class="arithmatex">\[
+c \sim \text{Binomial}(\rho) \\
+rt \sim \text{InverseGamma}(\alpha=2, \beta) \\
+\]</div>
+<p><strong>Prior</strong>: The priors of the two parameters <span class="arithmatex">\(\rho\)</span> and <span class="arithmatex">\(\beta\)</span> are independent. We define a <code>Beta</code> prior over the probabilty parameter of the <code>Binomial</code> used in the simulator and a <code>Gamma</code> prior over the shape-parameter of the <code>inverse Gamma</code> used in the simulator:</p>
+<div class="arithmatex">\[
+p(\beta, \rho) = p(\beta) \; p(\rho) ; \\
+p(\beta) = \text{Gamma}(1, 0.5) \\
+p(\text{probs}) = \text{Beta}(2, 2)
+\]</div>
+<p>Because the <code>InverseGamma</code> and the <code>Binomial</code> likelihoods are well-defined we can perform MCMC on this problem and obtain reference-posterior samples.</p>
+<p><em>Note: While the simulator we use in this tutorial only has a single continous and discrete dimension, MNLE also works with multi-dimensional continuous and discrete variables.</em></p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">example_01_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">BinomialGammaPotential</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pyro.distributions</span><span class="w"> </span><span class="kn">import</span> <span class="n">InverseGamma</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch</span><span class="w"> </span><span class="kn">import</span> <span class="n">Tensor</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.distributions</span><span class="w"> </span><span class="kn">import</span> <span class="n">Beta</span><span class="p">,</span> <span class="n">Binomial</span><span class="p">,</span> <span class="n">Gamma</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.analysis</span><span class="w"> </span><span class="kn">import</span> <span class="n">pairplot</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference</span><span class="w"> </span><span class="kn">import</span> <span class="n">MNLE</span><span class="p">,</span> <span class="n">MCMCPosterior</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference.posteriors.posterior_parameters</span><span class="w"> </span><span class="kn">import</span> <span class="n">MCMCPosteriorParameters</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference.potentials.likelihood_based_potential</span><span class="w"> </span><span class="kn">import</span> <span class="n">LikelihoodBasedPotential</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.neural_nets</span><span class="w"> </span><span class="kn">import</span> <span class="n">likelihood_nn</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">BoxUniform</span><span class="p">,</span> <span class="n">MultipleIndependent</span><span class="p">,</span> <span class="n">mcmc_transform</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.utils.metrics</span><span class="w"> </span><span class="kn">import</span> <span class="n">c2st</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="c1"># Toy simulator for mixed data</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">mixed_simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">concentration_scaling</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Returns a sample from a mixed distribution given parameters theta.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        theta: batch of parameters, shape (batch_size, 1 + num_categories) concentration_scaling:</span>
+<span class="sd">        scaling factor for the concentration parameter of the InverseGamma</span>
+<span class="sd">        distribution, mimics an experimental condition.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">beta</span><span class="p">,</span> <span class="n">rho</span> <span class="o">=</span> <span class="n">theta</span><span class="p">[:,</span> <span class="p">:</span><span class="mi">1</span><span class="p">],</span> <span class="n">theta</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">:]</span>
+
+    <span class="n">choices</span> <span class="o">=</span> <span class="n">Binomial</span><span class="p">(</span><span class="n">probs</span><span class="o">=</span><span class="n">rho</span><span class="p">)</span><span class="o">.</span><span class="n">sample</span><span class="p">()</span>
+    <span class="n">rts</span> <span class="o">=</span> <span class="n">InverseGamma</span><span class="p">(</span>
+        <span class="n">concentration</span><span class="o">=</span><span class="n">concentration_scaling</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">beta</span><span class="p">),</span> <span class="n">rate</span><span class="o">=</span><span class="n">beta</span>
+    <span class="p">)</span><span class="o">.</span><span class="n">sample</span><span class="p">()</span>
+
+    <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">((</span><span class="n">rts</span><span class="p">,</span> <span class="n">choices</span><span class="p">),</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="c1"># Define independent prior.</span>
+<span class="n">prior</span> <span class="o">=</span> <span class="n">MultipleIndependent</span><span class="p">(</span>
+    <span class="p">[</span>
+        <span class="n">Gamma</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="mf">1.0</span><span class="p">]),</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="mf">0.5</span><span class="p">])),</span>
+        <span class="n">Beta</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="mf">2.0</span><span class="p">]),</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="mf">2.0</span><span class="p">])),</span>
+    <span class="p">],</span>
+    <span class="n">validate_args</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">prior_transform</span> <span class="o">=</span> <span class="n">mcmc_transform</span><span class="p">(</span><span class="n">prior</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="obtain-reference-posterior-samples-via-analytical-likelihood-and-mcmc">Obtain reference-posterior samples via analytical likelihood and MCMC<a class="headerlink" href="#obtain-reference-posterior-samples-via-analytical-likelihood-and-mcmc" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="mi">42</span><span class="p">)</span>
+<span class="n">num_trials</span> <span class="o">=</span> <span class="mi">10</span>
+<span class="n">num_samples</span> <span class="o">=</span> <span class="mi">1000</span>
+<span class="n">theta_o</span> <span class="o">=</span> <span class="n">prior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">1</span><span class="p">,))</span>
+<span class="n">x_o</span> <span class="o">=</span> <span class="n">mixed_simulator</span><span class="p">(</span><span class="n">theta_o</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="n">num_trials</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="n">mcmc_kwargs</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
+    <span class="n">num_chains</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span>
+    <span class="n">warmup_steps</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span>
+    <span class="n">init_strategy</span><span class="o">=</span><span class="s2">&quot;resample&quot;</span><span class="p">,</span>
+    <span class="n">thin</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+    <span class="n">num_workers</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">true_posterior</span> <span class="o">=</span> <span class="n">MCMCPosterior</span><span class="p">(</span>
+    <span class="n">potential_fn</span><span class="o">=</span><span class="n">BinomialGammaPotential</span><span class="p">(</span><span class="n">prior</span><span class="p">,</span> <span class="n">x_o</span><span class="p">),</span>
+    <span class="n">proposal</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span>
+    <span class="n">theta_transform</span><span class="o">=</span><span class="n">prior_transform</span><span class="p">,</span>
+    <span class="o">**</span><span class="n">mcmc_kwargs</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">true_samples</span> <span class="o">=</span> <span class="n">true_posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_samples</span><span class="p">,))</span>
+</code></pre></div>
+<h3 id="train-mnle-and-generate-samples-via-mcmc">Train MNLE and generate samples via MCMC<a class="headerlink" href="#train-mnle-and-generate-samples-via-mcmc" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="c1"># Training data</span>
+<span class="n">num_simulations</span> <span class="o">=</span> <span class="mi">10000</span>
+<span class="c1"># For training the MNLE emulator we need to define a proposal distribution, the prior is</span>
+<span class="c1"># a good choice.</span>
+<span class="n">proposal</span> <span class="o">=</span> <span class="n">prior</span>
+<span class="n">theta</span> <span class="o">=</span> <span class="n">proposal</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_simulations</span><span class="p">,))</span>
+<span class="n">x</span> <span class="o">=</span> <span class="n">mixed_simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
+
+<span class="c1"># Train MNLE and obtain MCMC-based posterior.</span>
+<span class="n">estimator_builder</span> <span class="o">=</span> <span class="n">likelihood_nn</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">&quot;mnle&quot;</span><span class="p">,</span> <span class="n">log_transform_x</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">trainer</span> <span class="o">=</span> <span class="n">MNLE</span><span class="p">(</span><span class="n">proposal</span><span class="p">,</span> <span class="n">estimator_builder</span><span class="p">)</span>
+<span class="n">estimator</span> <span class="o">=</span> <span class="n">trainer</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 58 epochs.
+</code></pre></div>
+
+<div class="highlight"><pre><span></span><code><span class="c1"># Build posterior from the trained estimator and prior.</span>
+<span class="n">mnle_posterior</span> <span class="o">=</span> <span class="n">trainer</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span> <span class="n">posterior_parameters</span><span class="o">=</span><span class="n">MCMCPosteriorParameters</span><span class="p">(</span><span class="o">**</span><span class="n">mcmc_kwargs</span><span class="p">))</span>
+
+<span class="n">mnle_samples</span> <span class="o">=</span> <span class="n">mnle_posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_samples</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_o</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="compare-mnle-and-reference-posterior">Compare MNLE and reference posterior<a class="headerlink" href="#compare-mnle-and-reference-posterior" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="c1"># Plot them in one pairplot as contours (obtained via KDE on the samples).</span>
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">pairplot</span><span class="p">(</span>
+    <span class="p">[</span>
+        <span class="n">prior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">1000</span><span class="p">,)),</span>
+        <span class="n">true_samples</span><span class="p">,</span>
+        <span class="n">mnle_samples</span><span class="p">,</span>
+    <span class="p">],</span>
+    <span class="n">points</span><span class="o">=</span><span class="n">theta_o</span><span class="p">,</span>
+    <span class="n">diag</span><span class="o">=</span><span class="s2">&quot;kde&quot;</span><span class="p">,</span>
+    <span class="n">upper</span><span class="o">=</span><span class="s2">&quot;contour&quot;</span><span class="p">,</span>
+    <span class="n">upper_kwargs</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">levels</span><span class="o">=</span><span class="p">[</span><span class="mf">0.95</span><span class="p">]),</span>
+    <span class="n">diag_kwargs</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">bins</span><span class="o">=</span><span class="mi">100</span><span class="p">),</span>
+    <span class="n">fig_kwargs</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span>
+        <span class="n">points_offdiag</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">marker</span><span class="o">=</span><span class="s2">&quot;*&quot;</span><span class="p">,</span> <span class="n">markersize</span><span class="o">=</span><span class="mi">10</span><span class="p">),</span>
+        <span class="n">points_colors</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;k&quot;</span><span class="p">],</span>
+    <span class="p">),</span>
+    <span class="n">labels</span><span class="o">=</span><span class="p">[</span><span class="sa">r</span><span class="s2">&quot;$\beta$&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;$\rho$&quot;</span><span class="p">],</span>
+    <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span> <span class="mi">6</span><span class="p">),</span>
+<span class="p">)</span>
+
+<span class="n">plt</span><span class="o">.</span><span class="n">sca</span><span class="p">(</span><span class="n">ax</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span>
+    <span class="p">[</span><span class="s2">&quot;Prior&quot;</span><span class="p">,</span> <span class="s2">&quot;Reference&quot;</span><span class="p">,</span> <span class="s2">&quot;MNLE&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;$\theta_o$&quot;</span><span class="p">],</span>
+    <span class="n">frameon</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">fontsize</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span>
+<span class="p">);</span>
+</code></pre></div>
+<p><img alt="png" src="../Example_01_DecisionMakingModel_files/Example_01_DecisionMakingModel_14_0.png" /></p>
+<p>We see that the inferred <code>MNLE</code> posterior nicely matches the reference posterior, and how both inferred a posterior that is quite different from the prior.</p>
+<p>Because MNLE training is amortized we can obtain another posterior given a different observation with potentially a different number of trials, just by running MCMC again (without re-training <code>MNLE</code>):</p>
+<h3 id="repeat-inference-with-different-x_o-that-contains-more-trials">Repeat inference with different <code>x_o</code> that contains more trials<a class="headerlink" href="#repeat-inference-with-different-x_o-that-contains-more-trials" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="n">num_trials</span> <span class="o">=</span> <span class="mi">50</span>
+<span class="n">x_o</span> <span class="o">=</span> <span class="n">mixed_simulator</span><span class="p">(</span><span class="n">theta_o</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="n">num_trials</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+<span class="n">true_samples</span> <span class="o">=</span> <span class="n">true_posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_samples</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_o</span><span class="p">,</span> <span class="o">**</span><span class="n">mcmc_kwargs</span><span class="p">)</span>
+<span class="n">mnle_samples</span> <span class="o">=</span> <span class="n">mnle_posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_samples</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_o</span><span class="p">,</span> <span class="o">**</span><span class="n">mcmc_kwargs</span><span class="p">)</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="c1"># Plot them in one pairplot as contours (obtained via KDE on the samples).</span>
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">pairplot</span><span class="p">(</span>
+    <span class="p">[</span>
+        <span class="n">prior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">1000</span><span class="p">,)),</span>
+        <span class="n">true_samples</span><span class="p">,</span>
+        <span class="n">mnle_samples</span><span class="p">,</span>
+    <span class="p">],</span>
+    <span class="n">points</span><span class="o">=</span><span class="n">theta_o</span><span class="p">,</span>
+    <span class="n">diag</span><span class="o">=</span><span class="s2">&quot;kde&quot;</span><span class="p">,</span>
+    <span class="n">upper</span><span class="o">=</span><span class="s2">&quot;contour&quot;</span><span class="p">,</span>
+    <span class="n">diag_kwargs</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">bins</span><span class="o">=</span><span class="mi">100</span><span class="p">),</span>
+    <span class="n">upper_kwargs</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">levels</span><span class="o">=</span><span class="p">[</span><span class="mf">0.95</span><span class="p">]),</span>
+    <span class="n">fig_kwargs</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span>
+        <span class="n">points_offdiag</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">marker</span><span class="o">=</span><span class="s2">&quot;*&quot;</span><span class="p">,</span> <span class="n">markersize</span><span class="o">=</span><span class="mi">10</span><span class="p">),</span>
+        <span class="n">points_colors</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;k&quot;</span><span class="p">],</span>
+    <span class="p">),</span>
+    <span class="n">labels</span><span class="o">=</span><span class="p">[</span><span class="sa">r</span><span class="s2">&quot;$\beta$&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;$\rho$&quot;</span><span class="p">],</span>
+    <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span> <span class="mi">6</span><span class="p">),</span>
+<span class="p">)</span>
+
+<span class="n">plt</span><span class="o">.</span><span class="n">sca</span><span class="p">(</span><span class="n">ax</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span>
+    <span class="p">[</span><span class="s2">&quot;Prior&quot;</span><span class="p">,</span> <span class="s2">&quot;Reference&quot;</span><span class="p">,</span> <span class="s2">&quot;MNLE&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;$\theta_o$&quot;</span><span class="p">],</span>
+    <span class="n">frameon</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">fontsize</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span>
+<span class="p">);</span>
+</code></pre></div>
+<p><img alt="png" src="../Example_01_DecisionMakingModel_files/Example_01_DecisionMakingModel_18_0.png" /></p>
+<div class="highlight"><pre><span></span><code><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;c2st between true and MNLE posterior: </span><span class="si">{</span><span class="n">c2st</span><span class="p">(</span><span class="n">true_samples</span><span class="p">,</span><span class="w"> </span><span class="n">mnle_samples</span><span class="p">)</span><span class="o">.</span><span class="n">item</span><span class="p">()</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>c2st between true and MNLE posterior: 0.57
+</code></pre></div>
+
+<p>Again we can see that the posteriors match nicely. In addition, we observe that the posterior&rsquo;s (epistemic) uncertainty reduces as we increase the number of trials.</p>
+<p>Note: <code>MNLE</code> is trained on single-trial data. Theoretically, density estimation is perfectly accurate only in the limit of infinite training data. Thus, training with a finite amount of training data naturally induces a small bias in the density estimator.
+As we observed above, this bias is so small that we don&rsquo;t really notice it, e.g., the <code>c2st</code> scores were close to 0.5.
+However, when we increase the number of trials in <code>x_o</code> dramatically (on the order of 1000s) the small bias can accumulate over the trials and inference with <code>MNLE</code> can become less accurate.</p>
+<h2 id="mnle-with-experimental-conditions">MNLE with experimental conditions<a class="headerlink" href="#mnle-with-experimental-conditions" title="Permanent link">&para;</a></h2>
+<p>In the perceptual decision-making research, it is common to design experiments with varying experimental decisions, e.g., to vary the difficulty of the task.
+During parameter inference, it can be beneficial to incorporate the experimental conditions.</p>
+<p>In MNLE, we are learning an emulator that should be able to generate synthetic experimental data including reaction times and choices given different experimental conditions.
+Thus, to make MNLE work with experimental conditions, we need to include them in the training process, i.e., treat them like auxiliary parameters of the simulator:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Define a proposal that contains both, priors for the parameters and a discrte</span>
+<span class="c1"># prior over experimental conditions.</span>
+<span class="n">proposal</span> <span class="o">=</span> <span class="n">MultipleIndependent</span><span class="p">(</span>
+    <span class="p">[</span>
+        <span class="n">Gamma</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="mf">1.0</span><span class="p">]),</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="mf">0.5</span><span class="p">])),</span>
+        <span class="n">Beta</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="mf">2.0</span><span class="p">]),</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="mf">2.0</span><span class="p">])),</span>
+        <span class="n">BoxUniform</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="mf">0.0</span><span class="p">]),</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="mf">1.0</span><span class="p">])),</span>
+    <span class="p">],</span>
+    <span class="n">validate_args</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="c1"># define a simulator wrapper in which the experimental condition are contained</span>
+<span class="c1"># in theta and passed to the simulator.</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">sim_wrapper</span><span class="p">(</span><span class="n">theta_and_conditions</span><span class="p">):</span>
+    <span class="c1"># simulate with experiment conditions</span>
+    <span class="k">return</span> <span class="n">mixed_simulator</span><span class="p">(</span>
+        <span class="c1"># we assume the first two parameters are beta and rho</span>
+        <span class="n">theta</span><span class="o">=</span><span class="n">theta_and_conditions</span><span class="p">[:,</span> <span class="p">:</span><span class="mi">2</span><span class="p">],</span>
+        <span class="c1"># we treat the third concentration parameter as an experimental condition</span>
+        <span class="n">concentration_scaling</span><span class="o">=</span><span class="n">theta_and_conditions</span><span class="p">[:,</span> <span class="mi">2</span><span class="p">:],</span>
+    <span class="p">)</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="c1"># Simulated data</span>
+<span class="n">num_simulations</span> <span class="o">=</span> <span class="mi">10000</span>
+<span class="n">num_samples</span> <span class="o">=</span> <span class="mi">1000</span>
+<span class="n">theta</span> <span class="o">=</span> <span class="n">proposal</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_simulations</span><span class="p">,))</span>
+<span class="n">x</span> <span class="o">=</span> <span class="n">sim_wrapper</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
+<span class="k">assert</span> <span class="n">x</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="p">(</span><span class="n">num_simulations</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+
+<span class="c1"># simulate observed data and define ground truth parameters</span>
+<span class="n">num_trials</span> <span class="o">=</span> <span class="mi">10</span>
+<span class="c1"># draw one ground truth parameter</span>
+<span class="n">theta_o</span> <span class="o">=</span> <span class="n">proposal</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">1</span><span class="p">,))[:,</span> <span class="p">:</span><span class="mi">2</span><span class="p">]</span>
+<span class="c1"># draw num_trials many different conditions</span>
+<span class="n">conditions</span> <span class="o">=</span> <span class="n">proposal</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_trials</span><span class="p">,))[:,</span> <span class="mi">2</span><span class="p">:]</span>
+<span class="c1"># Theta is repeated for each trial, conditions are different for each trial.</span>
+<span class="n">theta_and_conditions_o</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">((</span><span class="n">theta_o</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="n">num_trials</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="n">conditions</span><span class="p">),</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">x_o</span> <span class="o">=</span> <span class="n">sim_wrapper</span><span class="p">(</span><span class="n">theta_and_conditions_o</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="obtain-ground-truth-posterior-via-mcmc">Obtain ground truth posterior via MCMC<a class="headerlink" href="#obtain-ground-truth-posterior-via-mcmc" title="Permanent link">&para;</a></h3>
+<p>We obtain a ground-truth posterior via MCMC by using the analytical Binomial-Gamma
+likelihood as before. </p>
+<p>For that, we first the define the actual prior, i.e., the distribution over the
+parameter we want to infer (not the proposal). (dropping the uniform prior over
+experimental conditions).</p>
+<p>Additionally, we pass the entire batch of i.i.d. data <code>x_o</code> and matching batch of i.i.d.
+<code>conditions</code>.</p>
+<div class="highlight"><pre><span></span><code><span class="n">prior</span> <span class="o">=</span> <span class="n">MultipleIndependent</span><span class="p">(</span>
+    <span class="p">[</span>
+        <span class="n">Gamma</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="mf">1.0</span><span class="p">]),</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="mf">0.5</span><span class="p">])),</span>
+        <span class="n">Beta</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="mf">2.0</span><span class="p">]),</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="mf">2.0</span><span class="p">])),</span>
+    <span class="p">],</span>
+    <span class="n">validate_args</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">prior_transform</span> <span class="o">=</span> <span class="n">mcmc_transform</span><span class="p">(</span><span class="n">prior</span><span class="p">)</span>
+
+<span class="c1"># We can now use the PotentialFunctionProvider to obtain a ground-truth</span>
+<span class="c1"># posterior via MCMC.</span>
+<span class="n">true_posterior_samples</span> <span class="o">=</span> <span class="n">MCMCPosterior</span><span class="p">(</span>
+    <span class="n">BinomialGammaPotential</span><span class="p">(</span>
+        <span class="n">prior</span><span class="p">,</span>
+        <span class="n">x_o</span><span class="p">,</span>
+        <span class="n">concentration_scaling</span><span class="o">=</span><span class="n">conditions</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="n">theta_transform</span><span class="o">=</span><span class="n">prior_transform</span><span class="p">,</span>
+    <span class="n">proposal</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span>
+    <span class="o">**</span><span class="n">mcmc_kwargs</span><span class="p">,</span>
+<span class="p">)</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_samples</span><span class="p">,))</span>
+</code></pre></div>
+<h3 id="train-mnle-including-experimental-conditions">Train MNLE including experimental conditions<a class="headerlink" href="#train-mnle-including-experimental-conditions" title="Permanent link">&para;</a></h3>
+<p>Next, we use the combined parameters and conditions (<code>theta</code>) and the corresponding
+simulated data to train <code>MNLE</code>.</p>
+<div class="highlight"><pre><span></span><code><span class="n">estimator_builder</span> <span class="o">=</span> <span class="n">likelihood_nn</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">&quot;mnle&quot;</span><span class="p">,</span> <span class="n">log_transform_x</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">trainer</span> <span class="o">=</span> <span class="n">MNLE</span><span class="p">(</span><span class="n">proposal</span><span class="p">,</span> <span class="n">estimator_builder</span><span class="p">)</span>
+<span class="n">estimator</span> <span class="o">=</span> <span class="n">trainer</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 77 epochs.
+</code></pre></div>
+
+<h3 id="construct-conditional-potential-function">Construct conditional potential function<a class="headerlink" href="#construct-conditional-potential-function" title="Permanent link">&para;</a></h3>
+<p>We have now an emulator for the extended simulator, i.e., the one that has both the
+model parameters and the experimental condition as parameters. </p>
+<p>To obtain posterior
+samples conditioned on a particular experimental condition (and on x_o), we need to
+construct a corresponding potential function that can return the log likelihood of the
+model parameters, but conditioned on the experimental condition.</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># First, we define the potential function for the complete, unconditional MNLE-likelihood</span>
+<span class="n">potential_fn</span> <span class="o">=</span> <span class="n">LikelihoodBasedPotential</span><span class="p">(</span><span class="n">estimator</span><span class="p">,</span> <span class="n">proposal</span><span class="p">)</span>
+<span class="c1"># Then, we condition on the experimental conditions.</span>
+<span class="n">conditioned_potential_fn</span> <span class="o">=</span> <span class="n">potential_fn</span><span class="o">.</span><span class="n">condition_on_theta</span><span class="p">(</span>
+    <span class="n">conditions</span><span class="p">,</span>  <span class="c1"># pass only the conditions, must match the batch of iid data in x_o</span>
+    <span class="n">dims_global_theta</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span>  <span class="c1"># pass the dimensions in the original theta that correspond to beta and rho</span>
+<span class="p">)</span>
+
+<span class="c1"># Using this potential function, we can now obtain conditional samples.</span>
+<span class="n">mnle_posterior</span> <span class="o">=</span> <span class="n">MCMCPosterior</span><span class="p">(</span>
+    <span class="n">potential_fn</span><span class="o">=</span><span class="n">conditioned_potential_fn</span><span class="p">,</span>  <span class="c1"># pass the conditioned potential function</span>
+    <span class="n">theta_transform</span><span class="o">=</span><span class="n">prior_transform</span><span class="p">,</span>
+    <span class="n">proposal</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span>  <span class="c1"># pass the prior, not the proposal.</span>
+    <span class="o">**</span><span class="n">mcmc_kwargs</span>
+<span class="p">)</span>
+<span class="n">conditional_samples</span> <span class="o">=</span> <span class="n">mnle_posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_samples</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_o</span><span class="p">)</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="c1"># Finally, we can compare the ground truth conditional posterior with the</span>
+<span class="c1"># MNLE-conditional posterior.</span>
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">pairplot</span><span class="p">(</span>
+    <span class="p">[</span>
+        <span class="n">prior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">1000</span><span class="p">,)),</span>
+        <span class="n">true_posterior_samples</span><span class="p">,</span>
+        <span class="n">conditional_samples</span><span class="p">,</span>
+    <span class="p">],</span>
+    <span class="n">points</span><span class="o">=</span><span class="n">theta_o</span><span class="p">,</span>
+    <span class="n">diag</span><span class="o">=</span><span class="s2">&quot;kde&quot;</span><span class="p">,</span>
+    <span class="n">upper</span><span class="o">=</span><span class="s2">&quot;contour&quot;</span><span class="p">,</span>
+    <span class="n">diag_kwargs</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">bins</span><span class="o">=</span><span class="mi">100</span><span class="p">),</span>
+    <span class="n">upper_kwargs</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">levels</span><span class="o">=</span><span class="p">[</span><span class="mf">0.95</span><span class="p">]),</span>
+    <span class="n">fig_kwargs</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span>
+        <span class="n">points_offdiag</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">marker</span><span class="o">=</span><span class="s2">&quot;*&quot;</span><span class="p">,</span> <span class="n">markersize</span><span class="o">=</span><span class="mi">10</span><span class="p">),</span>
+        <span class="n">points_colors</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;k&quot;</span><span class="p">],</span>
+
+    <span class="p">),</span>
+    <span class="n">labels</span><span class="o">=</span><span class="p">[</span><span class="sa">r</span><span class="s2">&quot;$\beta$&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;$\rho$&quot;</span><span class="p">],</span>
+    <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span> <span class="mi">6</span><span class="p">),</span>
+<span class="p">)</span>
+
+<span class="n">plt</span><span class="o">.</span><span class="n">sca</span><span class="p">(</span><span class="n">ax</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span>
+    <span class="p">[</span><span class="s2">&quot;Prior&quot;</span><span class="p">,</span> <span class="s2">&quot;Reference&quot;</span><span class="p">,</span> <span class="s2">&quot;MNLE&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;$\theta_o$&quot;</span><span class="p">],</span>
+    <span class="n">frameon</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">fontsize</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;c2st between true and MNLE posterior: </span><span class="si">{</span><span class="n">c2st</span><span class="p">(</span><span class="n">true_posterior_samples</span><span class="p">,</span><span class="w"> </span><span class="n">conditional_samples</span><span class="p">)</span><span class="o">.</span><span class="n">item</span><span class="p">()</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>c2st between true and MNLE posterior: 0.59
+</code></pre></div>
+
+<p><img alt="png" src="../Example_01_DecisionMakingModel_files/Example_01_DecisionMakingModel_30_1.png" /></p>
+<p>They match accurately, showing that we can indeed post-hoc condition the trained MNLE likelihood on different experimental conditions.</p>
+<h3 id="inference-with-multiple-subjects-trials-and-conditions">Inference with multiple subjects, trials, and conditions<a class="headerlink" href="#inference-with-multiple-subjects-trials-and-conditions" title="Permanent link">&para;</a></h3>
+<p>Note that we can also do inference for multiple <code>x_os</code> (e.g., subjects) with varying
+numbers of trails and experimental conditions - all without retraining the MNLE.</p>
+<div class="highlight"><pre><span></span><code><span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="mi">42</span><span class="p">)</span>
+<span class="n">num_subjects</span> <span class="o">=</span> <span class="mi">3</span>
+<span class="n">num_trials</span> <span class="o">=</span> <span class="p">[</span><span class="mi">10</span><span class="p">,</span> <span class="mi">20</span><span class="p">,</span> <span class="mi">30</span><span class="p">]</span>
+<span class="c1"># draw one ground truth parameter</span>
+<span class="n">theta_o</span> <span class="o">=</span> <span class="n">proposal</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_subjects</span><span class="p">,))[:,</span> <span class="p">:</span><span class="mi">2</span><span class="p">]</span>
+<span class="c1"># Note that the trial conditions need to be the same for all subjects.</span>
+
+<span class="c1"># Simulate observed data for all subjects and trials.</span>
+<span class="n">x_os</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="n">conditions</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_subjects</span><span class="p">):</span>
+    <span class="n">conditions</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">proposal</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_trials</span><span class="p">[</span><span class="n">i</span><span class="p">],))[:,</span> <span class="mi">2</span><span class="p">:])</span>
+    <span class="c1"># Theta is repeated for each trial, conditions are different for each trial.</span>
+    <span class="n">theta_and_condition</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">((</span><span class="n">theta_o</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="n">num_trials</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="mi">1</span><span class="p">),</span> <span class="n">conditions</span><span class="p">[</span><span class="n">i</span><span class="p">]),</span> <span class="n">dim</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">x_os</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">sim_wrapper</span><span class="p">(</span><span class="n">theta_and_condition</span><span class="p">))</span>
+
+<span class="c1"># loop over subjects (vectorized batched x and batched conditions is not supported yet)</span>
+<span class="n">posterior_samples</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_subjects</span><span class="p">):</span>
+    <span class="c1"># condition the potential</span>
+    <span class="n">conditioned_potential_fn</span> <span class="o">=</span> <span class="n">potential_fn</span><span class="o">.</span><span class="n">condition_on_theta</span><span class="p">(</span>
+        <span class="n">conditions</span><span class="p">[</span><span class="n">idx</span><span class="p">],</span>
+        <span class="n">dims_global_theta</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span>
+    <span class="p">)</span>
+
+    <span class="c1"># pass potential to sampler</span>
+    <span class="n">mnle_posterior</span> <span class="o">=</span> <span class="n">MCMCPosterior</span><span class="p">(</span>
+        <span class="n">potential_fn</span><span class="o">=</span><span class="n">conditioned_potential_fn</span><span class="p">,</span>  <span class="c1"># pass the conditioned potential function</span>
+        <span class="n">theta_transform</span><span class="o">=</span><span class="n">prior_transform</span><span class="p">,</span>
+        <span class="n">proposal</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span>  <span class="c1"># pass the prior, not the proposal.</span>
+        <span class="o">**</span><span class="n">mcmc_kwargs</span>
+    <span class="p">)</span>
+    <span class="n">posterior_samples</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">mnle_posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_samples</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_os</span><span class="p">[</span><span class="n">idx</span><span class="p">],</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="c1"># Plotting all three posteriors in one pairplot.</span>
+
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">pairplot</span><span class="p">(</span>
+    <span class="p">[</span><span class="n">prior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">1000</span><span class="p">,))]</span> <span class="o">+</span> <span class="n">posterior_samples</span><span class="p">,</span>
+    <span class="n">diag</span><span class="o">=</span><span class="s2">&quot;kde&quot;</span><span class="p">,</span>
+    <span class="n">upper</span><span class="o">=</span><span class="s2">&quot;contour&quot;</span><span class="p">,</span>
+    <span class="n">diag_kwargs</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">bins</span><span class="o">=</span><span class="mi">100</span><span class="p">),</span>
+    <span class="n">upper_kwargs</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">levels</span><span class="o">=</span><span class="p">[</span><span class="mf">0.95</span><span class="p">]),</span>
+    <span class="n">fig_kwargs</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span>
+        <span class="n">points_offdiag</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">marker</span><span class="o">=</span><span class="s2">&quot;*&quot;</span><span class="p">,</span> <span class="n">markersize</span><span class="o">=</span><span class="mi">10</span><span class="p">),</span>
+        <span class="n">points_colors</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;k&quot;</span><span class="p">],</span>
+
+    <span class="p">),</span>
+    <span class="n">labels</span><span class="o">=</span><span class="p">[</span><span class="sa">r</span><span class="s2">&quot;$\beta$&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;$\rho$&quot;</span><span class="p">],</span>
+    <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">10</span><span class="p">),</span>
+<span class="p">)</span>
+
+<span class="n">plt</span><span class="o">.</span><span class="n">sca</span><span class="p">(</span><span class="n">ax</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span>
+    <span class="p">[</span><span class="s2">&quot;prior&quot;</span><span class="p">]</span> <span class="o">+</span> <span class="p">[</span><span class="sa">f</span><span class="s2">&quot;Subject </span><span class="si">{</span><span class="n">idx</span><span class="o">+</span><span class="mi">1</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_subjects</span><span class="p">)],</span>
+    <span class="n">frameon</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">fontsize</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span>
+<span class="p">);</span>
+</code></pre></div>
+<p><img alt="png" src="../Example_01_DecisionMakingModel_files/Example_01_DecisionMakingModel_34_0.png" /></p>
+<p>Note how the posteriors are becoming more narrow with increasing number of trials
+(subject 1: 10 trials vs. subject 3: 30 trials).</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/sbi-dev/sbi" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path fill="currentColor" d="M202.1 328.7c0 20.9-10.9 55.1-36.7 55.1s-36.7-34.2-36.7-55.1 10.9-55.1 36.7-55.1 36.7 34.2 36.7 55.1M496 278.2c0 31.9-3.2 65.7-17.5 95-37.9 76.6-142.1 74.8-216.7 74.8-75.8 0-186.2 2.7-225.6-74.8-14.6-29-20.2-63.1-20.2-95 0-41.9 13.9-81.5 41.5-113.6-5.2-15.8-7.7-32.4-7.7-48.8 0-21.5 4.9-32.3 14.6-51.8 45.3 0 74.3 9 108.8 36 29-6.9 58.8-10 88.7-10 27 0 54.2 2.9 80.4 9.2 34-26.7 63-35.2 107.8-35.2 9.8 19.5 14.6 30.3 14.6 51.8 0 16.4-2.6 32.7-7.7 48.2 27.5 32.4 39 72.3 39 114.2m-64.3 50.5c0-43.9-26.7-82.6-73.5-82.6-18.9 0-37 3.4-56 6-14.9 2.3-29.8 3.2-45.1 3.2-15.2 0-30.1-.9-45.1-3.2-18.7-2.6-37-6-56-6-46.8 0-73.5 38.7-73.5 82.6 0 87.8 80.4 101.3 150.4 101.3h48.2c70.3 0 150.6-13.4 150.6-101.3m-82.6-55.1c-25.8 0-36.7 34.2-36.7 55.1s10.9 55.1 36.7 55.1 36.7-34.2 36.7-55.1-10.9-55.1-36.7-55.1"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      <script id="__config" type="application/json">{"base": "../..", "features": ["content.code.copy"], "search": "../../assets/javascripts/workers/search.973d3a69.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.92b07e13.min.js"></script>
+      
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-MML-AM_CHTML"></script>
+      
+    
+  </body>
+</html>

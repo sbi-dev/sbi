@@ -1,0 +1,905 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://sbi-dev.github.io/sbi/v0.25.0/tutorials/19_flowmatching_and_scorematching/">
+      
+      
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.18">
+    
+    
+      
+        <title>Flow-Matching Posterior Estimation (FMPE) and Neural Posterior Score Estimation (NPSE) - sbi</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.7e37652d.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+  
+  
+    
+      
+      
+    
+  
+  
+  <style>:root{--md-admonition-icon--note:url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2016%2016%22%3E%3Cpath%20d%3D%22M1%207.775V2.75C1%201.784%201.784%201%202.75%201h5.025c.464%200%20.91.184%201.238.513l6.25%206.25a1.75%201.75%200%200%201%200%202.474l-5.026%205.026a1.75%201.75%200%200%201-2.474%200l-6.25-6.25A1.75%201.75%200%200%201%201%207.775m1.5%200c0%20.066.026.13.073.177l6.25%206.25a.25.25%200%200%200%20.354%200l5.025-5.025a.25.25%200%200%200%200-.354l-6.25-6.25a.25.25%200%200%200-.177-.073H2.75a.25.25%200%200%200-.25.25ZM6%205a1%201%200%201%201%200%202%201%201%200%200%201%200-2%22/%3E%3C/svg%3E');}</style>
+
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../static/global.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#flow-matching-posterior-estimation-fmpe-and-neural-posterior-score-estimation-npse" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="sbi" class="md-header__button md-logo" aria-label="sbi" data-md-component="logo">
+      
+  <img src="../../static/logo.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            sbi
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Flow-Matching Posterior Estimation (FMPE) and Neural Posterior Score Estimation (NPSE)
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="http://github.com/sbi-dev/sbi" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path fill="currentColor" d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    sbi-dev/sbi
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="sbi" class="md-nav__button md-logo" aria-label="sbi" data-md-component="logo">
+      
+  <img src="../../static/logo.svg" alt="logo">
+
+    </a>
+    sbi
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="http://github.com/sbi-dev/sbi" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path fill="currentColor" d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    sbi-dev/sbi
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Home
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Tutorials and Examples
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    API Reference
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    FAQ
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Contributing
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Contributing
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contribute/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    How to contribute
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../code_of_conduct/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Code of Conduct
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../citation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Citation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../credits/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Credits
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#fmpe" class="md-nav__link">
+    <span class="md-ellipsis">
+      FMPE
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="FMPE">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#key-concept" class="md-nav__link">
+    <span class="md-ellipsis">
+      Key Concept:
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-by-step-process" class="md-nav__link">
+    <span class="md-ellipsis">
+      Step-by-Step Process:
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#npse" class="md-nav__link">
+    <span class="md-ellipsis">
+      NPSE
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#vector-field-nets" class="md-nav__link">
+    <span class="md-ellipsis">
+      Vector field nets
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="flow-matching-posterior-estimation-fmpe-and-neural-posterior-score-estimation-npse">Flow-Matching Posterior Estimation (FMPE) and Neural Posterior Score Estimation (NPSE)<a class="headerlink" href="#flow-matching-posterior-estimation-fmpe-and-neural-posterior-score-estimation-npse" title="Permanent link">&para;</a></h1>
+<p><code>sbi</code> also incorporates recent algorithms based on Flow Matching and Score Matching generative models, which are also referred to as Continuous Normalizing Flows (CNF) and Denoising Diffusion Probabilistic Models (DDPM), respectively.</p>
+<p>At the highest level, you can conceptualize FMPE and NPSE as tackling the exact same problem as NPE, i.e., estimating the posterior from simulations, but replacing Normalizing Flows with different conditional density estimators. </p>
+<p>Flow Matching and Score Matching, as generative models, are also quite similar to Normalizing Flows, where a deep neural network parameterizes the transformation from a base distribution (e.g., Gaussian) to a more complex one that approximates the target density, but they differ in what this transformation looks like (more on that below). </p>
+<p>Beyond that, Flow Matching and Score Matching offer different benefits and drawbacks compared to Normalizing Flows, which make them better (or worse) choices for some problems. For examples, Score Matching (Diffusion Models) are known to be very flexible and can model high-dimensional distributions, but are comparatively slow during sampling.</p>
+<p>In this tutorial, we take a brief look at the API for <code>FMPE</code> and <code>NPSE</code>, their pros and cons, as well as highlight some notable options.</p>
+<p>For more information, see:</p>
+<p><strong>Score Matching</strong>:
+- Hyvärinen, A. &ldquo;Estimation of Non-Normalized Statistical Models by Score Matching.&rdquo; JMLR 2005.
+- Song, Y., et al. &ldquo;Score-Based Generative Modeling through Stochastic Differential Equations.&rdquo; ICLR 2021.
+- Geffner, T., Papamakarios, G., and Mnih, A. &ldquo;Score modeling for simulation-based inference.&rdquo; NeurIPS 2022 Workshop on Score-Based Methods. 2022.
+- Sharrock, L., Simons, J., et al. &ldquo;Sequential neural score estimation: Likelihood-free inference with conditional score based diffusion models.&rdquo; ICML 2024.</p>
+<p><strong>Flow Matching</strong>:
+- Lipman, Y., et al. &ldquo;Flow Matching for Generative Modeling.&rdquo; ICLR 2023
+- Wildberger, J.B.,  Buchholz, S., et al. &ldquo;Flow Matching for Scalable Simulation-Based Inference.&rdquo; NeurIPS 2023.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.analysis</span><span class="w"> </span><span class="kn">import</span> <span class="n">pairplot</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference</span><span class="w"> </span><span class="kn">import</span> <span class="n">NPSE</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">BoxUniform</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>The history saving thread hit an unexpected error (DatabaseError(&#39;database disk image is malformed&#39;)).History will not be written to the database.
+
+
+/mnt/lustre/work/macke/mgloeckler90/miniconda3/envs/sbi/lib/python3.12/site-packages/tqdm/auto.py:21: TqdmWarning: IProgress not found. Please update jupyter and ipywidgets. See https://ipywidgets.readthedocs.io/en/stable/user_install.html
+  from .autonotebook import tqdm as notebook_tqdm
+</code></pre></div>
+
+<div class="highlight"><pre><span></span><code><span class="c1"># Example toy simulator</span>
+<span class="c1"># Define the prior</span>
+<span class="n">num_dims</span> <span class="o">=</span> <span class="mi">3</span>
+<span class="n">num_sims</span> <span class="o">=</span> <span class="mi">5000</span>
+<span class="n">prior</span> <span class="o">=</span> <span class="n">BoxUniform</span><span class="p">(</span><span class="n">low</span><span class="o">=-</span><span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">num_dims</span><span class="p">),</span> <span class="n">high</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">num_dims</span><span class="p">))</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Linear gaussian simulator.&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">theta</span> <span class="o">+</span> <span class="mf">1.0</span> <span class="o">+</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn_like</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span> <span class="o">*</span> <span class="mf">0.1</span>
+
+<span class="c1"># Produce simulations</span>
+<span class="n">theta</span> <span class="o">=</span> <span class="n">prior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_sims</span><span class="p">,))</span>
+<span class="n">x</span> <span class="o">=</span> <span class="n">simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
+
+<span class="n">theta_o</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">num_dims</span><span class="p">)</span>
+<span class="n">x_o</span> <span class="o">=</span> <span class="n">simulator</span><span class="p">(</span><span class="n">theta_o</span><span class="p">)</span>
+</code></pre></div>
+<h2 id="fmpe">FMPE<a class="headerlink" href="#fmpe" title="Permanent link">&para;</a></h2>
+<p>Flow-Matching Posterior Estimation (FMPE) is an approach to Simulation-Based Inference
+(SBI) that leverages Flow Matching, a generative modeling technique where the
+transformation from a simple base distribution (like a Gaussian) to the target
+distribution is learned through matching the flow of probability densities.</p>
+<h3 id="key-concept">Key Concept:<a class="headerlink" href="#key-concept" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Flow Matching</strong>: The core idea is to model the probability flow between the base
+  distribution and the target distribution by minimizing a discrepancy between their
+  &ldquo;flows&rdquo; or &ldquo;dynamics&rdquo; in the latent space. This is typically done by training a neural
+  network to parameterize a vector field that defines how samples should be moved or
+  transformed in order to follow the target distribution.</li>
+</ul>
+<h3 id="step-by-step-process">Step-by-Step Process:<a class="headerlink" href="#step-by-step-process" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Base Distribution</strong>: Start with a simple base distribution (e.g., Gaussian).</li>
+<li><strong>Neural Network Parameterization</strong>: Use a neural network to learn a vector field
+   that describes the flow from the base distribution to the target distribution.</li>
+<li><strong>Flow Matching Objective</strong>: Optimize the neural network to minimize a loss function
+   that captures the difference between the flow of the base distribution and the target
+   distribution.</li>
+<li><strong>Sampling</strong>: Once trained, draw samples from the base distribution and apply the
+   learned flow transformation to obtain samples from the approximate posterior
+   distribution.</li>
+</ol>
+<p>FMPE can be more efficient than traditional normalizing flows in some settings,
+especially when the target distribution has complex structures or when high-dimensional
+data is involved (see Dax et al., 2023, <a href="https://arxiv.org/abs/2305.17161">https://arxiv.org/abs/2305.17161</a> for an
+example). However, compared to (discrete time) normalizing flows, flow matching is
+usually slower at inference time because sampling and evaluation of the target
+distribution requires solving the underlying ODE (compared to just doing a NN forward
+pass for normalizing flows). </p>
+<p>In the next cell, we&rsquo;ll show how to use FMPE using the <code>sbi</code> package.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference</span><span class="w"> </span><span class="kn">import</span> <span class="n">FMPE</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.neural_nets</span><span class="w"> </span><span class="kn">import</span> <span class="n">posterior_flow_nn</span>
+
+<span class="c1"># the quick way</span>
+<span class="n">trainer</span> <span class="o">=</span> <span class="n">FMPE</span><span class="p">(</span><span class="n">prior</span><span class="p">)</span>
+<span class="n">trainer</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
+<span class="n">posterior</span> <span class="o">=</span> <span class="n">trainer</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">()</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 467 epochs.
+
+/mnt/lustre/work/macke/mgloeckler90/sbi/sbi/inference/trainers/base.py:569: FutureWarning: The following arguments are deprecated and will be removed in a future version: mcmc_method, vi_method. Please use `posterior_parameters` instead. Refer to this guide for details:
+https://sbi.readthedocs.io/en/latest/how_to_guide/19_posterior_parameters.html#
+  self._raise_deprecation_warning(deprecated_params, **kwargs)
+</code></pre></div>
+
+<div class="highlight"><pre><span></span><code><span class="c1"># Set up a custom vector field neural network</span>
+<span class="n">net_builder</span> <span class="o">=</span> <span class="n">posterior_flow_nn</span><span class="p">(</span>
+    <span class="n">model</span><span class="o">=</span><span class="s2">&quot;mlp&quot;</span><span class="p">,</span>
+    <span class="n">num_layers</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>
+    <span class="n">hidden_features</span><span class="o">=</span><span class="mi">24</span><span class="p">,</span>
+    <span class="c1"># embedding_net=CNNEmbedding  # e.g., for image data.</span>
+<span class="p">)</span>
+<span class="n">trainer</span> <span class="o">=</span> <span class="n">FMPE</span><span class="p">(</span><span class="n">prior</span><span class="p">,</span> <span class="n">vf_estimator</span><span class="o">=</span><span class="n">net_builder</span><span class="p">)</span>
+<span class="n">trainer</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">(</span><span class="n">training_batch_size</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">learning_rate</span><span class="o">=</span><span class="mf">5e-4</span><span class="p">)</span>
+<span class="n">posterior</span> <span class="o">=</span> <span class="n">trainer</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">()</span>
+<span class="n">posterior_samples</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">10000</span><span class="p">,),</span> <span class="n">x_o</span><span class="p">)</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 229 epochs.
+
+Drawing 10000 posterior samples for 1 observations: 10099it [00:00, 17021.84it/s]
+</code></pre></div>
+
+<div class="highlight"><pre><span></span><code><span class="c1"># plot posterior samples</span>
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">pairplot</span><span class="p">(</span>
+    <span class="n">posterior_samples</span><span class="p">,</span> <span class="n">limits</span><span class="o">=</span><span class="p">[[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">]],</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mi">5</span><span class="p">),</span>
+    <span class="n">labels</span><span class="o">=</span><span class="p">[</span><span class="sa">r</span><span class="s2">&quot;$\theta_1$&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;$\theta_2$&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;$\theta_3$&quot;</span><span class="p">],</span>
+    <span class="n">points</span><span class="o">=</span><span class="n">theta_o</span> <span class="c1"># add ground truth thetas</span>
+<span class="p">)</span>
+</code></pre></div>
+<p><img alt="png" src="../19_flowmatching_and_scorematching_files/19_flowmatching_and_scorematching_6_0.png" /></p>
+<hr />
+<h2 id="npse">NPSE<a class="headerlink" href="#npse" title="Permanent link">&para;</a></h2>
+<p>NPSE approximates the posterior distribution by learning its score function, i.e., gradient of the log-density, using the denoising score matching loss. The class of generative models is referred to as score-based generative models, with close links to diffusion models.</p>
+<ul>
+<li>Score-based generative models have been shown to scale well to very high dimensions (e.g., high-resolutions images), which is particularly useful when the parameter space (and hence, the target posterior) is high-dimensional.</li>
+<li>On the other hand, sampling can be slower as it involves solving many steps of the stochastic differential equation for reversing the diffusion process.</li>
+</ul>
+<p>Note that only the single-round version of NPSE is implemented currently.</p>
+<p>For more details on score-based generative models, see <a href="https://arxiv.org/abs/2011.13456">Song et al., 2020</a> (in particular, Figure 1 and 2).</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Instantiate NPSE and append simulations</span>
+<span class="n">inference</span> <span class="o">=</span> <span class="n">NPSE</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span> <span class="n">sde_type</span><span class="o">=</span><span class="s2">&quot;ve&quot;</span><span class="p">)</span>
+<span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>&lt;sbi.inference.trainers.vfpe.npse.NPSE at 0x7fda4028ca70&gt;
+</code></pre></div>
+
+<p>Note the argument <code>sde_type</code>, which defines whether the forward diffusion process has a noising schedule that is Variance Exploding (<code>ve</code>, i.e., <a href="https://proceedings.neurips.cc/paper/2019/hash/3001ef257407d5a371a96dcd947c7d93-Abstract.html?ref=https://githubhelp.com">SMLD</a>), Variance Preserving (<code>vp</code>, i.e., <a href="https://proceedings.neurips.cc/paper/2020/hash/4c5bcfec8584af0d967f1ab10179ca4b-Abstract.html">DDPM</a>), or sub-Variance Preserving (<code>subvp</code>) in the limit.</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Train the score estimator</span>
+<span class="n">score_estimator</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 136 epochs.
+</code></pre></div>
+
+<div class="highlight"><pre><span></span><code><span class="c1"># Build the posterior using the trained score estimator, and sample</span>
+<span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">(</span><span class="n">score_estimator</span><span class="p">)</span>
+<span class="n">posterior_samples</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">10000</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_o</span><span class="p">)</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>Drawing 10000 posterior samples: 100%|██████████| 499/499 [00:10&lt;00:00, 46.73it/s]0&lt;?, ?it/s]
+Drawing 10000 posterior samples for 1 observations: 100%|██████████| 10000/10000 [00:10&lt;00:00, 936.14it/s]
+</code></pre></div>
+
+<div class="highlight"><pre><span></span><code><span class="c1"># plot posterior samples</span>
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">pairplot</span><span class="p">(</span>
+    <span class="n">posterior_samples</span><span class="p">,</span> <span class="n">limits</span><span class="o">=</span><span class="p">[[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">]],</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mi">5</span><span class="p">),</span>
+    <span class="n">labels</span><span class="o">=</span><span class="p">[</span><span class="sa">r</span><span class="s2">&quot;$\theta_1$&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;$\theta_2$&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;$\theta_3$&quot;</span><span class="p">],</span>
+    <span class="n">points</span><span class="o">=</span><span class="n">theta_o</span> <span class="c1"># add ground truth thetas</span>
+<span class="p">)</span>
+</code></pre></div>
+<p><img alt="png" src="../19_flowmatching_and_scorematching_files/19_flowmatching_and_scorematching_13_0.png" /></p>
+<h2 id="vector-field-nets">Vector field nets<a class="headerlink" href="#vector-field-nets" title="Permanent link">&para;</a></h2>
+<p>While NPE is architecturally limited to conditional density networks, both FMPE and NPSE solve a <strong>regression problem</strong> targeting a specific <em>vector field</em> of choice (e.g., marginal scores or transport velocities). This is advantageous because it allows us to use any &ldquo;off-the-shelf&rdquo; neural network to address our problem, in contrast to NPE, which is typically restricted to normalizing flows.</p>
+<p>However, their performance can be highly dependent on the suitability of the chosen neural network for the task at hand. For instance, diffusion models achieve state-of-the-art generative performance on images only when paired with a carefully designed U-Net–like architecture.  </p>
+<p>For both FMPE and NPSE, we provide a selection of neural networks tailored to the task:<br />
+- <code>mlp</code> and <code>ada_mlp</code> (MLP with adaptive layer norm for conditioning) — MLP variants that inject time information at each layer, as is common in diffusion architectures.<br />
+- <code>transformer</code> and <code>transformer_cross_attn</code> — scalable diffusion transformers (e.g., as in <a href="https://arxiv.org/abs/2212.09748">https://arxiv.org/abs/2212.09748</a>). The cross-attention variant supports arbitrary sequence lengths for conditioning.  </p>
+<p>For certain data types, such as image-like inputs, it may still be beneficial to use a more specialized architecture.</p>
+<div class="highlight"><pre><span></span><code><span class="n">net_builder</span> <span class="o">=</span> <span class="n">posterior_flow_nn</span><span class="p">(</span>
+    <span class="n">model</span><span class="o">=</span><span class="s2">&quot;transformer&quot;</span><span class="p">,</span>
+    <span class="n">num_layers</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+    <span class="n">num_heads</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+    <span class="n">hidden_features</span><span class="o">=</span><span class="mi">64</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="c1"># Transformers do benefit from GPU acceleration way more than e.g. NPE.</span>
+<span class="n">trainer</span> <span class="o">=</span> <span class="n">FMPE</span><span class="p">(</span><span class="n">prior</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;gpu&quot;</span><span class="p">),</span> <span class="n">vf_estimator</span><span class="o">=</span><span class="n">net_builder</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span>  <span class="c1"># Or NPE</span>
+<span class="n">estimator</span> <span class="o">=</span> <span class="n">trainer</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">(</span><span class="n">training_batch_size</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">learning_rate</span><span class="o">=</span><span class="mf">5e-4</span><span class="p">)</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>/mnt/lustre/work/macke/mgloeckler90/sbi/sbi/inference/trainers/vfpe/base_vf_inference.py:176: UserWarning: Data x has device &#39;cpu&#39;. Moving x to the data_device &#39;cuda&#39;. Training will proceed on device &#39;cuda&#39;.
+  theta, x = validate_theta_and_x(
+/mnt/lustre/work/macke/mgloeckler90/sbi/sbi/inference/trainers/vfpe/base_vf_inference.py:176: UserWarning: Parameters theta has device &#39;cpu&#39;. Moving theta to the data_device &#39;cuda&#39;. Training will proceed on device &#39;cuda&#39;.
+  theta, x = validate_theta_and_x(
+
+
+ Neural network successfully converged after 241 epochs.
+</code></pre></div>
+
+<div class="highlight"><pre><span></span><code><span class="c1"># Build the posterior using the trained score estimator, and sample</span>
+<span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">(</span><span class="n">estimator</span><span class="p">)</span>
+<span class="n">posterior_samples</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">10000</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_o</span><span class="p">)</span>
+
+<span class="c1"># plot posterior samples</span>
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">pairplot</span><span class="p">(</span>
+    <span class="n">posterior_samples</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;cpu&quot;</span><span class="p">),</span> <span class="n">limits</span><span class="o">=</span><span class="p">[[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">]],</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mi">5</span><span class="p">),</span>
+    <span class="n">labels</span><span class="o">=</span><span class="p">[</span><span class="sa">r</span><span class="s2">&quot;$\theta_1$&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;$\theta_2$&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;$\theta_3$&quot;</span><span class="p">],</span>
+    <span class="n">points</span><span class="o">=</span><span class="n">theta_o</span> <span class="c1"># add ground truth thetas</span>
+<span class="p">)</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>Drawing 10000 posterior samples: 100%|██████████| 499/499 [00:01&lt;00:00, 312.45it/s]&lt;?, ?it/s]
+Drawing 10000 posterior samples for 1 observations: 100%|██████████| 10000/10000 [00:01&lt;00:00, 6157.09it/s]
+</code></pre></div>
+
+<p><img alt="png" src="../19_flowmatching_and_scorematching_files/19_flowmatching_and_scorematching_16_1.png" /></p>
+<p>A custom neural net can be an arbirary <code>torch.nn.Module</code> that follows the abstract <code>VectorFieldNet</code> protocol. You can use any of the shelf neural network implemented in pytorch and e.g. &ldquo;wrap&rdquo; it to satisfy these constraints.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.utils.vector_field_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">VectorFieldNet</span>
+
+<span class="err">?</span><span class="n">VectorFieldNet</span><span class="o">.</span><span class="n">forward</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>[31mSignature:[39m
+VectorFieldNet.forward(
+    self,
+    theta: torch.Tensor,
+    x: torch.Tensor,
+    t: torch.Tensor,
+) -&gt; torch.Tensor
+[31mDocstring:[39m
+Forward pass to compute the vector field.
+
+Args:
+    theta: Parameters
+    x: Conditioning information
+    t: Time parameter (scalar or batched)
+
+Returns:
+    Vector field evaluation at the provided points
+[31mFile:[39m      /mnt/lustre/work/macke/mgloeckler90/sbi/sbi/utils/vector_field_utils.py
+[31mType:[39m      function
+</code></pre></div>
+
+<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">CustomNetExample</span><span class="p">(</span><span class="n">VectorFieldNet</span><span class="p">):</span> <span class="c1"># This can also just be torch.nn.Module</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">in_layer1</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Conv1d</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">512</span><span class="p">,</span> <span class="n">kernel_size</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">in_layer2</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Conv1d</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">512</span><span class="p">,</span> <span class="n">kernel_size</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">time_layer</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">512</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">out_layer</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="mi">512</span><span class="p">,</span><span class="mi">3</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">t</span><span class="p">):</span>
+        <span class="c1"># Requires 3 arguments for input (i.e. theta), condition (i.e. x) and &quot;time&quot; (a scalar)</span>
+
+        <span class="c1"># Whatever weird things you want to do, you can do here.</span>
+        <span class="n">h1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">in_layer1</span><span class="p">(</span><span class="n">x</span><span class="p">[</span><span class="o">...</span><span class="p">,</span><span class="kc">None</span><span class="p">,:])</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">h2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">in_layer2</span><span class="p">(</span><span class="n">theta</span><span class="p">[</span><span class="o">...</span><span class="p">,</span><span class="kc">None</span><span class="p">,:])</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">t</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">time_layer</span><span class="p">(</span><span class="n">t</span><span class="p">[</span><span class="o">...</span><span class="p">,</span><span class="kc">None</span><span class="p">])</span>
+        <span class="n">h</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">relu</span><span class="p">(</span><span class="n">h1</span> <span class="o">+</span> <span class="n">h2</span> <span class="o">+</span> <span class="n">t</span><span class="p">)</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">out_layer</span><span class="p">(</span><span class="n">h</span><span class="p">)</span>
+
+        <span class="c1"># Output dimension must exaclty match &quot;theta.shape&quot;</span>
+        <span class="k">return</span> <span class="n">out</span>
+
+<span class="n">net_base</span> <span class="o">=</span> <span class="n">CustomNetExample</span><span class="p">()</span>
+<span class="c1"># This will still add some of `sbi` standard &quot;preconditioning&quot; for</span>
+<span class="c1"># diffusion/fmpe as well as automatic z-scoring transforms.</span>
+<span class="c1"># If you do want this you can also simple write your own builder.</span>
+<span class="n">net_builder</span> <span class="o">=</span> <span class="n">posterior_flow_nn</span><span class="p">(</span>
+    <span class="n">model</span><span class="o">=</span><span class="n">net_base</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">trainer</span> <span class="o">=</span> <span class="n">FMPE</span><span class="p">(</span><span class="n">prior</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;cpu&quot;</span><span class="p">),</span> <span class="n">vf_estimator</span><span class="o">=</span><span class="n">net_builder</span><span class="p">)</span>
+<span class="n">estimator</span> <span class="o">=</span> <span class="n">trainer</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">(</span><span class="n">training_batch_size</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">learning_rate</span><span class="o">=</span><span class="mf">5e-4</span><span class="p">)</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 470 epochs.
+</code></pre></div>
+
+<div class="highlight"><pre><span></span><code><span class="c1"># Build the posterior using the trained score estimator, and sample</span>
+<span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">(</span><span class="n">estimator</span><span class="p">)</span>
+<span class="n">posterior_samples</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">10000</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_o</span><span class="p">)</span>
+
+<span class="c1"># plot posterior samples</span>
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">pairplot</span><span class="p">(</span>
+    <span class="n">posterior_samples</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;cpu&quot;</span><span class="p">),</span> <span class="n">limits</span><span class="o">=</span><span class="p">[[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">]],</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mi">5</span><span class="p">),</span>
+    <span class="n">labels</span><span class="o">=</span><span class="p">[</span><span class="sa">r</span><span class="s2">&quot;$\theta_1$&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;$\theta_2$&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;$\theta_3$&quot;</span><span class="p">],</span>
+    <span class="n">points</span><span class="o">=</span><span class="n">theta_o</span> <span class="c1"># add ground truth thetas</span>
+<span class="p">)</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>Drawing 10000 posterior samples: 100%|██████████| 499/499 [00:16&lt;00:00, 30.90it/s]0&lt;?, ?it/s]
+Drawing 10000 posterior samples for 1 observations: 100%|██████████| 10000/10000 [00:16&lt;00:00, 619.10it/s]
+</code></pre></div>
+
+<p><img alt="png" src="../19_flowmatching_and_scorematching_files/19_flowmatching_and_scorematching_20_1.png" /></p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/sbi-dev/sbi" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path fill="currentColor" d="M202.1 328.7c0 20.9-10.9 55.1-36.7 55.1s-36.7-34.2-36.7-55.1 10.9-55.1 36.7-55.1 36.7 34.2 36.7 55.1M496 278.2c0 31.9-3.2 65.7-17.5 95-37.9 76.6-142.1 74.8-216.7 74.8-75.8 0-186.2 2.7-225.6-74.8-14.6-29-20.2-63.1-20.2-95 0-41.9 13.9-81.5 41.5-113.6-5.2-15.8-7.7-32.4-7.7-48.8 0-21.5 4.9-32.3 14.6-51.8 45.3 0 74.3 9 108.8 36 29-6.9 58.8-10 88.7-10 27 0 54.2 2.9 80.4 9.2 34-26.7 63-35.2 107.8-35.2 9.8 19.5 14.6 30.3 14.6 51.8 0 16.4-2.6 32.7-7.7 48.2 27.5 32.4 39 72.3 39 114.2m-64.3 50.5c0-43.9-26.7-82.6-73.5-82.6-18.9 0-37 3.4-56 6-14.9 2.3-29.8 3.2-45.1 3.2-15.2 0-30.1-.9-45.1-3.2-18.7-2.6-37-6-56-6-46.8 0-73.5 38.7-73.5 82.6 0 87.8 80.4 101.3 150.4 101.3h48.2c70.3 0 150.6-13.4 150.6-101.3m-82.6-55.1c-25.8 0-36.7 34.2-36.7 55.1s10.9 55.1 36.7 55.1 36.7-34.2 36.7-55.1-10.9-55.1-36.7-55.1"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      <script id="__config" type="application/json">{"base": "../..", "features": ["content.code.copy"], "search": "../../assets/javascripts/workers/search.973d3a69.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.92b07e13.min.js"></script>
+      
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-MML-AM_CHTML"></script>
+      
+    
+  </body>
+</html>

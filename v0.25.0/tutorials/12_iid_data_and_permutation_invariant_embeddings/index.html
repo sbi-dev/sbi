@@ -1,0 +1,1014 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://sbi-dev.github.io/sbi/v0.25.0/tutorials/12_iid_data_and_permutation_invariant_embeddings/">
+      
+      
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.18">
+    
+    
+      
+        <title>SBI with iid data and permutation-invariant embeddings - sbi</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.7e37652d.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+  
+  
+    
+      
+      
+    
+  
+  
+  <style>:root{--md-admonition-icon--note:url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2016%2016%22%3E%3Cpath%20d%3D%22M1%207.775V2.75C1%201.784%201.784%201%202.75%201h5.025c.464%200%20.91.184%201.238.513l6.25%206.25a1.75%201.75%200%200%201%200%202.474l-5.026%205.026a1.75%201.75%200%200%201-2.474%200l-6.25-6.25A1.75%201.75%200%200%201%201%207.775m1.5%200c0%20.066.026.13.073.177l6.25%206.25a.25.25%200%200%200%20.354%200l5.025-5.025a.25.25%200%200%200%200-.354l-6.25-6.25a.25.25%200%200%200-.177-.073H2.75a.25.25%200%200%200-.25.25ZM6%205a1%201%200%201%201%200%202%201%201%200%200%201%200-2%22/%3E%3C/svg%3E');}</style>
+
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../static/global.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#sbi-with-iid-data-and-permutation-invariant-embeddings" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="sbi" class="md-header__button md-logo" aria-label="sbi" data-md-component="logo">
+      
+  <img src="../../static/logo.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            sbi
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              SBI with iid data and permutation-invariant embeddings
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="http://github.com/sbi-dev/sbi" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path fill="currentColor" d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    sbi-dev/sbi
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="sbi" class="md-nav__button md-logo" aria-label="sbi" data-md-component="logo">
+      
+  <img src="../../static/logo.svg" alt="logo">
+
+    </a>
+    sbi
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="http://github.com/sbi-dev/sbi" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path fill="currentColor" d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    sbi-dev/sbi
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Home
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Tutorials and Examples
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    API Reference
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    FAQ
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Contributing
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Contributing
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contribute/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    How to contribute
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../code_of_conduct/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Code of Conduct
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../citation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Citation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../credits/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Credits
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#amortization-of-neural-network-training-iid-inference-with-nle-nre" class="md-nav__link">
+    <span class="md-ellipsis">
+      Amortization of neural network training: iid-inference with NLE / NRE
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#full-amortization-iid-inference-with-npe-and-permutation-invariant-embedding-nets" class="md-nav__link">
+    <span class="md-ellipsis">
+      Full amortization: iid-inference with NPE and permutation-invariant embedding nets
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi-with-trial-based-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      SBI with trial-based data
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="SBI with trial-based data">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-analytical-posterior-concentrates-around-true-parameters-with-increasing-number-of-iid-trials" class="md-nav__link">
+    <span class="md-ellipsis">
+      The analytical posterior concentrates around true parameters with increasing number of IID trials
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#iid-inference-with-nle" class="md-nav__link">
+    <span class="md-ellipsis">
+      IID inference with NLE
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#iid-inference-with-npe-using-permutation-invariant-embedding-nets" class="md-nav__link">
+    <span class="md-ellipsis">
+      IID inference with NPE using permutation-invariant embedding nets
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="IID inference with NPE using permutation-invariant embedding nets">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#construct-training-data-set" class="md-nav__link">
+    <span class="md-ellipsis">
+      Construct training data set.
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#build-embedding-net" class="md-nav__link">
+    <span class="md-ellipsis">
+      Build embedding net
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#run-training" class="md-nav__link">
+    <span class="md-ellipsis">
+      Run training
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#amortized-inference" class="md-nav__link">
+    <span class="md-ellipsis">
+      Amortized inference
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="sbi-with-iid-data-and-permutation-invariant-embeddings">SBI with iid data and permutation-invariant embeddings<a class="headerlink" href="#sbi-with-iid-data-and-permutation-invariant-embeddings" title="Permanent link">&para;</a></h1>
+<p>There are scenarios in which we observe multiple data points per experiment and we can assume that they are independent and identically distributed (iid, i.e., they are assumed to have the same underlying model parameters).
+For example, in decision-making experiments, the experiment is often repeated in trials with the same experimental settings and conditions. The corresponding set of trials is then assumed to be &ldquo;iid&rdquo; given a single parameter set.
+In such a scenario, we may want to obtain the posterior given a set of observation <span class="arithmatex">\(p(\theta | X=\{x_i\}_i^N)\)</span>.</p>
+<h2 id="amortization-of-neural-network-training-iid-inference-with-nle-nre">Amortization of neural network training: iid-inference with NLE / NRE<a class="headerlink" href="#amortization-of-neural-network-training-iid-inference-with-nle-nre" title="Permanent link">&para;</a></h2>
+<p>For some SBI variants the iid assumption can be exploited: when using a likelihood-based SBI method (<code>NLE</code>, <code>NRE</code>) one can train the density or ratio estimator on single-trial data, and then perform inference with <code>MCMC</code> or variational inference (<code>VI</code>). Crucially, because the data is iid and the estimator is trained on single-trial data, one can repeat the inference with a different <code>x_o</code> (a different set of trials, or different number of trials) without having to retrain the density estimator. One can interpet this as amortization of the SBI training: we can obtain a neural likelihood, or likelihood-ratio estimate for new <code>x_o</code>s without retraining, but we still have to run <code>MCMC</code> or <code>VI</code> to do inference.</p>
+<p>In addition, one cannot only change the number of trials of a new <code>x_o</code>, but also the entire inference setting.
+For example, one can apply hierarchical inference with changing hierarchical denpendencies between the model parameters&ndash;all without having to retrain the density estimator because it estimates single-trail likelihoods.</p>
+<h2 id="full-amortization-iid-inference-with-npe-and-permutation-invariant-embedding-nets">Full amortization: iid-inference with NPE and permutation-invariant embedding nets<a class="headerlink" href="#full-amortization-iid-inference-with-npe-and-permutation-invariant-embedding-nets" title="Permanent link">&para;</a></h2>
+<p>When performing neural posterior estimation (<code>NPE</code>) we cannot exploit the iid assumption directly.
+Thus, the underlying neural network takes <code>x</code> as input and predicts the parameters of the density estimator.
+As a consequence, if <code>x</code> is a set of iid observations <span class="arithmatex">\(X=\{x_i\}_i^N\)</span> then the neural network has to be invariant to permutations of this set, i.e., it has to be permutation invariant. In addition, the neural network has to be able to consume a varying number of iid datapoints in order to be amortized over the number of trials.
+Therefore, in order to use <code>NPE</code> for inference on iid data, we need to provide a corresponding embedding network that handles the iid-data.
+This will likely require some hyperparameter tuning and more training data for inference to work accurately. But once we have this, inference is fully amortized, i.e., we can get new posterior samples almost instantly without retraining and without running <code>MCMC</code> or <code>VI</code>.</p>
+<h2 id="sbi-with-trial-based-data">SBI with trial-based data<a class="headerlink" href="#sbi-with-trial-based-data" title="Permanent link">&para;</a></h2>
+<p>For illustration, we use a simple linear Gaussian simulator, as in previous tutorials. The simulator takes a single parameter (vector) which is the mean of a Gaussian. The simulator then adds noise with a fixed variance (set to one).
+We define a Gaussian prior over the mean and perform inference.</p>
+<p>The observed data is also sampled from a Gaussian with some fixed &ldquo;ground-truth&rdquo; parameter <span class="arithmatex">\(\theta_o\)</span>.
+Crucially, the observed data <code>x_o</code> can consist of multiple samples given the same ground-truth parameters and these samples are iid given <span class="arithmatex">\(\theta\)</span>:</p>
+<div class="arithmatex">\[
+\theta \sim \mathcal{N}(\mu_0,\; \Sigma_0) \\
+x | \theta \sim \mathcal{N}(\theta,\; \Sigma=I) \\
+\mathbf{x_o} = \{x_o^i\}_{i=1}^N \sim  \mathcal{N}(\theta_o,\; \Sigma=I)
+\]</div>
+<p>For this toy problem, the ground-truth posterior is well defined, it is again a Gaussian, centered on the mean of <span class="arithmatex">\(\mathbf{x_o}\)</span> and with variance scaled by the number of trials <span class="arithmatex">\(N\)</span>, i.e., the more trials we observe, the more information about the underlying <span class="arithmatex">\(\theta_o\)</span> we have and the more concentrated the posteriors becomes.</p>
+<p>We will illustrate this below:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch</span><span class="w"> </span><span class="kn">import</span> <span class="n">eye</span><span class="p">,</span> <span class="n">zeros</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.distributions</span><span class="w"> </span><span class="kn">import</span> <span class="n">MultivariateNormal</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.analysis</span><span class="w"> </span><span class="kn">import</span> <span class="n">pairplot</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference</span><span class="w"> </span><span class="kn">import</span> <span class="n">NLE</span><span class="p">,</span> <span class="n">NPE</span><span class="p">,</span> <span class="n">simulate_for_sbi</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference.posteriors.posterior_parameters</span><span class="w"> </span><span class="kn">import</span> <span class="n">MCMCPosteriorParameters</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.simulators.linear_gaussian</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">linear_gaussian</span><span class="p">,</span>
+    <span class="n">true_posterior_linear_gaussian_mvn_prior</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.utils.metrics</span><span class="w"> </span><span class="kn">import</span> <span class="n">c2st</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.utils.user_input_checks</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">check_sbi_inputs</span><span class="p">,</span>
+    <span class="n">process_prior</span><span class="p">,</span>
+    <span class="n">process_simulator</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="c1"># Seeding</span>
+<span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="c1"># Gaussian simulator</span>
+<span class="n">theta_dim</span> <span class="o">=</span> <span class="mi">2</span>
+<span class="n">x_dim</span> <span class="o">=</span> <span class="n">theta_dim</span>
+
+<span class="c1"># likelihood_mean will be likelihood_shift+theta</span>
+<span class="n">likelihood_shift</span> <span class="o">=</span> <span class="o">-</span><span class="mf">1.0</span> <span class="o">*</span> <span class="n">zeros</span><span class="p">(</span><span class="n">x_dim</span><span class="p">)</span>
+<span class="n">likelihood_cov</span> <span class="o">=</span> <span class="mf">0.3</span> <span class="o">*</span> <span class="n">eye</span><span class="p">(</span><span class="n">x_dim</span><span class="p">)</span>
+
+<span class="n">prior_mean</span> <span class="o">=</span> <span class="n">zeros</span><span class="p">(</span><span class="n">theta_dim</span><span class="p">)</span>
+<span class="n">prior_cov</span> <span class="o">=</span> <span class="n">eye</span><span class="p">(</span><span class="n">theta_dim</span><span class="p">)</span>
+<span class="n">prior</span> <span class="o">=</span> <span class="n">MultivariateNormal</span><span class="p">(</span><span class="n">loc</span><span class="o">=</span><span class="n">prior_mean</span><span class="p">,</span> <span class="n">covariance_matrix</span><span class="o">=</span><span class="n">prior_cov</span><span class="p">)</span>
+
+<span class="c1"># Define Gaussian simulator</span>
+<span class="n">prior</span><span class="p">,</span> <span class="n">num_parameters</span><span class="p">,</span> <span class="n">prior_returns_numpy</span> <span class="o">=</span> <span class="n">process_prior</span><span class="p">(</span><span class="n">prior</span><span class="p">)</span>
+<span class="n">simulator</span> <span class="o">=</span> <span class="n">process_simulator</span><span class="p">(</span>
+    <span class="k">lambda</span> <span class="n">theta</span><span class="p">:</span> <span class="n">linear_gaussian</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">likelihood_shift</span><span class="p">,</span> <span class="n">likelihood_cov</span><span class="p">),</span>
+    <span class="n">prior</span><span class="p">,</span>
+    <span class="n">prior_returns_numpy</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">check_sbi_inputs</span><span class="p">(</span><span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">)</span>
+
+
+<span class="c1"># Use built-in function to obtain ground-truth posterior given x_o</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_true_posterior_samples</span><span class="p">(</span><span class="n">x_o</span><span class="p">,</span> <span class="n">num_samples</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">true_posterior_linear_gaussian_mvn_prior</span><span class="p">(</span>
+        <span class="n">x_o</span><span class="p">,</span> <span class="n">likelihood_shift</span><span class="p">,</span> <span class="n">likelihood_cov</span><span class="p">,</span> <span class="n">prior_mean</span><span class="p">,</span> <span class="n">prior_cov</span>
+    <span class="p">)</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_samples</span><span class="p">,))</span>
+</code></pre></div>
+<h3 id="the-analytical-posterior-concentrates-around-true-parameters-with-increasing-number-of-iid-trials">The analytical posterior concentrates around true parameters with increasing number of IID trials<a class="headerlink" href="#the-analytical-posterior-concentrates-around-true-parameters-with-increasing-number-of-iid-trials" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="n">num_trials</span> <span class="o">=</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">15</span><span class="p">,</span> <span class="mi">20</span><span class="p">]</span>
+<span class="n">theta_o</span> <span class="o">=</span> <span class="n">zeros</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">theta_dim</span><span class="p">)</span>
+
+<span class="c1"># Generate multiple x_os with increasing number of trials.</span>
+<span class="n">xos</span> <span class="o">=</span> <span class="p">[</span><span class="n">theta_o</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="n">nt</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">nt</span> <span class="ow">in</span> <span class="n">num_trials</span><span class="p">]</span>
+
+<span class="c1"># Obtain analytical posterior samples for each of them.</span>
+<span class="n">true_samples</span> <span class="o">=</span> <span class="p">[</span><span class="n">get_true_posterior_samples</span><span class="p">(</span><span class="n">xo</span><span class="p">,</span> <span class="mi">1000</span><span class="p">)</span> <span class="k">for</span> <span class="n">xo</span> <span class="ow">in</span> <span class="n">xos</span><span class="p">]</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="c1"># Plot them in one pairplot as contours (obtained via KDE on the samples).</span>
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">pairplot</span><span class="p">(</span>
+    <span class="n">true_samples</span><span class="p">,</span>
+    <span class="n">points</span><span class="o">=</span><span class="n">theta_o</span><span class="p">,</span>
+    <span class="n">diag</span><span class="o">=</span><span class="s2">&quot;kde&quot;</span><span class="p">,</span>
+    <span class="n">upper</span><span class="o">=</span><span class="s2">&quot;contour&quot;</span><span class="p">,</span>
+    <span class="n">diag_kwargs</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">bins</span><span class="o">=</span><span class="mi">100</span><span class="p">),</span>
+    <span class="n">upper_kwargs</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">levels</span><span class="o">=</span><span class="p">[</span><span class="mf">0.95</span><span class="p">]),</span>
+    <span class="n">fig_kwargs</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span>
+        <span class="n">points_colors</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;k&quot;</span><span class="p">],</span>
+        <span class="n">points_offdiag</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">marker</span><span class="o">=</span><span class="s2">&quot;*&quot;</span><span class="p">,</span> <span class="n">markersize</span><span class="o">=</span><span class="mi">10</span><span class="p">),</span>
+    <span class="p">),</span>
+<span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">sca</span><span class="p">(</span><span class="n">ax</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span>
+    <span class="p">[</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">nt</span><span class="si">}</span><span class="s2"> trials&quot;</span> <span class="k">if</span> <span class="n">nt</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="k">else</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">nt</span><span class="si">}</span><span class="s2"> trial&quot;</span> <span class="k">for</span> <span class="n">nt</span> <span class="ow">in</span> <span class="n">num_trials</span><span class="p">]</span>
+    <span class="o">+</span> <span class="p">[</span><span class="sa">r</span><span class="s2">&quot;$\theta_o$&quot;</span><span class="p">],</span>
+    <span class="n">frameon</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">fontsize</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span>
+<span class="p">);</span>
+</code></pre></div>
+<p><img alt="png" src="../12_iid_data_and_permutation_invariant_embeddings_files/12_iid_data_and_permutation_invariant_embeddings_6_0.png" /></p>
+<p>Indeed, with increasing number of trials the posterior density concentrates around the true underlying parameter.</p>
+<h2 id="iid-inference-with-nle">IID inference with NLE<a class="headerlink" href="#iid-inference-with-nle" title="Permanent link">&para;</a></h2>
+<p>(S)NLE and (S)NRE can perform inference given multiple IID obserations by using only single-trial training data (i.e., for training, we run the simulator only once per parameter set). Once the likelihood is learned on single trials (i.e., a neural network that predicts the likelihood of a single observation given a parameter set), one can sample the posterior for any number of trials. This works because, given a single-trial neural likelihood from (S)NLE or (S)NRE, we can calculate the joint likelihoods of all trials by multiplying them together (or adding them in log-space). The joint likelihood can then be plugged into <code>MCMC</code> or <code>VI</code>. <code>sbi</code> takes care of all of these steps, so you do not have to implement anything yourself:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Train NLE.</span>
+<span class="n">inferer</span> <span class="o">=</span> <span class="n">NLE</span><span class="p">(</span><span class="n">prior</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">density_estimator</span><span class="o">=</span><span class="s2">&quot;mdn&quot;</span><span class="p">)</span>
+<span class="n">theta</span><span class="p">,</span> <span class="n">x</span> <span class="o">=</span> <span class="n">simulate_for_sbi</span><span class="p">(</span><span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="mi">10000</span><span class="p">,</span> <span class="n">simulation_batch_size</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
+<span class="n">inferer</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">(</span><span class="n">training_batch_size</span><span class="o">=</span><span class="mi">1000</span><span class="p">);</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 71 epochs.
+</code></pre></div>
+
+<div class="highlight"><pre><span></span><code><span class="c1"># Obtain posterior samples for different number of iid xos.</span>
+<span class="n">nle_samples</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="n">num_samples</span> <span class="o">=</span> <span class="mi">1000</span>
+
+<span class="n">mcmc_parameters</span> <span class="o">=</span> <span class="n">MCMCPosteriorParameters</span><span class="p">(</span>
+    <span class="n">method</span><span class="o">=</span><span class="s2">&quot;slice_np_vectorized&quot;</span><span class="p">,</span>
+    <span class="n">num_chains</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>
+    <span class="n">thin</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
+    <span class="n">warmup_steps</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span>
+    <span class="n">init_strategy</span><span class="o">=</span><span class="s2">&quot;proposal&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">posterior</span> <span class="o">=</span> <span class="n">inferer</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">(</span>
+    <span class="n">posterior_parameters</span><span class="o">=</span><span class="n">mcmc_parameters</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="c1"># Generate samples with MCMC given the same set of x_os as above.</span>
+<span class="k">for</span> <span class="n">xo</span> <span class="ow">in</span> <span class="n">xos</span><span class="p">:</span>
+    <span class="n">nle_samples</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">sample_shape</span><span class="o">=</span><span class="p">(</span><span class="n">num_samples</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">xo</span><span class="p">))</span>
+</code></pre></div>
+<p>Note that <code>sbi</code> warns about <code>iid-x</code> with increasing number of trial here. We ignore the warning because that&rsquo;s exactly what we want to do.</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Plot them in one pairplot as contours (obtained via KDE on the samples).</span>
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">pairplot</span><span class="p">(</span>
+    <span class="n">nle_samples</span><span class="p">,</span>
+    <span class="n">points</span><span class="o">=</span><span class="n">theta_o</span><span class="p">,</span>
+    <span class="n">diag</span><span class="o">=</span><span class="s2">&quot;kde&quot;</span><span class="p">,</span>
+    <span class="n">upper</span><span class="o">=</span><span class="s2">&quot;contour&quot;</span><span class="p">,</span>
+    <span class="n">diag_kwargs</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">bins</span><span class="o">=</span><span class="mi">100</span><span class="p">),</span>
+    <span class="n">upper_kwargs</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">levels</span><span class="o">=</span><span class="p">[</span><span class="mf">0.95</span><span class="p">]),</span>
+    <span class="n">fig_kwargs</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span>
+        <span class="n">points_colors</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;k&quot;</span><span class="p">],</span>
+        <span class="n">points_offdiag</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">marker</span><span class="o">=</span><span class="s2">&quot;*&quot;</span><span class="p">,</span> <span class="n">markersize</span><span class="o">=</span><span class="mi">10</span><span class="p">),</span>
+    <span class="p">),</span>
+<span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">sca</span><span class="p">(</span><span class="n">ax</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span>
+    <span class="p">[</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">nt</span><span class="si">}</span><span class="s2"> trials&quot;</span> <span class="k">if</span> <span class="n">nt</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="k">else</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">nt</span><span class="si">}</span><span class="s2"> trial&quot;</span> <span class="k">for</span> <span class="n">nt</span> <span class="ow">in</span> <span class="n">num_trials</span><span class="p">]</span>
+    <span class="o">+</span> <span class="p">[</span><span class="sa">r</span><span class="s2">&quot;$\theta_o$&quot;</span><span class="p">],</span>
+    <span class="n">frameon</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">fontsize</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span>
+<span class="p">);</span>
+</code></pre></div>
+<p><img alt="png" src="../12_iid_data_and_permutation_invariant_embeddings_files/12_iid_data_and_permutation_invariant_embeddings_12_0.png" /></p>
+<p>The pairplot above already indicates that (S)NLE is well able to obtain accurate posterior samples also for increasing number of trials (note that we trained the single-round version of NLE so that we did not have to re-train it for new <span class="arithmatex">\(x_o\)</span>).</p>
+<p>Quantitatively we can measure the accuracy of NLE by calculating the <code>c2st</code> score between NLE and the true posterior samples, where the best accuracy is perfect for <code>0.5</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="n">cs</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="n">c2st</span><span class="p">(</span><span class="n">s1</span><span class="p">,</span> <span class="n">s2</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">s1</span><span class="p">,</span> <span class="n">s2</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">true_samples</span><span class="p">,</span> <span class="n">nle_samples</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="p">]</span>
+
+<span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">num_trials</span><span class="p">)):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;c2st score for num_trials=</span><span class="si">{</span><span class="n">num_trials</span><span class="p">[</span><span class="n">_</span><span class="p">]</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">cs</span><span class="p">[</span><span class="n">_</span><span class="p">]</span><span class="o">.</span><span class="n">item</span><span class="p">()</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>c2st score for num_trials=1: 0.50
+c2st score for num_trials=5: 0.51
+c2st score for num_trials=15: 0.51
+c2st score for num_trials=20: 0.51
+</code></pre></div>
+
+<h2 id="iid-inference-with-npe-using-permutation-invariant-embedding-nets">IID inference with NPE using permutation-invariant embedding nets<a class="headerlink" href="#iid-inference-with-npe-using-permutation-invariant-embedding-nets" title="Permanent link">&para;</a></h2>
+<p>For NPE we need to define an embedding net that handles the set-like structure of
+iid-data, i.e., a permutation invariant networks that can handle different numbers and
+orderings of trials.</p>
+<p>We implemented several embedding net classes that allow to construct such a permutation- and number-of-trials invariant embedding net.</p>
+<p>To become permutation invariant, the neural net first learns embeddings for single trials and then performs a permutation invariant operation on those embeddings, e.g., by taking the sum or the mean (Chen et al. 2018, Radev et al. 2021).</p>
+<p>To become invariant w.r.t. the number-of-trials, we train the net with varying number of trials for each parameter setting. This means that, unlike for (S)NLE and (S)NRE, (S)NPE requires to run the simulator multiple times for individual parameter sets to generate the training data.</p>
+<p>In order to implement this in <code>sbi</code>, &ldquo;unobserved&rdquo; trials in the training dataset have to be masked by NaNs (and ignore the resulting SBI warning about NaNs in the training data).</p>
+<h3 id="construct-training-data-set">Construct training data set.<a class="headerlink" href="#construct-training-data-set" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="c1"># we need to fix the maximum number of trials.</span>
+<span class="n">max_num_trials</span> <span class="o">=</span> <span class="mi">20</span>
+
+<span class="c1"># construct training data set: we want to cover the full range of possible number of</span>
+<span class="c1"># trials</span>
+<span class="n">num_training_samples</span> <span class="o">=</span> <span class="mi">1000</span>
+<span class="n">theta</span> <span class="o">=</span> <span class="n">prior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_training_samples</span><span class="p">,))</span>
+
+<span class="c1"># there are certainly smarter ways to construct the training data set, but we go with a</span>
+<span class="c1"># for loop here for illustration purposes.</span>
+<span class="n">x</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">num_training_samples</span> <span class="o">*</span> <span class="n">max_num_trials</span><span class="p">,</span> <span class="n">max_num_trials</span><span class="p">,</span> <span class="n">x_dim</span><span class="p">)</span> <span class="o">*</span> <span class="nb">float</span><span class="p">(</span>
+    <span class="s2">&quot;nan&quot;</span>
+<span class="p">)</span>
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_training_samples</span><span class="p">):</span>
+    <span class="n">xi</span> <span class="o">=</span> <span class="n">simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="n">max_num_trials</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+    <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">max_num_trials</span><span class="p">):</span>
+        <span class="n">x</span><span class="p">[</span><span class="n">i</span> <span class="o">*</span> <span class="n">max_num_trials</span> <span class="o">+</span> <span class="n">j</span><span class="p">,</span> <span class="p">:</span> <span class="n">j</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">xi</span><span class="p">[:</span> <span class="n">j</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="p">:]</span>
+
+<span class="n">theta</span> <span class="o">=</span> <span class="n">theta</span><span class="o">.</span><span class="n">repeat_interleave</span><span class="p">(</span><span class="n">max_num_trials</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="build-embedding-net">Build embedding net<a class="headerlink" href="#build-embedding-net" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.neural_nets</span><span class="w"> </span><span class="kn">import</span> <span class="n">posterior_nn</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.neural_nets.embedding_nets</span><span class="w"> </span><span class="kn">import</span> <span class="n">FCEmbedding</span><span class="p">,</span> <span class="n">PermutationInvariantEmbedding</span>
+
+<span class="c1"># embedding</span>
+<span class="n">latent_dim</span> <span class="o">=</span> <span class="mi">10</span>
+<span class="n">single_trial_net</span> <span class="o">=</span> <span class="n">FCEmbedding</span><span class="p">(</span>
+    <span class="n">input_dim</span><span class="o">=</span><span class="n">theta_dim</span><span class="p">,</span>
+    <span class="n">num_hiddens</span><span class="o">=</span><span class="mi">40</span><span class="p">,</span>
+    <span class="n">num_layers</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+    <span class="n">output_dim</span><span class="o">=</span><span class="n">latent_dim</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">embedding_net</span> <span class="o">=</span> <span class="n">PermutationInvariantEmbedding</span><span class="p">(</span>
+    <span class="n">single_trial_net</span><span class="p">,</span>
+    <span class="n">trial_net_output_dim</span><span class="o">=</span><span class="n">latent_dim</span><span class="p">,</span>
+    <span class="c1"># NOTE: post-embedding is not needed really.</span>
+    <span class="n">num_layers</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+    <span class="n">num_hiddens</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+    <span class="n">output_dim</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="c1"># we choose a simple MDN as the density estimator.</span>
+<span class="c1"># NOTE: we turn off z-scoring of the data, as we used NaNs for the missing trials.</span>
+<span class="n">density_estimator</span> <span class="o">=</span> <span class="n">posterior_nn</span><span class="p">(</span><span class="s2">&quot;mdn&quot;</span><span class="p">,</span> <span class="n">embedding_net</span><span class="o">=</span><span class="n">embedding_net</span><span class="p">,</span> <span class="n">z_score_x</span><span class="o">=</span><span class="s2">&quot;none&quot;</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="run-training">Run training<a class="headerlink" href="#run-training" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="n">inference</span> <span class="o">=</span> <span class="n">NPE</span><span class="p">(</span><span class="n">prior</span><span class="p">,</span> <span class="n">density_estimator</span><span class="o">=</span><span class="n">density_estimator</span><span class="p">)</span>
+<span class="c1"># NOTE: we don&#39;t exclude invalid x because we used NaNs for the missing trials.</span>
+<span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span>
+    <span class="n">theta</span><span class="p">,</span>
+    <span class="n">x</span><span class="p">,</span>
+    <span class="n">exclude_invalid_x</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">(</span><span class="n">training_batch_size</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
+<span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">()</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 276 epochs.
+</code></pre></div>
+
+<h3 id="amortized-inference">Amortized inference<a class="headerlink" href="#amortized-inference" title="Permanent link">&para;</a></h3>
+<p>Comparing runtimes, we see that the NPE training takes a bit longer than the training on single trials for <code>NLE</code> above.</p>
+<p>However, we trained the density estimator such that it can handle multiple and changing number of iid trials (up to 20).</p>
+<p>Thus, we can obtain posterior samples for different <code>x_o</code> with just a single forward pass instead of having to run <code>MCMC</code> for each new observation.</p>
+<p>As you can see below, the c2st score for increasing number of observed trials remains close to the ideal <code>0.5</code>.</p>
+<div class="highlight"><pre><span></span><code><span class="n">npe_samples</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="k">for</span> <span class="n">xo</span> <span class="ow">in</span> <span class="n">xos</span><span class="p">:</span>
+    <span class="c1"># we need to pad the x_os with NaNs to match the shape of the training data.</span>
+    <span class="n">xoi</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">max_num_trials</span><span class="p">,</span> <span class="n">x_dim</span><span class="p">)</span> <span class="o">*</span> <span class="nb">float</span><span class="p">(</span><span class="s2">&quot;nan&quot;</span><span class="p">)</span>
+    <span class="n">xoi</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">xo</span><span class="p">),</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">xo</span>
+    <span class="n">npe_samples</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">sample_shape</span><span class="o">=</span><span class="p">(</span><span class="n">num_samples</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">xoi</span><span class="p">))</span>
+
+<span class="n">cs</span> <span class="o">=</span> <span class="p">[</span><span class="n">c2st</span><span class="p">(</span><span class="n">s1</span><span class="p">,</span> <span class="n">s2</span><span class="p">)</span> <span class="k">for</span> <span class="n">s1</span><span class="p">,</span> <span class="n">s2</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">true_samples</span><span class="p">,</span> <span class="n">npe_samples</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">False</span><span class="p">)]</span>
+
+<span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">num_trials</span><span class="p">)):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;c2st score for num_trials=</span><span class="si">{</span><span class="n">num_trials</span><span class="p">[</span><span class="n">_</span><span class="p">]</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">cs</span><span class="p">[</span><span class="n">_</span><span class="p">]</span><span class="o">.</span><span class="n">item</span><span class="p">()</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>c2st score for num_trials=1: 0.52
+c2st score for num_trials=5: 0.52
+c2st score for num_trials=15: 0.51
+c2st score for num_trials=20: 0.51
+</code></pre></div>
+
+<div class="highlight"><pre><span></span><code><span class="n">num_trials</span> <span class="o">=</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">15</span><span class="p">,</span> <span class="mi">20</span><span class="p">]</span>
+<span class="n">xos</span> <span class="o">=</span> <span class="p">[</span><span class="n">theta_o</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="n">nt</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">nt</span> <span class="ow">in</span> <span class="n">num_trials</span><span class="p">]</span>
+
+<span class="n">npe_samples</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="k">for</span> <span class="n">xo</span> <span class="ow">in</span> <span class="n">xos</span><span class="p">:</span>
+    <span class="c1"># we need to pad the x_os with NaNs to match the shape of the training data.</span>
+    <span class="n">xoi</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">max_num_trials</span><span class="p">,</span> <span class="n">x_dim</span><span class="p">)</span> <span class="o">*</span> <span class="nb">float</span><span class="p">(</span><span class="s2">&quot;nan&quot;</span><span class="p">)</span>
+    <span class="n">xoi</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">xo</span><span class="p">),</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">xo</span>
+    <span class="n">npe_samples</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">sample_shape</span><span class="o">=</span><span class="p">(</span><span class="n">num_samples</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">xoi</span><span class="p">))</span>
+
+
+<span class="c1"># Plot them in one pairplot as contours (obtained via KDE on the samples).</span>
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">pairplot</span><span class="p">(</span>
+    <span class="n">npe_samples</span><span class="p">,</span>
+    <span class="n">points</span><span class="o">=</span><span class="n">theta_o</span><span class="p">,</span>
+    <span class="n">diag</span><span class="o">=</span><span class="s2">&quot;kde&quot;</span><span class="p">,</span>
+    <span class="n">upper</span><span class="o">=</span><span class="s2">&quot;contour&quot;</span><span class="p">,</span>
+    <span class="n">diag_kwargs</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">bins</span><span class="o">=</span><span class="mi">100</span><span class="p">),</span>
+    <span class="n">upper_kwargs</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">levels</span><span class="o">=</span><span class="p">[</span><span class="mf">0.95</span><span class="p">]),</span>
+    <span class="n">fig_kwargs</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span>
+        <span class="n">points_colors</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;k&quot;</span><span class="p">],</span>
+        <span class="n">points_offdiag</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">marker</span><span class="o">=</span><span class="s2">&quot;*&quot;</span><span class="p">,</span> <span class="n">markersize</span><span class="o">=</span><span class="mi">10</span>
+        <span class="p">),</span>
+    <span class="p">)</span>
+<span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">sca</span><span class="p">(</span><span class="n">ax</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span>
+    <span class="p">[</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">nt</span><span class="si">}</span><span class="s2"> trials&quot;</span> <span class="k">if</span> <span class="n">nt</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="k">else</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">nt</span><span class="si">}</span><span class="s2"> trial&quot;</span> <span class="k">for</span> <span class="n">nt</span> <span class="ow">in</span> <span class="n">num_trials</span><span class="p">]</span>
+    <span class="o">+</span> <span class="p">[</span><span class="sa">r</span><span class="s2">&quot;$\theta_o$&quot;</span><span class="p">],</span>
+    <span class="n">frameon</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">fontsize</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span>
+<span class="p">);</span>
+</code></pre></div>
+<p><img alt="png" src="../12_iid_data_and_permutation_invariant_embeddings_files/12_iid_data_and_permutation_invariant_embeddings_23_0.png" /></p>
+<div class="highlight"><pre><span></span><code><span class="c1"># We can easily obtain posteriors for many different x_os, instantly, because</span>
+<span class="c1"># NPE is fully amortized:</span>
+<span class="n">num_trials</span> <span class="o">=</span> <span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">6</span><span class="p">,</span> <span class="mi">8</span><span class="p">,</span> <span class="mi">12</span><span class="p">,</span> <span class="mi">14</span><span class="p">,</span> <span class="mi">18</span><span class="p">]</span>
+<span class="n">npe_samples</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="k">for</span> <span class="n">xo</span> <span class="ow">in</span> <span class="n">xos</span><span class="p">:</span>
+    <span class="c1"># we need to pad the x_os with NaNs to match the shape of the training data.</span>
+    <span class="n">xoi</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">max_num_trials</span><span class="p">,</span> <span class="n">x_dim</span><span class="p">)</span> <span class="o">*</span> <span class="nb">float</span><span class="p">(</span><span class="s2">&quot;nan&quot;</span><span class="p">)</span>
+    <span class="n">xoi</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">xo</span><span class="p">),</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">xo</span>
+    <span class="n">npe_samples</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">sample_shape</span><span class="o">=</span><span class="p">(</span><span class="n">num_samples</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">xoi</span><span class="p">))</span>
+
+
+<span class="c1"># Plot them in one pairplot as contours (obtained via KDE on the samples).</span>
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">pairplot</span><span class="p">(</span>
+    <span class="n">npe_samples</span><span class="p">,</span>
+    <span class="n">points</span><span class="o">=</span><span class="n">theta_o</span><span class="p">,</span>
+    <span class="n">diag</span><span class="o">=</span><span class="s2">&quot;kde&quot;</span><span class="p">,</span>
+    <span class="n">upper</span><span class="o">=</span><span class="s2">&quot;contour&quot;</span><span class="p">,</span>
+    <span class="n">diag_kwargs</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">bins</span><span class="o">=</span><span class="mi">100</span><span class="p">),</span>
+    <span class="n">upper_kwargs</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">levels</span><span class="o">=</span><span class="p">[</span><span class="mf">0.95</span><span class="p">]),</span>
+    <span class="n">fig_kwargs</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span>
+        <span class="n">points_colors</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;k&quot;</span><span class="p">],</span>
+        <span class="n">points_offdiag</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">marker</span><span class="o">=</span><span class="s2">&quot;*&quot;</span><span class="p">,</span> <span class="n">markersize</span><span class="o">=</span><span class="mi">10</span><span class="p">),</span>
+    <span class="p">),</span>
+<span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">sca</span><span class="p">(</span><span class="n">ax</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span>
+    <span class="p">[</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">nt</span><span class="si">}</span><span class="s2"> trials&quot;</span> <span class="k">if</span> <span class="n">nt</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="k">else</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">nt</span><span class="si">}</span><span class="s2"> trial&quot;</span> <span class="k">for</span> <span class="n">nt</span> <span class="ow">in</span> <span class="n">num_trials</span><span class="p">]</span>
+    <span class="o">+</span> <span class="p">[</span><span class="sa">r</span><span class="s2">&quot;$\theta_o$&quot;</span><span class="p">],</span>
+    <span class="n">frameon</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">fontsize</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span>
+<span class="p">);</span>
+</code></pre></div>
+<p><img alt="png" src="../12_iid_data_and_permutation_invariant_embeddings_files/12_iid_data_and_permutation_invariant_embeddings_24_0.png" /></p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/sbi-dev/sbi" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path fill="currentColor" d="M202.1 328.7c0 20.9-10.9 55.1-36.7 55.1s-36.7-34.2-36.7-55.1 10.9-55.1 36.7-55.1 36.7 34.2 36.7 55.1M496 278.2c0 31.9-3.2 65.7-17.5 95-37.9 76.6-142.1 74.8-216.7 74.8-75.8 0-186.2 2.7-225.6-74.8-14.6-29-20.2-63.1-20.2-95 0-41.9 13.9-81.5 41.5-113.6-5.2-15.8-7.7-32.4-7.7-48.8 0-21.5 4.9-32.3 14.6-51.8 45.3 0 74.3 9 108.8 36 29-6.9 58.8-10 88.7-10 27 0 54.2 2.9 80.4 9.2 34-26.7 63-35.2 107.8-35.2 9.8 19.5 14.6 30.3 14.6 51.8 0 16.4-2.6 32.7-7.7 48.2 27.5 32.4 39 72.3 39 114.2m-64.3 50.5c0-43.9-26.7-82.6-73.5-82.6-18.9 0-37 3.4-56 6-14.9 2.3-29.8 3.2-45.1 3.2-15.2 0-30.1-.9-45.1-3.2-18.7-2.6-37-6-56-6-46.8 0-73.5 38.7-73.5 82.6 0 87.8 80.4 101.3 150.4 101.3h48.2c70.3 0 150.6-13.4 150.6-101.3m-82.6-55.1c-25.8 0-36.7 34.2-36.7 55.1s10.9 55.1 36.7 55.1 36.7-34.2 36.7-55.1-10.9-55.1-36.7-55.1"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      <script id="__config" type="application/json">{"base": "../..", "features": ["content.code.copy"], "search": "../../assets/javascripts/workers/search.973d3a69.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.92b07e13.min.js"></script>
+      
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-MML-AM_CHTML"></script>
+      
+    
+  </body>
+</html>
