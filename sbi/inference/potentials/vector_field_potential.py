@@ -212,8 +212,8 @@ class VectorFieldBasedPotential(BasePotential):
 
         if self._x_o is None:
             raise ValueError(
-                "No observed data x_o is available. Please reinitialize \
-                the potential or manually set self._x_o."
+                "No observed data x_o is available. Please reinitialize"
+                "the potential or manually set self._x_o."
             )
 
         with torch.set_grad_enabled(track_gradients):
