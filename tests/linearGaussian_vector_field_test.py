@@ -588,3 +588,49 @@ def test_sample_conditional():
 
     max_err = np.max(error)
     assert max_err < 0.0027
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("vector_field_type", ["ve", "vp", "fmpe"])
+@pytest.mark.parametrize("prior_type", ["gaussian"])
+@pytest.mark.parametrize("iid_batch_size", [1, 2, 5])
+def test_iid_log_prob(vector_field_type, prior_type, iid_batch_size):
+    '''
+    Tests the log-probability computation of the score-based posterior.
+
+    '''
+
+    vector_field_trained_model = train_vector_field_model(vector_field_type, prior_type)
+
+    # Prior Gaussian
+    prior = vector_field_trained_model["prior"]
+    vf_estimator = vector_field_trained_model["estimator"]
+    inference = vector_field_trained_model["inference"]
+    likelihood_shift = vector_field_trained_model["likelihood_shift"]
+    likelihood_cov = vector_field_trained_model["likelihood_cov"]
+    prior_mean = vector_field_trained_model["prior_mean"]
+    prior_cov = vector_field_trained_model["prior_cov"]
+    num_dim = vector_field_trained_model["num_dim"]
+    num_posterior_samples = 1000
+
+    # Ground truth theta
+    theta_o = zeros(num_dim)
+    x_o = linear_gaussian(
+        theta_o.repeat(iid_batch_size, 1),
+        likelihood_shift=likelihood_shift,
+        likelihood_cov=likelihood_cov,
+    )
+    true_posterior = true_posterior_linear_gaussian_mvn_prior(
+        x_o, likelihood_shift, likelihood_cov, prior_mean, prior_cov
+    )
+
+    approx_posterior = inference.build_posterior(vf_estimator, prior=prior)
+    posterior_samples = true_posterior.sample((num_posterior_samples,))
+    true_prob = true_posterior.log_prob(posterior_samples)
+    approx_prob = approx_posterior.log_prob(posterior_samples, x=x_o)
+
+    diff = torch.abs(true_prob - approx_prob)
+    assert diff.mean() < 0.3 * iid_batch_size, (
+        f"Probs diff: {diff.mean()} too big "
+        f"for number of samples {num_posterior_samples}"
+    )
