@@ -631,6 +631,6 @@ def test_iid_log_prob(vector_field_type, prior_type, iid_batch_size):
 
     diff = torch.abs(true_prob - approx_prob)
     assert diff.mean() < 0.2, (
-        f"Probs diff: {diff.mean()} too big \
-            for number of samples {num_posterior_samples}"
+        f"Probs diff: {diff.mean()} too big "
+        f"for number of samples {num_posterior_samples}"
     )
