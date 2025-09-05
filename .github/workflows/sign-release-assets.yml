@@ -1,0 +1,63 @@
+name: Sign existing release assets 🔐
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Git tag of the existing release
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  sign-and-upload:
+    name: Sign and upload Sigstore bundles for release assets
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create dist directory
+        run: mkdir -p dist
+
+      - name: Download assets from GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: >-
+          gh release download
+          '${{ inputs.tag }}'
+          --repo '${{ github.repository }}'
+          -D dist/
+
+      - name: List downloaded files
+        run: ls -lah dist || true
+
+      - name: Collect files to sign
+        id: find
+        shell: bash
+        run: |
+          shopt -s nullglob
+          files=(dist/*.whl dist/*.tar.gz)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No distribution files found in dist/." >&2
+            exit 1
+          fi
+          printf '%s\n' "${files[@]}"
+          {
+            echo 'files<<EOF'
+            printf '%s\n' "${files[@]}"
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Sign assets with Sigstore
+        uses: sigstore/gh-action-sigstore-python@v3.0.0
+        with:
+          inputs: ${{ steps.find.outputs.files }}
+
+      - name: Upload signatures to GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: >-
+          gh release upload
+          '${{ inputs.tag }}' dist/**/*.sigstore.json
+          --repo '${{ github.repository }}'
