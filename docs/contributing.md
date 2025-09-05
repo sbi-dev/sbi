@@ -1,11 +1,9 @@
 (contributing)=
 # How to contribute
 
-!!! important
-
-    By participating in the `sbi` community, all members are expected to comply with
-    our [Code of Conduct](code_of_conduct.md). This ensures a positive and inclusive
-    environment for everyone involved.
+  By participating in the `sbi` community, all members are expected to comply with
+  our [Code of Conduct](code_of_conduct.md). This ensures a positive and inclusive
+  environment for everyone involved.
 
 ## User experiences, bugs, and feature requests
 
@@ -29,15 +27,14 @@ To give credit to contributors, we consider adding contributors who repeatedly
 and substantially contributed to `sbi` to the list of authors of the package at
 the end of every year. Additionally, we mention all contributors in the releases.
 
-!!! note
-    To avoid doing duplicated work, we strongly suggest that you go take
-    a look at our current [open issues](https://github.com/sbi-dev/sbi/issues) and
-    [pull requests](https://github.com/sbi-dev/sbi/pulls) to see if someone else is
-    already doing it. Also, in case you're planning to work on something that has not
-    yet been proposed by others (e.g. adding a new feature, adding a new example),
-    it is preferable to first open a new issue explaining what you intend to
-    propose and then working on your pull request after getting some feedback from
-    others.
+> To avoid doing duplicated work, we strongly suggest that you go take
+a look at our current [open issues](https://github.com/sbi-dev/sbi/issues) and
+[pull requests](https://github.com/sbi-dev/sbi/pulls) to see if someone else is
+already doing it. Also, in case you're planning to work on something that has not
+yet been proposed by others (e.g. adding a new feature, adding a new example),
+it is preferable to first open a new issue explaining what you intend to
+propose and then working on your pull request after getting some feedback from
+others.
 
 ### Contribution workflow
 
@@ -64,29 +61,19 @@ git clone git@github.com:$USERNAME/sbi.git
 cd sbi
 ```
 
-**Step 4**: Install a recent version of Python (we currently recommend 3.10)
-for instance using [`miniforge`](https://github.com/conda-forge/miniforge). We
-strongly recommend you create a specific `conda` environment for doing
-development on `sbi` as per:
+**Step 4**: Set up your development environment. Follow the [installation
+instructions](installation.md) to install Python and create a virtual environment with
+`uv`.
+
+**Step 5**: Install `sbi` in editable mode with development dependencies:
 
 ```bash
-conda create -n sbi_dev python=3.10
-conda activate sbi_dev
+uv pip install -e ".[dev]"
 ```
 
-**Step 5**: Install `sbi` in editable mode with
-
-```bash
-pip install -e ".[dev]"
-```
-
-This installs the `sbi` package into the current environment by creating a
-link to the source code directory (instead of copying the code to pip’s `site_packages`
-directory, which is what normally happens). This means that any edits you make
-to the `sbi` source code will be reflected the next time you open a Python interpreter
-and `import sbi` (the `-e` flag of pip stands for an “editable” installation,
-and the `dev` flag installs development and testing dependencies). This requires
-at least Python 3.8.
+This installs the `sbi` package in editable mode, meaning changes to the source code
+will be immediately reflected when you import `sbi`, along with all development and
+testing dependencies.
 
 **Step 6**: Add the upstream remote. This saves a reference to the main `sbi`
 repository, which you can use to keep your repository synchronized with the latest
@@ -109,7 +96,6 @@ upstream        git@github.com:sbi-dev/sbi.git (push)
 **Step 7**: Install `pre-commit` to run code style checks before each commit:
 
 ```bash
-pip install pre-commit
 pre-commit install
 ```
 
@@ -163,13 +149,12 @@ instructions to create a pull request from your fork.
 This will send a notification to `sbi` maintainers and trigger reviews and comments
 regarding your contribution.
 
-!!! note
-    It is often helpful to keep your local feature branch synchronized
-    with the latest changes of the main `sbi` repository:
-    ```
-    git fetch upstream
-    git merge upstream/main
-    ```
+> It is often helpful to keep your local feature branch synchronized
+with the latest changes of the main `sbi` repository:
+```
+git fetch upstream
+git merge upstream/main
+```
 
 ### Style conventions and testing
 
@@ -213,7 +198,7 @@ If any of these fail, try reproducing and solving the error locally:
   using `pre-commit run --all-files`. `ruff` tends to give informative error messages
   that help you fix the problem. Note that pre-commit only detects problems with `ruff`
   linting and formatting, but does not fix them. You can fix them either by running
-  `ruff check . --fix(linting)`, followed by `ruff format . --fix(formatting)`, or by
+  `ruff check . --fix` (linting), followed by `ruff format .` (formatting), or by
   hand.
 - **`pyright`**: Run it locally using `pyright sbi/` and ensure you are using
 the same
@@ -235,7 +220,9 @@ fails (xfailed).
 As SBI is a fundamentally data-driven approach, we are not only interested in whether
 the modifications to the codebase "pass the tests" but also in whether they improve or
 at least do not deteriorate the performance of the package for inference. To this end,
-we have a set of *mini-sbibm* tests (a minimal version of the sbi benchmarking package [`sbibm`](https://github.com/sbi-benchmark/sbibm)) that are intended for developers to run locally.
+we have a set of *mini-sbibm* tests (a minimal version of the sbi benchmarking package
+[`sbibm`](https://github.com/sbi-benchmark/sbibm)) that are intended for developers to
+run locally.
 
 These tests differ from the regular tests in that they always pass (provided there
 are no errors) but output performance metrics that can be compared, e.g., to the
@@ -244,7 +231,7 @@ is available via `pytest` through custom flags. To run the mini-sbibm tests, you
 the following command:
 
 ```bash
-    pytest --bm
+pytest --bm
 ```
 
 This will run all the mini-sbibm tests on all methods with default parameters and output
@@ -252,14 +239,14 @@ the performance metrics nicely formatted to the console. If you have multiple CP
 available, you can run the tests in parallel using the `-n auto` flag:
 
 ```bash
-    pytest --bm -n auto
+pytest --bm -n auto
 ```
 
 What if you are currently working on a specific method and you want to run the
 mini-sbibm tests only for this class of methods? You can use the `--bm-mode` flag:
 
 ```bash
-    pytest --bm --bm-mode nspe
+pytest --bm --bm-mode nspe
 ```
 
 This will run the mini-sbibm tests only for methods of the `nspe` class, but with a
@@ -272,31 +259,25 @@ test suite in `tests/test_bm.py`.
 
 ## Contributing to the documentation
 
-Most of the documentation for `sbi` is written in markdown and the website is generated
-using `mkdocs` with `mkdocstrings` and `mike`. The tutorials and examples are converted
-from jupyter notebooks into markdown files to be shown on the website. To work on
-improvements of the documentation, you should first  install the `doc` dependencies:
+Most of the documentation for `sbi` is written in reStructuredText and the website is
+generated using `Sphinx`. The tutorials and examples are Jupyter notebooks that are
+automatically converted during the build process. To work on improvements of the
+documentation, you should first install the `doc` dependencies:
 
 ```bash
-pip install -e ".[doc]"
+uv sync --extra doc
 ```
 
-Then, you can build the website locally by executing in the `docs` folder
+Then, you can build and serve the website locally by executing in the `docs` folder
 
 ```bash
-mkdocs serve
+sphinx-autobuild . _build/html
 ```
 
-This will build the website on a local host address shown in the terminal. Changes to
-the website files or a browser refresh will immediately rebuild the website.
-
-If you updated the tutorials or examples, you need to convert them to markdown first:
-
-```bash
-cd docs
-jupyter nbconvert --to markdown ../tutorials/*.ipynb --output-dir docs/tutorials/
-mkdocs serve
-```
+This command will automatically build the website and start a local development server with
+automatic rebuilding and live reload, so you can open it in your browser and see changes
+as you edit. Changes to the documentation files will automatically trigger a rebuild and
+be displayed locally.
 
 ### Using AI Coding Assistants
 

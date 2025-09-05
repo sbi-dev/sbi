@@ -1,3 +1,6 @@
+# This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+
 import functools
 import math
 from abc import ABC, abstractmethod
@@ -9,7 +12,7 @@ import torch.nn.functional as F
 from torch import Tensor
 from torch.distributions import Distribution
 
-from sbi.neural_nets.estimators.score_estimator import ConditionalScoreEstimator
+from sbi.neural_nets.estimators import ConditionalVectorFieldEstimator
 from sbi.utils.score_utils import (
     add_diag_or_dense,
     denoise,
@@ -318,9 +321,9 @@ class IntervalGuidance(UniversalGuidance):
 class IIDScoreFunction(ABC):
     def __init__(
         self,
-        score_estimator: "ConditionalScoreEstimator",
-        prior: Distribution,
-        device: str = "cpu",
+        vector_field_estimator: ConditionalVectorFieldEstimator,
+        prior: Distribution,  # type: ignore
+        device: Union[str, torch.device] = "cpu",
     ) -> None:
         r"""
         This is a abstract base class wrapper for score estimators.
@@ -336,13 +339,50 @@ class IIDScoreFunction(ABC):
         this requires some adjustments.
 
         Args:
-            score_estimator: The neural network modeling the score.
+            vector_field_estimator: The neural network modeling the score.
             prior: The prior distribution.
             device: The device on which to evaluate the potential. Defaults to "cpu".
         """
 
-        self.score_estimator = score_estimator.to(device).eval()
+        if not vector_field_estimator.SCORE_DEFINED:
+            raise ValueError(
+                "Score is not defined for this vector field estimator. "
+                "You are probably using a vector field estimator that does not "
+                "implement the score function, e.g. an optimal transport-based "
+                "flow matching. IID methods require the score function to be defined "
+                "so they are not applicable to this vector field estimator. "
+                "If you have implemented a custom vector field "
+                "estimator with score defined, set SCORE_DEFINED to True."
+            )
+        if not vector_field_estimator.MARGINALS_DEFINED:
+            raise ValueError(
+                "Marginals are not defined for this vector field estimator. "
+                "You are probably using a vector field estimator that does not "
+                "implement the marginals mean_t_fn and std_fn, e.g. an "
+                "optimal transport-based flow matching. IID methods require the "
+                "marginals to be defined so they are not applicable to this "
+                "vector field estimator. "
+                "If you have implemented a custom vector field "
+                "estimator with marginals defined, set MARGINALS_DEFINED to True."
+            )
+
+        self.vector_field_estimator = vector_field_estimator.to(device).eval()
         self.prior = prior
+        self.device = device
+
+    def to(self, device: Union[str, torch.device]) -> None:
+        """
+        Moves score_estimator and prior to the given device.
+
+        It also sets the device attribute to the given device.
+
+        Args:
+            device: Device to move the score_estimator and prior to.
+        """
+        self.device = device
+        self.vector_field_estimator.to(device)
+        if self.prior:
+            self.prior.to(device)  # type: ignore
 
     @abstractmethod
     def __call__(
@@ -366,17 +406,17 @@ class IIDScoreFunction(ABC):
 
 
 @register_iid_method("fnpe")
-class FNPEScoreFunction(IIDScoreFunction):
+class FactorizedNPEScoreFunction(IIDScoreFunction):
     def __init__(
         self,
-        score_estimator: "ConditionalScoreEstimator",
+        vector_field_estimator: ConditionalVectorFieldEstimator,
         prior: Distribution,
-        device: str = "cpu",
+        device: Union[str, torch.device] = "cpu",
         prior_score_weight: Optional[Callable[[Tensor], Tensor]] = None,
     ) -> None:
         r"""
-        The FNPEScoreFunction implments the "Factorized Neural Posterior Estimation"
-        method for score-based models [1].
+        The FactorizedNPEScoreFunction implments the
+        "Factorized Neural Posterior Estimation" method for score-based models [1].
 
         This method does not apply the necessary corrections for the score function, but
         instead uses a simple weighting of the prior score. This is generally applicable
@@ -391,15 +431,15 @@ class FNPEScoreFunction(IIDScoreFunction):
             (https://arxiv.org/abs/2209.14249)
 
         Args:
-            score_estimator: The neural network modeling the score.
+            vector_field_estimator: The neural network modeling the score.
             prior: The prior distribution.
             device: The device on which to evaluate the potential. Defaults to "cpu".
             prior_score_weight: A function to weight the prior score. Defaults to the
                 linear interpolation between zero (at t=0) and one (at t=t_max).
         """
-        super().__init__(score_estimator, prior, device)
+        super().__init__(vector_field_estimator, prior, device)
         if prior_score_weight is None:
-            t_max = score_estimator.t_max
+            t_max = vector_field_estimator.t_max
 
             def prior_score_weight_fn(t):
                 return (t_max - t) / t_max
@@ -428,13 +468,13 @@ class FNPEScoreFunction(IIDScoreFunction):
         assert conditions.ndim == 2, "Conditions must have shape [iid,...]"
 
         if time is None:
-            time = torch.tensor([self.score_estimator.t_min])
+            time = torch.tensor([self.vector_field_estimator.t_min])
 
         N = conditions.shape[0]
 
         # Compute the per-sample score
         inputs = ensure_theta_batched(inputs)
-        base_score = self.score_estimator(inputs, conditions, time)
+        base_score = self.vector_field_estimator.score(inputs, conditions, time)
 
         # Compute the prior score
 
@@ -451,11 +491,11 @@ class FNPEScoreFunction(IIDScoreFunction):
 class BaseGaussCorrectedScoreFunction(IIDScoreFunction):
     def __init__(
         self,
-        score_estimator: "ConditionalScoreEstimator",
+        vector_field_estimator: ConditionalVectorFieldEstimator,
         prior: Distribution,
         ensure_lam_psd: bool = True,
         lam_psd_nugget: float = 0.01,
-        device: str = "cpu",
+        device: Union[str, torch.device] = "cpu",
     ) -> None:
         r"""Base class for Gauss-corrected score function as proposed in [1].
 
@@ -481,13 +521,13 @@ class BaseGaussCorrectedScoreFunction(IIDScoreFunction):
             (https://arxiv.org/abs/2411.02728)
 
         Args:
-            score_estimator: The neural network modelling the score.
+            vector_field_estimator: The neural network modelling the score.
             prior: The prior distribution.
             ensure_lam_psd: Whether to ensure the precision matrix is positive definite.
             lam_psd_nugget: The nugget value to ensure positive definiteness.
             device: The device on which to evaluate the potential. Defaults to "cpu".
         """
-        super().__init__(score_estimator, prior, device)
+        super().__init__(vector_field_estimator, prior, device)
         self.ensure_lam_psd = ensure_lam_psd
         self.lam_psd_nugget = lam_psd_nugget
 
@@ -526,13 +566,13 @@ class BaseGaussCorrectedScoreFunction(IIDScoreFunction):
         precisions_posteriors = self.posterior_precision_est_fn(conditions)
 
         # Denoising posterior via Bayes rule
-        m = self.score_estimator.mean_t_fn(time)
-        std = self.score_estimator.std_fn(time)
+        m = self.vector_field_estimator.mean_t_fn(time)
+        std = self.vector_field_estimator.std_fn(time)
 
         if precisions_posteriors.ndim == 4:
-            Ident = torch.eye(precisions_posteriors.shape[-1])
+            Ident = torch.eye(precisions_posteriors.shape[-1], device=self.device)
         else:
-            Ident = torch.ones_like(precisions_posteriors)
+            Ident = torch.ones_like(precisions_posteriors, device=self.device)
 
         marginal_precisions = m**2 / std**2 * Ident + precisions_posteriors
         return marginal_precisions
@@ -547,10 +587,24 @@ class BaseGaussCorrectedScoreFunction(IIDScoreFunction):
         Returns:
             Marginal prior score.
         """
-        m = self.score_estimator.mean_t_fn(time)
-        std = self.score_estimator.std_fn(time)
-        p = marginalize(self.prior, m, std)
-        prior_score = compute_score(p, inputs)
+        # NOTE: This is for the uniform distribution and distirbutions that do not
+        # implement a log_prob.
+        try:
+            with torch.enable_grad():
+                inputs = inputs.clone().detach().requires_grad_(True)
+                m = self.vector_field_estimator.mean_t_fn(time)
+                std = self.vector_field_estimator.std_fn(time)
+                p = marginalize(self.prior, m, std)
+                log_p = p.log_prob(inputs)
+                prior_score = torch.autograd.grad(
+                    log_p,
+                    inputs,
+                    grad_outputs=torch.ones_like(log_p),
+                    create_graph=True,
+                )[0].detach()
+        except Exception:
+            prior_score = torch.zeros_like(inputs)
+
         return prior_score
 
     def marginal_denoising_prior_precision_fn(
@@ -565,8 +619,8 @@ class BaseGaussCorrectedScoreFunction(IIDScoreFunction):
         Returns:
             Marginal denoising prior precision.
         """
-        m = self.score_estimator.mean_t_fn(time)
-        std = self.score_estimator.std_fn(time)
+        m = self.vector_field_estimator.mean_t_fn(time)
+        std = self.vector_field_estimator.std_fn(time)
 
         p_denoise = denoise(self.prior, m, std, inputs)
 
@@ -611,9 +665,11 @@ class BaseGaussCorrectedScoreFunction(IIDScoreFunction):
         N, *_ = conditions.shape
 
         if time is None:
-            time = torch.tensor([self.score_estimator.t_min])
+            time = torch.tensor([self.vector_field_estimator.t_min])
 
-        base_score = self.score_estimator(inputs, conditions, time, **kwargs)
+        base_score = self.vector_field_estimator.score(
+            inputs, conditions, time, **kwargs
+        )
         prior_score = self.marginal_prior_score_fn(time, inputs)
 
         # Marginal prior precision
@@ -661,13 +717,13 @@ class BaseGaussCorrectedScoreFunction(IIDScoreFunction):
 class GaussCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
     def __init__(
         self,
-        score_estimator: "ConditionalScoreEstimator",
+        vector_field_estimator: ConditionalVectorFieldEstimator,
         prior: Distribution,
         posterior_precision: Optional[Tensor] = None,
         scale_from_prior_precision: float = 2.0,
         enable_lam_psd: bool = False,
         lam_psd_nugget: float = 0.01,
-        device: str = "cpu",
+        device: Union[str, torch.device] = "cpu",
     ) -> None:
         r"""
         This extends the BaseGaussCorrectedScoreFunction to provide a simple method to
@@ -676,7 +732,7 @@ class GaussCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
         precision. This method simply scales the prior precision by a factor.
 
         Args:
-            score_estimator: The neural network modeling the score.
+            vector_field_estimator: The neural network modeling the score.
             prior: The prior distribution.
             posterior_precision: Optional preset posterior precision.
             scale_from_prior_precision: If not provided it simply increases the prior
@@ -686,7 +742,7 @@ class GaussCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
             device: The device on which to evaluate the potential. Defaults to "cpu".
         """
         super().__init__(
-            score_estimator, prior, enable_lam_psd, lam_psd_nugget, device=device
+            vector_field_estimator, prior, enable_lam_psd, lam_psd_nugget, device=device
         )
 
         if posterior_precision is None:
@@ -734,7 +790,7 @@ class GaussCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
         except Exception:
             d = prior.event_shape[0]
             num_samples = int(math.sqrt(d) * 1000)
-            prior_samples = prior.sample((num_samples,))
+            prior_samples = prior.sample(torch.Size((num_samples,)))
             prior_precision_estimate = 1 / torch.var(prior_samples, dim=0)
             posterior_precision = scale_from_prior_precision * prior_precision_estimate
         return posterior_precision
@@ -744,23 +800,23 @@ class GaussCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
 class AutoGaussCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
     def __init__(
         self,
-        score_estimator: "ConditionalScoreEstimator",
+        vector_field_estimator: ConditionalVectorFieldEstimator,
         prior: Distribution,
         enable_lam_psd: bool = True,
         lam_psd_nugget: float = 0.01,
         precision_est_only_diag: bool = False,
         precision_est_budget: Optional[int] = None,
         precision_initial_sampler_steps: int = 100,
-        device: str = "cpu",
+        device: Union[str, torch.device] = "cpu",
     ) -> None:
         r"""
         This method extends the by estimating the posterior precision using
         approximate posterior samples obtained from a diffusion model (using the
-        score_estimator) [1]. This method has a slight initialization overhead, but
-        generally provides more accurate results than simple heuristics.
+        vector_field_estimator) [1]. This method has a slight initialization overhead,
+        but generally provides more accurate results than simple heuristics.
 
         Args:
-            score_estimator: The neural network modeling the score.
+            vector_field_estimator: The neural network modeling the score.
             prior: The prior distribution.
             enable_lam_psd: Whether to ensure the precision matrix is positive definite.
             lam_psd_nugget: The nugget value to ensure positive definiteness.
@@ -771,7 +827,7 @@ class AutoGaussCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
             device: The device on which to evaluate the potential. Defaults to "cpu".
         """
         super().__init__(
-            score_estimator, prior, enable_lam_psd, lam_psd_nugget, device=device
+            vector_field_estimator, prior, enable_lam_psd, lam_psd_nugget, device=device
         )
         self.precision_est_only_diag = precision_est_only_diag
         self.precision_est_budget = precision_est_budget
@@ -788,7 +844,7 @@ class AutoGaussCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
             Estimated posterior precision.
         """
         return self.estimate_posterior_precision(
-            self.score_estimator,
+            self.vector_field_estimator,
             self.prior,
             conditions,
             precision_est_only_diag=self.precision_est_only_diag,
@@ -800,7 +856,7 @@ class AutoGaussCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
     @functools.lru_cache()
     def estimate_posterior_precision(
         cls,
-        score_estimator: "ConditionalScoreEstimator",
+        vector_field_estimator: ConditionalVectorFieldEstimator,
         prior: Distribution,
         conditions: Tensor,
         precision_est_only_diag: bool = False,
@@ -812,7 +868,7 @@ class AutoGaussCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
         for each observation, then empirically estimating the precision matrix.
 
         Args:
-            score_estimator: The score estimator.
+            vector_field_estimator: The score estimator.
             prior: The prior distribution.
             conditions: Observed data.
             precision_est_only_diag: Whether to estimate only the diagonal of the
@@ -829,9 +885,11 @@ class AutoGaussCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
         # the results efficiently.
 
         # NOTE: To avoid circular imports :(
-        from sbi.inference.posteriors.score_posterior import ScorePosterior
+        from sbi.inference.posteriors.vector_field_posterior import VectorFieldPosterior
 
-        posterior = ScorePosterior(score_estimator, prior)
+        posterior = VectorFieldPosterior(
+            vector_field_estimator, prior, device=conditions.device
+        )
 
         if precision_est_budget is None:
             if precision_est_only_diag:
@@ -840,7 +898,7 @@ class AutoGaussCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
                 precision_est_budget = min(int(prior.event_shape[0] * 1000), 5000)
 
         thetas = posterior.sample_batched(
-            torch.Size([precision_est_budget]),
+            sample_shape=torch.Size([precision_est_budget]),
             x=conditions,
             show_progress_bars=False,
             steps=precision_initial_sampler_steps,
@@ -897,7 +955,7 @@ class JacCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
         with torch.enable_grad():
             # NOTE: torch.func can be realtively unstable...
             jac_fn = torch.func.jacrev(  # type: ignore
-                lambda x: self.score_estimator(x, conditions, time)
+                lambda x: self.vector_field_estimator.score(x, conditions, time)
             )
             jac_fn = torch.func.vmap(torch.func.vmap(jac_fn))  # type: ignore
             jac = jac_fn(inputs).squeeze(1)
@@ -905,11 +963,11 @@ class JacCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
         # Must be symmetrical
         jac = 0.5 * (jac + jac.transpose(-1, -2))
 
-        m = self.score_estimator.mean_t_fn(time)
-        std = self.score_estimator.std_fn(time)
-        cov0 = std**2 * jac + torch.eye(d)[None, None, :, :]
+        m = self.vector_field_estimator.mean_t_fn(time)
+        std = self.vector_field_estimator.std_fn(time)
+        cov0 = std**2 * jac + torch.eye(d, device=self.device)[None, None, :, :]
 
-        denoising_posterior_precision = m**2 / std**2 + torch.inverse(cov0)
+        denoising_posterior_precision = m**2 / std**2 * torch.inverse(cov0)
 
         return denoising_posterior_precision
 
@@ -937,7 +995,7 @@ def ensure_lam_positive_definite(
     denoising_posterior_precision: torch.Tensor,
     N: int,
     precision_nugget: float = 0.1,
-) -> (torch.Tensor, torch.Tensor):
+) -> tuple[torch.Tensor, torch.Tensor]:
     r"""
     Ensure that the matrix is positive definite.
 

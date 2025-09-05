@@ -15,7 +15,6 @@ from sbi.inference.potentials.base_potential import BasePotential
 from sbi.sbi_types import Shape, TorchTransform
 from sbi.simulators.linear_gaussian import true_posterior_linear_gaussian_mvn_prior
 from sbi.utils import BoxUniform, within_support
-from sbi.utils.metrics import c2st
 from sbi.utils.torchutils import ensure_theta_batched
 
 
@@ -139,18 +138,6 @@ def get_normalization_uniform_prior(
     acceptance_prob = posterior.leakage_correction(x=x)
 
     return posterior_likelihood_unnorm, posterior_likelihood_norm, acceptance_prob
-
-
-def check_c2st(x: Tensor, y: Tensor, alg: str, tol: float = 0.1) -> None:
-    """Compute classification based two-sample test accuracy and assert it close to
-    chance."""
-
-    score = c2st(x, y).item()
-    print(f"c2st for {alg} is {score:.2f}.")
-
-    assert (0.5 - tol) <= score <= (0.5 + tol), (
-        f"{alg}'s c2st={score:.2f} is too far from the desired near-chance performance."
-    )
 
 
 class PosteriorPotential(BasePotential):

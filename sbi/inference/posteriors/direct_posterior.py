@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import warnings
 from typing import Optional, Union
 
 import torch
@@ -24,17 +25,20 @@ from sbi.utils.user_input_checks import check_prior
 
 
 class DirectPosterior(NeuralPosterior):
-    r"""Posterior $p(\theta|x_o)$ with `log_prob()` and `sample()` methods, only
-    applicable to SNPE.<br/><br/>
-    SNPE trains a neural network to directly approximate the posterior distribution.
+    r"""Posterior based on neural networks that directly estimate the posterior (NPE).
+
+    NPE trains a neural network to directly approximate the posterior distribution.
     However, for bounded priors, the neural network can have leakage: it puts non-zero
     mass in regions where the prior is zero. The `DirectPosterior` class wraps the
-    trained network to deal with these cases.<br/><br/>
-    Specifically, this class offers the following functionality:<br/>
+    trained network to deal with these cases.
+
+    Specifically, this class offers the following functionality:
+
     - correct the calculation of the log probability such that it compensates for the
-      leakage.<br/>
-    - reject samples that lie outside of the prior bounds.<br/><br/>
-    This class can not be used in combination with SNLE or SNRE.
+      leakage.
+    - reject samples that lie outside of the prior bounds.
+
+    This class can not be used in combination with NLE or NRE.
     """
 
     def __init__(
@@ -42,7 +46,7 @@ class DirectPosterior(NeuralPosterior):
         posterior_estimator: ConditionalDensityEstimator,
         prior: Distribution,
         max_sampling_batch_size: int = 10_000,
-        device: Optional[str] = None,
+        device: Optional[Union[str, torch.device]] = None,
         x_shape: Optional[torch.Size] = None,
         enable_transform: bool = True,
     ):
@@ -63,6 +67,8 @@ class DirectPosterior(NeuralPosterior):
         # builds it itself. The `potential_fn` and `theta_transform` are used only for
         # obtaining the MAP.
         check_prior(prior)
+        self.enable_transform = enable_transform
+        self.x_shape = x_shape
         potential_fn, theta_transform = posterior_estimator_based_potential(
             posterior_estimator,
             prior,
@@ -77,6 +83,7 @@ class DirectPosterior(NeuralPosterior):
             x_shape=x_shape,
         )
 
+        self.device = device
         self.prior = prior
         self.posterior_estimator = posterior_estimator
 
@@ -85,6 +92,45 @@ class DirectPosterior(NeuralPosterior):
 
         self._purpose = """It samples the posterior network and rejects samples that
             lie outside of the prior bounds."""
+
+    def to(self, device: Union[str, torch.device]) -> None:
+        """Move posterior_estimator, prior and x_o to device.
+
+        Changes the device attribute, reinstanciates the
+        posterior, and resets the default x.
+
+        Args:
+            device: device where to move the posterior to.
+        """
+        self.device = device
+        if hasattr(self.prior, "to"):
+            self.prior.to(device)  # type: ignore
+        else:
+            raise ValueError("""Prior has no attribute to(device).""")
+        if hasattr(self.posterior_estimator, "to"):
+            self.posterior_estimator.to(device)
+        else:
+            raise ValueError("""Posterior estimator has no attribute to(device).""")
+
+        potential_fn, theta_transform = posterior_estimator_based_potential(
+            self.posterior_estimator,
+            self.prior,
+            x_o=None,
+            enable_transform=self.enable_transform,
+        )
+        x_o = None
+        if hasattr(self, "_x") and (self._x is not None):
+            x_o = self._x.to(device)
+
+        super().__init__(
+            potential_fn=potential_fn,
+            theta_transform=theta_transform,
+            device=device,
+            x_shape=self.x_shape,
+        )
+        # super().__init__ erases the self._x, so we need to set it again
+        if x_o is not None:
+            self.set_default_x(x_o)
 
     def sample(
         self,
@@ -168,12 +214,33 @@ class DirectPosterior(NeuralPosterior):
         num_samples = torch.Size(sample_shape).numel()
         condition_shape = self.posterior_estimator.condition_shape
         x = reshape_to_batch_event(x, event_shape=condition_shape)
+        num_xos = x.shape[0]
+
+        # throw warning if num_x * num_samples is too large
+        if num_xos * num_samples > 2**21:  # 2 million-ish
+            warnings.warn(
+                f"Note that for batched sampling, the direct posterior sampling "
+                f"generates {num_xos} * {num_samples} = {num_xos * num_samples} "
+                "samples. This can be slow and memory-intensive. Consider "
+                "reducing the number of samples or batch size.",
+                stacklevel=2,
+            )
 
         max_sampling_batch_size = (
             self.max_sampling_batch_size
             if max_sampling_batch_size is None
             else max_sampling_batch_size
         )
+
+        # Adjust max_sampling_batch_size to avoid excessive memory usage
+        if max_sampling_batch_size * num_xos > 100_000:
+            capped = max(1, 100_000 // num_xos)
+            warnings.warn(
+                f"Capping max_sampling_batch_size from {max_sampling_batch_size} "
+                f"to {capped} to avoid excessive memory usage.",
+                stacklevel=2,
+            )
+            max_sampling_batch_size = capped
 
         samples = rejection.accept_reject_sample(
             proposal=self.posterior_estimator.sample,

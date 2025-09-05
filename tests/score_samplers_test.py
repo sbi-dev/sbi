@@ -10,10 +10,10 @@ import torch
 from torch import Tensor
 from torch.distributions import Gamma, Independent, MultivariateNormal, Normal, Uniform
 
-from sbi.inference.potentials.score_based_potential import (
-    score_estimator_based_potential,
+from sbi.inference.potentials.vector_field_potential import (
+    vector_field_estimator_based_potential,
 )
-from sbi.neural_nets.net_builders import build_score_estimator
+from sbi.neural_nets import posterior_score_nn
 from sbi.samplers.score import Diffuser
 from sbi.utils import BoxUniform, MultipleIndependent
 
@@ -148,8 +148,8 @@ def test_gaussian_score_sampling(
 
     sampler = Diffuser(score_fn, predictor, corrector)
 
-    t_min = score_fn.score_estimator.t_min
-    t_max = score_fn.score_estimator.t_max
+    t_min = score_fn.vector_field_estimator.t_min
+    t_max = score_fn.vector_field_estimator.t_max
     ts = torch.linspace(t_max, t_min, 500)
     samples = sampler.run(1_000, ts)
 
@@ -184,14 +184,13 @@ def _build_gaussian_score_estimator(
         def forward(self, input, condition, time):
             return torch.zeros_like(input)
 
-    score_estimator = build_score_estimator(
-        building_thetas,
-        building_xs,
+    score_estimator = posterior_score_nn(
         sde_type=sde_type,
-        score_net=DummyNet(),
-    )
+        net=DummyNet(),
+        embedding_net=torch.nn.Identity(),
+    )(building_thetas, building_xs)
 
-    score_fn, _ = score_estimator_based_potential(
+    score_fn, _ = vector_field_estimator_based_potential(
         score_estimator, prior=None, x_o=torch.ones((1,))
     )
 

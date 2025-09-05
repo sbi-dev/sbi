@@ -1,39 +1,49 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from copy import deepcopy
-from typing import Any, Callable, Dict, Optional, Union
+from typing import Any, Dict, Literal, Optional, Union
 
 from torch.distributions import Distribution
 
-from sbi.inference.posteriors import MCMCPosterior, RejectionPosterior, VIPosterior
-from sbi.inference.potentials import likelihood_estimator_based_potential
-from sbi.inference.trainers.nle.nle_base import LikelihoodEstimator
+from sbi.inference.posteriors.base_posterior import NeuralPosterior
+from sbi.inference.posteriors.posterior_parameters import (
+    ImportanceSamplingPosteriorParameters,
+    MCMCPosteriorParameters,
+    RejectionPosteriorParameters,
+    VIPosteriorParameters,
+)
+from sbi.inference.trainers.nle.nle_base import LikelihoodEstimatorTrainer
 from sbi.neural_nets.estimators import MixedDensityEstimator
-from sbi.sbi_types import TensorboardSummaryWriter, TorchModule
+from sbi.neural_nets.estimators.base import ConditionalEstimatorBuilder
+from sbi.sbi_types import TensorBoardSummaryWriter
 from sbi.utils.sbiutils import del_entries
-from sbi.utils.user_input_checks import check_prior
 
 
-class MNLE(LikelihoodEstimator):
+class MNLE(LikelihoodEstimatorTrainer):
+    """Mixed Neural Likelihood Estimation (MNLE) [1].
+
+    Like NLE, but designed to be applied to data with mixed types, e.g., continuous
+    data and discrete data like they occur in decision-making experiments
+    (reation times and choices).
+
+    [1] Flexible and efficient simulation-based inference for models of
+    decision-making, Boelts et al. 2021,
+    https://www.biorxiv.org/content/10.1101/2021.12.22.473472v2
+    """
+
     def __init__(
         self,
         prior: Optional[Distribution] = None,
-        density_estimator: Union[str, Callable] = "mnle",
+        density_estimator: Union[
+            Literal["mnle"],
+            ConditionalEstimatorBuilder[MixedDensityEstimator],
+        ] = "mnle",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
-        summary_writer: Optional[TensorboardSummaryWriter] = None,
+        summary_writer: Optional[TensorBoardSummaryWriter] = None,
         show_progress_bars: bool = True,
     ):
-        r"""Mixed Neural Likelihood Estimation (MNLE) [1].
-
-        Like NLE, but designed to be applied to data with mixed types, e.g., continuous
-        data and discrete data like they occur in decision-making experiments
-        (reation times and choices).
-
-        [1] Flexible and efficient simulation-based inference for models of
-        decision-making, Boelts et al. 2021,
-        https://www.biorxiv.org/content/10.1101/2021.12.22.473472v2
+        r"""Initialize MNLE.
 
         Args:
             prior: A probability distribution that expresses prior knowledge about the
@@ -41,12 +51,12 @@ class MNLE(LikelihoodEstimator):
                 prior must be passed to `.build_posterior()`.
             density_estimator: If it is a string, it must be "mnle" to use the
                 preconfiugred neural nets for MNLE. Alternatively, a function
-                that builds a custom neural network can be provided. The function will
-                be called with the first batch of simulations (theta, x), which can
-                thus be used for shape inference and potentially for z-scoring. It
-                needs to return a PyTorch `nn.Module` implementing the density
-                estimator. The density estimator needs to provide the methods
-                `.log_prob`, `.log_prob_iid()` and `.sample()`.
+                that builds a custom neural network, which adheres to
+                `ConditionalEstimatorBuilder` protocol can be provided. The function
+                will be called with the first batch of simulations (theta, x), which can
+                thus be used for shape inference and potentially for z-scoring. The
+                density estimator needs to provide the methods `.log_prob` and
+                `.sample()` and must return a `MixedDensityEstimator`.
             device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.
@@ -89,15 +99,32 @@ class MNLE(LikelihoodEstimator):
 
     def build_posterior(
         self,
-        density_estimator: Optional[TorchModule] = None,
+        density_estimator: Optional[MixedDensityEstimator] = None,
         prior: Optional[Distribution] = None,
-        sample_with: str = "mcmc",
-        mcmc_method: str = "slice_np_vectorized",
-        vi_method: str = "rKL",
+        sample_with: Literal["mcmc", "rejection", "vi"] = "mcmc",
+        mcmc_method: Literal[
+            "slice_np",
+            "slice_np_vectorized",
+            "hmc_pyro",
+            "nuts_pyro",
+            "slice_pymc",
+            "hmc_pymc",
+            "nuts_pymc",
+        ] = "slice_np_vectorized",
+        vi_method: Literal["rKL", "fKL", "IW", "alpha"] = "rKL",
         mcmc_parameters: Optional[Dict[str, Any]] = None,
         vi_parameters: Optional[Dict[str, Any]] = None,
         rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
-    ) -> Union[MCMCPosterior, RejectionPosterior, VIPosterior]:
+        importance_sampling_parameters: Optional[Dict[str, Any]] = None,
+        posterior_parameters: Optional[
+            Union[
+                MCMCPosteriorParameters,
+                VIPosteriorParameters,
+                RejectionPosteriorParameters,
+                ImportanceSamplingPosteriorParameters,
+            ]
+        ] = None,
+    ) -> NeuralPosterior:
         r"""Build posterior from the neural density estimator.
 
         SNLE trains a neural network to approximate the likelihood $p(x|\theta)$. The
@@ -111,10 +138,14 @@ class MNLE(LikelihoodEstimator):
             prior: Prior distribution.
             sample_with: Method to use for sampling from the posterior. Must be one of
                 [`mcmc` | `rejection` | `vi`].
-            mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`,
-                `hmc`, `nuts`. Currently defaults to `slice_np` for a custom numpy
-                implementation of slice sampling; select `hmc`, `nuts` or `slice` for
-                Pyro-based sampling.
+            mcmc_method: Method used for MCMC sampling, one of `slice_np`,
+                `slice_np_vectorized`, `hmc_pyro`, `nuts_pyro`, `slice_pymc`,
+                `hmc_pymc`, `nuts_pymc`. `slice_np` is a custom
+                numpy implementation of slice sampling. `slice_np_vectorized` is
+                identical to `slice_np`, but if `num_chains>1`, the chains are
+                vectorized for `slice_np_vectorized` whereas they are run sequentially
+                for `slice_np`. The samplers ending on `_pyro` are using Pyro, and
+                likewise the samplers ending on `_pymc` are using PyMC.
             vi_method: Method used for VI, one of [`rKL`, `fKL`, `IW`, `alpha`]. Note
                 some of the methods admit a `mode seeking` property (e.g. rKL) whereas
                 some admit a `mass covering` one (e.g fKL).
@@ -122,70 +153,35 @@ class MNLE(LikelihoodEstimator):
             vi_parameters: Additional kwargs passed to `VIPosterior`.
             rejection_sampling_parameters: Additional kwargs passed to
                 `RejectionPosterior`.
+            importance_sampling_parameters: Additional kwargs passed to
+                `ImportanceSamplingPosterior`
+            posterior_parameters: Configuration passed to the init method for the
+                posterior. Must be one of the following
+                - `VIPosteriorParameters`
+                - `MCMCPosteriorParameters`
+                - `RejectionPosteriorParameters`
+                - `ImportanceSamplingPosteriorParameters`
 
         Returns:
             Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods
             (the returned log-probability is unnormalized).
         """
-        if prior is None:
-            assert (
-                self._prior is not None
-            ), """You did not pass a prior. You have to pass the prior either at
-            initialization `inference = SNLE(prior)` or to `.build_posterior
-            (prior=prior)`."""
-            prior = self._prior
-        else:
-            check_prior(prior)
+        if density_estimator is not None:
+            assert isinstance(
+                density_estimator, MixedDensityEstimator
+            ), f"""net must be of type MixedDensityEstimator but is {
+                type(density_estimator)
+            }."""
 
-        if density_estimator is None:
-            likelihood_estimator = self._neural_net
-            # If internal net is used device is defined.
-            device = self._device
-        else:
-            likelihood_estimator = density_estimator
-            # Otherwise, infer it from the device of the net parameters.
-            device = next(density_estimator.parameters()).device.type
-
-        assert isinstance(
-            likelihood_estimator, MixedDensityEstimator
-        ), f"""net must be of type MixedDensityEstimator but is {
-            type(likelihood_estimator)
-        }."""
-
-        (
-            potential_fn,
-            theta_transform,
-        ) = likelihood_estimator_based_potential(likelihood_estimator, prior, x_o=None)
-
-        if sample_with == "mcmc":
-            self._posterior = MCMCPosterior(
-                potential_fn=potential_fn,
-                theta_transform=theta_transform,
-                proposal=prior,
-                method=mcmc_method,
-                device=device,
-                **mcmc_parameters or {},
-            )
-        elif sample_with == "rejection":
-            self._posterior = RejectionPosterior(
-                potential_fn=potential_fn,
-                proposal=prior,
-                device=device,
-                **rejection_sampling_parameters or {},
-            )
-        elif sample_with == "vi":
-            self._posterior = VIPosterior(
-                potential_fn=potential_fn,
-                theta_transform=theta_transform,
-                prior=prior,  # type: ignore
-                vi_method=vi_method,
-                device=device,
-                **vi_parameters or {},
-            )
-        else:
-            raise NotImplementedError
-
-        # Store models at end of each round.
-        self._model_bank.append(deepcopy(self._posterior))
-
-        return deepcopy(self._posterior)
+        return super().build_posterior(
+            density_estimator=density_estimator,
+            prior=prior,
+            sample_with=sample_with,
+            posterior_parameters=posterior_parameters,
+            mcmc_method=mcmc_method,
+            vi_method=vi_method,
+            mcmc_parameters=mcmc_parameters,
+            vi_parameters=vi_parameters,
+            rejection_sampling_parameters=rejection_sampling_parameters,
+            importance_sampling_parameters=importance_sampling_parameters,
+        )

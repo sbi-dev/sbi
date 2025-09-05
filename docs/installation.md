@@ -1,39 +1,64 @@
 (installation)=
 # Installation
 
-`sbi` requires Python 3.10 or higher. A GPU is not required, but can lead to
-speed-up in some cases. We recommend using a
-[`conda`](https://docs.conda.io/en/latest/miniconda.html) virtual environment
-([Miniconda installation
-instructions](https://docs.conda.io/en/latest/miniconda.html)). If `conda` is
-installed on the system, an environment for installing `sbi` can be created as
-follows:
+`sbi` requires Python 3.10 or higher. We recommend using Python 3.12 for the best
+experience. A GPU is not required, but can lead to speed-up in some cases.
 
-```console
-# Create an environment for sbi (indicate Python 3.10 or higher); activate it
-$ conda create -n sbi_env python=3.10 && conda activate sbi_env
+## Recommended: Installation with uv
+
+We recommend using [`uv`](https://docs.astral.sh/uv)
+for package and environment management. If you haven't installed `uv` yet, follow
+the [installation instructions](https://docs.astral.sh/uv/getting-started/installation/).
+
+Create a virtual environment and install `sbi`:
+
+```bash
+# Create a virtual environment with Python 3.12
+uv venv --python 3.12
+
+# Activate the environment (on macOS/Linux)
+source .venv/bin/activate
+
+# On Windows
+# .venv\Scripts\activate
+
+# Install sbi
+uv pip install sbi
 ```
 
-Independent of whether you are using `conda` or not, `sbi` can be installed
-using `pip`:
+## Alternative installation methods
+
+### Using pip
+
+If you prefer using `pip` directly:
 
 ```bash
 python -m pip install sbi
 ```
 
-To install and add `sbi` to a project with [`pixi`](https://pixi.sh/), from the project directory run
+### Using conda
+
+To install into a conda environment:
+
+```bash
+# Create an environment for sbi (Python 3.10 or higher)
+conda create -n sbi_env python=3.12 && conda activate sbi_env
+
+# Install sbi from conda-forge
+conda install --channel conda-forge sbi
+```
+
+### Using pixi
+
+To install and add `sbi` to a project with [`pixi`](https://pixi.sh/):
 
 ```bash
 pixi add sbi
 ```
 
-and to install into a particular conda environment with [`conda`](https://docs.conda.io/projects/conda/), in the activated environment run
+## Testing the installation
 
-```bash
-conda install --channel conda-forge sbi
-```
-
-To test the installation, drop into a Python prompt and run
+To test the installation, drop into a Python prompt and run:
 
 ```python
 from sbi.examples.minimal import simple

@@ -1,9 +1,10 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import warnings
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from typing import Any, Callable, Dict, Optional, Union
+from typing import Any, Dict, Literal, Optional, Tuple, Union
 
 import torch
 from torch import Tensor, eye, nn, ones
@@ -11,25 +12,34 @@ from torch.distributions import Distribution
 from torch.nn.utils.clip_grad import clip_grad_norm_
 from torch.optim.adam import Adam
 from torch.utils.tensorboard.writer import SummaryWriter
+from typing_extensions import Self
 
-from sbi.inference.posteriors import MCMCPosterior, RejectionPosterior, VIPosterior
-from sbi.inference.posteriors.importance_posterior import ImportanceSamplingPosterior
+from sbi.inference.posteriors.base_posterior import NeuralPosterior
+from sbi.inference.posteriors.posterior_parameters import (
+    ImportanceSamplingPosteriorParameters,
+    MCMCPosteriorParameters,
+    RejectionPosteriorParameters,
+    VIPosteriorParameters,
+)
 from sbi.inference.potentials import ratio_estimator_based_potential
+from sbi.inference.potentials.ratio_based_potential import RatioBasedPotential
 from sbi.inference.trainers.base import NeuralInference
 from sbi.neural_nets import classifier_nn
+from sbi.neural_nets.estimators.base import ConditionalEstimatorBuilder
+from sbi.neural_nets.ratio_estimators import RatioEstimator
+from sbi.sbi_types import TorchTransform
 from sbi.utils import (
     check_estimator_arg,
-    check_prior,
     clamp_and_warn,
 )
 from sbi.utils.torchutils import repeat_rows
 
 
-class RatioEstimator(NeuralInference, ABC):
+class RatioEstimatorTrainer(NeuralInference, ABC):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
-        classifier: Union[str, Callable] = "resnet",
+        classifier: Union[str, ConditionalEstimatorBuilder[RatioEstimator]] = "resnet",
         device: str = "cpu",
         logging_level: Union[int, str] = "warning",
         summary_writer: Optional[SummaryWriter] = None,
@@ -55,11 +65,11 @@ class RatioEstimator(NeuralInference, ABC):
         Args:
             classifier: Classifier trained to approximate likelihood ratios. If it is
                 a string, use a pre-configured network of the provided type (one of
-                linear, mlp, resnet). Alternatively, a function that builds a custom
-                neural network can be provided. The function will be called with the
-                first batch of simulations (theta, x), which can thus be used for shape
-                inference and potentially for z-scoring. It needs to return a PyTorch
-                `nn.Module` implementing the classifier.
+                linear, mlp, resnet), or a callable that implements the
+                `ConditionalEstimatorBuilder` protocol. The callable will
+                be called with the first batch of simulations (theta, x), which can thus
+                be used for shape inference and potentially for z-scoring. It returns a
+                `RatioEstimator`.
 
         See docstring of `NeuralInference` class for all other arguments.
         """
@@ -83,6 +93,9 @@ class RatioEstimator(NeuralInference, ABC):
         else:
             self._build_neural_net = classifier
 
+    @abstractmethod
+    def _loss(self, theta: Tensor, x: Tensor, num_atoms: int) -> Tensor: ...
+
     def append_simulations(
         self,
         theta: Tensor,
@@ -91,7 +104,7 @@ class RatioEstimator(NeuralInference, ABC):
         from_round: int = 0,
         algorithm: str = "SNRE",
         data_device: Optional[str] = None,
-    ) -> "RatioEstimator":
+    ) -> Self:
         r"""Store parameters and simulation outputs to use them for later training.
 
         Data are stored as entries in lists for each type of variable (parameter/data).
@@ -104,21 +117,28 @@ class RatioEstimator(NeuralInference, ABC):
             theta: Parameter sets.
             x: Simulation outputs.
             exclude_invalid_x: Whether invalid simulations are discarded during
-                training. If `False`, SNRE raises an error when invalid simulations are
+                training. If `False`, NRE raises an error when invalid simulations are
                 found. If `True`, invalid simulations are discarded and training
                 can proceed, but this gives systematically wrong results.
             from_round: Which round the data stemmed from. Round 0 means from the prior.
-                With default settings, this is not used at all for `SNRE`. Only when
+                With default settings, this is not used at all for `NRE`. Only when
                 the user later on requests `.train(discard_prior_samples=True)`, we
                 use these indices to find which training data stemmed from the prior.
+            algorithm: Which algorithm is used. This is used to give a more informative
+                warning or error message when invalid simulations are found.
             data_device: Where to store the data, default is on the same device where
                 the training is happening. If training a large dataset on a GPU with not
                 much VRAM can set to 'cpu' to store data on system memory instead.
         Returns:
             NeuralInference object (returned so that this function is chainable).
         """
+        if exclude_invalid_x:
+            warnings.warn(
+                "NRE gives systematically wrong results when exclude_invalid_x=True.",
+                stacklevel=2,
+            )
 
-        return super().append_simulations(  # type: ignore
+        return super().append_simulations(
             theta=theta,
             x=x,
             exclude_invalid_x=exclude_invalid_x,
@@ -147,8 +167,16 @@ class RatioEstimator(NeuralInference, ABC):
 
         Args:
             num_atoms: Number of atoms to use for classification.
-            exclude_invalid_x: Whether to exclude simulation outputs `x=NaN` or `x=±∞`
-                during training. Expect errors, silent or explicit, when `False`.
+            training_batch_size: Training batch size.
+            learning_rate: Learning rate for Adam optimizer.
+            validation_fraction: The fraction of data to use for validation.
+            stop_after_epochs: The number of epochs to wait for improvement on the
+                validation set before terminating training.
+            max_num_epochs: Maximum number of epochs to run. If reached, we stop
+                training even when the validation loss is still decreasing. Otherwise,
+                we train until validation loss increases (see also `stop_after_epochs`).
+            clip_max_norm: Value at which to clip the total gradient norm in order to
+                prevent exploding gradients. Use None for no clipping.
             resume_training: Can be used in case training time is limited, e.g. on a
                 cluster. If `True`, the split between train and validation set, the
                 optimizer, the number of epochs, and the best validation log-prob will
@@ -158,6 +186,8 @@ class RatioEstimator(NeuralInference, ABC):
                 samples.
             retrain_from_scratch: Whether to retrain the conditional density
                 estimator for the posterior from scratch each round.
+            show_train_summary: Whether to print the number of epochs and validation
+                loss after the training.
             dataloader_kwargs: Additional or updated kwargs to be passed to the training
                 and validation dataloaders (like, e.g., a collate_fn).
             loss_kwargs: Additional or updated kwargs to be passed to the self._loss fn.
@@ -287,6 +317,91 @@ class RatioEstimator(NeuralInference, ABC):
 
         return deepcopy(self._neural_net)
 
+    def build_posterior(
+        self,
+        density_estimator: Optional[RatioEstimator] = None,
+        prior: Optional[Distribution] = None,
+        sample_with: Literal["mcmc", "rejection", "vi", "importance"] = "mcmc",
+        mcmc_method: Literal[
+            "slice_np",
+            "slice_np_vectorized",
+            "hmc_pyro",
+            "nuts_pyro",
+            "slice_pymc",
+            "hmc_pymc",
+            "nuts_pymc",
+        ] = "slice_np_vectorized",
+        vi_method: Literal["rKL", "fKL", "IW", "alpha"] = "rKL",
+        mcmc_parameters: Optional[Dict[str, Any]] = None,
+        vi_parameters: Optional[Dict[str, Any]] = None,
+        rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
+        importance_sampling_parameters: Optional[Dict[str, Any]] = None,
+        posterior_parameters: Optional[
+            Union[
+                MCMCPosteriorParameters,
+                VIPosteriorParameters,
+                RejectionPosteriorParameters,
+                ImportanceSamplingPosteriorParameters,
+            ]
+        ] = None,
+    ) -> NeuralPosterior:
+        r"""Build posterior from the neural density estimator.
+
+        SNRE trains a neural network to approximate likelihood ratios. The
+        posterior wraps the trained network such that one can directly evaluate the
+        unnormalized posterior log probability $p(\theta|x) \propto p(x|\theta) \cdot
+        p(\theta)$ and draw samples from the posterior with MCMC or rejection sampling.
+        Note that, in the case of single-round SNRE_A / AALR, it is possible to
+        evaluate the log-probability of the **normalized** posterior, but sampling
+        still requires MCMC (or rejection sampling).
+
+        Args:
+            density_estimator: The density estimator that the posterior is based on.
+                If `None`, use the latest neural density estimator that was trained.
+            prior: Prior distribution.
+            sample_with: Method to use for sampling from the posterior. Must be one of
+                [`mcmc` | `rejection` | `vi` | `importance`].
+            mcmc_method: Method used for MCMC sampling, one of `slice_np`,
+                `slice_np_vectorized`, `hmc_pyro`, `nuts_pyro`, `slice_pymc`,
+                `hmc_pymc`, `nuts_pymc`. `slice_np` is a custom
+                numpy implementation of slice sampling. `slice_np_vectorized` is
+                identical to `slice_np`, but if `num_chains>1`, the chains are
+                vectorized for `slice_np_vectorized` whereas they are run sequentially
+                for `slice_np`. The samplers ending on `_pyro` are using Pyro, and
+                likewise the samplers ending on `_pymc` are using PyMC.
+            vi_method: Method used for VI, one of [`rKL`, `fKL`, `IW`, `alpha`]. Note
+                that some of the methods admit a `mode seeking` property (e.g. rKL)
+                whereas some admit a `mass covering` one (e.g fKL).
+            mcmc_parameters: Additional kwargs passed to `MCMCPosterior`.
+            vi_parameters: Additional kwargs passed to `VIPosterior`.
+            rejection_sampling_parameters: Additional kwargs passed to
+                `RejectionPosterior`.
+            importance_sampling_parameters: Additional kwargs passed to
+                `ImportanceSamplingPosterior`.
+            posterior_parameters: Configuration passed to the init method for the
+                posterior. Must be one of the following:
+                - `VIPosteriorParameters`
+                - `ImportanceSamplingPosteriorParameters`
+                - `MCMCPosteriorParameters`
+                - `RejectionPosteriorParameters`
+
+        Returns:
+            Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods
+            (the returned log-probability is unnormalized).
+        """
+        return super().build_posterior(
+            density_estimator,
+            prior,
+            sample_with,
+            posterior_parameters,
+            mcmc_method=mcmc_method,
+            vi_method=vi_method,
+            mcmc_parameters=mcmc_parameters,
+            vi_parameters=vi_parameters,
+            rejection_sampling_parameters=rejection_sampling_parameters,
+            importance_sampling_parameters=importance_sampling_parameters,
+        )
+
     def _classifier_logits(self, theta: Tensor, x: Tensor, num_atoms: int) -> Tensor:
         """Return logits obtained through classifier forward pass.
 
@@ -308,117 +423,26 @@ class RatioEstimator(NeuralInference, ABC):
 
         return self._neural_net(atomic_theta, repeated_x)
 
-    @abstractmethod
-    def _loss(self, theta: Tensor, x: Tensor, num_atoms: int) -> Tensor:
-        raise NotImplementedError
+    def _get_potential_function(
+        self, prior: Distribution, estimator: RatioEstimator
+    ) -> Tuple[RatioBasedPotential, TorchTransform]:
+        r"""Gets the potential for ratio-based methods.
 
-    def build_posterior(
-        self,
-        density_estimator: Optional[nn.Module] = None,
-        prior: Optional[Distribution] = None,
-        sample_with: str = "mcmc",
-        mcmc_method: str = "slice_np_vectorized",
-        vi_method: str = "rKL",
-        mcmc_parameters: Optional[Dict[str, Any]] = None,
-        vi_parameters: Optional[Dict[str, Any]] = None,
-        rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
-        importance_sampling_parameters: Optional[Dict[str, Any]] = None,
-    ) -> Union[
-        MCMCPosterior, RejectionPosterior, VIPosterior, ImportanceSamplingPosterior
-    ]:
-        r"""Build posterior from the neural density estimator.
-
-        SNRE trains a neural network to approximate likelihood ratios. The
-        posterior wraps the trained network such that one can directly evaluate the
-        unnormalized posterior log probability $p(\theta|x) \propto p(x|\theta) \cdot
-        p(\theta)$ and draw samples from the posterior with MCMC or rejection sampling.
-        Note that, in the case of single-round SNRE_A / AALR, it is possible to
-        evaluate the log-probability of the **normalized** posterior, but sampling
-        still requires MCMC (or rejection sampling).
+        It also returns a transformation that can be used to transform the potential
+        into unconstrained space.
 
         Args:
-            density_estimator: The density estimator that the posterior is based on.
-                If `None`, use the latest neural density estimator that was trained.
-            prior: Prior distribution.
-            sample_with: Method to use for sampling from the posterior. Must be one of
-                [`mcmc` | `rejection` | `vi`].
-            mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`,
-                `hmc`, `nuts`. Currently defaults to `slice_np` for a custom numpy
-                implementation of slice sampling; select `hmc`, `nuts` or `slice` for
-                Pyro-based sampling.
-            vi_method: Method used for VI, one of [`rKL`, `fKL`, `IW`, `alpha`]. Note
-                that some of the methods admit a `mode seeking` property (e.g. rKL)
-                whereas some admit a `mass covering` one (e.g fKL).
-            mcmc_parameters: Additional kwargs passed to `MCMCPosterior`.
-            vi_parameters: Additional kwargs passed to `VIPosterior`.
-            rejection_sampling_parameters: Additional kwargs passed to
-                `RejectionPosterior`.
+            prior: The prior distribution.
+            estimator: The neural network modelling likelihood-to-evidence ratio.
 
         Returns:
-            Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods
-            (the returned log-probability is unnormalized).
+            The potential function and a transformation that maps
+            to unconstrained space.
         """
-        if prior is None:
-            assert (
-                self._prior is not None
-            ), """You did not pass a prior. You have to pass the prior either at
-                initialization `inference = SNRE(prior)` or to `.build_posterior
-                (prior=prior)`."""
-            prior = self._prior
-        else:
-            check_prior(prior)
-
-        if density_estimator is None:
-            ratio_estimator = self._neural_net
-            # If internal net is used device is defined.
-            device = self._device
-        else:
-            ratio_estimator = density_estimator
-            # Otherwise, infer it from the device of the net parameters.
-            device = str(next(density_estimator.parameters()).device)
-
         potential_fn, theta_transform = ratio_estimator_based_potential(
-            ratio_estimator=ratio_estimator,
+            ratio_estimator=estimator,
             prior=prior,
             x_o=None,
         )
 
-        if sample_with == "mcmc":
-            self._posterior = MCMCPosterior(
-                potential_fn=potential_fn,
-                theta_transform=theta_transform,
-                proposal=prior,
-                method=mcmc_method,
-                device=device,
-                **mcmc_parameters or {},
-            )
-        elif sample_with == "rejection":
-            self._posterior = RejectionPosterior(
-                potential_fn=potential_fn,
-                proposal=prior,
-                device=device,
-                **rejection_sampling_parameters or {},
-            )
-        elif sample_with == "vi":
-            self._posterior = VIPosterior(
-                potential_fn=potential_fn,
-                theta_transform=theta_transform,
-                prior=prior,  # type: ignore
-                vi_method=vi_method,
-                device=device,
-                **vi_parameters or {},
-            )
-        elif sample_with == "importance":
-            self._posterior = ImportanceSamplingPosterior(
-                potential_fn=potential_fn,
-                proposal=prior,
-                device=device,
-                **importance_sampling_parameters or {},
-            )
-        else:
-            raise NotImplementedError
-
-        # Store models at end of each round.
-        self._model_bank.append(deepcopy(self._posterior))
-
-        return deepcopy(self._posterior)
+        return potential_fn, theta_transform

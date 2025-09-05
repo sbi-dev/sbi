@@ -3,7 +3,7 @@
 
 import copy
 from copy import deepcopy
-from typing import Callable, Dict, Iterable, Optional, Union
+from typing import Callable, Dict, Iterable, Literal, Optional, Union
 
 import numpy as np
 import torch
@@ -12,7 +12,7 @@ from torch.distributions import Distribution
 from tqdm.auto import tqdm
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
-from sbi.inference.potentials.base_potential import BasePotential
+from sbi.inference.potentials.base_potential import BasePotential, CustomPotential
 from sbi.samplers.vi.vi_divergence_optimizers import get_VI_method
 from sbi.samplers.vi.vi_pyro_flows import get_flow_builder
 from sbi.samplers.vi.vi_quality_control import get_quality_metric
@@ -34,35 +34,49 @@ from sbi.utils.torchutils import atleast_2d_float32_tensor, ensure_theta_batched
 
 
 class VIPosterior(NeuralPosterior):
-    r"""Provides VI (Variational Inference) to sample from the posterior.<br/><br/>
-    SNLE or SNRE train neural networks to approximate the likelihood(-ratios).
-    `VIPosterior` allows to learn a tractable variational posterior $q(\theta)$ which
-    approximates the true posterior $p(\theta|x_o)$. After this second training stage,
-    we can produce approximate posterior samples, by just sampling from q with no
-    additional cost. For additional information see [1] and [2].<br/><br/>
-    References:<br/>
-    [1] Variational methods for simulation-based inference, Manuel Glöckler, Michael
-    Deistler, Jakob Macke, 2022, https://openreview.net/forum?id=kZ0UYdhqkNY<br/>
-    [2] Sequential Neural Posterior and Likelihood Approximation, Samuel Wiqvist, Jes
-    Frellsen, Umberto Picchini, 2021, https://arxiv.org/abs/2102.06522
+    r"""Provides VI (Variational Inference) to sample from the posterior.
+
+    SNLE or SNRE train neural networks to approximate the likelihood (or likelihood
+    ratios). ``VIPosterior`` allows learning a tractable variational posterior
+    :math:`q(\theta)` which approximates the true posterior
+    :math:`p(\theta|x_o)`. After this second training stage, we can produce
+    approximate posterior samples by sampling from :math:`q` at no additional cost.
+
+    For additional information, see [1]_ and [2]_.
+
+    References
+    ----------
+
+    .. [1] Glöckler, M., Deistler, M., & Macke, J. (2022).
+        Variational methods for simulation-based inference.
+        https://openreview.net/forum?id=kZ0UYdhqkNY
+
+    .. [2] Wiqvist, S., Frellsen, J., & Picchini, U. (2021).
+        Sequential Neural Posterior and Likelihood Approximation.
+        https://arxiv.org/abs/2102.06522
     """
 
     def __init__(
         self,
-        potential_fn: Union[Callable, BasePotential],
-        prior: Optional[TorchDistribution] = None,
-        q: Union[str, PyroTransformedDistribution, "VIPosterior", Callable] = "maf",
+        potential_fn: Union[BasePotential, CustomPotential],
+        prior: Optional[TorchDistribution] = None,  # type: ignore
+        q: Union[
+            Literal["nsf", "scf", "maf", "mcf", "gaussian", "gaussian_diag"],
+            PyroTransformedDistribution,
+            "VIPosterior",
+            Callable,
+        ] = "maf",
         theta_transform: Optional[TorchTransform] = None,
-        vi_method: str = "rKL",
-        device: str = "cpu",
+        vi_method: Literal["rKL", "fKL", "IW", "alpha"] = "rKL",
+        device: Union[str, torch.device] = "cpu",
         x_shape: Optional[torch.Size] = None,
-        parameters: Iterable = [],
-        modules: Iterable = [],
+        parameters: Optional[Iterable] = None,
+        modules: Optional[Iterable] = None,
     ):
         """
         Args:
             potential_fn: The potential function from which to draw samples. Must be a
-                `BasePotential` or a `Callable` which takes `theta` and `x_o` as inputs.
+                `BasePotential` or a `CustomPotential`.
             prior: This is the prior distribution. Note that this is only
                 used to check/construct the variational distribution or within some
                 quality metrics. Please make sure that this matches with the prior
@@ -103,6 +117,8 @@ class VIPosterior(NeuralPosterior):
 
         # Especially the prior may be on another device -> move it...
         self._device = device
+        self.theta_transform = theta_transform
+        self.x_shape = x_shape
         self.potential_fn.device = device
         move_all_tensor_to_device(self.potential_fn, device)
 
@@ -129,14 +145,49 @@ class VIPosterior(NeuralPosterior):
         else:
             self.link_transform = theta_transform.inv
 
+        if parameters is None:
+            parameters = []
+        if modules is None:
+            modules = []
         # This will set the variational distribution and VI method
-        self.set_q(q, parameters=parameters, modules=modules)
+        self.set_q(
+            q,
+            parameters=parameters,
+            modules=modules,
+        )
         self.set_vi_method(vi_method)
 
         self._purpose = (
             "It provides Variational inference to .sample() from the posterior and "
             "can evaluate the _normalized_ posterior density with .log_prob()."
         )
+
+    def to(self, device: Union[str, torch.device]) -> None:
+        """
+        Move potential_fn, _prior and x_o to device, and change the device attribute.
+
+        Reinstantiates the posterior and re sets the default x.
+
+        Args:
+            device: The device to move the posterior to.
+        """
+        self.device = device
+        self.potential_fn.to(device)  # type: ignore
+        self._prior.to(device)  # type: ignore
+        if self._x is not None:
+            x_o = self._x.to(device)
+        self.theta_transform = mcmc_transform(self._prior, device=device)
+        super().__init__(
+            self.potential_fn, self.theta_transform, device, x_shape=self.x_shape
+        )
+        # super().__init__ erases the self._x, so we need to set it again
+        if self._x is not None:
+            self.set_default_x(x_o)
+
+        if self.theta_transform is None:
+            self.link_transform = mcmc_transform(self._prior).inv
+        else:
+            self.link_transform = self.theta_transform.inv
 
     @property
     def q(self) -> Distribution:
@@ -176,8 +227,8 @@ class VIPosterior(NeuralPosterior):
     def set_q(
         self,
         q: Union[str, PyroTransformedDistribution, "VIPosterior", Callable],
-        parameters: Iterable = [],
-        modules: Iterable = [],
+        parameters: Optional[Iterable] = None,
+        modules: Optional[Iterable] = None,
     ) -> None:
         """Defines the variational family.
 
@@ -206,6 +257,10 @@ class VIPosterior(NeuralPosterior):
             modules: List of modules associated with the distribution object.
 
         """
+        if parameters is None:
+            parameters = []
+        if modules is None:
+            modules = []
         self._q_arg = (q, parameters, modules)
         if isinstance(q, Distribution):
             q = adapt_variational_distribution(
@@ -304,9 +359,9 @@ class VIPosterior(NeuralPosterior):
         show_progress_bars: bool = True,
     ) -> Tensor:
         raise NotImplementedError(
-            "Batched sampling is not implemented for VIPosterior. \
-            Alternatively you can use `sample` in a loop \
-            [posterior.sample(theta, x_o) for x_o in x]."
+            "Batched sampling is not implemented for VIPosterior. "
+            "Alternatively you can use `sample` in a loop "
+            "[posterior.sample(theta, x_o) for x_o in x]."
         )
 
     def log_prob(

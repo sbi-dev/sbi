@@ -8,6 +8,7 @@ from typing import Any, Callable, Dict, Optional, Tuple, Union
 import torch
 from numpy import ndarray
 from torch import Tensor
+from torch.distributions import Distribution
 
 from sbi.inference.abc.abc_base import ABCBASE
 from sbi.utils.kde import KDEWrapper, get_kde
@@ -20,9 +21,9 @@ class MCABC(ABCBASE):
     def __init__(
         self,
         simulator: Callable,
-        prior,
+        prior: Distribution,
         distance: Union[str, Callable] = "l2",
-        requires_iid_data: Optional[None] = None,
+        requires_iid_data: Optional[bool] = None,
         distance_kwargs: Optional[Dict] = None,
         num_workers: int = 1,
         simulation_batch_size: int = 1,
@@ -147,7 +148,7 @@ class MCABC(ABCBASE):
             pilot_theta = self.prior.sample((num_pilot_simulations,))
             pilot_x = self._batched_simulator(pilot_theta)
 
-            sass_transform = self.get_sass_transform(
+            sass_transform = super()._get_sass_transform(
                 pilot_theta, pilot_x, sass_expansion_degree
             )
 
@@ -155,7 +156,7 @@ class MCABC(ABCBASE):
             def simulator(theta):
                 return sass_transform(self._batched_simulator(theta))
 
-            x_o = sass_transform(x_o)
+            x_o = sass_transform(process_x(x_o))
         else:
             simulator = self._batched_simulator
 
@@ -173,11 +174,10 @@ class MCABC(ABCBASE):
         if not self.distance.requires_iid_data:
             x = x.squeeze(1)
             self.x_shape = x[0].shape
-            self.x_o = process_x(x_o, self.x_shape)
         else:
             self.x_shape = x[0, 0].shape
-            self.x_o = process_x(x_o, self.x_shape)
 
+        self.x_o = process_x(x_o, self.x_shape)
         distances = self.distance(self.x_o, x)
 
         # Select based on acceptance threshold epsilon.
@@ -204,16 +204,18 @@ class MCABC(ABCBASE):
         # Maybe adjust theta with LRA.
         if lra:
             self.logger.info("Running Linear regression adjustment.")
-            final_theta = self.run_lra(theta_accepted, x_accepted, observation=self.x_o)
+            final_theta = super()._run_lra(
+                theta_accepted, x_accepted, observation=self.x_o
+            )
         else:
             final_theta = theta_accepted
 
         if kde:
             self.logger.info(
-                """KDE on %s samples with bandwidth option
-                {kde_kwargs["bandwidth"] if "bandwidth" in kde_kwargs else "cv"}.
-                Beware that KDE can give unreliable results when used with too few
-                samples and in high dimensions.""",
+                "KDE on %s samples with bandwidth option "
+                f"{kde_kwargs.get('bandwidth', 'cv')}. "
+                "Beware that KDE can give unreliable results when used with too few"
+                " samples and in high dimensions.",
                 final_theta.shape[0],
             )
 

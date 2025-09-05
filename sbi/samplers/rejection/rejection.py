@@ -1,3 +1,6 @@
+# This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+
 import logging
 import warnings
 from typing import Any, Callable, Dict, Optional, Tuple
@@ -215,8 +218,8 @@ def accept_reject_sample(
 
     Args:
         proposal: A callable that takes `sample_shape` as arguments (and kwargs as
-        needed). Returns samples from the proposal distribution with shape
-        (*sample_shape, event_dim).
+            needed). Returns samples from the proposal distribution with shape
+            (*sample_shape, event_dim).
         accept_reject_fn: Function that evaluates which samples are accepted or
             rejected. Must take a batch of parameters and return a boolean tensor which
             indicates which parameters get accepted.
@@ -243,9 +246,8 @@ def accept_reject_sample(
         Accepted samples of shape `(sample_dim, batch_dim, *event_shape)`, and
         acceptance rates for each observation.
     """
-
     if kwargs:
-        logging.warn(
+        logging.warning(
             f"You passed arguments to `rejection_sampling_parameters` that "
             f"are unused when you do not specify a `proposal` in the same "
             f"dictionary. The unused arguments are: {kwargs}"
@@ -253,11 +255,6 @@ def accept_reject_sample(
 
     # Progress bar can be skipped, e.g. when sampling after each round just for
     # logging.
-    pbar = tqdm(
-        disable=not show_progress_bars,
-        total=num_samples,
-        desc=f"Drawing {num_samples} posterior samples",
-    )
     if proposal_sampling_kwargs is None:
         proposal_sampling_kwargs = {}
 
@@ -269,15 +266,23 @@ def accept_reject_sample(
     if "condition" in proposal_sampling_kwargs:
         num_xos = proposal_sampling_kwargs["condition"].shape[0]
 
+    pbar = tqdm(
+        disable=not show_progress_bars,
+        total=num_samples,
+        desc=f"Drawing {num_samples} samples for {num_xos} observation" + "s"
+        if num_xos > 1
+        else "",
+    )
+
     accepted = [[] for _ in range(num_xos)]
     acceptance_rate = torch.full((num_xos,), float("Nan"))
     leakage_warning_raised = False
-    # Ruff suggestion
 
     # To cover cases with few samples without leakage:
     sampling_batch_size = min(num_samples, max_sampling_batch_size)
     num_sampled_total = torch.zeros(num_xos)
     num_samples_possible = 0
+
     while num_remaining > 0:
         # Sample and reject.
         candidates = proposal(
@@ -286,6 +291,7 @@ def accept_reject_sample(
         )
         # SNPE-style rejection-sampling when the proposal is the neural net.
         are_accepted = accept_reject_fn(candidates)
+
         # Reshape necessary in certain cases which do not follow the shape conventions
         # of the "DensityEstimator" class.
         are_accepted = are_accepted.reshape(sampling_batch_size, num_xos)
@@ -321,7 +327,7 @@ def accept_reject_sample(
             max(int(1.5 * num_remaining / max(min_acceptance_rate, 1e-12)), 100),
         )
         if (
-            num_sampled_total.min().item() > 1000
+            num_samples_possible > (sampling_batch_size - 1)
             and min_acceptance_rate < warn_acceptance
             and not leakage_warning_raised
         ):

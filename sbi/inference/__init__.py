@@ -1,14 +1,17 @@
+# This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+
 from sbi.inference.abc import MCABC, SMCABC
 from sbi.inference.trainers.base import (
     NeuralInference,  # noqa: F401
     check_if_proposal_has_default_x,
     infer,
 )
-from sbi.inference.trainers.fmpe import FMPE
+from sbi.inference.trainers.marginal import MarginalTrainer
 from sbi.inference.trainers.nle import MNLE, NLE_A
-from sbi.inference.trainers.npe import NPE_A, NPE_B, NPE_C  # noqa: F401
-from sbi.inference.trainers.npse import NPSE
+from sbi.inference.trainers.npe import MNPE, NPE_A, NPE_B, NPE_C  # noqa: F401
 from sbi.inference.trainers.nre import BNRE, NRE_A, NRE_B, NRE_C  # noqa: F401
+from sbi.inference.trainers.vfpe import FMPE, NPSE
 
 SNL = SNLE = SNLE_A = NLE = NLE_A
 _nle_family = ["NLE"]
@@ -17,7 +20,7 @@ _nle_family = ["NLE"]
 SNPE_A = NPE_A
 SNPE_B = NPE_B
 SNPE = APT = SNPE_C = NPE = NPE_C
-_npe_family = ["NPE_A", "NPE_C"]
+_npe_family = ["NPE_A", "NPE_B", "NPE_C"]
 
 
 SRE = SNRE = SNRE_B = NRE = NRE_B
@@ -38,13 +41,16 @@ from sbi.inference.posteriors import (
     ImportanceSamplingPosterior,
     MCMCPosterior,
     RejectionPosterior,
-    ScorePosterior,
     VIPosterior,
+    VectorFieldPosterior,
 )
 from sbi.inference.potentials import (
     likelihood_estimator_based_potential,
     mixed_likelihood_estimator_based_potential,
     posterior_estimator_based_potential,
     ratio_estimator_based_potential,
+    vector_field_estimator_based_potential,
 )
 from sbi.utils.simulation_utils import simulate_for_sbi
+
+__all__ = ["FMPE", "MarginalTrainer", "NLE", "NPE", "NPSE", "NRE", "simulate_for_sbi"]

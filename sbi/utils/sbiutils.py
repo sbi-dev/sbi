@@ -5,7 +5,17 @@ import logging
 import random
 import warnings
 from math import pi
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Type, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Sequence,
+    Tuple,
+    Type,
+    Union,
+)
 
 import numpy as np
 import pyknos.nflows.transforms as nflows_tf
@@ -101,7 +111,9 @@ def clamp_and_warn(name: str, value: float, min_val: float, max_val: float) -> f
     return clamped_val
 
 
-def z_score_parser(z_score_flag: Optional["str"]) -> Tuple[bool, bool]:
+def z_score_parser(
+    z_score_flag: Optional[str] = None,
+) -> Tuple[bool, bool]:
     """Parses string z-score flag into booleans.
 
     Converts string flag into booleans denoting whether to z-score or not, and whether
@@ -133,11 +145,15 @@ def z_score_parser(z_score_flag: Optional["str"]) -> Tuple[bool, bool]:
         # Got one of two valid z-scoring methods.
         z_score_bool = True
         structured_data = z_score_flag == "structured"
-
+    elif z_score_flag == "transform_to_unconstrained":
+        # Dependent on the distribution, the biject_to function
+        # will provide e.g., a logit, exponential of z-scored distribution.
+        z_score_bool, structured_data = False, False
     else:
         # Return warning due to invalid option, defaults to not z-scoring.
         raise ValueError(
-            "Invalid z-scoring option. Use 'none', 'independent', or 'structured'."
+            "Invalid z-scoring option. Use 'none', 'independent' "
+            "'structured' or 'transform_to_unconstrained'."
         )
 
     return z_score_bool, structured_data
@@ -193,6 +209,35 @@ def standardizing_transform_zuko(
         AffineTransform,
         loc=-t_mean / t_std,
         scale=1 / t_std,
+        buffer=True,
+    )
+
+
+class CallableTransform:
+    """Wraps a PyTorch Transform to be used in Zuko UnconditionalTransform."""
+
+    def __init__(self, transform):
+        self.transform = transform
+
+    def __call__(self):
+        return self.transform
+
+
+def biject_transform_zuko(
+    transform: TorchTransform,
+) -> zuko.flows.UnconditionalTransform:
+    """
+    Wraps a pytorch transform in a Zuko unconditional transfrom on a bounded interval.
+
+    Args:
+        transform: a bijective transformation for Zuko, depending on the input
+        (e.g., logit, exponential or z-scored)
+
+    Returns:
+        Zuko bijective transformation
+    """
+    return zuko.flows.UnconditionalTransform(
+        CallableTransform(transform),
         buffer=True,
     )
 
@@ -284,7 +329,7 @@ def standardizing_net(
         # Compute per-dimension (independent) mean.
         t_mean = torch.mean(batch_t[is_valid_t], dim=0)
 
-    if len(batch_t > 1):
+    if len(batch_t) > 1:
         if structured_dims:
             # Compute std per-sample first.
             sample_std = torch.std(batch_t[is_valid_t], dim=1)
@@ -665,7 +710,7 @@ def mcmc_transform(
     prior: Distribution,
     num_prior_samples_for_zscoring: int = 1000,
     enable_transform: bool = True,
-    device: str = "cpu",
+    device: Union[str, torch.device] = "cpu",
     **kwargs,
 ) -> TorchTransform:
     """
@@ -676,7 +721,7 @@ def mcmc_transform(
 
     It does two things:
     1) When the prior support is bounded, it transforms the parameters into unbounded
-        space.
+    space.
     2) It z-scores the parameters such that MCMC is performed in a z-scored space.
 
     Args:
@@ -691,8 +736,25 @@ def mcmc_transform(
     Returns: A transformation that transforms whose `forward()` maps from unconstrained
         (or z-scored) to constrained (or non-z-scored) space.
     """
-
     if enable_transform:
+
+        def prior_mean_std_transform(prior, device):
+            try:
+                prior_mean = prior.mean.to(device)
+                prior_std = prior.stddev.to(device)
+            except (NotImplementedError, AttributeError):
+                warnings.warn(
+                    "The passed discrete prior has no mean or stddev attribute, "
+                    "estimating them from samples to build affine standardizing "
+                    "transform.",
+                    stacklevel=2,
+                )
+                theta = prior.sample(torch.Size((num_prior_samples_for_zscoring,)))
+                prior_mean = theta.mean(dim=0).to(device)
+                prior_std = theta.std(dim=0).to(device)
+            transform = torch_tf.AffineTransform(loc=prior_mean, scale=prior_std)
+            return transform
+
         # Some distributions have a support argument but it raises a
         # NotImplementedError. We catch this case here.
         try:
@@ -718,35 +780,31 @@ def mcmc_transform(
                 constraint = prior.support.base_constraint  # type: ignore
             else:
                 constraint = prior.support
-            if isinstance(constraint, constraints._Real):
-                support_is_bounded = False
+
+            # Check if the support is discrete
+            if hasattr(prior.support, "is_discrete"):
+                is_discrete = prior.support.is_discrete  # type: ignore
             else:
-                support_is_bounded = True
-        else:
-            support_is_bounded = False
+                is_discrete = False
 
-        # Prior with bounded support, e.g., uniform priors.
-        if has_support and support_is_bounded:
-            transform = biject_to(prior.support)
-        # For all other cases build affine transform with mean and std.
-        else:
-            try:
-                prior_mean = prior.mean.to(device)
-                prior_std = prior.stddev.to(device)
-            except (NotImplementedError, AttributeError):
-                # NotImplementedError -> Distribution that inherits from torch dist but
-                # does not implement mean, e.g., TransformedDistribution.
-                # AttributeError -> Custom distribution that has no mean/std attribute.
-                warnings.warn(
-                    "The passed prior has no mean or stddev attribute, estimating "
-                    "them from samples to build affimed standardizing transform.",
-                    stacklevel=2,
-                )
-                theta = prior.sample(torch.Size((num_prior_samples_for_zscoring,)))
-                prior_mean = theta.mean(dim=0).to(device)
-                prior_std = theta.std(dim=0).to(device)
+            if is_discrete:
+                # For discrete distributions, use mean/std transform
+                transform = prior_mean_std_transform(prior, device)
+            else:
+                # For continuous distributions, check if support is bounded
+                if isinstance(constraint, constraints._Real):
+                    support_is_bounded = False
+                else:
+                    support_is_bounded = True
 
-            transform = torch_tf.AffineTransform(loc=prior_mean, scale=prior_std)
+                if support_is_bounded:
+                    transform = biject_to(prior.support)
+                else:
+                    # Use mean/std transform for unbounded continuous distributions
+                    transform = prior_mean_std_transform(prior, device)
+        else:
+            # No support property, use mean/std transform
+            transform = prior_mean_std_transform(prior, device)
     else:
         transform = torch_tf.identity_transform
 
@@ -908,6 +966,7 @@ def gradient_ascent(
         theta_transform = theta_transform
 
     init_probs = potential_fn(inits).detach()
+    inits = inits.to(init_probs.device)
 
     # Pick the `num_to_optimize` best init locations.
     sort_indices = torch.argsort(init_probs, dim=0)

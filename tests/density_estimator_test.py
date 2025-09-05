@@ -3,27 +3,31 @@
 
 from __future__ import annotations
 
-from typing import Callable, Tuple
+from typing import Callable, Dict, Tuple
 
 import pytest
 import torch
-from torch import eye, zeros
-from torch.distributions import MultivariateNormal
+from torch import Tensor, eye, zeros
+from torch.distributions import HalfNormal, MultivariateNormal
 
+from sbi.inference import NLE, NPE, NRE
+from sbi.inference.trainers.base import NeuralInference
+from sbi.inference.trainers.vfpe.fmpe import FMPE
+from sbi.inference.trainers.vfpe.npse import NPSE
 from sbi.neural_nets.embedding_nets import CNNEmbedding
-from sbi.neural_nets.estimators.shape_handling import (
-    reshape_to_sample_batch_event,
-)
+from sbi.neural_nets.estimators.shape_handling import reshape_to_sample_batch_event
+from sbi.neural_nets.estimators.zuko_flow import ZukoFlow
 from sbi.neural_nets.net_builders import (
     build_categoricalmassestimator,
+    build_flow_matching_estimator,
     build_made,
     build_maf,
     build_maf_rqs,
     build_mdn,
-    build_mlp_flowmatcher,
     build_mnle,
+    build_mnpe,
     build_nsf,
-    build_resnet_flowmatcher,
+    build_score_matching_estimator,
     build_zuko_bpf,
     build_zuko_gf,
     build_zuko_maf,
@@ -34,6 +38,9 @@ from sbi.neural_nets.net_builders import (
     build_zuko_sospf,
     build_zuko_unaf,
 )
+from sbi.neural_nets.net_builders.flow import build_zuko_flow
+from sbi.neural_nets.ratio_estimators import RatioEstimator
+from sbi.utils.torchutils import BoxUniform
 
 # List of all density estimator builders for testing.
 model_builders = [
@@ -53,9 +60,10 @@ model_builders = [
     build_zuko_unaf,
 ]
 
-flowmatching_build_functions = [
-    build_mlp_flowmatcher,
-    build_resnet_flowmatcher,
+
+vector_field_builders = [
+    build_flow_matching_estimator,
+    build_score_matching_estimator,
 ]
 
 
@@ -137,7 +145,11 @@ def test_shape_handling_utility_for_density_estimator(
 
 
 @pytest.mark.parametrize(
-    "density_estimator_build_fn", model_builders + flowmatching_build_functions
+    "density_estimator_build_fn",
+    [
+        build_nsf,
+        build_zuko_nsf,
+    ],  # just test nflows and zuko i.e. normalizing flows
 )
 @pytest.mark.parametrize("input_sample_dim", (1, 2))
 @pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
@@ -192,7 +204,7 @@ def test_density_estimator_log_prob_shapes_with_embedding(
 @pytest.mark.parametrize("density_estimator_build_fn", model_builders)
 @pytest.mark.parametrize("sample_shape", ((), (1,), (2, 3)))
 @pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
-@pytest.mark.parametrize("condition_event_shape", ((1,), (7,)))
+@pytest.mark.parametrize("condition_event_shape", ((1,), (2,)))
 @pytest.mark.parametrize("batch_dim", (1, 10))
 def test_density_estimator_sample_shapes(
     density_estimator_build_fn,
@@ -242,9 +254,15 @@ def test_correctness_of_density_estimator_log_prob(
 
 
 @pytest.mark.parametrize(
-    "density_estimator_build_fn", model_builders + flowmatching_build_functions
+    "density_estimator_build_fn",
+    [
+        build_nsf,
+        build_zuko_nsf,
+    ],  # just test nflows and zuko
 )
-@pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
+@pytest.mark.parametrize(
+    "input_event_shape", ((1,), pytest.param((2,), marks=pytest.mark.slow))
+)
 @pytest.mark.parametrize("condition_event_shape", ((1,), (7,)))
 @pytest.mark.parametrize("sample_shape", ((1000,), (500, 2)))
 def test_correctness_of_batched_vs_seperate_sample_and_log_prob(
@@ -268,11 +286,17 @@ def test_correctness_of_batched_vs_seperate_sample_and_log_prob(
     samples = density_estimator.sample(sample_shape, condition=condition)
     samples = samples.reshape(-1, batch_dim, *input_event_shape)  # Flat for comp.
 
+    # Flatten sample_shape to (B*E,) if it is (B, E)
+    if len(sample_shape) > 1:
+        flat_sample_shape = (torch.prod(torch.tensor(sample_shape)).item(),)
+    else:
+        flat_sample_shape = sample_shape
+
     samples_separate1 = density_estimator.sample(
-        (1000,), condition=condition[0][None, ...]
+        flat_sample_shape, condition=condition[0][None, ...]
     )
     samples_separate2 = density_estimator.sample(
-        (1000,), condition=condition[1][None, ...]
+        flat_sample_shape, condition=condition[1][None, ...]
     )
 
     # Check if means are approx. same
@@ -311,11 +335,14 @@ def _build_density_estimator_and_tensors(
     """Helper function for all tests that deal with shapes of density
     estimators."""
 
+    batch_size = 1000
     # Use positive random values for continuous dims (log transform)
-    batch_input = torch.rand((1000, *input_event_shape), dtype=torch.float32) * 10.0
+    batch_input = (
+        torch.rand((batch_size, *input_event_shape), dtype=torch.float32) * 10.0
+    )
     # make last dim discrete for mixed density estimators
-    batch_input[:, -1] = torch.randint(0, 4, (1000,))
-    batch_condition = torch.randn((1000, *condition_event_shape))
+    batch_input[:, -1] = torch.randint(0, 4, (batch_size,))
+    batch_condition = torch.randn((batch_size, *condition_event_shape))
     if len(condition_event_shape) > 1:
         embedding_net = CNNEmbedding(condition_event_shape, kernel_size=1)
         z_score_y = "structured"
@@ -323,7 +350,13 @@ def _build_density_estimator_and_tensors(
         embedding_net = torch.nn.Identity()
         z_score_y = "independent"
 
-    if density_estimator_build_fn in [build_mnle, build_categoricalmassestimator]:
+    if density_estimator_build_fn in [
+        build_mnle,
+        build_mnpe,
+        build_categoricalmassestimator,
+        build_flow_matching_estimator,
+        build_score_matching_estimator,
+    ]:
         density_estimator = density_estimator_build_fn(
             batch_x=batch_input,
             batch_y=batch_condition,
@@ -331,11 +364,16 @@ def _build_density_estimator_and_tensors(
             z_score_y=z_score_y,
         )
     else:
+        embedding_net_kwarg = (
+            dict(embedding_net_y=embedding_net)
+            if "score" in density_estimator_build_fn.__name__
+            else dict(embedding_net=embedding_net)
+        )
         density_estimator = density_estimator_build_fn(
             torch.randn_like(batch_input),
             torch.randn_like(batch_condition),
-            embedding_net=embedding_net,
             z_score_y=z_score_y,
+            **embedding_net_kwarg,
         )
 
     inputs = batch_input[:batch_dim]
@@ -362,10 +400,26 @@ def _build_density_estimator_and_tensors(
         [build_mnle, 1, (2,), (7, 7), 10],
         [build_mnle, 1, (2,), (2, 7), 10],
         [build_mnle, 1, (2,), (7, 2), 10],
+        # Add MNPE test cases (note: x and y roles are swapped)
+        (build_mnpe, 1, (2,), (7,), 1),
+        (build_mnpe, 1, (2,), (7,), 10),
+        [build_mnpe, 1, (2,), (7, 7), 10],
+        [build_mnpe, 1, (2,), (2, 7), 10],
+        [build_mnpe, 1, (2,), (7, 2), 10],
         [build_categoricalmassestimator, 1, (1,), (7, 7), 10],
         [build_categoricalmassestimator, 2, (1,), (7, 7), 10],
         pytest.param(
             build_mnle,
+            2,
+            (1,),
+            (7,),
+            10,
+            marks=pytest.mark.xfail(
+                reason="Sample dim > 1 not supported for Mixed Density Estimation"
+            ),
+        ),
+        pytest.param(
+            build_mnpe,
             2,
             (1,),
             (7,),
@@ -415,3 +469,197 @@ def test_mixed_density_estimator(
     # Test samples
     samples = density_estimator.sample(sample_shape, condition=conditions)
     assert samples.shape == (*sample_shape, batch_dim, *input_event_shape)
+
+
+@pytest.mark.parametrize("which_nf", ["MAF", "CNF"])
+@pytest.mark.parametrize(
+    "x_dist",
+    [
+        BoxUniform(low=-2 * torch.ones(5), high=2 * torch.ones(5)),
+        HalfNormal(scale=torch.ones(1) * 2),
+        MultivariateNormal(loc=zeros(5), covariance_matrix=eye(5)),
+    ],
+)
+def test_build_zuko_flow_with_valid_unconstrained_transform(which_nf, x_dist):
+    """Test that ZukoFlow builds successfully with valid `x_dist`."""
+    # input dimension is 5
+    batch_x = torch.randn(10, 5)
+    batch_y = torch.randn(10, 3)
+
+    # Test case where x_dist is provided (should not raise an error)
+    flow = build_zuko_flow(
+        which_nf=which_nf,
+        batch_x=batch_x,
+        batch_y=batch_y,
+        z_score_x="transform_to_unconstrained",
+        z_score_y="transform_to_unconstrained",
+        x_dist=x_dist,
+    )
+    assert isinstance(flow, ZukoFlow)
+
+
+@pytest.mark.parametrize("which_nf", ["MAF", "CNF"])
+def test_build_zuko_flow_missing_x_dist_raises_error(which_nf):
+    """Test that ValueError is raised if `x_dist` is None when required."""
+    batch_x = torch.randn(10, 5)
+    batch_y = torch.randn(10, 3)
+
+    with pytest.raises(
+        ValueError,
+        match=r".*distribution.*x_dist.*",
+    ):
+        build_zuko_flow(
+            which_nf=which_nf,
+            batch_x=batch_x,
+            batch_y=batch_y,
+            z_score_x="transform_to_unconstrained",
+            z_score_y="transform_to_unconstrained",
+            x_dist=None,  # No distribution provided
+        )
+
+
+def build_classifier(theta, x):
+    net = torch.nn.Linear(theta.shape[1] + x.shape[1], 1)
+    return RatioEstimator(net=net, theta_shape=theta[0].shape, x_shape=x[0].shape)
+
+
+def build_estimator(theta, x):
+    return build_mdn(theta, x)
+
+
+def build_vf_estimator_npse(theta, x):
+    return build_score_matching_estimator(theta, x)
+
+
+def build_vf_estimator_fmpe(theta, x):
+    return build_flow_matching_estimator(theta, x)
+
+
+def build_estimator_missing_args():
+    pass
+
+
+def build_estimator_missing_return(theta: Tensor, x: Tensor):
+    pass
+
+
+@pytest.mark.parametrize(
+    ("params", "trainer_class"),
+    [
+        # Valid builders
+        pytest.param(dict(classifier=build_classifier), NRE),
+        pytest.param(dict(density_estimator=build_estimator), NPE),
+        pytest.param(dict(density_estimator=build_estimator), NLE),
+        pytest.param(dict(vf_estimator=build_vf_estimator_fmpe), FMPE),
+        pytest.param(dict(vf_estimator=build_vf_estimator_npse), NPSE),
+        # Invalid builders
+        pytest.param(
+            dict(classifier=build_estimator_missing_args),
+            NRE,
+            marks=pytest.mark.xfail(
+                raises=TypeError,
+                reason="Missing required parameters in classifier builder.",
+            ),
+        ),
+        pytest.param(
+            dict(density_estimator=build_estimator_missing_args),
+            NPE,
+            marks=pytest.mark.xfail(
+                raises=TypeError,
+                reason="Missing required parameters in density estimator builder.",
+            ),
+        ),
+        pytest.param(
+            dict(density_estimator=build_estimator_missing_args),
+            NLE,
+            marks=pytest.mark.xfail(
+                raises=TypeError,
+                reason="Missing required parameters in density estimator builder.",
+            ),
+        ),
+        pytest.param(
+            dict(vf_estimator=build_estimator_missing_args),
+            FMPE,
+            marks=pytest.mark.xfail(
+                raises=TypeError,
+                reason="Missing required parameters in vf_estimator builder.",
+            ),
+        ),
+        pytest.param(
+            dict(vf_estimator=build_estimator_missing_args),
+            NPSE,
+            marks=pytest.mark.xfail(
+                raises=TypeError,
+                reason="Missing required parameters in vf_estimator builder.",
+            ),
+        ),
+        pytest.param(
+            dict(classifier=build_estimator_missing_return),
+            NRE,
+            marks=pytest.mark.xfail(
+                raises=AttributeError,
+                reason="Missing return of RatioEstimator in classifier builder.",
+            ),
+        ),
+        pytest.param(
+            dict(density_estimator=build_estimator_missing_return),
+            NPE,
+            marks=pytest.mark.xfail(
+                raises=AttributeError,
+                reason="Missing return of type ConditionalEstimator"
+                " in density estimator builder.",
+            ),
+        ),
+        pytest.param(
+            dict(density_estimator=build_estimator_missing_return),
+            NLE,
+            marks=pytest.mark.xfail(
+                raises=AttributeError,
+                reason="Missing return of type ConditionalEstimator"
+                " in density estimator builder.",
+            ),
+        ),
+        pytest.param(
+            dict(vf_estimator=build_estimator_missing_return),
+            FMPE,
+            marks=pytest.mark.xfail(
+                raises=AttributeError,
+                reason="Missing return of type ConditionalVectorFieldEstimator"
+                " in density estimator builder.",
+            ),
+        ),
+        pytest.param(
+            dict(vf_estimator=build_estimator_missing_return),
+            NPSE,
+            marks=pytest.mark.xfail(
+                raises=AttributeError,
+                reason="Missing return of type ConditionalVectorFieldEstimator"
+                " in density estimator builder.",
+            ),
+        ),
+    ],
+)
+def test_trainers_with_valid_and_invalid_estimator_builders(
+    params: Dict, trainer_class: type[NeuralInference]
+):
+    """
+    Test trainers classes work with valid classifier builders and fail
+    with invalid ones.
+
+    Args:
+        params: Parameters passed to the trainer class.
+        trainer_class: Trainer classes.
+    """
+
+    def simulator(theta):
+        return 1.0 + theta + torch.randn(theta.shape, device=theta.device) * 0.1
+
+    num_dim = 3
+    prior = BoxUniform(low=-2 * torch.ones(num_dim), high=2 * torch.ones(num_dim))
+    theta = prior.sample((300,))
+    x = simulator(theta)
+
+    inference = trainer_class(**params)
+    inference.append_simulations(theta, x)
+
+    inference.train(max_num_epochs=1)

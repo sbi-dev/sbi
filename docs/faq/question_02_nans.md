@@ -8,7 +8,7 @@ In cases where a very large fraction of simulations return `NaN` or `inf`,
 discarding many simulations can be wasteful. There are two options to deal with
 this: Either you use the `RestrictionEstimator` to learn regions in parameter
 space that do not produce `NaN` or `inf`, see
-[here](https://sbi-dev.github.io/sbi/latest/tutorials/06_restriction_estimator/).
+[here](https://sbi.readthedocs.io/en/latest/advanced_tutorials/06_restriction_estimator.html).
 Alternatively, you can manually substitute the 'invalid' values with a
 reasonable replacement. For example, at the end of your simulation code, you
 search for invalid entries and replace them with a floating point number.
