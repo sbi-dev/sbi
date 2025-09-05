@@ -23,7 +23,7 @@ from sbi.analysis.sensitivity_analysis import (
 
 @pytest.fixture
 def toy_theta_property() -> Tuple[Tensor, Tensor]:
-    # Small synthetic regression task: y = sum(theta) + noise
+    """Small synthetic (theta, property) dataset for regression testing."""
     n, d = 64, 3
     theta = torch.randn(n, d)
     y = theta.sum(dim=1, keepdim=True) + 0.05 * torch.randn(n, 1)
@@ -31,6 +31,8 @@ def toy_theta_property() -> Tuple[Tensor, Tensor]:
 
 
 class _PriorWithStats:
+    """Simple Gaussian prior with mean and stddev attributes."""
+
     def __init__(self, d: int):
         self.mean = torch.zeros(d)
         self.stddev = torch.ones(d)
@@ -40,6 +42,8 @@ class _PriorWithStats:
 
 
 class _PriorWithoutStats:
+    """Simple prior without mean and stddev attributes."""
+
     def __init__(self, d: int):
         self._d = d
 
@@ -48,6 +52,8 @@ class _PriorWithoutStats:
 
 
 class _PosteriorStub:
+    """Stub posterior with simple Gaussian prior and quadratic potential."""
+
     def __init__(self, d: int, with_stats: bool = True):
         self._device = "cpu"
         self.d = d
@@ -69,12 +75,13 @@ class _PosteriorStub:
     ]
 )
 def posterior_stub(request) -> _PosteriorStub:
+    """Fixture providing a stub posterior with and without prior stats."""
     return _PosteriorStub(d=3, with_stats=request.param)
 
 
 @pytest.fixture
 def embedding_net_theta() -> nn.Module:
-    # Lightweight embedding to exercise embedding pathway
+    """Small embedding net for theta."""
     return nn.Sequential(nn.Linear(3, 3), nn.ReLU())
 
 
@@ -84,6 +91,7 @@ def embedding_net_theta() -> nn.Module:
 
 
 def test_destandardize_and_destandardizing_net_forward() -> None:
+    """Tests destandardizing_net and Destandardize layer."""
     # Create a batch with near-zero variance in one dim to exercise min-std flooring
     n, d = 50, 2
     col0 = torch.randn(n, 1)
@@ -109,6 +117,7 @@ def test_destandardize_and_destandardizing_net_forward() -> None:
 
 
 def test_destandardizing_net_single_sample_branch() -> None:
+    """Tests destandardizing_net when batch has a single row."""
     # When batch has a single row, we enter the else-branch and use t_std = 1
     batch = torch.tensor([[2.0, -3.0]], dtype=torch.float32)
     net = destandardizing_net(batch, min_std=0.5)
@@ -169,6 +178,7 @@ def test_add_property_and_train_models(
     posterior_stub,
     embedding_net_theta,
 ) -> None:
+    """Tests that add_property and train run without error for different models."""
     theta, y = toy_theta_property
     a = ActiveSubspace(posterior_stub)
     a.add_property(
@@ -195,6 +205,7 @@ def test_add_property_and_train_models(
 
 
 def test_add_property_with_callable_model(toy_theta_property, posterior_stub) -> None:
+    """Tests that add_property works with a user-defined model builder."""
     theta, y = toy_theta_property
 
     def builder(batch_theta: Tensor) -> nn.Module:
@@ -208,6 +219,7 @@ def test_add_property_with_callable_model(toy_theta_property, posterior_stub) ->
 
 
 def test_add_property_invalid_model_raises(toy_theta_property, posterior_stub) -> None:
+    """Tests that add_property raises for invalid model name."""
     theta, y = toy_theta_property
     a = ActiveSubspace(posterior_stub)
     with pytest.raises(NameError):
@@ -251,6 +263,7 @@ def test_find_directions_with_regression_net(
 def test_find_directions_with_posterior_log_prob_warns(
     toy_theta_property, posterior_stub
 ) -> None:
+    """Tests that find_directions with posterior log-prob issues a warning."""
     theta, y = toy_theta_property
     a = ActiveSubspace(posterior_stub)
     a.add_property(theta=theta, emergent_property=y, model="mlp", hidden_features=8)
@@ -266,6 +279,7 @@ def test_find_directions_with_posterior_log_prob_warns(
 
 
 def test_find_directions_raises_without_property(posterior_stub) -> None:
+    """Tests that find_directions raises if no property was added."""
     a = ActiveSubspace(posterior_stub)
     with pytest.raises(ValueError):
         _ = a.find_directions(
@@ -277,6 +291,7 @@ def test_find_directions_raises_without_property(posterior_stub) -> None:
 def test_project_after_find_directions(
     norm_gradients, toy_theta_property, posterior_stub
 ) -> None:
+    """Tests that project works after find_directions and returns correct shapes."""
     theta, y = toy_theta_property
     a = ActiveSubspace(posterior_stub)
     a.add_property(theta=theta, emergent_property=y, model="mlp", hidden_features=8)
