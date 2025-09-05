@@ -36,28 +36,68 @@ jobs:
         id: find
         shell: bash
         run: |
+          set -euo pipefail
           shopt -s nullglob
-          files=(dist/*.whl dist/*.tar.gz)
-          if [ ${#files[@]} -eq 0 ]; then
+          # Gather candidate distribution files
+          candidates=(dist/*.whl dist/*.tar.gz)
+          if [ ${#candidates[@]} -eq 0 ]; then
             echo "No distribution files found in dist/." >&2
-            exit 1
+            # Nothing to do; expose empty outputs
+            echo 'inputs=' >> "$GITHUB_OUTPUT"
+            echo 'bundles=' >> "$GITHUB_OUTPUT"
+            exit 0
           fi
-          printf '%s\n' "${files[@]}"
+          # Filter to only those missing their .sigstore.json bundle
+          to_sign=()
+          bundles=()
+          for f in "${candidates[@]}"; do
+            b="${f}.sigstore.json"
+            if [ ! -f "$b" ]; then
+              to_sign+=("$f")
+              bundles+=("$b")
+            fi
+          done
+          if [ ${#to_sign[@]} -eq 0 ]; then
+            echo "All bundles already present; nothing to sign."
+            echo 'inputs=' >> "$GITHUB_OUTPUT"
+            echo 'bundles=' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          printf 'Will sign %d file(s):\n' "${#to_sign[@]}"
+          printf '%s\n' "${to_sign[@]}"
+          # Emit multiline outputs for subsequent steps
           {
-            echo 'files<<EOF'
-            printf '%s\n' "${files[@]}"
+            echo 'inputs<<EOF'
+            printf '%s\n' "${to_sign[@]}"
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo 'bundles<<EOF'
+            printf '%s\n' "${bundles[@]}"
             echo 'EOF'
           } >> "$GITHUB_OUTPUT"
 
       - name: Sign assets with Sigstore
+        if: ${{ steps.find.outputs.inputs != '' }}
         uses: sigstore/gh-action-sigstore-python@v3.0.0
         with:
-          inputs: ${{ steps.find.outputs.files }}
+          inputs: ${{ steps.find.outputs.inputs }}
 
       - name: Upload signatures to GitHub Release
+        if: ${{ steps.find.outputs.bundles != '' }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: >-
-          gh release upload
-          '${{ inputs.tag }}' dist/**/*.sigstore.json
-          --repo '${{ github.repository }}'
+        run: |
+          set -euo pipefail
+          # Read bundle list from the step output and upload only new ones
+          mapfile -t paths < <(printf '%s\n' "${{ steps.find.outputs.bundles }}")
+          # Filter out any empty lines
+          cleaned=()
+          for p in "${paths[@]}"; do
+            [ -n "$p" ] && cleaned+=("$p")
+          done
+          if [ ${#cleaned[@]} -gt 0 ]; then
+            gh release upload "${{ inputs.tag }}" "${cleaned[@]}" --repo "${{ github.repository }}"
+          else
+            echo "No new bundles to upload."
+          fi
