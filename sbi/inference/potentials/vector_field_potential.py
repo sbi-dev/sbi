@@ -229,11 +229,13 @@ class VectorFieldBasedPotential(BasePotential):
         if self.guidance_method is not None:
             score_wrapper, cfg = get_guidance_method(self.guidance_method)
             cfg_params = cfg(**(self.guidance_params or {}))
+            # Note to make this cross compatible with IID we need make this
+            # wrapper more like a proper estimator.
             vf_estimator = score_wrapper(
                 self.vector_field_estimator,
                 self.prior,
+                cfg=cfg_params,
                 device=device,
-                **cfg_params,
             )
         else:
             vf_estimator = self.vector_field_estimator

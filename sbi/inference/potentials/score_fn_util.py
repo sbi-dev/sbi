@@ -98,7 +98,7 @@ def register_iid_method(name: str) -> Callable:
 class ScoreAdaptation(ABC):
     def __init__(
         self,
-        score_estimator: ConditionalScoreEstimator,
+        vf_estimator: ConditionalVectorFieldEstimator,
         prior: Optional[Distribution],
         device: str = "cpu",
     ):
@@ -110,13 +110,16 @@ class ScoreAdaptation(ABC):
             prior: The prior distribution.
             device: The device on which to evaluate the potential.
         """
-        self.score_estimator = score_estimator
+        self.vf_estimator = vf_estimator
         self.prior = prior
         self.device = device
 
     @abstractmethod
     def __call__(self, input: Tensor, condition: Tensor, time: Optional[Tensor] = None):
         pass
+
+    def score(self, input: Tensor, condition: Tensor, t: Optional[Tensor] = None):
+        return self.__call__(input, condition, t)
 
 
 @dataclass
@@ -131,7 +134,7 @@ class AffineClassifierFreeGuidanceCfg:
 class AffineClassifierFreeGuidance(ScoreAdaptation):
     def __init__(
         self,
-        score_estimator: ConditionalScoreEstimator,
+        vf_estimator: ConditionalVectorFieldEstimator,
         prior: Optional[Distribution],
         cfg: AffineClassifierFreeGuidanceCfg,
         device: str = "cpu",
@@ -166,23 +169,21 @@ class AffineClassifierFreeGuidance(ScoreAdaptation):
         self.prior_shift = torch.tensor(cfg.prior_shift, device=device)
         self.likelihood_scale = torch.tensor(cfg.likelihood_scale, device=device)
         self.likelihood_shift = torch.tensor(cfg.likelihood_shift, device=device)
-        super().__init__(score_estimator, prior, device)
+        super().__init__(vf_estimator, prior, device)
 
     def marginal_prior_score(self, theta: Tensor, time: Tensor):
         """Computes the marginal prior score analyticaly (or approximatly)"""
-        m = self.score_estimator.mean_t_fn(time)
-        std = self.score_estimator.std_fn(time)
+        m = self.vf_estimator.mean_t_fn(time)
+        std = self.vf_estimator.std_fn(time)
         marginal_prior = marginalize(self.prior, m, std)  # type: ignore
         marginal_prior_score = compute_score(marginal_prior, theta)
         return marginal_prior_score
 
     def __call__(self, input: Tensor, condition: Tensor, time: Optional[Tensor] = None):
         if time is None:
-            time = torch.tensor([self.score_estimator.t_min])
+            time = torch.tensor([self.vf_estimator.t_min])
 
-        posterior_score = self.score_estimator(
-            input=input, condition=condition, time=time
-        )
+        posterior_score = self.vf_estimator(input=input, condition=condition, time=time)
         prior_score = self.marginal_prior_score(input, time)
         ll_score = posterior_score - prior_score
         ll_score_mod = ll_score * self.likelihood_scale + self.likelihood_shift
@@ -203,7 +204,7 @@ class UniversalGuidanceCfg:
 class UniversalGuidance(ScoreAdaptation):
     def __init__(
         self,
-        score_estimator: ConditionalScoreEstimator,
+        vf_estimator: ConditionalVectorFieldEstimator,
         prior: Optional[Distribution],
         cfg: UniversalGuidanceCfg,
         device: str = "cpu",
@@ -240,14 +241,14 @@ class UniversalGuidance(ScoreAdaptation):
         else:
             self.guidance_fn_score = cfg.guidance_fn_score
 
-        super().__init__(score_estimator, prior, device)
+        super().__init__(vf_estimator, prior, device)
 
     def __call__(self, input: Tensor, condition: Tensor, time: Optional[Tensor] = None):
         if time is None:
-            time = torch.tensor([self.score_estimator.t_min])
-        score = self.score_estimator(input, condition, time)
-        m = self.score_estimator.mean_t_fn(time)
-        std = self.score_estimator.std_fn(time)
+            time = torch.tensor([self.vf_estimator.t_min])
+        score = self.vf_estimator(input, condition, time)
+        m = self.vf_estimator.mean_t_fn(time)
+        std = self.vf_estimator.std_fn(time)
 
         # Tweedie's formula for denoising
         denoised_input = (input + std**2 * score) / m
@@ -268,7 +269,7 @@ class IntervalGuidanceCfg:
 class IntervalGuidance(UniversalGuidance):
     def __init__(
         self,
-        score_estimator: ConditionalScoreEstimator,
+        vf_estimator: ConditionalVectorFieldEstimator,
         prior: Optional[Distribution],
         cfg: IntervalGuidanceCfg,
         device: str = "cpu",
@@ -311,7 +312,7 @@ class IntervalGuidance(UniversalGuidance):
             return out
 
         super().__init__(
-            score_estimator,
+            vf_estimator,
             prior,
             UniversalGuidanceCfg(guidance_fn=interval_fn),
             device=device,

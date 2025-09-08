@@ -637,6 +637,8 @@ def test_iid_log_prob(vector_field_type, prior_type, iid_batch_size):
 
 
 @pytest.mark.slow
+@pytest.mark.parametrize("vector_field_type", ["ve", "fmpe"])
+@pytest.mark.parametrize("prior_type", ["gaussian"])
 @pytest.mark.parametrize(
     "guidance_params",
     [
@@ -645,14 +647,15 @@ def test_iid_log_prob(vector_field_type, prior_type, iid_batch_size):
         pytest.param({"lower_bound": 1.0, "upper_bound": None}, id="only lower"),
     ],
 )
-def test_npse_interval_guidance(npse_trained_model, guidance_params):
+def test_npse_interval_guidance(vector_field_type, prior_type, guidance_params):
     """Test whether NPSE infers well a simple example with available ground truth."""
     num_samples = 1000
+    vector_field_trained_model = train_vector_field_model(vector_field_type, prior_type)
 
     # Extract data from fixture
-    score_estimator = npse_trained_model["score_estimator"]
-    inference = npse_trained_model["inference"]
-    num_dim = npse_trained_model["num_dim"]
+    score_estimator = vector_field_trained_model["estimator"]
+    inference = vector_field_trained_model["inference"]
+    num_dim = vector_field_trained_model["num_dim"]
 
     x_o = zeros(1, num_dim)
     posterior = inference.build_posterior(score_estimator)
@@ -670,6 +673,8 @@ def test_npse_interval_guidance(npse_trained_model, guidance_params):
 
 
 @pytest.mark.slow
+@pytest.mark.parametrize("vector_field_type", ["ve", "fmpe"])
+@pytest.mark.parametrize("prior_type", ["gaussian"])
 @pytest.mark.parametrize(
     "guidance_params",
     [
@@ -677,19 +682,20 @@ def test_npse_interval_guidance(npse_trained_model, guidance_params):
         pytest.param({"likelihood_scale": 0.8}, id="decrease likelihood"),
     ],
 )
-def test_npse_affine_classifier_free(npse_trained_model, guidance_params):
+def test_npse_affine_classifier_free(vector_field_type, prior_type, guidance_params):
     """Test whether NPSE infers well a simple example with available ground truth."""
     num_samples = 1000
+    vf_trained_model = train_vector_field_model(vector_field_type, prior_type)
 
     # Extract data from fixture
-    score_estimator = npse_trained_model["score_estimator"]
-    inference = npse_trained_model["inference"]
-    num_dim = npse_trained_model["num_dim"]
-    likelihood_shift = npse_trained_model["likelihood_shift"]
-    likelihood_cov = npse_trained_model["likelihood_cov"]
-    prior_mean = npse_trained_model["prior_mean"]
-    prior_cov = npse_trained_model["prior_cov"]
-    prior = npse_trained_model["prior"]
+    score_estimator = vf_trained_model["estimator"]
+    inference = vf_trained_model["inference"]
+    num_dim = vf_trained_model["num_dim"]
+    likelihood_shift = vf_trained_model["likelihood_shift"]
+    likelihood_cov = vf_trained_model["likelihood_cov"]
+    prior_mean = vf_trained_model["prior_mean"]
+    prior_cov = vf_trained_model["prior_cov"]
+    prior = vf_trained_model["prior"]
     if not isinstance(prior, MultivariateNormal):
         return
 
