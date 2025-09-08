@@ -637,7 +637,7 @@ def test_iid_log_prob(vector_field_type, prior_type, iid_batch_size):
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize("vector_field_type", ["ve", "fmpe"])
+@pytest.mark.parametrize("vector_field_type", ["ve", "vp"])
 @pytest.mark.parametrize("prior_type", ["gaussian"])
 @pytest.mark.parametrize(
     "guidance_params",
@@ -673,7 +673,7 @@ def test_npse_interval_guidance(vector_field_type, prior_type, guidance_params):
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize("vector_field_type", ["ve", "fmpe"])
+@pytest.mark.parametrize("vector_field_type", ["ve", "vp"])
 @pytest.mark.parametrize("prior_type", ["gaussian"])
 @pytest.mark.parametrize(
     "guidance_params",
