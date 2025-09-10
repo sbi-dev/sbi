@@ -761,9 +761,7 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
 
         self._proposal_roundwise.append(proposal)
 
-        if self._prior is None or (
-            isinstance(self._prior, NoPrior) and self._prior.batch_shape == torch.Size()
-        ):
+        if self._prior is None:
             inputs_prior = self.get_simulations()[0].to(self._device)
 
             # To prevent an ImproperEmpirical built over invalid values
@@ -773,11 +771,7 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
             # ImproperEmpirical at all
             inputs_prior, _ = handle_invalid_inputs_for_simformer(inputs_prior)
 
-            self._prior = NoPrior(
-                batch_shape=inputs_prior.shape[:1],
-                event_shape=inputs_prior.shape[1:],
-                device=data_device,
-            )
+            self._prior = NoPrior(event_shape=inputs_prior.shape[1:])
 
         return self
 
