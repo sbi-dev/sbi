@@ -913,6 +913,8 @@ class NoPrior(Distribution):
     See #1635.
     """
 
+    support = constraints.real  # type: ignore
+
     def __init__(
         self, batch_shape=torch.Size(), event_shape=torch.Size(), device: str = 'cpu'
     ):
