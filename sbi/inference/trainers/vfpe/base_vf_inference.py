@@ -1088,8 +1088,8 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
 
     def build_posterior(
         self,
-        edge_mask: Optional[Tensor] = None,
         mvf_estimator: Optional[MaskedConditionalVectorFieldEstimator] = None,
+        edge_mask: Optional[Tensor] = None,
         prior: Optional[Distribution] = None,
         sample_with: Literal['ode', 'sde'] = "sde",
         posterior_parameters: Optional[VectorFieldPosteriorParameters] = None,
@@ -1144,8 +1144,8 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
 
     def build_likelihood(
         self,
-        edge_mask: Optional[Tensor] = None,
         mvf_estimator: Optional[MaskedConditionalVectorFieldEstimator] = None,
+        edge_mask: Optional[Tensor] = None,
         prior: Optional[Distribution] = None,
         sample_with: Literal['ode', 'sde'] = "sde",
         likelihood_parameters: Optional[VectorFieldPosteriorParameters] = None,
