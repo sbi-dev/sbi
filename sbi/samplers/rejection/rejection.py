@@ -269,7 +269,9 @@ def accept_reject_sample(
     pbar = tqdm(
         disable=not show_progress_bars,
         total=num_samples,
-        desc=f"Drawing {num_samples} posterior samples for {num_xos} observations",
+        desc=f"Drawing {num_samples} samples for {num_xos} observation" + "s"
+        if num_xos > 1
+        else "",
     )
 
     accepted = [[] for _ in range(num_xos)]
@@ -280,6 +282,7 @@ def accept_reject_sample(
     sampling_batch_size = min(num_samples, max_sampling_batch_size)
     num_sampled_total = torch.zeros(num_xos)
     num_samples_possible = 0
+
     while num_remaining > 0:
         # Sample and reject.
         candidates = proposal(
@@ -288,6 +291,7 @@ def accept_reject_sample(
         )
         # SNPE-style rejection-sampling when the proposal is the neural net.
         are_accepted = accept_reject_fn(candidates)
+
         # Reshape necessary in certain cases which do not follow the shape conventions
         # of the "DensityEstimator" class.
         are_accepted = are_accepted.reshape(sampling_batch_size, num_xos)
@@ -323,7 +327,7 @@ def accept_reject_sample(
             max(int(1.5 * num_remaining / max(min_acceptance_rate, 1e-12)), 100),
         )
         if (
-            num_samples_possible > 1000
+            num_samples_possible > (sampling_batch_size - 1)
             and min_acceptance_rate < warn_acceptance
             and not leakage_warning_raised
         ):

@@ -20,7 +20,7 @@ from typing import (
 from warnings import warn
 
 import torch
-from torch import Tensor, nn
+from torch import Tensor
 from torch.distributions import Distribution
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
@@ -51,7 +51,6 @@ from sbi.neural_nets.estimators.base import (
     MaskedConditionalEstimator,
     MaskedConditionalVectorFieldEstimator,
 )
-from sbi.neural_nets.ratio_estimators import RatioEstimator
 from sbi.sbi_types import TorchTransform
 from sbi.utils import (
     check_prior,
@@ -178,9 +177,7 @@ def check_if_proposal_has_default_x(proposal: Any):
 class BaseNeuralInference:
     "Mixin for NeuralInference objects"
 
-    _neural_net: Optional[
-        Union[RatioEstimator, ConditionalEstimator, MaskedConditionalEstimator]
-    ]
+    _neural_net: Optional[Union[ConditionalEstimator, MaskedConditionalEstimator]]
     _train_loss: float
     _val_loss: float
     _prior: Distribution
@@ -340,7 +337,7 @@ class BaseNeuralInference:
     def _get_potential_function(
         self,
         prior: Distribution,
-        estimator: nn.Module,
+        estimator: ConditionalEstimator | MaskedConditionalEstimator,
     ) -> Tuple[BasePotential, TorchTransform]:
         """Abstract definition for subclass-specific potential creation"""
         ...
@@ -390,8 +387,8 @@ class BaseNeuralInference:
         return prior
 
     def _resolve_estimator(
-        self, estimator: Optional[nn.Module]
-    ) -> Tuple[nn.Module, str]:
+        self, estimator: Optional[ConditionalEstimator | MaskedConditionalEstimator]
+    ) -> Tuple[ConditionalEstimator | MaskedConditionalEstimator, str]:
         """
         Resolves the estimator and determines its device.
 
@@ -415,12 +412,11 @@ class BaseNeuralInference:
             device = self._device
         else:
             if not isinstance(
-                estimator,
-                (ConditionalEstimator, RatioEstimator, MaskedConditionalEstimator),
+                estimator, (ConditionalEstimator, MaskedConditionalEstimator)
             ):
                 raise TypeError(
-                    f"`estimator` must be ConditionalEstimator, RatioEstimator "
-                    f"or MaskedConditionalEstimator, got {type(estimator).__name__}",
+                    "estimator must be ConditionalEstimator,"
+                    f" got {type(estimator).__name__}",
                 )
             # Otherwise, infer it from the device of the net parameters
             device = str(next(estimator.parameters()).device)
@@ -651,7 +647,7 @@ class BaseNeuralInference:
 
     def _create_posterior(
         self,
-        estimator: nn.Module,
+        estimator: ConditionalEstimator | MaskedConditionalEstimator,
         prior: Distribution,
         sample_with: Literal[
             "mcmc", "rejection", "vi", "importance", "direct", "sde", "ode"
@@ -999,7 +995,7 @@ class BaseNeuralInference:
 class NeuralInference(ABC, BaseNeuralInference):
     """Abstract base class for neural inference methods."""
 
-    _neural_net: Optional[RatioEstimator | ConditionalEstimator]
+    _neural_net: Optional[ConditionalEstimator]
 
     def __init__(
         self,
@@ -1115,7 +1111,7 @@ class NeuralInference(ABC, BaseNeuralInference):
 
     def build_posterior(
         self,
-        estimator: Optional[Union[RatioEstimator, ConditionalEstimator]],
+        estimator: Optional[ConditionalEstimator],
         prior: Optional[Distribution],
         sample_with: Literal[
             "mcmc", "rejection", "vi", "importance", "direct", "sde", "ode"
@@ -1169,8 +1165,8 @@ class NeuralInference(ABC, BaseNeuralInference):
         return deepcopy(self._posterior)
 
     def _resolve_estimator(
-        self, estimator: Optional[Union[RatioEstimator, ConditionalEstimator]]
-    ) -> Tuple[Union[RatioEstimator, ConditionalEstimator], str]:
+        self, estimator: Optional[ConditionalEstimator]
+    ) -> Tuple[ConditionalEstimator, str]:
         """
         Resolves the estimator and determines its device.
 
@@ -1185,7 +1181,7 @@ class NeuralInference(ABC, BaseNeuralInference):
             A tuple of (estimator, device).
         """
         resolved_estimator, device = super()._resolve_estimator(estimator)
-        assert isinstance(resolved_estimator, (RatioEstimator, ConditionalEstimator)), (
+        assert isinstance(resolved_estimator, (ConditionalEstimator)), (
             f"Expected `estimator` to be a RatioEstimator, ConditionalEstimator "
             f"or None but got {type(resolved_estimator).__name__}. "
             "Ensure that the estimator passed to NeuralInference is of the "

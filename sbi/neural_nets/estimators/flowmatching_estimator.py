@@ -246,7 +246,9 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         score = (-(1 - t) * v - input) / (t + self.noise_scale)
         return score
 
-    def drift_fn(self, input: Tensor, times: Tensor) -> Tensor:
+    def drift_fn(
+        self, input: Tensor, times: Tensor, effective_t_max: float = 0.99
+    ) -> Tensor:
         r"""Drift function for the flow matching estimator.
 
         The drift function is calculated based on [3]_ (see Equation 7):
@@ -266,14 +268,22 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         Args:
             input: Parameters :math:`\theta_t`.
             times: SDE time variable in [0,1].
+            effective_t_max: Upper bound on time to avoid numerical issues at t=1.
+                This effectively prevents an explosion of the SDE in the beginning.
+                Note that this does not affect the ODE sampling, which always uses
+                times in [0,1].
 
         Returns:
             Drift function at a given time.
         """
         # analytical f(t) does not depend on noise_scale and is undefined at t = 1.
-        return -input / torch.maximum(1 - times, torch.tensor(1e-6).to(input))
+        return -input / torch.maximum(
+            1 - times, torch.tensor(1 - effective_t_max).to(input)
+        )
 
-    def diffusion_fn(self, input: Tensor, times: Tensor) -> Tensor:
+    def diffusion_fn(
+        self, input: Tensor, times: Tensor, effective_t_max: float = 0.99
+    ) -> Tensor:
         r"""Diffusion function for the flow matching estimator.
 
         The diffusion function is calculated based on [3]_ (see Equation 7):
@@ -291,6 +301,10 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         Args:
             input: Parameters :math:`\theta_t`.
             times: SDE time variable in [0,1].
+            effective_t_max: Upper bound on time to avoid numerical issues at t=1.
+                This effectively prevents an explosion of the SDE in the beginning.
+                Note that this does not affect the ODE sampling, which always uses
+                times in [0,1].
 
         Returns:
             Diffusion function at a given time.
@@ -299,10 +313,10 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         return torch.sqrt(
             2
             * (times + self.noise_scale)
-            / torch.maximum(1 - times, torch.tensor(1e-6).to(times))
+            / torch.maximum(1 - times, torch.tensor(1 - effective_t_max).to(times))
         )
 
-    def mean_t_fn(self, times: Tensor) -> Tensor:
+    def mean_t_fn(self, times: Tensor, effective_t_max: float = 0.99) -> Tensor:
         r"""Linear coefficient of the perturbation kernel expectation
         :math:`\mu_t(t) = E[\theta_t | \theta_0]` for the flow matching estimator.
 
@@ -319,10 +333,18 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
 
         Args:
             times: SDE time variable in [0,1].
+            effective_t_max: Upper bound on time to avoid numerical issues at t=1.
+                This prevents singularity at t=1 in the mean function (mean_t=0.).
+                NOTE: This did affect the IID sampling as the analytical denoising
+                moments run into issues (as mean_t=0) effectively makes it pure
+                noise and equations are not well defined anymore. Alternatively
+                we could also adapt the analytical denoising equations in
+                `utils/score_utils.py` to account for this case.
 
         Returns:
             Mean function at a given time.
         """
+        times = torch.clamp(times, max=effective_t_max)
         mean_t = 1 - times
         for _ in range(len(self.input_shape)):
             mean_t = mean_t.unsqueeze(-1)

@@ -1188,7 +1188,7 @@ class SubVariancePreservingSDE:
         Returns:
             Drift function at a given time.
         """
-        phi = -0.5 * self._beta_schedule(times)
+        phi = -0.5 * self._beta_schedule(times).to(input.device)
 
         while len(phi.shape) < len(input.shape):
             phi = phi.unsqueeze(-1)
@@ -1421,7 +1421,7 @@ class VarianceExplodingSDE:
         while len(g.shape) < len(input.shape):
             g = g.unsqueeze(-1)
 
-        return g
+        return g.to(input.device)
 
 
 class VEScoreEstimator(ConditionalScoreEstimator, VarianceExplodingSDE):

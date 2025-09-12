@@ -4,7 +4,7 @@
 import time
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from typing import Any, Callable, Literal, Optional, Protocol, Tuple, Union
+from typing import Any, Callable, Literal, Optional, Tuple, Union
 
 import torch
 from torch import Tensor, ones
@@ -29,6 +29,10 @@ from sbi.neural_nets.estimators import (
     ConditionalVectorFieldEstimator,
     MaskedConditionalVectorFieldEstimator,
 )
+from sbi.neural_nets.estimators.base import (
+    ConditionalEstimatorBuilder,
+    MaskedConditionalEstimatorBuilder,
+)
 from sbi.sbi_types import TorchTransform
 from sbi.utils import (
     check_estimator_arg,
@@ -49,41 +53,6 @@ from sbi.utils.torchutils import assert_all_finite
 from sbi.utils.user_input_checks import validate_inputs
 
 
-class VectorFieldEstimatorBuilder(Protocol):
-    """Protocol for building a vector field estimator from data."""
-
-    def __call__(self, theta: Tensor, x: Tensor) -> ConditionalVectorFieldEstimator:
-        """Build a vector field estimator from theta and x, which mainly
-        inform the shape of the input and the condition to the neural network.
-        Generally, it can also be used to z-score the data, but not in the case
-        of vector field estimators.
-
-        Args:
-            theta: Parameter sets.
-            x: Simulation outputs.
-
-        Returns:
-            Vector field estimator.
-        """
-        ...
-
-
-class MaskedVectorFieldEstimatorBuilder(Protocol):
-    """Protocol for building a masked vector field estimator from data."""
-
-    def __call__(self, inputs: Tensor) -> MaskedConditionalVectorFieldEstimator:
-        """Build a masked vector field estimator from inputs, which mainly inform
-        the shape of the input to the neural network.
-
-        Args:
-            inputs: Simulation outputs.
-
-        Returns:
-            Masked vector field estimator.
-        """
-        ...
-
-
 class VectorFieldTrainer(NeuralInference, ABC):
     _neural_net: ConditionalVectorFieldEstimator
 
@@ -92,7 +61,7 @@ class VectorFieldTrainer(NeuralInference, ABC):
         prior: Optional[Distribution] = None,
         vector_field_estimator_builder: Union[
             Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
-            VectorFieldEstimatorBuilder,
+            ConditionalEstimatorBuilder[ConditionalVectorFieldEstimator],
         ] = "mlp",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
@@ -111,7 +80,7 @@ class VectorFieldTrainer(NeuralInference, ABC):
             prior: Prior distribution.
             vector_field_estimator_builder: Neural network architecture for the
                 vector field estimator. Can be a string (e.g. 'mlp' or 'ada_mlp') or a
-                callable that implements the `VectorFieldEstimatorBuilder` protocol
+                callable that implements the `ConditionalEstimatorBuilder` protocol
                 with `__call__` that receives `theta` and `x` and returns a
                 `ConditionalVectorFieldEstimator`.
             device: Device to run the training on.
@@ -151,7 +120,7 @@ class VectorFieldTrainer(NeuralInference, ABC):
         self,
         model: Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
         **kwargs,
-    ) -> VectorFieldEstimatorBuilder:
+    ) -> ConditionalEstimatorBuilder[ConditionalVectorFieldEstimator]:
         pass
 
     def append_simulations(
@@ -614,7 +583,8 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
     def __init__(
         self,
         mvf_estimator_builder: Union[
-            str, MaskedVectorFieldEstimatorBuilder
+            Literal["simformer"],
+            MaskedConditionalEstimatorBuilder[MaskedConditionalVectorFieldEstimator],
         ] = "simformer",
         posterior_latent_idx: Optional[list | Tensor] = None,
         posterior_observed_idx: Optional[list | Tensor] = None,
@@ -636,7 +606,7 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
                 this prior is ignored.
             mvf_estimator_builder: Neural network architecture for the
                 masked vector field estimator. Can be a string (e.g. 'simformer')
-                or a callable that implements the `MaskedVectorFieldEstimatorBuilder`
+                or a callable that implements the `MaskedConditionalEstimatorBuilder`
                 protocol with `__call__` that receives `inputs`
                 and returns a `MaskedConditionalVectorFieldEstimator`.
             device: Device to run the training on.
@@ -677,7 +647,9 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
         self._proposal_roundwise = []
 
     @abstractmethod
-    def _build_default_nn_fn(self, **kwargs) -> MaskedVectorFieldEstimatorBuilder:
+    def _build_default_nn_fn(
+        self, **kwargs
+    ) -> MaskedConditionalEstimatorBuilder[MaskedConditionalVectorFieldEstimator]:
         pass
 
     def append_simulations(
@@ -1138,7 +1110,7 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
                   to save memory resources.
             mvf_estimator: Neural network architecture for the masked
                 vector field estimator. Can be a callable that implements
-                the `MaskedVectorFieldEstimatorBuilder` protocol.
+                the `MaskedConditionalEstimatorBuilder` protocol.
                 If a callable, `__call__` must accept `inputs`, and return
                 a `MaskedConditionalVectorFieldEstimator`. If `None` uses the
                 underlying trained neural net.
@@ -1199,7 +1171,7 @@ class MaskedVectorFieldTrainer(MaskedNeuralInference, ABC):
 
             mvf_estimator: Neural network architecture for the masked
                 vector field estimator. Can be a callable that implements
-                the `MaskedVectorFieldEstimatorBuilder` protocol.
+                the `MaskedConditionalEstimatorBuilder` protocol.
                 If a callable, `__call__` must accept `inputs`, and return
                 a `MaskedConditionalVectorFieldEstimator`. If `None` uses the
                 underlying trained neural net.
