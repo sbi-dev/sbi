@@ -4,7 +4,7 @@
 from typing import Dict, Optional, Tuple, Union
 
 import torch
-from torch import Tensor, nn
+from torch import Tensor
 from torch.distributions import Distribution
 
 from sbi.inference.trainers.nre.nre_base import (
@@ -87,7 +87,7 @@ class NRE_C(RatioEstimatorTrainer):
         retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[Dict] = None,
-    ) -> nn.Module:
+    ) -> RatioEstimator:
         r"""Return classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
 
         Args:

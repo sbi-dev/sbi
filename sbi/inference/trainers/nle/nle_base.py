@@ -3,14 +3,10 @@
 
 import warnings
 from abc import ABC
-from copy import deepcopy
-from typing import Any, Dict, Literal, Optional, Tuple, Union
+from typing import Any, Dict, Literal, Optional, Sequence, Tuple, Union
 
-import torch
 from torch import Tensor
 from torch.distributions import Distribution
-from torch.nn.utils.clip_grad import clip_grad_norm_
-from torch.optim.adam import Adam
 from torch.utils.tensorboard.writer import SummaryWriter
 from typing_extensions import Self
 
@@ -35,7 +31,7 @@ from sbi.utils import check_estimator_arg, x_shape_from_simulation
 from sbi.utils.torchutils import assert_all_finite
 
 
-class LikelihoodEstimatorTrainer(NeuralInference, ABC):
+class LikelihoodEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], ABC):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
@@ -182,10 +178,8 @@ class LikelihoodEstimatorTrainer(NeuralInference, ABC):
         Returns:
             Density estimator that has learned the distribution $p(x|\theta)$.
         """
-        # Load data from most recent round.
-        self._round = max(self._data_round_index)
-        # Starting index for the training set (1 = discard round-0 samples).
-        start_idx = int(discard_prior_samples and self._round > 0)
+
+        start_idx = self._get_start_index(discard_prior_samples=discard_prior_samples)
 
         train_loader, val_loader = self.get_dataloaders(
             start_idx,
@@ -195,104 +189,21 @@ class LikelihoodEstimatorTrainer(NeuralInference, ABC):
             dataloader_kwargs=dataloader_kwargs,
         )
 
-        # First round or if retraining from scratch:
-        # Call the `self._build_neural_net` with the rounds' thetas and xs as
-        # arguments, which will build the neural network
-        # This is passed into NeuralPosterior, to create a neural posterior which
-        # can `sample()` and `log_prob()`. The network is accessible via `.net`.
-        if self._neural_net is None or retrain_from_scratch:
-            # Get theta,x to initialize NN
-            theta, x, _ = self.get_simulations(starting_round=start_idx)
-            # Use only training data for building the neural net (z-scoring transforms)
-            self._neural_net = self._build_neural_net(
-                theta[self.train_indices].to("cpu"),
-                x[self.train_indices].to("cpu"),
-            )
-            assert len(x_shape_from_simulation(x.to("cpu"))) < 3, (
-                "SNLE cannot handle multi-dimensional simulator output."
-            )
-            del theta, x
+        self._initialize_neural_network(
+            retrain_from_scratch=retrain_from_scratch,
+            start_idx=start_idx,
+        )
 
-        self._neural_net.to(self._device)
-        if not resume_training:
-            self.optimizer = Adam(
-                list(self._neural_net.parameters()),
-                lr=learning_rate,
-            )
-            self.epoch, self._val_loss = 0, float("Inf")
-
-        while self.epoch <= max_num_epochs and not self._converged(
-            self.epoch, stop_after_epochs
-        ):
-            # Train for a single epoch.
-            self._neural_net.train()
-            train_loss_sum = 0
-            for batch in train_loader:
-                self.optimizer.zero_grad()
-                theta_batch, x_batch = (
-                    batch[0].to(self._device),
-                    batch[1].to(self._device),
-                )
-                # Evaluate on x with theta as context.
-                train_losses = self._loss(theta=theta_batch, x=x_batch)
-                train_loss = torch.mean(train_losses)
-                train_loss_sum += train_losses.sum().item()
-
-                train_loss.backward()
-                if clip_max_norm is not None:
-                    clip_grad_norm_(
-                        self._neural_net.parameters(),
-                        max_norm=clip_max_norm,
-                    )
-                self.optimizer.step()
-
-            self.epoch += 1
-
-            train_loss_average = train_loss_sum / (
-                len(train_loader) * train_loader.batch_size  # type: ignore
-            )
-            self._summary["training_loss"].append(train_loss_average)
-
-            # Calculate validation performance.
-            self._neural_net.eval()
-            val_loss_sum = 0
-            with torch.no_grad():
-                for batch in val_loader:
-                    theta_batch, x_batch = (
-                        batch[0].to(self._device),
-                        batch[1].to(self._device),
-                    )
-                    # Evaluate on x with theta as context.
-                    val_losses = self._loss(theta=theta_batch, x=x_batch)
-                    val_loss_sum += val_losses.sum().item()
-
-            # Take mean over all validation samples.
-            self._val_loss = val_loss_sum / (
-                len(val_loader) * val_loader.batch_size  # type: ignore
-            )
-            # Log validation loss for every epoch.
-            self._summary["validation_loss"].append(self._val_loss)
-
-            self._maybe_show_progress(self._show_progress_bars, self.epoch)
-
-        self._report_convergence_at_end(self.epoch, stop_after_epochs, max_num_epochs)
-
-        # Update summary.
-        self._summary["epochs_trained"].append(self.epoch)
-        self._summary["best_validation_loss"].append(self._best_val_loss)
-
-        # Update TensorBoard and summary dict.
-        self._summarize(round_=self._round)
-
-        # Update description for progress bar.
-        if show_train_summary:
-            print(self._describe_round(self._round, self._summary))
-
-        # Avoid keeping the gradients in the resulting network, which can
-        # cause memory leakage when benchmarking.
-        self._neural_net.zero_grad(set_to_none=True)
-
-        return deepcopy(self._neural_net)
+        return self._run_training_loop(
+            train_loader=train_loader,
+            val_loader=val_loader,
+            max_num_epochs=max_num_epochs,
+            stop_after_epochs=stop_after_epochs,
+            learning_rate=learning_rate,
+            resume_training=resume_training,
+            clip_max_norm=clip_max_norm,
+            show_train_summary=show_train_summary,
+        )
 
     def build_posterior(
         self,
@@ -413,3 +324,81 @@ class LikelihoodEstimatorTrainer(NeuralInference, ABC):
         loss = self._neural_net.loss(x, condition=theta)
         assert_all_finite(loss, "NLE loss")
         return loss
+
+    def _get_start_index(self, discard_prior_samples: bool) -> int:
+        """
+        Determine the starting index for training based on previous rounds.
+
+        Args:
+            discard_prior_samples: Whether to discard samples simulated in round 1, i.e.
+                from the prior.
+
+        Returns:
+            If `discard_prior_samples` is True and previous rounds exist,
+            the method will return 1 to skip samples from round 0; otherwise,
+            it returns 0.
+        """
+
+        # Load data from most recent round.
+        self._round = max(self._data_round_index)
+        # Starting index for the training set (1 = discard round-0 samples).
+        start_idx = int(discard_prior_samples and self._round > 0)
+
+        return start_idx
+
+    def _initialize_neural_network(
+        self,
+        retrain_from_scratch: bool,
+        start_idx: int,
+    ) -> None:
+        """
+        Initialize the neural network if it is None or retraining from scratch.
+
+        Args:
+            retrain_from_scratch: Whether to retrain the conditional density
+                estimator for the posterior from scratch each round.
+            start_idx: The index of the first round to retrieve simulation data from.
+        """
+
+        # First round or if retraining from scratch:
+        # Call the `self._build_neural_net` with the rounds' thetas and xs as
+        # arguments, which will build the neural network
+        # This is passed into NeuralPosterior, to create a neural posterior which
+        # can `sample()` and `log_prob()`. The network is accessible via `.net`.
+        if self._neural_net is None or retrain_from_scratch:
+            # Get theta,x to initialize NN
+            theta, x, _ = self.get_simulations(starting_round=start_idx)
+            # Use only training data for building the neural net (z-scoring transforms)
+            self._neural_net = self._build_neural_net(
+                theta[self.train_indices].to("cpu"),
+                x[self.train_indices].to("cpu"),
+            )
+
+            assert len(x_shape_from_simulation(x.to("cpu"))) < 3, (
+                "SNLE cannot handle multi-dimensional simulator output."
+            )
+            del theta, x
+
+    def _get_losses(
+        self, batch: Sequence[Tensor], loss_kwargs: Dict[str, Any]
+    ) -> Tensor:
+        """
+        Compute losses for a batch of data.
+
+        Args:
+            batch: A batch of data.
+            loss_kwargs: Additional keyword arguments passed to self._loss fn.
+
+        Returns:
+            A tensor containing the computed losses for each sample in the batch.
+        """
+
+        # Get batches on current device.
+        theta_batch, x_batch = (
+            batch[0].to(self._device),
+            batch[1].to(self._device),
+        )
+
+        losses = self._loss(theta_batch, x_batch)
+
+        return losses
