@@ -1,12 +1,13 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Dict, Optional, Union
+from typing import Dict, Optional, Sequence, Union
 
 import torch
 from torch import Tensor, nn, ones
 from torch.distributions import Distribution
 
+from sbi.inference.trainers._contracts import LossArgs, LossArgsBNRE
 from sbi.inference.trainers.nre.nre_a import NRE_A
 from sbi.neural_nets.estimators.base import ConditionalEstimatorBuilder
 from sbi.neural_nets.ratio_estimators import RatioEstimator
@@ -109,10 +110,13 @@ class BNRE(NRE_A):
         Returns:
             Classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
         """
+
         kwargs = del_entries(locals(), entries=("self", "__class__"))
-        kwargs["loss_kwargs"] = {
-            "regularization_strength": kwargs.pop("regularization_strength")
-        }
+        kwargs["loss_kwargs"] = LossArgsBNRE(
+            num_atoms=10,
+            regularization_strength=kwargs.pop("regularization_strength"),
+        )
+
         return super().train(**kwargs)
 
     def _loss(
@@ -151,3 +155,14 @@ class BNRE(NRE_A):
         loss = bce + regularization_strength * regularizer
         assert_all_finite(loss, "BNRE loss")
         return loss
+
+    def _get_losses(
+        self, batch: Sequence[Tensor], loss_args: LossArgs | None
+    ) -> Tensor:
+        if not isinstance(loss_args, LossArgsBNRE):
+            raise TypeError(
+                "Expected type of loss_args to be LossArgsBNRE,"
+                f" but got {type(loss_args)}"
+            )
+
+        return super()._get_losses(batch=batch, loss_args=loss_args)

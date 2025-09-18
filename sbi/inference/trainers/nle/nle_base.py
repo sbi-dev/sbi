@@ -19,7 +19,8 @@ from sbi.inference.posteriors.posterior_parameters import (
 )
 from sbi.inference.potentials import likelihood_estimator_based_potential
 from sbi.inference.potentials.likelihood_based_potential import LikelihoodBasedPotential
-from sbi.inference.trainers.base import NeuralInference
+from sbi.inference.trainers._contracts import StartIndexContext
+from sbi.inference.trainers.base import LossArgs, NeuralInference
 from sbi.neural_nets import likelihood_nn
 from sbi.neural_nets.estimators import ConditionalDensityEstimator
 from sbi.neural_nets.estimators.base import ConditionalEstimatorBuilder
@@ -179,7 +180,9 @@ class LikelihoodEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], A
             Density estimator that has learned the distribution $p(x|\theta)$.
         """
 
-        start_idx = self._get_start_index(discard_prior_samples=discard_prior_samples)
+        start_idx = self._get_start_index(
+            ctx=StartIndexContext(discard_prior_samples=discard_prior_samples)
+        )
 
         train_loader, val_loader = self.get_dataloaders(
             start_idx,
@@ -325,24 +328,22 @@ class LikelihoodEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], A
         assert_all_finite(loss, "NLE loss")
         return loss
 
-    def _get_start_index(self, discard_prior_samples: bool) -> int:
+    def _get_start_index(self, ctx: StartIndexContext) -> int:
         """
         Determine the starting index for training based on previous rounds.
 
         Args:
-            discard_prior_samples: Whether to discard samples simulated in round 1, i.e.
-                from the prior.
-
+            ctx: StartIndexContext dataclass values used to determine the starting
+                index of the training set.
         Returns:
-            If `discard_prior_samples` is True and previous rounds exist,
-            the method will return 1 to skip samples from round 0; otherwise,
+            The method will return 1 to skip samples from round 0; otherwise,
             it returns 0.
         """
 
         # Load data from most recent round.
         self._round = max(self._data_round_index)
         # Starting index for the training set (1 = discard round-0 samples).
-        start_idx = int(discard_prior_samples and self._round > 0)
+        start_idx = int(ctx.discard_prior_samples and self._round > 0)
 
         return start_idx
 
@@ -380,14 +381,14 @@ class LikelihoodEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], A
             del theta, x
 
     def _get_losses(
-        self, batch: Sequence[Tensor], loss_kwargs: Dict[str, Any]
+        self, batch: Sequence[Tensor], loss_args: LossArgs | None
     ) -> Tensor:
         """
         Compute losses for a batch of data.
 
         Args:
             batch: A batch of data.
-            loss_kwargs: Additional keyword arguments passed to self._loss fn.
+            loss_args: Additional arguments passed to self._loss fn.
 
         Returns:
             A tensor containing the computed losses for each sample in the batch.

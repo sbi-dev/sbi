@@ -106,7 +106,7 @@ class NPE_A(PosteriorEstimatorTrainer):
         self._ran_final_round = False
 
         # WARNING: sneaky trick ahead. We proxy the parent's `train` here,
-        # requiring the signature to have `num_atoms`, save it for use below, and
+        # requiring the signature to have `num_components`, save it for use below, and
         # continue. It's sneaky because we are using the object (self) as a namespace
         # to pass arguments between functions, and that's implicit state management.
         kwargs = del_entries(

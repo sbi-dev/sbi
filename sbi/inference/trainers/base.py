@@ -49,6 +49,7 @@ from sbi.inference.posteriors.rejection_posterior import RejectionPosterior
 from sbi.inference.posteriors.vector_field_posterior import VectorFieldPosterior
 from sbi.inference.posteriors.vi_posterior import VIPosterior
 from sbi.inference.potentials.base_potential import BasePotential
+from sbi.inference.trainers._contracts import LossArgs, StartIndexContext
 from sbi.neural_nets.estimators.base import (
     ConditionalDensityEstimator,
     ConditionalEstimator,
@@ -321,11 +322,11 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
     ) -> None: ...
 
     @abstractmethod
-    def _get_start_index(self, discard_prior_samples: bool) -> int: ...
+    def _get_start_index(self, ctx: StartIndexContext) -> int: ...
 
     @abstractmethod
     def _get_losses(
-        self, batch: Sequence[Tensor], loss_kwargs: Dict[str, Any]
+        self, batch: Sequence[Tensor], loss_args: LossArgs | None
     ) -> Tensor: ...
 
     @abstractmethod
@@ -901,7 +902,7 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         resume_training: bool,
         clip_max_norm: Optional[float],
         show_train_summary: bool,
-        loss_kwargs: Optional[Dict[str, Any]] = None,
+        loss_args: LossArgs | None = None,
         summarization_kwargs: Optional[Dict[str, Any]] = None,
     ) -> ConditionalEstimatorType:
         """
@@ -925,12 +926,9 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
                 be restored from the last time `.train()` was called.
             show_train_summary: Whether to print the number of epochs and validation
                 loss after the training.
-            loss_kwargs: Additional or updated kwargs to be passed to the self._loss fn.
+            loss_args: Additional arguments passed to self._loss fn.
             summarization_kwargs: Additional kwargs passed to self._summarize_epoch fn.
         """
-
-        if loss_kwargs is None:
-            loss_kwargs = {}
 
         if summarization_kwargs is None:
             summarization_kwargs = {}
@@ -953,12 +951,12 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
             # Train for a single epoch.
             self._neural_net.train()
             epoch_start_time = time.time()
-            train_loss = self._train_epoch(train_loader, clip_max_norm, loss_kwargs)
+            train_loss = self._train_epoch(train_loader, clip_max_norm, loss_args)
 
             # Calculate validation performance.
             self._neural_net.eval()
 
-            self._val_loss = self._validate_epoch(val_loader, loss_kwargs)
+            self._val_loss = self._validate_epoch(val_loader, loss_args)
 
             self._summarize_epoch(
                 train_loss, self._val_loss, epoch_start_time, summarization_kwargs
@@ -990,7 +988,7 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         self,
         train_loader: data.DataLoader,
         clip_max_norm: Optional[float],
-        loss_kwargs: Dict[str, Any],
+        loss_args: LossArgs | None,
     ) -> float:
         """
         Perform a single training epoch over the provided training data.
@@ -999,7 +997,7 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
             train_loader: Dataloader for training.
             clip_max_norm: Value at which to clip the total gradient norm in order to
                 prevent exploding gradients. Use None for no clipping.
-            loss_kwargs: Additional or updated kwargs to be passed to the self._loss fn.
+            loss_args: Additional arguments passed to self._loss fn.
 
         Returns:
             The average training loss over all samples in the epoch.
@@ -1010,7 +1008,7 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         train_loss_sum = 0
         for batch in train_loader:
             self.optimizer.zero_grad()
-            train_losses = self._get_losses(batch=batch, loss_kwargs=loss_kwargs)
+            train_losses = self._get_losses(batch=batch, loss_args=loss_args)
             train_loss = torch.mean(train_losses)
             train_loss_sum += train_losses.sum().item()
 
@@ -1031,14 +1029,14 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
     def _validate_epoch(
         self,
         val_loader: data.DataLoader,
-        loss_kwargs: Dict[str, Any],
+        loss_args: LossArgs | None,
     ) -> float:
         """
         Perform a single validation epoch over the provided validation data.
 
         Args:
             val_loader: Dataloader for validation.
-            loss_kwargs: Additional or updated kwargs to be passed to the self._loss fn.
+            loss_args: Additional arguments passed to self._loss fn.
 
         Returns:
             The average validation loss over all samples in the epoch.
@@ -1047,7 +1045,7 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         val_loss_sum = 0
         with torch.no_grad():
             for batch in val_loader:
-                val_losses = self._get_losses(batch=batch, loss_kwargs=loss_kwargs)
+                val_losses = self._get_losses(batch=batch, loss_args=loss_args)
                 val_loss_sum += val_losses.sum().item()
 
         # Take mean over all validation samples.

@@ -3,6 +3,7 @@
 
 from abc import ABC, abstractmethod
 from copy import deepcopy
+from dataclasses import asdict, replace
 from typing import Any, Callable, Dict, Literal, Optional, Sequence, Tuple, Union
 
 import torch
@@ -19,6 +20,8 @@ from sbi.inference.potentials.vector_field_potential import (
     VectorFieldBasedPotential,
     vector_field_estimator_based_potential,
 )
+from sbi.inference.trainers._contracts import LossArgsVF, StartIndexContext
+from sbi.inference.trainers.base import LossArgs
 from sbi.neural_nets.estimators import ConditionalVectorFieldEstimator
 from sbi.neural_nets.estimators.base import ConditionalEstimatorBuilder
 from sbi.sbi_types import TorchTransform
@@ -272,9 +275,11 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator], ABC):
             calibration_kernel = default_calibration_kernel
 
         start_idx = self._get_start_index(
-            discard_prior_samples=discard_prior_samples,
-            force_first_round_loss=force_first_round_loss,
-            resume_training=resume_training,
+            ctx=StartIndexContext(
+                discard_prior_samples=discard_prior_samples,
+                force_first_round_loss=force_first_round_loss,
+                resume_training=resume_training,
+            )
         )
 
         # Set the proposal to the last proposal that was passed by the user. For
@@ -303,7 +308,7 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator], ABC):
                 validation_times,
             )
 
-        loss_kwargs = dict(
+        loss_args = LossArgsVF(
             proposal=proposal,
             calibration_kernel=calibration_kernel,
             force_first_round_loss=force_first_round_loss,
@@ -321,7 +326,7 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator], ABC):
             resume_training=resume_training,
             clip_max_norm=clip_max_norm,
             show_train_summary=show_train_summary,
-            loss_kwargs=loss_kwargs,
+            loss_args=loss_args,
             summarization_kwargs=summarization_kwargs,
         )
 
@@ -472,7 +477,7 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator], ABC):
         return calibration_kernel(x) * loss
 
     def _get_losses(
-        self, batch: Sequence[Tensor], loss_kwargs: Dict[str, Any]
+        self, batch: Sequence[Tensor], loss_args: LossArgs | None
     ) -> Tensor:
         """
         Compute losses for a batch of data.
@@ -492,7 +497,13 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator], ABC):
             batch[2].to(self._device),
         )
 
-        validation_times = loss_kwargs.get("times")
+        if not isinstance(loss_args, LossArgsVF):
+            raise TypeError(
+                "Expected type of loss_args to be LossArgsVF,"
+                f" but got {type(loss_args)}"
+            )
+
+        validation_times = loss_args.times
         if validation_times is not None and isinstance(validation_times, Tensor):
             # For validation loss, we evaluate at a fixed set of times to reduce
             # the variance in the validation loss, for improved convergence
@@ -512,44 +523,47 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator], ABC):
                 val_batch_size, dim=0
             )
 
-            loss_kwargs = loss_kwargs.copy()
-            loss_kwargs["times"] = validation_times_rep
+            loss_args = replace(loss_args, **dict(times=validation_times_rep))
 
         losses = self._loss(
             theta=theta_batch,
             x=x_batch,
             masks=masks_batch,
-            **loss_kwargs,
+            **asdict(loss_args),
         )
+
         return losses
 
     def _train_epoch(
         self,
         train_loader: data.DataLoader,
         clip_max_norm: Optional[float],
-        loss_kwargs: Dict[str, Any],
+        loss_args: LossArgs | None,
     ) -> float:
         """
         Override the parent method for performing a single training epoch over the
-        provided training data to remove times from `loss_kwargs` as it is only used
+        provided training data to set `times` to None as it is only used
         when calculating the validation loss.
 
         Args:
             train_loader: Dataloader for training.
             clip_max_norm: Value at which to clip the total gradient norm in order to
                 prevent exploding gradients. Use None for no clipping.
-            loss_kwargs: Additional or updated kwargs to be passed to the self._loss fn.
+            loss_args: Additional arguments passed to self._loss fn.
 
         Returns:
             The average training loss over all samples in the epoch.
         """
 
-        loss_kwargs = {k: v for k, v in loss_kwargs.items() if k != "times"}
+        if loss_args is None or not isinstance(loss_args, LossArgsVF):
+            raise TypeError()
+
+        loss_args = replace(loss_args, **dict(times=None))
 
         return super()._train_epoch(
             train_loader=train_loader,
             clip_max_norm=clip_max_norm,
-            loss_kwargs=loss_kwargs,
+            loss_args=loss_args,
         )
 
     def _summarize_epoch(
@@ -601,22 +615,15 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator], ABC):
             summarization_kwargs=summarization_kwargs,
         )
 
-    def _get_start_index(
-        self,
-        discard_prior_samples: bool,
-        force_first_round_loss: bool,
-        resume_training: bool,
-    ) -> int:
+    def _get_start_index(self, ctx: StartIndexContext) -> int:
         """
         Determine the starting index for training based on previous rounds.
 
         Args:
-            discard_prior_samples: Whether to discard samples simulated in round 1, i.e.
-                from the prior.
-
+            ctx: StartIndexContext dataclass values used to determine the starting
+                index of the training set.
         Returns:
-            If `discard_prior_samples` is True and previous rounds exist,
-            the method will return 1 to skip samples from round 0; otherwise,
+            The method will return 1 to skip samples from round 0; otherwise,
             it returns 0.
         """
 
@@ -624,7 +631,7 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator], ABC):
         self._round = max(self._data_round_index)
 
         if self._round == 0 and self._neural_net is not None:
-            assert force_first_round_loss or resume_training, (
+            assert ctx.force_first_round_loss or ctx.resume_training, (
                 "You have already trained this neural network. After you had trained "
                 "the network, you again appended simulations with `append_simulations"
                 "(theta, x)`, but you did not provide a proposal. If the new "
@@ -639,7 +646,7 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator], ABC):
             )
 
         # Starting index for the training set (1 = discard round-0 samples).
-        start_idx = int(discard_prior_samples and self._round > 0)
+        start_idx = int(ctx.discard_prior_samples and self._round > 0)
 
         return start_idx
 

@@ -1,12 +1,14 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import warnings
 from typing import Any, Dict, Optional, Union
 
 import torch
 from torch import Tensor, nn, ones
 from torch.distributions import Distribution
 
+from sbi.inference.trainers._contracts import LossArgsNRE
 from sbi.inference.trainers.nre.nre_base import (
     RatioEstimatorTrainer,
 )
@@ -105,10 +107,17 @@ class NRE_A(RatioEstimatorTrainer):
             Classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
         """
 
+        if loss_kwargs is not None:
+            warnings.warn(
+                "loss_kwargs argument is not used and will be ignored.", stacklevel=2
+            )
+
         # AALR is defined for `num_atoms=2`.
         # Proxy to `super().__call__` to ensure right parameter.
         kwargs = del_entries(locals(), entries=("self", "__class__"))
-        return super().train(**kwargs, num_atoms=2)
+        kwargs["loss_kwargs"] = LossArgsNRE(num_atoms=2)
+
+        return super().train(**kwargs)
 
     def _loss(self, theta: Tensor, x: Tensor, num_atoms: int) -> Tensor:
         """Returns the binary cross-entropy loss for the trained classifier.

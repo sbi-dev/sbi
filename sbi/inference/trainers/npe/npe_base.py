@@ -2,6 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from abc import ABC, abstractmethod
+from dataclasses import asdict
 from typing import Any, Callable, Dict, Literal, Optional, Sequence, Tuple, Union
 from warnings import warn
 
@@ -21,7 +22,9 @@ from sbi.inference.posteriors.posterior_parameters import (
 )
 from sbi.inference.potentials import posterior_estimator_based_potential
 from sbi.inference.potentials.posterior_based_potential import PosteriorBasedPotential
+from sbi.inference.trainers._contracts import LossArgsNPE, StartIndexContext
 from sbi.inference.trainers.base import (
+    LossArgs,
     NeuralInference,
     check_if_proposal_has_default_x,
 )
@@ -289,9 +292,11 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
             calibration_kernel = default_calibration_kernel
 
         start_idx = self._get_start_index(
-            discard_prior_samples=discard_prior_samples,
-            force_first_round_loss=force_first_round_loss,
-            resume_training=resume_training,
+            ctx=StartIndexContext(
+                discard_prior_samples=discard_prior_samples,
+                force_first_round_loss=force_first_round_loss,
+                resume_training=resume_training,
+            )
         )
 
         # Set the proposal to the last proposal that was passed by the user. For
@@ -313,11 +318,12 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
             start_idx=start_idx,
         )
 
-        loss_kwargs = dict(
+        loss_args = LossArgsNPE(
             proposal=proposal,
             calibration_kernel=calibration_kernel,
             force_first_round_loss=force_first_round_loss,
         )
+
         return self._run_training_loop(
             train_loader=train_loader,
             val_loader=val_loader,
@@ -327,7 +333,7 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
             resume_training=resume_training,
             clip_max_norm=clip_max_norm,
             show_train_summary=show_train_summary,
-            loss_kwargs=loss_kwargs,
+            loss_args=loss_args,
         )
 
     def build_posterior(
@@ -570,22 +576,15 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
                 "with `append_simulations(..., proprosal=None)`."
             )
 
-    def _get_start_index(
-        self,
-        discard_prior_samples: bool,
-        force_first_round_loss: bool,
-        resume_training: bool,
-    ) -> int:
+    def _get_start_index(self, ctx: StartIndexContext) -> int:
         """
         Determine the starting index for training based on previous rounds.
 
         Args:
-            discard_prior_samples: Whether to discard samples simulated in round 1, i.e.
-                from the prior.
-
+            ctx: StartIndexContext dataclass values used to determine the starting
+                index of the training set.
         Returns:
-            If `discard_prior_samples` is True and previous rounds exist,
-            the method will return 1 to skip samples from round 0; otherwise,
+            The method will return 1 to skip samples from round 0; otherwise,
             it returns 0.
         """
 
@@ -593,7 +592,7 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
         self._round = max(self._data_round_index)
 
         if self._round == 0 and self._neural_net is not None:
-            assert force_first_round_loss or resume_training, (
+            assert ctx.force_first_round_loss or ctx.resume_training, (
                 "You have already trained this neural network. After you had trained "
                 "the network, you again appended simulations with `append_simulations"
                 "(theta, x)`, but you did not provide a proposal. If the new "
@@ -608,7 +607,7 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
             )
 
         # Starting index for the training set (1 = discard round-0 samples).
-        start_idx = int(discard_prior_samples and self._round > 0)
+        start_idx = int(ctx.discard_prior_samples and self._round > 0)
 
         # For non-atomic loss, we can not reuse samples from previous rounds as of now.
         # SNPE-A can, by construction of the algorithm, only use samples from the last
@@ -657,14 +656,14 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
             del theta, x
 
     def _get_losses(
-        self, batch: Sequence[Tensor], loss_kwargs: Dict[str, Any]
+        self, batch: Sequence[Tensor], loss_args: LossArgs | None
     ) -> Tensor:
         """
         Compute losses for a batch of data.
 
         Args:
             batch: A batch of data.
-            loss_kwargs: Additional keyword arguments passed to self._loss fn.
+            loss_args: Additional arguments passed to self._loss fn.
 
         Returns:
             A tensor containing the computed losses for each sample in the batch.
@@ -675,7 +674,14 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
             batch[1].to(self._device),
             batch[2].to(self._device),
         )
+
+        if not isinstance(loss_args, LossArgsNPE):
+            raise TypeError(
+                "Expected type of loss_args to be LossArgsNPE,"
+                f" but got {type(loss_args)}"
+            )
+
         # Take negative loss here to get validation log_prob.
-        losses = self._loss(theta_batch, x_batch, masks_batch, **loss_kwargs)
+        losses = self._loss(theta_batch, x_batch, masks_batch, **asdict(loss_args))
 
         return losses
