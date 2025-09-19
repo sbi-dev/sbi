@@ -22,7 +22,11 @@ from sbi.inference.posteriors.posterior_parameters import (
 )
 from sbi.inference.potentials import posterior_estimator_based_potential
 from sbi.inference.potentials.posterior_based_potential import PosteriorBasedPotential
-from sbi.inference.trainers._contracts import LossArgsNPE, StartIndexContext
+from sbi.inference.trainers._contracts import (
+    LossArgsNPE,
+    StartIndexContext,
+    TrainConfig,
+)
 from sbi.inference.trainers.base import (
     LossArgs,
     NeuralInference,
@@ -283,6 +287,18 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
             Density estimator that approximates the distribution $p(\theta|x)$.
         """
 
+        train_config = TrainConfig(
+            max_num_epochs=max_num_epochs,
+            stop_after_epochs=stop_after_epochs,
+            learning_rate=learning_rate,
+            resume_training=resume_training,
+            show_train_summary=show_train_summary,
+            training_batch_size=training_batch_size,
+            retrain_from_scratch=retrain_from_scratch,
+            validation_fraction=validation_fraction,
+            clip_max_norm=clip_max_norm,
+        )
+
         # Calibration kernels proposed in Lueckmann, Gonçalves et al., 2017.
         if calibration_kernel is None:
 
@@ -295,7 +311,7 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
             ctx=StartIndexContext(
                 discard_prior_samples=discard_prior_samples,
                 force_first_round_loss=force_first_round_loss,
-                resume_training=resume_training,
+                resume_training=train_config.resume_training,
             )
         )
 
@@ -307,14 +323,14 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
 
         train_loader, val_loader = self.get_dataloaders(
             start_idx,
-            training_batch_size,
-            validation_fraction,
-            resume_training,
+            train_config.training_batch_size,
+            train_config.validation_fraction,
+            train_config.resume_training,
             dataloader_kwargs=dataloader_kwargs,
         )
 
         self._initialize_neural_network(
-            retrain_from_scratch=retrain_from_scratch,
+            retrain_from_scratch=train_config.retrain_from_scratch,
             start_idx=start_idx,
         )
 
@@ -327,12 +343,7 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
         return self._run_training_loop(
             train_loader=train_loader,
             val_loader=val_loader,
-            max_num_epochs=max_num_epochs,
-            stop_after_epochs=stop_after_epochs,
-            learning_rate=learning_rate,
-            resume_training=resume_training,
-            clip_max_norm=clip_max_norm,
-            show_train_summary=show_train_summary,
+            train_config=train_config,
             loss_args=loss_args,
         )
 

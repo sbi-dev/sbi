@@ -20,7 +20,7 @@ from sbi.inference.potentials.vector_field_potential import (
     VectorFieldBasedPotential,
     vector_field_estimator_based_potential,
 )
-from sbi.inference.trainers._contracts import LossArgsVF, StartIndexContext
+from sbi.inference.trainers._contracts import LossArgsVF, StartIndexContext, TrainConfig
 from sbi.inference.trainers.base import LossArgs
 from sbi.neural_nets.estimators import ConditionalVectorFieldEstimator
 from sbi.neural_nets.estimators.base import ConditionalEstimatorBuilder
@@ -266,6 +266,18 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator], ABC):
             Vector field estimator that approximates the posterior.
         """
 
+        train_config = TrainConfig(
+            max_num_epochs=max_num_epochs,
+            stop_after_epochs=stop_after_epochs,
+            learning_rate=learning_rate,
+            resume_training=resume_training,
+            show_train_summary=show_train_summary,
+            training_batch_size=training_batch_size,
+            retrain_from_scratch=retrain_from_scratch,
+            validation_fraction=validation_fraction,
+            clip_max_norm=clip_max_norm,
+        )
+
         # Calibration kernels proposed in Lueckmann, Gonçalves et al., 2017.
         if calibration_kernel is None:
 
@@ -278,7 +290,7 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator], ABC):
             ctx=StartIndexContext(
                 discard_prior_samples=discard_prior_samples,
                 force_first_round_loss=force_first_round_loss,
-                resume_training=resume_training,
+                resume_training=train_config.resume_training,
             )
         )
 
@@ -290,14 +302,14 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator], ABC):
 
         train_loader, val_loader = self.get_dataloaders(
             start_idx,
-            training_batch_size,
-            validation_fraction,
-            resume_training,
+            train_config.training_batch_size,
+            train_config.validation_fraction,
+            train_config.resume_training,
             dataloader_kwargs=dataloader_kwargs,
         )
 
         self._initialize_neural_network(
-            retrain_from_scratch=retrain_from_scratch,
+            retrain_from_scratch=train_config.retrain_from_scratch,
             start_idx=start_idx,
         )
 
@@ -320,12 +332,7 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator], ABC):
         return self._run_training_loop(
             train_loader=train_loader,
             val_loader=val_loader,
-            max_num_epochs=max_num_epochs,
-            stop_after_epochs=stop_after_epochs,
-            learning_rate=learning_rate,
-            resume_training=resume_training,
-            clip_max_norm=clip_max_norm,
-            show_train_summary=show_train_summary,
+            train_config=train_config,
             loss_args=loss_args,
             summarization_kwargs=summarization_kwargs,
         )

@@ -21,7 +21,11 @@ from sbi.inference.posteriors.posterior_parameters import (
 )
 from sbi.inference.potentials import ratio_estimator_based_potential
 from sbi.inference.potentials.ratio_based_potential import RatioBasedPotential
-from sbi.inference.trainers._contracts import LossArgsNRE, StartIndexContext
+from sbi.inference.trainers._contracts import (
+    LossArgsNRE,
+    StartIndexContext,
+    TrainConfig,
+)
 from sbi.inference.trainers.base import (
     LossArgs,
     NeuralInference,
@@ -199,6 +203,18 @@ class RatioEstimatorTrainer(NeuralInference[RatioEstimator], ABC):
             Classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
         """
 
+        train_config = TrainConfig(
+            max_num_epochs=max_num_epochs,
+            stop_after_epochs=stop_after_epochs,
+            learning_rate=learning_rate,
+            resume_training=resume_training,
+            show_train_summary=show_train_summary,
+            training_batch_size=training_batch_size,
+            retrain_from_scratch=retrain_from_scratch,
+            validation_fraction=validation_fraction,
+            clip_max_norm=clip_max_norm,
+        )
+
         if num_atoms is not None:
             warnings.warn(
                 "num_atoms value is ignored. The value must be passed through"
@@ -227,13 +243,16 @@ class RatioEstimatorTrainer(NeuralInference[RatioEstimator], ABC):
 
         train_loader, val_loader = self.get_dataloaders(
             start_idx,
-            training_batch_size,
-            validation_fraction,
-            resume_training,
+            train_config.training_batch_size,
+            train_config.validation_fraction,
+            train_config.resume_training,
             dataloader_kwargs=dataloader_kwargs,
         )
 
-        clipped_batch_size = min(training_batch_size, val_loader.batch_size)  # type: ignore
+        clipped_batch_size = min(
+            train_config.training_batch_size,
+            val_loader.batch_size,  # type: ignore
+        )
 
         num_atoms = int(
             clamp_and_warn(
@@ -248,19 +267,14 @@ class RatioEstimatorTrainer(NeuralInference[RatioEstimator], ABC):
         loss_kwargs = replace(loss_kwargs, **dict(num_atoms=num_atoms))
 
         self._initialize_neural_network(
-            retrain_from_scratch=retrain_from_scratch,
+            retrain_from_scratch=train_config.retrain_from_scratch,
             start_idx=start_idx,
         )
 
         return self._run_training_loop(
             train_loader=train_loader,
             val_loader=val_loader,
-            max_num_epochs=max_num_epochs,
-            stop_after_epochs=stop_after_epochs,
-            learning_rate=learning_rate,
-            resume_training=resume_training,
-            clip_max_norm=clip_max_norm,
-            show_train_summary=show_train_summary,
+            train_config=train_config,
             loss_args=loss_kwargs,
         )
 

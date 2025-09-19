@@ -19,7 +19,7 @@ from sbi.inference.posteriors.posterior_parameters import (
 )
 from sbi.inference.potentials import likelihood_estimator_based_potential
 from sbi.inference.potentials.likelihood_based_potential import LikelihoodBasedPotential
-from sbi.inference.trainers._contracts import StartIndexContext
+from sbi.inference.trainers._contracts import StartIndexContext, TrainConfig
 from sbi.inference.trainers.base import LossArgs, NeuralInference
 from sbi.neural_nets import likelihood_nn
 from sbi.neural_nets.estimators import ConditionalDensityEstimator
@@ -184,28 +184,33 @@ class LikelihoodEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], A
             ctx=StartIndexContext(discard_prior_samples=discard_prior_samples)
         )
 
-        train_loader, val_loader = self.get_dataloaders(
-            start_idx,
-            training_batch_size,
-            validation_fraction,
-            resume_training,
-            dataloader_kwargs=dataloader_kwargs,
-        )
-
-        self._initialize_neural_network(
-            retrain_from_scratch=retrain_from_scratch,
-            start_idx=start_idx,
-        )
-
-        return self._run_training_loop(
-            train_loader=train_loader,
-            val_loader=val_loader,
+        train_config = TrainConfig(
             max_num_epochs=max_num_epochs,
             stop_after_epochs=stop_after_epochs,
             learning_rate=learning_rate,
             resume_training=resume_training,
-            clip_max_norm=clip_max_norm,
             show_train_summary=show_train_summary,
+            training_batch_size=training_batch_size,
+            retrain_from_scratch=retrain_from_scratch,
+            validation_fraction=validation_fraction,
+            clip_max_norm=clip_max_norm,
+        )
+
+        train_loader, val_loader = self.get_dataloaders(
+            start_idx,
+            train_config.training_batch_size,
+            train_config.validation_fraction,
+            train_config.resume_training,
+            dataloader_kwargs=dataloader_kwargs,
+        )
+
+        self._initialize_neural_network(
+            retrain_from_scratch=train_config.retrain_from_scratch,
+            start_idx=start_idx,
+        )
+
+        return self._run_training_loop(
+            train_loader=train_loader, val_loader=val_loader, train_config=train_config
         )
 
     def build_posterior(

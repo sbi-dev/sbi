@@ -49,7 +49,7 @@ from sbi.inference.posteriors.rejection_posterior import RejectionPosterior
 from sbi.inference.posteriors.vector_field_posterior import VectorFieldPosterior
 from sbi.inference.posteriors.vi_posterior import VIPosterior
 from sbi.inference.potentials.base_potential import BasePotential
-from sbi.inference.trainers._contracts import LossArgs, StartIndexContext
+from sbi.inference.trainers._contracts import LossArgs, StartIndexContext, TrainConfig
 from sbi.neural_nets.estimators.base import (
     ConditionalDensityEstimator,
     ConditionalEstimator,
@@ -337,6 +337,9 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
     ) -> Tuple[BasePotential, TorchTransform]:
         """Subclass-specific potential creation"""
         ...
+
+    @abstractmethod
+    def _loss(self, *args, **kwargs) -> Tensor: ...
 
     def get_simulations(
         self,
@@ -896,12 +899,7 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         self,
         train_loader: data.DataLoader,
         val_loader: data.DataLoader,
-        max_num_epochs: int,
-        stop_after_epochs: int,
-        learning_rate: float,
-        resume_training: bool,
-        clip_max_norm: Optional[float],
-        show_train_summary: bool,
+        train_config: TrainConfig,
         loss_args: LossArgs | None = None,
         summarization_kwargs: Optional[Dict[str, Any]] = None,
     ) -> ConditionalEstimatorType:
@@ -912,20 +910,8 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         Args:
             train_loader: Dataloader for training.
             val_loader: Dataloader for validation.
-            learning_rate: Learning rate for Adam optimizer.
-            stop_after_epochs: The number of epochs to wait for improvement on the
-                validation set before terminating training.
-            max_num_epochs: Maximum number of epochs to run. If reached, we stop
-                training even when the validation loss is still decreasing. Otherwise,
-                we train until validation loss increases (see also `stop_after_epochs`).
-            clip_max_norm: Value at which to clip the total gradient norm in order to
-                prevent exploding gradients. Use None for no clipping.
-            resume_training: Can be used in case training time is limited, e.g. on a
-                cluster. If `True`, the split between train and validation set, the
-                optimizer, the number of epochs, and the best validation log-prob will
-                be restored from the last time `.train()` was called.
-            show_train_summary: Whether to print the number of epochs and validation
-                loss after the training.
+            train_config: TrainConfig dataclass configuration for the core training
+                path.
             loss_args: Additional arguments passed to self._loss fn.
             summarization_kwargs: Additional kwargs passed to self._summarize_epoch fn.
         """
@@ -938,20 +924,22 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         # Move entire net to device for training.
         self._neural_net.to(self._device)
 
-        if not resume_training:
+        if not train_config.resume_training:
             self.optimizer = Adam(
                 list(self._neural_net.parameters()),
-                lr=learning_rate,
+                lr=train_config.learning_rate,
             )
             self.epoch, self.val_loss = 0, float("Inf")
 
-        while self.epoch <= max_num_epochs and not self._converged(
-            self.epoch, stop_after_epochs
+        while self.epoch <= train_config.max_num_epochs and not self._converged(
+            self.epoch, train_config.stop_after_epochs
         ):
             # Train for a single epoch.
             self._neural_net.train()
             epoch_start_time = time.time()
-            train_loss = self._train_epoch(train_loader, clip_max_norm, loss_args)
+            train_loss = self._train_epoch(
+                train_loader, train_config.clip_max_norm, loss_args
+            )
 
             # Calculate validation performance.
             self._neural_net.eval()
@@ -965,7 +953,9 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
             self.epoch += 1
             self._maybe_show_progress(self._show_progress_bars, self.epoch)
 
-        self._report_convergence_at_end(self.epoch, stop_after_epochs, max_num_epochs)
+        self._report_convergence_at_end(
+            self.epoch, train_config.stop_after_epochs, train_config.max_num_epochs
+        )
 
         # Update summary.
         self._summary["epochs_trained"].append(self.epoch)
@@ -975,7 +965,7 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         self._summarize(round_=self._round)
 
         # Update description for progress bar.
-        if show_train_summary:
+        if train_config.show_train_summary:
             print(self._describe_round(self._round, self._summary))
 
         # Avoid keeping the gradients in the resulting network, which can
