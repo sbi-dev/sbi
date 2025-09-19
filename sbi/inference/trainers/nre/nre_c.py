@@ -223,6 +223,8 @@ class NRE_C(RatioEstimatorTrainer):
     def _get_losses(
         self, batch: Sequence[Tensor], loss_args: LossArgs | None
     ) -> Tensor:
+        """Override the parent class method to check the type of loss_args."""
+
         if not isinstance(loss_args, LossArgsNRE_C):
             raise TypeError(
                 "Expected type of loss_args to be LossArgsNRE_C,"

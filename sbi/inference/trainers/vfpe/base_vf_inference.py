@@ -562,8 +562,11 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator], ABC):
             The average training loss over all samples in the epoch.
         """
 
-        if loss_args is None or not isinstance(loss_args, LossArgsVF):
-            raise TypeError()
+        if not isinstance(loss_args, LossArgsVF):
+            raise TypeError(
+                "Expected type of loss_args to be LossArgsVF,"
+                f" but got {type(loss_args)}"
+            )
 
         loss_args = replace(loss_args, **dict(times=None))
 

@@ -158,6 +158,8 @@ class BNRE(NRE_A):
     def _get_losses(
         self, batch: Sequence[Tensor], loss_args: LossArgs | None
     ) -> Tensor:
+        """Override the parent class method to check the type of loss_args."""
+
         if not isinstance(loss_args, LossArgsBNRE):
             raise TypeError(
                 "Expected type of loss_args to be LossArgsBNRE,"
