@@ -17,26 +17,26 @@ from sbi.neural_nets.factory import simformer_flow_nn, simformer_score_nn
 class Simformer(MaskedVectorFieldTrainer):
     """Simformer as in Gloeckler et al. (ICML, 2024) [1].
 
-    Simformer enables sampling from arbitrary conditional distributions,
-    not just posterior or likelihood, by operating on a unified input tensor
-    that represents all variables.
+    Simformer enables sampling from arbitrary conditional distributions, not just
+    posterior or likelihood, by operating on a unified input tensor that represents all
+    variables.
 
     The roles of variables—latent (to be inferred) or observed (to be conditioned on)—
-    are specified by a boolean mask `condition_mask`.
+    are specified by a boolean mask `condition_mask`. Dependencies among variables are
+    defined by a boolean adjacency matrix `edge_mask`.
 
-    - `True` (or `1`): The variable is observed (conditioned on).
-    - `False` (or `0`): The variable is latent (to be inferred).
-
-    Dependencies among variables are defined by a boolean adjacency matrix `edge_mask`.
-
-    - `True` (or `1`): An edge exists from the row variable to the column variable.
-    - `False` (or `0`): No edge exists.
-    - if `None`, it will be equivalent to a full attention (i.e., full ones)
-      mask, we suggest you to use `None` instead of ones to save memory resources
+    Mask semantics: - ``condition_mask`` [B, T]: boolean per variable.
+      - ``True``/1 → observed (conditioned on).
+      - ``False``/0 → latent (to be inferred).
+    - ``edge_mask`` [B, T, T]: boolean adjacency describing allowed attention. -
+      ``True``/1 → attention from query i to key j is allowed (edge i→j). - ``False``/0
+      → attention is disallowed. - If ``None``, full attention is used. Prefer passing
+      ``None`` over
+        an all-ones tensor to save memory.
 
     NOTE:
-        This is the score-based implementation of the Simformer, sbi also
-        provides a flow-matching one as FlowMatchingSimformer.
+        This is the score-based implementation of the Simformer; sbi also provides a
+        flow-matching variant as ``FlowMatchingSimformer``.
 
     NOTE:
         Multi-round inference is not supported yet.
@@ -73,12 +73,12 @@ class Simformer(MaskedVectorFieldTrainer):
                 protocol. If a callable, `__call__` must accept `inputs`, and return
                 a `MaskedConditionalVectorFieldEstimator`.
             sde_type: Type of SDE to use. Must be one of ['vp', 've', 'subvp'].
-                posterior_latent_idx: List or Tensor of indexes identifying which
-                variables are latent (to be infered),
-                i.e, which variables identify $\theta$.
-            posterior_observed_idx: List or Tensor of indexes identifying which
-                variables are observed (to be infered) according to a posterior,
-                i.e, which variables identify $x$.
+            posterior_latent_idx: List or Tensor of indices identifying which
+                variables are latent (to be inferred), i.e., those that correspond
+                to $\theta$ in a posterior.
+            posterior_observed_idx: List or Tensor of indices identifying which
+                variables are observed (to be conditioned on) in a posterior,
+                i.e., those that correspond to $x$.
             device: Device to run the training on.
             logging_level: Logging level for the training. Can be an integer or a
                 string.
@@ -109,22 +109,10 @@ class Simformer(MaskedVectorFieldTrainer):
 class FlowMatchingSimformer(MaskedVectorFieldTrainer):
     """Flow-matching version of the Simformer, Gloeckler et al. (ICML, 2024) [1].
 
-    Simformer enables sampling from arbitrary conditional distributions,
-    not just posterior or likelihood, by operating on a unified input tensor
-    that represents all variables.
+    The flow-matching version of the Simformer shares the same architecture
+    and masking semantics as the score-based Simformer above.
 
-    The roles of variables—latent (to be inferred) or observed (to be conditioned on)—
-    are specified by a boolean mask `condition_mask`.
-
-    - `True` (or `1`): The variable is observed (conditioned on).
-    - `False` (or `0`): The variable is latent (to be inferred).
-
-    Dependencies among variables are defined by a boolean adjacency matrix `edge_mask`.
-
-    - `True` (or `1`): An edge exists from the row variable to the column variable.
-    - `False` (or `0`): No edge exists.
-    - if `None`, it will be equivalent to a full attention (i.e., full ones)
-      mask, we suggest you to use `None` instead of ones to save memory resources
+    See `Simformer` for details.
 
     NOTE:
         - Multi-round inference is not supported yet.
@@ -159,12 +147,12 @@ class FlowMatchingSimformer(MaskedVectorFieldTrainer):
                 or a callable that implements the `MaskedConditionalEstimatorBuilder`
                 protocol. If a callable, `__call__` must accept `inputs`, and return
                 a `MaskedConditionalVectorFieldEstimator`.
-            posterior_latent_idx: List or Tensor of indexes identifying which
-                variables are latent (to be infered),
-                i.e, which variables identify $\theta$.
-            posterior_observed_idx: List or Tensor of indexes identifying which
-                variables are observed (to be infered) according to a posterior,
-                i.e, which variables identify $x$.
+            posterior_latent_idx: List or Tensor of indices identifying which
+                variables are latent (to be inferred), i.e., those that correspond
+                to $\theta$ in a posterior.
+            posterior_observed_idx: List or Tensor of indices identifying which
+                variables are observed (to be conditioned on) in a posterior,
+                i.e., those that correspond to $x$.
             device: Device to run the training on.
             logging_level: Logging level for the training. Can be an integer or a
                 string.

@@ -736,18 +736,18 @@ class TimeAdditiveBlock(nn.Module):
         self.mlp_fc2 = nn.Linear(int(hidden_features * mlp_ratio), hidden_features)
 
     def forward(self, x: Tensor, cond: Tensor, mask: Optional[Tensor] = None):
-        batch_size, seq_lenght, _ = x.shape
+        batch_size, seq_length, _ = x.shape
 
         # First LayerNorm and self-attention with masking
         x_norm = self.norm1(x)
 
         if mask is not None and mask.dim() == 3:
             # mask: [B, T, T] -> [B * num_heads, T, T]
-            batch_size, seq_lenght, _ = mask.shape
+            batch_size, seq_length, _ = mask.shape
             mask = (
                 mask.unsqueeze(1)
-                .expand(batch_size, self.attn.num_heads, seq_lenght, seq_lenght)
-                .reshape(batch_size * self.attn.num_heads, seq_lenght, seq_lenght)
+                .expand(batch_size, self.attn.num_heads, seq_length, seq_length)
+                .reshape(batch_size * self.attn.num_heads, seq_length, seq_length)
             )
 
         attn_out, _ = self.attn(query=x_norm, key=x_norm, value=x_norm, attn_mask=mask)
@@ -863,11 +863,11 @@ class DiTBlock(nn.Module):
         if mask is not None:
             if mask.dim() == 3:
                 # mask: [B, T, T] -> [B * num_heads, T, T]
-                seq_lenght = mask.shape[1]
+                seq_length = mask.shape[1]
                 mask = (
                     mask.unsqueeze(1)
-                    .expand(batch_size, self.attn.num_heads, seq_lenght, seq_lenght)
-                    .reshape(batch_size * self.attn.num_heads, seq_lenght, seq_lenght)
+                    .expand(batch_size, self.attn.num_heads, seq_length, seq_length)
+                    .reshape(batch_size * self.attn.num_heads, seq_length, seq_length)
                 )
             elif mask.dim() == 2:
                 # [T, T], pass as-is
@@ -1180,20 +1180,36 @@ class VectorFieldSimformer(MaskedVectorFieldNet):
         fourier_scale: float = 30.0,
         activation: type[nn.Module] = nn.GELU,
     ):
+        """Initialize a Simformer vector-field network.
+
+        Args:
+            in_features: Number of per-node features (F).
+            num_nodes: Sequence length / number of nodes (T = m + n).
+            dim_val: Value-token embedding dimension.
+            dim_id: ID-token embedding dimension.
+            dim_cond: Conditioning-token embedding dimension.
+            time_embedding_dim: Time embedding dimension.
+            hidden_features: Transformer hidden size.
+            num_layers: Number of transformer blocks.
+            num_heads: Number of attention heads.
+            mlp_ratio: Expansion ratio in MLP sub-blocks.
+            ada_time: If True, use DiTBlock (adaptive) instead of time-additive.
+            time_emb_type: "sinusoidal" or "random_fourier".
+            sinusoidal_max_freq: Max freq for sinusoidal time embedding.
+            fourier_scale: Scale for random Fourier time embedding.
+            activation: Activation class.
+        """
         super().__init__()
-        self.in_features = in_features  # Number of features by each node (F)
-        self.num_nodes = num_nodes  # Number of nodes in the DAG (T = m + n)
-        self.dim_val = dim_val  # Dimension of the value token
-        self.dim_id = dim_id  # Dimension of the id token
-        self.dim_cond = dim_cond  # Dimension of the conditioning token
-        self.dim_t = time_embedding_dim  # Dimension of the time embedding
-        self.dim_hidden = (
-            hidden_features  # Dimension of the latent space in the transformer blocks
-        )
-        self.num_layers = num_layers  # Number of transformer blocks to stack
-        self.num_heads = (
-            num_heads  # Number of attention heads per each transformer block
-        )
+        # Core dims
+        self.in_features = in_features
+        self.num_nodes = num_nodes
+        self.dim_val = dim_val
+        self.dim_id = dim_id
+        self.dim_cond = dim_cond
+        self.dim_t = time_embedding_dim
+        self.dim_hidden = hidden_features
+        self.num_layers = num_layers
+        self.num_heads = num_heads
 
         # Tokenize on val
         self.val_linear = nn.Linear(in_features, dim_val)
@@ -1245,10 +1261,10 @@ class VectorFieldSimformer(MaskedVectorFieldNet):
         condition_mask: Tensor,
         edge_mask: Optional[Tensor] = None,
     ) -> Tensor:
-        """Forward pass through the Simfomer.
+        """Forward pass through the Simformer.
 
         Args:
-            input: Input tensor on which the vector field is evaluated.
+            inputs: Input tensor on which the vector field is evaluated.
             t: Time embedding.
             condition_mask: A boolean mask indicating the role of each variable.
                 Expected shape: `(batch_size, num_variables)`.
@@ -1259,8 +1275,8 @@ class VectorFieldSimformer(MaskedVectorFieldNet):
             edge_mask: A boolean mask defining the adjacency matrix of the directed
                 acyclic graph (DAG) representing dependencies among variables.
                 Expected shape: `(batch_size, num_variables, num_variables)`.
-                    - `True` (or `1`): An edge exists from the row variable to
-                    the column variable.
+                    - `True` (or `1`): Attention from query index i to key index j is
+                    allowed (i attends to j). See note below.
                     - `False` (or `0`): No edge exists between these variables.
                     - if None, it will be equivalent to a full attention
                     (i.e., full ones) mask, we suggest you to use None instead of ones
@@ -1326,13 +1342,11 @@ class VectorFieldSimformer(MaskedVectorFieldNet):
         h = self.in_proj(tokens)  # [B, T, dim_hidden]
 
         # Pass through transformer blocks
-        # Invert mask to follow Torch convention
-        # Edge mask convention:
-        #   E(i,j) = 1 for edge j depending on i,
-        #   0 otherwise
-        # Torch convention:
-        #   True for masked (no attention),
-        #   False for allowed (attention)
+        # Mask conventions:
+        # - edge_mask[i, j] == 1 means attention from query i to key j is allowed.
+        # - torch.nn.MultiheadAttention expects attn_mask with True = masked (no
+        #   attention), False = allowed. Therefore we invert edge_mask before passing
+        #   it to the blocks.
         t_h = t_h.expand(B, t_h.shape[1])
         for block in self.blocks:
             h = block(h, t_h, (~edge_mask.bool() if edge_mask is not None else None))
@@ -1593,7 +1607,7 @@ def build_simformer_network(
         batch_x: Batch of xs, used to infer input and node dimensions.
         batch_y: Batch of ys, unused, kept for compatibility.
         hidden_features: Dimension of hidden features (dim_hidden in Simformer).
-        num_blocks: Number of transformer blocks.
+        num_layers: Number of transformer blocks.
         num_heads: Number of attention heads per block.
         mlp_ratio: Ratio for MLP hidden dimension in transformer blocks.
         time_embedding_dim: Number of dimensions for time embedding (dim_t).
