@@ -113,7 +113,6 @@ class BNRE(NRE_A):
 
         kwargs = del_entries(locals(), entries=("self", "__class__"))
         kwargs["loss_kwargs"] = LossArgsBNRE(
-            num_atoms=10,
             regularization_strength=kwargs.pop("regularization_strength"),
         )
 

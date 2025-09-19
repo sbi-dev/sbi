@@ -223,7 +223,7 @@ class RatioEstimatorTrainer(NeuralInference[RatioEstimator], ABC):
             )
 
         if loss_kwargs is None:
-            loss_kwargs = LossArgsNRE(num_atoms=10)
+            loss_kwargs = LossArgsNRE()
             warnings.warn(
                 "You haven't passed a value to loss_kwargs argument a default of"
                 f" {loss_kwargs.num_atoms} is set for number of atoms used for"

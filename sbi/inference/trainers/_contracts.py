@@ -91,10 +91,10 @@ class LossArgsNRE:
         num_atoms: Number of atoms to use for classification.
     """
 
-    num_atoms: int
+    num_atoms: int = 10
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class LossArgsBNRE(LossArgsNRE):
     r"""
     Typed args for balanced neural ratio estimation losses (BNRE).
@@ -107,7 +107,7 @@ class LossArgsBNRE(LossArgsNRE):
     regularization_strength: float
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class LossArgsNRE_C(LossArgsNRE):
     r"""
     Typed args for NRE_C losses.
