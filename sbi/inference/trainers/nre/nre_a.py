@@ -109,7 +109,9 @@ class NRE_A(RatioEstimatorTrainer):
 
         if loss_kwargs is not None:
             warnings.warn(
-                "loss_kwargs argument is not used and will be ignored.", stacklevel=2
+                "loss_kwargs argument is not used in NRE_A and will be ignored. Number"
+                " of atoms is set to 2 by default.",
+                stacklevel=2,
             )
 
         # AALR is defined for `num_atoms=2`.
