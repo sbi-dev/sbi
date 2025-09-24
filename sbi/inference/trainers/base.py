@@ -215,6 +215,8 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
 
         self._round = 0
         self._val_loss = float("Inf")
+        self._best_val_loss = self._val_loss
+        self._epochs_since_last_improvement = 0
 
         self._summary_writer = (
             self._default_summary_writer() if summary_writer is None else summary_writer
