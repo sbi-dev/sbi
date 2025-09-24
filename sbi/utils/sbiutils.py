@@ -242,6 +242,21 @@ def biject_transform_zuko(
     )
 
 
+def warn_empirical_prior_memory_risk(context: Optional[str] = None) -> None:
+    """Emit a standardized warning about empirical-prior memory/VRAM risks.
+
+    Args:
+        context: Optional context string to append to the warning.
+    """
+    base = (
+        "Empirical prior memory/VRAM risk: empirical priors retain all simulations "
+        "as support and may trigger operations over large supports. This can "
+        "significantly increase memory usage and cause out-of-memory (OOM) errors."
+    )
+    message = f"{base} Context: {context}" if context else base
+    warnings.warn(message, stacklevel=2)
+
+
 def z_standardization(
     batch_t: Tensor,
     structured_dims: bool = False,
@@ -737,6 +752,13 @@ def mcmc_transform(
         (or z-scored) to constrained (or non-z-scored) space.
     """
     if enable_transform:
+        if isinstance(prior, (ImproperEmpirical, Empirical)):
+            warn_empirical_prior_memory_risk(
+                "disabled parameter transforms to avoid sampling-based moments"
+            )
+            return torch_tf.IndependentTransform(
+                torch_tf.identity_transform, reinterpreted_batch_ndims=1
+            )
 
         def prior_mean_std_transform(prior, device):
             try:
@@ -855,6 +877,13 @@ class ImproperEmpirical(Empirical):
     initialization. Thus, all posterior samples would be rejected for not fitting this
     criterion.
     """
+
+    def __init__(self, values: Tensor, log_weights: Optional[Tensor] = None):
+        super().__init__(values, log_weights=log_weights)
+        # Warn if extremely large to inform about memory/serialization cost.
+        support_size = values.shape[0]
+        if support_size > 10_000_000:  # 10M still works well on modern hardware.
+            warn_empirical_prior_memory_risk(f">10M support size (size={support_size})")
 
     def log_prob(self, value: Tensor) -> Tensor:
         """
