@@ -308,7 +308,7 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
             calibration_kernel = default_calibration_kernel
 
         start_idx = self._get_start_index(
-            ctx=StartIndexContext(
+            context=StartIndexContext(
                 discard_prior_samples=discard_prior_samples,
                 force_first_round_loss=force_first_round_loss,
                 resume_training=train_config.resume_training,
@@ -587,12 +587,12 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
                 "with `append_simulations(..., proprosal=None)`."
             )
 
-    def _get_start_index(self, ctx: StartIndexContext) -> int:
+    def _get_start_index(self, context: StartIndexContext) -> int:
         """
         Determine the starting index for training based on previous rounds.
 
         Args:
-            ctx: StartIndexContext dataclass values used to determine the starting
+            context: StartIndexContext dataclass values used to determine the starting
                 index of the training set.
         Returns:
             The method will return 1 to skip samples from round 0; otherwise,
@@ -603,7 +603,7 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
         self._round = max(self._data_round_index)
 
         if self._round == 0 and self._neural_net is not None:
-            assert ctx.force_first_round_loss or ctx.resume_training, (
+            assert context.force_first_round_loss or context.resume_training, (
                 "You have already trained this neural network. After you had trained "
                 "the network, you again appended simulations with `append_simulations"
                 "(theta, x)`, but you did not provide a proposal. If the new "
@@ -618,7 +618,7 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
             )
 
         # Starting index for the training set (1 = discard round-0 samples).
-        start_idx = int(ctx.discard_prior_samples and self._round > 0)
+        start_idx = int(context.discard_prior_samples and self._round > 0)
 
         # For non-atomic loss, we can not reuse samples from previous rounds as of now.
         # SNPE-A can, by construction of the algorithm, only use samples from the last

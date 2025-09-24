@@ -181,7 +181,7 @@ class LikelihoodEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], A
         """
 
         start_idx = self._get_start_index(
-            ctx=StartIndexContext(discard_prior_samples=discard_prior_samples)
+            context=StartIndexContext(discard_prior_samples=discard_prior_samples)
         )
 
         train_config = TrainConfig(
@@ -333,12 +333,12 @@ class LikelihoodEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], A
         assert_all_finite(loss, "NLE loss")
         return loss
 
-    def _get_start_index(self, ctx: StartIndexContext) -> int:
+    def _get_start_index(self, context: StartIndexContext) -> int:
         """
         Determine the starting index for training based on previous rounds.
 
         Args:
-            ctx: StartIndexContext dataclass values used to determine the starting
+            context: StartIndexContext dataclass values used to determine the starting
                 index of the training set.
         Returns:
             The method will return 1 to skip samples from round 0; otherwise,
@@ -348,7 +348,7 @@ class LikelihoodEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], A
         # Load data from most recent round.
         self._round = max(self._data_round_index)
         # Starting index for the training set (1 = discard round-0 samples).
-        start_idx = int(ctx.discard_prior_samples and self._round > 0)
+        start_idx = int(context.discard_prior_samples and self._round > 0)
 
         return start_idx
 

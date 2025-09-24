@@ -225,7 +225,7 @@ class RatioEstimatorTrainer(NeuralInference[RatioEstimator], ABC):
         if loss_kwargs is None:
             loss_kwargs = LossArgsNRE()
             warnings.warn(
-                "You haven't passed a value to loss_kwargs argument a default of"
+                "You haven't passed a value to loss_kwargs argument. A default of"
                 f" {loss_kwargs.num_atoms} is set for number of atoms used for"
                 " classification.",
                 stacklevel=2,
@@ -238,7 +238,7 @@ class RatioEstimatorTrainer(NeuralInference[RatioEstimator], ABC):
             )
 
         start_idx = self._get_start_index(
-            ctx=StartIndexContext(discard_prior_samples=discard_prior_samples)
+            context=StartIndexContext(discard_prior_samples=discard_prior_samples)
         )
 
         train_loader, val_loader = self.get_dataloaders(
@@ -408,12 +408,12 @@ class RatioEstimatorTrainer(NeuralInference[RatioEstimator], ABC):
 
         return potential_fn, theta_transform
 
-    def _get_start_index(self, ctx: StartIndexContext) -> int:
+    def _get_start_index(self, context: StartIndexContext) -> int:
         """
         Determine the starting index for training based on previous rounds.
 
         Args:
-            ctx: StartIndexContext dataclass values used to determine the starting
+            context: StartIndexContext dataclass values used to determine the starting
                 index of the training set.
 
         Returns:
@@ -424,7 +424,7 @@ class RatioEstimatorTrainer(NeuralInference[RatioEstimator], ABC):
         # Load data from most recent round.
         self._round = max(self._data_round_index)
         # Starting index for the training set (1 = discard round-0 samples).
-        start_idx = int(ctx.discard_prior_samples and self._round > 0)
+        start_idx = int(context.discard_prior_samples and self._round > 0)
 
         return start_idx
 

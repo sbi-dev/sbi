@@ -18,7 +18,7 @@ class StartIndexContext:
     """Inputs for computing the start index of training.
 
     Consolidates parameters that previously varied across subclasses, enabling a
-    single base signature: `_get_start_index(ctx: StartIndexContext) -> int`.
+    single base signature: `_get_start_index(context: StartIndexContext) -> int`.
 
     Fields are optional where method families differ; subclasses read only what
     they need.
