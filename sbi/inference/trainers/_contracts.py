@@ -12,10 +12,6 @@ if TYPE_CHECKING:  # import-heavy deps only for type checkers
 
     from sbi.inference.posteriors.base_posterior import NeuralPosterior
 
-# ---------------------------------------------------------------------------
-# Contexts
-# ---------------------------------------------------------------------------
-
 
 @dataclass(frozen=True)
 class StartIndexContext:
@@ -38,11 +34,6 @@ class StartIndexContext:
 
     # Generic training state:
     resume_training: Optional[bool] = None
-
-
-# ---------------------------------------------------------------------------
-# Training configuration
-# ---------------------------------------------------------------------------
 
 
 @dataclass
@@ -72,14 +63,6 @@ class TrainConfig:
 
     # Regularization / safety
     clip_max_norm: Optional[float] = None
-
-
-# ---------------------------------------------------------------------------
-# Typed loss arguments per estimator family
-# ---------------------------------------------------------------------------
-
-# To avoid runtime imports, we rely on forward references (strings) for types
-# like "Tensor", "Distribution", and "NeuralPosterior".
 
 
 @dataclass(frozen=True)
