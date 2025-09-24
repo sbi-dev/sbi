@@ -1,9 +1,9 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import warnings
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, Literal, Optional, Sequence, Tuple, Union
-from warnings import warn
 
 from torch import Tensor, ones
 from torch.distributions import Distribution
@@ -43,7 +43,11 @@ from sbi.utils import (
     validate_theta_and_x,
     warn_if_zscoring_changes_data,
 )
-from sbi.utils.sbiutils import ImproperEmpirical, mask_sims_from_prior
+from sbi.utils.sbiutils import (
+    ImproperEmpirical,
+    mask_sims_from_prior,
+    warn_empirical_prior_memory_risk,
+)
 from sbi.utils.torchutils import assert_all_finite
 
 
@@ -212,7 +216,7 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
         if self._prior is None or isinstance(self._prior, ImproperEmpirical):
             if proposal is not None:
                 raise ValueError(
-                    "You had not passed a prior at initialization, but now you "
+                    "You did not passed a prior at initialization, but now you "
                     "passed a proposal. If you want to run multi-round SNPE, you have "
                     "to specify a prior (set the `.prior` argument or re-initialize "
                     "the object with a prior distribution). If the samples you passed "
@@ -448,10 +452,19 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
             The potential function and a transformation that maps
             to unconstrained space.
         """
+
+        is_empirical = isinstance(prior, ImproperEmpirical)
+        if is_empirical:
+            warn_empirical_prior_memory_risk(
+                "disabling parameter transforms for empirical prior"
+            )
+
         potential_fn, theta_transform = posterior_estimator_based_potential(
             posterior_estimator=estimator,
             prior=prior,
             x_o=None,
+            # Disable transforms if prior is empirical to avoid sampling issues.
+            enable_transform=not is_empirical,
         )
         return potential_fn, theta_transform
 
@@ -541,7 +554,7 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
 
             if isinstance(proposal, RestrictedPrior):
                 if proposal._prior is not self._prior:
-                    warn(
+                    warnings.warn(
                         "The proposal you passed is a `RestrictedPrior`, but the "
                         "proposal distribution it uses is not the prior (it can be "
                         "accessed via `RestrictedPrior._prior`). We do not "
@@ -553,7 +566,7 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
                 not isinstance(proposal, NeuralPosterior)
                 and proposal is not self._prior
             ):
-                warn(
+                warnings.warn(
                     "The proposal you passed is neither the prior nor a "
                     "`NeuralPosterior` object. If you are an expert user and did so "
                     "for research purposes, this is fine. If not, you might be doing "
