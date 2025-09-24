@@ -31,7 +31,7 @@ class StartIndexContext:
     # Common across methods (e.g., NLE/NRE);
     discard_prior_samples: bool
 
-    # SNPE-specific knobs (optional, read if relevant):
+    # SNPE-specific knobs
     force_first_round_loss: Optional[bool] = None
     use_non_atomic_loss: Optional[bool] = None
     ran_final_round: Optional[bool] = None
