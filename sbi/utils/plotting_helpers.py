@@ -56,7 +56,8 @@ def to_list_kwargs(x: "KwargsType", len: int) -> List[Optional[Dict]]:
             dict_list.append(value)
         else:
             raise TypeError(
-                f"Expected type of dataclass, dict or None, got type={type(x)}"
+                f"Expected type of dataclass, dict or None, "
+                f"but got type={type(value).__name__}"
             )
 
     return dict_list
