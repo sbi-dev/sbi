@@ -54,6 +54,105 @@ K = TypeVar("K")
 KwargsType = Union[List[Optional[Union[Dict, K]]], Dict, K, None]
 
 
+def marginal_plot(
+    samples: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
+    points: Optional[
+        Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor]
+    ] = None,
+    limits: Optional[Union[List, torch.Tensor]] = None,
+    subset: Optional[List[int]] = None,
+    diag: Optional[Union[List[Optional[str]], str]] = "hist",
+    figsize: Optional[Tuple] = (10, 2),
+    labels: Optional[List[str]] = None,
+    ticks: Optional[Union[List, torch.Tensor]] = None,
+    diag_kwargs: KwargsType[DiagOptions] = None,
+    fig_kwargs: Optional[Union[Dict, FigOptions]] = None,
+    fig: Optional[FigureBase] = None,
+    axes: Optional[Axes] = None,
+    **kwargs: Optional[Any],
+) -> Tuple[FigureBase, Axes]:
+    """
+    Plot samples in a row showing 1D marginals of selected dimensions.
+
+    Each of the plots can be interpreted as a 1D-marginal of the distribution
+    that the samples were drawn from.
+
+    Args:
+        samples: Samples used to build the histogram.
+        points: List of additional points to scatter.
+        limits: Array containing the plot xlim for each parameter dimension. If None,
+            just use the min and max of the passed samples
+        subset: List containing the dimensions to plot. E.g. subset=[1,3] will plot
+            plot only the 1st and 3rd dimension but will discard the 0th and 2nd (and,
+            if they exist, the 4th, 5th and so on).
+        diag: Plotting style for 1D marginals, {hist, kde cond, None}.
+        figsize: Size of the entire figure.
+        labels: List of strings specifying the names of the parameters.
+        ticks: Position of the ticks.
+        diag_kwargs: Additional arguments to adjust the diagonal plot,
+            see the source code in `KdeDiagOptions`, `HistDiagOptions` or
+            `ScatterDiagOptions`.
+        fig_kwargs: Additional arguments to adjust the overall figure,
+            see the source code in `FigOptions`.
+        fig: matplotlib figure to plot on.
+        axes: matplotlib axes corresponding to fig.
+        **kwargs: Additional arguments to adjust the plot (deprecated)
+    Returns: figure and axis of posterior distribution plot
+    """
+
+    # backwards compatibility
+    if len(kwargs) > 0:
+        fig, axes = _use_deprecated_plot(
+            marginal_plot_dep,
+            samples=samples,
+            points=points,
+            limits=limits,
+            subset=subset,
+            diag=diag,
+            figsize=figsize,
+            labels=labels,
+            ticks=ticks,
+            fig=fig,
+            axes=axes,
+            **kwargs,
+        )
+        return fig, axes
+
+    samples, _, limits = prepare_for_plot(samples, limits)
+
+    # prepare kwargs and functions of the subplots
+    diag_kwargs_filled, diag_func = _prepare_kwargs(
+        plot=diag,
+        samples=samples,
+        get_plot_funcs=get_diag_funcs,
+        get_default_kwargs=get_default_diag_kwargs,
+        plot_kwargs=diag_kwargs,
+    )
+
+    # prepare fig_kwargs
+    fig_kwargs_filled = _prepare_fig_kwargs(fig_kwargs, samples)
+
+    # generate plot
+    return _arrange_grid(
+        diag_func,
+        [None],
+        [None],
+        diag_kwargs_filled,
+        [None],
+        [None],
+        samples,
+        points,
+        limits,
+        subset,
+        figsize,
+        labels,
+        ticks,
+        fig,
+        axes,
+        fig_kwargs_filled,
+    )
+
+
 def pairplot(
     samples: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
     points: Optional[
@@ -118,6 +217,8 @@ def pairplot(
     Returns: figure and axis of posterior distribution plot
     """
 
+    upper = _prepare_upper(offdiag, upper)  # type: ignore
+
     plotting_styles = [
         (diag, DiagLiteral, "diag"),
         (upper, UpperLiteral, "upper"),
@@ -146,8 +247,6 @@ def pairplot(
             **kwargs,
         )
         return fig, axes
-
-    upper = _prepare_upper(offdiag, upper)  # type: ignore
 
     samples, dim, limits = prepare_for_plot(samples, limits, points)
 
@@ -918,107 +1017,13 @@ def _prepare_upper(
     """
 
     if offdiag is not None:
+        if upper != "hist" and offdiag != upper:
+            raise ValueError(
+                "You have passed mismatching values to both upper and offdiag"
+                " arguments. offdiag is deprecated, use upper instead."
+            )
         warn("offdiag is deprecated, use upper or lower instead.", stacklevel=2)
     return offdiag or upper
-
-
-def marginal_plot(
-    samples: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
-    points: Optional[
-        Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor]
-    ] = None,
-    limits: Optional[Union[List, torch.Tensor]] = None,
-    subset: Optional[List[int]] = None,
-    diag: Optional[Union[List[Optional[str]], str]] = "hist",
-    figsize: Optional[Tuple] = (10, 2),
-    labels: Optional[List[str]] = None,
-    ticks: Optional[Union[List, torch.Tensor]] = None,
-    diag_kwargs: KwargsType[DiagOptions] = None,
-    fig_kwargs: Optional[Union[Dict, FigOptions]] = None,
-    fig: Optional[FigureBase] = None,
-    axes: Optional[Axes] = None,
-    **kwargs: Optional[Any],
-) -> Tuple[FigureBase, Axes]:
-    """
-    Plot samples in a row showing 1D marginals of selected dimensions.
-
-    Each of the plots can be interpreted as a 1D-marginal of the distribution
-    that the samples were drawn from.
-
-    Args:
-        samples: Samples used to build the histogram.
-        points: List of additional points to scatter.
-        limits: Array containing the plot xlim for each parameter dimension. If None,
-            just use the min and max of the passed samples
-        subset: List containing the dimensions to plot. E.g. subset=[1,3] will plot
-            plot only the 1st and 3rd dimension but will discard the 0th and 2nd (and,
-            if they exist, the 4th, 5th and so on).
-        diag: Plotting style for 1D marginals, {hist, kde cond, None}.
-        figsize: Size of the entire figure.
-        labels: List of strings specifying the names of the parameters.
-        ticks: Position of the ticks.
-        diag_kwargs: Additional arguments to adjust the diagonal plot,
-            see the source code in `KdeDiagOptions`, `HistDiagOptions` or
-            `ScatterDiagOptions`.
-        fig_kwargs: Additional arguments to adjust the overall figure,
-            see the source code in `FigOptions`.
-        fig: matplotlib figure to plot on.
-        axes: matplotlib axes corresponding to fig.
-        **kwargs: Additional arguments to adjust the plot (deprecated)
-    Returns: figure and axis of posterior distribution plot
-    """
-
-    # backwards compatibility
-    if len(kwargs) > 0:
-        fig, axes = _use_deprecated_plot(
-            marginal_plot_dep,
-            samples=samples,
-            points=points,
-            limits=limits,
-            subset=subset,
-            diag=diag,
-            figsize=figsize,
-            labels=labels,
-            ticks=ticks,
-            fig=fig,
-            axes=axes,
-            **kwargs,
-        )
-        return fig, axes
-
-    samples, _, limits = prepare_for_plot(samples, limits)
-
-    # prepare kwargs and functions of the subplots
-    diag_kwargs_filled, diag_func = _prepare_kwargs(
-        plot=diag,
-        samples=samples,
-        get_plot_funcs=get_diag_funcs,
-        get_default_kwargs=get_default_diag_kwargs,
-        plot_kwargs=diag_kwargs,
-    )
-
-    # prepare fig_kwargs
-    fig_kwargs_filled = _prepare_fig_kwargs(fig_kwargs, samples)
-
-    # generate plot
-    return _arrange_grid(
-        diag_func,
-        [None],
-        [None],
-        diag_kwargs_filled,
-        [None],
-        [None],
-        samples,
-        points,
-        limits,
-        subset,
-        figsize,
-        labels,
-        ticks,
-        fig,
-        axes,
-        fig_kwargs_filled,
-    )
 
 
 def conditional_marginal_plot(

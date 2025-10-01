@@ -217,7 +217,7 @@ def test_plotting_fails_for_insufficient_sample_label_length():
     close()
 
 
-def test_plotting_raises_warning_for_deprecated_argument():
+def test_plotting_raises_warning_for_offdiag_argument():
     """
     Verify that `pairplot` raises a warning when using the `offdiag` argument.
     """
@@ -226,6 +226,20 @@ def test_plotting_raises_warning_for_deprecated_argument():
 
     with pytest.warns():
         _ = pairplot(samples=posterior_samples, offdiag="contour")
+
+    close()
+
+
+def test_plotting_raises_warning_for_mistmatching_offdiag_argument():
+    """
+    Verify that `pairplot` raises a ValueError when using the `offdiag`
+    and `upper` argument together.
+    """
+
+    posterior_samples = torch.randn(100, 3)
+
+    with pytest.raises(ValueError):
+        _ = pairplot(samples=posterior_samples, offdiag="contour", upper="scatter")
 
     close()
 
