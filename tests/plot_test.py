@@ -217,7 +217,7 @@ def test_plotting_fails_for_insufficient_sample_label_length():
     close()
 
 
-def test_plotting_raises_warning_for_offdiag_argument():
+def test_pairplot_warns_on_offdiag_argument():
     """
     Verify that `pairplot` raises a warning when using the `offdiag` argument.
     """
@@ -230,7 +230,7 @@ def test_plotting_raises_warning_for_offdiag_argument():
     close()
 
 
-def test_plotting_raises_warning_for_mistmatching_offdiag_argument():
+def test_pairplot_raises_error_on_offdiag_and_upper_conflict():
     """
     Verify that `pairplot` raises a ValueError when using the `offdiag`
     and `upper` argument together.
