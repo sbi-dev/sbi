@@ -333,7 +333,9 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
     @abstractmethod
     def _get_losses(
         self, batch: Sequence[Tensor], loss_args: LossArgs | None
-    ) -> Tensor: ...
+    ) -> Tensor:
+        """Return per-sample loss tensor for a training/validation batch."""
+        ...
 
     @abstractmethod
     def _get_potential_function(
