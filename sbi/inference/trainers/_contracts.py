@@ -123,7 +123,7 @@ class LossArgsNRE_A(LossArgsNRE):
 
     def __post_init__(self):
         if self.num_atoms != 2:
-            raise ValueError("num_atoms must always be 2")
+            raise ValueError("In AARL / NRE-A, num_atoms must always be 2")
 
 
 @dataclass(frozen=True, kw_only=True)
