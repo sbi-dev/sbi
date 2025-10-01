@@ -79,10 +79,11 @@ dev = [
     # Test
     "pytest",
     "pytest-cov",
+    "pytest-harvest",
+	"pytest-mock",
+    "pytest-split",
     "pytest-testmon",
     "pytest-xdist",
-    "pytest-harvest",
-    "pytest-split",
     "torchtestcase",
 ]
 
