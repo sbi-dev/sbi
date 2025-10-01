@@ -263,8 +263,9 @@ class RatioEstimatorTrainer(NeuralInference[RatioEstimator], ABC):
             )
         )
 
-        # Update num_atoms field in loss_kwargs
-        loss_kwargs = replace(loss_kwargs, **dict(num_atoms=num_atoms))
+        if num_atoms != loss_kwargs.num_atoms:
+            # Update num_atoms field in loss_kwargs
+            loss_kwargs = replace(loss_kwargs, **dict(num_atoms=num_atoms))
 
         self._initialize_neural_network(
             retrain_from_scratch=train_config.retrain_from_scratch,

@@ -3,8 +3,16 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Callable, Optional, TypeVar, Union
+
+from sbi.utils.typechecks import (
+    validate_bool,
+    validate_float_range,
+    validate_optional,
+    validate_positive_float,
+    validate_positive_int,
+)
 
 if TYPE_CHECKING:  # import-heavy deps only for type checkers
     from torch import Tensor
@@ -29,11 +37,14 @@ class StartIndexContext:
 
     # SNPE-specific knobs
     force_first_round_loss: Optional[bool] = None
-    use_non_atomic_loss: Optional[bool] = None
-    ran_final_round: Optional[bool] = None
 
     # Generic training state:
     resume_training: Optional[bool] = None
+
+    def __post_init__(self):
+        validate_bool(self.discard_prior_samples, "discard_prior_samples")
+        validate_optional(self.force_first_round_loss, "force_first_round_loss", bool)
+        validate_optional(self.resume_training, "resume_training", bool)
 
 
 @dataclass
@@ -64,6 +75,24 @@ class TrainConfig:
     # Regularization / safety
     clip_max_norm: Optional[float] = None
 
+    def __post_init__(self):
+        validate_positive_int(self.training_batch_size, "training_batch_size")
+        validate_positive_float(self.learning_rate, "learning_rate")
+        validate_float_range(
+            self.validation_fraction,
+            "validation_fraction",
+            min_val=0,
+            max_val=1,
+            range_inclusive=False,
+        )
+        validate_positive_int(self.stop_after_epochs, "stop_after_epochs")
+        validate_positive_int(self.max_num_epochs, "max_num_epochs")
+        validate_bool(self.resume_training, "resume_training")
+        validate_bool(self.retrain_from_scratch, "retrain_from_scratch")
+        validate_bool(self.show_train_summary, "show_train_summary")
+        if self.clip_max_norm is not None:
+            validate_positive_float(self.clip_max_norm, "clip_max_norm")
+
 
 @dataclass(frozen=True)
 class LossArgsNRE:
@@ -76,9 +105,29 @@ class LossArgsNRE:
 
     num_atoms: int = 10
 
+    def __post_init__(self):
+        validate_positive_int(self.num_atoms, "num_atoms")
+
+
+@dataclass(frozen=True)
+class LossArgsNRE_A(LossArgsNRE):
+    """
+    Typed args for NRE_A.
+
+    Fields:
+        num_atoms: Number of atoms to use for classification,
+            AALR is defined for `num_atoms=2`.
+    """
+
+    num_atoms: int = field(init=False, default=2)
+
+    def __post_init__(self):
+        if self.num_atoms != 2:
+            raise ValueError("num_atoms must always be 2")
+
 
 @dataclass(frozen=True, kw_only=True)
-class LossArgsBNRE(LossArgsNRE):
+class LossArgsBNRE(LossArgsNRE_A):
     r"""
     Typed args for balanced neural ratio estimation losses (BNRE).
 
@@ -88,6 +137,9 @@ class LossArgsBNRE(LossArgsNRE):
     """
 
     regularization_strength: float
+
+    def __post_init__(self):
+        validate_positive_float(self.regularization_strength, "regularization_strength")
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -103,6 +155,9 @@ class LossArgsNRE_C(LossArgsNRE):
     """
 
     gamma: float
+
+    def __post_init__(self):
+        validate_positive_float(self.gamma, "gamma")
 
 
 @dataclass(frozen=True)
@@ -123,6 +178,21 @@ class LossArgsNPE:
     proposal: Optional[Union["Distribution", "NeuralPosterior"]] = None
     calibration_kernel: Optional[Callable[..., "Tensor"]] = None
     force_first_round_loss: bool = False
+
+    def __post_init__(self):
+        if self.proposal is not None:
+            from torch.distributions import Distribution
+
+            from sbi.inference.posteriors.base_posterior import NeuralPosterior
+
+            validate_optional(
+                self.proposal,
+                "proposal",
+                Distribution,
+                NeuralPosterior,
+            )
+        validate_optional(self.calibration_kernel, "calibration_kernel", Callable)
+        validate_bool(self.force_first_round_loss, "force_first_round_loss")
 
 
 @dataclass(frozen=True)
@@ -146,8 +216,29 @@ class LossArgsVF:
     times: Optional["Tensor"] = None
     force_first_round_loss: bool = False
 
+    def __post_init__(self):
+        if self.proposal is not None:
+            from torch.distributions import Distribution
 
-# Union/TypeVar helpers if generics are desired in core signatures
+            from sbi.inference.posteriors.base_posterior import NeuralPosterior
+
+            validate_optional(
+                self.proposal,
+                "proposal",
+                Distribution,
+                NeuralPosterior,
+            )
+
+        validate_optional(self.calibration_kernel, "calibration_kernel", Callable)
+
+        if self.times is not None:
+            from torch import Tensor
+
+            validate_optional(self.times, "times", Tensor)
+
+        validate_bool(self.force_first_round_loss, "force_first_round_loss")
+
+
 LossArgs = Union[LossArgsNRE, LossArgsNPE, LossArgsVF]
 LossArgsT = TypeVar("LossArgsT", LossArgsNRE, LossArgsNPE, LossArgsVF)
 

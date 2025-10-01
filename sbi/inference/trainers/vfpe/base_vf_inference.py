@@ -102,8 +102,7 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator], ABC):
         self,
         model: Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
         **kwargs,
-    ) -> ConditionalEstimatorBuilder[ConditionalVectorFieldEstimator]:
-        pass
+    ) -> ConditionalEstimatorBuilder[ConditionalVectorFieldEstimator]: ...
 
     def append_simulations(
         self,
@@ -530,7 +529,7 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator], ABC):
                 val_batch_size, dim=0
             )
 
-            loss_args = replace(loss_args, **dict(times=validation_times_rep))
+            loss_args = replace(loss_args, times=validation_times_rep)
 
         losses = self._loss(
             theta=theta_batch,

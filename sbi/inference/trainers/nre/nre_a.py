@@ -1,14 +1,13 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-import warnings
-from typing import Any, Dict, Optional, Union
+from typing import Dict, Optional, Union
 
 import torch
 from torch import Tensor, nn, ones
 from torch.distributions import Distribution
 
-from sbi.inference.trainers._contracts import LossArgsNRE
+from sbi.inference.trainers._contracts import LossArgsNRE_A
 from sbi.inference.trainers.nre.nre_base import (
     RatioEstimatorTrainer,
 )
@@ -73,7 +72,7 @@ class NRE_A(RatioEstimatorTrainer):
         retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[Dict] = None,
-        loss_kwargs: Optional[Dict[str, Any]] = None,
+        loss_kwargs: Optional[LossArgsNRE_A] = None,
     ) -> RatioEstimator:
         r"""Return classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
 
@@ -107,17 +106,15 @@ class NRE_A(RatioEstimatorTrainer):
             Classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
         """
 
-        if loss_kwargs is not None:
-            warnings.warn(
-                "loss_kwargs argument is not used in NRE_A and will be ignored. Number"
-                " of atoms is set to 2 by default.",
-                stacklevel=2,
-            )
-
-        # AALR is defined for `num_atoms=2`.
-        # Proxy to `super().__call__` to ensure right parameter.
         kwargs = del_entries(locals(), entries=("self", "__class__"))
-        kwargs["loss_kwargs"] = LossArgsNRE(num_atoms=2)
+
+        if loss_kwargs is None:
+            kwargs["loss_kwargs"] = LossArgsNRE_A()
+        elif not issubclass(type(loss_kwargs), LossArgsNRE_A):
+            raise TypeError(
+                "Expected loss_kwargs to be a subclass of LossArgsNRE_A,"
+                f" but got {type(loss_kwargs)}"
+            )
 
         return super().train(**kwargs)
 
