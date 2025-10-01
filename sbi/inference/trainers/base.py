@@ -347,7 +347,9 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         ...
 
     @abstractmethod
-    def _loss(self, *args, **kwargs) -> Tensor: ...
+    def _loss(self, *args, **kwargs) -> Tensor:
+        """Compute scalar loss given subclass-specific inputs."""
+        ...
 
     def get_simulations(
         self,
