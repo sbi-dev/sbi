@@ -13,6 +13,7 @@ from typing import (
     TypeVar,
     Union,
     cast,
+    get_args,
 )
 from warnings import warn
 
@@ -51,6 +52,153 @@ LowerLiteral = Literal["hist", "scatter", "contour", "kde"]
 DiagLiteral = Literal["hist", "scatter", "kde"]
 K = TypeVar("K")
 KwargsType = Union[List[Optional[Union[Dict, K]]], Dict, K, None]
+
+
+def pairplot(
+    samples: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
+    points: Optional[
+        Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor]
+    ] = None,
+    limits: Optional[Union[List, torch.Tensor]] = None,
+    subset: Optional[List[int]] = None,
+    upper: Optional[Union[List[Optional[UpperLiteral]], UpperLiteral]] = "hist",
+    lower: Optional[Union[List[Optional[LowerLiteral]], LowerLiteral]] = None,
+    diag: Optional[Union[List[Optional[DiagLiteral]], DiagLiteral]] = "hist",
+    figsize: Tuple = (10, 10),
+    labels: Optional[List[str]] = None,
+    ticks: Optional[Union[List, torch.Tensor]] = None,
+    offdiag: Optional[Union[List[Optional[str]], str]] = None,
+    diag_kwargs: KwargsType[DiagOptions] = None,
+    upper_kwargs: KwargsType[OffDiagOptions] = None,
+    lower_kwargs: KwargsType[OffDiagOptions] = None,
+    fig_kwargs: Optional[Union[Dict, FigOptions]] = None,
+    fig: Optional[FigureBase] = None,
+    axes: Optional[Axes] = None,
+    **kwargs: Optional[Any],
+) -> Tuple[FigureBase, Axes]:
+    """
+    Plot samples in a 2D grid showing marginals and pairwise marginals.
+
+    Each of the diagonal plots can be interpreted as a 1D-marginal of the distribution
+    that the samples were drawn from. Each upper-diagonal plot can be interpreted as a
+    2D-marginal of the distribution.
+
+    Args:
+        samples: Samples used to build the histogram.
+        points: List of additional points to scatter.
+        limits: Array containing the plot xlim for each parameter dimension. If None,
+            just use the min and max of the passed samples
+        subset: List containing the dimensions to plot. E.g. subset=[1,3] will plot
+            plot only the 1st and 3rd dimension but will discard the 0th and 2nd (and,
+            if they exist, the 4th, 5th and so on).
+        upper: Plotting style for upper diagonal, {hist, scatter, contour, kde,
+            None}.
+        lower: Plotting style for upper diagonal, {hist, scatter, contour, kde,
+            None}.
+        diag: Plotting style for diagonal, {hist, scatter, kde}.
+        figsize: Size of the entire figure.
+        labels: List of strings specifying the names of the parameters.
+        ticks: Position of the ticks.
+        offdiag: deprecated, use upper instead.
+        diag_kwargs: Additional arguments to adjust the diagonal plot,
+            see the source code in `KdeDiagOptions`, `HistDiagOptions` or
+            `ScatterDiagOptions`.
+        upper_kwargs: Additional arguments to adjust the upper diagonal plot,
+            see the source code in `KdeOffDiagOptions`, `HistOffDiagOptions`,
+            `ScatterOffDiagOptions`, `ContourOffDiagOptions` or `PlotOffDiagOptions`.
+        lower_kwargs: Additional arguments to adjust the lower diagonal plot,
+            see the source code in `KdeOffDiagOptions`, `HistOffDiagOptions`,
+            `ScatterOffDiagOptions`, `ContourOffDiagOptions` or `PlotOffDiagOptions`.
+        fig_kwargs: Additional arguments to adjust the overall figure,
+            see the source code in `FigOptions`
+        fig: matplotlib figure to plot on.
+        axes: matplotlib axes corresponding to fig.
+        **kwargs: Additional arguments to adjust the plot (deprecated).
+
+    Returns: figure and axis of posterior distribution plot
+    """
+
+    plotting_styles = [
+        (diag, DiagLiteral, "diag"),
+        (upper, UpperLiteral, "upper"),
+        (lower, LowerLiteral, "lower"),
+    ]
+
+    for plotting_style, literal, argument_name in plotting_styles:
+        _validate_plotting_style(plotting_style, literal, argument_name)
+
+    # Backwards compatibility
+    if len(kwargs) > 0:
+        fig, axes = _use_deprecated_plot(
+            pairplot_dep,
+            samples=samples,
+            points=points,
+            limits=limits,
+            subset=subset,
+            offdiag=offdiag,
+            diag=diag,
+            figsize=figsize,
+            labels=labels,
+            ticks=ticks,
+            upper=upper,
+            fig=fig,
+            axes=axes,
+            **kwargs,
+        )
+        return fig, axes
+
+    upper = _prepare_upper(offdiag, upper)  # type: ignore
+
+    samples, dim, limits = prepare_for_plot(samples, limits, points)
+
+    # prepare figure kwargs
+    fig_kwargs_filled = _prepare_fig_kwargs(fig_kwargs, samples)
+
+    # Prepare diag
+    diag_kwargs_filled, diag_func = _prepare_kwargs(
+        plot=diag,  # type: ignore
+        samples=samples,
+        get_plot_funcs=get_diag_funcs,
+        get_default_kwargs=get_default_diag_kwargs,
+        plot_kwargs=diag_kwargs,
+    )
+
+    # Prepare upper
+    upper_kwargs_filled, upper_func = _prepare_kwargs(
+        plot=upper,  # type: ignore
+        samples=samples,
+        get_plot_funcs=get_offdiag_funcs,
+        get_default_kwargs=get_default_offdiag_kwargs,
+        plot_kwargs=upper_kwargs,
+    )
+
+    # Prepare lower
+    lower_kwargs_filled, lower_func = _prepare_kwargs(
+        plot=lower,  # type: ignore
+        samples=samples,
+        get_plot_funcs=get_offdiag_funcs,
+        get_default_kwargs=get_default_offdiag_kwargs,
+        plot_kwargs=lower_kwargs,
+    )
+
+    return _arrange_grid(
+        diag_func,
+        upper_func,
+        lower_func,
+        diag_kwargs_filled,
+        upper_kwargs_filled,
+        lower_kwargs_filled,
+        samples,
+        points,
+        limits,
+        subset,
+        figsize,
+        labels,
+        ticks,
+        fig,
+        axes,
+        fig_kwargs_filled,
+    )
 
 
 # Plotting functions
@@ -627,142 +775,35 @@ def get_conditional_diag_func(opts, limits, eps_margins, resolution):
     return diag_func
 
 
-def pairplot(
-    samples: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
-    points: Optional[
-        Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor]
-    ] = None,
-    limits: Optional[Union[List, torch.Tensor]] = None,
-    subset: Optional[List[int]] = None,
-    upper: Optional[Union[List[Optional[UpperLiteral]], UpperLiteral]] = "hist",
-    lower: Optional[Union[List[Optional[LowerLiteral]], LowerLiteral]] = None,
-    diag: Optional[Union[List[Optional[DiagLiteral]], DiagLiteral]] = "hist",
-    figsize: Tuple = (10, 10),
-    labels: Optional[List[str]] = None,
-    ticks: Optional[Union[List, torch.Tensor]] = None,
-    offdiag: Optional[Union[List[Optional[str]], str]] = None,
-    diag_kwargs: KwargsType[DiagOptions] = None,
-    upper_kwargs: KwargsType[OffDiagOptions] = None,
-    lower_kwargs: KwargsType[OffDiagOptions] = None,
-    fig_kwargs: Optional[Union[Dict, FigOptions]] = None,
-    fig: Optional[FigureBase] = None,
-    axes: Optional[Axes] = None,
-    **kwargs: Optional[Any],
-) -> Tuple[FigureBase, Axes]:
+def _validate_plotting_style(
+    plotting_style: Union[List[Optional[str]], str, None],
+    style_literal: str,
+    argument_name: str,
+):
     """
-    Plot samples in a 2D grid showing marginals and pairwise marginals.
-
-    Each of the diagonal plots can be interpreted as a 1D-marginal of the distribution
-    that the samples were drawn from. Each upper-diagonal plot can be interpreted as a
-    2D-marginal of the distribution.
+    This method validates if the plotting style that is passed is None or among the
+    allowed plotting styles defined in style_literal.
 
     Args:
-        samples: Samples used to build the histogram.
-        points: List of additional points to scatter.
-        limits: Array containing the plot xlim for each parameter dimension. If None,
-            just use the min and max of the passed samples
-        subset: List containing the dimensions to plot. E.g. subset=[1,3] will plot
-            plot only the 1st and 3rd dimension but will discard the 0th and 2nd (and,
-            if they exist, the 4th, 5th and so on).
-        upper: Plotting style for upper diagonal, {hist, scatter, contour, kde,
-            None}.
-        lower: Plotting style for upper diagonal, {hist, scatter, contour, kde,
-            None}.
-        diag: Plotting style for diagonal, {hist, scatter, kde}.
-        figsize: Size of the entire figure.
-        labels: List of strings specifying the names of the parameters.
-        ticks: Position of the ticks.
-        offdiag: deprecated, use upper instead.
-        diag_kwargs: Additional arguments to adjust the diagonal plot,
-            see the source code in `KdeDiagOptions`, `HistDiagOptions` or
-            `ScatterDiagOptions`.
-        upper_kwargs: Additional arguments to adjust the upper diagonal plot,
-            see the source code in `KdeOffDiagOptions`, `HistOffDiagOptions`,
-            `ScatterOffDiagOptions`, `ContourOffDiagKwarg` or `PlotOffDiagOptions`.
-        lower_kwargs: Additional arguments to adjust the lower diagonal plot,
-            see the source code in `KdeOffDiagOptions`, `HistOffDiagOptions`,
-            `ScatterOffDiagOptions`, `ContourOffDiagKwarg` or `PlotOffDiagOptions`.
-        fig_kwargs: Additional arguments to adjust the overall figure,
-            see the source code in `FigOptions`
-        fig: matplotlib figure to plot on.
-        axes: matplotlib axes corresponding to fig.
-        **kwargs: Additional arguments to adjust the plot (deprecated).
-
-    Returns: figure and axis of posterior distribution plot
+        plotting_style: The plotting style that is selected.
+        style_literal: Allowed plotting styles.
+        argument_name: The name of the argument being validated.
     """
 
-    # Backwards compatibility
-    if len(kwargs) > 0:
-        fig, axes = _use_deprecated_plot(
-            pairplot_dep,
-            samples=samples,
-            points=points,
-            limits=limits,
-            subset=subset,
-            offdiag=offdiag,
-            diag=diag,
-            figsize=figsize,
-            labels=labels,
-            ticks=ticks,
-            upper=upper,
-            fig=fig,
-            axes=axes,
-            **kwargs,
+    allowed_styles = get_args(style_literal)
+
+    if isinstance(plotting_style, list):
+        for i, val in enumerate(plotting_style):
+            if val is not None and val not in allowed_styles:
+                raise ValueError(
+                    f"Expected {argument_name} at index {i} to be None or one",
+                    f" of {allowed_styles} but got {val}.",
+                )
+    elif plotting_style is not None and plotting_style not in allowed_styles:
+        raise ValueError(
+            f"Expected {argument_name} to be None, a list or one",
+            f" of {allowed_styles} but got {plotting_style}.",
         )
-        return fig, axes
-
-    upper = _prepare_upper(offdiag, upper)  # type: ignore
-
-    samples, dim, limits = prepare_for_plot(samples, limits, points)
-
-    # prepare figure kwargs
-    fig_kwargs_filled = _prepare_fig_kwargs(fig_kwargs, samples)
-
-    # Prepare diag
-    diag_kwargs_filled, diag_func = _prepare_kwargs(
-        plot=diag,  # type: ignore
-        samples=samples,
-        get_plot_funcs=get_diag_funcs,
-        get_default_kwargs=get_default_diag_kwargs,
-        plot_kwargs=diag_kwargs,
-    )
-
-    # Prepare upper
-    upper_kwargs_filled, upper_func = _prepare_kwargs(
-        plot=upper,  # type: ignore
-        samples=samples,
-        get_plot_funcs=get_offdiag_funcs,
-        get_default_kwargs=get_default_offdiag_kwargs,
-        plot_kwargs=upper_kwargs,
-    )
-
-    # Prepare lower
-    lower_kwargs_filled, lower_func = _prepare_kwargs(
-        plot=lower,  # type: ignore
-        samples=samples,
-        get_plot_funcs=get_offdiag_funcs,
-        get_default_kwargs=get_default_offdiag_kwargs,
-        plot_kwargs=lower_kwargs,
-    )
-
-    return _arrange_grid(
-        diag_func,
-        upper_func,
-        lower_func,
-        diag_kwargs_filled,
-        upper_kwargs_filled,
-        lower_kwargs_filled,
-        samples,
-        points,
-        limits,
-        subset,
-        figsize,
-        labels,
-        ticks,
-        fig,
-        axes,
-        fig_kwargs_filled,
-    )
 
 
 def _prepare_kwargs(
