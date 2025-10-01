@@ -326,7 +326,9 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
     ...
 
     @abstractmethod
-    def _get_start_index(self, context: StartIndexContext) -> int: ...
+    def _get_start_index(self, context: StartIndexContext) -> int:
+        """Get the starting index for the current round."""
+        ...
 
     @abstractmethod
     def _get_losses(
