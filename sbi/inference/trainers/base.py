@@ -321,7 +321,9 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
     @abstractmethod
     def _initialize_neural_network(
         self, retrain_from_scratch: bool, start_idx: int
-    ) -> None: ...
+    ) -> None:
+    """Initialize (or reinitialize) the neural network for the current round."""
+    ...
 
     @abstractmethod
     def _get_start_index(self, context: StartIndexContext) -> int: ...
