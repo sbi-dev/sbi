@@ -17,20 +17,18 @@ class DiagOptions:
     configuration classes such as KDE, Histogram, and Scatter.
     """
 
-    ...
+    mpl_kwargs: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
 class KdeDiagOptions(DiagOptions):
     bw_method: str = "scott"
     bins: int = 50
-    mpl_kwargs: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
 class HistDiagOptions(DiagOptions):
     bin_heuristic: str = "Freedman-Diaconis"
-    mpl_kwargs: Dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
         mpl_kwargs_defaults = {
@@ -42,8 +40,7 @@ class HistDiagOptions(DiagOptions):
 
 
 @dataclass(frozen=True)
-class ScatterDiagOptions(DiagOptions):
-    mpl_kwargs: Dict[str, Any] = field(default_factory=dict)
+class ScatterDiagOptions(DiagOptions): ...
 
 
 @dataclass(frozen=True)
@@ -55,14 +52,13 @@ class OffDiagOptions:
     scatter, histogram, contour, and line plots.
     """
 
-    ...
+    mpl_kwargs: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
 class KdeOffDiagOptions(OffDiagOptions):
     bw_method: str = "scott"
     bins: int = 50
-    mpl_kwargs: Dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
         mpl_kwargs_defaults = {"cmap": "viridis", "origin": "lower", "aspect": "auto"}
@@ -74,7 +70,6 @@ class KdeOffDiagOptions(OffDiagOptions):
 class HistOffDiagOptions(OffDiagOptions):
     bin_heuristic: Optional[str] = None
     np_hist_kwargs: Dict[str, Any] = field(default_factory=dict)
-    mpl_kwargs: Dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
         mpl_kwargs_defaults = {"cmap": "viridis", "origin": "lower", "aspect": "auto"}
@@ -88,8 +83,6 @@ class HistOffDiagOptions(OffDiagOptions):
 
 @dataclass(frozen=True)
 class ScatterOffDiagOptions(OffDiagOptions):
-    mpl_kwargs: Dict[str, Any] = field(default_factory=dict)
-
     def __post_init__(self):
         mpl_kwargs_defaults = {
             "edgecolor": "white",
@@ -106,13 +99,10 @@ class ContourOffDiagOptions(OffDiagOptions):
     bins: int = 50
     percentile: bool = True
     levels: list = field(default_factory=lambda: [0.68, 0.95, 0.99])
-    mpl_kwargs: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
 class PlotOffDiagOptions(OffDiagOptions):
-    mpl_kwargs: Dict[str, Any] = field(default_factory=dict)
-
     def __post_init__(self):
         mpl_kwargs_defaults = {"aspect": "auto"}
         updated = {**mpl_kwargs_defaults, **self.mpl_kwargs}
@@ -261,7 +251,9 @@ def _set_color(i: int) -> str:
         str: A color string from the Matplotlib color cycle.
     """
 
-    new_color = plt.rcParams["axes.prop_cycle"].by_key()["color"][i * 2]
+    colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+    # Take modulo to avoid IndexError for large i value
+    new_color = colors[(i * 2) % len(colors)]
     return new_color
 
 
@@ -275,7 +267,7 @@ def get_default_offdiag_kwargs(offdiag: Optional[str], i: int = 0) -> Dict[str, 
     elif offdiag == "scatter":
         offdiag_options = ScatterOffDiagOptions(mpl_kwargs=dict(color=_set_color(i)))
     elif offdiag == "contour" or offdiag == "contourf":
-        offdiag_options = ContourOffDiagOptions(mpl_kwargs=dict(color=_set_color(i)))
+        offdiag_options = ContourOffDiagOptions(mpl_kwargs=dict(colors=_set_color(i)))
     elif offdiag == "plot":
         offdiag_options = PlotOffDiagOptions(mpl_kwargs=dict(color=_set_color(i)))
     else:
