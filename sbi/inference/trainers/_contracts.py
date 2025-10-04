@@ -4,8 +4,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Callable, Optional, TypeVar, Union
+from typing import Callable, Optional, TypeVar, Union
 
+from torch import Tensor
+from torch.distributions import Distribution
+
+from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.utils.typechecks import (
     validate_bool,
     validate_float_range,
@@ -13,12 +17,6 @@ from sbi.utils.typechecks import (
     validate_positive_float,
     validate_positive_int,
 )
-
-if TYPE_CHECKING:  # import-heavy deps only for type checkers
-    from torch import Tensor
-    from torch.distributions import Distribution
-
-    from sbi.inference.posteriors.base_posterior import NeuralPosterior
 
 
 @dataclass(frozen=True)
@@ -180,17 +178,7 @@ class LossArgsNPE:
     force_first_round_loss: bool = False
 
     def __post_init__(self):
-        if self.proposal is not None:
-            from torch.distributions import Distribution
-
-            from sbi.inference.posteriors.base_posterior import NeuralPosterior
-
-            validate_optional(
-                self.proposal,
-                "proposal",
-                Distribution,
-                NeuralPosterior,
-            )
+        validate_optional(self.proposal, "proposal", Distribution, NeuralPosterior)
         validate_optional(self.calibration_kernel, "calibration_kernel", Callable)
         validate_bool(self.force_first_round_loss, "force_first_round_loss")
 
@@ -217,25 +205,9 @@ class LossArgsVF:
     force_first_round_loss: bool = False
 
     def __post_init__(self):
-        if self.proposal is not None:
-            from torch.distributions import Distribution
-
-            from sbi.inference.posteriors.base_posterior import NeuralPosterior
-
-            validate_optional(
-                self.proposal,
-                "proposal",
-                Distribution,
-                NeuralPosterior,
-            )
-
+        validate_optional(self.proposal, "proposal", Distribution, NeuralPosterior)
         validate_optional(self.calibration_kernel, "calibration_kernel", Callable)
-
-        if self.times is not None:
-            from torch import Tensor
-
-            validate_optional(self.times, "times", Tensor)
-
+        validate_optional(self.times, "times", Tensor)
         validate_bool(self.force_first_round_loss, "force_first_round_loss")
 
 
