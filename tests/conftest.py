@@ -1,6 +1,6 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
-import pathlib
+
 import re
 import shutil
 from pathlib import Path
@@ -12,11 +12,15 @@ import pytest
 import torch
 from pytest_harvest import get_session_results_df, get_xdist_worker_id, is_main_process
 
+from sbi.inference.posteriors.posterior_parameters import MCMCPosteriorParameters
 from sbi.utils.sbiutils import seed_all_backends
 
 # Seed for `set_seed` fixture. Change to random state of all seeded tests.
 seed = 1
 harvested_fixture_data = None
+
+# Whether to keep benchmark results in a .csv or delete them
+KEEP_BM_RESULTS = True
 
 
 # Use seed automatically for every test function.
@@ -76,11 +80,25 @@ def pytest_addoption(parser):
     parser.addini("datadir", "datadir for pytest-regressions")
     parser.addini("original_datadir", "original_datadir for pytest-regressions")
 
+    parser.addoption(
+        "--bm-num-simulations",
+        action="store",
+        default=2000,
+        type=int,
+        help="Run mini-benchmark tests with specified number of simulations",
+    )
+
 
 @pytest.fixture
 def benchmark_mode(request):
     """Fixture to access the --bm value in test files."""
     return request.config.getoption("--bm-mode")
+
+
+@pytest.fixture
+def benchmark_num_simulations(request):
+    """Fixture to access the --bm-num-simulations value in test files."""
+    return int(request.config.getoption("--bm-num-simulations"))
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -211,15 +229,15 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
 
 
 @pytest.fixture(scope="function")
-def mcmc_params_accurate() -> dict:
+def mcmc_params_accurate() -> MCMCPosteriorParameters:
     """Fixture for MCMC parameters for functional tests."""
-    return dict(num_chains=20, thin=2, warmup_steps=50)
+    return MCMCPosteriorParameters(num_chains=20, thin=2, warmup_steps=50)
 
 
 @pytest.fixture(scope="function")
-def mcmc_params_fast() -> dict:
+def mcmc_params_fast() -> MCMCPosteriorParameters:
     """Fixture for MCMC parameters for fast tests."""
-    return dict(num_chains=1, thin=1, warmup_steps=1)
+    return MCMCPosteriorParameters(num_chains=1, thin=1, warmup_steps=1)
 
 
 # Pytest harvest xdist support.
@@ -238,12 +256,18 @@ def pytest_sessionfinish(session):
     session_results_df = get_session_results_df(session)
     suffix = 'all' if is_main_process(session) else get_xdist_worker_id(session)
     RESULTS_PATH = Path('./.bm_results/')
-    if RESULTS_PATH.exists():
+    if RESULTS_PATH.exists() and not KEEP_BM_RESULTS:
         rmtree(RESULTS_PATH)
-    RESULTS_PATH.mkdir(exist_ok=False)
+    RESULTS_PATH.mkdir(exist_ok=True)
 
     if suffix == 'all':
-        session_results_df.to_csv('./.bm_results/results_all.csv')
+        results_file = './.bm_results/results_all.csv'
+        if Path(results_file).exists():
+            # Append without writing header
+            session_results_df.to_csv(results_file, mode='a', header=False)
+        else:
+            # Write with header if file does not exist
+            session_results_df.to_csv(results_file)
     else:
         session_results_df.to_csv('./.bm_results/results_%s.csv' % suffix)
 
@@ -258,21 +282,19 @@ def _get_test_based_data_dir(request: Any, ini_defined_path: str):
             the base directory.
 
     Returns:
-        pathlib.Path: The computed path where test data should be stored.
+        Path: The computed path where test data should be stored.
     """
     config = request.config
     root_path = config.rootpath.resolve()
 
     # Get the test root directory from pytest.ini (typically "tests/")
-    test_root = (root_path / pathlib.Path(config.getini('testpaths')[0])).resolve()
+    test_root = (root_path / Path(config.getini('testpaths')[0])).resolve()
 
     # Get the base directory for regression data (e.g., "tests/__regressions__")
-    regression_root = (
-        root_path / pathlib.Path(config.getini(ini_defined_path))
-    ).resolve()
+    regression_root = (root_path / Path(config.getini(ini_defined_path))).resolve()
 
     # Get the test file's relative path within the test root directory
-    test_file_relative_path = pathlib.Path(request.node.fspath).relative_to(test_root)
+    test_file_relative_path = Path(request.node.fspath).relative_to(test_root)
 
     # Extract the base test function name (handles parameterized tests correctly)
     test_function_name = request.node.originalname
@@ -286,10 +308,10 @@ def _get_test_based_data_dir(request: Any, ini_defined_path: str):
 
 
 @pytest.fixture
-def datadir(request) -> pathlib.Path:
+def datadir(request) -> Path:
     return _get_test_based_data_dir(request, "datadir")
 
 
 @pytest.fixture
-def original_datadir(request) -> pathlib.Path:
+def original_datadir(request) -> Path:
     return _get_test_based_data_dir(request, "original_datadir")

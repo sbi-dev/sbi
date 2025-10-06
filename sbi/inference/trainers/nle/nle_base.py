@@ -3,34 +3,42 @@
 
 import warnings
 from abc import ABC
-from copy import deepcopy
-from typing import Any, Callable, Dict, Optional, Union
+from typing import Any, Dict, Literal, Optional, Sequence, Tuple, Union
 
-import torch
 from torch import Tensor
 from torch.distributions import Distribution
-from torch.nn.utils.clip_grad import clip_grad_norm_
-from torch.optim.adam import Adam
 from torch.utils.tensorboard.writer import SummaryWriter
+from typing_extensions import Self
 
-from sbi.inference.posteriors import MCMCPosterior, RejectionPosterior, VIPosterior
-from sbi.inference.posteriors.importance_posterior import ImportanceSamplingPosterior
+from sbi.inference.posteriors.base_posterior import NeuralPosterior
+from sbi.inference.posteriors.posterior_parameters import (
+    ImportanceSamplingPosteriorParameters,
+    MCMCPosteriorParameters,
+    RejectionPosteriorParameters,
+    VIPosteriorParameters,
+)
 from sbi.inference.potentials import likelihood_estimator_based_potential
+from sbi.inference.potentials.likelihood_based_potential import LikelihoodBasedPotential
 from sbi.inference.trainers.base import NeuralInference
 from sbi.neural_nets import likelihood_nn
 from sbi.neural_nets.estimators import ConditionalDensityEstimator
+from sbi.neural_nets.estimators.base import ConditionalEstimatorBuilder
 from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
 )
-from sbi.utils import check_estimator_arg, check_prior, x_shape_from_simulation
+from sbi.sbi_types import TorchTransform
+from sbi.utils import check_estimator_arg, x_shape_from_simulation
 from sbi.utils.torchutils import assert_all_finite
 
 
-class LikelihoodEstimator(NeuralInference, ABC):
+class LikelihoodEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], ABC):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
-        density_estimator: Union[str, Callable] = "maf",
+        density_estimator: Union[
+            Literal["nsf", "maf", "mdn", "made"],
+            ConditionalEstimatorBuilder[ConditionalDensityEstimator],
+        ] = "maf",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
@@ -45,12 +53,12 @@ class LikelihoodEstimator(NeuralInference, ABC):
                 distribution) can be used.
             density_estimator: If it is a string, use a pre-configured network of the
                 provided type (one of nsf, maf, mdn, made). Alternatively, a function
-                that builds a custom neural network can be provided. The function will
-                be called with the first batch of simulations (theta, x), which can
-                thus be used for shape inference and potentially for z-scoring. It
-                needs to return a PyTorch `nn.Module` implementing the density
-                estimator. The density estimator needs to provide the methods
-                `.log_prob` and `.sample()`.
+                that builds a custom neural network, which adheres to
+                `ConditionalEstimatorBuilder` protocol can be provided. The function
+                will be called with the first batch of simulations (theta, x), which can
+                thus be used for shape inference and potentially for z-scoring. The
+                density estimator needs to provide the methods `.log_prob` and
+                `.sample()` and must return a `ConditionalDensityEstimator`.
 
         See docstring of `NeuralInference` class for all other arguments.
         """
@@ -82,7 +90,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
         from_round: int = 0,
         algorithm: str = "SNLE",
         data_device: Optional[str] = None,
-    ) -> "LikelihoodEstimator":
+    ) -> Self:
         r"""Store parameters and simulation outputs to use them for later training.
 
         Data are stored as entries in lists for each type of variable (parameter/data).
@@ -102,6 +110,8 @@ class LikelihoodEstimator(NeuralInference, ABC):
                 With default settings, this is not used at all for `NLE`. Only when
                 the user later on requests `.train(discard_prior_samples=True)`, we
                 use these indices to find which training data stemmed from the prior.
+            algorithm: Which algorithm is used. This is used to give a more informative
+                warning or error message when invalid simulations are found.
             data_device: Where to store the data, default is on the same device where
                 the training is happening. If training a large dataset on a GPU with not
                 much VRAM can set to 'cpu' to store data on system memory instead.
@@ -114,8 +124,8 @@ class LikelihoodEstimator(NeuralInference, ABC):
                 "NLE gives systematically wrong results when exclude_invalid_x=True.",
                 stacklevel=2,
             )
-        # pyright false positive, will be fixed with pyright 1.1.310
-        return super().append_simulations(  # type: ignore
+
+        return super().append_simulations(
             theta=theta,
             x=x,
             exclude_invalid_x=exclude_invalid_x,
@@ -141,6 +151,16 @@ class LikelihoodEstimator(NeuralInference, ABC):
         r"""Train the density estimator to learn the distribution $p(x|\theta)$.
 
         Args:
+            training_batch_size: Training batch size.
+            learning_rate: Learning rate for Adam optimizer.
+            validation_fraction: The fraction of data to use for validation.
+            stop_after_epochs: The number of epochs to wait for improvement on the
+                validation set before terminating training.
+            max_num_epochs: Maximum number of epochs to run. If reached, we stop
+                training even when the validation loss is still decreasing. Otherwise,
+                we train until validation loss increases (see also `stop_after_epochs`).
+            clip_max_norm: Value at which to clip the total gradient norm in order to
+                prevent exploding gradients. Use None for no clipping.
             resume_training: Can be used in case training time is limited, e.g. on a
                 cluster. If `True`, the split between train and validation set, the
                 optimizer, the number of epochs, and the best validation log-prob will
@@ -158,10 +178,8 @@ class LikelihoodEstimator(NeuralInference, ABC):
         Returns:
             Density estimator that has learned the distribution $p(x|\theta)$.
         """
-        # Load data from most recent round.
-        self._round = max(self._data_round_index)
-        # Starting index for the training set (1 = discard round-0 samples).
-        start_idx = int(discard_prior_samples and self._round > 0)
+
+        start_idx = self._get_start_index(discard_prior_samples=discard_prior_samples)
 
         train_loader, val_loader = self.get_dataloaders(
             start_idx,
@@ -171,119 +189,50 @@ class LikelihoodEstimator(NeuralInference, ABC):
             dataloader_kwargs=dataloader_kwargs,
         )
 
-        # First round or if retraining from scratch:
-        # Call the `self._build_neural_net` with the rounds' thetas and xs as
-        # arguments, which will build the neural network
-        # This is passed into NeuralPosterior, to create a neural posterior which
-        # can `sample()` and `log_prob()`. The network is accessible via `.net`.
-        if self._neural_net is None or retrain_from_scratch:
-            # Get theta,x to initialize NN
-            theta, x, _ = self.get_simulations(starting_round=start_idx)
-            # Use only training data for building the neural net (z-scoring transforms)
-            self._neural_net = self._build_neural_net(
-                theta[self.train_indices].to("cpu"),
-                x[self.train_indices].to("cpu"),
-            )
-            assert len(x_shape_from_simulation(x.to("cpu"))) < 3, (
-                "SNLE cannot handle multi-dimensional simulator output."
-            )
-            del theta, x
+        self._initialize_neural_network(
+            retrain_from_scratch=retrain_from_scratch,
+            start_idx=start_idx,
+        )
 
-        self._neural_net.to(self._device)
-        if not resume_training:
-            self.optimizer = Adam(
-                list(self._neural_net.parameters()),
-                lr=learning_rate,
-            )
-            self.epoch, self._val_loss = 0, float("Inf")
-
-        while self.epoch <= max_num_epochs and not self._converged(
-            self.epoch, stop_after_epochs
-        ):
-            # Train for a single epoch.
-            self._neural_net.train()
-            train_loss_sum = 0
-            for batch in train_loader:
-                self.optimizer.zero_grad()
-                theta_batch, x_batch = (
-                    batch[0].to(self._device),
-                    batch[1].to(self._device),
-                )
-                # Evaluate on x with theta as context.
-                train_losses = self._loss(theta=theta_batch, x=x_batch)
-                train_loss = torch.mean(train_losses)
-                train_loss_sum += train_losses.sum().item()
-
-                train_loss.backward()
-                if clip_max_norm is not None:
-                    clip_grad_norm_(
-                        self._neural_net.parameters(),
-                        max_norm=clip_max_norm,
-                    )
-                self.optimizer.step()
-
-            self.epoch += 1
-
-            train_loss_average = train_loss_sum / (
-                len(train_loader) * train_loader.batch_size  # type: ignore
-            )
-            self._summary["training_loss"].append(train_loss_average)
-
-            # Calculate validation performance.
-            self._neural_net.eval()
-            val_loss_sum = 0
-            with torch.no_grad():
-                for batch in val_loader:
-                    theta_batch, x_batch = (
-                        batch[0].to(self._device),
-                        batch[1].to(self._device),
-                    )
-                    # Evaluate on x with theta as context.
-                    val_losses = self._loss(theta=theta_batch, x=x_batch)
-                    val_loss_sum += val_losses.sum().item()
-
-            # Take mean over all validation samples.
-            self._val_loss = val_loss_sum / (
-                len(val_loader) * val_loader.batch_size  # type: ignore
-            )
-            # Log validation loss for every epoch.
-            self._summary["validation_loss"].append(self._val_loss)
-
-            self._maybe_show_progress(self._show_progress_bars, self.epoch)
-
-        self._report_convergence_at_end(self.epoch, stop_after_epochs, max_num_epochs)
-
-        # Update summary.
-        self._summary["epochs_trained"].append(self.epoch)
-        self._summary["best_validation_loss"].append(self._best_val_loss)
-
-        # Update TensorBoard and summary dict.
-        self._summarize(round_=self._round)
-
-        # Update description for progress bar.
-        if show_train_summary:
-            print(self._describe_round(self._round, self._summary))
-
-        # Avoid keeping the gradients in the resulting network, which can
-        # cause memory leakage when benchmarking.
-        self._neural_net.zero_grad(set_to_none=True)
-
-        return deepcopy(self._neural_net)
+        return self._run_training_loop(
+            train_loader=train_loader,
+            val_loader=val_loader,
+            max_num_epochs=max_num_epochs,
+            stop_after_epochs=stop_after_epochs,
+            learning_rate=learning_rate,
+            resume_training=resume_training,
+            clip_max_norm=clip_max_norm,
+            show_train_summary=show_train_summary,
+        )
 
     def build_posterior(
         self,
         density_estimator: Optional[ConditionalDensityEstimator] = None,
         prior: Optional[Distribution] = None,
-        sample_with: str = "mcmc",
-        mcmc_method: str = "slice_np_vectorized",
-        vi_method: str = "rKL",
+        sample_with: Literal["mcmc", "rejection", "vi", "importance"] = "mcmc",
+        mcmc_method: Literal[
+            "slice_np",
+            "slice_np_vectorized",
+            "hmc_pyro",
+            "nuts_pyro",
+            "slice_pymc",
+            "hmc_pymc",
+            "nuts_pymc",
+        ] = "slice_np_vectorized",
+        vi_method: Literal["rKL", "fKL", "IW", "alpha"] = "rKL",
         mcmc_parameters: Optional[Dict[str, Any]] = None,
         vi_parameters: Optional[Dict[str, Any]] = None,
         rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
         importance_sampling_parameters: Optional[Dict[str, Any]] = None,
-    ) -> Union[
-        MCMCPosterior, RejectionPosterior, VIPosterior, ImportanceSamplingPosterior
-    ]:
+        posterior_parameters: Optional[
+            Union[
+                MCMCPosteriorParameters,
+                VIPosteriorParameters,
+                RejectionPosteriorParameters,
+                ImportanceSamplingPosteriorParameters,
+            ]
+        ] = None,
+    ) -> NeuralPosterior:
         r"""Build posterior from the neural density estimator.
 
         SNLE trains a neural network to approximate the likelihood $p(x|\theta)$. The
@@ -296,11 +245,15 @@ class LikelihoodEstimator(NeuralInference, ABC):
                 If `None`, use the latest neural density estimator that was trained.
             prior: Prior distribution.
             sample_with: Method to use for sampling from the posterior. Must be one of
-                [`mcmc` | `rejection` | `vi`].
-            mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`,
-                `hmc`, `nuts`. Currently defaults to `slice_np` for a custom numpy
-                implementation of slice sampling; select `hmc`, `nuts` or `slice` for
-                Pyro-based sampling.
+                [`mcmc` | `rejection` | `vi` | `importance`].
+            mcmc_method: Method used for MCMC sampling, one of `slice_np`,
+                `slice_np_vectorized`, `hmc_pyro`, `nuts_pyro`, `slice_pymc`,
+                `hmc_pymc`, `nuts_pymc`. `slice_np` is a custom
+                numpy implementation of slice sampling. `slice_np_vectorized` is
+                identical to `slice_np`, but if `num_chains>1`, the chains are
+                vectorized for `slice_np_vectorized` whereas they are run sequentially
+                for `slice_np`. The samplers ending on `_pyro` are using Pyro, and
+                likewise the samplers ending on `_pymc` are using PyMC.
             vi_method: Method used for VI, one of [`rKL`, `fKL`, `IW`, `alpha`]. Note
                 some of the methods admit a `mode seeking` property (e.g. rKL) whereas
                 some admit a `mass covering` one (e.g fKL).
@@ -308,75 +261,55 @@ class LikelihoodEstimator(NeuralInference, ABC):
             vi_parameters: Additional kwargs passed to `VIPosterior`.
             rejection_sampling_parameters: Additional kwargs passed to
                 `RejectionPosterior`.
-
+            importance_sampling_parameters: Additional kwargs passed to
+                `ImportanceSamplingPosterior`.
+            posterior_parameters: Configuration passed to the init method for the
+                posterior. Must be one of the following
+                - `VIPosteriorParameters`
+                - `ImportanceSamplingPosteriorParameters`
+                - `MCMCPosteriorParameters`
+                - `RejectionPosteriorParameters`
         Returns:
             Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods
             (the returned log-probability is unnormalized).
         """
-        if prior is None:
-            assert (
-                self._prior is not None
-            ), """You did not pass a prior. You have to pass the prior either at
-            initialization `inference = SNLE(prior)` or to `.build_posterior
-            (prior=prior)`."""
-            prior = self._prior
-        else:
-            check_prior(prior)
 
-        if density_estimator is None:
-            likelihood_estimator = self._neural_net
-            # If internal net is used device is defined.
-            device = self._device
-        else:
-            likelihood_estimator = density_estimator
-            # Otherwise, infer it from the device of the net parameters.
-            device = str(next(density_estimator.parameters()).device)
+        return super().build_posterior(
+            density_estimator,
+            prior,
+            sample_with,
+            posterior_parameters,
+            mcmc_method=mcmc_method,
+            vi_method=vi_method,
+            mcmc_parameters=mcmc_parameters,
+            vi_parameters=vi_parameters,
+            rejection_sampling_parameters=rejection_sampling_parameters,
+            importance_sampling_parameters=importance_sampling_parameters,
+        )
 
+    def _get_potential_function(
+        self, prior: Distribution, estimator: ConditionalDensityEstimator
+    ) -> Tuple[LikelihoodBasedPotential, TorchTransform]:
+        r"""Gets potential :math:`\log(p(x_o|\theta)p(\theta))` for
+        likelihood estimator.
+
+        It also returns a transformation that can be used to transform the potential
+        into unconstrained space.
+
+        Args:
+            prior: The prior distribution.
+            estimator: The density estimator modelling the likelihood.
+
+        Returns:
+            The potential function $p(x_o|\theta)p(\theta)$ and a transformation that
+            maps to unconstrained space.
+        """
         potential_fn, theta_transform = likelihood_estimator_based_potential(
-            likelihood_estimator=likelihood_estimator,
+            likelihood_estimator=estimator,
             prior=prior,
             x_o=None,
         )
-
-        if sample_with == "mcmc":
-            self._posterior = MCMCPosterior(
-                potential_fn=potential_fn,
-                theta_transform=theta_transform,
-                proposal=prior,
-                method=mcmc_method,
-                device=device,
-                **mcmc_parameters or {},
-            )
-        elif sample_with == "rejection":
-            self._posterior = RejectionPosterior(
-                potential_fn=potential_fn,
-                proposal=prior,
-                device=device,
-                **rejection_sampling_parameters or {},
-            )
-        elif sample_with == "vi":
-            self._posterior = VIPosterior(
-                potential_fn=potential_fn,
-                theta_transform=theta_transform,
-                prior=prior,  # type: ignore
-                vi_method=vi_method,
-                device=device,
-                **vi_parameters or {},
-            )
-        elif sample_with == "importance":
-            self._posterior = ImportanceSamplingPosterior(
-                potential_fn=potential_fn,
-                proposal=prior,
-                device=device,
-                **importance_sampling_parameters or {},
-            )
-        else:
-            raise NotImplementedError
-
-        # Store models at end of each round.
-        self._model_bank.append(deepcopy(self._posterior))
-
-        return deepcopy(self._posterior)
+        return potential_fn, theta_transform
 
     def _loss(self, theta: Tensor, x: Tensor) -> Tensor:
         r"""Return loss for SNLE, which is the likelihood of $-\log q(x_i | \theta_i)$.
@@ -391,3 +324,81 @@ class LikelihoodEstimator(NeuralInference, ABC):
         loss = self._neural_net.loss(x, condition=theta)
         assert_all_finite(loss, "NLE loss")
         return loss
+
+    def _get_start_index(self, discard_prior_samples: bool) -> int:
+        """
+        Determine the starting index for training based on previous rounds.
+
+        Args:
+            discard_prior_samples: Whether to discard samples simulated in round 1, i.e.
+                from the prior.
+
+        Returns:
+            If `discard_prior_samples` is True and previous rounds exist,
+            the method will return 1 to skip samples from round 0; otherwise,
+            it returns 0.
+        """
+
+        # Load data from most recent round.
+        self._round = max(self._data_round_index)
+        # Starting index for the training set (1 = discard round-0 samples).
+        start_idx = int(discard_prior_samples and self._round > 0)
+
+        return start_idx
+
+    def _initialize_neural_network(
+        self,
+        retrain_from_scratch: bool,
+        start_idx: int,
+    ) -> None:
+        """
+        Initialize the neural network if it is None or retraining from scratch.
+
+        Args:
+            retrain_from_scratch: Whether to retrain the conditional density
+                estimator for the posterior from scratch each round.
+            start_idx: The index of the first round to retrieve simulation data from.
+        """
+
+        # First round or if retraining from scratch:
+        # Call the `self._build_neural_net` with the rounds' thetas and xs as
+        # arguments, which will build the neural network
+        # This is passed into NeuralPosterior, to create a neural posterior which
+        # can `sample()` and `log_prob()`. The network is accessible via `.net`.
+        if self._neural_net is None or retrain_from_scratch:
+            # Get theta,x to initialize NN
+            theta, x, _ = self.get_simulations(starting_round=start_idx)
+            # Use only training data for building the neural net (z-scoring transforms)
+            self._neural_net = self._build_neural_net(
+                theta[self.train_indices].to("cpu"),
+                x[self.train_indices].to("cpu"),
+            )
+
+            assert len(x_shape_from_simulation(x.to("cpu"))) < 3, (
+                "SNLE cannot handle multi-dimensional simulator output."
+            )
+            del theta, x
+
+    def _get_losses(
+        self, batch: Sequence[Tensor], loss_kwargs: Dict[str, Any]
+    ) -> Tensor:
+        """
+        Compute losses for a batch of data.
+
+        Args:
+            batch: A batch of data.
+            loss_kwargs: Additional keyword arguments passed to self._loss fn.
+
+        Returns:
+            A tensor containing the computed losses for each sample in the batch.
+        """
+
+        # Get batches on current device.
+        theta_batch, x_batch = (
+            batch[0].to(self._device),
+            batch[1].to(self._device),
+        )
+
+        losses = self._loss(theta_batch, x_batch)
+
+        return losses

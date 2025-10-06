@@ -4,7 +4,7 @@
 import warnings
 from copy import deepcopy
 from functools import partial
-from typing import Any, Callable, Dict, Optional, Union
+from typing import Any, Callable, Dict, Literal, Optional, Union
 
 import torch
 from pyknos.mdn.mdn import MultivariateGaussianMDN
@@ -13,9 +13,14 @@ from torch import Tensor
 from torch.distributions import Distribution, MultivariateNormal
 
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
-from sbi.inference.trainers.npe.npe_base import PosteriorEstimator
-from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
-from sbi.sbi_types import TensorboardSummaryWriter, TorchModule
+from sbi.inference.trainers.npe.npe_base import (
+    PosteriorEstimatorTrainer,
+)
+from sbi.neural_nets.estimators.base import (
+    ConditionalDensityEstimator,
+    ConditionalEstimatorBuilder,
+)
+from sbi.sbi_types import TensorBoardSummaryWriter
 from sbi.utils import torchutils
 from sbi.utils.sbiutils import (
     batched_mixture_mv,
@@ -26,33 +31,38 @@ from sbi.utils.sbiutils import (
 from sbi.utils.torchutils import BoxUniform, assert_all_finite, atleast_2d
 
 
-class NPE_A(PosteriorEstimator):
+class NPE_A(PosteriorEstimatorTrainer):
+    r"""Neural Posterior Estimation algorithm as in Papamakarios et al. (2016) [1].
+
+    [1] *Fast epsilon-free Inference of Simulation Models with Bayesian
+        Conditional Density Estimation*, Papamakarios et al., NeurIPS 2016.
+        https://arxiv.org/abs/1605.06376
+
+    Like all NPE methods, this method trains a deep neural density estimator to
+    directly approximate the posterior. Also like all other NPE methods, in the
+    first round, this density estimator is trained with a maximum-likelihood loss.
+
+    This class implements NPE-A. NPE-A trains across multiple rounds with a
+    maximum-likelihood-loss. This will make training converge to the proposal
+    posterior instead of the true posterior. To correct for this, SNPE-A applies a
+    post-hoc correction after training. This correction has to be performed
+    analytically. Thus, NPE-A is limited to Gaussian distributions for all but the
+    last round. In the last round, NPE-A can use a Mixture of Gaussians."""
+
     def __init__(
         self,
         prior: Optional[Distribution] = None,
-        density_estimator: Union[str, Callable] = "mdn_snpe_a",
+        density_estimator: Union[
+            Literal["mdn_snpe_a"],
+            ConditionalEstimatorBuilder[ConditionalDensityEstimator],
+        ] = "mdn_snpe_a",
         num_components: int = 10,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
-        summary_writer: Optional[TensorboardSummaryWriter] = None,
+        summary_writer: Optional[TensorBoardSummaryWriter] = None,
         show_progress_bars: bool = True,
     ):
-        r"""NPE-A [1].
-
-        [1] _Fast epsilon-free Inference of Simulation Models with Bayesian Conditional
-            Density Estimation_, Papamakarios et al., NeurIPS 2016,
-            https://arxiv.org/abs/1605.06376.
-
-        Like all NPE methods, this method trains a deep neural density estimator to
-        directly approximate the posterior. Also like all other NPE methods, in the
-        first round, this density estimator is trained with a maximum-likelihood loss.
-
-        This class implements NPE-A. NPE-A trains across multiple rounds with a
-        maximum-likelihood-loss. This will make training converge to the proposal
-        posterior instead of the true posterior. To correct for this, SNPE-A applies a
-        post-hoc correction after training. This correction has to be performed
-        analytically. Thus, NPE-A is limited to Gaussian distributions for all but the
-        last round. In the last round, NPE-A can use a Mixture of Gaussians.
+        r"""Initialize NPE-A [1].
 
         Args:
             prior: A probability distribution that expresses prior knowledge about the
@@ -61,17 +71,18 @@ class NPE_A(PosteriorEstimator):
                 distribution) can be used.
             density_estimator: If it is a string (only "mdn_snpe_a" is valid), use a
                 pre-configured mixture of densities network. Alternatively, a function
-                that builds a custom neural network can be provided. The function will
-                be called with the first batch of simulations (theta, x), which can
-                thus be used for shape inference and potentially for z-scoring. It
-                needs to return a PyTorch `nn.Module` implementing the density
-                estimator. The density estimator needs to provide the methods
-                `.log_prob` and `.sample()`. Note that until the last round only a
-                single (multivariate) Gaussian component is used for training (see
-                Algorithm 1 in [1]). In the last round, this component is replicated
-                `num_components` times, its parameters are perturbed with a very small
-                noise, and then the last training round is done with the expanded
-                Gaussian mixture as estimator for the proposal posterior.
+                that builds a custom neural network, which adheres to
+                `ConditionalEstimatorBuilder` protocol can be provided. The function
+                will be called with the first batch of simulations (theta, x), which can
+                thus be used for shape inference and potentially for z-scoring. The
+                density estimator needs to provide the methods `.log_prob` and
+                `.sample()` and must return a `ConditionalDensityEstimator`.
+                Note that until the last round only a single (multivariate) Gaussian
+                component is used for training (seeAlgorithm 1 in [1]). In the last
+                round, this component is replicated `num_components` times,
+                its parameters are perturbed with a very small noise, and then the last
+                training round is done with the expanded Gaussian mixture as estimator
+                for the proposal posterior.
             num_components: Number of components of the mixture of Gaussians in the
                 last round. This overrides the `num_components` value passed to
                 `posterior_nn()`.
@@ -229,7 +240,7 @@ class NPE_A(PosteriorEstimator):
 
     def correct_for_proposal(
         self,
-        density_estimator: Optional[TorchModule] = None,
+        density_estimator: Optional[torch.nn.Module] = None,
     ) -> "NPE_A_MDN":
         r"""Build mixture of Gaussians that approximates the posterior.
 
@@ -283,7 +294,7 @@ class NPE_A(PosteriorEstimator):
 
     def build_posterior(
         self,
-        density_estimator: Optional[TorchModule] = None,
+        density_estimator: Optional[torch.nn.Module] = None,
         prior: Optional[Distribution] = None,
         **kwargs,
     ) -> "DirectPosterior":

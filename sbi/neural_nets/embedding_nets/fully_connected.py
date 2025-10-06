@@ -5,6 +5,8 @@ from torch import Tensor, nn
 
 
 class FCEmbedding(nn.Module):
+    """Fully-connected multi-layer neural network to be used as embedding network."""
+
     def __init__(
         self,
         input_dim: int,

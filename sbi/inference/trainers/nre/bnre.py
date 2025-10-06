@@ -1,37 +1,42 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Callable, Dict, Optional, Union
+from typing import Dict, Optional, Union
 
 import torch
 from torch import Tensor, nn, ones
 from torch.distributions import Distribution
 
 from sbi.inference.trainers.nre.nre_a import NRE_A
-from sbi.sbi_types import TensorboardSummaryWriter
+from sbi.neural_nets.estimators.base import ConditionalEstimatorBuilder
+from sbi.neural_nets.ratio_estimators import RatioEstimator
+from sbi.sbi_types import TensorBoardSummaryWriter
 from sbi.utils.sbiutils import del_entries
 from sbi.utils.torchutils import assert_all_finite
 
 
 class BNRE(NRE_A):
+    r"""Balanced neural ratio estimation (BNRE) as in Delaunoy et al. (2022) [1].
+
+    BNRE is a variation of NRE aiming to produce more conservative posterior
+    approximations.
+
+    [1] Delaunoy, A., Hermans, J., Rozet, F., Wehenkel, A., & Louppe, G..
+    Towards Reliable Simulation-Based Inference with Balanced Neural Ratio
+    Estimation.
+    NeurIPS 2022. https://arxiv.org/abs/2208.13624
+    """
+
     def __init__(
         self,
         prior: Optional[Distribution] = None,
-        classifier: Union[str, Callable] = "resnet",
+        classifier: Union[str, ConditionalEstimatorBuilder[RatioEstimator]] = "resnet",
         device: str = "cpu",
         logging_level: Union[int, str] = "warning",
-        summary_writer: Optional[TensorboardSummaryWriter] = None,
+        summary_writer: Optional[TensorBoardSummaryWriter] = None,
         show_progress_bars: bool = True,
     ):
-        r"""Balanced neural ratio estimation (BNRE)[1].
-
-        BNRE is a variation of NRE aiming to produce more conservative posterior
-        approximations.
-
-        [1] Delaunoy, A., Hermans, J., Rozet, F., Wehenkel, A., & Louppe, G..
-        Towards Reliable Simulation-Based Inference with Balanced Neural Ratio
-        Estimation.
-        NeurIPS 2022. https://arxiv.org/abs/2208.13624
+        r"""Balanced neural ratio estimation (BNRE).
 
         Args:
             prior: A probability distribution that expresses prior knowledge about the
@@ -39,11 +44,11 @@ class BNRE(NRE_A):
                 prior must be passed to `.build_posterior()`.
             classifier: Classifier trained to approximate likelihood ratios. If it is
                 a string, use a pre-configured network of the provided type (one of
-                linear, mlp, resnet). Alternatively, a function that builds a custom
-                neural network can be provided. The function will be called with the
-                first batch of simulations $(\theta, x)$, which can thus be used for
-                shape inference and potentially for z-scoring. It needs to return a
-                PyTorch `nn.Module` implementing the classifier.
+                linear, mlp, resnet), or a callable that implements the
+                `ConditionalEstimatorBuilder` protocol. The callable will
+                be called with the first batch of simulations (theta, x), which can thus
+                be used for shape inference and potentially for z-scoring. It returns a
+                `RatioEstimator`.
             device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.
@@ -70,7 +75,7 @@ class BNRE(NRE_A):
         retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[Dict] = None,
-    ) -> nn.Module:
+    ) -> RatioEstimator:
         r"""Return classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
         Args:
 

@@ -12,9 +12,9 @@ from sbi.inference.posteriors.vi_posterior import VIPosterior
 from sbi.neural_nets import posterior_nn
 from sbi.neural_nets.embedding_nets import FCEmbedding
 from sbi.utils import BoxUniform
+from sbi.utils.metrics import check_c2st
 from sbi.utils.torchutils import process_device
 from sbi.utils.user_input_checks_utils import MultipleIndependent
-from tests.test_utils import check_c2st
 
 
 # toy simulator for continuous data with mixed parameters
@@ -36,18 +36,7 @@ def mixed_simulator(theta, sigma2=0.1):
 
 
 @pytest.mark.gpu
-@pytest.mark.parametrize(
-    "device",
-    [
-        pytest.param(
-            "gpu",
-            marks=pytest.mark.xfail(
-                raises=NotImplementedError,
-                reason="MultipleIndependent does not support device handling yet.",
-            ),
-        )
-    ],
-)
+@pytest.mark.parametrize("device", [pytest.param("gpu")])
 def test_mnpe_on_device(
     device,
     num_simulations: int = 100,
@@ -55,10 +44,6 @@ def test_mnpe_on_device(
     """Test MNPE API on device (CPU/GPU)."""
     num_samples = 10
     device = process_device(device)
-
-    # Generate data with mixed parameter types
-    theta_true = torch.tensor([[-0.5, 0.5, 1.0]], device=device)
-    x_o = mixed_simulator(theta_true).to(device)
 
     prior = MultipleIndependent(
         [
@@ -70,6 +55,9 @@ def test_mnpe_on_device(
     theta = prior.sample((num_simulations,))
     x = mixed_simulator(theta).to(device)
 
+    theta_true = prior.sample((1,))
+    x_o = mixed_simulator(theta_true).to(device)
+
     trainer = MNPE(prior=prior, device=device)
     trainer.append_simulations(theta, x).train(max_num_epochs=1)
 
@@ -80,7 +68,7 @@ def test_mnpe_on_device(
         x=x_o,
         show_progress_bars=False,
     )
-    assert samples.shape == (num_samples, 2)
+    assert samples.shape == (num_samples, 3)
 
 
 def test_batched_sampling(num_simulations: int = 100):

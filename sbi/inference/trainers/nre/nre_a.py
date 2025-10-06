@@ -1,32 +1,39 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Any, Callable, Dict, Optional, Union
+from typing import Any, Dict, Optional, Union
 
 import torch
 from torch import Tensor, nn, ones
 from torch.distributions import Distribution
 
-from sbi.inference.trainers.nre.nre_base import RatioEstimator
-from sbi.sbi_types import TensorboardSummaryWriter
+from sbi.inference.trainers.nre.nre_base import (
+    RatioEstimatorTrainer,
+)
+from sbi.neural_nets.estimators.base import ConditionalEstimatorBuilder
+from sbi.neural_nets.ratio_estimators import RatioEstimator
+from sbi.sbi_types import TensorBoardSummaryWriter
 from sbi.utils.sbiutils import del_entries
 from sbi.utils.torchutils import assert_all_finite
 
 
-class NRE_A(RatioEstimator):
+class NRE_A(RatioEstimatorTrainer):
+    """AALR, here known as Neural Ratio Estimation algorithm (NRE-A) [1].
+
+    [1] *Likelihood-free MCMC with Amortized Approximate Likelihood Ratios*, Hermans
+        et al., ICML 2020, https://arxiv.org/abs/1903.04057
+    """
+
     def __init__(
         self,
         prior: Optional[Distribution] = None,
-        classifier: Union[str, Callable] = "resnet",
+        classifier: Union[str, ConditionalEstimatorBuilder[RatioEstimator]] = "resnet",
         device: str = "cpu",
         logging_level: Union[int, str] = "warning",
-        summary_writer: Optional[TensorboardSummaryWriter] = None,
+        summary_writer: Optional[TensorBoardSummaryWriter] = None,
         show_progress_bars: bool = True,
     ):
-        r"""AALR[1], here known as NRE_A.
-
-        [1] _Likelihood-free MCMC with Amortized Approximate Likelihood Ratios_, Hermans
-            et al., ICML 2020, https://arxiv.org/abs/1903.04057
+        r"""Initialize NRE_A.
 
         Args:
             prior: A probability distribution that expresses prior knowledge about the
@@ -34,11 +41,11 @@ class NRE_A(RatioEstimator):
                 prior must be passed to `.build_posterior()`.
             classifier: Classifier trained to approximate likelihood ratios. If it is
                 a string, use a pre-configured network of the provided type (one of
-                linear, mlp, resnet). Alternatively, a function that builds a custom
-                neural network can be provided. The function will be called with the
-                first batch of simulations (theta, x), which can thus be used for shape
-                inference and potentially for z-scoring. It needs to return a PyTorch
-                `nn.Module` implementing the classifier.
+                linear, mlp, resnet), or a callable that implements the
+                `ConditionalEstimatorBuilder` protocol. The callable will
+                be called with the first batch of simulations (theta, x), which can
+                thus be used for shape inference and potentially for z-scoring. It
+                returns a `RatioEstimator`.
             device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.
@@ -65,7 +72,7 @@ class NRE_A(RatioEstimator):
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[Dict] = None,
         loss_kwargs: Optional[Dict[str, Any]] = None,
-    ) -> nn.Module:
+    ) -> RatioEstimator:
         r"""Return classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
 
         Args:

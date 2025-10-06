@@ -64,6 +64,8 @@ def build_input_layer(
 
 
 class RestrictionEstimator:
+    """Classifier to estimate regions of the prior that give good simulation results."""
+
     def __init__(
         self,
         prior: Distribution,
@@ -607,6 +609,8 @@ class AcceptRejectFunction:
 
 
 class RestrictedPrior(Distribution):
+    """Distribution that restricts the prior distribution to a smaller region."""
+
     def __init__(
         self,
         prior: Distribution,
@@ -615,14 +619,13 @@ class RestrictedPrior(Distribution):
         sample_with: str = "rejection",
         device: str = "cpu",
     ) -> None:
-        r"""
-        Initialize the simulation informed prior.
+        r"""Initialize the simulation-informed prior.
 
         References:
-        - Deistler et al. (2022): "Energy-efficient network activity from disparate
-          circuit parameters"
-        - Deistler et al. (2022): "Truncated proposals for scalable and hassle-free
-          simulation-based inference"
+        - Deistler et al. (2022): *Energy-efficient network activity from disparate
+        circuit parameters*
+        - Deistler et al. (2022): *Truncated proposals for scalable and hassle-free
+        simulation-based inference*
 
         Args:
             prior: Prior distribution, will be used as proposal distribution whose

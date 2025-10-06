@@ -1,41 +1,161 @@
-cff-version: 1.2.0
-message: "Please cite https://doi.org/10.21105/joss.02505 also"
-title: "sbi: Simulation-based inference toolkit"
+cff-version: "1.2.0"
 authors:
-- family-names: Tejero-Cantero
-  given-names: Alvaro
-  orcid: "http://orcid.org/0000-0002-8768-4227"
 - family-names: Boelts
   given-names: Jan
-  orcid: "http://orcid.org/0000-0003-4979-7092"
 - family-names: Deistler
   given-names: Michael
-  orcid: "http://orcid.org/0000-0002-3573-0404"
+- family-names: Gloeckler
+  given-names: Manuel
+- family-names: Tejero-Cantero
+  given-names: Álvaro
 - family-names: Lueckmann
   given-names: Jan-Matthis
-  orcid: "http://orcid.org/0000-0003-4320-4663"
+- family-names: Moss
+  given-names: Guy
+- family-names: Steinbach
+  given-names: Peter
+- family-names: Moreau
+  given-names: Thomas
+- family-names: Muratore
+  given-names: Fabio
+- family-names: Linhart
+  given-names: Julia
 - family-names: Durkan
   given-names: Conor
-  orcid: "http://orcid.org/0000-0001-9333-7777"
-- family-names: Gonçalves
+- family-names: Vetter
+  given-names: Julius
+- family-names: Miller
+  given-names: Benjamin Kurt
+- family-names: Herold
+  given-names: Maternus
+- family-names: Ziaeemehr
+  given-names: Abolfazl
+- family-names: Pals
+  given-names: Matthijs
+- family-names: Gruner
+  given-names: Theo
+- family-names: Bischoff
+  given-names: Sebastian
+- family-names: Krouglova
+  given-names: Nastya
+- family-names: Gao
+  given-names: Richard
+- family-names: Lappalainen
+  given-names: Janne K
+- family-names: Mucsányi
+  given-names: Bálint
+- family-names: Pei
+  given-names: Felix
+- family-names: Schulz
+  given-names: Auguste
+- family-names: Stefanidi
+  given-names: Zinovia
+- family-names: Rodrigues
   given-names: Pedro
-  orcid: "http://orcid.org/0000-0002-6987-4836"
+- family-names: Schröder
+  given-names: Cornelius
+- family-names: Zaid
+  given-names: Faried Abu
+- family-names: Beck
+  given-names: Jonas
+- family-names: Kapoor
+  given-names: Jaivardhan
 - family-names: Greenberg
-  given-names: David
-  orcid: "http://orcid.org/0000-0002-8515-0459"
+  given-names: David S.
+- family-names: Gonçalves
+  given-names: Pedro J.
 - family-names: Macke
-  given-names: Jakob
-  orcid: "https://orcid.org/0000-0001-5154-8912"
-
-version: 0.21.0
-date-released: "2022-12-22"
-identifiers:
- - type: "ascl-id"
-   value: "2306.002"
- - type: "doi"
-   value: 10.21105/joss.02505
- - type: "bibcode"
-   value: "2023ascl.soft06002T"
-abstract: "Simulation-based inference is the process of finding parameters of a simulator from observations. The PyTorch package sbi performs simulation-based inference by taking a Bayesian approach to return a full posterior distribution over the parameters, conditional on the observations. This posterior can be amortized (<i>i.e.</i> useful for any observation) or focused (<i>i.e.</i>tailored to a particular observation), with different computational trade-offs. The code offers a simple interface for one-line posterior inference."
-license: AGPL-3.0
-repository-code: https://github.com/mackelab/sbi
+  given-names: Jakob H.
+contact:
+- family-names: Boelts
+  given-names: Jan
+- family-names: Deistler
+  given-names: Michael
+- family-names: Macke
+  given-names: Jakob H.
+doi: 10.5281/zenodo.15034786
+message: If you use this software, please cite our article in the
+  Journal of Open Source Software.
+preferred-citation:
+  authors:
+  - family-names: Boelts
+    given-names: Jan
+  - family-names: Deistler
+    given-names: Michael
+  - family-names: Gloeckler
+    given-names: Manuel
+  - family-names: Tejero-Cantero
+    given-names: Álvaro
+  - family-names: Lueckmann
+    given-names: Jan-Matthis
+  - family-names: Moss
+    given-names: Guy
+  - family-names: Steinbach
+    given-names: Peter
+  - family-names: Moreau
+    given-names: Thomas
+  - family-names: Muratore
+    given-names: Fabio
+  - family-names: Linhart
+    given-names: Julia
+  - family-names: Durkan
+    given-names: Conor
+  - family-names: Vetter
+    given-names: Julius
+  - family-names: Miller
+    given-names: Benjamin Kurt
+  - family-names: Herold
+    given-names: Maternus
+  - family-names: Ziaeemehr
+    given-names: Abolfazl
+  - family-names: Pals
+    given-names: Matthijs
+  - family-names: Gruner
+    given-names: Theo
+  - family-names: Bischoff
+    given-names: Sebastian
+  - family-names: Krouglova
+    given-names: Nastya
+  - family-names: Gao
+    given-names: Richard
+  - family-names: Lappalainen
+    given-names: Janne K
+  - family-names: Mucsányi
+    given-names: Bálint
+  - family-names: Pei
+    given-names: Felix
+  - family-names: Schulz
+    given-names: Auguste
+  - family-names: Stefanidi
+    given-names: Zinovia
+  - family-names: Rodrigues
+    given-names: Pedro
+  - family-names: Schröder
+    given-names: Cornelius
+  - family-names: Zaid
+    given-names: Faried Abu
+  - family-names: Beck
+    given-names: Jonas
+  - family-names: Kapoor
+    given-names: Jaivardhan
+  - family-names: Greenberg
+    given-names: David S.
+  - family-names: Gonçalves
+    given-names: Pedro J.
+  - family-names: Macke
+    given-names: Jakob H.
+  date-published: 2025-04-08
+  doi: 10.21105/joss.07754
+  issn: 2475-9066
+  issue: 108
+  journal: Journal of Open Source Software
+  publisher:
+    name: Open Journals
+  start: 7754
+  title: "sbi reloaded: a toolkit for simulation-based inference
+    workflows"
+  type: article
+  url: "https://joss.theoj.org/papers/10.21105/joss.07754"
+  volume: 10
+title: "sbi reloaded: a toolkit for simulation-based inference
+  workflows"

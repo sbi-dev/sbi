@@ -1,5 +1,5 @@
 # Contributing to sbi
 
-The latest contributing guide is available in the repository at `docs/contribute.md`, or online at:
+The latest contributing guide is available in the repository at [`docs/contributing.md`](docs/contributing.md), or online at:
 
-[sbi-dev.github.io/sbi/latest/contribute/](https://sbi-dev.github.io/sbi/latest/contribute/)
+[sbi.readthedocs.io/en/latest/contributing.html](https://sbi.readthedocs.io/en/latest/contributing.html)
