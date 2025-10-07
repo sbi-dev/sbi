@@ -112,6 +112,9 @@ class BNRE(NRE_A):
         """
 
         kwargs = del_entries(locals(), entries=("self", "__class__"))
+
+        # Configure _loss function parameters by initializing LossArgsBNRE
+        # with the given regularization strength.
         kwargs["loss_kwargs"] = LossArgsBNRE(
             regularization_strength=kwargs.pop("regularization_strength"),
         )
