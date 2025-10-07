@@ -63,9 +63,12 @@ def build_categoricalmassestimator(
             unique(col).numel() for col in batch_x_discrete.T
         ])
         num_categories = inferred_categories
+    # get all the unique values for each column
+    categorical_values = [unique(col) for col in batch_x.T]
 
     categorical_net = CategoricalMADE(
         num_categories=num_categories,
+        categorical_values=categorical_values,
         num_hidden_features=num_hidden,
         num_context_features=y_numel,
         num_blocks=num_layers,

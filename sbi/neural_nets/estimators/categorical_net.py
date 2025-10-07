@@ -1,7 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Callable, Optional
+from typing import Callable, List, Optional
 
 import torch
 from nflows.utils import torchutils
@@ -25,6 +25,7 @@ class CategoricalMADE(MADE):
         self,
         num_categories: Tensor,
         num_hidden_features: int,
+        categorical_values: Optional[List[Tensor]] = None,
         num_context_features: Optional[int] = None,
         num_blocks: int = 2,
         use_residual_blocks: bool = True,
@@ -44,6 +45,7 @@ class CategoricalMADE(MADE):
                 number of categories. Can handle mutliple variables with differing
                 numbers of choices.
             num_hidden_features: number of hidden units per layer.
+            categorical_values: list of unique values for each variable.
             num_context_features: number of context features.
             num_blocks: number of masked blocks.
             use_residual_blocks: whether to use residual blocks.
@@ -57,21 +59,33 @@ class CategoricalMADE(MADE):
             raise ValueError("Residual blocks can't be used with random masks.")
 
         self.num_variables = len(num_categories)
-        self.num_categories = int(torch.max(num_categories))
+        self.num_categories_max = int(torch.max(num_categories))
+
+        # Store the original num_categories for each variable
+        self.num_categories_per_var = num_categories.clone()
+
+        # Store unique values for mapping (initialized on first use)
+        if categorical_values is not None:
+            self.categorical_values_per_var = categorical_values
+        else:
+            # assume that all values are 0 to num_categories
+            self.categorical_values_per_var = [
+                torch.arange(int(num_categories[i])) for i in range(self.num_variables)
+            ]
 
         super().__init__(
             features=self.num_variables,
             hidden_features=num_hidden_features,
             context_features=num_context_features,
             num_blocks=num_blocks,
-            output_multiplier=self.num_categories,
+            output_multiplier=self.num_categories_max,
             use_residual_blocks=use_residual_blocks,
             random_mask=random_mask,
             activation=activation,
             dropout_probability=dropout_probability,
             use_batch_norm=use_batch_norm,
         )
-        mask = torch.zeros(self.num_variables, self.num_categories)
+        mask = torch.zeros(self.num_variables, self.num_categories_max)
         for i, c in enumerate(num_categories):
             mask[i, :c] = 1
         self.register_buffer("mask", mask)
@@ -80,6 +94,34 @@ class CategoricalMADE(MADE):
         self.hidden_features = num_hidden_features
         self.epsilon = epsilon
         self.context_features = num_context_features
+
+    def _get_mapped_input(self, input: Tensor) -> Tensor:
+        """Map user categorical values to 0-based indices."""
+        mapped = input.clone()
+        for i, categorical_vals in enumerate(self.categorical_values_per_var):
+            # Create a mapping tensor for vectorized lookup
+            unique_vals = (
+                categorical_vals.clone()
+                .detach()
+                .to(device=input.device, dtype=input.dtype)
+            )
+            indices = torch.searchsorted(unique_vals, input[..., i].contiguous())
+            indices = indices.clamp(0, len(categorical_vals) - 1)
+            mapped[..., i] = indices
+        return mapped
+
+    def _get_original_values(self, indices: Tensor) -> Tensor:
+        """Map 0-based indices back to original categorical values."""
+        mapped = indices.clone()
+        for i, categorical_vals in enumerate(self.categorical_values_per_var):
+            # Create a lookup tensor for direct indexing
+            lookup = (
+                categorical_vals.clone()
+                .detach()
+                .to(device=indices.device, dtype=mapped.dtype)
+            )
+            mapped[..., i] = lookup[indices[..., i].long()]
+        return mapped
 
     def forward(self, input: Tensor, condition: Optional[Tensor] = None) -> Tensor:
         r"""Forward pass of the categorical density estimator network to compute the
@@ -110,10 +152,12 @@ class CategoricalMADE(MADE):
         Returns:
             Log-probabilities of shape `(batch_size,)`.
         """
-        outputs = self.forward(input, condition=condition)
+        mapped_input = self._get_mapped_input(input)
 
-        outputs = outputs.reshape(*input.shape, self.num_categories)
-        log_prob = Categorical(logits=outputs).log_prob(input).sum(dim=-1)
+        outputs = self.forward(mapped_input, condition=condition)
+
+        outputs = outputs.reshape(*mapped_input.shape, self.num_categories_max)
+        log_prob = Categorical(logits=outputs).log_prob(mapped_input).sum(dim=-1)
 
         return log_prob
 
@@ -155,11 +199,13 @@ class CategoricalMADE(MADE):
             )
             for i in range(self.num_variables):
                 outputs = self.forward(samples, context)
-                outputs = outputs.reshape(*samples.shape, self.num_categories)
+                outputs = outputs.reshape(*samples.shape, self.num_categories_max)
                 samples[:, :, : i + 1] = Categorical(
                     logits=outputs[:, :, : i + 1]
                 ).sample()
 
+        # Map sampled indices back to original categorical values
+        samples = self._get_original_values(samples)
         return samples.reshape(*sample_shape, batch_dim, self.num_variables)
 
 
@@ -180,7 +226,7 @@ class CategoricalMassEstimator(ConditionalDensityEstimator):
             net=net, input_shape=input_shape, condition_shape=condition_shape
         )
         self.net = net
-        self.num_categories = net.num_categories
+        self.num_categories = net.num_categories_max
 
     def log_prob(self, input: Tensor, condition: Tensor, **kwargs) -> Tensor:
         """Return log-probability of samples under the categorical distribution.
