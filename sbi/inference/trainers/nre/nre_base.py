@@ -457,9 +457,7 @@ class RatioEstimatorTrainer(NeuralInference[RatioEstimator], ABC):
 
             del x, theta
 
-    def _get_losses(
-        self, batch: Sequence[Tensor], loss_args: LossArgs | None
-    ) -> Tensor:
+    def _get_losses(self, batch: Sequence[Tensor], loss_args: LossArgs) -> Tensor:
         """
         Compute losses for a batch of data.
 
@@ -476,7 +474,7 @@ class RatioEstimatorTrainer(NeuralInference[RatioEstimator], ABC):
             batch[1].to(self._device),
         )
 
-        if loss_args is None or not issubclass(type(loss_args), LossArgsNRE):
+        if not issubclass(type(loss_args), LossArgsNRE):
             raise TypeError(
                 "Expected loss_args to be a subclass of LossArgsNRE,"
                 f" but got {type(loss_args)}"

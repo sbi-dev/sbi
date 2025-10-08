@@ -220,10 +220,8 @@ class NRE_C(RatioEstimatorTrainer):
         p_marginal = 1 / (1 + gamma)
         return p_marginal, p_joint
 
-    def _get_losses(
-        self, batch: Sequence[Tensor], loss_args: LossArgs | None
-    ) -> Tensor:
-        """Override the parent class method to check the type of loss_args."""
+    def _get_losses(self, batch: Sequence[Tensor], loss_args: LossArgs) -> Tensor:
+        """Overrides the parent class method to check the type of loss_args."""
 
         if not isinstance(loss_args, LossArgsNRE_C):
             raise TypeError(

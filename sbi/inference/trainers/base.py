@@ -19,6 +19,7 @@ from typing import (
     Sequence,
     Tuple,
     Union,
+    overload,
 )
 from warnings import warn
 
@@ -330,9 +331,22 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         """Get the starting index for the current round."""
         ...
 
+    @overload
+    def _get_losses(self, batch: Sequence[Tensor]) -> Tensor:
+        """
+        Called when the trainer does not require additional loss arguments
+        (e.g., NLE).
+        """
+        ...
+
+    @overload
+    def _get_losses(self, batch: Sequence[Tensor], loss_args: LossArgs) -> Tensor:
+        """Called when the trainer requires additional loss parameters via loss_args."""
+        ...
+
     @abstractmethod
     def _get_losses(
-        self, batch: Sequence[Tensor], loss_args: LossArgs | None
+        self, batch: Sequence[Tensor], loss_args: LossArgs | None = None
     ) -> Tensor:
         """Return per-sample loss tensor for a training/validation batch."""
         ...
@@ -1008,7 +1022,10 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         train_loss_sum = 0
         for batch in train_loader:
             self.optimizer.zero_grad()
-            train_losses = self._get_losses(batch=batch, loss_args=loss_args)
+            if loss_args is None:
+                train_losses = self._get_losses(batch=batch)
+            else:
+                train_losses = self._get_losses(batch=batch, loss_args=loss_args)
             train_loss = torch.mean(train_losses)
             train_loss_sum += train_losses.sum().item()
 
@@ -1045,7 +1062,10 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         val_loss_sum = 0
         with torch.no_grad():
             for batch in val_loader:
-                val_losses = self._get_losses(batch=batch, loss_args=loss_args)
+                if loss_args is None:
+                    val_losses = self._get_losses(batch=batch)
+                else:
+                    val_losses = self._get_losses(batch=batch, loss_args=loss_args)
                 val_loss_sum += val_losses.sum().item()
 
         # Take mean over all validation samples.

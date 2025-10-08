@@ -666,9 +666,7 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
 
             del theta, x
 
-    def _get_losses(
-        self, batch: Sequence[Tensor], loss_args: LossArgs | None
-    ) -> Tensor:
+    def _get_losses(self, batch: Sequence[Tensor], loss_args: LossArgs) -> Tensor:
         """
         Compute losses for a batch of data.
 

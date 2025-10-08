@@ -158,10 +158,8 @@ class BNRE(NRE_A):
         assert_all_finite(loss, "BNRE loss")
         return loss
 
-    def _get_losses(
-        self, batch: Sequence[Tensor], loss_args: LossArgs | None
-    ) -> Tensor:
-        """Override the parent class method to check the type of loss_args."""
+    def _get_losses(self, batch: Sequence[Tensor], loss_args: LossArgs) -> Tensor:
+        """Overrides the parent class method to check the type of loss_args."""
 
         if not isinstance(loss_args, LossArgsBNRE):
             raise TypeError(

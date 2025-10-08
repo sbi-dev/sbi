@@ -20,7 +20,7 @@ from sbi.inference.posteriors.posterior_parameters import (
 from sbi.inference.potentials import likelihood_estimator_based_potential
 from sbi.inference.potentials.likelihood_based_potential import LikelihoodBasedPotential
 from sbi.inference.trainers._contracts import StartIndexContext, TrainConfig
-from sbi.inference.trainers.base import LossArgs, NeuralInference
+from sbi.inference.trainers.base import NeuralInference
 from sbi.neural_nets import likelihood_nn
 from sbi.neural_nets.estimators import ConditionalDensityEstimator
 from sbi.neural_nets.estimators.base import ConditionalEstimatorBuilder
@@ -385,15 +385,12 @@ class LikelihoodEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], A
             )
             del theta, x
 
-    def _get_losses(
-        self, batch: Sequence[Tensor], loss_args: LossArgs | None
-    ) -> Tensor:
+    def _get_losses(self, batch: Sequence[Tensor]) -> Tensor:
         """
         Compute losses for a batch of data.
 
         Args:
             batch: A batch of data.
-            loss_args: Additional arguments passed to self._loss fn.
 
         Returns:
             A tensor containing the computed losses for each sample in the batch.
