@@ -59,7 +59,7 @@ class CategoricalMADE(MADE):
             raise ValueError("Residual blocks can't be used with random masks.")
 
         self.num_variables = len(num_categories)
-        self.num_categories_max = int(torch.max(num_categories))
+        self.max_num_categories = int(torch.max(num_categories))
 
         # Store the original num_categories for each variable
         self.num_categories_per_var = num_categories.clone()
@@ -78,14 +78,14 @@ class CategoricalMADE(MADE):
             hidden_features=num_hidden_features,
             context_features=num_context_features,
             num_blocks=num_blocks,
-            output_multiplier=self.num_categories_max,
+            output_multiplier=self.max_num_categories,
             use_residual_blocks=use_residual_blocks,
             random_mask=random_mask,
             activation=activation,
             dropout_probability=dropout_probability,
             use_batch_norm=use_batch_norm,
         )
-        mask = torch.zeros(self.num_variables, self.num_categories_max)
+        mask = torch.zeros(self.num_variables, self.max_num_categories)
         for i, c in enumerate(num_categories):
             mask[i, :c] = 1
         self.register_buffer("mask", mask)
@@ -95,31 +95,42 @@ class CategoricalMADE(MADE):
         self.epsilon = epsilon
         self.context_features = num_context_features
 
-    def _get_mapped_input(self, input: Tensor) -> Tensor:
-        """Map user categorical values to 0-based indices."""
-        mapped = input.clone()
+        # Precompute and register per-variable lookup tables for value/index mapping.
+        dtype = (
+            self.categorical_values_per_var[0].dtype
+            if len(self.categorical_values_per_var) > 0
+            else torch.long
+        )
+        values_lookup = torch.zeros(
+            self.num_variables, self.max_num_categories, dtype=dtype
+        )
         for i, categorical_vals in enumerate(self.categorical_values_per_var):
-            # Create a mapping tensor for vectorized lookup
-            unique_vals = (
-                categorical_vals.clone()
-                .detach()
-                .to(device=input.device, dtype=input.dtype)
+            sorted_vals = torch.sort(categorical_vals).values
+            c = int(self.num_categories_per_var[i])
+            values_lookup[i, :c] = sorted_vals.to(dtype)
+        self.values_lookup = values_lookup
+
+    def _map_values_to_indices(self, input: Tensor) -> Tensor:
+        """Map user categorical values to 0-based indices."""
+        # Cast once to the lookup dtype to avoid per-iteration conversions
+        input_for_search = input.to(self.values_lookup.dtype)
+        mapped = input_for_search.clone()
+        for i in range(self.num_variables):
+            c = int(self.num_categories_per_var[i])
+            unique_vals = self.values_lookup[i, :c]
+            indices = torch.searchsorted(
+                unique_vals, input_for_search[..., i].contiguous()
             )
-            indices = torch.searchsorted(unique_vals, input[..., i].contiguous())
-            indices = indices.clamp(0, len(categorical_vals) - 1)
+            indices = indices.clamp(0, c - 1)
             mapped[..., i] = indices
         return mapped
 
-    def _get_original_values(self, indices: Tensor) -> Tensor:
+    def _map_indices_to_values(self, indices: Tensor) -> Tensor:
         """Map 0-based indices back to original categorical values."""
         mapped = indices.clone()
-        for i, categorical_vals in enumerate(self.categorical_values_per_var):
-            # Create a lookup tensor for direct indexing
-            lookup = (
-                categorical_vals.clone()
-                .detach()
-                .to(device=indices.device, dtype=mapped.dtype)
-            )
+        for i in range(self.num_variables):
+            c = int(self.num_categories_per_var[i])
+            lookup = self.values_lookup[i, :c]
             mapped[..., i] = lookup[indices[..., i].long()]
         return mapped
 
@@ -152,11 +163,11 @@ class CategoricalMADE(MADE):
         Returns:
             Log-probabilities of shape `(batch_size,)`.
         """
-        mapped_input = self._get_mapped_input(input)
+        mapped_input = self._map_values_to_indices(input)
 
         outputs = self.forward(mapped_input, condition=condition)
 
-        outputs = outputs.reshape(*mapped_input.shape, self.num_categories_max)
+        outputs = outputs.reshape(*mapped_input.shape, self.max_num_categories)
         log_prob = Categorical(logits=outputs).log_prob(mapped_input).sum(dim=-1)
 
         return log_prob
@@ -199,13 +210,13 @@ class CategoricalMADE(MADE):
             )
             for i in range(self.num_variables):
                 outputs = self.forward(samples, context)
-                outputs = outputs.reshape(*samples.shape, self.num_categories_max)
+                outputs = outputs.reshape(*samples.shape, self.max_num_categories)
                 samples[:, :, : i + 1] = Categorical(
                     logits=outputs[:, :, : i + 1]
                 ).sample()
 
         # Map sampled indices back to original categorical values
-        samples = self._get_original_values(samples)
+        samples = self._map_indices_to_values(samples)
         return samples.reshape(*sample_shape, batch_dim, self.num_variables)
 
 
@@ -226,7 +237,7 @@ class CategoricalMassEstimator(ConditionalDensityEstimator):
             net=net, input_shape=input_shape, condition_shape=condition_shape
         )
         self.net = net
-        self.num_categories = net.num_categories_max
+        self.num_categories = net.max_num_categories
 
     def log_prob(self, input: Tensor, condition: Tensor, **kwargs) -> Tensor:
         """Return log-probability of samples under the categorical distribution.
