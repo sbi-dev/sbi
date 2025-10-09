@@ -1,21 +1,13 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from dataclasses import asdict
 
 import pytest
 import torch
 
 from sbi.inference import NPE, NRE
 from sbi.inference.trainers._contracts import (
-    LossArgsBNRE,
-    LossArgsNPE,
     LossArgsNRE,
-    LossArgsNRE_A,
-    LossArgsNRE_C,
-    LossArgsVF,
-    StartIndexContext,
-    TrainConfig,
 )
 from sbi.inference.trainers.nre.bnre import BNRE
 from sbi.inference.trainers.nre.nre_a import NRE_A
@@ -26,38 +18,19 @@ from sbi.utils.torchutils import BoxUniform
 non_positive_values = [-1, 0, False]
 
 
-@pytest.fixture()
-def train_config_dict():
-    """Test fixture for training dictionary hyperparameters."""
-
-    return dict(
-        training_batch_size=1,
-        learning_rate=5e-4,
-        validation_fraction=0.1,
-        stop_after_epochs=20,
-        max_num_epochs=1,
-        resume_training=False,
-        retrain_from_scratch=False,
-        show_train_summary=False,
-    )
-
-
 @pytest.mark.parametrize(
-    ("inference_class", "loss_args_dataclass", "loss_args", "skipped_argument"),
+    ("inference_class", "loss_args"),
     [
-        (NRE, LossArgsNRE, dict(num_atoms=9), None),
-        (NRE_A, LossArgsNRE_A, dict(), "num_atoms"),
-        (NRE_C, LossArgsNRE_C, dict(gamma=1.0), "num_atoms"),
-        (BNRE, LossArgsBNRE, dict(regularization_strength=100.0), "num_atoms"),
-        (NPE, LossArgsNPE, dict(force_first_round_loss=False), "proposal"),
-        (FMPE, LossArgsVF, dict(force_first_round_loss=False), "proposal"),
+        (NRE, dict(num_atoms=10)),
+        (NRE_C, dict(gamma=1.0)),
+        (BNRE, dict(regularization_strength=100.0)),
+        (NPE, dict(force_first_round_loss=False)),
+        (FMPE, dict(force_first_round_loss=False)),
         # Failing cases
         *[
             pytest.param(
                 NRE,
-                LossArgsNRE,
                 dict(num_atoms=value),
-                None,
                 marks=pytest.mark.xfail(raises=(TypeError, ValueError)),
             )
             for value in non_positive_values
@@ -65,9 +38,7 @@ def train_config_dict():
         *[
             pytest.param(
                 NPE,
-                LossArgsNRE_C,
                 dict(gamma=value),
-                None,
                 marks=pytest.mark.xfail(raises=(TypeError, ValueError)),
             )
             for value in non_positive_values
@@ -75,18 +46,19 @@ def train_config_dict():
         *[
             pytest.param(
                 BNRE,
-                LossArgsBNRE,
                 dict(regularization_strength=value),
-                None,
                 marks=pytest.mark.xfail(raises=(TypeError, ValueError)),
             )
             for value in non_positive_values
         ],
     ],
 )
-def test_trainer_dataclass_loss_args_validation(
-    inference_class, loss_args_dataclass, loss_args, skipped_argument
-):
+def test_loss_args_dataclass_validation(inference_class, loss_args):
+    """
+    Test train method loss arguments that pass through LossArgs dataclasses are
+    validated.
+    """
+
     def simulator(theta):
         return 1.0 + theta + torch.randn(theta.shape, device=theta.device) * 0.1
 
@@ -98,23 +70,22 @@ def test_trainer_dataclass_loss_args_validation(
     inference = inference_class(prior=prior)
     inference.append_simulations(theta, x)
 
-    dataclass = loss_args_dataclass(**loss_args)
-
-    kwargs = asdict(dataclass)
-
-    if skipped_argument is not None:
-        kwargs.pop(skipped_argument)
-
-    if isinstance(dataclass, LossArgsVF):
-        kwargs["validation_times"] = kwargs.pop("times")
-
-    inference.train(**kwargs)
+    inference.train(**loss_args)
 
 
 @pytest.mark.parametrize(
     ("train_config_args"),
     [
-        {},
+        dict(
+            training_batch_size=1,
+            learning_rate=5e-4,
+            validation_fraction=0.1,
+            stop_after_epochs=20,
+            max_num_epochs=1,
+            resume_training=False,
+            retrain_from_scratch=False,
+            show_train_summary=False,
+        ),
         # Failing cases
         *[
             pytest.param(
@@ -160,7 +131,12 @@ def test_trainer_dataclass_loss_args_validation(
         ],
     ],
 )
-def test_trainer_config_validation(train_config_args, train_config_dict):
+def test_trainer_config_dataclass_validation(train_config_args):
+    """
+    Test train method arguments that pass through TrainConfig dataclass are
+    validated.
+    """
+
     def simulator(theta):
         return 1.0 + theta + torch.randn(theta.shape, device=theta.device) * 0.1
 
@@ -172,11 +148,7 @@ def test_trainer_config_validation(train_config_args, train_config_dict):
     inference = NPE(prior=prior)
     inference.append_simulations(theta, x)
 
-    train_config_dict = {**train_config_dict, **train_config_args}
-
-    train_config = TrainConfig(**train_config_dict)
-
-    inference.train(**asdict(train_config))
+    inference.train(**train_config_args)
 
 
 @pytest.mark.parametrize(
@@ -187,9 +159,18 @@ def test_trainer_config_validation(train_config_args, train_config_dict):
             resume_training=False,
             force_first_round_loss=False,
         ),
+        pytest.param(
+            dict(discard_prior_samples=None),
+            marks=pytest.mark.xfail(raises=(TypeError)),
+        ),
     ],
 )
 def test_trainer_dataclass_start_index_context_validation(dataclass_args):
+    """
+    Test train method arguments that pass through StartIndexContext dataclass are
+    validated.
+    """
+
     def simulator(theta):
         return 1.0 + theta + torch.randn(theta.shape, device=theta.device) * 0.1
 
@@ -201,11 +182,7 @@ def test_trainer_dataclass_start_index_context_validation(dataclass_args):
     inference = NPE(prior=prior)
     inference.append_simulations(theta, x)
 
-    dataclass = StartIndexContext(**dataclass_args)
-
-    kwargs = asdict(dataclass)
-
-    inference.train(**kwargs)
+    inference.train(**dataclass_args)
 
 
 @pytest.mark.parametrize(
