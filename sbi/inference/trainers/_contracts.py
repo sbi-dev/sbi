@@ -193,7 +193,7 @@ class LossArgsVF:
         calibration_kernel: A function to calibrate the loss with respect
             to the simulations `x` (optional). See Lueckmann, Gonçalves et al.,
             NeurIPS 2017. If `None`, no calibration is used.
-        times: Times :math:`t`.
+        times: Time steps to compute the loss at.
         force_first_round_loss: If `True`, train with maximum likelihood,
             i.e., potentially ignoring the correction for using a proposal
             distribution different from the prior.
