@@ -1,12 +1,13 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Dict, Optional, Tuple, Union
+from typing import Dict, Optional, Sequence, Tuple, Union
 
 import torch
 from torch import Tensor
 from torch.distributions import Distribution
 
+from sbi.inference.trainers._contracts import LossArgs, LossArgsNRE_C
 from sbi.inference.trainers.nre.nre_base import (
     RatioEstimatorTrainer,
 )
@@ -129,9 +130,12 @@ class NRE_C(RatioEstimatorTrainer):
         Returns:
             Classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
         """
+
         kwargs = del_entries(locals(), entries=("self", "__class__"))
-        kwargs["num_atoms"] = kwargs.pop("num_classes") + 1
-        kwargs["loss_kwargs"] = {"gamma": kwargs.pop("gamma")}
+        kwargs["loss_kwargs"] = LossArgsNRE_C(
+            num_atoms=kwargs.pop("num_classes") + 1, gamma=kwargs.pop("gamma")
+        )
+
         return super().train(**kwargs)
 
     def _loss(
@@ -215,3 +219,14 @@ class NRE_C(RatioEstimatorTrainer):
         p_joint = gamma / (1 + gamma)
         p_marginal = 1 / (1 + gamma)
         return p_marginal, p_joint
+
+    def _get_losses(self, batch: Sequence[Tensor], loss_args: LossArgs) -> Tensor:
+        """Overrides the parent class method to check the type of loss_args."""
+
+        if not isinstance(loss_args, LossArgsNRE_C):
+            raise TypeError(
+                "Expected type of loss_args to be LossArgsNRE_C,"
+                f" but got {type(loss_args)}"
+            )
+
+        return super()._get_losses(batch=batch, loss_args=loss_args)
