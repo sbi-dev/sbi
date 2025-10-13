@@ -9,6 +9,7 @@ nav:
   - Contributing:
     - How to contribute: contribute.md
     - Code of Conduct: code_of_conduct.md
+    - Enhancement Proposals: proposals.md
   - Citation: citation.md
   - Credits: credits.md
 
