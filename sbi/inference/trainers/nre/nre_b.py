@@ -7,6 +7,7 @@ import torch
 from torch import Tensor
 from torch.distributions import Distribution
 
+from sbi.inference.trainers._contracts import LossArgsNRE
 from sbi.inference.trainers.nre.nre_base import (
     RatioEstimatorTrainer,
 )
@@ -105,6 +106,8 @@ class NRE_B(RatioEstimatorTrainer):
             Classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
         """
         kwargs = del_entries(locals(), entries=("self", "__class__"))
+        kwargs["loss_kwargs"] = LossArgsNRE(num_atoms=kwargs.pop("num_atoms"))
+
         return super().train(**kwargs)
 
     def _loss(self, theta: Tensor, x: Tensor, num_atoms: int) -> Tensor:

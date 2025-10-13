@@ -3,6 +3,7 @@
 
 import warnings
 from abc import ABC, abstractmethod
+from dataclasses import asdict, replace
 from typing import Any, Dict, Literal, Optional, Sequence, Tuple, Union
 
 import torch
@@ -20,7 +21,15 @@ from sbi.inference.posteriors.posterior_parameters import (
 )
 from sbi.inference.potentials import ratio_estimator_based_potential
 from sbi.inference.potentials.ratio_based_potential import RatioBasedPotential
-from sbi.inference.trainers.base import NeuralInference
+from sbi.inference.trainers._contracts import (
+    LossArgsNRE,
+    StartIndexContext,
+    TrainConfig,
+)
+from sbi.inference.trainers.base import (
+    LossArgs,
+    NeuralInference,
+)
 from sbi.neural_nets import classifier_nn
 from sbi.neural_nets.estimators.base import ConditionalEstimatorBuilder
 from sbi.neural_nets.ratio_estimators import RatioEstimator
@@ -146,7 +155,7 @@ class RatioEstimatorTrainer(NeuralInference[RatioEstimator], ABC):
 
     def train(
         self,
-        num_atoms: int = 10,
+        num_atoms: Optional[int] = None,
         training_batch_size: int = 200,
         learning_rate: float = 5e-4,
         validation_fraction: float = 0.1,
@@ -158,12 +167,13 @@ class RatioEstimatorTrainer(NeuralInference[RatioEstimator], ABC):
         retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[Dict] = None,
-        loss_kwargs: Optional[Dict[str, Any]] = None,
+        loss_kwargs: Optional[LossArgsNRE] = None,
     ) -> RatioEstimator:
         r"""Return classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
 
         Args:
-            num_atoms: Number of atoms to use for classification.
+            num_atoms: Number of atoms to use for classification, this value must be
+                passed through the loss_kwargs argument.
             training_batch_size: Training batch size.
             learning_rate: Learning rate for Adam optimizer.
             validation_fraction: The fraction of data to use for validation.
@@ -193,44 +203,80 @@ class RatioEstimatorTrainer(NeuralInference[RatioEstimator], ABC):
             Classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
         """
 
-        start_idx = self._get_start_index(discard_prior_samples=discard_prior_samples)
-
-        train_loader, val_loader = self.get_dataloaders(
-            start_idx,
-            training_batch_size,
-            validation_fraction,
-            resume_training,
-            dataloader_kwargs=dataloader_kwargs,
-        )
-
-        clipped_batch_size = min(training_batch_size, val_loader.batch_size)  # type: ignore
-
-        num_atoms = int(
-            clamp_and_warn(
-                "num_atoms", num_atoms, min_val=2, max_val=clipped_batch_size
-            )
-        )
-
-        self._initialize_neural_network(
-            retrain_from_scratch=retrain_from_scratch,
-            start_idx=start_idx,
-        )
-
-        if loss_kwargs is None:
-            loss_kwargs = {}
-
-        loss_kwargs["num_atoms"] = num_atoms
-
-        return self._run_training_loop(
-            train_loader=train_loader,
-            val_loader=val_loader,
+        train_config = TrainConfig(
             max_num_epochs=max_num_epochs,
             stop_after_epochs=stop_after_epochs,
             learning_rate=learning_rate,
             resume_training=resume_training,
-            clip_max_norm=clip_max_norm,
             show_train_summary=show_train_summary,
-            loss_kwargs=loss_kwargs,
+            training_batch_size=training_batch_size,
+            retrain_from_scratch=retrain_from_scratch,
+            validation_fraction=validation_fraction,
+            clip_max_norm=clip_max_norm,
+        )
+
+        if num_atoms is not None:
+            warnings.warn(
+                "num_atoms value is ignored. The value must be passed through"
+                " the loss_kwargs argument.",
+                stacklevel=2,
+            )
+
+        if loss_kwargs is None:
+            loss_kwargs = LossArgsNRE()
+            warnings.warn(
+                "No value provided for loss_kwargs. NRE loss arguments like "
+                "num_atoms should be set via `LossArgsNRE. A default of  "
+                "num_atoms={loss_kwargs.num_atoms} will be used.",
+                stacklevel=2,
+            )
+
+        if not issubclass(type(loss_kwargs), LossArgsNRE):
+            raise TypeError(
+                "Expected loss_kwargs to be a subclass of LossArgsNRE,"
+                f" but got {type(loss_kwargs)}"
+            )
+
+        start_idx = self._get_start_index(
+            context=StartIndexContext(discard_prior_samples=discard_prior_samples)
+        )
+
+        train_loader, val_loader = self.get_dataloaders(
+            start_idx,
+            train_config.training_batch_size,
+            train_config.validation_fraction,
+            train_config.resume_training,
+            dataloader_kwargs=dataloader_kwargs,
+        )
+
+        clipped_batch_size = min(
+            train_config.training_batch_size,
+            val_loader.batch_size,  # type: ignore
+        )
+
+        num_atoms = int(
+            clamp_and_warn(
+                "num_atoms",
+                loss_kwargs.num_atoms,
+                min_val=2,
+                max_val=clipped_batch_size,
+            )
+        )
+
+        if num_atoms != loss_kwargs.num_atoms:
+            # Update num_atoms field in loss_kwargs
+            loss_kwargs = replace(loss_kwargs, **dict(num_atoms=num_atoms))
+
+        self._initialize_neural_network(
+            retrain_from_scratch=train_config.retrain_from_scratch,
+            start_idx=start_idx,
+        )
+
+        return self._run_training_loop(
+            train_loader=train_loader,
+            val_loader=val_loader,
+            train_config=train_config,
+            loss_args=loss_kwargs,
         )
 
     def build_posterior(
@@ -363,24 +409,23 @@ class RatioEstimatorTrainer(NeuralInference[RatioEstimator], ABC):
 
         return potential_fn, theta_transform
 
-    def _get_start_index(self, discard_prior_samples: bool) -> int:
+    def _get_start_index(self, context: StartIndexContext) -> int:
         """
         Determine the starting index for training based on previous rounds.
 
         Args:
-            discard_prior_samples: Whether to discard samples simulated in round 1, i.e.
-                from the prior.
+            context: StartIndexContext dataclass values used to determine the starting
+                index of the training set.
 
         Returns:
-            If `discard_prior_samples` is True and previous rounds exist,
-            the method will return 1 to skip samples from round 0; otherwise,
+            The method will return 1 to skip samples from round 0; otherwise,
             it returns 0.
         """
 
         # Load data from most recent round.
         self._round = max(self._data_round_index)
         # Starting index for the training set (1 = discard round-0 samples).
-        start_idx = int(discard_prior_samples and self._round > 0)
+        start_idx = int(context.discard_prior_samples and self._round > 0)
 
         return start_idx
 
@@ -412,15 +457,13 @@ class RatioEstimatorTrainer(NeuralInference[RatioEstimator], ABC):
 
             del x, theta
 
-    def _get_losses(
-        self, batch: Sequence[Tensor], loss_kwargs: Dict[str, Any]
-    ) -> Tensor:
+    def _get_losses(self, batch: Sequence[Tensor], loss_args: LossArgs) -> Tensor:
         """
         Compute losses for a batch of data.
 
         Args:
             batch: A batch of data.
-            loss_kwargs: Additional keyword arguments passed to self._loss fn.
+            loss_args: Additional arguments passed to self._loss fn.
 
         Returns:
             A tensor containing the computed losses for each sample in the batch.
@@ -430,6 +473,13 @@ class RatioEstimatorTrainer(NeuralInference[RatioEstimator], ABC):
             batch[0].to(self._device),
             batch[1].to(self._device),
         )
-        losses = self._loss(theta_batch, x_batch, **loss_kwargs)
+
+        if not issubclass(type(loss_args), LossArgsNRE):
+            raise TypeError(
+                "Expected loss_args to be a subclass of LossArgsNRE,"
+                f" but got {type(loss_args)}"
+            )
+
+        losses = self._loss(theta_batch, x_batch, **asdict(loss_args))
 
         return losses
