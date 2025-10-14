@@ -1,7 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Callable, List, Optional
+from typing import Callable, List, Optional, cast
 
 import torch
 from nflows.utils import torchutils
@@ -61,18 +61,6 @@ class CategoricalMADE(MADE):
         self.num_variables = len(num_categories)
         self.max_num_categories = int(torch.max(num_categories))
 
-        # Store the original num_categories for each variable as a buffer
-        self.num_categories_per_var = num_categories.clone()
-
-        # Store unique values for mapping (initialized on first use)
-        if categorical_values is not None:
-            self.categorical_values_per_var = categorical_values
-        else:
-            # assume that all values are 0 to num_categories
-            self.categorical_values_per_var = [
-                torch.arange(int(num_categories[i])) for i in range(self.num_variables)
-            ]
-
         super().__init__(
             features=self.num_variables,
             hidden_features=num_hidden_features,
@@ -85,6 +73,22 @@ class CategoricalMADE(MADE):
             dropout_probability=dropout_probability,
             use_batch_norm=use_batch_norm,
         )
+
+        # Store the original num_categories for each variable as a buffer
+        self.num_categories_per_var = num_categories.clone()
+
+        # Determine if mapping is needed (only when categorical_values is provided)
+        self._needs_mapping = categorical_values is not None
+
+        # Store unique values for mapping (initialized on first use)
+        if self._needs_mapping:
+            self.categorical_values_per_var = cast(List[Tensor], categorical_values)
+        else:
+            # assume that all values are 0 to num_categories
+            self.categorical_values_per_var: List[Tensor] = [
+                torch.arange(int(num_categories[i])) for i in range(self.num_variables)
+            ]
+
         mask = torch.zeros(self.num_variables, self.max_num_categories)
         for i, c in enumerate(num_categories):
             mask[i, :c] = 1
@@ -95,23 +99,9 @@ class CategoricalMADE(MADE):
         self.epsilon = epsilon
         self.context_features = num_context_features
 
-        # Initialize and register lookup buffers once during init.
-        self._init_lookup_buffers()
-
-    def _map_values_to_indices(self, input: Tensor) -> Tensor:
-        """Map user categorical values to 0-based indices."""
-        # Cast once to the lookup dtype to avoid per-iteration conversions
-        input_for_search = input.to(self.values_lookup.dtype)
-        mapped = input_for_search.clone()
-        for i in range(self.num_variables):
-            c = int(self.num_categories_per_var[i])
-            unique_vals = self.values_lookup[i, :c]
-            indices = torch.searchsorted(
-                unique_vals, input_for_search[..., i].contiguous()
-            )
-            indices = indices.clamp(0, c - 1)
-            mapped[..., i] = indices
-        return mapped
+        # Initialize and register lookup buffers only if mapping is needed
+        if self._needs_mapping:
+            self._init_lookup_buffers()
 
     def _init_lookup_buffers(self) -> None:
         """Initialize and register lookup tensors as buffers."""
@@ -131,6 +121,30 @@ class CategoricalMADE(MADE):
 
         # Register buffers for proper device moves and state_dict handling.
         self.register_buffer("values_lookup", values_lookup)
+
+    def _map_values_to_indices(self, input: Tensor) -> Tensor:
+        """Map user categorical values to 0-based indices."""
+        # Cast once to the lookup dtype to avoid per-iteration conversions
+        input_for_search = input.to(self.values_lookup.dtype)
+        mapped = input_for_search.clone()
+        for i in range(self.num_variables):
+            c = int(self.num_categories_per_var[i])
+            unique_vals = self.values_lookup[i, :c]
+            input_values = input_for_search[..., i].contiguous()
+            indices = torch.searchsorted(unique_vals, input_values)
+
+            # Check if clamping would change indices (indicating invalid values)
+            indices_clamped = indices.clamp(0, c - 1)
+            if not (indices == indices_clamped).all():
+                invalid_mask = indices != indices_clamped
+                raise ValueError(
+                    f"Variable {i} contains values not seen during training: "
+                    f"{input_values[invalid_mask].unique().tolist()}. "
+                    f"Valid values are: {unique_vals.tolist()}"
+                )
+
+            mapped[..., i] = indices
+        return mapped
 
     def _map_indices_to_values(self, indices: Tensor) -> Tensor:
         """Map 0-based indices back to original categorical values."""
@@ -170,7 +184,10 @@ class CategoricalMADE(MADE):
         Returns:
             Log-probabilities of shape `(batch_size,)`.
         """
-        mapped_input = self._map_values_to_indices(input)
+        if self._needs_mapping:
+            mapped_input = self._map_values_to_indices(input)
+        else:
+            mapped_input = input
 
         outputs = self.forward(mapped_input, condition=condition)
 
@@ -222,8 +239,9 @@ class CategoricalMADE(MADE):
                     logits=outputs[:, :, : i + 1]
                 ).sample()
 
-        # Map sampled indices back to original categorical values
-        samples = self._map_indices_to_values(samples)
+        # Map sampled indices back to original categorical values if needed
+        if self._needs_mapping:
+            samples = self._map_indices_to_values(samples)
         return samples.reshape(*sample_shape, batch_dim, self.num_variables)
 
 
