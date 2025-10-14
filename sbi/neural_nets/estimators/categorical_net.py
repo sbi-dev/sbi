@@ -61,7 +61,7 @@ class CategoricalMADE(MADE):
         self.num_variables = len(num_categories)
         self.max_num_categories = int(torch.max(num_categories))
 
-        # Store the original num_categories for each variable
+        # Store the original num_categories for each variable as a buffer
         self.num_categories_per_var = num_categories.clone()
 
         # Store unique values for mapping (initialized on first use)
@@ -95,20 +95,8 @@ class CategoricalMADE(MADE):
         self.epsilon = epsilon
         self.context_features = num_context_features
 
-        # Precompute and register per-variable lookup tables for value/index mapping.
-        dtype = (
-            self.categorical_values_per_var[0].dtype
-            if len(self.categorical_values_per_var) > 0
-            else torch.long
-        )
-        values_lookup = torch.zeros(
-            self.num_variables, self.max_num_categories, dtype=dtype
-        )
-        for i, categorical_vals in enumerate(self.categorical_values_per_var):
-            sorted_vals = torch.sort(categorical_vals).values
-            c = int(self.num_categories_per_var[i])
-            values_lookup[i, :c] = sorted_vals.to(dtype)
-        self.values_lookup = values_lookup
+        # Initialize and register lookup buffers once during init.
+        self._init_lookup_buffers()
 
     def _map_values_to_indices(self, input: Tensor) -> Tensor:
         """Map user categorical values to 0-based indices."""
@@ -124,6 +112,25 @@ class CategoricalMADE(MADE):
             indices = indices.clamp(0, c - 1)
             mapped[..., i] = indices
         return mapped
+
+    def _init_lookup_buffers(self) -> None:
+        """Initialize and register lookup tensors as buffers."""
+        # Precompute and register per-variable lookup tables for value/index mapping.
+        dtype = (
+            self.categorical_values_per_var[0].dtype
+            if len(self.categorical_values_per_var) > 0
+            else torch.long
+        )
+        values_lookup = torch.zeros(
+            self.num_variables, self.max_num_categories, dtype=dtype
+        )
+        for i, categorical_vals in enumerate(self.categorical_values_per_var):
+            sorted_vals = torch.sort(categorical_vals).values
+            c = int(self.num_categories_per_var[i])
+            values_lookup[i, :c] = sorted_vals.to(dtype)
+
+        # Register buffers for proper device moves and state_dict handling.
+        self.register_buffer("values_lookup", values_lookup)
 
     def _map_indices_to_values(self, indices: Tensor) -> Tensor:
         """Map 0-based indices back to original categorical values."""
