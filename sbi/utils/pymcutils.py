@@ -82,11 +82,11 @@ class NeuralLikelihoodOp(Op):
         """
         # Ensure theta is a tensor variable
         theta = pt.as_tensor_variable(theta)
-
-        # Outputs are: scalar log-likelihood and gradient vector (match theta dtype)
-        outputs = [pt.scalar(dtype=theta.dtype), pt.vector(dtype=theta.dtype)]
-
-        return Apply(self, [theta], outputs)
+        # Outputs are: scalar log-likelihood and gradient with the same
+        # type (dtype/broadcastable) as theta so PyTensor enforces shape rank.
+        logp_out = pt.scalar(dtype=theta.dtype)
+        grad_out = theta.type()
+        return Apply(self, [theta], [logp_out, grad_out])
 
     def perform(
         self,
@@ -101,70 +101,79 @@ class NeuralLikelihoodOp(Op):
             inputs: List containing [theta_array]
             output_storage: List of arrays to store outputs [log_prob, gradients]
         """
-        # Get theta from inputs (NumPy array) and convert to torch on the
-        # estimator's device/dtype with gradient tracking enabled.
         theta_np = inputs[0]
-        theta_torch = torch.as_tensor(
-            theta_np, dtype=self._torch_dtype, device=self._torch_device
-        )
-        theta_torch.requires_grad_(True)
+        # Expected rank based on the provided input array
+        expected_ndim = int(np.ndim(theta_np))
 
-        # Keep the original shape for gradient computation
-        original_shape = theta_torch.shape
-
-        # Ensure theta has batch dimension: (batch_dim, *cond_event_shape)
-        if theta_torch.dim() == 1:
-            theta_torch = theta_torch.unsqueeze(0)
-
-        # Safeguard: PyMC evaluates one theta per logp call. Prevent accidental
-        # passing of multiple thetas that would otherwise be summed.
-        if theta_torch.shape[0] != 1:
+        # Normalize theta for estimator: allowed shapes are (D,) or (1, D)
+        if np.ndim(theta_np) == 1:
+            theta_for_est = theta_np[np.newaxis, :]
+        elif np.ndim(theta_np) == 2 and theta_np.shape[0] == 1:
+            theta_for_est = theta_np
+        elif np.ndim(theta_np) == 2 and theta_np.shape[0] > 1:
             raise ValueError(
                 "NeuralLikelihoodOp received a batch of thetas with batch_dim="
-                f"{theta_torch.shape[0]}. This Op expects exactly one theta per "
+                f"{theta_np.shape[0]}. This Op expects exactly one theta per "
                 "evaluation. If you intend to evaluate multiple thetas, loop over "
-                "them externally. I.i.d. observations are supported by providing "
-                "observed with shape (n_obs, *event_shape); this Op sums over the "
-                "observation (sample) dimension automatically."
+                "them externally."
             )
+        else:
+            raise ValueError(
+                "NeuralLikelihoodOp expects theta with shape (D,) or (1, D), "
+                f"got {theta_np.shape}."
+            )
+
+        # Convert to torch on the estimator's device/dtype with gradient tracking
+        theta_torch = torch.as_tensor(
+            theta_for_est, dtype=self._torch_dtype, device=self._torch_device
+        )
+        theta_torch.requires_grad_(True)
+        # theta_torch shape is (1, D)
 
         # Estimator expects input (sample_dim, batch_dim, *event) and
         # condition (batch_dim, *params). Use sample_dim=n_obs, batch_dim=1.
         obs = self.observation  # (n_obs, *event_shape)
-        # Insert batch_dim=1 → (n_obs, 1, *event_shape)
         obs_expanded = obs.unsqueeze(1)
 
         with torch.set_grad_enabled(True):
-            log_prob = self.estimator.log_prob(
+            log_prob_batch = self.estimator.log_prob(
                 input=obs_expanded, condition=theta_torch
             )
-
-        # Reduce to scalar (sum over sample_dim)
-        if log_prob.dim() > 0:
-            log_prob = log_prob.sum()
+            log_prob_sum_over_samples = log_prob_batch.sum(dim=0)  # (1,)
+            # Squeeze batch_dim=1 to get a scalar
+            log_prob_scalar = log_prob_sum_over_samples.squeeze()
 
         # Compute gradients eagerly (so grad() can reference this output symbolically)
-        if log_prob.requires_grad:
+        if log_prob_scalar.requires_grad:
             grad_list = torch.autograd.grad(
-                outputs=log_prob,
+                outputs=log_prob_scalar,
                 inputs=theta_torch,
                 create_graph=False,
                 allow_unused=False,
             )
             grad_t = grad_list[0]
-            # Remove batch dimension if it was added
-            if len(original_shape) == 1 and grad_t.shape[0] == 1:
-                grad_t = grad_t.squeeze(0)
+            # Convert to numpy; currently shape expected (1, D)
             grad_np = grad_t.detach().cpu().numpy()
         else:
             # Use theta's dtype for numerical outputs if possible
-            grad_np = np.zeros(original_shape, dtype=theta_np.dtype)
+            grad_np = np.zeros(theta_np.shape, dtype=theta_np.dtype)
+
+        # Match gradient rank to the input theta's ndim expected by PyTensor
+        if expected_ndim == 1 and grad_np.ndim == 2 and grad_np.shape[0] == 1:
+            grad_np = grad_np[0]
+        elif expected_ndim == 2 and grad_np.ndim == 1:
+            grad_np = grad_np[np.newaxis, :]
+        elif expected_ndim not in (1, 2):
+            raise ValueError(
+                "NeuralLikelihoodOp only supports theta of rank 1 or 2; got "
+                f"rank {expected_ndim}."
+            )
 
         # Store outputs using theta dtype (PyMC typically expects floatX)
         out_dtype = (
             theta_np.dtype if np.issubdtype(theta_np.dtype, np.floating) else np.float64
         )
-        output_storage[0][0] = log_prob.detach().cpu().numpy().astype(out_dtype)
+        output_storage[0][0] = log_prob_scalar.detach().cpu().numpy().astype(out_dtype)
         output_storage[1][0] = grad_np.astype(out_dtype)
 
     def grad(

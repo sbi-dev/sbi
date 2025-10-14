@@ -80,9 +80,9 @@ def test_nle_pymc_bridge_minimal(method, get_trained_nle, linear_gaussian_setup)
         mcmc_method: PyMC step method class to use for sampling
     """
 
-    # === Create observed data ===
+    # Observed data with multiple iid trials.
     true_theta = torch.tensor([1.0, -0.5, 0.3])  # 3D parameters
-    num_trials = 1
+    num_trials = 10
     x_o = linear_gaussian_setup["simulator"](
         true_theta.unsqueeze(0).repeat(num_trials, 1)
     )
