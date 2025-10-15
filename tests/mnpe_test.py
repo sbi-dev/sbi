@@ -83,7 +83,9 @@ def test_mnpe_indices(
     """Test MNPE API with indices not at zero."""
     num_sim = num_simulations + 1  # plus one because of test point
 
-    discrete_theta = torch.randint(low=10, high=20, size=(num_sim, dim_theta_discrete))
+    discrete_theta = torch.randint(
+        low=discrete_low, high=discrete_high, size=(num_sim, dim_theta_discrete)
+    )
     continuous_theta = torch.randn((num_sim, dim_theta_continuous))
     theta_all = torch.cat([continuous_theta, discrete_theta], dim=1)
     x_all = torch.randn((num_sim, dim_x))
