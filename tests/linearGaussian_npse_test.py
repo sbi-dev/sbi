@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from itertools import product
-from typing import List, Optional, Tuple
+from typing import List, Literal, Optional, Tuple
 
 import pytest
 from torch import eye, ones, zeros
@@ -8,13 +8,16 @@ from torch.distributions import MultivariateNormal
 
 from sbi import utils as utils
 from sbi.inference import NPSE
+from sbi.inference.posteriors.vector_field_posterior import VectorFieldPosterior
 from sbi.simulators import linear_gaussian
 from sbi.simulators.linear_gaussian import (
     samples_true_posterior_linear_gaussian_uniform_prior,
     true_posterior_linear_gaussian_mvn_prior,
 )
+from sbi.utils.metrics import check_c2st
+from sbi.utils.torchutils import BoxUniform
 
-from .test_utils import check_c2st, get_dkl_gaussian_prior
+from .test_utils import get_dkl_gaussian_prior
 
 IID_METHODS = ["fnpe", "gauss", "auto_gauss", "jac_gauss"]
 NUM_DIM = [1, 2, 3]
@@ -26,9 +29,11 @@ SDE_TYPE = ["vp", "ve", "subvp"]
 
 @dataclass(frozen=True)
 class NpseTrainingTestCase:
+    """Defines a NPSE training test case."""
+
     num_dim: int
     prior_type: Optional[str]
-    sde_type: str
+    sde_type: Literal["vp", "ve", "subvp"]
 
     def __str__(self):
         return f"{self.prior_type}_prior-dim_{self.num_dim}-{self.sde_type}"
@@ -74,8 +79,8 @@ class NpseTrainingTestCase:
     def _get_default_prior(self):
         if self.prior is not None:
             return self.prior
-
-        return utils.BoxUniform(-2.0 * ones(self.num_dim), 2.0 * ones(self.num_dim))
+        else:
+            return BoxUniform(-2.0 * ones(self.num_dim), 2.0 * ones(self.num_dim))
 
     def get_training_data(self, num_simulations: int):
         theta = self._get_default_prior().sample((num_simulations,))
@@ -88,16 +93,17 @@ class NpseTrainingTestCase:
                 x_o,
                 self.likelihood_shift,
                 self.likelihood_cov,
-                self.prior_mean,
-                self.prior_cov,
+                self.prior_mean,  # type: ignore
+                self.prior_cov,  # type: ignore
             )
             target_samples = gt_posterior.sample((num_samples,))
         elif self.prior_type in {"uniform", None}:
+            prior: BoxUniform = self._get_default_prior()  # type: ignore
             target_samples = samples_true_posterior_linear_gaussian_uniform_prior(
                 x_o,
                 self.likelihood_shift,
                 self.likelihood_cov,
-                prior=self._get_default_prior(),
+                prior=prior,
                 num_samples=num_samples,
             )
         else:
@@ -163,7 +169,7 @@ def _get_regression_cases() -> List[Tuple[NpseTrainingTestCase, NpseSamplingTest
     :return: list of combinations of training and sampling test cases
     """
     all_train = [
-        NpseTrainingTestCase(num_dim, prior_type, sde_type)
+        NpseTrainingTestCase(num_dim, prior_type, sde_type)  # type: ignore
         for num_dim, prior_type, sde_type in product(NUM_DIM, PRIOR_TYPE, SDE_TYPE)
     ]
     all_sample = [
@@ -234,6 +240,7 @@ def _build_posterior(inference, score_estimator, x_o, prior=None, sample_with=No
 
 @pytest.fixture(scope="module")
 def npse_trained_model(request):
+    # TODO: Move those up to top of file as global constants for better visibility.
     num_simulations = 5_000
     stop_after_epochs = 200
     training_batch_size = 100
@@ -342,15 +349,17 @@ def test_npse_snapshot(
         training_batch_size=None,
     )
     x_o = zeros(sampling_test_case.num_trials, training_test_case.num_dim)
-    posterior = _build_posterior(
+    posterior: VectorFieldPosterior = _build_posterior(
         inference,
         score_estimator,
         x_o,
         prior=training_test_case.prior,
         sample_with=sampling_test_case.sampling_method,
-    )
+    )  # type: ignore
     samples = posterior.sample(
-        (num_samples,), iid_method=sampling_test_case.iid_method, steps=steps
+        (num_samples,),
+        iid_method=sampling_test_case.iid_method,  # type: ignore
+        steps=steps,
     )
     ndarrays_regression.check(
         {'values': samples.numpy()}, default_tolerance=dict(atol=1e-3, rtol=1e-2)
