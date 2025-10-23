@@ -399,20 +399,27 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
                 - a custom function that returns a Callable.
         """
         if weight_fn == "identity":
-            self.weight_fn = lambda times: 1
+            self.weight_fn = self._identity_weight_fn
         elif weight_fn == "max_likelihood":
-            self.weight_fn = (
-                lambda times: self.diffusion_fn(
-                    torch.ones((1,), device=times.device), times
-                )
-                ** 2
-            )
+            self.weight_fn = self._max_likelihood_weight_fn
         elif weight_fn == "variance":
-            self.weight_fn = lambda times: self.std_fn(times) ** 2
+            self.weight_fn = self._variance_weight_fn
         elif callable(weight_fn):
             self.weight_fn = weight_fn
         else:
             raise ValueError(f"Weight function {weight_fn} not recognized.")
+
+    def _identity_weight_fn(self, times):
+        """Return ones for any time t."""
+        return 1
+
+    def _max_likelihood_weight_fn(self, times):
+        """Return weights proportional to the diffusion function."""
+        return self.diffusion_fn(torch.ones((1,), device=times.device), times) ** 2
+
+    def _variance_weight_fn(self, times):
+        """Return weights as the variance."""
+        return self.std_fn(times) ** 2
 
     def ode_fn(self, input: Tensor, condition: Tensor, times: Tensor) -> Tensor:
         """ODE flow function of the score estimator.
