@@ -21,12 +21,45 @@ from sbi.utils.sbiutils import del_entries
 
 
 class MNPE(NPE_C):
-    r"""Mixed Neural Posterior Estimation (MNPE).
+    r"""Method that can infer discrete and continuous parameters (Mixed NPE).
 
-    Like NPE-C, but designed to be applied to data with mixed types, e.g.,
-    continuous parameters and discrete parameters like they occur in models with
-    switching components. The emebedding net will only operate on the continuous
-    parameters, note this to design the dimension of the embedding net.
+    MNPE (Mixed Neural Posterior Estimation) is similar to NPE: it directly
+    estimates a distribution over parameters given data. Unlike NPE, it is designed to
+    be applied to parmaeters with mixed types, i.e., continuous and discrete parameters.
+    This can occur, for example, in models with switching components. The emebedding
+    net will only operate on the continuous parameters, note this to design the
+    dimension of the embedding net.
+
+    Example:
+    --------
+
+    ::
+
+        import torch
+        from sbi.inference import MNPE
+
+        dim_theta_discrete = 3
+        dim_theta_continuous = 2
+        dim_theta = 5
+        dim_x = 50
+
+        num_sims = 100
+
+        discrete_theta = torch.randint(low=0, high=2, size=(100, dim_theta_discrete))
+        continuous_theta = torch.randn((num_sims, dim_theta_discrete))
+
+        # Important: the theta must have all continuous paramters first, and
+        # discrete parameters after this.
+        theta = torch.cat([continuous_theta, discrete_theta], dim=1)
+        x = torch.randn((num_sims, dim_x))
+
+        inference = MNPE()
+        _ = inference.append_simulations(theta, x).train()
+
+        posterior = inference.build_posterior()
+
+        x_o = torch.randn((1, dim_x))
+        samples = posterior.sample((100,), x=x_o)
     """
 
     def __init__(

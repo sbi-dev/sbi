@@ -19,8 +19,9 @@ from sbi.utils.user_input_checks import process_x
 class EnsemblePosterior(NeuralPosterior):
     r"""Wrapper for bundling together different posterior instances into an ensemble.
 
-    This class creates a posterior ensemble from a set of N different, already trained
-    posterior estimators :math:`p_{i}(\theta|x_o)`, where :math:`i \in \{1,...,N\}`.
+    This class creates a posterior ensemble from a set of :math:`N` different, already
+    trained posterior estimators :math:`p_{i}(\theta \mid x_o)`, where
+    :math:`i \in \{1, \ldots, N\}`.
 
     It can wrap all posterior classes available in ``sbi`` and even a mixture of
     different posteriors, i.e. obtained via SNLE and SNPE at the same time, since it
@@ -29,6 +30,28 @@ class EnsemblePosterior(NeuralPosterior):
     prior.
 
     So far, ``log_prob()``, ``sample()`` and ``map()`` functionality are supported.
+
+    Example:
+    --------
+
+    ::
+
+        import torch
+        from sbi.inference import NPE, EnsemblePosterior
+
+        theta = prior.sample((100,))
+        x = simulate(theta)
+
+        n_ensembles = 10
+        posteriors = []
+        for _ in range(n_ensembles):
+            inference = NPE()
+            inference.append_simulations(theta, x).train()
+            posteriors.append(inference.build_posterior())
+
+        ensemble = EnsemblePosterior(posteriors)
+        ensemble.set_default_x(torch.zeros((3,)))
+        ensemble.sample((1,))
 
     Attributes:
         posteriors: List of the posterior estimators making up the ensemble.
@@ -40,22 +63,6 @@ class EnsemblePosterior(NeuralPosterior):
             optimization performed when obtaining the map. It does not affect the
             .sample() and .log_prob() methods.
         device: device to host the posterior distribution.
-
-    Example:
-    --------
-
-    ::
-
-        import torch
-        from joblib import Parallel, delayed
-        from sbi.examples.minimal import simple
-
-        n_ensembles = 10
-        posteriors = Parallel(n_jobs=-1)(delayed(simple)() for i in range(n_ensembles))
-
-        ensemble = EnsemblePosterior(posteriors)
-        ensemble.set_default_x(torch.zeros((3,)))
-        ensemble.sample((1,))
     """
 
     def __init__(
