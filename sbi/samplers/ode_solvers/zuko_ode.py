@@ -5,6 +5,8 @@
 Zuko ODE solver.
 """
 
+import functools
+
 import torch.nn as nn
 from torch import Tensor
 from torch.distributions import Distribution
@@ -81,8 +83,9 @@ class ZukoNeuralODE(NeuralODE):
             The distribution object with `log_prob` and
             `sample` methods that wraps the ODE solver.
         """
+        partial_f = functools.partial(self._f_condition_last, condition=condition)
         transform = FreeFormJacobianTransform(
-            f=lambda t, input: self.f(input, condition, t),
+            f=partial_f,
             t0=condition.new_tensor(self.t_min),
             t1=condition.new_tensor(self.t_max),
             phi=(condition, *self.net.parameters()),
@@ -93,3 +96,10 @@ class ZukoNeuralODE(NeuralODE):
             transform=transform,
             base=DiagNormal(self.mean_base, self.std_base).expand(condition.shape[:-1]),
         )
+
+    def _f_condition_last(self, t, input, condition):
+        """Return the ODE function with argument-order changed: condition is last.
+
+        This is a helper to build a partial function in `get_distribution`, which
+        requires that `condition` is passed as last element."""
+        return self.f(input, condition, t)
