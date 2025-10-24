@@ -18,6 +18,7 @@ from sbi.neural_nets.estimators.score_estimator import (
 from sbi.utils.nn_utils import get_numel
 from sbi.utils.sbiutils import (
     standardizing_net,
+    z_score_parser,
     z_standardization,
 )
 from sbi.utils.user_input_checks import check_data_device
@@ -129,12 +130,16 @@ def build_vector_field_estimator(
             raise ValueError(f"Unknown architecture: {net}")
 
     # Z-score setup
-    mean_0, std_0 = z_standardization(batch_x, z_score_x == "structured")
+    z_score_x_bool, structured_x = z_score_parser(z_score_x)
+    if z_score_x_bool:
+        mean_0, std_0 = z_standardization(batch_x, structured_x)
+    else:
+        mean_0, std_0 = 0, 1
+
+    z_score_y_bool, structured_y = z_score_parser(z_score_y)
     embedding_net_y = (
-        nn.Sequential(
-            standardizing_net(batch_y, z_score_y == "structured"), embedding_net
-        )
-        if z_score_y
+        nn.Sequential(standardizing_net(batch_y, structured_y), embedding_net)
+        if z_score_y_bool
         else embedding_net
     )
 
