@@ -1,6 +1,6 @@
-# Enhancement Proposals (EPs)
+# Enhancement Proposals
 
-Enhancement Proposals document and discuss substantial changes to sbi’s API, internals,
+Enhancement Proposals (EPs) document and discuss substantial changes to sbi’s API, internals,
 or processes. EPs provide context, motivation, and a concrete design for review and
 decision-making.
 

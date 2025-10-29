@@ -37,8 +37,9 @@ codebase harder to work with.
 
 - **Seamless experiment tracking**: Support for TensorBoard, WandB, MLflow, and stdout
   without changing existing code
-- **Multiple early stopping strategies**: Patience-based, plateau detection, and custom
-  criteria
+- **Clear API for early stopping strategies**: Better docs for patience-based
+  (implemented internally), plus possibly a lightweight interface to external early
+  stopping strategies.
 - **Better debugging**: Typed configurations with clear error messages
 - **Zero migration effort**: Full backward compatibility with existing code
 
@@ -47,9 +48,29 @@ codebase harder to work with.
 - **Reduced code duplication**: Extract shared training logic into reusable components
 - **Type safety**: Prevent entire classes of bugs through static typing
 - **Easier feature integration**: Clean interfaces for community contributions
-- **Future extensibility**: Foundation for integration with PyTorch early stopping methods
+- **Future extensibility**: Lightweight interfaces for external tools, e.g., logging and
+  early stoppping.
+
+## Non-Goals
+
+We want to avoid removing code duplication just for the sake of reduced LOC. Sometimes,
+code duplication is required and preferred in favor of overcomplicated large class
+structures with unclear separation of concerns. In other words, having clear API interfaces is
+more important than reducing code duplication.
+
+We also want to avoid adding complexity by aiming implementing all possible features.
+E.g., we probably should not implement all kinds of early stopping tools internally
+because this will add maintainance and documentation burden for us, and overhead for the
+user to understand the API and the docs. Instead, we should implement either a
+lightweight interface that allows to plug external early stopping tool, or implement
+just a basic version in our internal training (like we do now), and refer to the
+flexible training interface when a user wants to use other approaches.
 
 ## Design
+
+These are very rough sketches of how this could look like. They should be open for
+discussion and can be changed substantially when we implement this (s.t. to the
+non-goals defined above).
 
 ### Current API
 
