@@ -229,15 +229,16 @@ class CategoricalMADE(MADE):
         # for i = 1, ..., num_variables:
         #   x_i ~ Categorical(logits=f_i(x_1, ..., x_{i-1}, c))
         with torch.no_grad():
-            samples = torch.randn(
+            # Zeros is fine here because values will be masked out anyway.
+            samples = torch.zeros(
                 num_samples, batch_dim, self.num_variables, device=context.device
             )
             for i in range(self.num_variables):
+                # generate outputs given all previously sampled variables.
                 outputs = self.forward(samples, context)
                 outputs = outputs.reshape(*samples.shape, self.max_num_categories)
-                samples[:, :, : i + 1] = Categorical(
-                    logits=outputs[:, :, : i + 1]
-                ).sample()
+                # Select logits and sample only for variable i
+                samples[:, :, i] = Categorical(logits=outputs[:, :, i, :]).sample()
 
         # Map sampled indices back to original categorical values if needed
         if self._needs_mapping:
