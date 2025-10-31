@@ -1174,7 +1174,7 @@ class VectorFieldSimformer(MaskedVectorFieldNet):
         num_layers: int = 4,
         num_heads: int = 4,
         mlp_ratio: int = 2,
-        ada_time: int = False,
+        ada_time: bool = False,
         time_emb_type: str = "random_fourier",
         sinusoidal_max_freq: float = 0.01,
         fourier_scale: float = 30.0,
