@@ -204,12 +204,14 @@ class VectorFieldPosterior(NeuralPosterior):
         x = reshape_to_batch_event(x, self.vector_field_estimator.condition_shape)
         _, num_nans, num_infs = handle_invalid_x(x)
 
-        assert num_nans + num_infs == 0, (
-            "Some invalid entries (NaN/Infs) were "
-            "found in x. You probably passed these as the ground observed x's `x_obs`. "
-            "Please, remove these values and provide reasonable observed x's to avoid "
-            "the sampling process to run indefinitely."
-        )
+        if num_nans + num_infs == 0:
+            ValueError(
+                "Some invalid entries (NaN/Infs) were "
+                "found in x. You probably passed these as the ground observed "
+                "x's `x_obs`. "
+                "Please, remove these values and provide reasonable observed x's "
+                "to avoid the sampling process to run indefinitely."
+            )
 
         is_iid = x.shape[0] > 1
         self.potential_fn.set_x(
