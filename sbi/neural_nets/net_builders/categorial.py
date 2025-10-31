@@ -23,7 +23,7 @@ def build_categoricalmassestimator(
     z_score_y: Optional[str] = "independent",
     num_hidden: int = 20,
     num_layers: int = 2,
-    num_categories: Optional[Tensor] = None,
+    num_categories_per_variable: Optional[Tensor] = None,
     embedding_net: nn.Module = nn.Identity(),
 ):
     """Returns a density estimator for a categorical random variable.
@@ -41,7 +41,7 @@ def build_categoricalmassestimator(
 
     if z_score_x != "none":
         raise ValueError("Categorical input should not be z-scored.")
-    if num_categories is None:
+    if num_categories_per_variable is None:
         warnings.warn(
             "Inferring num_categories from batch_x. Ensure all categories are present.",
             stacklevel=2,
@@ -57,17 +57,17 @@ def build_categoricalmassestimator(
             standardizing_net(batch_y, structured_y), embedding_net
         )
 
-    if num_categories is None:
+    if num_categories_per_variable is None:
         batch_x_discrete = batch_x[:, _is_discrete(batch_x)]
         inferred_categories = tensor([
             unique(col).numel() for col in batch_x_discrete.T
         ])
-        num_categories = inferred_categories
+        num_categories_per_variable = inferred_categories
     # get all the unique values for each column
     categorical_values = [unique(col) for col in batch_x.T]
 
     categorical_net = CategoricalMADE(
-        num_categories=num_categories,
+        num_categories=num_categories_per_variable,
         categorical_values=categorical_values,
         num_hidden_features=num_hidden,
         num_context_features=y_numel,
