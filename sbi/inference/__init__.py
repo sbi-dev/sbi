@@ -61,7 +61,6 @@ from sbi.inference.potentials import (
 from sbi.utils.simulation_utils import simulate_for_sbi
 
 __all__ = [
-    "Simformer",
     "FlowMatchingSimformer",
     "FMPE",
     "MarginalTrainer",
@@ -69,5 +68,6 @@ __all__ = [
     "NPE",
     "NPSE",
     "NRE",
+    "Simformer",
     "simulate_for_sbi",
 ]
