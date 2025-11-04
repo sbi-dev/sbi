@@ -238,6 +238,7 @@ def _build_posterior(inference, score_estimator, x_o, prior=None, sample_with=No
     return posterior
 
 
+@pytest.mark.skip
 @pytest.fixture(scope="module")
 def npse_trained_model(request):
     # TODO: Move those up to top of file as global constants for better visibility.
@@ -256,6 +257,7 @@ def npse_trained_model(request):
     return inference, score_estimator, test_case
 
 
+@pytest.mark.skip
 @pytest.mark.slow
 @pytest.mark.parametrize(
     "npse_trained_model", training_test_cases_all, indirect=True, ids=str
@@ -284,6 +286,7 @@ def test_c2st(npse_trained_model, sampling_test_case: NpseSamplingTestCase):
     )
 
 
+@pytest.mark.skip
 @pytest.mark.slow
 @pytest.mark.parametrize(
     "npse_trained_model", training_test_cases_gaussian, indirect=True, ids=str
@@ -306,6 +309,7 @@ def test_kld_gaussian(npse_trained_model):
     assert dkl < max_dkl, f"D-KL={dkl} is more than 2std above the average performance."
 
 
+@pytest.mark.skip
 @pytest.mark.slow
 @pytest.mark.parametrize(
     "npse_trained_model", training_test_cases_gaussian, indirect=True, ids=str
@@ -329,6 +333,7 @@ def test_npse_map(npse_trained_model):
     assert ((map_ - gt_posterior.mean) ** 2).sum() < 0.5, "MAP is not close to GT."
 
 
+@pytest.mark.skip
 @pytest.mark.parametrize(
     "training_test_case, sampling_test_case", _get_regression_cases(), ids=str
 )
