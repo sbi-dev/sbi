@@ -228,7 +228,7 @@ Conduct](CODE_OF_CONDUCT.md).
 `sbi` is the successor (using PyTorch) of the
 [`delfi`](https://github.com/mackelab/delfi) package. It started as a fork of Conor M.
 Durkan's `lfi`. `sbi` runs as a community project. See also
-[credits](https://github.com/sbi-dev/sbi/blob/master/docs/docs/credits.md).
+[credits](https://github.com/sbi-dev/sbi/blob/master/docs/credits.md).
 
 ## Support
 
