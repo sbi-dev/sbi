@@ -14,7 +14,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.22">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.23">
     
     
       
@@ -576,8 +576,6 @@
 <p>Utilities</p>
 </li>
 </ul>
-<h2 id="posterior-estimation-npe">Posterior estimation (NPE)<a class="headerlink" href="#posterior-estimation-npe" title="Permanent link">&para;</a></h2>
-<p><strong>Fast ε-free Inference of Simulation Models with Bayesian Conditional Density Estimation</strong><br> by Papamakarios &amp; Murray (NeurIPS 2016) <br><a href="https://papers.nips.cc/paper/6084-fast-free-inference-of-simulation-models-with-bayesian-conditional-density-estimation.pdf">[PDF]</a> <a href="https://papers.nips.cc/paper/6084-fast-free-inference-of-simulation-models-with-bayesian-conditional-density-estimation/bibtex">[BibTeX]</a></p>
 <div class="highlight"><pre><span></span><code><span class="c1"># Example setup</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
 
@@ -591,6 +589,31 @@
 <span class="n">simulator</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">theta</span><span class="p">:</span> <span class="n">theta</span> <span class="o">+</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn_like</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span> <span class="o">*</span> <span class="mf">0.1</span>
 <span class="n">x_o</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">])</span>
 </code></pre></div>
+<h2 id="posterior-estimation-npe">Posterior estimation (NPE)<a class="headerlink" href="#posterior-estimation-npe" title="Permanent link">&para;</a></h2>
+<p>The core idea of Neural Posterior Estimation (NPE) is to train a conditional generative
+model that directly predicts the posterior given observations. This idea was originally
+developed by Papamakarios &amp; Murray (NeurIPS 2016). The default implementation of NPE in
+the <code>sbi</code> package follows Greenberg, Nonnenmacher &amp; Macke, who proposed NPE with
+normalizing flows:</p>
+<p>As such, for the default implementation of <code>NPE</code> in the <code>sbi</code> package, we recommend to
+cite:</p>
+<p><strong>Fast ε-free Inference of Simulation Models with Bayesian Conditional Density Estimation</strong><br> by Papamakarios &amp; Murray (NeurIPS 2016) <br><a href="https://papers.nips.cc/paper/6084-fast-free-inference-of-simulation-models-with-bayesian-conditional-density-estimation.pdf">[PDF]</a></p>
+<p><strong>Automatic posterior transformation for likelihood-free inference</strong><br>by Greenberg, Nonnenmacher &amp; Macke (ICML 2019) <br><a href="http://proceedings.mlr.press/v97/greenberg19a/greenberg19a.pdf">[PDF]</a></p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference</span><span class="w"> </span><span class="kn">import</span> <span class="n">NPE</span>
+
+<span class="n">inference</span> <span class="o">=</span> <span class="n">NPE</span><span class="p">(</span><span class="n">prior</span><span class="p">)</span>
+<span class="n">theta</span> <span class="o">=</span> <span class="n">prior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_sims</span><span class="p">,))</span>
+<span class="n">x</span> <span class="o">=</span> <span class="n">simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
+<span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
+<span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">()</span>
+<span class="n">samples</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">1000</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_o</span><span class="p">)</span>
+</code></pre></div>
+<p>Beyond this, the <code>sbi</code> package implements many modifications and extensions of these algorithms for Neural Posterior Estimation, which are outlined below.</p>
+<p><strong>Fast ε-free Inference of Simulation Models with Bayesian Conditional Density Estimation</strong><br> by Papamakarios &amp; Murray (NeurIPS 2016) <br><a href="https://papers.nips.cc/paper/6084-fast-free-inference-of-simulation-models-with-bayesian-conditional-density-estimation.pdf">[PDF]</a></p>
+<p>Papamakarios et al. (2016) were the first to use neural networks to directly predict
+the posterior given observations. As density estimator, they used mixture density
+networks. In addition, they also proposed a sequential algorithm for neural posterior
+estimation. Their full algorithm can be implemented as follows:</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference</span><span class="w"> </span><span class="kn">import</span> <span class="n">NPE_A</span>
 
 <span class="n">inference</span> <span class="o">=</span> <span class="n">NPE_A</span><span class="p">(</span><span class="n">prior</span><span class="p">)</span>
@@ -605,10 +628,41 @@
     <span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">()</span><span class="o">.</span><span class="n">set_default_x</span><span class="p">(</span><span class="n">x_o</span><span class="p">)</span>
     <span class="n">proposal</span> <span class="o">=</span> <span class="n">posterior</span>
 </code></pre></div>
-<p><strong>Automatic posterior transformation for likelihood-free inference</strong><br>by Greenberg, Nonnenmacher &amp; Macke (ICML 2019) <br><a href="http://proceedings.mlr.press/v97/greenberg19a/greenberg19a.pdf">[PDF]</a></p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference</span><span class="w"> </span><span class="kn">import</span> <span class="n">NPE</span>
+<p><strong>Flexible statistical inference for mechanistic models of neural dynamics</strong><br>by Lueckmann, Goncalves, Bassetto, Öcal, Nonnenmacher, Macke (NeurIPS 2017) <br><a href="https://proceedings.neurips.cc/paper/2017/hash/addfa9b7e234254d26e9c7f2af1005cb-Abstract.html">[PDF]</a></p>
+<p>Like Papamakarios et al. (2016), Lueckmann et al. (2017) used mixture density networks for
+NPE. In addition, they also proposed embedding networks for time series, and proposed a
+different loss function for the sequential version of the algorithm.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference</span><span class="w"> </span><span class="kn">import</span> <span class="n">NPE_B</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.neural_nets</span><span class="w"> </span><span class="kn">import</span> <span class="n">posterior_nn</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.neural_nets.embedding_nets</span><span class="w"> </span><span class="kn">import</span> <span class="n">FCEmbedding</span>
 
-<span class="n">inference</span> <span class="o">=</span> <span class="n">NPE</span><span class="p">(</span><span class="n">prior</span><span class="p">)</span>
+<span class="n">embedding</span> <span class="o">=</span> <span class="n">FCEmbedding</span><span class="p">(</span><span class="n">num_dims</span><span class="p">)</span>
+<span class="n">density_estimator</span> <span class="o">=</span> <span class="n">posterior_nn</span><span class="p">(</span><span class="s2">&quot;mdn&quot;</span><span class="p">,</span> <span class="n">embedding_net</span><span class="o">=</span><span class="n">embedding</span><span class="p">)</span>
+<span class="n">inference</span> <span class="o">=</span> <span class="n">NPE_B</span><span class="p">(</span><span class="n">prior</span><span class="p">,</span> <span class="n">density_estimator</span><span class="o">=</span><span class="n">density_estimator</span><span class="p">)</span>
+
+<span class="n">proposal</span> <span class="o">=</span> <span class="n">prior</span>
+<span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_rounds</span><span class="p">):</span>
+    <span class="n">theta</span> <span class="o">=</span> <span class="n">proposal</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_sims</span><span class="p">,))</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="n">simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
+    <span class="n">_</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">proposal</span><span class="o">=</span><span class="n">proposal</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
+    <span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">()</span><span class="o">.</span><span class="n">set_default_x</span><span class="p">(</span><span class="n">x_o</span><span class="p">)</span>
+    <span class="n">proposal</span> <span class="o">=</span> <span class="n">posterior</span>
+</code></pre></div>
+<p><strong>Automatic posterior transformation for likelihood-free inference</strong><br>by Greenberg, Nonnenmacher &amp; Macke (ICML 2019) <br><a href="http://proceedings.mlr.press/v97/greenberg19a/greenberg19a.pdf">[PDF]</a></p>
+<p>Greenberg, Nonnenmacher &amp; Macke were the first to use normalizing flows for neural
+posterior estimation (NPE), which is the default for the <code>NPE</code> class in the <code>sbi</code>
+package (see above). In addition, they also proposed embedding networks
+in combination with normalizing flows, and proposed a modified loss function for the
+sequential version of the neural posterior estimation. These additional contributions
+can be implemented as follows:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference</span><span class="w"> </span><span class="kn">import</span> <span class="n">NPE</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.neural_nets</span><span class="w"> </span><span class="kn">import</span> <span class="n">posterior_nn</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.neural_nets.embedding_nets</span><span class="w"> </span><span class="kn">import</span> <span class="n">FCEmbedding</span>
+
+<span class="n">embedding</span> <span class="o">=</span> <span class="n">FCEmbedding</span><span class="p">(</span><span class="n">num_dims</span><span class="p">)</span>
+<span class="n">density_estimator</span> <span class="o">=</span> <span class="n">posterior_nn</span><span class="p">(</span><span class="s2">&quot;maf&quot;</span><span class="p">,</span> <span class="n">embedding_net</span><span class="o">=</span><span class="n">embedding</span><span class="p">)</span>
+<span class="n">inference</span> <span class="o">=</span> <span class="n">NPE</span><span class="p">(</span><span class="n">prior</span><span class="p">,</span> <span class="n">density_estimator</span><span class="o">=</span><span class="n">density_estimator</span><span class="p">)</span>
+
 <span class="n">proposal</span> <span class="o">=</span> <span class="n">prior</span>
 <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_rounds</span><span class="p">):</span>
     <span class="n">theta</span> <span class="o">=</span> <span class="n">proposal</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_sims</span><span class="p">,))</span>
@@ -621,19 +675,27 @@
 networks</strong><br> by Radev, S. T., Mertens, U. K., Voss, A., Ardizzone, L., &amp; Köthe,
 U. (2020) (IEEE transactions on neural networks and learning systems 2020)<br>
 <a href="https://ieeexplore.ieee.org/abstract/document/9298920">Paper</a></p>
-<p>The density estimation part of BayesFlow is equivalent to single-round NPE. The
-additional contribution of the paper are several embedding networks for high-dimensional
-data including permutation invariant embeddings. Similar embeddings networks are
-implemented in <code>sbi</code> as well, under <code>sbi.neural_nets.embedding_nets</code>.</p>
+<p>The density estimation part of BayesFlow is equivalent to single-round NPE (Greenberg
+et al., 2019). The additional contribution of BayesFlow are permutation invariant
+embedding networks for iid data, which can be implemented in <code>sbi</code> as follows:</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># Posterior estimation with BayesFlow is equivalent to single-round NPE.</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference</span><span class="w"> </span><span class="kn">import</span> <span class="n">NPE</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.neural_nets</span><span class="w"> </span><span class="kn">import</span> <span class="n">posterior_nn</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sbi.neural_nets.embedding_nets</span><span class="w"> </span><span class="kn">import</span> <span class="n">FCEmbedding</span><span class="p">,</span> <span class="n">PermutationInvariantEmbedding</span>
 
-<span class="n">inference</span> <span class="o">=</span> <span class="n">NPE</span><span class="p">(</span><span class="n">prior</span><span class="p">)</span>
+<span class="n">num_iid</span> <span class="o">=</span> <span class="mi">3</span>
+<span class="n">simulator_iid</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">theta</span><span class="p">:</span> <span class="n">theta</span> <span class="o">+</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="n">num_iid</span><span class="p">,</span> <span class="o">*</span><span class="n">theta</span><span class="o">.</span><span class="n">shape</span><span class="p">))</span> <span class="o">*</span> <span class="mf">0.1</span>
+
+<span class="n">trial_net</span> <span class="o">=</span> <span class="n">FCEmbedding</span><span class="p">(</span><span class="n">num_dims</span><span class="p">,</span> <span class="mi">20</span><span class="p">)</span>
+<span class="n">embedding</span> <span class="o">=</span> <span class="n">PermutationInvariantEmbedding</span><span class="p">(</span><span class="n">trial_net</span><span class="p">,</span> <span class="mi">20</span><span class="p">)</span>
+<span class="n">density_estimator</span> <span class="o">=</span> <span class="n">posterior_nn</span><span class="p">(</span><span class="s2">&quot;maf&quot;</span><span class="p">,</span> <span class="n">embedding_net</span><span class="o">=</span><span class="n">embedding</span><span class="p">)</span>
+<span class="n">inference</span> <span class="o">=</span> <span class="n">NPE</span><span class="p">(</span><span class="n">prior</span><span class="p">,</span> <span class="n">density_estimator</span><span class="o">=</span><span class="n">density_estimator</span><span class="p">)</span>
+
 <span class="n">theta</span> <span class="o">=</span> <span class="n">prior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_sims</span><span class="p">,))</span>
-<span class="n">x</span> <span class="o">=</span> <span class="n">simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
+<span class="n">x</span> <span class="o">=</span> <span class="n">simulator_iid</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span><span class="o">.</span><span class="n">permute</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
 <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
 <span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">()</span>
-<span class="n">samples</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">1000</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_o</span><span class="p">)</span>
+<span class="n">samples</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">1000</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="n">num_iid</span><span class="p">,</span> <span class="n">num_dims</span><span class="p">)))</span>
 </code></pre></div>
 <p><strong>Truncated proposals for scalable and hassle-free simulation-based inference</strong> <br> by Deistler, Goncalves &amp; Macke (NeurIPS 2022) <br><a href="https://arxiv.org/abs/2210.04815">[Paper]</a></p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference</span><span class="w"> </span><span class="kn">import</span> <span class="n">NPE</span>
@@ -678,7 +740,7 @@ Schölkopf (NeurIPS 2023) <br> <a href="https://arxiv.org/abs/2305.17161">[Paper
 <span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">()</span><span class="o">.</span><span class="n">set_default_x</span><span class="p">(</span><span class="n">x_o</span><span class="p">)</span>
 </code></pre></div>
 <h2 id="likelihood-estimation-nle">Likelihood estimation (NLE)<a class="headerlink" href="#likelihood-estimation-nle" title="Permanent link">&para;</a></h2>
-<p><strong>Sequential neural likelihood: Fast likelihood-free inference with autoregressive flows</strong><br>by Papamakarios, Sterratt &amp; Murray (AISTATS 2019) <br><a href="http://proceedings.mlr.press/v89/papamakarios19a/papamakarios19a.pdf">[PDF]</a> <a href="https://gpapamak.github.io/bibtex/snl.bib">[BibTeX]</a></p>
+<p><strong>Sequential neural likelihood: Fast likelihood-free inference with autoregressive flows</strong><br>by Papamakarios, Sterratt &amp; Murray (AISTATS 2019) <br><a href="http://proceedings.mlr.press/v89/papamakarios19a/papamakarios19a.pdf">[PDF]</a></p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference</span><span class="w"> </span><span class="kn">import</span> <span class="n">NLE</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference.posteriors.posterior_parameters</span><span class="w"> </span><span class="kn">import</span> <span class="n">MCMCPosteriorParameters</span>
 
