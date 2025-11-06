@@ -527,7 +527,7 @@
           <li class="md-nav__item">
   <a href="#papamakarios-murray-2016" class="md-nav__link">
     <span class="md-ellipsis">
-      Papamakarios &amp; Murray (2016)
+      Papamakarios &amp; Murray, 2016
     </span>
   </a>
   
@@ -536,7 +536,7 @@
           <li class="md-nav__item">
   <a href="#lueckmann-et-al-2017" class="md-nav__link">
     <span class="md-ellipsis">
-      Lueckmann et al, 2017
+      Lueckmann et al., 2017
     </span>
   </a>
   
@@ -808,7 +808,7 @@
 <p>The core idea of Neural Posterior Estimation (NPE) is to train a conditional generative
 model that directly predicts the posterior given observations. This idea was originally
 developed by Papamakarios &amp; Murray (NeurIPS 2016). The default implementation of NPE in
-the <code>sbi</code> package follows Greenberg, Nonnenmacher &amp; Macke, who proposed NPE with
+the <code>sbi</code> package follows Greenberg, Nonnenmacher &amp; Macke (ICML 2019), who proposed NPE with
 normalizing flows:</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.inference</span><span class="w"> </span><span class="kn">import</span> <span class="n">NPE</span>
 
@@ -829,8 +829,13 @@ cite:</p>
 <p><em>Automatic posterior transformation for likelihood-free inference</em> by Greenberg, Nonnenmacher &amp; Macke (ICML 2019) <a href="http://proceedings.mlr.press/v97/greenberg19a/greenberg19a.pdf">[PDF]</a></p>
 </li>
 </ul>
-<p>Beyond this, the <code>sbi</code> package implements many modifications and extensions of these algorithms for Neural Posterior Estimation, which are outlined below.</p>
-<h3 id="papamakarios-murray-2016">Papamakarios &amp; Murray (2016)<a class="headerlink" href="#papamakarios-murray-2016" title="Permanent link">&para;</a></h3>
+<p>Beyond this, the <code>sbi</code> package implements many modifications and extensions of these algorithms for Neural Posterior Estimation, which are outlined below. These methods include</p>
+<ul>
+<li>various types of embedding networks (Lueckmann et al., Greenberg et al., Radev et al.,),</li>
+<li>various generative models (Dax et al., Geffner et al., Sharrock et al.), and</li>
+<li>various algorithms for sequential NPE (called <em>SNPE</em>) which perform inference across several rounds (Papamakarios et al., Lueckmann et al., Greenberg et al., Deistler et al.). Note that all SNPE methods use the same loss function in the first round and, thus, NPE is equivalent to single-round SNPE.</li>
+</ul>
+<h3 id="papamakarios-murray-2016">Papamakarios &amp; Murray, 2016<a class="headerlink" href="#papamakarios-murray-2016" title="Permanent link">&para;</a></h3>
 <p><em>Fast ε-free Inference of Simulation Models with Bayesian Conditional Density Estimation</em>
 by Papamakarios &amp; Murray (NeurIPS 2016) <a href="https://papers.nips.cc/paper/6084-fast-free-inference-of-simulation-models-with-bayesian-conditional-density-estimation.pdf">[PDF]</a></p>
 <p>Papamakarios et al. (2016) were the first to use neural networks to directly predict
@@ -851,7 +856,7 @@ estimation. Their full algorithm can be implemented as follows:</p>
     <span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">()</span><span class="o">.</span><span class="n">set_default_x</span><span class="p">(</span><span class="n">x_o</span><span class="p">)</span>
     <span class="n">proposal</span> <span class="o">=</span> <span class="n">posterior</span>
 </code></pre></div>
-<h3 id="lueckmann-et-al-2017">Lueckmann et al, 2017<a class="headerlink" href="#lueckmann-et-al-2017" title="Permanent link">&para;</a></h3>
+<h3 id="lueckmann-et-al-2017">Lueckmann et al., 2017<a class="headerlink" href="#lueckmann-et-al-2017" title="Permanent link">&para;</a></h3>
 <p><em>Flexible statistical inference for mechanistic models of neural dynamics</em> by Lueckmann,
 Goncalves, Bassetto, Öcal, Nonnenmacher, Macke (NeurIPS 2017) <a href="https://proceedings.neurips.cc/paper/2017/hash/addfa9b7e234254d26e9c7f2af1005cb-Abstract.html">[PDF]</a></p>
 <p>Like Papamakarios et al. (2016), Lueckmann et al. (2017) used mixture density networks for
