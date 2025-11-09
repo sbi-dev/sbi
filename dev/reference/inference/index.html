@@ -15776,7 +15776,8 @@ proposal.</p>
 <span class="normal">116</span>
 <span class="normal">117</span>
 <span class="normal">118</span>
-<span class="normal">119</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">simulate_for_sbi</span><span class="p">(</span>
+<span class="normal">119</span>
+<span class="normal">120</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">simulate_for_sbi</span><span class="p">(</span>
     <span class="n">simulator</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span>
     <span class="n">proposal</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
     <span class="n">num_simulations</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
@@ -15859,9 +15860,10 @@ proposal.</p>
                 <span class="p">]</span>
             <span class="k">except</span> <span class="ne">TypeError</span> <span class="k">as</span> <span class="n">err</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
-                    <span class="s2">&quot;For multiprocessing, we switch to numpy arrays. Make sure to &quot;</span>
-                    <span class="s2">&quot;preprocess your simulator with `process_simulator` to handle numpy&quot;</span>
-                    <span class="s2">&quot; arrays.&quot;</span>
+                    <span class="s2">&quot;There is a TypeError error in your simulator function. Note: For&quot;</span>
+                    <span class="s2">&quot; multiprocessing, we switch to numpy arrays. Besides confirming&quot;</span>
+                    <span class="s2">&quot; your simulator works correctly, make sure to preprocess your&quot;</span>
+                    <span class="s2">&quot; simulator with `process_simulator` to handle numpy arrays.&quot;</span>
                 <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">err</span>
 
         <span class="k">else</span><span class="p">:</span>
