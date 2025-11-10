@@ -17,6 +17,10 @@ Available adapters:
 
 from .tensorboard import TensorBoardLogger
 from .wandb import WandBSummaryWriter
+# convenience exports for users
+from .loggers.wandb import WandbLogger  # noqa: F401
+from .loggers.tensorboard import TensorBoardLogger  # noqa: F401
+
 
 __all__ = [
     "TensorBoardLogger",
