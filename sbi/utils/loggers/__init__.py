@@ -17,12 +17,14 @@ Available adapters:
 
 from .tensorboard import TensorBoardLogger
 from .wandb import WandBSummaryWriter
-# convenience exports for users
-from .loggers.wandb import WandbLogger  # noqa: F401
-from .loggers.tensorboard import TensorBoardLogger  # noqa: F401
 
+# convenience exports / aliases
+# Provide a user-friendly name for the WandB adapter without importing
+# via an incorrect nested package path.
+WandbLogger = WandBSummaryWriter
 
 __all__ = [
     "TensorBoardLogger",
     "WandBSummaryWriter",
+    "WandbLogger",
 ]
