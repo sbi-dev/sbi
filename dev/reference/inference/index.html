@@ -994,6 +994,7 @@
               Bases: <code><span title="sbi.inference.trainers.npe.npe_base.PosteriorEstimatorTrainer">PosteriorEstimatorTrainer</span></code></p>
 
 
+
         <p>Neural Posterior Estimation algorithm as in Papamakarios et al. (2016) [1].</p>
 <p>[1] <em>Fast epsilon-free Inference of Simulation Models with Bayesian
     Conditional Density Estimation</em>, Papamakarios et al., NeurIPS 2016.
@@ -1015,7 +1016,7 @@ last round. In the last round, NPE-A can use a Mixture of Gaussians.</p>
 
 
 
-              <details class="quote">
+              <details class="mkdocstrings-source">
                 <summary>Source code in <code>sbi/inference/trainers/npe/npe_a.py</code></summary>
                 <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 34</span>
 <span class="normal"> 35</span>
@@ -1887,7 +1888,7 @@ file location (default is <code>&lt;current working directory&gt;/logs</code>.)<
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/trainers/npe/npe_a.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 52</span>
 <span class="normal"> 53</span>
@@ -2111,7 +2112,7 @@ If <code>None</code>, use the latest neural density estimator that was trained.<
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/trainers/npe/npe_a.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">292</span>
 <span class="normal">293</span>
@@ -2261,7 +2262,7 @@ If <code>None</code>, use the latest neural density estimator that was trained.<
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/trainers/npe/npe_a.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">238</span>
 <span class="normal">239</span>
@@ -2656,7 +2657,7 @@ on the number of mixture components.</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/trainers/npe/npe_a.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">118</span>
 <span class="normal">119</span>
@@ -2925,6 +2926,7 @@ on the number of mixture components.</p>
               Bases: <code><span title="sbi.inference.trainers.npe.npe_base.PosteriorEstimatorTrainer">PosteriorEstimatorTrainer</span></code></p>
 
 
+
         <p>Neural Posterior Estimation algorithm (NPE-B) as in Lueckmann et al. (2017) [1].</p>
 <p>[1] <em>Flexible statistical inference for mechanistic models of neural
     dynamics</em>, Lueckmann, Gonçalves et al., NeurIPS 2017. <a href="https://arxiv.org/abs/171">https://arxiv.org/abs/171</a></p>
@@ -2943,7 +2945,7 @@ Thus, SNPE-B is not limited to Gaussian proposal.</p>
 
 
 
-              <details class="quote">
+              <details class="mkdocstrings-source">
                 <summary>Source code in <code>sbi/inference/trainers/npe/npe_b.py</code></summary>
                 <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 23</span>
 <span class="normal"> 24</span>
@@ -3337,7 +3339,7 @@ file location (default is <code>&lt;current working directory&gt;/logs</code>.)<
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/trainers/npe/npe_b.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">39</span>
 <span class="normal">40</span>
@@ -3438,6 +3440,7 @@ file location (default is <code>&lt;current working directory&gt;/logs</code>.)<
               Bases: <code><span title="sbi.inference.trainers.npe.npe_base.PosteriorEstimatorTrainer">PosteriorEstimatorTrainer</span></code></p>
 
 
+
         <p>Neural Posterior Estimation algorithm (NPE-C) as in Greenberg et al. (2019). [1]</p>
 <p>[1] <em>Automatic Posterior Transformation for Likelihood-free Inference</em>,
     Greenberg et al., ICML 2019, <a href="https://arxiv.org/abs/1905.07488">https://arxiv.org/abs/1905.07488</a>.</p>
@@ -3474,7 +3477,7 @@ the atomic loss.</p>
 
 
 
-              <details class="quote">
+              <details class="mkdocstrings-source">
                 <summary>Source code in <code>sbi/inference/trainers/npe/npe_c.py</code></summary>
                 <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 37</span>
 <span class="normal"> 38</span>
@@ -4922,7 +4925,7 @@ log file location (default is <code>&lt;current working directory&gt;/logs</code
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/trainers/npe/npe_c.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 72</span>
 <span class="normal"> 73</span>
@@ -5310,7 +5313,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/trainers/npe/npe_c.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">108</span>
 <span class="normal">109</span>
@@ -5533,6 +5536,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
               Bases: <code><span title="sbi.inference.trainers.vfpe.base_vf_inference.VectorFieldTrainer">VectorFieldTrainer</span></code></p>
 
 
+
         <p>Flow Matching Posterior Estimation (FMPE).</p>
 
 
@@ -5542,7 +5546,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 
 
 
-              <details class="quote">
+              <details class="mkdocstrings-source">
                 <summary>Source code in <code>sbi/inference/trainers/vfpe/fmpe.py</code></summary>
                 <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 24</span>
 <span class="normal"> 25</span>
@@ -5939,7 +5943,7 @@ warning is raised and the <code>vf_estimator="mlp"</code> default is used.</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/trainers/vfpe/fmpe.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">27</span>
 <span class="normal">28</span>
@@ -6199,7 +6203,7 @@ VectorFieldPosterior.</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/trainers/vfpe/fmpe.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 81</span>
 <span class="normal"> 82</span>
@@ -6320,6 +6324,7 @@ VectorFieldPosterior.</p>
               Bases: <code><span title="sbi.inference.trainers.vfpe.base_vf_inference.VectorFieldTrainer">VectorFieldTrainer</span></code></p>
 
 
+
         <p>Neural Posterior Score Estimation as in Geffner et al. and Sharrock et al.</p>
 <p>Instead of performing conditonal <em>density</em> estimation, NPSE methods perform
 conditional <em>score</em> estimation i.e. they estimate the gradient of the log
@@ -6335,7 +6340,7 @@ not tested yet.</p>
 
 
 
-              <details class="quote">
+              <details class="mkdocstrings-source">
                 <summary>Source code in <code>sbi/inference/trainers/vfpe/npse.py</code></summary>
                 <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 20</span>
 <span class="normal"> 21</span>
@@ -6802,7 +6807,7 @@ string.</p>
 </ul>
 </details>
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/trainers/vfpe/npse.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">31</span>
 <span class="normal">32</span>
@@ -7087,7 +7092,7 @@ VectorFieldPosterior.</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/trainers/vfpe/npse.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">100</span>
 <span class="normal">101</span>
@@ -7204,6 +7209,7 @@ VectorFieldPosterior.</p>
               Bases: <code><span title="sbi.inference.trainers.nle.nle_base.LikelihoodEstimatorTrainer">LikelihoodEstimatorTrainer</span></code></p>
 
 
+
         <p>Neural Likelihood Estimation (NLE) as in Papamakarios et al. (2019) [1].</p>
 <p>[1] Sequential Neural Likelihood: Fast Likelihood-free Inference with
     Autoregressive Flows, Papamakarios et al., AISTATS 2019,
@@ -7216,7 +7222,7 @@ VectorFieldPosterior.</p>
 
 
 
-              <details class="quote">
+              <details class="mkdocstrings-source">
                 <summary>Source code in <code>sbi/inference/trainers/nle/nle_a.py</code></summary>
                 <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">17</span>
 <span class="normal">18</span>
@@ -7460,7 +7466,7 @@ sampling.</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/trainers/nle/nle_a.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">25</span>
 <span class="normal">26</span>
@@ -7565,6 +7571,7 @@ sampling.</p>
               Bases: <code><span title="sbi.inference.trainers.nre.nre_base.RatioEstimatorTrainer">RatioEstimatorTrainer</span></code></p>
 
 
+
         <p>AALR, here known as Neural Ratio Estimation algorithm (NRE-A) [1].</p>
 <p>[1] <em>Likelihood-free MCMC with Amortized Approximate Likelihood Ratios</em>, Hermans
     et al., ICML 2020, <a href="https://arxiv.org/abs/1903.04057">https://arxiv.org/abs/1903.04057</a></p>
@@ -7576,7 +7583,7 @@ sampling.</p>
 
 
 
-              <details class="quote">
+              <details class="mkdocstrings-source">
                 <summary>Source code in <code>sbi/inference/trainers/nre/nre_a.py</code></summary>
                 <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 21</span>
 <span class="normal"> 22</span>
@@ -7979,7 +7986,7 @@ sampling.</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/trainers/nre/nre_a.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">28</span>
 <span class="normal">29</span>
@@ -8308,7 +8315,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/trainers/nre/nre_a.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 62</span>
 <span class="normal"> 63</span>
@@ -8455,6 +8462,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
               Bases: <code><span title="sbi.inference.trainers.nre.nre_base.RatioEstimatorTrainer">RatioEstimatorTrainer</span></code></p>
 
 
+
         <p>SRE, here known as Neural Ratio Estimation algorithm (NRE-B) [1].</p>
 <p>[1] <em>On Contrastive Learning for Likelihood-free Inference</em>, Durkan et al.,
     ICML 2020, <a href="https://arxiv.org/pdf/2002.03712">https://arxiv.org/pdf/2002.03712</a></p>
@@ -8466,7 +8474,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 
 
 
-              <details class="quote">
+              <details class="mkdocstrings-source">
                 <summary>Source code in <code>sbi/inference/trainers/nre/nre_b.py</code></summary>
                 <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 21</span>
 <span class="normal"> 22</span>
@@ -8855,7 +8863,7 @@ sampling.</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/trainers/nre/nre_b.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">28</span>
 <span class="normal">29</span>
@@ -9184,7 +9192,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/trainers/nre/nre_b.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 62</span>
 <span class="normal"> 63</span>
@@ -9315,6 +9323,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
               Bases: <code><span title="sbi.inference.trainers.nre.nre_base.RatioEstimatorTrainer">RatioEstimatorTrainer</span></code></p>
 
 
+
         <p>NRE-C [1] is a generalization of amortized versions of NRE_A and NRE_B.</p>
 <p>NRE-C:
 (1) Like NRE_B, features a &ldquo;multiclass&rdquo; loss function where several marginally
@@ -9337,7 +9346,7 @@ will be estimated only up to a function (normalizing constant) of the data
 
 
 
-              <details class="quote">
+              <details class="mkdocstrings-source">
                 <summary>Source code in <code>sbi/inference/trainers/nre/nre_c.py</code></summary>
                 <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 21</span>
 <span class="normal"> 22</span>
@@ -9914,7 +9923,7 @@ sampling.</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/trainers/nre/nre_c.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">42</span>
 <span class="normal">43</span>
@@ -10282,7 +10291,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/trainers/nre/nre_c.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 76</span>
 <span class="normal"> 77</span>
@@ -10441,6 +10450,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
               Bases: <code><a class="autorefs autorefs-internal" title="NRE_A (sbi.inference.trainers.nre.nre_a.NRE_A)" href="#sbi.inference.trainers.nre.nre_a.NRE_A">NRE_A</a></code></p>
 
 
+
         <p>Balanced neural ratio estimation (BNRE) as in Delaunoy et al. (2022) [1].</p>
 <p>BNRE is a variation of NRE aiming to produce more conservative posterior
 approximations.</p>
@@ -10456,7 +10466,7 @@ NeurIPS 2022. <a href="https://arxiv.org/abs/2208.13624">https://arxiv.org/abs/2
 
 
 
-              <details class="quote">
+              <details class="mkdocstrings-source">
                 <summary>Source code in <code>sbi/inference/trainers/nre/bnre.py</code></summary>
                 <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 19</span>
 <span class="normal"> 20</span>
@@ -10913,7 +10923,7 @@ sampling.</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/trainers/nre/bnre.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">31</span>
 <span class="normal">32</span>
@@ -11032,7 +11042,7 @@ dataloader_kwargs: Additional or updated kwargs to be passed to the training
     Classifier that approximates the ratio <span class="arithmatex">\(p(\theta,x)/p(\theta)p(x)\)</span>.</p>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/trainers/nre/bnre.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 65</span>
 <span class="normal"> 66</span>
@@ -11179,6 +11189,7 @@ dataloader_kwargs: Additional or updated kwargs to be passed to the training
               Bases: <code><span title="sbi.inference.abc.abc_base.ABCBASE">ABCBASE</span></code></p>
 
 
+
         <p>Monte-Carlo Approximate Bayesian Computation (Rejection ABC).</p>
 
 
@@ -11188,7 +11199,7 @@ dataloader_kwargs: Additional or updated kwargs to be passed to the training
 
 
 
-              <details class="quote">
+              <details class="mkdocstrings-source">
                 <summary>Source code in <code>sbi/inference/abc/mcabc.py</code></summary>
                 <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 18</span>
 <span class="normal"> 19</span>
@@ -11921,7 +11932,7 @@ kde True), distances and simulated data x.</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/abc/mcabc.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 78</span>
 <span class="normal"> 79</span>
@@ -12418,7 +12429,7 @@ all simulations at the same time.</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/abc/mcabc.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">21</span>
 <span class="normal">22</span>
@@ -12561,6 +12572,7 @@ all simulations at the same time.</p>
               Bases: <code><span title="sbi.inference.abc.abc_base.ABCBASE">ABCBASE</span></code></p>
 
 
+
         <p>Sequential Monte Carlo Approximate Bayesian Computation.</p>
 
 
@@ -12570,7 +12582,7 @@ all simulations at the same time.</p>
 
 
 
-              <details class="quote">
+              <details class="mkdocstrings-source">
                 <summary>Source code in <code>sbi/inference/abc/smcabc.py</code></summary>
                 <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 23</span>
 <span class="normal"> 24</span>
@@ -14545,7 +14557,7 @@ populations.</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/abc/smcabc.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">121</span>
 <span class="normal">122</span>
@@ -15259,7 +15271,7 @@ sampling.</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/abc/smcabc.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 26</span>
 <span class="normal"> 27</span>
@@ -15472,7 +15484,7 @@ sampling.</p>
         <p>Return samples from particles sampled with weights.</p>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/abc/smcabc.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">587</span>
 <span class="normal">588</span>
@@ -15676,7 +15688,7 @@ proposal.</p>
         <p>Returns: Sampled parameters <span class="arithmatex">\(\theta\)</span> and simulation-outputs <span class="arithmatex">\(x\)</span>.</p>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/utils/simulation_utils.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 21</span>
 <span class="normal"> 22</span>
@@ -16006,7 +16018,7 @@ prior, theta_numel, prior_returns_numpy = process_prior(prior)
 </code></pre></div>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/utils/user_input_checks.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 38</span>
 <span class="normal"> 39</span>
@@ -16278,7 +16290,7 @@ simulator = process_simulator(simulator, prior, prior_returns_numpy)
 </code></pre></div>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/utils/user_input_checks.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">468</span>
 <span class="normal">469</span>

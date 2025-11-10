@@ -1092,6 +1092,7 @@
               Bases: <code><span title="sbi.inference.posteriors.base_posterior.NeuralPosterior">NeuralPosterior</span></code></p>
 
 
+
         <p>Posterior based on neural networks that directly estimate the posterior (NPE).</p>
 <p>NPE trains a neural network to directly approximate the posterior distribution.
 However, for bounded priors, the neural network can have leakage: it puts non-zero
@@ -1112,7 +1113,7 @@ trained network to deal with these cases.</p>
 
 
 
-              <details class="quote">
+              <details class="mkdocstrings-source">
                 <summary>Source code in <code>sbi/inference/posteriors/direct_posterior.py</code></summary>
                 <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 27</span>
 <span class="normal"> 28</span>
@@ -2277,7 +2278,7 @@ returned for <code>theta_transform</code>.</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/direct_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">44</span>
 <span class="normal">45</span>
@@ -2492,7 +2493,7 @@ re-evaluate only whenever a new <code>x</code> is passed.</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/direct_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">412</span>
 <span class="normal">413</span>
@@ -2753,7 +2754,7 @@ These parameters only have an effect if <code>norm_posterior=True</code>.</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/direct_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">257</span>
 <span class="normal">258</span>
@@ -3062,7 +3063,7 @@ These parameters only have an effect if <code>norm_posterior=True</code>.</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/direct_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">337</span>
 <span class="normal">338</span>
@@ -3451,7 +3452,7 @@ have a cached value.</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/direct_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">471</span>
 <span class="normal">472</span>
@@ -3670,7 +3671,7 @@ samples and then reshape into the desired shape.</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/direct_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">135</span>
 <span class="normal">136</span>
@@ -3909,7 +3910,7 @@ given every observation.</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/direct_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">192</span>
 <span class="normal">193</span>
@@ -4091,7 +4092,7 @@ posterior, and resets the default x.</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/direct_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 96</span>
 <span class="normal"> 97</span>
@@ -4198,6 +4199,7 @@ posterior, and resets the default x.</p>
               Bases: <code><span title="sbi.inference.posteriors.base_posterior.NeuralPosterior">NeuralPosterior</span></code></p>
 
 
+
         <p>Provides importance sampling to sample from the posterior.</p>
 <p>SNLE or SNRE train neural networks to approximate the likelihood(-ratios).
 <code>ImportanceSamplingPosterior</code> allows to estimate the posterior log-probability by
@@ -4212,7 +4214,7 @@ sampling-importance-resampling (SIR) (with <code>.sir_sample()</code>)</p>
 
 
 
-              <details class="quote">
+              <details class="mkdocstrings-source">
                 <summary>Source code in <code>sbi/inference/posteriors/importance_posterior.py</code></summary>
                 <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 18</span>
 <span class="normal"> 19</span>
@@ -5142,7 +5144,7 @@ None, <code>potential_fn.device</code> is used.</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/importance_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">28</span>
 <span class="normal">29</span>
@@ -5315,7 +5317,7 @@ unchanged and have a cached value.</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/importance_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">150</span>
 <span class="normal">151</span>
@@ -5496,7 +5498,7 @@ consumption.</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/importance_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">108</span>
 <span class="normal">109</span>
@@ -5819,7 +5821,7 @@ have a cached value.</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/importance_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">326</span>
 <span class="normal">327</span>
@@ -6089,7 +6091,7 @@ proposal at every iteration.</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/importance_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">186</span>
 <span class="normal">187</span>
@@ -6240,7 +6242,7 @@ proposal at every iteration.</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/importance_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 81</span>
 <span class="normal"> 82</span>
@@ -6323,6 +6325,7 @@ proposal at every iteration.</p>
               Bases: <code><span title="sbi.inference.posteriors.base_posterior.NeuralPosterior">NeuralPosterior</span></code></p>
 
 
+
         <p>Provides MCMC to sample from the posterior.</p>
 <p>SNLE or SNRE train neural networks to approximate the likelihood(-ratios).
 <code>MCMCPosterior</code> allows to sample from the posterior with MCMC.</p>
@@ -6334,7 +6337,7 @@ proposal at every iteration.</p>
 
 
 
-              <details class="quote">
+              <details class="mkdocstrings-source">
                 <summary>Source code in <code>sbi/inference/posteriors/mcmc_posterior.py</code></summary>
                 <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">  41</span>
 <span class="normal">  42</span>
@@ -8578,7 +8581,7 @@ proposal at every iteration.</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/mcmc_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1101</span>
 <span class="normal">1102</span>
@@ -8887,7 +8890,7 @@ faster than <code>"spawn"</code> but is only supported on POSIX-based systems
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/mcmc_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 48</span>
 <span class="normal"> 49</span>
@@ -9171,7 +9174,7 @@ sbi slice samplers, only the samples are added.</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/mcmc_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1043</span>
 <span class="normal">1044</span>
@@ -9378,7 +9381,7 @@ consumption.</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/mcmc_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">222</span>
 <span class="normal">223</span>
@@ -9673,7 +9676,7 @@ have a cached value.</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/mcmc_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 976</span>
 <span class="normal"> 977</span>
@@ -9951,7 +9954,7 @@ samples and then reshape into the desired shape.</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/mcmc_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">250</span>
 <span class="normal">251</span>
@@ -10501,7 +10504,7 @@ parameter generation and mcmc sampling.</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/mcmc_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">404</span>
 <span class="normal">405</span>
@@ -10868,7 +10871,7 @@ parameter generation and mcmc sampling.</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/mcmc_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">210</span>
 <span class="normal">211</span>
@@ -10943,7 +10946,7 @@ parameter generation and mcmc sampling.</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/mcmc_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">167</span>
 <span class="normal">168</span>
@@ -11028,6 +11031,7 @@ parameter generation and mcmc sampling.</p>
               Bases: <code><span title="sbi.inference.posteriors.base_posterior.NeuralPosterior">NeuralPosterior</span></code></p>
 
 
+
         <p>Provides rejection sampling to sample from the posterior.</p>
 <p>SNLE or SNRE train neural networks to approximate the likelihood(-ratios).
 <code>RejectionPosterior</code> allows to sample from the posterior with rejection sampling.</p>
@@ -11039,7 +11043,7 @@ parameter generation and mcmc sampling.</p>
 
 
 
-              <details class="quote">
+              <details class="mkdocstrings-source">
                 <summary>Source code in <code>sbi/inference/posteriors/rejection_posterior.py</code></summary>
                 <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 19</span>
 <span class="normal"> 20</span>
@@ -11750,7 +11754,7 @@ maximum of the <code>potential_fn / proposal</code> ratio.</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/rejection_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">26</span>
 <span class="normal">27</span>
@@ -11939,7 +11943,7 @@ consumption.</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/rejection_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">102</span>
 <span class="normal">103</span>
@@ -12234,7 +12238,7 @@ have a cached value.</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/rejection_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">211</span>
 <span class="normal">212</span>
@@ -12475,7 +12479,7 @@ samples and then reshape into the desired shape.</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/rejection_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">130</span>
 <span class="normal">131</span>
@@ -12662,7 +12666,7 @@ samples and then reshape into the desired shape.</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/rejection_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 75</span>
 <span class="normal"> 76</span>
@@ -12745,6 +12749,7 @@ samples and then reshape into the desired shape.</p>
               Bases: <code><span title="sbi.inference.posteriors.base_posterior.NeuralPosterior">NeuralPosterior</span></code></p>
 
 
+
         <p>Posterior based on flow- or score-matching estimators.</p>
 <p>This posterior samples from the vector field model - typically a score-based or a
 flow matching model - given the <code>vector_field_estimator</code> and rejects samples that
@@ -12765,7 +12770,7 @@ the ODE to compute the log-probability.</p>
 
 
 
-              <details class="quote">
+              <details class="mkdocstrings-source">
                 <summary>Source code in <code>sbi/inference/posteriors/vector_field_posterior.py</code></summary>
                 <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 32</span>
 <span class="normal"> 33</span>
@@ -14081,7 +14086,7 @@ sampler or the SDE-based sampler.</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/vector_field_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 50</span>
 <span class="normal"> 51</span>
@@ -14331,7 +14336,7 @@ consumption.</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/vector_field_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">384</span>
 <span class="normal">385</span>
@@ -14622,7 +14627,7 @@ have a cached value.</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/vector_field_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">517</span>
 <span class="normal">518</span>
@@ -15055,7 +15060,7 @@ it and have the SCORE_DEFINED class attribute set to True.</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/vector_field_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">144</span>
 <span class="normal">145</span>
@@ -15496,7 +15501,7 @@ linear grid between t_max and t_min is used.</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/vector_field_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">418</span>
 <span class="normal">419</span>
@@ -15786,7 +15791,7 @@ depend on the used ODE backend.</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/vector_field_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">356</span>
 <span class="normal">357</span>
@@ -15892,7 +15897,7 @@ depend on the used ODE backend.</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/vector_field_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">108</span>
 <span class="normal">109</span>
@@ -15993,6 +15998,7 @@ depend on the used ODE backend.</p>
               Bases: <code><span title="sbi.inference.posteriors.base_posterior.NeuralPosterior">NeuralPosterior</span></code></p>
 
 
+
         <p>Provides VI (Variational Inference) to sample from the posterior.</p>
 <p>SNLE or SNRE train neural networks to approximate the likelihood (or likelihood
 ratios). <code>VIPosterior</code> allows learning a tractable variational posterior
@@ -16015,7 +16021,7 @@ approximate posterior samples by sampling from :math:<code>q</code> at no additi
 
 
 
-              <details class="quote">
+              <details class="mkdocstrings-source">
                 <summary>Source code in <code>sbi/inference/posteriors/vi_posterior.py</code></summary>
                 <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 36</span>
 <span class="normal"> 37</span>
@@ -17466,7 +17472,7 @@ incompatible deep copying).</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/vi_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">637</span>
 <span class="normal">638</span>
@@ -17562,7 +17568,7 @@ due not support pickle protocols (e.g. due to local functions, etc.).</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/vi_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">663</span>
 <span class="normal">664</span>
@@ -17797,7 +17803,7 @@ attribute.</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/vi_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 59</span>
 <span class="normal"> 60</span>
@@ -18061,7 +18067,7 @@ e.g. remains deep copy compatible.</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/vi_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">678</span>
 <span class="normal">679</span>
@@ -18168,7 +18174,7 @@ prop, prop_prior].</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/vi_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">548</span>
 <span class="normal">549</span>
@@ -18301,7 +18307,7 @@ consumption.</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/vi_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">367</span>
 <span class="normal">368</span>
@@ -18594,7 +18600,7 @@ have a cached value.</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/vi_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">569</span>
 <span class="normal">570</span>
@@ -18803,7 +18809,7 @@ have a cached value.</p>
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/vi_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">331</span>
 <span class="normal">332</span>
@@ -18949,7 +18955,7 @@ is already a <code>VIPosterior</code>, then the arguments will be copied from it
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/vi_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">227</span>
 <span class="normal">228</span>
@@ -19184,7 +19190,7 @@ is already a <code>VIPosterior</code>, then the arguments will be copied from it
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/vi_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">318</span>
 <span class="normal">319</span>
@@ -19261,7 +19267,7 @@ is already a <code>VIPosterior</code>, then the arguments will be copied from it
     </table>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/vi_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">165</span>
 <span class="normal">166</span>
@@ -19592,7 +19598,7 @@ weight_transform: Callable applied to importance weights (only for fKL)</p>
     VIPosterior: <code>VIPosterior</code> (can be used to chain calls).</p>
 
 
-            <details class="quote">
+            <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/vi_posterior.py</code></summary>
               <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">394</span>
 <span class="normal">395</span>
