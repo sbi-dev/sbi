@@ -1,10 +1,10 @@
+# SPDX-FileCopyrightText: 2023-2025 sbi-dev
+# SPDX-License-Identifier: Apache-2.0
+
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-# SPDX-FileCopyrightText: 2023-2025 sbi-dev
-# SPDX-License-Identifier: Apache-2.0
 from __future__ import annotations
-
 from typing import Any, Optional
 
 from torch.utils.tensorboard.writer import SummaryWriter
