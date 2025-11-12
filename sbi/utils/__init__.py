@@ -76,6 +76,10 @@ from sbi.utils.user_input_checks import (
 )
 from sbi.utils.user_input_checks_utils import MultipleIndependent
 
+# Export newly added loggers
+from .loggers.tensorboard import TensorBoardLogger
+from .loggers.wandb import WandBSummaryWriter as WandbLogger
+
 
 __all__ = [
     "process_prior",
@@ -87,4 +91,6 @@ __all__ = [
     "get_density_thresholder",
     "transformed_potential",
     "mcmc_transform",
+    "TensorBoardLogger",
+    "WandbLogger",
 ]
