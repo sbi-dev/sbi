@@ -8,7 +8,7 @@ Zuko ODE solver.
 import functools
 
 import torch.nn as nn
-from torch import Tensor
+from torch import Size, Tensor
 from torch.distributions import Distribution
 from zuko.distributions import DiagNormal, NormalizingFlow
 from zuko.transforms import FreeFormJacobianTransform
@@ -28,6 +28,7 @@ class ZukoNeuralODE(NeuralODE):
         atol: float = 1e-6,
         rtol: float = 1e-5,
         exact: bool = True,
+        condition_shape: Size = Size([1]),
     ) -> None:
         r"""
         Initialize the ZukoNeuralODE class.
@@ -57,6 +58,7 @@ class ZukoNeuralODE(NeuralODE):
             rtol: The relative tolerance for the ODE solver.
             exact: Whether the exact log-determinant of the Jacobian or an unbiased
             stochastic estimate thereof is calculated.
+            condition_shape: The shape of the condition tensor.
         """
 
         super().__init__(
@@ -70,6 +72,8 @@ class ZukoNeuralODE(NeuralODE):
             rtol=rtol,
             exact=exact,
         )
+
+        self.condition_shape = condition_shape
 
     def get_distribution(self, condition: Tensor, **kwargs) -> Distribution:
         """
@@ -94,7 +98,9 @@ class ZukoNeuralODE(NeuralODE):
 
         return NormalizingFlow(
             transform=transform,
-            base=DiagNormal(self.mean_base, self.std_base).expand(condition.shape[:-1]),
+            base=DiagNormal(self.mean_base, self.std_base).expand(
+                condition.shape[: -len(self.condition_shape)]
+            ),
         )
 
     def _f_condition_last(self, t, input, condition):

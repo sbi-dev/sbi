@@ -60,6 +60,10 @@ class VectorFieldBasedPotential(BasePotential):
         self.iid_params = iid_params
 
         neural_ode_kwargs = neural_ode_kwargs or {}
+        if "condition_shape" not in neural_ode_kwargs:
+            neural_ode_kwargs["condition_shape"] = (
+                self.vector_field_estimator.condition_shape
+            )
         self.neural_ode = build_neural_ode(
             self.vector_field_estimator.ode_fn,
             self.vector_field_estimator.net,
