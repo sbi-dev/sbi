@@ -35,7 +35,6 @@ from torch.distributions import (
 from torch.optim.adam import Adam
 
 from sbi.sbi_types import TorchTransform
-from sbi.utils.torchutils import atleast_2d
 
 
 def warn_if_zscoring_changes_data(x: Tensor, duplicate_tolerance: float = 0.1) -> None:
@@ -240,21 +239,6 @@ def biject_transform_zuko(
         CallableTransform(transform),
         buffer=True,
     )
-
-
-def warn_empirical_prior_memory_risk(context: Optional[str] = None) -> None:
-    """Emit a standardized warning about empirical-prior memory/VRAM risks.
-
-    Args:
-        context: Optional context string to append to the warning.
-    """
-    base = (
-        "Empirical prior memory/VRAM risk: empirical priors retain all simulations "
-        "as support and may trigger operations over large supports. This can "
-        "significantly increase memory usage and cause out-of-memory (OOM) errors."
-    )
-    message = f"{base} Context: {context}" if context else base
-    warnings.warn(message, stacklevel=2)
 
 
 def z_standardization(
@@ -752,13 +736,6 @@ def mcmc_transform(
         (or z-scored) to constrained (or non-z-scored) space.
     """
     if enable_transform:
-        if isinstance(prior, (ImproperEmpirical, Empirical)):
-            warn_empirical_prior_memory_risk(
-                "disabled parameter transforms to avoid sampling-based moments"
-            )
-            return torch_tf.IndependentTransform(
-                torch_tf.identity_transform, reinterpreted_batch_ndims=1
-            )
 
         def prior_mean_std_transform(prior, device):
             try:
@@ -850,7 +827,12 @@ def check_transform(
 ) -> None:
     """Check validity of transformed and re-transformed samples."""
 
-    theta = prior.sample(torch.Size((2,)))
+    # check transform with prior samples
+    try:
+        theta = prior.sample(torch.Size((2,)))
+    except NotImplementedError:
+        # Prior has no sampling method, use the prior mean instead
+        theta = prior.mean.repeat(2, *[1] * prior.mean.dim())
 
     theta_unconstrained = transform.inv(theta)
     assert (
@@ -881,9 +863,15 @@ class ImproperEmpirical(Empirical):
     def __init__(self, values: Tensor, log_weights: Optional[Tensor] = None):
         super().__init__(values, log_weights=log_weights)
         # Warn if extremely large to inform about memory/serialization cost.
-        support_size = values.shape[0]
-        if support_size > 10_000_000:  # 10M still works well on modern hardware.
-            warn_empirical_prior_memory_risk(f">10M support size (size={support_size})")
+        self._mean = self._compute_mean(values, log_weights)
+        self._variance = self._compute_variance(values, log_weights)
+
+    def sample(self, sample_shape=torch.Size()):
+        raise NotImplementedError(
+            "Sampling from ImproperEmpirical is not supported. If you are using "
+            "likelihood or ratio estimation, or multi-round inference, you need to "
+            "define a prior distribution."
+        )
 
     def log_prob(self, value: Tensor) -> Tensor:
         """
@@ -895,8 +883,79 @@ class ImproperEmpirical(Empirical):
         Returns:
             Tensor of as many ones as there were parameter sets.
         """
-        value = atleast_2d(value)
-        return zeros(value.shape[0])
+        raise NotImplementedError(
+            "Evaluating log_prob from ImproperEmpirical is not supported. If you are "
+            "using likelihood or ratio estimation, or multi-round inference, you need "
+            "to define a prior distribution."
+        )
+
+    def _compute_mean(self, values: Tensor, weights: Optional[Tensor] = None) -> Tensor:
+        """
+        Return the mean of the empirical distribution.
+
+        Args:
+            values: The empirical samples.
+            weights: Optional weights for the samples.
+
+        Returns:
+            The mean of the empirical distribution.
+        """
+        if weights is None:
+            return torch.mean(values, dim=0)
+        else:
+            normalized_weights = torch.nn.functional.softmax(weights, dim=0)
+            return torch.sum(normalized_weights.unsqueeze(-1) * values, dim=0)
+
+    def _compute_variance(
+        self, values: Tensor, weights: Optional[Tensor] = None
+    ) -> Tensor:
+        """
+        Return the standard deviation of the empirical distribution.
+
+        Args:
+            values: The empirical samples.
+            weights: Optional weights for the samples.
+
+        Returns:
+            The standard deviation of the empirical distribution.
+        """
+        if weights is None:
+            variance = torch.var(values, dim=0)
+        else:
+            normalized_weights = torch.nn.functional.softmax(weights, dim=0)
+            variance = torch.sum(
+                normalized_weights.unsqueeze(-1) * (values - self._mean) ** 2,
+                dim=0,
+            )
+            # bias correction
+            variance = variance / (1 - torch.sum(normalized_weights**2))
+        return variance
+
+    @property
+    def mean(self) -> Tensor:
+        return self._mean
+
+    @property
+    def variance(self) -> Tensor:
+        return self._variance
+
+    @property
+    def stddev(self) -> Tensor:
+        return torch.sqrt(self._variance)
+
+    def to(self, device: Union[str, torch.device]) -> None:
+        """
+        Move the distribution to a different device.
+
+        Args:
+            device: The device to move the distribution to.
+
+        Returns:
+            The distribution on the specified device.
+        """
+        self._mean = self._mean.to(device)
+        self._variance = self._variance.to(device)
+        super().to(device)
 
 
 def mog_log_prob(
