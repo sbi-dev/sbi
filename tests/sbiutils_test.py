@@ -1,7 +1,6 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-import warnings
 from typing import Tuple
 
 import matplotlib.pyplot as plt
@@ -21,7 +20,7 @@ from sbi.inference import NPE, NPE_A
 from sbi.inference.trainers.npe.npe_a import NPE_A_MDN
 from sbi.neural_nets import classifier_nn, likelihood_nn, posterior_nn
 from sbi.utils import BoxUniform, get_kde
-from sbi.utils.sbiutils import ImproperEmpirical, mcmc_transform, z_score_parser
+from sbi.utils.sbiutils import z_score_parser
 
 
 def test_conditional_density_1d():
@@ -555,15 +554,3 @@ def test_z_scoring_structured(z_x, z_theta, builder):
     # plt.plot(x_zstructured.T)
     # plt.title('z-scored: structured dims');
     # plt.show()
-
-
-def test_mcmc_transform_emits_warning_for_improper_empirical():
-    values = torch.randn(100, 3)
-    logw = torch.zeros(values.shape[0])
-    prior = ImproperEmpirical(values, log_weights=logw)
-    with warnings.catch_warnings(record=True) as w:
-        warnings.simplefilter("always")
-        _ = mcmc_transform(prior, enable_transform=True)
-        assert any("Empirical prior memory/VRAM risk" in str(ww.message) for ww in w), (
-            "Expected generic empirical prior memory/VRAM risk warning."
-        )

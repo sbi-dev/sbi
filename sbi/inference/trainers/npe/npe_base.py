@@ -53,7 +53,6 @@ from sbi.utils import (
 from sbi.utils.sbiutils import (
     ImproperEmpirical,
     mask_sims_from_prior,
-    warn_empirical_prior_memory_risk,
 )
 from sbi.utils.torchutils import assert_all_finite
 
@@ -470,18 +469,10 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
             to unconstrained space.
         """
 
-        is_empirical = isinstance(prior, ImproperEmpirical)
-        if is_empirical:
-            warn_empirical_prior_memory_risk(
-                "disabling parameter transforms for empirical prior"
-            )
-
         potential_fn, theta_transform = posterior_estimator_based_potential(
             posterior_estimator=estimator,
             prior=prior,
             x_o=None,
-            # Disable transforms if prior is empirical to avoid sampling issues.
-            enable_transform=not is_empirical,
         )
         return potential_fn, theta_transform
 
