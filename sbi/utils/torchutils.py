@@ -486,7 +486,8 @@ def assert_all_finite(quantity: Tensor, description: str = "tensor") -> None:
     """Raise if tensor quantity contains any NaN or Inf element."""
 
     msg = f"NaN/Inf present in {description}."
-    assert torch.isfinite(quantity).all(), msg
+    if not torch.isfinite(quantity).all():
+        raise ValueError(msg)
 
 
 def assert_not_nan_or_plus_inf(quantity: Tensor, description: str = "tensor") -> None:
