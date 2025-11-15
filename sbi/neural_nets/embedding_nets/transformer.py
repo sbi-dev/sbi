@@ -651,6 +651,10 @@ class TransformerEmbedding(nn.Module):
             intermediate_size (int): hidden size of the feedforward layer
             head_dim (int): dimension key/query vectors
             attention_dropout (float): value for the dropout of the attention layer
+        Note:
+            This module now supports scalar time-series inputs. Inputs of shape
+            `(batch, seq_len)` or `(batch, seq_len, 1)` are automatically projected
+            to `feature_space_dim` before being passed through the transformer.
 
         MoE:
             router_jitter_noise (float): noise added before routing the input vectors
@@ -693,7 +697,7 @@ class TransformerEmbedding(nn.Module):
         self.preprocess = (
             ViTEmbeddings(self.config) if self.config["vit"] else IdentityEncoder()
         )
-
+        self.input_proj = None
         self.layers = nn.ModuleList([
             TransformerBlock(self.config)
             for _ in range(self.config["num_hidden_layers"])
@@ -764,9 +768,10 @@ class TransformerEmbedding(nn.Module):
     ) -> Tuple[torch.Tensor, Optional[Tuple[torch.Tensor, torch.Tensor]]]:
         """
         Args:
-            input (`torch.Tensor`): input of shape `(batch, seq_len,
-            feature_space_dim)`
-            or `(batch, num_channels, height, width)` if using ViT
+            input (`torch.Tensor`):
+                - For scalar time-series: `(batch, seq_len)` or `(batch, seq_len, 1)`
+                - For vector time-series: `(batch, seq_len, feature_dim)`
+                - For images (when `vit=True`): `(batch, num_channels, height, width)`
             attention_mask (`torch.Tensor`, *optional*):
                 attention mask of size `(batch_size, sequence_length)`
             output_attentions (`bool`, *optional*):
@@ -779,6 +784,18 @@ class TransformerEmbedding(nn.Module):
         """
 
         input = self.preprocess(input)
+        if not self.config.get("vit", False):
+            if input.ndim == 2:
+                input = input.unsqueeze(-1)
+
+            in_features = input.shape[-1]
+            target_features = self.config["feature_space_dim"]
+
+            if in_features != target_features:
+                if self.input_proj is None:
+                    self.input_proj = nn.Linear(in_features, target_features).to(input)
+                input = self.input_proj(input)
+
         if self.is_causal:
             dtype, device = input.dtype, input.device
 

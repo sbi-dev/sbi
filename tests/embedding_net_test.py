@@ -277,6 +277,26 @@ def test_transformer_embedding(config, seq_length):
     _test_helper_embedding_net(prior, xo, simulator, net)
 
 
+def test_transformer_embedding_scalar_timeseries():
+    config = {
+        **BASE_CONFIG,
+        "feature_space_dim": 32,
+        "vit": False,
+        "num_attention_heads": 4,
+        "num_key_value_heads": 4,
+        "head_dim": None,
+    }
+
+    net = TransformerEmbedding(config)
+
+    batch = 5
+    seq_length = 100
+    x = torch.randn(batch, seq_length)
+
+    out = net(x)
+    assert out.shape == (batch, config["feature_space_dim"] // 2)
+
+
 @pytest.mark.parametrize(
     "config",
     (
