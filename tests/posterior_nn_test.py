@@ -25,6 +25,8 @@ from sbi.inference.posteriors.posterior_parameters import (
     MCMCPosteriorParameters,
     RejectionPosteriorParameters,
 )
+from sbi.neural_nets import posterior_flow_nn
+from sbi.neural_nets.embedding_nets import CNNEmbedding
 from sbi.simulators.linear_gaussian import (
     diagonal_linear_gaussian,
     linear_gaussian,
@@ -316,6 +318,60 @@ def test_batched_score_sample_with_different_x(
 
 
 @pytest.mark.slow
+@pytest.mark.parametrize("vector_field_method", [NPSE, FMPE])
+@pytest.mark.parametrize("x_o_batch_dim", (0, 1, 2))
+@pytest.mark.parametrize("sampling_method", ["sde", "ode"])
+@pytest.mark.parametrize(
+    "sample_shape",
+    (
+        (5,),  # less than num_chains
+        (4, 2),  # 2D batch
+    ),
+)
+def test_batched_vector_field_sample_with_multidim_x(
+    vector_field_method: type,
+    x_o_batch_dim: bool,
+    sampling_method: str,
+    sample_shape: torch.Size,
+):
+    num_dim = 5
+    num_simulations = 100
+
+    prior = BoxUniform(low=torch.Tensor([-1.0]), high=torch.Tensor([1.0]))
+    simulator, embedding_net = get_multidim_simulator_embedding(
+        num_dim=num_dim, embedding_dim=10
+    )
+
+    flow_estimator = posterior_flow_nn(
+        model='mlp',
+        embedding_net=embedding_net,
+    )
+
+    inference = vector_field_method(prior=prior, vf_estimator=flow_estimator)
+    theta = prior.sample((num_simulations,))
+    x = simulator(theta)
+    inference.append_simulations(theta, x).train(max_num_epochs=2)
+
+    x_o = (
+        ones(num_dim, num_dim)
+        if x_o_batch_dim == 0
+        else ones(x_o_batch_dim, num_dim, num_dim)
+    )
+
+    posterior = inference.build_posterior(sample_with=sampling_method)
+
+    samples = posterior.sample_batched(
+        sample_shape,
+        x_o,
+    )
+    assert (
+        samples.shape == (*sample_shape, x_o_batch_dim, 1)
+        if x_o_batch_dim > 0
+        else (*sample_shape, 1)
+    ), "Sample shape wrong"
+
+
+@pytest.mark.slow
 @pytest.mark.parametrize("density_estimator", ["mdn", "maf", "zuko_nsf"])
 def test_batched_sampling_and_logprob_accuracy(density_estimator: str):
     """Test with two different observations and compare to sequential methods."""
@@ -409,3 +465,28 @@ def test_build_posterior_raises_error_for_rejection_sampling():
 
     inference.train(max_num_epochs=1)
     inference.build_posterior(posterior_parameters=RejectionPosteriorParameters())
+
+
+def get_multidim_simulator_embedding(num_dim: int = 5, embedding_dim: int = 10):
+    """Returns a simulator that adds noise to theta and embeds it in higher dim."""
+
+    def simulator(theta):
+        if theta.dim() == 1:
+            theta = theta.unsqueeze(0)
+        mean = torch.ones(num_dim, num_dim)
+        mean = mean.unsqueeze(0).expand(theta.shape[0], -1, -1)
+
+        # mean is a 10x10 matrix with all elements equal to theta
+        mean = mean + theta.unsqueeze(-1)
+
+        x = mean + 0.1 * torch.randn_like(mean)
+        return x
+
+    embedding_net = CNNEmbedding(
+        input_shape=(num_dim, num_dim),
+        in_channels=1,
+        output_dim=embedding_dim,
+        kernel_size=num_dim // 2 + 1,
+    )
+
+    return simulator, embedding_net
