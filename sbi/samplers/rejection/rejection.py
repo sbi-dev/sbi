@@ -2,6 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import logging
+import time
 import warnings
 from typing import Any, Callable, Dict, Optional, Tuple
 
@@ -24,6 +25,7 @@ def rejection_sample(
     num_samples_to_find_max: int = 10_000,
     num_iter_to_find_max: int = 100,
     m: float = 1.2,
+    max_sampling_time: Optional[float] = None,
     device: str = "cpu",
 ) -> Tuple[Tensor, Tensor]:
     r"""Return samples from a `potential_fn` obtained via rejection sampling.
@@ -56,6 +58,10 @@ def rejection_sample(
             distribution, but will increase the fraction of rejected samples and thus
             computation time.
         device: Device on which to sample.
+        max_sampling_time: Optional maximum allowed sampling time (in seconds).
+            If this time is exceeded, rejection sampling is aborted and a RuntimeError
+            is raised. This prevents jobs from stalling indefinitely when the
+            acceptance rate is extremely low.
 
     Returns:
         Accepted samples and acceptance rate as scalar Tensor.
@@ -131,7 +137,19 @@ def rejection_sample(
 
         # To cover cases with few samples without leakage:
         sampling_batch_size = min(num_samples, max_sampling_batch_size)
+        start_time = time.time()
         while num_remaining > 0:
+            if (
+                max_sampling_time is not None
+                and (time.time() - start_time) > max_sampling_time
+            ):
+                raise RuntimeError(
+                    "Rejection sampling exceeded max_sampling_time."
+                    "Sampling aborted early."
+                    "Due to extremely low acceptance."
+                    "Consider switching to MCMC or VI."
+                )
+
             # Sample and reject.
             candidates = proposal.sample(sampling_batch_size).reshape(
                 sampling_batch_size, -1
@@ -200,6 +218,7 @@ def accept_reject_sample(
     max_sampling_batch_size: int = 10_000,
     proposal_sampling_kwargs: Optional[Dict] = None,
     alternative_method: Optional[str] = None,
+    max_sampling_time: Optional[float] = None,
     **kwargs,
 ) -> Tuple[Tensor, Tensor]:
     r"""Returns samples from a proposal according to a acception criterion.
@@ -241,6 +260,10 @@ def accept_reject_sample(
             rate is too high. Used only for printing during a potential warning.
         kwargs: Absorb additional unused arguments that can be passed to
             `rejection_sample()`. Warn if not empty.
+        max_sampling_time: Optional maximum allowed sampling time (in seconds).
+            If exceeded, the sampling loop is interrupted and a RuntimeError is raised.
+            This prevents infinite or excessively slow rejection sampling runs, e.g.
+            in cases of heavy leakage or extremely low acceptance rates.
 
     Returns:
         Accepted samples of shape `(sample_dim, batch_dim, *event_shape)`, and
@@ -283,7 +306,19 @@ def accept_reject_sample(
     num_sampled_total = torch.zeros(num_xos)
     num_samples_possible = 0
 
+    start_time = time.time()
     while num_remaining > 0:
+        if (
+            max_sampling_time is not None
+            and (time.time() - start_time) > max_sampling_time
+        ):
+            raise RuntimeError(
+                "Rejection sampling exceeded max_sampling_time."
+                "Sampling aborted early"
+                "Because of extremely low acceptance."
+                "Consider switching to 'sample_with=mcmc'."
+            )
+
         # Sample and reject.
         candidates = proposal(
             (sampling_batch_size,),  # type: ignore
