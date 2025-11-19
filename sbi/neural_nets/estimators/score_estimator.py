@@ -119,8 +119,7 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         # Now that input_shape and mean_0, std_0 is set, we can compute the proper mean
         # and std for the "base" distribution.
         # Create t on the correct device to avoid CPU/GPU mismatch
-        device = self.mean_0.device
-        t_tensor = torch.as_tensor([t_max], device=device)
+        t_tensor = torch.as_tensor([t_max], device=self.mean_0.device)
         mean_t = self.approx_marginal_mean(t_tensor)
         std_t = self.approx_marginal_std(t_tensor)
         mean_t = torch.broadcast_to(mean_t, (1, *input_shape))
