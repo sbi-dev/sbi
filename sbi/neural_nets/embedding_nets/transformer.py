@@ -628,95 +628,123 @@ class ViTEmbeddings(nn.Module):
 
 
 class TransformerEmbedding(nn.Module):
-    def __init__(self, config):
+    def __init__(
+        self,
+        *,
+        pos_emb: str = "rotary",
+        pos_emb_base: float = 10e4,
+        rms_norm_eps: float = 1e-05,
+        router_jitter_noise: float = 0.0,
+        vit_dropout: float = 0.5,
+        mlp_activation: str = "gelu",
+        is_causal: bool = True,
+        vit: bool = False,
+        num_hidden_layers: int = 4,
+        num_attention_heads: int = 12,
+        num_key_value_heads: int = 12,
+        intermediate_size: int = 256,
+        ffn: str = "mlp",
+        head_dim: Optional[int] = None,
+        attention_dropout: float = 0.5,
+        feature_space_dim: int,
+        final_emb_dimension: Optional[int] = None,
+        image_size: Optional[int] = None,
+        patch_size: Optional[int] = None,
+        num_channels: Optional[int] = None,
+        num_local_experts: Optional[int] = None,
+        num_experts_per_tok: Optional[int] = None,
+    ):
         super().__init__()
         """
         Main class for constructing a transformer embedding
         Basic configuration parameters:
-            pos_emb (string): position encoding to be used, currently available:
+            pos_emb: position encoding to be used, currently available:
             {"rotary", "positional", "none"}
-            pos_emb_base (float): base used to construct the positinal encoding
-            rms_norm_eps (float): noise added to the rms variance computation
-            ffn (string): feedforward layer after used after computing the attention:
+            pos_emb_base: base used to construct the positinal encoding
+            rms_norm_eps: noise added to the rms variance computation
+            ffn: feedforward layer after used after computing the attention:
             {"mlp", "moe"}
-            mlp_activation (string): activation function to be used within the ffn
+            mlp_activation: activation function to be used within the ffn
             layer
-            is_causal (bool): specifies whether causal mask should be created
-            vit (bool): specifies the whether a convolutional layer should be used for
+            is_causal: specifies whether causal mask should be created
+            vit: specifies the whether a convolutional layer should be used for
             processing images, inspired by the vision transformer
-            num_hidden_layer (int): number of transformer blocks
-            num_attention_heads (int): number of attention heads
-            num_key_value_heads (int): number of key/value heads
-            feature_space_dim (int): dimension of the feature vectors
-            intermediate_size (int): hidden size of the feedforward layer
-            head_dim (int): dimension key/query vectors
-            attention_dropout (float): value for the dropout of the attention layer
-        Note:
-            This module now supports scalar time-series inputs. Inputs of shape
-            `(batch, seq_len)` or `(batch, seq_len, 1)` are automatically projected
-            to `feature_space_dim` before being passed through the transformer.
+            num_hidden_layers: number of transformer blocks
+            num_attention_heads: number of attention heads
+            num_key_value_heads: number of key/value heads
+            feature_space_dim: dimension of the feature vectors
+            intermediate_size: hidden size of the feedforward layer
+            head_dim: dimension key/query vectors
+            attention_dropout: value for the dropout of the attention layer
 
         MoE:
-            router_jitter_noise (float): noise added before routing the input vectors
+            router_jitter_noise: noise added before routing the input vectors
             to the experts
-            num_local_experts (int): total number of experts
-            num_experts_per_tok (int): number of experts each token is assigned to
+            num_local_experts: total number of experts
+            num_experts_per_tok: number of experts each token is assigned to
 
         ViT
-            feature_space_dim (int): dimension of the feature vectors after
+            feature_space_dim: dimension of the feature vectors after
             preprocessing the images
-            image_size (int): dimension of the squared image used to created
+            image_size: dimension of the squared image used to created
             the positional encoders
             a rectagular image can be used at training/inference time by
             resampling the encoders
-            patch_size (int): size of the square patches used to create the
+            patch_size: size of the square patches used to create the
             positional encoders
-            num_channels (int): number of channels of the input image
-            vit_dropout (float): value for the dropout of the attention layer
+            num_channels: number of channels of the input image
+            vit_dropout: value for the dropout of the attention layer
         """
-        self.config = {
-            "pos_emb": "rotary",
-            "pos_emb_base": 10e4,
-            "rms_norm_eps": 1e-05,
-            "router_jitter_noise": 0.0,
-            "vit_dropout": 0.5,
-            "mlp_activation": "gelu",
-            "is_causal": True,
-            "vit": False,
-            "num_hidden_layers": 4,
-            "num_attention_heads": 12,
-            "num_key_value_heads": 12,
-            "intermediate_size": 256,
-            "ffn": "mlp",
-            "head_dim": None,
-            "attention_dropout": 0.5,
-        }
 
-        self.config.update(config)
-
-        self.preprocess = (
-            ViTEmbeddings(self.config) if self.config["vit"] else IdentityEncoder()
+        self.config = dict(
+            pos_emb=pos_emb,
+            pos_emb_base=pos_emb_base,
+            rms_norm_eps=rms_norm_eps,
+            router_jitter_noise=router_jitter_noise,
+            vit_dropout=vit_dropout,
+            mlp_activation=mlp_activation,
+            is_causal=is_causal,
+            vit=vit,
+            num_hidden_layers=num_hidden_layers,
+            num_attention_heads=num_attention_heads,
+            num_key_value_heads=num_key_value_heads,
+            intermediate_size=intermediate_size,
+            ffn=ffn,
+            head_dim=head_dim,
+            attention_dropout=attention_dropout,
+            feature_space_dim=feature_space_dim,
+            image_size=image_size,
+            patch_size=patch_size,
+            num_channels=num_channels,
+            num_local_experts=num_local_experts,
+            num_experts_per_tok=num_experts_per_tok,
         )
-        self.input_proj = None
+
+        self.preprocess = ViTEmbeddings(self.config) if vit else IdentityEncoder()
+
+        self._supports_scalar_series = not vit
+        if self._supports_scalar_series:
+            self.scalar_projection = nn.Linear(
+                1, feature_space_dim
+            )  # proj 1D → model dim
+
         self.layers = nn.ModuleList([
-            TransformerBlock(self.config)
-            for _ in range(self.config["num_hidden_layers"])
+            TransformerBlock(self.config) for _ in range(num_hidden_layers)
         ])
-        self.is_causal = self.config["is_causal"] and not self.config["vit"]
+        self.is_causal = is_causal and not vit
 
-        self.norm = RMSNorm(
-            self.config["feature_space_dim"], eps=self.config["rms_norm_eps"]
-        )
-        final_emb_dimension = self.config.get(
-            "final_emb_dimension", self.config["feature_space_dim"] // 2
-        )
-        if not config["vit"] and final_emb_dimension > self.config["feature_space_dim"]:
+        self.norm = RMSNorm(feature_space_dim, eps=rms_norm_eps)
+
+        if final_emb_dimension is None:
+            final_emb_dimension = feature_space_dim // 2
+
+        if not vit and final_emb_dimension > feature_space_dim:
             raise ValueError(
-                "The final embedding dimension should be equal or smaller than "
-                "the input dimension"
+                "The final embedding dimension should be "
+                "equal or smaller than the input dimension"
             )
         self.aggregator = nn.Linear(
-            self.config["feature_space_dim"],
+            feature_space_dim,
             final_emb_dimension,
         )
         self.causal_mask_cache_ = (None, None, None)
@@ -768,33 +796,25 @@ class TransformerEmbedding(nn.Module):
     ) -> Tuple[torch.Tensor, Optional[Tuple[torch.Tensor, torch.Tensor]]]:
         """
         Args:
-            input (`torch.Tensor`):
-                - For scalar time-series: `(batch, seq_len)` or `(batch, seq_len, 1)`
-                - For vector time-series: `(batch, seq_len, feature_dim)`
-                - For images (when `vit=True`): `(batch, num_channels, height, width)`
-            attention_mask (`torch.Tensor`, *optional*):
+            input: input of shape `(batch, seq_len,
+            feature_space_dim)`
+            or `(batch, num_channels, height, width)` if using ViT
+            attention_mask:
                 attention mask of size `(batch_size, sequence_length)`
-            output_attentions (`bool`, *optional*):
+            output_attentions:
                 Whether or not to return the attention tensors
-            cache_attention_mask (`bool`, *optional*):
+            cache_attention_mask:
                 Whether or not to cache the expanded attention mask, useful if using
                 multiple batched with identical input shapes
-            kwargs (`dict`, *optional*):
+            kwargs:
                 Arbitrary kwargs
         """
 
         input = self.preprocess(input)
-        if not self.config.get("vit", False):
-            if input.ndim == 2:
-                input = input.unsqueeze(-1)
 
-            in_features = input.shape[-1]
-            target_features = self.config["feature_space_dim"]
-
-            if in_features != target_features:
-                if self.input_proj is None:
-                    self.input_proj = nn.Linear(in_features, target_features).to(input)
-                input = self.input_proj(input)
+        if self._supports_scalar_series and input.ndim == 2:
+            input = input.unsqueeze(-1)  # (B, T, 1)
+            input = self.scalar_projection(input)  # (B, T, feature_space_dim)
 
         if self.is_causal:
             dtype, device = input.dtype, input.device
