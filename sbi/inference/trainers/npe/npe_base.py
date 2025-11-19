@@ -608,17 +608,12 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
 
         if self._round == 0 and self._neural_net is not None:
             assert context.force_first_round_loss or context.resume_training, (
-                "You have already trained this neural network. After you had trained "
-                "the network, you again appended simulations with `append_simulations"
-                "(theta, x)`, but you did not provide a proposal. If the new "
-                "simulations are sampled from the prior, you can set "
-                "`.train(..., force_first_round_loss=True`). However, if the new "
-                "simulations were not sampled from the prior, you should pass the "
-                "proposal, i.e. `append_simulations(theta, x, proposal)`. If "
-                "your samples are not sampled from the prior and you do not pass a "
-                "proposal and you set `force_first_round_loss=True`, the result of "
-                "SNPE will not be the true posterior. Instead, it will be the proposal "
-                "posterior, which (usually) is more narrow than the true posterior."
+                "This neural network has already been trained. "
+                "If you want to continue training without adding new simulations, "
+                "set resume_training=True. "
+                "If you appended new simulations, you must either provide a proposal "
+                "in append_simulations(), or set force_first_round_loss=True for "
+                "simulations drawn from the prior."
             )
 
         # Starting index for the training set (1 = discard round-0 samples).
