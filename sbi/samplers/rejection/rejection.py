@@ -144,10 +144,10 @@ def rejection_sample(
                 and (time.time() - start_time) > max_sampling_time
             ):
                 raise RuntimeError(
-                    "Rejection sampling exceeded max_sampling_time."
-                    "Sampling aborted early."
-                    "Due to extremely low acceptance."
-                    "Consider switching to MCMC or VI."
+                    "Sampling aborted early because rejection sampling exceeded "
+                    "max_sampling_time. This is likely due to extremely low "
+                    "acceptance. Consider switching to MCMC or VI, or checking "
+                    "for model misspecification."
                 )
 
             # Sample and reject.
@@ -313,10 +313,10 @@ def accept_reject_sample(
             and (time.time() - start_time) > max_sampling_time
         ):
             raise RuntimeError(
-                "Rejection sampling exceeded max_sampling_time."
-                "Sampling aborted early"
-                "Because of extremely low acceptance."
-                "Consider switching to 'sample_with=mcmc'."
+                "Sampling aborted early because rejection sampling exceeded "
+                "max_sampling_time. This is likely due to extremely low "
+                "acceptance. Consider switching to MCMC or VI, or checking "
+                "for model misspecification."
             )
 
         # Sample and reject.
