@@ -19,3 +19,7 @@ python:
       path: .
       extra_requirements:
         - doc
+
+redirects:
+  - redirect: /
+    to: /en/stable/
