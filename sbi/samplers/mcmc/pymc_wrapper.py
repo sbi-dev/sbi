@@ -112,7 +112,7 @@ class PyMCSampler:
         tune: int = 1000,
         chains: Optional[int] = None,
         mp_ctx: str = "spawn",
-        progressbar: bool = True,
+        progressbar: bool = False,
         param_name: str = "theta",
         device: str = "cpu",
     ):

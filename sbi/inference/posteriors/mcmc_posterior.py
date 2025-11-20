@@ -916,7 +916,7 @@ class MCMCPosterior(NeuralPosterior):
             tune=warmup_steps,
             chains=num_chains,
             mp_ctx=mp_context,
-            progressbar=show_progress_bars,
+            progressbar=False,
             param_name=self.param_name,
             device=self._device,
         )
