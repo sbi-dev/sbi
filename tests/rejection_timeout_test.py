@@ -4,6 +4,7 @@
 import pytest
 import torch
 
+from sbi.inference.posteriors.rejection_posterior import RejectionPosterior
 from sbi.samplers.rejection import accept_reject_sample, rejection_sample
 
 
@@ -28,12 +29,12 @@ def always_reject_fn(x):
 def test_accept_reject_sample_timeout():
     proposal = DummyProposal()
 
-    with pytest.raises(RuntimeError):
+    with pytest.raises(RuntimeError, match="rejection sampling exceeded"):
         accept_reject_sample(
             proposal=proposal,
             accept_reject_fn=always_reject_fn,
             num_samples=5,
-            max_sampling_time=0.2,
+            max_sampling_time=0.01,
         )
 
 
@@ -44,11 +45,46 @@ def test_rejection_sample_timeout():
     def dummy_potential_fn(x):
         return torch.full((x.shape[0],), -1e6)
 
-    with pytest.raises(RuntimeError):
+    with pytest.raises(RuntimeError, match="rejection sampling exceeded"):
         rejection_sample(
             potential_fn=dummy_potential_fn,
             proposal=proposal,
             num_samples=5,
-            max_sampling_time=0.2,
+            max_sampling_time=0.01,
             m=1e12,
         )
+
+
+@pytest.mark.slow
+def test_rejection_posterior_timeout():
+    prior = torch.distributions.MultivariateNormal(torch.zeros(1), torch.eye(1))
+
+    class DummyPotential:
+        """
+        Minimal compliant potential implementing CustomPotential interface.
+        Forces rejection by returning very low log-probability.
+        """
+
+        device = "cpu"
+
+        def __call__(
+            self, theta: torch.Tensor, x_o: torch.Tensor = None
+        ) -> torch.Tensor:
+            return torch.full((theta.shape[0],), -1e6)
+
+        def set_x(self, x):
+            pass
+
+        def to(self, device):
+            self.device = device
+            return self
+
+    posterior = RejectionPosterior(
+        potential_fn=DummyPotential(),
+        proposal=prior,
+    )
+
+    posterior.set_default_x(torch.zeros(1))
+
+    with pytest.raises(RuntimeError, match="max_sampling_time"):
+        posterior.sample((5,), max_sampling_time=0.01)

@@ -188,8 +188,12 @@ def rejection_sample(
                 logging.warning(
                     f"""Only {acceptance_rate:.3%} proposal samples were accepted. It
                         may take a long time to collect the remaining {num_remaining}
-                        samples. Consider interrupting (Ctrl-C) and switching to a
-                        different sampling method with
+                        samples. You can prevent long runtimes by
+                        setting `max_sampling_time` to limit runtime, or disabling
+                        rejection sampling (e.g. via `reject_outside_prior=False` in
+                        `posterior.sample()` when available).
+                        Alternatively, consider interrupting (Ctrl-C) and switching
+                        to a different sampling method with
                         `build_posterior(..., sample_with='mcmc')`. or
                         `build_posterior(..., sample_with='vi')`."""
                 )
@@ -387,10 +391,13 @@ def accept_reject_sample(
             else:
                 warn_msg = f"""Only {min_acceptance_rate:.3%} proposal samples are
                     accepted. It may take a long time to collect the remaining
-                    {num_remaining} samples. """
+                    {num_remaining} samples. You can prevent very long runtimes by
+                    setting `max_sampling_time` to limit runtime, or disabling
+                    rejection sampling (e.g. via `reject_outside_prior=False` in
+                    `posterior.sample()` when available)."""
                 if alternative_method is not None:
-                    warn_msg += f"""Consider interrupting (Ctrl-C) and switching to
-                    `{alternative_method}`."""
+                    warn_msg += f"""Alternatively, consider interrupting (Ctrl-C)
+                    and switching to `{alternative_method}`."""
                 logging.warning(warn_msg)
 
             leakage_warning_raised = True  # Ensure warning is raised just once.
