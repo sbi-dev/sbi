@@ -628,6 +628,116 @@ class ViTEmbeddings(nn.Module):
 
 
 class TransformerEmbedding(nn.Module):
+    r"""
+    Transformer-based embedding network for **time series** and **image** data.
+
+    This module provides a flexible embedding architecture that supports both
+    (1) 1D / multivariate time series (e.g., experimental trials, temporal signals),
+    and
+    (2) image inputs via a lightweight Vision Transformer (ViT)-style patch embedding.
+
+    It is designed for simulation-based inference (SBI) workflows where raw
+    observations must be encoded into fixed-dimensional embeddings before passing
+    them to a neural density estimator.
+
+    Parameters
+    ----------
+    pos_emb :
+        Positional embedding type. One of ``{"rotary", "positional", "none"}``.
+    pos_emb_base :
+        Base frequency for rotary positional embeddings.
+    rms_norm_eps :
+        Epsilon for RMSNorm layers.
+    router_jitter_noise :
+        Noise added when routing tokens to MoE experts.
+    vit_dropout :
+        Dropout applied inside ViT patch embedding layers.
+    mlp_activation :
+        Activation used inside the feedforward blocks.
+    is_causal :
+        If ``True``, applies a causal mask during attention (useful for time-series).
+    vit :
+        If ``True``, enables Vision Transformer mode for 2D image inputs.
+    num_hidden_layers :
+        Number of transformer encoder blocks.
+    num_attention_heads :
+        Number of self-attention heads.
+    num_key_value_heads :
+        Number of KV heads (for multi-query attention).
+    intermediate_size :
+        Hidden dimension of feedforward network (or MoE experts).
+    ffn :
+        Feedforward type. One of ``{"mlp", "moe"}``.
+    head_dim :
+        Per-head embedding dimension. If ``None``, inferred as
+        ``feature_space_dim // num_attention_heads``.
+    attention_dropout :
+        Dropout used inside the attention mechanism.
+    feature_space_dim :
+        Dimensionality of the token embeddings flowing through the transformer.
+        - For time-series, this is the model dimension.
+        - For images (``vit=True``), this is the post-patch-projection embedding size.
+    final_emb_dimension :
+        Output embedding dimension. Defaults to ``feature_space_dim // 2``.
+    image_size :
+        Input image height/width (only if ``vit=True``).
+    patch_size :
+        ViT patch size (only if ``vit=True``).
+    num_channels :
+        Number of image channels for ViT mode.
+    num_local_experts :
+        Number of MoE experts (only relevant when ``ffn="moe"``).
+    num_experts_per_tok :
+        How many experts each token is routed to in MoE mode.
+
+    Notes
+    -----
+    **Time-series mode (``vit=False``)**
+    - Inputs of shape ``(batch, seq_len)`` (scalar series) are automatically
+      projected to ``(batch, seq_len, feature_space_dim)``.
+    - Inputs of shape ``(batch, seq_len, features)`` are used as-is.
+    - Causal masking is applied if ``is_causal=True`` (default).
+    - Suitable for experimental trials, temporal dynamics, or sets of sequential
+      observations.
+
+    **Image mode (``vit=True``)**
+    - Inputs must have shape ``(batch, channels, height, width)``.
+    - Images are patchified, linearly projected, and fed to the transformer.
+    - Causal masking is disabled in this mode.
+
+    **Output**
+    The embedding is obtained by selecting the final token and applying a linear
+    projection, resulting in a tensor of shape:
+
+    ``(batch, final_emb_dimension)``
+
+    Example
+    -------
+    **1D time-series (default mode)**::
+
+        from sbi.neural_nets.embedding_nets import TransformerEmbedding
+        import torch
+
+        x = torch.randn(16, 100)       # (batch, seq_len)
+        emb = TransformerEmbedding(feature_space_dim=64)
+        z = emb(x)
+
+    **Image input (ViT-style)**::
+
+        from sbi.neural_nets.embedding_nets import TransformerEmbedding
+        import torch
+
+        x = torch.randn(8, 3, 64, 64)  # (batch, C, H, W)
+        emb = TransformerEmbedding(
+            vit=True,
+            image_size=64,
+            patch_size=8,
+            num_channels=3,
+            feature_space_dim=128,
+        )
+        z = emb(x)
+    """
+
     def __init__(
         self,
         *,
@@ -657,41 +767,42 @@ class TransformerEmbedding(nn.Module):
         super().__init__()
         """
         Main class for constructing a transformer embedding
-        Basic configuration parameters:
+
+        Args:
             pos_emb: position encoding to be used, currently available:
-            {"rotary", "positional", "none"}
+                {"rotary", "positional", "none"}
             pos_emb_base: base used to construct the positinal encoding
             rms_norm_eps: noise added to the rms variance computation
             ffn: feedforward layer after used after computing the attention:
-            {"mlp", "moe"}
+                {"mlp", "moe"}
             mlp_activation: activation function to be used within the ffn
-            layer
+                layer
             is_causal: specifies whether causal mask should be created
             vit: specifies the whether a convolutional layer should be used for
-            processing images, inspired by the vision transformer
+                processing images, inspired by the vision transformer
             num_hidden_layers: number of transformer blocks
             num_attention_heads: number of attention heads
             num_key_value_heads: number of key/value heads
             feature_space_dim: dimension of the feature vectors
             intermediate_size: hidden size of the feedforward layer
-            head_dim: dimension key/query vectors
+                head_dim: dimension key/query vectors
             attention_dropout: value for the dropout of the attention layer
 
         MoE:
             router_jitter_noise: noise added before routing the input vectors
-            to the experts
+                to the experts
             num_local_experts: total number of experts
             num_experts_per_tok: number of experts each token is assigned to
 
         ViT
             feature_space_dim: dimension of the feature vectors after
-            preprocessing the images
+                preprocessing the images
             image_size: dimension of the squared image used to created
-            the positional encoders
-            a rectagular image can be used at training/inference time by
-            resampling the encoders
+                the positional encoders
+                a rectagular image can be used at training/inference time by
+                resampling the encoders
             patch_size: size of the square patches used to create the
-            positional encoders
+                positional encoders
             num_channels: number of channels of the input image
             vit_dropout: value for the dropout of the attention layer
         """
@@ -797,8 +908,8 @@ class TransformerEmbedding(nn.Module):
         """
         Args:
             input: input of shape `(batch, seq_len,
-            feature_space_dim)`
-            or `(batch, num_channels, height, width)` if using ViT
+                feature_space_dim)` or `(batch, num_channels,
+                height, width)` if using ViT
             attention_mask:
                 attention mask of size `(batch_size, sequence_length)`
             output_attentions:
