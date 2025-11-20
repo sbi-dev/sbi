@@ -606,14 +606,21 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
         # Load data from most recent round.
         self._round = max(self._data_round_index)
 
-        if self._round == 0 and self._neural_net is not None:
-            assert context.force_first_round_loss or context.resume_training, (
+        if (
+            self._round == 0
+            and self._neural_net is not None
+            and not (context.force_first_round_loss or context.resume_training)
+        ):
+            raise ValueError(
                 "This neural network has already been trained. "
                 "If you want to continue training without adding new simulations, "
                 "set resume_training=True. "
                 "If you appended new simulations, you must either provide a proposal "
                 "in append_simulations(), or set force_first_round_loss=True for "
-                "simulations drawn from the prior."
+                "simulations drawn from the prior. "
+                "Warning: Setting force_first_round_loss=True with simulations not "
+                "drawn from the prior will produce the proposal posterior instead of "
+                "the true posterior, which is typically more narrow."
             )
 
         # Starting index for the training set (1 = discard round-0 samples).
