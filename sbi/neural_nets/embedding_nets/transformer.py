@@ -907,9 +907,9 @@ class TransformerEmbedding(nn.Module):
     ) -> Tuple[torch.Tensor, Optional[Tuple[torch.Tensor, torch.Tensor]]]:
         """
         Args:
-            input: input of shape `(batch, seq_len,
-                feature_space_dim)` or `(batch, num_channels,
-                height, width)` if using ViT
+            input:
+                input of shape `(batch, seq_len, feature_space_dim)`
+                or `(batch, num_channels, height, width)` if using ViT
             attention_mask:
                 attention mask of size `(batch_size, sequence_length)`
             output_attentions:
