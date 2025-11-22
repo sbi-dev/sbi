@@ -127,6 +127,10 @@ class PyMCSampler:
             chains: Number of MCMC chains to run in parallel.
             mp_ctx: Multiprocessing context for parallel sampling.
             progressbar: Whether to show/hide progress bars.
+                Note: Progress bars are disabled for PyMC sampling in this
+                project due to an incompatibility from PyMC >= 5.20.1 and
+                that affects progress display.
+                See PR #1697 for details: https://github.com/sbi-dev/sbi/pull/1697
             param_name: Name for parameter variable, for PyMC and ArviZ structures
             device: The device to which to move the parameters for potential_fn.
         """
