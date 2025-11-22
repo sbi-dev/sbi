@@ -796,7 +796,7 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
         if summarization_kwargs is None:
             summarization_kwargs = {}
 
-        assert self._neural_net is not None
+        assert self._neural_net is not None, "Initialize self._neural_net."
 
         # Move entire net to device for training.
         self._neural_net.to(self._device)
@@ -870,7 +870,7 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
             The average training loss over all samples in the epoch.
         """
 
-        assert self._neural_net is not None
+        assert self._neural_net is not None, "Initialize self._neural_net."
 
         train_loss_sum = 0
         for batch in train_loader:
@@ -1009,7 +1009,7 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
         """
         converged = False
 
-        assert self._neural_net is not None
+        assert self._neural_net is not None, "Initialize self._neural_net."
         neural_net = self._neural_net
 
         # Initialize tracking variables if not exists
