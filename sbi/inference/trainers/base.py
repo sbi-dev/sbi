@@ -186,7 +186,7 @@ def check_if_proposal_has_default_x(proposal: Any):
 class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
     "Mixin for NeuralInference objects"
 
-    _neural_net: Optional[BaseConditionalEstimatorType]
+    _neural_net: BaseConditionalEstimatorType
     _train_loss: float
     _val_loss: float
     _prior: Distribution
@@ -224,7 +224,6 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
         self._prior = prior if prior is not None else NoPrior(device=self._device)
 
         self._posterior = None
-        self._neural_net = None
 
         self._show_progress_bars = show_progress_bars
 
