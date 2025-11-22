@@ -369,6 +369,8 @@ class RatioEstimatorTrainer(NeuralInference[RatioEstimator]):
 
         The logits are obtained from atomic sets of (theta,x) pairs.
         """
+        if self._neural_net is None:
+            raise RuntimeError("Neural network has not been initialized yet. ")
         batch_size = theta.shape[0]
         repeated_x = repeat_rows(x, num_atoms)
 

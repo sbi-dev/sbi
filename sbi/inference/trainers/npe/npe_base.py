@@ -534,6 +534,8 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator]):
                 i.e., potentially ignoring the correction for using a proposal
                 distribution different from the prior.
         """
+        if self._neural_net is None:
+            raise RuntimeError("Neural network has not been initialized yet. ")
         if self._round == 0 or force_first_round_loss:
             theta = reshape_to_batch_event(
                 theta, event_shape=self._neural_net.input_shape

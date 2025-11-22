@@ -324,6 +324,8 @@ class LikelihoodEstimatorTrainer(NeuralInference[ConditionalDensityEstimator]):
         Returns:
             Negative log prob.
         """
+        if self._neural_net is None:
+            raise RuntimeError("Neural network has not been initialized yet. ")
         theta = reshape_to_batch_event(
             theta, event_shape=self._neural_net.condition_shape
         )
