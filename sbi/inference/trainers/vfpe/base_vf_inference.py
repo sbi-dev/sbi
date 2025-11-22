@@ -50,12 +50,10 @@ from sbi.utils.sbiutils import (
 from sbi.utils.torchutils import assert_all_finite
 from sbi.utils.user_input_checks import validate_inputs
 
-# ! Maybe a mixin could be a good idea for functions which are shared among the two?
+# TODO: Maybe a mixin could be a good idea for functions which are shared among the two?
 
 
 class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator]):
-    _neural_net: ConditionalVectorFieldEstimator  # ! Can be removed?
-
     def __init__(
         self,
         prior: Optional[Distribution] = None,
@@ -644,8 +642,6 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator]):
 class MaskedVectorFieldTrainer(
     MaskedNeuralInference[MaskedConditionalVectorFieldEstimator]
 ):
-    _neural_net: MaskedConditionalVectorFieldEstimator  # ! Can be removed?
-
     def __init__(
         self,
         mvf_estimator_builder: Union[
@@ -716,7 +712,6 @@ class MaskedVectorFieldTrainer(
     def _build_default_nn_fn(
         self,
         **kwargs,
-        # ! Should I add `model = Literal[Simformer]` parameter here?
     ) -> MaskedConditionalEstimatorBuilder[MaskedConditionalVectorFieldEstimator]:
         pass
 
@@ -953,8 +948,6 @@ class MaskedVectorFieldTrainer(
 
         summarization_kwargs = dict(ema_loss_decay=ema_loss_decay)
 
-        # V To adapt for masked in MaskedNeuralInference
-        #   (currently is on BaseNeuralInference, i.e., the same of NeuralInfernece)
         return self._run_training_loop(
             train_loader=train_loader,
             val_loader=val_loader,
@@ -1139,7 +1132,6 @@ class MaskedVectorFieldTrainer(
         assert_all_finite(loss, f"{cls_name} loss")
         return calibration_kernel(inputs) * loss
 
-    # V To adapt
     def _get_losses(self, batch: Sequence[Tensor], loss_args: LossArgs) -> Tensor:
         """
         Compute losses for a batch of data.
@@ -1223,7 +1215,6 @@ class MaskedVectorFieldTrainer(
 
         return losses
 
-    # V To adapt
     def _train_epoch(
         self,
         train_loader: data.DataLoader,
@@ -1343,7 +1334,6 @@ class MaskedVectorFieldTrainer(
 
         return start_idx
 
-    # V To adapt
     def _initialize_neural_network(
         self,
         retrain_from_scratch: bool,

@@ -898,35 +898,7 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
 
     @abstractmethod
     def _get_losses(self, batch: Sequence[Tensor], loss_args=None) -> Tensor:
-        pass  # ! TODO: place somewhere better
-        # ! and generalize, then review what methods
-        # ! can be brough in BaseNeuralInference
-
-        # === Non-masked _get_losses ===
-        # Get batches on current device.
-        # theta_batch, x_batch = (
-        # batch[0].to(self._device),
-        # batch[1].to(self._device),
-        # )
-        # losses = self._loss(theta_batch, x_batch)
-        # return losses
-
-        # === Masked _get_losses ===
-        # Get batches on current device.
-        # theta_batch, x_batch, masks_batch = (
-        # batch[0].to(self._device),
-        # batch[1].to(self._device),
-        # batch[2].to(self._device),
-        # )
-        # train_losses = self._loss(
-        # theta=theta_batch,
-        # x=x_batch,
-        # prior_masks=masks_batch,
-        # proposal=proposal,
-        # calibration_kernel=calibration_kernel,
-        # force_first_round_loss=force_first_round_loss,
-        # )
-        # return losses
+        pass
 
     def _validate_epoch(
         self,
