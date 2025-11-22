@@ -7,6 +7,12 @@ from typing import Optional, Protocol, Tuple, TypeVar, Union
 import torch
 from torch import Tensor, nn
 
+BaseConditionalEstimatorType = TypeVar(
+    'BaseConditionalEstimatorType',
+    bound=Union["ConditionalEstimator", "MaskedConditionalEstimator"],
+    covariant=True,
+)
+
 ConditionalEstimatorType = TypeVar(
     'ConditionalEstimatorType',
     bound="ConditionalEstimator",
@@ -17,12 +23,6 @@ MaskedConditionalEstimatorType = TypeVar(
     'MaskedConditionalEstimatorType',
     bound="MaskedConditionalEstimator",
     covariant=True,
-)
-
-BaseConditionalEstimatorType = TypeVar(
-    'BaseConditionalEstimatorType',
-    "ConditionalEstimator",
-    "MaskedConditionalEstimator",
 )
 
 

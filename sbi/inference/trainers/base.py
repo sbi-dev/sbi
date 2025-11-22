@@ -1218,10 +1218,10 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
         self.__dict__ = state_dict
 
 
-class NeuralInference(BaseNeuralInference, Generic[ConditionalEstimatorType]):
+class NeuralInference(
+    BaseNeuralInference[ConditionalEstimatorType], Generic[ConditionalEstimatorType]
+):
     """Abstract base class for neural inference methods."""
-
-    _neural_net: Optional[ConditionalEstimatorType]
 
     def __init__(
         self,
@@ -1417,11 +1417,10 @@ class NeuralInference(BaseNeuralInference, Generic[ConditionalEstimatorType]):
 
 
 class MaskedNeuralInference(
-    BaseNeuralInference, Generic[MaskedConditionalEstimatorType]
+    BaseNeuralInference[MaskedConditionalEstimatorType],
+    Generic[MaskedConditionalEstimatorType],
 ):
     """Abstract base class for masked neural inference methods."""
-
-    _neural_net: Optional[MaskedConditionalEstimatorType]
 
     def __init__(
         self,
