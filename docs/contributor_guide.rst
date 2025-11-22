@@ -13,4 +13,5 @@ developer-focused resources.
    :caption: Contribution guides
 
    contributing
+   proposals
    code_of_conduct

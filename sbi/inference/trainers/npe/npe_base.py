@@ -1,17 +1,13 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-import time
-from abc import ABC, abstractmethod
-from copy import deepcopy
-from typing import Any, Callable, Dict, Literal, Optional, Tuple, Union
-from warnings import warn
+import warnings
+from abc import abstractmethod
+from dataclasses import asdict
+from typing import Any, Callable, Dict, Literal, Optional, Sequence, Tuple, Union
 
-import torch
 from torch import Tensor, ones
 from torch.distributions import Distribution
-from torch.nn.utils.clip_grad import clip_grad_norm_
-from torch.optim.adam import Adam
 from torch.utils.tensorboard.writer import SummaryWriter
 from typing_extensions import Self
 
@@ -26,7 +22,13 @@ from sbi.inference.posteriors.posterior_parameters import (
 )
 from sbi.inference.potentials import posterior_estimator_based_potential
 from sbi.inference.potentials.posterior_based_potential import PosteriorBasedPotential
+from sbi.inference.trainers._contracts import (
+    LossArgsNPE,
+    StartIndexContext,
+    TrainConfig,
+)
 from sbi.inference.trainers.base import (
+    LossArgs,
     NeuralInference,
     check_if_proposal_has_default_x,
 )
@@ -48,16 +50,14 @@ from sbi.utils import (
     validate_theta_and_x,
     warn_if_zscoring_changes_data,
 )
-from sbi.utils.sbiutils import ImproperEmpirical, mask_sims_from_prior
+from sbi.utils.sbiutils import (
+    ImproperEmpirical,
+    mask_sims_from_prior,
+)
 from sbi.utils.torchutils import assert_all_finite
 
 
-class PosteriorEstimatorTrainer(NeuralInference, ABC):
-    # TODO: This should also allow for Optional, but
-    # pyright raises errors (also in NRE and NLE base classes)
-    # as some of the methods need to make sure the neural net is not None
-    _neural_net: ConditionalDensityEstimator
-
+class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator]):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
@@ -222,7 +222,7 @@ class PosteriorEstimatorTrainer(NeuralInference, ABC):
         if self._prior is None or isinstance(self._prior, ImproperEmpirical):
             if proposal is not None:
                 raise ValueError(
-                    "You had not passed a prior at initialization, but now you "
+                    "You did not passed a prior at initialization, but now you "
                     "passed a proposal. If you want to run multi-round SNPE, you have "
                     "to specify a prior (set the `.prior` argument or re-initialize "
                     "the object with a prior distribution). If the samples you passed "
@@ -289,23 +289,18 @@ class PosteriorEstimatorTrainer(NeuralInference, ABC):
         Returns:
             Density estimator that approximates the distribution $p(\theta|x)$.
         """
-        # Load data from most recent round.
-        self._round = max(self._data_round_index)
 
-        if self._round == 0 and self._neural_net is not None:
-            assert force_first_round_loss or resume_training, (
-                "You have already trained this neural network. After you had trained "
-                "the network, you again appended simulations with `append_simulations"
-                "(theta, x)`, but you did not provide a proposal. If the new "
-                "simulations are sampled from the prior, you can set "
-                "`.train(..., force_first_round_loss=True`). However, if the new "
-                "simulations were not sampled from the prior, you should pass the "
-                "proposal, i.e. `append_simulations(theta, x, proposal)`. If "
-                "your samples are not sampled from the prior and you do not pass a "
-                "proposal and you set `force_first_round_loss=True`, the result of "
-                "SNPE will not be the true posterior. Instead, it will be the proposal "
-                "posterior, which (usually) is more narrow than the true posterior."
-            )
+        train_config = TrainConfig(
+            max_num_epochs=max_num_epochs,
+            stop_after_epochs=stop_after_epochs,
+            learning_rate=learning_rate,
+            resume_training=resume_training,
+            show_train_summary=show_train_summary,
+            training_batch_size=training_batch_size,
+            retrain_from_scratch=retrain_from_scratch,
+            validation_fraction=validation_fraction,
+            clip_max_norm=clip_max_norm,
+        )
 
         # Calibration kernels proposed in Lueckmann, Gonçalves et al., 2017.
         if calibration_kernel is None:
@@ -315,15 +310,13 @@ class PosteriorEstimatorTrainer(NeuralInference, ABC):
 
             calibration_kernel = default_calibration_kernel
 
-        # Starting index for the training set (1 = discard round-0 samples).
-        start_idx = int(discard_prior_samples and self._round > 0)
-
-        # For non-atomic loss, we can not reuse samples from previous rounds as of now.
-        # SNPE-A can, by construction of the algorithm, only use samples from the last
-        # round. SNPE-A is the only algorithm that has an attribute `_ran_final_round`,
-        # so this is how we check for whether or not we are using SNPE-A.
-        if self.use_non_atomic_loss or hasattr(self, "_ran_final_round"):
-            start_idx = self._round
+        start_idx = self._get_start_index(
+            context=StartIndexContext(
+                discard_prior_samples=discard_prior_samples,
+                force_first_round_loss=force_first_round_loss,
+                resume_training=train_config.resume_training,
+            )
+        )
 
         # Set the proposal to the last proposal that was passed by the user. For
         # atomic SNPE, it does not matter what the proposal is. For non-atomic
@@ -333,132 +326,29 @@ class PosteriorEstimatorTrainer(NeuralInference, ABC):
 
         train_loader, val_loader = self.get_dataloaders(
             start_idx,
-            training_batch_size,
-            validation_fraction,
-            resume_training,
+            train_config.training_batch_size,
+            train_config.validation_fraction,
+            train_config.resume_training,
             dataloader_kwargs=dataloader_kwargs,
         )
-        # First round or if retraining from scratch:
-        # Call the `self._build_neural_net` with the rounds' thetas and xs as
-        # arguments, which will build the neural network.
-        # This is passed into NeuralPosterior, to create a neural posterior which
-        # can `sample()` and `log_prob()`. The network is accessible via `.net`.
-        if self._neural_net is None or retrain_from_scratch:
-            # Get theta,x to initialize NN
-            theta, x, _ = self.get_simulations(starting_round=start_idx)
-            # Use only training data for building the neural net (z-scoring transforms)
 
-            self._neural_net = self._build_neural_net(
-                theta[self.train_indices].to("cpu"),
-                x[self.train_indices].to("cpu"),
-            )
+        self._initialize_neural_network(
+            retrain_from_scratch=train_config.retrain_from_scratch,
+            start_idx=start_idx,
+        )
 
-            theta = reshape_to_sample_batch_event(
-                theta.to("cpu"), self._neural_net.input_shape
-            )
-            x = reshape_to_batch_event(x.to("cpu"), self._neural_net.condition_shape)
-            test_posterior_net_for_multi_d_x(self._neural_net, theta, x)
+        loss_args = LossArgsNPE(
+            proposal=proposal,
+            calibration_kernel=calibration_kernel,
+            force_first_round_loss=force_first_round_loss,
+        )
 
-            del theta, x
-
-        # Move entire net to device for training.
-        self._neural_net.to(self._device)
-
-        if not resume_training:
-            self.optimizer = Adam(list(self._neural_net.parameters()), lr=learning_rate)
-            self.epoch, self._val_loss = 0, float("Inf")
-
-        while self.epoch <= max_num_epochs and not self._converged(
-            self.epoch, stop_after_epochs
-        ):
-            # Train for a single epoch.
-            self._neural_net.train()
-            train_loss_sum = 0
-            epoch_start_time = time.time()
-            for batch in train_loader:
-                self.optimizer.zero_grad()
-                # Get batches on current device.
-                theta_batch, x_batch, masks_batch = (
-                    batch[0].to(self._device),
-                    batch[1].to(self._device),
-                    batch[2].to(self._device),
-                )
-
-                train_losses = self._loss(
-                    theta_batch,
-                    x_batch,
-                    masks_batch,
-                    proposal,
-                    calibration_kernel,
-                    force_first_round_loss=force_first_round_loss,
-                )
-                train_loss = torch.mean(train_losses)
-                train_loss_sum += train_losses.sum().item()
-
-                train_loss.backward()
-                if clip_max_norm is not None:
-                    clip_grad_norm_(
-                        self._neural_net.parameters(), max_norm=clip_max_norm
-                    )
-                self.optimizer.step()
-
-            self.epoch += 1
-
-            train_loss_average = train_loss_sum / (
-                len(train_loader) * train_loader.batch_size  # type: ignore
-            )
-            self._summary["training_loss"].append(train_loss_average)
-
-            # Calculate validation performance.
-            self._neural_net.eval()
-            val_loss_sum = 0
-
-            with torch.no_grad():
-                for batch in val_loader:
-                    theta_batch, x_batch, masks_batch = (
-                        batch[0].to(self._device),
-                        batch[1].to(self._device),
-                        batch[2].to(self._device),
-                    )
-                    # Take negative loss here to get validation log_prob.
-                    val_losses = self._loss(
-                        theta_batch,
-                        x_batch,
-                        masks_batch,
-                        proposal,
-                        calibration_kernel,
-                        force_first_round_loss=force_first_round_loss,
-                    )
-                    val_loss_sum += val_losses.sum().item()
-
-            # Take mean over all validation samples.
-            self._val_loss = val_loss_sum / (
-                len(val_loader) * val_loader.batch_size  # type: ignore
-            )
-            # Log validation loss for every epoch.
-            self._summary["validation_loss"].append(self._val_loss)
-            self._summary["epoch_durations_sec"].append(time.time() - epoch_start_time)
-
-            self._maybe_show_progress(self._show_progress_bars, self.epoch)
-
-        self._report_convergence_at_end(self.epoch, stop_after_epochs, max_num_epochs)
-
-        # Update summary.
-        self._summary["epochs_trained"].append(self.epoch)
-        self._summary["best_validation_loss"].append(self._best_val_loss)
-
-        # Update tensorboard and summary dict.
-        self._summarize(round_=self._round)
-
-        # Update description for progress bar.
-        if show_train_summary:
-            print(self._describe_round(self._round, self._summary))
-
-        # Avoid keeping the gradients in the resulting network, which can
-        # cause memory leakage when benchmarking.
-        self._neural_net.zero_grad(set_to_none=True)
-
-        return deepcopy(self._neural_net)
+        return self._run_training_loop(
+            train_loader=train_loader,
+            val_loader=val_loader,
+            train_config=train_config,
+            loss_args=loss_args,
+        )
 
     def build_posterior(
         self,
@@ -578,6 +468,7 @@ class PosteriorEstimatorTrainer(NeuralInference, ABC):
             The potential function and a transformation that maps
             to unconstrained space.
         """
+
         potential_fn, theta_transform = posterior_estimator_based_potential(
             posterior_estimator=estimator,
             prior=prior,
@@ -671,7 +562,7 @@ class PosteriorEstimatorTrainer(NeuralInference, ABC):
 
             if isinstance(proposal, RestrictedPrior):
                 if proposal._prior is not self._prior:
-                    warn(
+                    warnings.warn(
                         "The proposal you passed is a `RestrictedPrior`, but the "
                         "proposal distribution it uses is not the prior (it can be "
                         "accessed via `RestrictedPrior._prior`). We do not "
@@ -683,7 +574,7 @@ class PosteriorEstimatorTrainer(NeuralInference, ABC):
                 not isinstance(proposal, NeuralPosterior)
                 and proposal is not self._prior
             ):
-                warn(
+                warnings.warn(
                     "The proposal you passed is neither the prior nor a "
                     "`NeuralPosterior` object. If you are an expert user and did so "
                     "for research purposes, this is fine. If not, you might be doing "
@@ -699,3 +590,111 @@ class PosteriorEstimatorTrainer(NeuralInference, ABC):
                 "were sampled from the prior, single-round inference can be performed "
                 "with `append_simulations(..., proprosal=None)`."
             )
+
+    def _get_start_index(self, context: StartIndexContext) -> int:
+        """
+        Determine the starting index for training based on previous rounds.
+
+        Args:
+            context: StartIndexContext dataclass values used to determine the starting
+                index of the training set.
+        Returns:
+            The method will return 1 to skip samples from round 0; otherwise,
+            it returns 0.
+        """
+
+        # Load data from most recent round.
+        self._round = max(self._data_round_index)
+
+        if self._round == 0 and self._neural_net is not None:
+            assert context.force_first_round_loss or context.resume_training, (
+                "You have already trained this neural network. After you had trained "
+                "the network, you again appended simulations with `append_simulations"
+                "(theta, x)`, but you did not provide a proposal. If the new "
+                "simulations are sampled from the prior, you can set "
+                "`.train(..., force_first_round_loss=True`). However, if the new "
+                "simulations were not sampled from the prior, you should pass the "
+                "proposal, i.e. `append_simulations(theta, x, proposal)`. If "
+                "your samples are not sampled from the prior and you do not pass a "
+                "proposal and you set `force_first_round_loss=True`, the result of "
+                "SNPE will not be the true posterior. Instead, it will be the proposal "
+                "posterior, which (usually) is more narrow than the true posterior."
+            )
+
+        # Starting index for the training set (1 = discard round-0 samples).
+        start_idx = int(context.discard_prior_samples and self._round > 0)
+
+        # For non-atomic loss, we can not reuse samples from previous rounds as of now.
+        # SNPE-A can, by construction of the algorithm, only use samples from the last
+        # round. SNPE-A is the only algorithm that has an attribute `_ran_final_round`,
+        # so this is how we check for whether or not we are using SNPE-A.
+        if self.use_non_atomic_loss or hasattr(self, "_ran_final_round"):
+            start_idx = self._round
+
+        return start_idx
+
+    def _initialize_neural_network(
+        self,
+        retrain_from_scratch: bool,
+        start_idx: int,
+    ) -> None:
+        """
+        Initialize the neural network if it is None or retraining from scratch.
+
+        Args:
+            retrain_from_scratch: Whether to retrain the conditional density
+                estimator for the posterior from scratch each round.
+            start_idx: The index of the first round to retrieve simulation data from.
+        """
+
+        # First round or if retraining from scratch:
+        # Call the `self._build_neural_net` with the rounds' thetas and xs as
+        # arguments, which will build the neural network.
+        # This is passed into NeuralPosterior, to create a neural posterior which
+        # can `sample()` and `log_prob()`. The network is accessible via `.net`.
+        if self._neural_net is None or retrain_from_scratch:
+            # Get theta,x to initialize NN
+            theta, x, _ = self.get_simulations(starting_round=start_idx)
+            # Use only training data for building the neural net (z-scoring transforms)
+
+            self._neural_net = self._build_neural_net(
+                theta[self.train_indices].to("cpu"),
+                x[self.train_indices].to("cpu"),
+            )
+
+            theta = reshape_to_sample_batch_event(
+                theta.to("cpu"), self._neural_net.input_shape
+            )
+            x = reshape_to_batch_event(x.to("cpu"), self._neural_net.condition_shape)
+            test_posterior_net_for_multi_d_x(self._neural_net, theta, x)
+
+            del theta, x
+
+    def _get_losses(self, batch: Sequence[Tensor], loss_args: LossArgs) -> Tensor:
+        """
+        Compute losses for a batch of data.
+
+        Args:
+            batch: A batch of data.
+            loss_args: Additional arguments passed to self._loss fn.
+
+        Returns:
+            A tensor containing the computed losses for each sample in the batch.
+        """
+
+        theta_batch, x_batch, masks_batch = (
+            batch[0].to(self._device),
+            batch[1].to(self._device),
+            batch[2].to(self._device),
+        )
+
+        if not isinstance(loss_args, LossArgsNPE):
+            raise TypeError(
+                "Expected type of loss_args to be LossArgsNPE,"
+                f" but got {type(loss_args)}"
+            )
+
+        # Take negative loss here to get validation log_prob.
+        losses = self._loss(theta_batch, x_batch, masks_batch, **asdict(loss_args))
+
+        return losses

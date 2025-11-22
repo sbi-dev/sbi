@@ -30,6 +30,7 @@ Neural nets
 
    how_to_guide/03_choose_neural_net.ipynb
    how_to_guide/04_embedding_networks.ipynb
+   how_to_guide/20_time_series_embedding.ipynb
    how_to_guide/08_permutation_invariant_embeddings.ipynb
    how_to_guide/03_density_estimators.ipynb
 

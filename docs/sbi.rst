@@ -59,6 +59,7 @@ Training
 
    sbi.inference.NPE_C
    sbi.inference.NPE_A
+   sbi.inference.MNPE
    sbi.inference.FMPE
    sbi.inference.NPSE
    sbi.inference.Simformer

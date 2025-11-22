@@ -216,4 +216,5 @@ def _separate_input(
 
 def _is_discrete(input: Tensor) -> Tensor:
     """Infer discrete columns in input data."""
+    # Check for integer values by rounding.
     return torch.tensor([torch.allclose(col, col.round()) for col in input.T])

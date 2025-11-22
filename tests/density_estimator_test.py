@@ -597,7 +597,7 @@ def build_estimator_missing_return(theta: Tensor, x: Tensor):
             dict(classifier=build_estimator_missing_return),
             NRE,
             marks=pytest.mark.xfail(
-                raises=AttributeError,
+                raises=AssertionError,
                 reason="Missing return of RatioEstimator in classifier builder.",
             ),
         ),
@@ -614,7 +614,7 @@ def build_estimator_missing_return(theta: Tensor, x: Tensor):
             dict(density_estimator=build_estimator_missing_return),
             NLE,
             marks=pytest.mark.xfail(
-                raises=AttributeError,
+                raises=AssertionError,
                 reason="Missing return of type ConditionalEstimator"
                 " in density estimator builder.",
             ),

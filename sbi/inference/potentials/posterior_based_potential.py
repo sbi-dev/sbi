@@ -16,7 +16,10 @@ from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_sample_batch_event,
 )
 from sbi.sbi_types import TorchTransform
-from sbi.utils.sbiutils import mcmc_transform, within_support
+from sbi.utils.sbiutils import (
+    mcmc_transform,
+    within_support,
+)
 from sbi.utils.torchutils import ensure_theta_batched
 
 

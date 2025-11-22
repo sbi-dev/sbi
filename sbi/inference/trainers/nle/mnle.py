@@ -20,13 +20,13 @@ from sbi.utils.sbiutils import del_entries
 
 
 class MNLE(LikelihoodEstimatorTrainer):
-    """Mixed Neural Likelihood Estimation (MNLE) [1].
+    """Method that can infer parameters given discrete and continuous data (Mixed NLE).
 
     Like NLE, but designed to be applied to data with mixed types, e.g., continuous
     data and discrete data like they occur in decision-making experiments
     (reation times and choices).
 
-    [1] Flexible and efficient simulation-based inference for models of
+    Flexible and efficient simulation-based inference for models of
     decision-making, Boelts et al. 2021,
     https://www.biorxiv.org/content/10.1101/2021.12.22.473472v2
     """

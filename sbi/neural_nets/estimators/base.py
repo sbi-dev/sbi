@@ -19,6 +19,12 @@ MaskedConditionalEstimatorType = TypeVar(
     covariant=True,
 )
 
+BaseConditionalEstimatorType = TypeVar(
+    'BaseConditionalEstimatorType',
+    "ConditionalEstimator",
+    "MaskedConditionalEstimator",
+)
+
 
 class ConditionalEstimatorBuilder(Protocol[ConditionalEstimatorType]):
     """Protocol for building a neural network from the data for the density
