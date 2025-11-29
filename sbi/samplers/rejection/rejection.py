@@ -146,8 +146,10 @@ def rejection_sample(
                 raise RuntimeError(
                     "Sampling aborted early because rejection sampling exceeded "
                     "max_sampling_time. This is likely due to extremely low "
-                    "acceptance. Consider switching to MCMC or VI, or checking "
-                    "for model misspecification."
+                    "acceptance. You can disable rejection sampling using "
+                    "`reject_outside_prior=False` to draw samples directly from "
+                    "the trained estimator. Consider switching to MCMC or VI, or "
+                    "checking for model misspecification."
                 )
 
             # Sample and reject.
@@ -319,8 +321,10 @@ def accept_reject_sample(
             raise RuntimeError(
                 "Sampling aborted early because rejection sampling exceeded "
                 "max_sampling_time. This is likely due to extremely low "
-                "acceptance. Consider switching to MCMC or VI, or checking "
-                "for model misspecification."
+                "acceptance. You can disable rejection sampling using "
+                "`reject_outside_prior=False` to draw samples directly from "
+                "the trained estimator. Consider switching to MCMC or VI, or "
+                "checking for model misspecification."
             )
 
         # Sample and reject.
