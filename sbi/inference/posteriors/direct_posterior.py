@@ -139,6 +139,8 @@ class DirectPosterior(NeuralPosterior):
         max_sampling_batch_size: int = 10_000,
         sample_with: Optional[str] = None,
         show_progress_bars: bool = True,
+        reject_outside_prior: bool = True,
+        max_sampling_time: Optional[float] = None,
     ) -> Tensor:
         r"""Return samples from posterior distribution $p(\theta|x)$.
 
@@ -149,6 +151,11 @@ class DirectPosterior(NeuralPosterior):
             sample_with: This argument only exists to keep backward-compatibility with
                 `sbi` v0.17.2 or older. If it is set, we instantly raise an error.
             show_progress_bars: Whether to show sampling progress monitor.
+            reject_outside_prior: If True (default), rejection sampling is used to
+                ensure samples lie within the prior support. If False, samples are drawn
+                directly from the proposal without rejection sampling.
+            max_sampling_time: Optional maximum allowed sampling time in seconds.
+                If exceeded, sampling is aborted and a RuntimeError is raised.
         """
         num_samples = torch.Size(sample_shape).numel()
         x = self._x_else_default_x(x)
@@ -177,15 +184,24 @@ class DirectPosterior(NeuralPosterior):
                 f"`.build_posterior(sample_with={sample_with}).`"
             )
 
-        samples = rejection.accept_reject_sample(
-            proposal=self.posterior_estimator.sample,
-            accept_reject_fn=lambda theta: within_support(self.prior, theta),
-            num_samples=num_samples,
-            show_progress_bars=show_progress_bars,
-            max_sampling_batch_size=max_sampling_batch_size,
-            proposal_sampling_kwargs={"condition": x},
-            alternative_method="build_posterior(..., sample_with='mcmc')",
-        )[0]  # [0] to return only samples, not acceptance probabilities.
+        if reject_outside_prior:
+            # normal rejection behaviour
+            samples = rejection.accept_reject_sample(
+                proposal=self.posterior_estimator.sample,
+                accept_reject_fn=lambda theta: within_support(self.prior, theta),
+                num_samples=num_samples,
+                show_progress_bars=show_progress_bars,
+                max_sampling_batch_size=max_sampling_batch_size,
+                proposal_sampling_kwargs={"condition": x},
+                alternative_method="build_posterior(..., sample_with='mcmc')",
+                max_sampling_time=max_sampling_time,
+            )[0]
+        else:
+            # bypass rejection sampling entirely
+            samples = self.posterior_estimator.sample(
+                torch.Size([num_samples]),
+                condition=x,
+            )
 
         return samples[:, 0]  # Remove batch dimension.
 
@@ -195,6 +211,8 @@ class DirectPosterior(NeuralPosterior):
         x: Tensor,
         max_sampling_batch_size: int = 10_000,
         show_progress_bars: bool = True,
+        reject_outside_prior: bool = True,
+        max_sampling_time: Optional[float] = None,
     ) -> Tensor:
         r"""Given a batch of observations [x_1, ..., x_B] this function samples from
         posteriors $p(\theta|x_1)$, ... ,$p(\theta|x_B)$, in a batched (i.e. vectorized)
@@ -207,6 +225,11 @@ class DirectPosterior(NeuralPosterior):
                 `batch_dim` corresponds to the number of observations to be drawn.
             max_sampling_batch_size: Maximum batch size for rejection sampling.
             show_progress_bars: Whether to show sampling progress monitor.
+            reject_outside_prior: If True (default), rejection sampling is used to
+                ensure samples lie within the prior support. If False, samples are drawn
+                directly from the proposal without rejection sampling.
+            max_sampling_time: Optional maximum allowed sampling time in seconds.
+                If exceeded, sampling is aborted and a RuntimeError is raised.
 
         Returns:
             Samples from the posteriors of shape (*sample_shape, B, *input_shape)
@@ -242,15 +265,24 @@ class DirectPosterior(NeuralPosterior):
             )
             max_sampling_batch_size = capped
 
-        samples = rejection.accept_reject_sample(
-            proposal=self.posterior_estimator.sample,
-            accept_reject_fn=lambda theta: within_support(self.prior, theta),
-            num_samples=num_samples,
-            show_progress_bars=show_progress_bars,
-            max_sampling_batch_size=max_sampling_batch_size,
-            proposal_sampling_kwargs={"condition": x},
-            alternative_method="build_posterior(..., sample_with='mcmc')",
-        )[0]
+        if reject_outside_prior:
+            # normal rejection behaviour
+            samples = rejection.accept_reject_sample(
+                proposal=self.posterior_estimator.sample,
+                accept_reject_fn=lambda theta: within_support(self.prior, theta),
+                num_samples=num_samples,
+                show_progress_bars=show_progress_bars,
+                max_sampling_batch_size=max_sampling_batch_size,
+                proposal_sampling_kwargs={"condition": x},
+                alternative_method="build_posterior(..., sample_with='mcmc')",
+                max_sampling_time=max_sampling_time,
+            )[0]
+        else:
+            # bypass rejection sampling entirely
+            samples = self.posterior_estimator.sample(
+                torch.Size([num_samples]),
+                condition=x,
+            )
 
         return samples
 

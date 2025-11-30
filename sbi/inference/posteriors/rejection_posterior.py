@@ -137,6 +137,8 @@ class RejectionPosterior(NeuralPosterior):
         m: Optional[float] = None,
         sample_with: Optional[str] = None,
         show_progress_bars: bool = True,
+        reject_outside_prior: bool = True,
+        max_sampling_time: Optional[float] = None,
     ):
         r"""Return samples from posterior $p(\theta|x)$ via rejection sampling.
 
@@ -147,7 +149,13 @@ class RejectionPosterior(NeuralPosterior):
             sample_with: This argument only exists to keep backward-compatibility with
                 `sbi` v0.17.2 or older. If it is set, we instantly raise an error.
             show_progress_bars: Whether to show sampling progress monitor.
-
+            reject_outside_prior:
+                If True (default), rejection sampling is used to ensure samples lie
+                within the prior support. If False, samples are drawn directly from
+                the proposal without rejection sampling.
+            max_sampling_time:
+                Optional maximum allowed sampling time in seconds. If exceeded,
+                sampling is aborted and a RuntimeError is raised.
         Returns:
             Samples from posterior.
         """
@@ -180,18 +188,22 @@ class RejectionPosterior(NeuralPosterior):
         )
         m = self.m if m is None else m
 
-        samples, _ = rejection_sample(
-            potential,
-            proposal=self.proposal,
-            num_samples=num_samples,
-            show_progress_bars=show_progress_bars,
-            warn_acceptance=0.01,
-            max_sampling_batch_size=max_sampling_batch_size,
-            num_samples_to_find_max=num_samples_to_find_max,
-            num_iter_to_find_max=num_iter_to_find_max,
-            m=m,
-            device=self._device,
-        )
+        if reject_outside_prior:
+            samples, _ = rejection_sample(
+                potential,
+                proposal=self.proposal,
+                num_samples=num_samples,
+                show_progress_bars=show_progress_bars,
+                warn_acceptance=0.01,
+                max_sampling_batch_size=max_sampling_batch_size,
+                num_samples_to_find_max=num_samples_to_find_max,
+                num_iter_to_find_max=num_iter_to_find_max,
+                m=m,
+                max_sampling_time=max_sampling_time,
+                device=self._device,
+            )
+        else:
+            samples = self.proposal.sample((num_samples,))
 
         return samples.reshape((*sample_shape, -1))
 
