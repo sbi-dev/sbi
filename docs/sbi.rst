@@ -46,6 +46,7 @@ Embedding nets
    sbi.neural_nets.embedding_nets.PermutationInvariantEmbedding
    sbi.neural_nets.embedding_nets.ResNetEmbedding1D
    sbi.neural_nets.embedding_nets.ResNetEmbedding2D
+   sbi.neural_nets.embedding_nets.TransformerEmbedding
 
 
 Training

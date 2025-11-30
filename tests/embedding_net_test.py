@@ -260,7 +260,7 @@ BASE_CONFIG = {
 )
 @pytest.mark.parametrize("seq_length", (24, 13, 5))
 def test_transformer_embedding(config, seq_length):
-    net = TransformerEmbedding(config=config)
+    net = TransformerEmbedding(**config)
 
     def simulator(theta):
         x = MultivariateNormal(
@@ -291,7 +291,7 @@ def test_transformer_embedding(config, seq_length):
 )
 @pytest.mark.parametrize("img_shape", ((3, 32, 24), (3, 64, 64)))
 def test_transformer_vitembedding(config, img_shape):
-    net = TransformerEmbedding(config=config)
+    net = TransformerEmbedding(**config)
 
     def simulator(theta):
         x = MultivariateNormal(
@@ -307,6 +307,30 @@ def test_transformer_vitembedding(config, img_shape):
     xo = torch.ones(1, img_shape[0], img_shape[1], img_shape[2])
 
     prior = MultivariateNormal(torch.zeros(img_shape[0]), torch.eye(img_shape[0]))
+
+    _test_helper_embedding_net(prior, xo, simulator, net)
+
+
+@pytest.mark.parametrize("seq_length", (10, 20))
+def test_transformer_embedding_scalar_timeseries(seq_length):
+    net = TransformerEmbedding(
+        pos_emb="rotary",
+        feature_space_dim=32,
+        num_attention_heads=4,
+        num_key_value_heads=4,
+        vit=False,
+        head_dim=None,
+        intermediate_size=64,
+        num_hidden_layers=2,
+        attention_dropout=0.1,
+    )
+
+    def simulator(theta):
+        batch = theta.shape[0]
+        return torch.randn(batch, seq_length) + theta[:, 0:1]
+
+    xo = torch.randn(1, seq_length)  # shape: (1, T)
+    prior = MultivariateNormal(torch.zeros(1), torch.eye(1))
 
     _test_helper_embedding_net(prior, xo, simulator, net)
 
