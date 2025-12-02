@@ -3,11 +3,9 @@
 
 from __future__ import annotations
 
-import sys
 from dataclasses import asdict
 
 import numpy as np
-import pymc
 import pytest
 import torch
 from torch import eye, ones, zeros
@@ -193,13 +191,7 @@ def test_c2st_pymc_sampler_on_Gaussian(
     (
         "nuts_pyro",
         "hmc_pyro",
-        pytest.param(
-            "nuts_pymc",
-            marks=pytest.mark.skipif(
-                condition=sys.version_info >= (3, 10) and pymc.__version__ >= "5.20.1",
-                reason="Inconsistent behaviour with pymc>=5.20.1 and python>=3.10",
-            ),
-        ),
+        "nuts_pymc",
         "hmc_pymc",
         "slice_pymc",
         "slice_np",

@@ -3,10 +3,8 @@
 
 from __future__ import annotations
 
-import sys
 from dataclasses import asdict
 
-import pymc
 import pytest
 from pyro.infer.mcmc import MCMC
 from torch import Tensor, eye, zeros
@@ -30,13 +28,7 @@ from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
         "slice_np_vectorized",
         "nuts_pyro",
         "hmc_pyro",
-        pytest.param(
-            "nuts_pymc",
-            marks=pytest.mark.skipif(
-                condition=sys.version_info >= (3, 10) and pymc.__version__ >= "5.20.1",
-                reason="Inconsistent behaviour with pymc>=5.20.1 and python>=3.10",
-            ),
-        ),
+        "nuts_pymc",
         "hmc_pymc",
         "slice_pymc",
     ),
