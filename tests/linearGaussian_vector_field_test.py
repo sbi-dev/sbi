@@ -34,6 +34,8 @@ from sbi.utils import BoxUniform
 from sbi.utils.metrics import check_c2st
 from sbi.utils.user_input_checks import process_simulator
 
+from .test_utils import get_dkl_gaussian_prior
+
 IID_METHODS = ["fnpe", "gauss", "auto_gauss", "jac_gauss"]
 NUM_DIM = [1, 2, 3]
 NUM_TRIAL = [1, 3, 8, 16]
@@ -392,6 +394,28 @@ def test_vector_field_map(vector_field_trained_model):
         .map(show_progress_bars=True, num_iter=5)
     )
     assert ((map_ - gt_posterior.mean) ** 2).sum() < 0.5, "MAP is not close to GT."
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize(
+    "vector_field_trained_model", training_test_cases_gaussian, indirect=True, ids=str
+)
+def test_kld_gaussian(vector_field_trained_model):
+    # For the Gaussian prior, we compute the KLd between ground truth and
+    # posterior.
+    inference, score_estimator, test_case = vector_field_trained_model
+    x_o = zeros(1, test_case.num_dim)
+    posterior = _build_posterior(inference, score_estimator, x_o)
+    dkl = get_dkl_gaussian_prior(
+        posterior,
+        x_o[0],
+        test_case.likelihood_shift,
+        test_case.likelihood_cov,
+        test_case.prior_mean,
+        test_case.prior_cov,
+    )
+    max_dkl = 0.15
+    assert dkl < max_dkl, f"D-KL={dkl} is more than 2std above the average performance."
 
 
 # NOTE: Using a function with explicit caching instead of a parametrized fixture here to
