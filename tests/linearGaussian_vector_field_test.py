@@ -28,7 +28,6 @@ from sbi.inference.posteriors.posterior_parameters import VectorFieldPosteriorPa
 from sbi.neural_nets.factory import posterior_flow_nn
 from sbi.simulators import linear_gaussian
 from sbi.simulators.linear_gaussian import (
-    samples_true_posterior_linear_gaussian_mvn_prior_different_dims,
     samples_true_posterior_linear_gaussian_uniform_prior,
     true_posterior_linear_gaussian_mvn_prior,
 )
@@ -42,6 +41,7 @@ NUM_TRIAL = [1, 3, 8, 16]
 PRIOR_TYPE = ["gaussian", "uniform", None]
 SAMPLING_METHODS = ["sde", "ode"]
 SDE_TYPE = ["vp", "ve", "subvp", "fmpe"]
+VF_ESTIMATOR = ["mlp", "ada_mlp", "transformer"]
 
 
 @dataclass(frozen=True)
@@ -51,9 +51,13 @@ class VectorFieldTrainingTestCase:
     num_dim: int
     prior_type: Optional[str]
     vector_field_type: Literal["vp", "ve", "subvp", "fmpe"]
+    vf_estimator: Literal["mlp", "ada_mlp", "transformer"]
 
     def __str__(self):
-        return f"{self.prior_type}_prior-dim_{self.num_dim}-{self.vector_field_type}"
+        return (
+            f"{self.prior_type}_prior-dim_{self.num_dim}-{self.vector_field_type}"
+            f"-{self.vf_estimator}"
+        )
 
     @property
     def likelihood_shift(self):
@@ -139,24 +143,32 @@ class VectorFieldSamplingTestCase:
 
 
 training_test_cases_gaussian = [
-    VectorFieldTrainingTestCase(1, "gaussian", "vp"),
-    VectorFieldTrainingTestCase(1, "gaussian", "ve"),
-    VectorFieldTrainingTestCase(1, "gaussian", "fmpe"),
-    VectorFieldTrainingTestCase(2, "gaussian", "ve"),
-    VectorFieldTrainingTestCase(2, "gaussian", "vp"),
-    VectorFieldTrainingTestCase(2, "gaussian", "subvp"),
-    VectorFieldTrainingTestCase(2, "gaussian", "fmpe"),
+    VectorFieldTrainingTestCase(1, "gaussian", "vp", 'mlp'),
+    VectorFieldTrainingTestCase(1, "gaussian", "ve", 'mlp'),
+    VectorFieldTrainingTestCase(1, "gaussian", "fmpe", 'mlp'),
+    VectorFieldTrainingTestCase(2, "gaussian", "ve", 'mlp'),
+    VectorFieldTrainingTestCase(2, "gaussian", "vp", 'mlp'),
+    VectorFieldTrainingTestCase(2, "gaussian", "subvp", 'mlp'),
+    VectorFieldTrainingTestCase(2, "gaussian", "fmpe", 'mlp'),
 ]
 
 training_test_cases_uniform = [
-    VectorFieldTrainingTestCase(2, "uniform", "ve"),
-    VectorFieldTrainingTestCase(2, "uniform", "vp"),
-    VectorFieldTrainingTestCase(2, "uniform", "subvp"),
-    VectorFieldTrainingTestCase(2, "uniform", "fmpe"),
-    VectorFieldTrainingTestCase(3, "uniform", "ve"),
-    VectorFieldTrainingTestCase(3, "uniform", "vp"),
-    VectorFieldTrainingTestCase(3, "uniform", "subvp"),
-    VectorFieldTrainingTestCase(3, "uniform", "fmpe"),
+    VectorFieldTrainingTestCase(2, "uniform", "ve", 'mlp'),
+    VectorFieldTrainingTestCase(2, "uniform", "vp", 'mlp'),
+    VectorFieldTrainingTestCase(2, "uniform", "subvp", 'mlp'),
+    VectorFieldTrainingTestCase(2, "uniform", "fmpe", 'mlp'),
+    VectorFieldTrainingTestCase(3, "uniform", "ve", 'mlp'),
+    VectorFieldTrainingTestCase(3, "uniform", "vp", 'mlp'),
+    VectorFieldTrainingTestCase(3, "uniform", "subvp", 'mlp'),
+    VectorFieldTrainingTestCase(3, "uniform", "fmpe", 'mlp'),
+    VectorFieldTrainingTestCase(3, "uniform", "ve", 'ada_mlp'),
+    VectorFieldTrainingTestCase(3, "uniform", "vp", 'ada_mlp'),
+    VectorFieldTrainingTestCase(3, "uniform", "subvp", 'ada_mlp'),
+    VectorFieldTrainingTestCase(3, "uniform", "fmpe", 'ada_mlp'),
+    VectorFieldTrainingTestCase(3, "uniform", "ve", 'transformer'),
+    VectorFieldTrainingTestCase(3, "uniform", "vp", 'transformer'),
+    VectorFieldTrainingTestCase(3, "uniform", "subvp", 'transformer'),
+    VectorFieldTrainingTestCase(3, "uniform", "fmpe", 'transformer'),
 ]
 
 training_test_cases_all = training_test_cases_gaussian + training_test_cases_uniform
@@ -191,8 +203,10 @@ def _get_regression_cases() -> List[
     :return: list of combinations of training and sampling test cases
     """
     all_train = [
-        VectorFieldTrainingTestCase(num_dim, prior_type, sde_type)  # type: ignore
-        for num_dim, prior_type, sde_type in product(NUM_DIM, PRIOR_TYPE, SDE_TYPE)
+        VectorFieldTrainingTestCase(num_dim, prior_type, sde_type, estimator)  # type: ignore
+        for num_dim, prior_type, sde_type, estimator in product(
+            NUM_DIM, PRIOR_TYPE, SDE_TYPE, VF_ESTIMATOR
+        )
     ]
     all_sample = [
         VectorFieldSamplingTestCase(iid_method, sampling_method, num_trials)
@@ -349,113 +363,13 @@ def test_c2st(
     check_c2st(
         npse_samples,
         test_case.get_target_samples(npse_samples.shape[0], x_o),
-        alg=f"vector_field-{test_case.vector_field_type or 'vp'}-{test_case.prior_type}"
-        f"-{test_case.num_dim}D-{sampling_test_case.sampling_method}",
+        alg=f"vector_field-{test_case.vector_field_type or 'vp'}"
+        f"-{test_case.vector_field_type}"
+        f"-{test_case.prior_type}"
+        f"-{test_case.num_dim}D"
+        f"-{sampling_test_case.sampling_method}",
         tol=0.05 * min(sampling_test_case.num_trials, 8),
     )
-
-
-@pytest.mark.parametrize("vector_field_type", [NPSE, FMPE])
-def test_c2st_vector_field_on_linearGaussian_different_dims(vector_field_type):
-    """Test NPE on linear Gaussian with different theta and x dimensionality."""
-
-    theta_dim = 3
-    x_dim = 2
-    discard_dims = theta_dim - x_dim
-
-    x_o = zeros(1, x_dim)
-    num_samples = 1000
-    num_simulations = 2000
-
-    # likelihood_mean will be likelihood_shift+theta
-    likelihood_shift = -1.0 * ones(x_dim)
-    likelihood_cov = 0.3 * eye(x_dim)
-
-    prior_mean = zeros(theta_dim)
-    prior_cov = eye(theta_dim)
-    prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
-    target_samples = samples_true_posterior_linear_gaussian_mvn_prior_different_dims(
-        x_o,
-        likelihood_shift,
-        likelihood_cov,
-        prior_mean,
-        prior_cov,
-        num_discarded_dims=discard_dims,
-        num_samples=num_samples,
-    )
-
-    def simulator(theta):
-        return linear_gaussian(
-            theta,
-            likelihood_shift,
-            likelihood_cov,
-            num_discarded_dims=discard_dims,
-        )
-
-    # Test whether prior can be `None`.
-    inference = vector_field_type(prior=None)
-
-    theta = prior.sample((num_simulations,))
-    x = simulator(theta)
-
-    # Test whether we can stop and resume.
-    inference.append_simulations(theta, x).train()
-    posterior = inference.build_posterior().set_default_x(x_o)
-    samples = posterior.sample((num_samples,))
-
-    # Compute the c2st and assert it is near chance level of 0.5.
-    check_c2st(
-        samples,
-        target_samples,
-        alg=f"{vector_field_type.__name__}_different_dims_and_resume_training",
-    )
-
-
-@pytest.mark.parametrize("vector_field_type", [NPSE, FMPE])
-@pytest.mark.parametrize(
-    "model", ["mlp", "ada_mlp", pytest.param("transformer", marks=[pytest.mark.slow])]
-)
-def test_vfinference_with_different_models(vector_field_type, model):
-    """Test fmpe with different vector field estimators on linear Gaussian."""
-
-    theta_dim = 3
-    x_dim = 3
-
-    x_o = zeros(1, x_dim)
-    num_samples = 1000
-    num_simulations = 2500
-
-    # likelihood_mean will be likelihood_shift+theta
-    likelihood_shift = -1.0 * ones(x_dim)
-    likelihood_cov = 0.9 * eye(x_dim)
-
-    prior_mean = zeros(theta_dim)
-    prior_cov = eye(theta_dim)
-
-    prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
-    gt_posterior = true_posterior_linear_gaussian_mvn_prior(
-        x_o, likelihood_shift, likelihood_cov, prior_mean, prior_cov
-    )
-    target_samples = gt_posterior.sample((num_samples,))
-
-    theta = prior.sample((num_simulations,))
-    x = linear_gaussian(theta, likelihood_shift, likelihood_cov)
-
-    estimator_build_fun = posterior_flow_nn(net=model)
-
-    inference = vector_field_type(prior, vf_estimator=estimator_build_fun)
-
-    inference.append_simulations(theta, x).train()
-    posterior = inference.build_posterior().set_default_x(x_o)
-    samples = posterior.sample((num_samples,))
-
-    # Compute the c2st and assert it is near chance level of 0.5.
-    check_c2st(samples, target_samples, alg=f"fmpe_{model}")
-
-
-# ------------------------------------------------------------------------------
-# -------------------------------- SLOW TESTS ----------------------------------
-# ------------------------------------------------------------------------------
 
 
 # NOTE: Using a function with explicit caching instead of a parametrized fixture here to
