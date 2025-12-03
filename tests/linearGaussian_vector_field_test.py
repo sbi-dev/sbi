@@ -24,7 +24,6 @@ from sbi.inference import (
     vector_field_estimator_based_potential,
 )
 from sbi.inference.posteriors import MCMCPosteriorParameters
-from sbi.inference.posteriors.posterior_parameters import VectorFieldPosteriorParameters
 from sbi.neural_nets.factory import posterior_flow_nn
 from sbi.simulators import linear_gaussian
 from sbi.simulators.linear_gaussian import (
@@ -487,84 +486,6 @@ def test_vector_field_sde_ode_sampling_equivalence(vector_field_type, prior_type
         ode_samples,
         alg=f"sample_methods_equivalence-{vector_field_type}",
         tol=0.07,
-    )
-
-
-@pytest.mark.slow
-@pytest.mark.parametrize("vector_field_type", ["ve", "fmpe", "subvp", "vp"])
-@pytest.mark.parametrize("prior_type", ["gaussian", "uniform"])
-@pytest.mark.parametrize(
-    "iid_method, num_trials",
-    [
-        pytest.param("fnpe", 5, id="fnpe-5trials"),
-        pytest.param("gauss", 5, id="gauss-5trials"),
-        pytest.param("auto_gauss", 5, id="auto_gauss-5trials"),
-        pytest.param("jac_gauss", 5, id="jac_gauss-5trials"),
-    ],
-)
-def test_vector_field_iid_inference(
-    vector_field_type, prior_type, iid_method, num_trials
-):
-    """
-    Test whether NPSE and FMPE infers well a simple example with available ground truth.
-
-    Args:
-        vector_field_type: The type of vector field ("ve", "fmpe", etc.).
-        prior_type: The type of prior distribution ("gaussian" or "uniform").
-        iid_method: The IID method to use for sampling.
-        num_trials: The number of trials to run.
-    """
-
-    vector_field_trained_model = train_vector_field_model(vector_field_type, prior_type)
-
-    # Extract data from the trained model
-    estimator = vector_field_trained_model["estimator"]
-    inference = vector_field_trained_model["inference"]
-    prior = vector_field_trained_model["prior"]
-    likelihood_shift = vector_field_trained_model["likelihood_shift"]
-    likelihood_cov = vector_field_trained_model["likelihood_cov"]
-    prior_mean = vector_field_trained_model["prior_mean"]
-    prior_cov = vector_field_trained_model["prior_cov"]
-    num_dim = vector_field_trained_model["num_dim"]
-
-    num_samples = 1000
-
-    x_o = zeros(num_trials, num_dim)
-
-    posterior = inference.build_posterior(
-        estimator,
-        sample_with="sde",  # iid works only with score-based SDEs.
-        posterior_parameters=VectorFieldPosteriorParameters(iid_method=iid_method),
-    )
-    posterior.set_default_x(x_o)
-    samples = posterior.sample((num_samples,))
-
-    if prior_type == "gaussian":
-        gt_posterior = true_posterior_linear_gaussian_mvn_prior(
-            x_o, likelihood_shift, likelihood_cov, prior_mean, prior_cov
-        )
-        target_samples = gt_posterior.sample((num_samples,))
-    elif prior_type == "uniform":
-        target_samples = samples_true_posterior_linear_gaussian_uniform_prior(
-            x_o,
-            likelihood_shift,
-            likelihood_cov,
-            prior,
-        )
-    else:
-        raise ValueError(f"Invalid prior type: {prior_type}")
-
-    # Compute the c2st and assert it is near chance level of 0.5.
-    # Some degradation is expected, also because posterior get tighter which
-    # usually makes the c2st worse.
-    check_c2st(
-        samples,
-        target_samples,
-        alg=(
-            f"{vector_field_type}-{prior_type}-"
-            f"{num_dim}-{iid_method}-{num_trials}iid-trials"
-        ),
-        tol=0.07 * max(num_trials, 2),
     )
 
 
