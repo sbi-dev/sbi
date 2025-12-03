@@ -372,6 +372,29 @@ def test_c2st(
     )
 
 
+@pytest.mark.slow
+@pytest.mark.parametrize(
+    "vector_field_trained_model", training_test_cases_gaussian, indirect=True, ids=str
+)
+def test_vector_field_map(vector_field_trained_model):
+    inference, score_estimator, test_case = vector_field_trained_model
+    x_o = zeros(1, test_case.num_dim)
+    gt_posterior = true_posterior_linear_gaussian_mvn_prior(
+        x_o,
+        test_case.likelihood_shift,
+        test_case.likelihood_cov,
+        test_case.prior_mean,
+        test_case.prior_cov,
+    )
+
+    map_ = (
+        inference.build_posterior()
+        .set_default_x(x_o)
+        .map(show_progress_bars=True, num_iter=5)
+    )
+    assert ((map_ - gt_posterior.mean) ** 2).sum() < 0.5, "MAP is not close to GT."
+
+
 # NOTE: Using a function with explicit caching instead of a parametrized fixture here to
 # make the test cases below more readable and maintainable.
 
@@ -543,42 +566,6 @@ def test_vector_field_iid_inference(
         ),
         tol=0.07 * max(num_trials, 2),
     )
-
-
-@pytest.mark.slow
-@pytest.mark.parametrize("vector_field_type", ["npse", "fmpe"])
-def test_vector_field_map(vector_field_type):
-    num_dim = 2
-    x_o = zeros(num_dim)
-    num_simulations = 3000
-
-    # likelihood_mean will be likelihood_shift+theta
-    likelihood_shift = -1.0 * ones(num_dim)
-    likelihood_cov = 0.3 * eye(num_dim)
-
-    prior_mean = zeros(num_dim)
-    prior_cov = eye(num_dim)
-    prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
-    gt_posterior = true_posterior_linear_gaussian_mvn_prior(
-        x_o, likelihood_shift, likelihood_cov, prior_mean, prior_cov
-    )
-
-    if vector_field_type == "npse":
-        inference = NPSE(prior, show_progress_bars=True)
-    elif vector_field_type == "fmpe":
-        inference = FMPE(prior, show_progress_bars=True)
-    else:
-        raise ValueError(f"Invalid vector field type: {vector_field_type}")
-
-    theta = prior.sample((num_simulations,))
-    x = linear_gaussian(theta, likelihood_shift, likelihood_cov)
-
-    inference.append_simulations(theta, x).train(max_num_epochs=100)
-    posterior = inference.build_posterior().set_default_x(x_o)
-
-    map_ = posterior.map(show_progress_bars=True, num_iter=5)
-
-    assert ((map_ - gt_posterior.mean) ** 2).sum() < 0.5, "MAP is not close to GT."
 
 
 # TODO: Need to add NPSE when the network builders are unified, but anyway
