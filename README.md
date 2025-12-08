@@ -136,7 +136,7 @@ You can also access and run these tutorials directly in your browser by opening
 “Code” button on the GitHub repository and select “Open with Codespaces.” This provides
 a fully functional environment where you can explore `sbi` through Jupyter notebooks.
 
-You might also find this tutorial paper useful: [Deistler, M., Boelts, J., Steinbach, P., Moss, G., Moreau, T., Gloeckler, M., ... & Macke, J. H. (2025). Simulation-based inference: A practical guide. arXiv preprint arXiv:2508.12939.](https://arxiv.org/abs/2508.12939). It describes the SBI workflow and offer practical guidelines and diagnostic tools for every stage of the process---from setting up the simulator and prior, choosing and training inference networks, to performing inference and validating the results, and also includes several worked examples.
+You might also find this tutorial paper useful: [Deistler, M., Boelts, J., Steinbach, P., Moss, G., Moreau, T., Gloeckler, M., ... & Macke, J. H. (2025). Simulation-based inference: A practical guide. arXiv preprint arXiv:2508.12939.](https://arxiv.org/abs/2508.12939). It describes the SBI workflow and offers practical guidelines and diagnostic tools for every stage of the process: from setting up the simulator and prior, choosing and training inference networks, to performing inference and validating the results. It also includes several worked examples.
 
 ## Inference Algorithms
 
