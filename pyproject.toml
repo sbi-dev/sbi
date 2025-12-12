@@ -32,7 +32,6 @@ dependencies = [
     "arviz",
     "joblib>=1.0.0",
     "matplotlib",
-    "notebook <= 6.4.12",
     "numpy",
     "pillow",
     "pyknos>=0.16.0",
@@ -48,7 +47,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+notebook = ["notebook<=6.4.12"]
 doc = [
+    "sbi[notebook]",
     # Documentation
     "ipython <= 8.9.0",
     "jupyter_contrib_nbextensions",
