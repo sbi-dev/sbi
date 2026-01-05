@@ -17,7 +17,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.0">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
     
     
       
@@ -25,7 +25,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.618322db.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -868,7 +868,7 @@
 
 <h3 id="evaluate-the-posterior-estimator">Evaluate the posterior estimator<a class="headerlink" href="#evaluate-the-posterior-estimator" title="Permanent link">&para;</a></h3>
 <p>We choose to evaluate the posterior estimator at three different observations, simulated from parameters independently sampled from the prior: 
-<span class="arithmatex">\(<span class="arithmatex">\(\theta^\star_i \sim p(\theta) \quad \rightarrow \quad x^\star_i \sim p(x\mid \theta_i), \quad i=1,2,3~.\)</span>\)</span></p>
+$<span class="arithmatex">\(\theta^\star_i \sim p(\theta) \quad \rightarrow \quad x^\star_i \sim p(x\mid \theta_i), \quad i=1,2,3~.\)</span>$</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sbi.simulators.gaussian_mixture</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">samples_true_posterior_gaussian_mixture_uniform_prior</span><span class="p">,</span>
 <span class="p">)</span>
@@ -921,7 +921,7 @@
 <h4 id="quantitative-diagnostics">Quantitative diagnostics<a class="headerlink" href="#quantitative-diagnostics" title="Permanent link">&para;</a></h4>
 <p>We here compute the test statistics and p-values for three different observations <code>x_o</code> (as mentioned above, this is done in an amortized way without having to retrain the classifiers). </p>
 <blockquote>
-<p>Note: The p-value associated to the test corresponds to the proportion of times the L-C2ST statistic under the null hypothesis <span class="arithmatex">\(\{T_h\}_{h=1}^H\)</span> is greater than the L-C2ST statistic <span class="arithmatex">\(T_\mathrm{o}\)</span> at the observation <code>x_o</code>. It is computed by taking the empirical mean over statistics computed on several trials under the null hypothesis: <span class="arithmatex">\(<span class="arithmatex">\(\text{p-value}(x_\mathrm{o}) = \frac{1}{H} \sum_{h=1}^{H} I(T_h &lt; T_o)~.\)</span>\)</span></p>
+<p>Note: The p-value associated to the test corresponds to the proportion of times the L-C2ST statistic under the null hypothesis <span class="arithmatex">\(\{T_h\}_{h=1}^H\)</span> is greater than the L-C2ST statistic <span class="arithmatex">\(T_\mathrm{o}\)</span> at the observation <code>x_o</code>. It is computed by taking the empirical mean over statistics computed on several trials under the null hypothesis: $<span class="arithmatex">\(\text{p-value}(x_\mathrm{o}) = \frac{1}{H} \sum_{h=1}^{H} I(T_h &lt; T_o)~.\)</span>$</p>
 </blockquote>
 <div class="highlight"><pre><span></span><code><span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="nb">len</span><span class="p">(</span><span class="n">thetas_star</span><span class="p">),</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">12</span><span class="p">,</span><span class="mi">3</span><span class="p">))</span>
 <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">thetas_star</span><span class="p">)):</span>
@@ -1119,7 +1119,7 @@ Following Theorem 4 of <a href="https://arxiv.org/abs/2306.03580">[Linhart et al
 - no permutation method is used inside <code>train_under_null_hypothesis</code></p>
 <blockquote>
 <p>Note: <strong>Quick reminder on Normalizing Flows.</strong> We consider a <strong>conditional Normalizing Flow</strong> <span class="arithmatex">\(q_{\phi}(\theta \mid x)\)</span> with base distribution <span class="arithmatex">\(p(z) = \mathcal{N}(0,\mathbf{1}_m)\)</span> and bijective transormation <span class="arithmatex">\(T_{\phi}(.; x)\)</span> defined on <span class="arithmatex">\(\mathbb{R}^2\)</span> and for all <span class="arithmatex">\(x \in \mathbb{R}^2\)</span> for our example problem in 2D. Sampling from the normalizing flow consists of applying the forward transformation <span class="arithmatex">\(T_\phi\)</span>:
-<span class="arithmatex">\(<span class="arithmatex">\(\theta = T_{\phi}(z; x) \sim q_{\phi}(\theta \mid x), \quad z\sim p(z)~.\)</span>\)</span>
+$<span class="arithmatex">\(\theta = T_{\phi}(z; x) \sim q_{\phi}(\theta \mid x), \quad z\sim p(z)~.\)</span>$
 <strong>Characterization of the null hypothesis.</strong> Comparing the estimated and true posterior distributions is equivalent to comparing the base distribution to the inversely transformed prior samples: 
 $$ p(\theta \mid x) = q_{\phi}(\theta \mid x) \iff p(T_{\phi}^{-1}(\theta; x)\mid x) = p(T_{\phi}^{-1}(T_{\phi}(z; x); x)) = p(z) = \mathcal{N}(0,\mathbf{1}_m)$$</p>
 </blockquote>
@@ -1354,10 +1354,10 @@ $$ p(\theta \mid x) = q_{\phi}(\theta \mid x) \iff p(T_{\phi}^{-1}(\theta; x)\mi
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy"], "search": "../../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.e71a0d61.min.js"></script>
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
         <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-MML-AM_CHTML"></script>
       
