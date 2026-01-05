@@ -481,58 +481,68 @@ def test_z_score_parser(z_x, z_theta):
         "transform_to_unconstrained",
     ],
 )
-@pytest.mark.parametrize("builder", [likelihood_nn, posterior_nn, classifier_nn])
-def test_z_scoring_structured(z_x, z_theta, builder):
-    """
-    Test that z-scoring string args don't break API.
-    """
-    # Generate some signals for test.
-    t = torch.arange(0, 1, 0.1)
-    x_sin = torch.sin(t * 2 * torch.pi * 5)
-    t_batch = torch.stack([(x_sin * (i + 1)) + (i * 2) for i in range(10)])
+@pytest.mark.parametrize("build_fn", [likelihood_nn, posterior_nn, classifier_nn])
+def test_z_scoring_structured(z_x, z_theta, build_fn):
+    """Test z-scoring args across architectures and ensure correct input shapes."""
+    batch_dim, num_dim = 10, 3
+    dist = BoxUniform(low=-2 * torch.ones(num_dim), high=2 * torch.ones(num_dim))
+    theta = dist.sample((batch_dim,))
+    x = dist.sample((batch_dim,))
 
-    num_dim = t_batch.shape[1]
-    x_dist = BoxUniform(low=-2 * torch.ones(num_dim), high=2 * torch.ones(num_dim))
+    models = [
+        "mdn",
+        "made",
+        "maf",
+        "nsf",
+        "zuko_nice",
+        "zuko_nsf",
+        "zuko_maf",
+        "zuko_ncsf",
+        "zuko_bpf",
+        "maf_rqs",
+        "zuko_sospf",
+        "zuko_naf",
+        "zuko_unaf",
+        "zuko_gf",
+    ]
 
-    # API tests
-    # TODO: Test breaks at "mnle"
-    if builder in [likelihood_nn, posterior_nn]:
-        for model in [
-            "mdn",
-            "made",
-            "maf",
-            "nsf",
-            "zuko_nice",
-            "zuko_nsf",
-            "zuko_maf",
-            "zuko_ncsf",
-            "zuko_bpf",
-            "maf_rqs",
-            "zuko_sospf",
-            "zuko_naf",
-            "zuko_unaf",
-            "zuko_gf",
-        ]:
-            net = builder(
-                model,
-                z_score_theta=z_theta,
-                z_score_x=z_x,
-                hidden_features=2,
-                num_transforms=1,
-                x_dist=x_dist,
+    if build_fn == likelihood_nn:
+        models.append("mnle")
+    elif build_fn == classifier_nn:
+        models = ["linear", "mlp", "resnet"]
+
+    for model in models:
+        if model == "mnle":
+            x_cont, x_disc = x[:, :-1], torch.randint(0, 2, (batch_dim, 1)).float()
+            model_x = torch.cat([x_cont, x_disc], dim=1)
+        else:
+            model_x = x
+
+        kwargs = {
+            "model": model,
+            "z_score_theta": z_theta,
+            "z_score_x": z_x,
+            "hidden_features": 8,
+        }
+        if build_fn in [likelihood_nn, posterior_nn]:
+            kwargs.update({"x_dist": dist, "num_transforms": 1})
+
+        build_fun = build_fn(**kwargs)
+        estimator = build_fun(theta, model_x)
+
+        if build_fn == posterior_nn:
+            assert estimator.log_prob(theta.unsqueeze(0), model_x).shape == (
+                1,
+                batch_dim,
             )
-            assert net(t_batch, t_batch)
-    else:
-        for model in ["linear", "mlp", "resnet"]:
-            net = builder(
-                model,
-                z_score_theta=z_theta,
-                z_score_x=z_x,
-                hidden_features=2,
+        elif build_fn == likelihood_nn:
+            assert estimator.log_prob(model_x.unsqueeze(0), theta).shape == (
+                1,
+                batch_dim,
             )
-            assert net(t_batch, t_batch)
+        else:
+            assert estimator(theta, model_x).shape[0] == batch_dim
 
-    # Test that it doesn't break what doesn't use structured z-scoring.
     assert sensitivity_analysis.Destandardize(0, 1)
 
     # # Uncomment to plot the generated signal.
