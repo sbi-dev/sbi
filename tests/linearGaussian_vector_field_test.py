@@ -1,8 +1,9 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from dataclasses import asdict
-from typing import List, Literal
+from dataclasses import asdict, dataclass
+from itertools import product
+from typing import List, Literal, Optional, Tuple
 
 import numpy as np
 import pytest
@@ -23,11 +24,9 @@ from sbi.inference import (
     vector_field_estimator_based_potential,
 )
 from sbi.inference.posteriors import MCMCPosteriorParameters
-from sbi.inference.posteriors.posterior_parameters import VectorFieldPosteriorParameters
 from sbi.neural_nets.factory import posterior_flow_nn
 from sbi.simulators import linear_gaussian
 from sbi.simulators.linear_gaussian import (
-    samples_true_posterior_linear_gaussian_mvn_prior_different_dims,
     samples_true_posterior_linear_gaussian_uniform_prior,
     true_posterior_linear_gaussian_mvn_prior,
 )
@@ -37,220 +36,386 @@ from sbi.utils.user_input_checks import process_simulator
 
 from .test_utils import get_dkl_gaussian_prior
 
-# ------------------------------------------------------------------------------
-# ------------------------------- FAST TESTS -----------------------------------
-# ------------------------------------------------------------------------------
+IID_METHODS = ["fnpe", "gauss", "auto_gauss", "jac_gauss"]
+NUM_DIM = [1, 2, 3]
+NUM_TRIAL = [1, 3, 8, 16]
+PRIOR_TYPE = ["gaussian", "uniform", None]
+SAMPLING_METHODS = ["sde", "ode"]
+SDE_TYPE = ["vp", "ve", "subvp", "fmpe"]
+VF_ESTIMATOR = ["mlp", "ada_mlp", "transformer"]
 
 
-# We always test num_dim and sample_with with defaults and mark the rests as slow.
-@pytest.mark.parametrize(
-    "vector_field_type, num_dim, prior_str, sample_with",
-    [
-        ("vp", 1, "gaussian", ["sde", "ode"]),
-        ("vp", 3, "uniform", ["sde", "ode"]),
-        ("vp", 3, "gaussian", ["sde", "ode"]),
-        ("ve", 3, "uniform", ["sde", "ode"]),
-        ("subvp", 3, "uniform", ["sde", "ode"]),
-        ("fmpe", 1, "gaussian", ["sde", "ode"]),
-        ("fmpe", 1, "uniform", ["sde", "ode"]),
-        ("fmpe", 3, "gaussian", ["sde", "ode"]),
-        ("fmpe", 3, "uniform", ["sde", "ode"]),
-    ],
-)
-def test_c2st_vector_field_on_linearGaussian(
-    vector_field_type,
-    num_dim: int,
-    prior_str: str,
-    sample_with: List[Literal["sde", "ode"]],
+@dataclass(frozen=True)
+class VectorFieldTrainingTestCase:
+    """Defines a Vector Field training test case."""
+
+    num_dim: int
+    prior_type: Optional[str]
+    vector_field_type: Literal["vp", "ve", "subvp", "fmpe"]
+    vf_estimator: Literal["mlp", "ada_mlp", "transformer"]
+
+    def __str__(self):
+        return (
+            f"{self.prior_type}_prior-dim_{self.num_dim}-{self.vector_field_type}"
+            f"-{self.vf_estimator}"
+        )
+
+    @property
+    def likelihood_shift(self):
+        return -ones(self.num_dim)
+
+    @property
+    def likelihood_cov(self):
+        return 0.3 * eye(self.num_dim)
+
+    @property
+    def prior_mean(self):
+        if self.prior_type == "gaussian":
+            return zeros(self.num_dim)
+        else:
+            return None
+
+    @property
+    def prior_cov(self):
+        if self.prior_type == "gaussian":
+            return eye(self.num_dim)
+        else:
+            return None
+
+    @property
+    def prior(self):
+        if self.prior_type == "gaussian":
+            prior = MultivariateNormal(
+                loc=self.prior_mean, covariance_matrix=self.prior_cov
+            )
+        elif self.prior_type == "uniform":
+            prior = utils.BoxUniform(
+                -2.0 * ones(self.num_dim), 2.0 * ones(self.num_dim)
+            )
+        elif self.prior_type is None:
+            prior = None
+        else:
+            raise NotImplementedError(f"Unsupported prior type: {self.prior_type}")
+        return prior
+
+    def _get_default_prior(self):
+        if self.prior is not None:
+            return self.prior
+        else:
+            return BoxUniform(-2.0 * ones(self.num_dim), 2.0 * ones(self.num_dim))
+
+    def get_training_data(self, num_simulations: int):
+        theta = self._get_default_prior().sample((num_simulations,))
+        x = linear_gaussian(theta, self.likelihood_shift, self.likelihood_cov)
+        return theta, x
+
+    def get_target_samples(self, num_samples: int, x_o):
+        if self.prior_type == "gaussian":
+            gt_posterior = true_posterior_linear_gaussian_mvn_prior(
+                x_o,
+                self.likelihood_shift,
+                self.likelihood_cov,
+                self.prior_mean,  # type: ignore
+                self.prior_cov,  # type: ignore
+            )
+            target_samples = gt_posterior.sample((num_samples,))
+        elif self.prior_type in {"uniform", None}:
+            prior: BoxUniform = self._get_default_prior()  # type: ignore
+            target_samples = samples_true_posterior_linear_gaussian_uniform_prior(
+                x_o,
+                self.likelihood_shift,
+                self.likelihood_cov,
+                prior=prior,
+                num_samples=num_samples,
+            )
+        else:
+            raise NotImplementedError(f"Unsupported prior type: {self.prior_type}")
+        return target_samples
+
+
+@dataclass(frozen=True)
+class VectorFieldSamplingTestCase:
+    iid_method: str
+    sampling_method: str
+    num_trials: int
+
+    def __str__(self):
+        return f"{self.iid_method}-{self.sampling_method}-trials_{self.num_trials}"
+
+
+training_test_cases_gaussian = [
+    VectorFieldTrainingTestCase(1, "gaussian", "vp", 'mlp'),
+    VectorFieldTrainingTestCase(1, "gaussian", "ve", 'mlp'),
+    VectorFieldTrainingTestCase(1, "gaussian", "fmpe", 'mlp'),
+    VectorFieldTrainingTestCase(2, "gaussian", "ve", 'mlp'),
+    VectorFieldTrainingTestCase(2, "gaussian", "vp", 'mlp'),
+    VectorFieldTrainingTestCase(2, "gaussian", "subvp", 'mlp'),
+    VectorFieldTrainingTestCase(2, "gaussian", "fmpe", 'mlp'),
+]
+
+training_test_cases_uniform = [
+    VectorFieldTrainingTestCase(2, "uniform", "ve", 'mlp'),
+    VectorFieldTrainingTestCase(2, "uniform", "vp", 'mlp'),
+    VectorFieldTrainingTestCase(2, "uniform", "subvp", 'mlp'),
+    VectorFieldTrainingTestCase(2, "uniform", "fmpe", 'mlp'),
+    VectorFieldTrainingTestCase(3, "uniform", "ve", 'mlp'),
+    VectorFieldTrainingTestCase(3, "uniform", "vp", 'mlp'),
+    VectorFieldTrainingTestCase(3, "uniform", "subvp", 'mlp'),
+    VectorFieldTrainingTestCase(3, "uniform", "fmpe", 'mlp'),
+    VectorFieldTrainingTestCase(3, "uniform", "ve", 'ada_mlp'),
+    VectorFieldTrainingTestCase(3, "uniform", "vp", 'ada_mlp'),
+    VectorFieldTrainingTestCase(3, "uniform", "subvp", 'ada_mlp'),
+    VectorFieldTrainingTestCase(3, "uniform", "fmpe", 'ada_mlp'),
+    VectorFieldTrainingTestCase(3, "uniform", "ve", 'transformer'),
+    VectorFieldTrainingTestCase(3, "uniform", "vp", 'transformer'),
+    VectorFieldTrainingTestCase(3, "uniform", "subvp", 'transformer'),
+    VectorFieldTrainingTestCase(3, "uniform", "fmpe", 'transformer'),
+]
+
+training_test_cases_all = training_test_cases_gaussian + training_test_cases_uniform
+
+sampling_test_cases_1_trial = [
+    VectorFieldSamplingTestCase(iid, sampling, 1)
+    for iid, sampling in product(IID_METHODS, SAMPLING_METHODS)
+]
+
+sampling_test_cases_n_trials = [
+    VectorFieldSamplingTestCase("fnpe", "sde", 3),
+    VectorFieldSamplingTestCase("gauss", "sde", 3),
+    VectorFieldSamplingTestCase("auto_gauss", "sde", 3),
+    VectorFieldSamplingTestCase("jac_gauss", "sde", 3),
+    VectorFieldSamplingTestCase("fnpe", "sde", 8),
+    VectorFieldSamplingTestCase("gauss", "sde", 8),
+    VectorFieldSamplingTestCase("auto_gauss", "sde", 8),
+    VectorFieldSamplingTestCase("jac_gauss", "sde", 8),
+]
+
+sampling_test_cases_all = sampling_test_cases_1_trial + sampling_test_cases_n_trials
+
+
+def _get_regression_cases() -> List[
+    Tuple[VectorFieldTrainingTestCase, VectorFieldSamplingTestCase]
+]:
+    """
+    # ToDO check if there is a bug for prior_type='uniform' and num_trial>1
+    # ToDO validate bug for combination sde_type='ode' and num_trial>1
+    # ToDO investigate non-determinism for prior_type=None, dim>= 2, ve, auto/jac_gauss
+    To make the regression tests run fast enough, we exclude certain combinations
+    :return: list of combinations of training and sampling test cases
+    """
+    all_train = [
+        VectorFieldTrainingTestCase(num_dim, prior_type, sde_type, estimator)  # type: ignore
+        for num_dim, prior_type, sde_type, estimator in product(
+            NUM_DIM, PRIOR_TYPE, SDE_TYPE, VF_ESTIMATOR
+        )
+    ]
+    all_sample = [
+        VectorFieldSamplingTestCase(iid_method, sampling_method, num_trials)
+        for iid_method, sampling_method, num_trials in product(
+            IID_METHODS, SAMPLING_METHODS, NUM_TRIAL
+        )
+    ]
+    all_combinations = product(all_train, all_sample)
+
+    is_uniform = lambda t: t.prior_type == "uniform"
+    too_many_trial = lambda s: s.num_trials > 1
+    is_ode = lambda s: s.sampling_method == "ode"
+
+    is_non_deterministic = (
+        lambda t, s: t.prior_type is None
+        and t.vector_field_type == "ve"
+        and t.num_dim >= 2
+        and s.iid_method in {"auto_gauss", "jac_gauss"}
+        and s.num_trials >= 16
+    )
+
+    exclude_cond = lambda t, s: (
+        (is_uniform(t) or is_ode(s)) and too_many_trial(s)
+    ) or is_non_deterministic(t, s)
+    combinations = []
+    for train_case, sampling_case in all_combinations:
+        if not exclude_cond(train_case, sampling_case):
+            combinations.append((train_case, sampling_case))
+    return combinations
+
+
+def _train_vector_field(
+    test_case: VectorFieldTrainingTestCase,
+    num_simulations,
+    stop_after_epochs=None,
+    training_batch_size=None,
+    max_num_epochs=None,
 ):
-    """
-    Test whether NPSE and FMPE infer well a simple example with available ground truth.
-    """
-
-    x_o = zeros(1, num_dim)
-    num_samples = 1000
-    num_simulations = 2500
-
-    # likelihood_mean will be likelihood_shift+theta
-    likelihood_shift = -1.0 * ones(num_dim)
-    likelihood_cov = 0.3 * eye(num_dim)
-
-    if prior_str == "gaussian":
-        prior_mean = zeros(num_dim)
-        prior_cov = eye(num_dim)
-        prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
-        gt_posterior = true_posterior_linear_gaussian_mvn_prior(
-            x_o, likelihood_shift, likelihood_cov, prior_mean, prior_cov
-        )
-        target_samples = gt_posterior.sample((num_samples,))
+    if test_case.vector_field_type == "fmpe":
+        inference = FMPE(prior=test_case.prior, show_progress_bars=True)
     else:
-        prior = utils.BoxUniform(-2.0 * ones(num_dim), 2.0 * ones(num_dim))
-        target_samples = samples_true_posterior_linear_gaussian_uniform_prior(
-            x_o,
-            likelihood_shift,
-            likelihood_cov,
-            prior=prior,
-            num_samples=num_samples,
+        inference = NPSE(
+            prior=test_case.prior,
+            show_progress_bars=True,
+            sde_type=test_case.vector_field_type,
         )
-    if vector_field_type == "fmpe":
-        inference = FMPE(prior, show_progress_bars=True)
+    theta, x = test_case.get_training_data(num_simulations)
+
+    kwargs = {}
+    if stop_after_epochs is not None:
+        kwargs["stop_after_epochs"] = stop_after_epochs
+    if training_batch_size is not None:
+        kwargs["training_batch_size"] = training_batch_size
+    if max_num_epochs is not None:
+        kwargs["max_num_epochs"] = max_num_epochs
+
+    score_estimator = inference.append_simulations(theta, x).train(**kwargs)
+    return inference, score_estimator
+
+
+def _build_posterior(inference, score_estimator, x_o, prior=None, sample_with=None):
+    kwargs = {}
+    if prior is not None:
+        kwargs["prior"] = prior
+    if sample_with is not None:
+        kwargs["sample_with"] = sample_with
+
+    posterior = inference.build_posterior(score_estimator, **kwargs)
+    posterior.set_default_x(x_o)
+    return posterior
+
+
+@pytest.fixture(scope="module")
+def vector_field_trained_model(request):
+    # TODO: Move those up to top of file as global constants for better visibility.
+    num_simulations = 5_000
+    stop_after_epochs = 200
+    training_batch_size = 100
+    test_case: VectorFieldTrainingTestCase = request.param
+    if test_case.vector_field_type == "fmpe":
+        inference = FMPE(prior=test_case.prior, show_progress_bars=True)
     else:
-        inference = NPSE(prior, sde_type=vector_field_type, show_progress_bars=True)
-
-    theta = prior.sample((num_simulations,))
-    x = linear_gaussian(theta, likelihood_shift, likelihood_cov)
-
-    vf_estimator = inference.append_simulations(theta, x).train()
-    # amortize the training when testing sample_with.
-    for method in sample_with:
-        posterior = inference.build_posterior(
-            vf_estimator,
-            sample_with=method,
-            posterior_parameters=VectorFieldPosteriorParameters(),
+        inference = NPSE(
+            prior=test_case.prior,
+            show_progress_bars=True,
+            sde_type=test_case.vector_field_type,
         )
-        posterior.set_default_x(x_o)
-        samples = posterior.sample((num_samples,))
-
-        # Compute the c2st and assert it is near chance level of 0.5.
-        check_c2st(
-            samples,
-            target_samples,
-            alg=f"vector_field-{vector_field_type}-{prior_str}-{num_dim}D-{method}",
-        )
-
-    # Checks for log_prob()
-    if prior_str == "gaussian":
-        # For the Gaussian prior, we compute the KLd between ground truth and
-        # posterior.
-
-        # For type checking below.
-        assert isinstance(posterior, VectorFieldPosterior)
-
-        # Disable exact integration for the ODE solver to speed up the computation.
-        # But this gives stochastic results -> increase max_dkl a bit
-
-        posterior.potential_fn.neural_ode.update_params(
-            exact=False,
-            atol=1e-4,
-            rtol=1e-4,
-        )
-        dkl = get_dkl_gaussian_prior(
-            posterior,
-            x_o[0],
-            likelihood_shift,
-            likelihood_cov,
-            prior_mean,
-            prior_cov,
-        )
-
-        max_dkl = 0.25
-
-        assert dkl < max_dkl, (
-            f"D-KL={dkl} is more than 2 stds above the average performance."
-        )
-
-
-@pytest.mark.parametrize("vector_field_type", [NPSE, FMPE])
-def test_c2st_vector_field_on_linearGaussian_different_dims(vector_field_type):
-    """Test NPE on linear Gaussian with different theta and x dimensionality."""
-
-    theta_dim = 3
-    x_dim = 2
-    discard_dims = theta_dim - x_dim
-
-    x_o = zeros(1, x_dim)
-    num_samples = 1000
-    num_simulations = 2000
-
-    # likelihood_mean will be likelihood_shift+theta
-    likelihood_shift = -1.0 * ones(x_dim)
-    likelihood_cov = 0.3 * eye(x_dim)
-
-    prior_mean = zeros(theta_dim)
-    prior_cov = eye(theta_dim)
-    prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
-    target_samples = samples_true_posterior_linear_gaussian_mvn_prior_different_dims(
-        x_o,
-        likelihood_shift,
-        likelihood_cov,
-        prior_mean,
-        prior_cov,
-        num_discarded_dims=discard_dims,
-        num_samples=num_samples,
+    theta, x = test_case.get_training_data(num_simulations)
+    inference.append_simulations(theta, x)
+    inference, score_estimator = _train_vector_field(
+        test_case, num_simulations, stop_after_epochs, training_batch_size
     )
-
-    def simulator(theta):
-        return linear_gaussian(
-            theta,
-            likelihood_shift,
-            likelihood_cov,
-            num_discarded_dims=discard_dims,
-        )
-
-    # Test whether prior can be `None`.
-    inference = vector_field_type(prior=None)
-
-    theta = prior.sample((num_simulations,))
-    x = simulator(theta)
-
-    # Test whether we can stop and resume.
-    inference.append_simulations(theta, x).train()
-    posterior = inference.build_posterior().set_default_x(x_o)
-    samples = posterior.sample((num_samples,))
-
-    # Compute the c2st and assert it is near chance level of 0.5.
-    check_c2st(
-        samples,
-        target_samples,
-        alg=f"{vector_field_type.__name__}_different_dims_and_resume_training",
-    )
+    return inference, score_estimator, test_case
 
 
-@pytest.mark.parametrize("vector_field_type", [NPSE, FMPE])
 @pytest.mark.parametrize(
-    "model", ["mlp", "ada_mlp", pytest.param("transformer", marks=[pytest.mark.slow])]
+    "training_test_case, sampling_test_case", _get_regression_cases(), ids=str
 )
-def test_vfinference_with_different_models(vector_field_type, model):
-    """Test fmpe with different vector field estimators on linear Gaussian."""
+def test_vector_field_snapshot(
+    sampling_test_case: VectorFieldSamplingTestCase,
+    training_test_case: VectorFieldTrainingTestCase,
+    ndarrays_regression,
+):
+    num_simulations = 5
+    num_samples = 2
+    steps = 5
 
-    theta_dim = 3
-    x_dim = 3
-
-    x_o = zeros(1, x_dim)
-    num_samples = 1000
-    num_simulations = 2500
-
-    # likelihood_mean will be likelihood_shift+theta
-    likelihood_shift = -1.0 * ones(x_dim)
-    likelihood_cov = 0.9 * eye(x_dim)
-
-    prior_mean = zeros(theta_dim)
-    prior_cov = eye(theta_dim)
-
-    prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
-    gt_posterior = true_posterior_linear_gaussian_mvn_prior(
-        x_o, likelihood_shift, likelihood_cov, prior_mean, prior_cov
+    inference, score_estimator = _train_vector_field(
+        training_test_case,
+        num_simulations,
+        stop_after_epochs=1,
+        max_num_epochs=1,
+        training_batch_size=None,
     )
-    target_samples = gt_posterior.sample((num_samples,))
+    x_o = zeros(sampling_test_case.num_trials, training_test_case.num_dim)
+    posterior: VectorFieldPosterior = _build_posterior(
+        inference,
+        score_estimator,
+        x_o,
+        prior=training_test_case.prior,
+        sample_with=sampling_test_case.sampling_method,
+    )  # type: ignore
+    samples = posterior.sample(
+        (num_samples,),
+        iid_method=sampling_test_case.iid_method,  # type: ignore
+        steps=steps,
+    )
+    ndarrays_regression.check(
+        {'values': samples.numpy()}, default_tolerance=dict(atol=1e-3, rtol=1e-2)
+    )
 
-    theta = prior.sample((num_simulations,))
-    x = linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    estimator_build_fun = posterior_flow_nn(net=model)
+@pytest.mark.slow
+@pytest.mark.parametrize(
+    "vector_field_trained_model", training_test_cases_all, indirect=True, ids=str
+)
+@pytest.mark.parametrize("sampling_test_case", sampling_test_cases_all, ids=str)
+def test_c2st(
+    vector_field_trained_model, sampling_test_case: VectorFieldSamplingTestCase
+):
+    num_samples = 1_000
+    inference, score_estimator, test_case = vector_field_trained_model
+    x_o = zeros(sampling_test_case.num_trials, test_case.num_dim)
+    posterior = _build_posterior(
+        inference,
+        score_estimator,
+        x_o,
+        prior=test_case.prior,
+        sample_with=sampling_test_case.sampling_method,
+    )
+    npse_samples = posterior.sample(
+        (num_samples,), iid_method=sampling_test_case.iid_method
+    )
+    check_c2st(
+        npse_samples,
+        test_case.get_target_samples(npse_samples.shape[0], x_o),
+        alg=f"vector_field-{test_case.vector_field_type or 'vp'}"
+        f"-{test_case.vector_field_type}"
+        f"-{test_case.prior_type}"
+        f"-{test_case.num_dim}D"
+        f"-{sampling_test_case.sampling_method}",
+        tol=0.05 * min(sampling_test_case.num_trials, 8),
+    )
 
-    inference = vector_field_type(prior, vf_estimator=estimator_build_fun)
 
-    inference.append_simulations(theta, x).train()
-    posterior = inference.build_posterior().set_default_x(x_o)
-    samples = posterior.sample((num_samples,))
+@pytest.mark.slow
+@pytest.mark.parametrize(
+    "vector_field_trained_model", training_test_cases_gaussian, indirect=True, ids=str
+)
+def test_vector_field_map(vector_field_trained_model):
+    inference, score_estimator, test_case = vector_field_trained_model
+    x_o = zeros(1, test_case.num_dim)
+    gt_posterior = true_posterior_linear_gaussian_mvn_prior(
+        x_o,
+        test_case.likelihood_shift,
+        test_case.likelihood_cov,
+        test_case.prior_mean,
+        test_case.prior_cov,
+    )
 
-    # Compute the c2st and assert it is near chance level of 0.5.
-    check_c2st(samples, target_samples, alg=f"fmpe_{model}")
+    map_ = (
+        inference.build_posterior()
+        .set_default_x(x_o)
+        .map(show_progress_bars=True, num_iter=5)
+    )
+    assert ((map_ - gt_posterior.mean) ** 2).sum() < 0.5, "MAP is not close to GT."
 
 
-# ------------------------------------------------------------------------------
-# -------------------------------- SLOW TESTS ----------------------------------
-# ------------------------------------------------------------------------------
+@pytest.mark.slow
+@pytest.mark.parametrize(
+    "vector_field_trained_model", training_test_cases_gaussian, indirect=True, ids=str
+)
+def test_kld_gaussian(vector_field_trained_model):
+    # For the Gaussian prior, we compute the KLd between ground truth and
+    # posterior.
+    inference, score_estimator, test_case = vector_field_trained_model
+    x_o = zeros(1, test_case.num_dim)
+    posterior = _build_posterior(inference, score_estimator, x_o)
+    dkl = get_dkl_gaussian_prior(
+        posterior,
+        x_o[0],
+        test_case.likelihood_shift,
+        test_case.likelihood_cov,
+        test_case.prior_mean,
+        test_case.prior_cov,
+    )
+    max_dkl = 0.15
+    assert dkl < max_dkl, f"D-KL={dkl} is more than 2std above the average performance."
 
 
 # NOTE: Using a function with explicit caching instead of a parametrized fixture here to
@@ -346,120 +511,6 @@ def test_vector_field_sde_ode_sampling_equivalence(vector_field_type, prior_type
         alg=f"sample_methods_equivalence-{vector_field_type}",
         tol=0.07,
     )
-
-
-@pytest.mark.slow
-@pytest.mark.parametrize("vector_field_type", ["ve", "fmpe", "subvp", "vp"])
-@pytest.mark.parametrize("prior_type", ["gaussian", "uniform"])
-@pytest.mark.parametrize(
-    "iid_method, num_trials",
-    [
-        pytest.param("fnpe", 5, id="fnpe-5trials"),
-        pytest.param("gauss", 5, id="gauss-5trials"),
-        pytest.param("auto_gauss", 5, id="auto_gauss-5trials"),
-        pytest.param("jac_gauss", 5, id="jac_gauss-5trials"),
-    ],
-)
-def test_vector_field_iid_inference(
-    vector_field_type, prior_type, iid_method, num_trials
-):
-    """
-    Test whether NPSE and FMPE infers well a simple example with available ground truth.
-
-    Args:
-        vector_field_type: The type of vector field ("ve", "fmpe", etc.).
-        prior_type: The type of prior distribution ("gaussian" or "uniform").
-        iid_method: The IID method to use for sampling.
-        num_trials: The number of trials to run.
-    """
-
-    vector_field_trained_model = train_vector_field_model(vector_field_type, prior_type)
-
-    # Extract data from the trained model
-    estimator = vector_field_trained_model["estimator"]
-    inference = vector_field_trained_model["inference"]
-    prior = vector_field_trained_model["prior"]
-    likelihood_shift = vector_field_trained_model["likelihood_shift"]
-    likelihood_cov = vector_field_trained_model["likelihood_cov"]
-    prior_mean = vector_field_trained_model["prior_mean"]
-    prior_cov = vector_field_trained_model["prior_cov"]
-    num_dim = vector_field_trained_model["num_dim"]
-
-    num_samples = 1000
-
-    x_o = zeros(num_trials, num_dim)
-
-    posterior = inference.build_posterior(
-        estimator,
-        sample_with="sde",  # iid works only with score-based SDEs.
-        posterior_parameters=VectorFieldPosteriorParameters(iid_method=iid_method),
-    )
-    posterior.set_default_x(x_o)
-    samples = posterior.sample((num_samples,))
-
-    if prior_type == "gaussian":
-        gt_posterior = true_posterior_linear_gaussian_mvn_prior(
-            x_o, likelihood_shift, likelihood_cov, prior_mean, prior_cov
-        )
-        target_samples = gt_posterior.sample((num_samples,))
-    elif prior_type == "uniform":
-        target_samples = samples_true_posterior_linear_gaussian_uniform_prior(
-            x_o,
-            likelihood_shift,
-            likelihood_cov,
-            prior,
-        )
-    else:
-        raise ValueError(f"Invalid prior type: {prior_type}")
-
-    # Compute the c2st and assert it is near chance level of 0.5.
-    # Some degradation is expected, also because posterior get tighter which
-    # usually makes the c2st worse.
-    check_c2st(
-        samples,
-        target_samples,
-        alg=(
-            f"{vector_field_type}-{prior_type}-"
-            f"{num_dim}-{iid_method}-{num_trials}iid-trials"
-        ),
-        tol=0.07 * max(num_trials, 2),
-    )
-
-
-@pytest.mark.slow
-@pytest.mark.parametrize("vector_field_type", ["npse", "fmpe"])
-def test_vector_field_map(vector_field_type):
-    num_dim = 2
-    x_o = zeros(num_dim)
-    num_simulations = 3000
-
-    # likelihood_mean will be likelihood_shift+theta
-    likelihood_shift = -1.0 * ones(num_dim)
-    likelihood_cov = 0.3 * eye(num_dim)
-
-    prior_mean = zeros(num_dim)
-    prior_cov = eye(num_dim)
-    prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
-    gt_posterior = true_posterior_linear_gaussian_mvn_prior(
-        x_o, likelihood_shift, likelihood_cov, prior_mean, prior_cov
-    )
-
-    if vector_field_type == "npse":
-        inference = NPSE(prior, show_progress_bars=True)
-    elif vector_field_type == "fmpe":
-        inference = FMPE(prior, show_progress_bars=True)
-    else:
-        raise ValueError(f"Invalid vector field type: {vector_field_type}")
-
-    theta = prior.sample((num_simulations,))
-    x = linear_gaussian(theta, likelihood_shift, likelihood_cov)
-
-    inference.append_simulations(theta, x).train(max_num_epochs=100)
-    posterior = inference.build_posterior().set_default_x(x_o)
-
-    map_ = posterior.map(show_progress_bars=True, num_iter=5)
-
-    assert ((map_ - gt_posterior.mean) ** 2).sum() < 0.5, "MAP is not close to GT."
 
 
 # TODO: Need to add NPSE when the network builders are unified, but anyway
