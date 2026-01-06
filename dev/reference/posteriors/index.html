@@ -7581,7 +7581,17 @@ proposal at every iteration.</p>
 <span class="normal">1109</span>
 <span class="normal">1110</span>
 <span class="normal">1111</span>
-<span class="normal">1112</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">MCMCPosterior</span><span class="p">(</span><span class="n">NeuralPosterior</span><span class="p">):</span>
+<span class="normal">1112</span>
+<span class="normal">1113</span>
+<span class="normal">1114</span>
+<span class="normal">1115</span>
+<span class="normal">1116</span>
+<span class="normal">1117</span>
+<span class="normal">1118</span>
+<span class="normal">1119</span>
+<span class="normal">1120</span>
+<span class="normal">1121</span>
+<span class="normal">1122</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">MCMCPosterior</span><span class="p">(</span><span class="n">NeuralPosterior</span><span class="p">):</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Provides MCMC to sample from the posterior.</span>
 
 <span class="sd">    SNLE or SNRE train neural networks to approximate the likelihood(-ratios).</span>
@@ -8451,6 +8461,16 @@ proposal at every iteration.</p>
         <span class="n">num_chains</span> <span class="o">=</span> <span class="n">mp</span><span class="o">.</span><span class="n">cpu_count</span><span class="p">()</span> <span class="o">-</span> <span class="mi">1</span> <span class="k">if</span> <span class="n">num_chains</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">num_chains</span>
         <span class="n">steps</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">slice_pymc</span><span class="o">=</span><span class="s2">&quot;slice&quot;</span><span class="p">,</span> <span class="n">hmc_pymc</span><span class="o">=</span><span class="s2">&quot;hmc&quot;</span><span class="p">,</span> <span class="n">nuts_pymc</span><span class="o">=</span><span class="s2">&quot;nuts&quot;</span><span class="p">)</span>
 
+        <span class="k">if</span> <span class="n">show_progress_bars</span><span class="p">:</span>
+            <span class="n">warn</span><span class="p">(</span>
+                <span class="s2">&quot;Note: progress bars for PyMC sampling are disabled due to an &quot;</span>
+                <span class="s2">&quot;incompatibility with PyMC&gt;=5.20.1; &quot;</span>
+                <span class="s2">&quot;progressbar will be set to False. See PR #1697: &quot;</span>
+                <span class="s2">&quot;https://github.com/sbi-dev/sbi/pull/1697&quot;</span><span class="p">,</span>
+                <span class="ne">UserWarning</span><span class="p">,</span>
+                <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+            <span class="p">)</span>
+
         <span class="n">sampler</span> <span class="o">=</span> <span class="n">PyMCSampler</span><span class="p">(</span>
             <span class="n">potential_fn</span><span class="o">=</span><span class="n">potential_function</span><span class="p">,</span>
             <span class="n">step</span><span class="o">=</span><span class="n">steps</span><span class="p">[</span><span class="n">mcmc_method</span><span class="p">],</span>
@@ -8459,7 +8479,7 @@ proposal at every iteration.</p>
             <span class="n">tune</span><span class="o">=</span><span class="n">warmup_steps</span><span class="p">,</span>
             <span class="n">chains</span><span class="o">=</span><span class="n">num_chains</span><span class="p">,</span>
             <span class="n">mp_ctx</span><span class="o">=</span><span class="n">mp_context</span><span class="p">,</span>
-            <span class="n">progressbar</span><span class="o">=</span><span class="n">show_progress_bars</span><span class="p">,</span>
+            <span class="n">progressbar</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
             <span class="n">param_name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">param_name</span><span class="p">,</span>
             <span class="n">device</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">,</span>
         <span class="p">)</span>
@@ -8754,18 +8774,18 @@ proposal at every iteration.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/mcmc_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1101</span>
-<span class="normal">1102</span>
-<span class="normal">1103</span>
-<span class="normal">1104</span>
-<span class="normal">1105</span>
-<span class="normal">1106</span>
-<span class="normal">1107</span>
-<span class="normal">1108</span>
-<span class="normal">1109</span>
-<span class="normal">1110</span>
-<span class="normal">1111</span>
-<span class="normal">1112</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">__getstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">:</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1111</span>
+<span class="normal">1112</span>
+<span class="normal">1113</span>
+<span class="normal">1114</span>
+<span class="normal">1115</span>
+<span class="normal">1116</span>
+<span class="normal">1117</span>
+<span class="normal">1118</span>
+<span class="normal">1119</span>
+<span class="normal">1120</span>
+<span class="normal">1121</span>
+<span class="normal">1122</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">__getstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Get state of MCMCPosterior.</span>
 
 <span class="sd">    Removes the posterior sampler from the state, as it may not be picklable.</span>
@@ -9347,17 +9367,7 @@ sbi slice samplers, only the samples are added.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/mcmc_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1043</span>
-<span class="normal">1044</span>
-<span class="normal">1045</span>
-<span class="normal">1046</span>
-<span class="normal">1047</span>
-<span class="normal">1048</span>
-<span class="normal">1049</span>
-<span class="normal">1050</span>
-<span class="normal">1051</span>
-<span class="normal">1052</span>
-<span class="normal">1053</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1053</span>
 <span class="normal">1054</span>
 <span class="normal">1055</span>
 <span class="normal">1056</span>
@@ -9403,7 +9413,17 @@ sbi slice samplers, only the samples are added.</p>
 <span class="normal">1096</span>
 <span class="normal">1097</span>
 <span class="normal">1098</span>
-<span class="normal">1099</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_arviz_inference_data</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">InferenceData</span><span class="p">:</span>
+<span class="normal">1099</span>
+<span class="normal">1100</span>
+<span class="normal">1101</span>
+<span class="normal">1102</span>
+<span class="normal">1103</span>
+<span class="normal">1104</span>
+<span class="normal">1105</span>
+<span class="normal">1106</span>
+<span class="normal">1107</span>
+<span class="normal">1108</span>
+<span class="normal">1109</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_arviz_inference_data</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">InferenceData</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Returns arviz InferenceData object constructed most recent samples.</span>
 
 <span class="sd">    Note: the InferenceData is constructed using the posterior samples generated in</span>
@@ -9849,17 +9869,7 @@ have a cached value.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/mcmc_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 976</span>
-<span class="normal"> 977</span>
-<span class="normal"> 978</span>
-<span class="normal"> 979</span>
-<span class="normal"> 980</span>
-<span class="normal"> 981</span>
-<span class="normal"> 982</span>
-<span class="normal"> 983</span>
-<span class="normal"> 984</span>
-<span class="normal"> 985</span>
-<span class="normal"> 986</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 986</span>
 <span class="normal"> 987</span>
 <span class="normal"> 988</span>
 <span class="normal"> 989</span>
@@ -9914,7 +9924,17 @@ have a cached value.</p>
 <span class="normal">1038</span>
 <span class="normal">1039</span>
 <span class="normal">1040</span>
-<span class="normal">1041</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">map</span><span class="p">(</span>
+<span class="normal">1041</span>
+<span class="normal">1042</span>
+<span class="normal">1043</span>
+<span class="normal">1044</span>
+<span class="normal">1045</span>
+<span class="normal">1046</span>
+<span class="normal">1047</span>
+<span class="normal">1048</span>
+<span class="normal">1049</span>
+<span class="normal">1050</span>
+<span class="normal">1051</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">map</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">num_iter</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1_000</span><span class="p">,</span>
