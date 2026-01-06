@@ -8,8 +8,7 @@ import warnings
 from typing import Optional
 
 import torch
-import torch.nn as nn
-from torch import Tensor
+from torch import Tensor, nn
 
 from sbi.inference.trainers.npe.npe_base import PosteriorEstimatorTrainer
 from sbi.neural_nets.estimators import UnconditionalDensityEstimator
@@ -157,10 +156,9 @@ def calc_misspecification_mmd(
             )
         if inference._neural_net.embedding_net is None:
             raise AttributeError(
-                "embedding_net attribute is None but is required for misspecification"
-                " detection."
+                "embedding_net attribute is None but is required for misspecification "
+                "detection."
             )
-
         z_obs = inference._neural_net.embedding_net(x_obs).detach()
         z = inference._neural_net.embedding_net(x).detach()
     else:
