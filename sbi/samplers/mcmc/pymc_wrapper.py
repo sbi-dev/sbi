@@ -65,8 +65,8 @@ class PyMCPotential(pt.Op):  # type: ignore
         # call the potential function
         energy = self.potential_fn(params, track_gradients=self.track_gradients)
 
-        # output the log-likelihood
-        outputs[0][0] = tensor2numpy(energy).astype(np.float64)
+        # output the log-likelihood, PyMC requires a scalar for the energy
+        outputs[0][0] = tensor2numpy(energy.squeeze()).astype(np.float64)
 
         # compute and record gradients if desired
         if self.track_gradients:
@@ -112,7 +112,7 @@ class PyMCSampler:
         tune: int = 1000,
         chains: Optional[int] = None,
         mp_ctx: str = "spawn",
-        progressbar: bool = False,
+        progressbar: bool = True,
         param_name: str = "theta",
         device: str = "cpu",
     ):
@@ -127,10 +127,6 @@ class PyMCSampler:
             chains: Number of MCMC chains to run in parallel.
             mp_ctx: Multiprocessing context for parallel sampling.
             progressbar: Whether to show/hide progress bars.
-                Note: Progress bars are disabled for PyMC sampling in this
-                project due to an incompatibility from PyMC >= 5.20.1 and
-                that affects progress display.
-                See PR #1697 for details: https://github.com/sbi-dev/sbi/pull/1697
             param_name: Name for parameter variable, for PyMC and ArviZ structures
             device: The device to which to move the parameters for potential_fn.
         """

@@ -86,6 +86,7 @@ dev = [
     "pytest-split",
     "pytest-testmon",
     "pytest-xdist",
+    "sbi[notebook]",  # for tutorial tests.
     "torchtestcase",
 ]
 
