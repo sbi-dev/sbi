@@ -25,7 +25,11 @@ from sbi.samplers.score.diffuser import Diffuser
 from sbi.samplers.score.predictors import Predictor
 from sbi.sbi_types import Shape
 from sbi.utils import check_prior
-from sbi.utils.sbiutils import gradient_ascent, within_support
+from sbi.utils.sbiutils import (
+    gradient_ascent,
+    warn_if_outside_prior_support,
+    within_support,
+)
 from sbi.utils.torchutils import ensure_theta_batched
 
 
@@ -230,6 +234,7 @@ class VectorFieldPosterior(NeuralPosterior):
                     max_sampling_time=max_sampling_time,
                 )
             else:
+                # Bypass rejection sampling entirely.
                 samples = self.sample_via_ode(torch.Size([num_samples]))
         elif sample_with == "sde":
             proposal_sampling_kwargs = {
@@ -253,6 +258,7 @@ class VectorFieldPosterior(NeuralPosterior):
                     max_sampling_time=max_sampling_time,
                 )
             else:
+                # Bypass rejection sampling entirely.
                 samples = self._sample_via_diffusion(
                     (num_samples,),
                     **proposal_sampling_kwargs,
@@ -261,6 +267,9 @@ class VectorFieldPosterior(NeuralPosterior):
             raise ValueError(
                 f"Expected sample_with to be 'ode' or 'sde', but got {sample_with}."
             )
+
+        if not reject_outside_prior:
+            warn_if_outside_prior_support(self.prior, samples)
 
         samples = samples.reshape(
             sample_shape + self.vector_field_estimator.input_shape
@@ -513,6 +522,7 @@ class VectorFieldPosterior(NeuralPosterior):
                     max_sampling_time=max_sampling_time,
                 )
             else:
+                # Bypass rejection sampling.
                 samples = self.sample_via_ode(torch.Size([num_samples]))
             samples = samples.reshape(
                 sample_shape + batch_shape + self.vector_field_estimator.input_shape
@@ -540,12 +550,16 @@ class VectorFieldPosterior(NeuralPosterior):
                     max_sampling_time=max_sampling_time,
                 )
             else:
+                # Bypass rejection sampling.
                 samples = self._sample_via_diffusion(
                     (num_samples,), **proposal_sampling_kwargs
                 )
             samples = samples.reshape(
                 sample_shape + batch_shape + self.vector_field_estimator.input_shape
             )
+
+        if not reject_outside_prior:
+            warn_if_outside_prior_support(self.prior, samples)
 
         return samples
 

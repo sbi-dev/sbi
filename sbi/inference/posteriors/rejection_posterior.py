@@ -203,7 +203,14 @@ class RejectionPosterior(NeuralPosterior):
                 device=self._device,
             )
         else:
+            # Bypass rejection sampling entirely.
             samples = self.proposal.sample((num_samples,))
+            warn(
+                "Samples drawn with reject_outside_prior=False are taken directly "
+                "from the proposal without rejection sampling. These samples may lie "
+                "outside the prior support, which could lead to incorrect inference.",
+                stacklevel=2,
+            )
 
         return samples.reshape((*sample_shape, -1))
 

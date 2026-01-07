@@ -19,7 +19,7 @@ from sbi.neural_nets.estimators.shape_handling import (
 )
 from sbi.samplers.rejection import rejection
 from sbi.sbi_types import Shape
-from sbi.utils.sbiutils import within_support
+from sbi.utils.sbiutils import warn_if_outside_prior_support, within_support
 from sbi.utils.torchutils import ensure_theta_batched
 from sbi.utils.user_input_checks import check_prior
 
@@ -185,7 +185,7 @@ class DirectPosterior(NeuralPosterior):
             )
 
         if reject_outside_prior:
-            # normal rejection behaviour
+            # Normal rejection behavior.
             samples = rejection.accept_reject_sample(
                 proposal=self.posterior_estimator.sample,
                 accept_reject_fn=lambda theta: within_support(self.prior, theta),
@@ -197,11 +197,12 @@ class DirectPosterior(NeuralPosterior):
                 max_sampling_time=max_sampling_time,
             )[0]
         else:
-            # bypass rejection sampling entirely
+            # Bypass rejection sampling entirely.
             samples = self.posterior_estimator.sample(
                 torch.Size([num_samples]),
                 condition=x,
             )
+            warn_if_outside_prior_support(self.prior, samples[:, 0])
 
         return samples[:, 0]  # Remove batch dimension.
 
@@ -266,7 +267,7 @@ class DirectPosterior(NeuralPosterior):
             max_sampling_batch_size = capped
 
         if reject_outside_prior:
-            # normal rejection behaviour
+            # Normal rejection behavior.
             samples = rejection.accept_reject_sample(
                 proposal=self.posterior_estimator.sample,
                 accept_reject_fn=lambda theta: within_support(self.prior, theta),
@@ -278,11 +279,12 @@ class DirectPosterior(NeuralPosterior):
                 max_sampling_time=max_sampling_time,
             )[0]
         else:
-            # bypass rejection sampling entirely
+            # Bypass rejection sampling entirely.
             samples = self.posterior_estimator.sample(
                 torch.Size([num_samples]),
                 condition=x,
             )
+            warn_if_outside_prior_support(self.prior, samples)
 
         return samples
 
