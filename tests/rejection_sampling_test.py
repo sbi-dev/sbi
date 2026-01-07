@@ -1,13 +1,16 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import warnings
 from unittest.mock import patch
 
 import pytest
 import torch
+from torch.distributions import Uniform
 
 from sbi.inference.posteriors.rejection_posterior import RejectionPosterior
 from sbi.samplers.rejection import accept_reject_sample, rejection_sample
+from sbi.utils.sbiutils import warn_if_outside_prior_support
 
 
 class DummyProposal:
@@ -118,3 +121,39 @@ def test_reject_outside_prior_support_behavior():
         no_reject = unbounded_posterior.sample((5,), reject_outside_prior=False)
 
     assert torch.all(no_reject == 5.0)
+
+
+def test_warn_if_outside_prior_support():
+    """Test the warning utility for samples outside prior support."""
+    prior = Uniform(torch.zeros(2), torch.ones(2))
+
+    # Samples inside prior - no warning expected
+    samples_inside = torch.rand(100, 2)
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        warn_if_outside_prior_support(prior, samples_inside)
+        assert len(w) == 0
+
+    # Samples mostly outside prior - warning expected
+    samples_outside = torch.rand(100, 2) + 2.0  # All outside [0, 1]
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        warn_if_outside_prior_support(prior, samples_outside)
+        assert len(w) == 1
+        assert "outside the prior support" in str(w[0].message)
+
+    # Samples just below threshold (5%) - no warning expected
+    samples_mixed = torch.rand(100, 2)
+    samples_mixed[:4] = 2.0  # 4% outside
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        warn_if_outside_prior_support(prior, samples_mixed, threshold=0.05)
+        assert len(w) == 0
+
+    # Samples just above threshold - warning expected
+    samples_mixed = torch.rand(100, 2)
+    samples_mixed[:6] = 2.0  # 6% outside
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        warn_if_outside_prior_support(prior, samples_mixed, threshold=0.05)
+        assert len(w) == 1
