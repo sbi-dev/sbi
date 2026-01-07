@@ -670,6 +670,38 @@ def within_support(distribution: Any, samples: Tensor) -> Tensor:
         return torch.isfinite(distribution.log_prob(samples))
 
 
+def warn_if_outside_prior_support(
+    prior: Any,
+    samples: Tensor,
+    threshold: float = 0.05,
+    stacklevel: int = 3,
+) -> None:
+    """Warn if a significant fraction of samples lie outside prior support.
+
+    This is useful when rejection sampling is bypassed (e.g., with
+    `reject_outside_prior=False`) to alert users that samples may not respect
+    prior constraints.
+
+    Args:
+        prior: Prior distribution to check support against.
+        samples: Samples to check, will be reshaped to (-1, event_dim).
+        threshold: Fraction of out-of-support samples above which to trigger
+            the warning. Default is 0.05 (5%).
+        stacklevel: Stack level for the warning. Default is 3, which accounts
+            for this function being called from a posterior's sample method.
+    """
+    flat_samples = samples.reshape(-1, samples.shape[-1])
+    in_support = within_support(prior, flat_samples)
+    frac_outside = 1.0 - in_support.float().mean().item()
+    if frac_outside > threshold:
+        warnings.warn(
+            f"{frac_outside:.1%} of samples drawn with reject_outside_prior="
+            f"False lie outside the prior support. This may lead to incorrect "
+            f"inference.",
+            stacklevel=stacklevel,
+        )
+
+
 def match_theta_and_x_batch_shapes(theta: Tensor, x: Tensor) -> Tuple[Tensor, Tensor]:
     r"""Return $\theta$ and `x` with batch shape matched to each other.
     When `x` is just a single observation it is repeated for all entries in the

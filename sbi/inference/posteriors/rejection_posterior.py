@@ -137,6 +137,8 @@ class RejectionPosterior(NeuralPosterior):
         m: Optional[float] = None,
         sample_with: Optional[str] = None,
         show_progress_bars: bool = True,
+        reject_outside_prior: bool = True,
+        max_sampling_time: Optional[float] = None,
     ):
         r"""Return samples from posterior $p(\theta|x)$ via rejection sampling.
 
@@ -147,6 +149,14 @@ class RejectionPosterior(NeuralPosterior):
             sample_with: This argument only exists to keep backward-compatibility with
                 `sbi` v0.17.2 or older. If it is set, we instantly raise an error.
             show_progress_bars: Whether to show sampling progress monitor.
+            reject_outside_prior: If True (default), rejection sampling is used to
+                ensure samples lie within the prior support. If False, samples are drawn
+                directly from the proposal without rejection, which is faster but may
+                include samples outside the prior support.
+            max_sampling_time: Optional maximum allowed sampling time in seconds.
+                If exceeded, sampling is aborted and a RuntimeError is raised. Only
+                applies when `reject_outside_prior=True` (no effect otherwise since
+                direct sampling from the proposal is fast).
 
         Returns:
             Samples from posterior.
@@ -180,18 +190,29 @@ class RejectionPosterior(NeuralPosterior):
         )
         m = self.m if m is None else m
 
-        samples, _ = rejection_sample(
-            potential,
-            proposal=self.proposal,
-            num_samples=num_samples,
-            show_progress_bars=show_progress_bars,
-            warn_acceptance=0.01,
-            max_sampling_batch_size=max_sampling_batch_size,
-            num_samples_to_find_max=num_samples_to_find_max,
-            num_iter_to_find_max=num_iter_to_find_max,
-            m=m,
-            device=self._device,
-        )
+        if reject_outside_prior:
+            samples, _ = rejection_sample(
+                potential,
+                proposal=self.proposal,
+                num_samples=num_samples,
+                show_progress_bars=show_progress_bars,
+                warn_acceptance=0.01,
+                max_sampling_batch_size=max_sampling_batch_size,
+                num_samples_to_find_max=num_samples_to_find_max,
+                num_iter_to_find_max=num_iter_to_find_max,
+                m=m,
+                max_sampling_time=max_sampling_time,
+                device=self._device,
+            )
+        else:
+            # Bypass rejection sampling entirely.
+            samples = self.proposal.sample((num_samples,))
+            warn(
+                "Samples drawn with reject_outside_prior=False are taken directly "
+                "from the proposal without rejection sampling. These samples may lie "
+                "outside the prior support, which could lead to incorrect inference.",
+                stacklevel=2,
+            )
 
         return samples.reshape((*sample_shape, -1))
 
