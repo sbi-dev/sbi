@@ -908,16 +908,6 @@ class MCMCPosterior(NeuralPosterior):
         num_chains = mp.cpu_count() - 1 if num_chains is None else num_chains
         steps = dict(slice_pymc="slice", hmc_pymc="hmc", nuts_pymc="nuts")
 
-        if show_progress_bars:
-            warn(
-                "Note: progress bars for PyMC sampling are disabled due to an "
-                "incompatibility with PyMC>=5.20.1; "
-                "progressbar will be set to False. See PR #1697: "
-                "https://github.com/sbi-dev/sbi/pull/1697",
-                UserWarning,
-                stacklevel=2,
-            )
-
         sampler = PyMCSampler(
             potential_fn=potential_function,
             step=steps[mcmc_method],
@@ -926,7 +916,7 @@ class MCMCPosterior(NeuralPosterior):
             tune=warmup_steps,
             chains=num_chains,
             mp_ctx=mp_context,
-            progressbar=False,
+            progressbar=show_progress_bars,
             param_name=self.param_name,
             device=self._device,
         )
