@@ -153,9 +153,12 @@ class DirectPosterior(NeuralPosterior):
             show_progress_bars: Whether to show sampling progress monitor.
             reject_outside_prior: If True (default), rejection sampling is used to
                 ensure samples lie within the prior support. If False, samples are drawn
-                directly from the proposal without rejection sampling.
+                directly from the neural density estimator without rejection, which is
+                faster but may include samples outside the prior support.
             max_sampling_time: Optional maximum allowed sampling time in seconds.
-                If exceeded, sampling is aborted and a RuntimeError is raised.
+                If exceeded, sampling is aborted and a RuntimeError is raised. Only
+                applies when `reject_outside_prior=True` (no effect otherwise since
+                direct sampling is fast).
         """
         num_samples = torch.Size(sample_shape).numel()
         x = self._x_else_default_x(x)
@@ -228,9 +231,11 @@ class DirectPosterior(NeuralPosterior):
             show_progress_bars: Whether to show sampling progress monitor.
             reject_outside_prior: If True (default), rejection sampling is used to
                 ensure samples lie within the prior support. If False, samples are drawn
-                directly from the proposal without rejection sampling.
+                directly from the neural density estimator without rejection, which is
+                faster but may include samples outside the prior support.
             max_sampling_time: Optional maximum allowed sampling time in seconds.
-                If exceeded, sampling is aborted and a RuntimeError is raised.
+                If exceeded, sampling is aborted and a RuntimeError is raised. Only
+                applies when `reject_outside_prior=True`.
 
         Returns:
             Samples from the posteriors of shape (*sample_shape, B, *input_shape)

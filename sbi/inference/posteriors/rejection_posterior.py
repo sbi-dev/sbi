@@ -149,13 +149,15 @@ class RejectionPosterior(NeuralPosterior):
             sample_with: This argument only exists to keep backward-compatibility with
                 `sbi` v0.17.2 or older. If it is set, we instantly raise an error.
             show_progress_bars: Whether to show sampling progress monitor.
-            reject_outside_prior:
-                If True (default), rejection sampling is used to ensure samples lie
-                within the prior support. If False, samples are drawn directly from
-                the proposal without rejection sampling.
-            max_sampling_time:
-                Optional maximum allowed sampling time in seconds. If exceeded,
-                sampling is aborted and a RuntimeError is raised.
+            reject_outside_prior: If True (default), rejection sampling is used to
+                ensure samples lie within the prior support. If False, samples are drawn
+                directly from the proposal without rejection, which is faster but may
+                include samples outside the prior support.
+            max_sampling_time: Optional maximum allowed sampling time in seconds.
+                If exceeded, sampling is aborted and a RuntimeError is raised. Only
+                applies when `reject_outside_prior=True` (no effect otherwise since
+                direct sampling from the proposal is fast).
+
         Returns:
             Samples from posterior.
         """

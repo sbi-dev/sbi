@@ -203,9 +203,12 @@ class VectorFieldPosterior(NeuralPosterior):
             show_progress_bars: Whether to show a progress bar during sampling.
             reject_outside_prior: If True (default), rejection sampling is used to
                 ensure samples lie within the prior support. If False, samples are drawn
-                directly from the proposal without rejection sampling.
+                directly from the ODE/SDE sampler without rejection, which is faster but
+                may include samples outside the prior support.
             max_sampling_time: Optional maximum allowed sampling time in seconds.
-                If exceeded, sampling is aborted and a RuntimeError is raised.
+                If exceeded, sampling is aborted and a RuntimeError is raised. Only
+                applies when `reject_outside_prior=True` (no effect otherwise since
+                direct sampling does not use rejection).
         """
 
         if sample_with is None:
@@ -480,9 +483,11 @@ class VectorFieldPosterior(NeuralPosterior):
             show_progress_bars: Whether to show sampling progress monitor.
             reject_outside_prior: If True (default), rejection sampling is used to
                 ensure samples lie within the prior support. If False, samples are drawn
-                directly from the proposal without rejection sampling.
+                directly from the ODE/SDE sampler without rejection, which is faster but
+                may include samples outside the prior support.
             max_sampling_time: Optional maximum allowed sampling time in seconds.
-                If exceeded, sampling is aborted and a RuntimeError is raised.
+                If exceeded, sampling is aborted and a RuntimeError is raised. Only
+                applies when `reject_outside_prior=True`.
 
         Returns:
             Samples from the posteriors of shape (*sample_shape, B, *input_shape)
