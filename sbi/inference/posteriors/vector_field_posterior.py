@@ -291,6 +291,7 @@ class VectorFieldPosterior(NeuralPosterior):
         max_sampling_batch_size: int = 10_000,
         show_progress_bars: bool = True,
         save_intermediate: bool = False,
+        **kwargs,
     ) -> Tensor:
         r"""Return samples from posterior distribution $p(\theta|x)$.
 
