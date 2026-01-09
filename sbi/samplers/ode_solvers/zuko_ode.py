@@ -69,14 +69,13 @@ class ZukoNeuralODE(NeuralODE):
             net,
             mean_base,
             std_base,
+            condition_shape,
             t_min,
             t_max,
             atol=atol,
             rtol=rtol,
             exact=exact,
         )
-
-        self.condition_shape = condition_shape
 
     def get_distribution(self, condition: Tensor, **kwargs) -> Distribution:
         """
@@ -89,7 +88,25 @@ class ZukoNeuralODE(NeuralODE):
         Returns:
             The distribution object with `log_prob` and
             `sample` methods that wraps the ODE solver.
+
+        Raises:
+            ValueError: If the condition tensor shape does not match condition_shape.
         """
+        # Validate condition shape
+        cond_event_dims = len(self.condition_shape)
+        if condition.ndim < cond_event_dims:
+            raise ValueError(
+                f"Condition tensor has {condition.ndim} dimensions, but "
+                f"condition_shape {tuple(self.condition_shape)} requires at least "
+                f"{cond_event_dims} dimensions."
+            )
+        actual_event_shape = condition.shape[-cond_event_dims:]
+        if actual_event_shape != self.condition_shape:
+            raise ValueError(
+                f"Condition tensor event shape {tuple(actual_event_shape)} does not "
+                f"match expected condition_shape {tuple(self.condition_shape)}."
+            )
+
         partial_f = functools.partial(self._f_condition_last, condition=condition)
         transform = FreeFormJacobianTransform(
             f=partial_f,
