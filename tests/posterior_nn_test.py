@@ -369,6 +369,8 @@ def test_batched_vector_field_sample_with_multidim_x(
         if x_o_batch_dim > 0
         else (*sample_shape, 1)
     ), "Sample shape wrong"
+    assert not torch.isnan(samples).any(), "Samples contain NaN values"
+    assert not torch.isinf(samples).any(), "Samples contain Inf values"
 
 
 @pytest.mark.slow
@@ -468,7 +470,7 @@ def test_build_posterior_raises_error_for_rejection_sampling():
 
 
 def get_multidim_simulator_embedding(num_dim: int = 5, embedding_dim: int = 10):
-    """Returns a simulator that adds noise to theta and embeds it in higher dim."""
+    """Returns a simulator producing 2D matrix observations and a CNN embedding net."""
 
     def simulator(theta):
         if theta.dim() == 1:
@@ -476,7 +478,7 @@ def get_multidim_simulator_embedding(num_dim: int = 5, embedding_dim: int = 10):
         mean = torch.ones(num_dim, num_dim)
         mean = mean.unsqueeze(0).expand(theta.shape[0], -1, -1)
 
-        # mean is a 10x10 matrix with all elements equal to theta
+        # mean is a (num_dim x num_dim) matrix with all elements equal to theta
         mean = mean + theta.unsqueeze(-1)
 
         x = mean + 0.1 * torch.randn_like(mean)
