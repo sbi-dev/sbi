@@ -1,7 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-"""Unit tests for MultivariateGaussianMDN."""
+"""Unit tests for MultivariateGaussianMDN and MixtureDensityEstimator."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ import torch
 from torch import nn
 
 from sbi.neural_nets.estimators.mixture_density_estimator import (
+    MixtureDensityEstimator,
     MultivariateGaussianMDN,
 )
 from sbi.neural_nets.estimators.mog import MoG
@@ -249,8 +250,8 @@ class TestMultivariateGaussianMDNSample:
         context = torch.randn(batch_size, context_features)
         samples = mdn.sample(torch.Size([num_samples]), context)
 
-        # MDN.sample returns (batch_size, *sample_shape, features)
-        assert samples.shape == (batch_size, num_samples, features)
+        # MDN.sample returns (*sample_shape, batch_size, features) - same as MoG
+        assert samples.shape == (num_samples, batch_size, features)
 
     def test_sample_finite(self):
         """Test that samples are finite."""
@@ -290,7 +291,7 @@ class TestMultivariateGaussianMDNDimensions:
         samples = mdn.sample(torch.Size([10]), context)
 
         assert log_prob.shape == (4,)
-        assert samples.shape == (4, 10, features)
+        assert samples.shape == (10, 4, features)  # (*sample_shape, batch, features)
 
     @pytest.mark.parametrize("num_components", [1, 2, 5, 20])
     def test_different_num_components(self, num_components):
@@ -341,15 +342,19 @@ class TestMultivariateGaussianMDNDevice:
         assert mog.device.type == "cuda"
 
 
-class TestMultivariateGaussianMDNFunctional:
-    """Functional tests for MDN density estimation accuracy."""
+class TestMixtureDensityEstimatorFunctional:
+    """Functional tests for MixtureDensityEstimator accuracy.
+
+    These tests validate the full stack: MixtureDensityEstimator wrapping
+    MultivariateGaussianMDN, using the standard sbi training interface.
+    """
 
     @pytest.mark.slow
-    def test_mdn_learns_simple_mog(self):
-        """Test that MDN can learn a simple 2-component MoG distribution.
+    def test_estimator_learns_simple_mog(self):
+        """Test that estimator can learn a simple 2-component MoG distribution.
 
         This test creates a ground truth 2-component MoG where the mixture
-        weights and means depend on the context. The MDN is trained to learn
+        weights and means depend on the context. The estimator is trained to learn
         this conditional distribution and validated using c2st.
         """
         from sbi.utils.metrics import c2st
@@ -403,67 +408,67 @@ class TestMultivariateGaussianMDNFunctional:
         train_context = torch.randn(num_train, context_features)
         train_samples = sample_from_true_mog(train_context)
 
-        # Create and train MDN
-        mdn = MultivariateGaussianMDN(
+        # Create MixtureDensityEstimator (full stack)
+        mdn_net = MultivariateGaussianMDN(
             features=features,
             context_features=context_features,
             hidden_features=64,
             num_components=num_components,
             num_hidden_layers=2,
         )
+        estimator = MixtureDensityEstimator(
+            net=mdn_net,
+            input_shape=torch.Size([features]),
+            condition_shape=torch.Size([context_features]),
+        )
 
-        optimizer = torch.optim.Adam(mdn.parameters(), lr=1e-3)
+        optimizer = torch.optim.Adam(estimator.parameters(), lr=1e-3)
 
-        # Training loop
+        # Training loop using estimator.loss()
         batch_size = 256
         num_epochs = 100
 
-        mdn.train()
+        estimator.train()
         for epoch in range(num_epochs):
             # Shuffle data
             perm = torch.randperm(num_train)
             train_context_shuffled = train_context[perm]
             train_samples_shuffled = train_samples[perm]
 
-            epoch_loss = 0.0
-            num_batches = 0
-
             for i in range(0, num_train, batch_size):
                 batch_context = train_context_shuffled[i:i + batch_size]
                 batch_samples = train_samples_shuffled[i:i + batch_size]
 
                 optimizer.zero_grad()
-                log_prob = mdn.log_prob(batch_samples, batch_context)
-                loss = -log_prob.mean()
+                loss = estimator.loss(batch_samples, batch_context).mean()
                 loss.backward()
                 optimizer.step()
 
-                epoch_loss += loss.item()
-                num_batches += 1
-
         # Evaluate on test context
-        mdn.eval()
+        estimator.eval()
         test_context = torch.randn(1, context_features)  # Single test context
 
-        # Get samples from trained MDN
+        # Get samples from trained estimator (sbi convention: sample_shape, batch, input)
         with torch.no_grad():
-            mdn_samples = mdn.sample(torch.Size([num_test_samples]), test_context).squeeze(0)
+            samples = estimator.sample(torch.Size([num_test_samples]), test_context)
+            # Shape: (num_test_samples, 1, features) -> squeeze batch dim
+            estimator_samples = samples.squeeze(1)
 
         # Get samples from true distribution
         test_context_expanded = test_context.expand(num_test_samples, -1)
         true_samples = sample_from_true_mog(test_context_expanded)
 
         # Compare using c2st
-        c2st_score = c2st(mdn_samples, true_samples).item()
+        c2st_score = c2st(estimator_samples, true_samples).item()
 
         # c2st should be close to 0.5 (chance level) if distributions match
         assert 0.4 <= c2st_score <= 0.6, (
-            f"MDN c2st={c2st_score:.3f} is too far from chance level (0.5). "
-            "The MDN may not have learned the true distribution accurately."
+            f"Estimator c2st={c2st_score:.3f} is too far from chance level (0.5). "
+            "The estimator may not have learned the true distribution accurately."
         )
 
-    def test_mdn_learns_simple_gaussian(self):
-        """Test that MDN can learn a simple Gaussian (single component).
+    def test_estimator_learns_simple_gaussian(self):
+        """Test that estimator can learn a simple Gaussian (single component).
 
         This is a simpler test that verifies basic learning capability.
         """
@@ -487,18 +492,23 @@ class TestMultivariateGaussianMDNFunctional:
         train_samples = torch.stack([sample_true(c.unsqueeze(0)).squeeze(0)
                                      for c in train_context])
 
-        # Train MDN with single component
-        mdn = MultivariateGaussianMDN(
+        # Create MixtureDensityEstimator with single component
+        mdn_net = MultivariateGaussianMDN(
             features=features,
             context_features=context_features,
             hidden_features=32,
             num_components=1,  # Single component for Gaussian
             num_hidden_layers=2,
         )
+        estimator = MixtureDensityEstimator(
+            net=mdn_net,
+            input_shape=torch.Size([features]),
+            condition_shape=torch.Size([context_features]),
+        )
 
-        optimizer = torch.optim.Adam(mdn.parameters(), lr=1e-3)
+        optimizer = torch.optim.Adam(estimator.parameters(), lr=1e-3)
 
-        mdn.train()
+        estimator.train()
         for _ in range(50):
             perm = torch.randperm(num_train)
             for i in range(0, num_train, 128):
@@ -506,23 +516,410 @@ class TestMultivariateGaussianMDNFunctional:
                 batch_x = train_samples[perm[i:i + 128]]
 
                 optimizer.zero_grad()
-                loss = -mdn.log_prob(batch_x, batch_ctx).mean()
+                loss = estimator.loss(batch_x, batch_ctx).mean()
                 loss.backward()
                 optimizer.step()
 
         # Test
-        mdn.eval()
+        estimator.eval()
         test_ctx = torch.tensor([[0.5, -0.5]])
 
         with torch.no_grad():
-            mdn_samples = mdn.sample(torch.Size([num_test_samples]), test_ctx).squeeze(0)
+            samples = estimator.sample(torch.Size([num_test_samples]), test_ctx)
+            # Shape: (num_test_samples, 1, features) -> squeeze batch dim
+            estimator_samples = samples.squeeze(1)
 
         true_samples = torch.stack([
             sample_true(test_ctx).squeeze(0) for _ in range(num_test_samples)
         ])
 
-        c2st_score = c2st(mdn_samples, true_samples).item()
+        c2st_score = c2st(estimator_samples, true_samples).item()
 
         assert 0.35 <= c2st_score <= 0.65, (
-            f"MDN c2st={c2st_score:.3f} indicates poor learning."
+            f"Estimator c2st={c2st_score:.3f} indicates poor learning."
         )
+
+
+# ============================================================================
+# MixtureDensityEstimator Tests
+# ============================================================================
+
+
+class TestMixtureDensityEstimatorCreation:
+    """Test MixtureDensityEstimator creation and initialization."""
+
+    def test_estimator_creation_basic(self):
+        """Test basic estimator creation."""
+        mdn_net = MultivariateGaussianMDN(
+            features=3,
+            context_features=5,
+            hidden_features=20,
+            num_components=4,
+        )
+        estimator = MixtureDensityEstimator(
+            net=mdn_net,
+            input_shape=torch.Size([3]),
+            condition_shape=torch.Size([5]),
+        )
+
+        assert estimator.input_shape == torch.Size([3])
+        assert estimator.condition_shape == torch.Size([5])
+
+    def test_estimator_creation_with_embedding_net(self):
+        """Test estimator creation with embedding network."""
+        embedding_net = nn.Sequential(
+            nn.Linear(10, 5),
+            nn.ReLU(),
+        )
+        mdn_net = MultivariateGaussianMDN(
+            features=3,
+            context_features=5,  # Must match embedding output
+            hidden_features=20,
+            num_components=4,
+        )
+        estimator = MixtureDensityEstimator(
+            net=mdn_net,
+            input_shape=torch.Size([3]),
+            condition_shape=torch.Size([10]),  # Raw condition dim
+            embedding_net=embedding_net,
+        )
+
+        assert estimator.embedding_net is embedding_net
+        assert estimator.condition_shape == torch.Size([10])
+
+    def test_estimator_creation_mismatched_embedding_raises(self):
+        """Test that mismatched embedding dimensions raise error."""
+        embedding_net = nn.Sequential(
+            nn.Linear(10, 7),  # Outputs 7
+            nn.ReLU(),
+        )
+        mdn_net = MultivariateGaussianMDN(
+            features=3,
+            context_features=5,  # Expects 5
+            hidden_features=20,
+            num_components=4,
+        )
+
+        with pytest.raises(ValueError, match="embedding_net output dimension"):
+            MixtureDensityEstimator(
+                net=mdn_net,
+                input_shape=torch.Size([3]),
+                condition_shape=torch.Size([10]),
+                embedding_net=embedding_net,
+            )
+
+
+class TestMixtureDensityEstimatorLogProb:
+    """Test MixtureDensityEstimator log_prob method."""
+
+    def test_log_prob_shape_2d_input(self):
+        """Test log_prob with 2D input (batch_dim, input_dim)."""
+        batch_size = 8
+        input_dim = 3
+        condition_dim = 5
+
+        mdn_net = MultivariateGaussianMDN(
+            features=input_dim,
+            context_features=condition_dim,
+            hidden_features=20,
+            num_components=4,
+        )
+        estimator = MixtureDensityEstimator(
+            net=mdn_net,
+            input_shape=torch.Size([input_dim]),
+            condition_shape=torch.Size([condition_dim]),
+        )
+
+        condition = torch.randn(batch_size, condition_dim)
+        inputs = torch.randn(batch_size, input_dim)
+
+        log_prob = estimator.log_prob(inputs, condition)
+
+        assert log_prob.shape == (batch_size,)
+        assert torch.all(torch.isfinite(log_prob))
+
+    def test_log_prob_shape_3d_input(self):
+        """Test log_prob with 3D input (sample_dim, batch_dim, input_dim)."""
+        sample_dim = 10
+        batch_size = 8
+        input_dim = 3
+        condition_dim = 5
+
+        mdn_net = MultivariateGaussianMDN(
+            features=input_dim,
+            context_features=condition_dim,
+            hidden_features=20,
+            num_components=4,
+        )
+        estimator = MixtureDensityEstimator(
+            net=mdn_net,
+            input_shape=torch.Size([input_dim]),
+            condition_shape=torch.Size([condition_dim]),
+        )
+
+        condition = torch.randn(batch_size, condition_dim)
+        inputs = torch.randn(sample_dim, batch_size, input_dim)
+
+        log_prob = estimator.log_prob(inputs, condition)
+
+        assert log_prob.shape == (sample_dim, batch_size)
+        assert torch.all(torch.isfinite(log_prob))
+
+    def test_log_prob_with_embedding_net(self):
+        """Test log_prob with embedding network."""
+        batch_size = 8
+        input_dim = 3
+        raw_condition_dim = 10
+        embedded_dim = 5
+
+        embedding_net = nn.Linear(raw_condition_dim, embedded_dim)
+        mdn_net = MultivariateGaussianMDN(
+            features=input_dim,
+            context_features=embedded_dim,
+            hidden_features=20,
+            num_components=4,
+        )
+        estimator = MixtureDensityEstimator(
+            net=mdn_net,
+            input_shape=torch.Size([input_dim]),
+            condition_shape=torch.Size([raw_condition_dim]),
+            embedding_net=embedding_net,
+        )
+
+        condition = torch.randn(batch_size, raw_condition_dim)
+        inputs = torch.randn(batch_size, input_dim)
+
+        log_prob = estimator.log_prob(inputs, condition)
+
+        assert log_prob.shape == (batch_size,)
+
+
+class TestMixtureDensityEstimatorLoss:
+    """Test MixtureDensityEstimator loss method."""
+
+    def test_loss_shape(self):
+        """Test that loss returns correct shape."""
+        batch_size = 16
+        input_dim = 3
+        condition_dim = 5
+
+        mdn_net = MultivariateGaussianMDN(
+            features=input_dim,
+            context_features=condition_dim,
+            hidden_features=20,
+            num_components=4,
+        )
+        estimator = MixtureDensityEstimator(
+            net=mdn_net,
+            input_shape=torch.Size([input_dim]),
+            condition_shape=torch.Size([condition_dim]),
+        )
+
+        condition = torch.randn(batch_size, condition_dim)
+        inputs = torch.randn(batch_size, input_dim)
+
+        loss = estimator.loss(inputs, condition)
+
+        assert loss.shape == (batch_size,)
+        assert torch.all(torch.isfinite(loss))
+
+    def test_loss_equals_negative_log_prob(self):
+        """Test that loss equals negative log probability."""
+        mdn_net = MultivariateGaussianMDN(
+            features=2,
+            context_features=3,
+            hidden_features=20,
+            num_components=4,
+        )
+        estimator = MixtureDensityEstimator(
+            net=mdn_net,
+            input_shape=torch.Size([2]),
+            condition_shape=torch.Size([3]),
+        )
+
+        condition = torch.randn(8, 3)
+        inputs = torch.randn(8, 2)
+
+        loss = estimator.loss(inputs, condition)
+        log_prob = estimator.log_prob(inputs, condition)
+
+        assert torch.allclose(loss, -log_prob)
+
+    def test_loss_gradient_flows(self):
+        """Test that gradients flow through loss."""
+        mdn_net = MultivariateGaussianMDN(
+            features=2,
+            context_features=3,
+            hidden_features=20,
+            num_components=4,
+        )
+        estimator = MixtureDensityEstimator(
+            net=mdn_net,
+            input_shape=torch.Size([2]),
+            condition_shape=torch.Size([3]),
+        )
+
+        condition = torch.randn(8, 3)
+        inputs = torch.randn(8, 2)
+
+        loss = estimator.loss(inputs, condition).mean()
+        loss.backward()
+
+        # Check gradients exist on MDN parameters
+        for param in estimator.net.parameters():
+            assert param.grad is not None
+
+
+class TestMixtureDensityEstimatorSample:
+    """Test MixtureDensityEstimator sample method."""
+
+    def test_sample_shape(self):
+        """Test sample output shape follows sbi convention."""
+        batch_size = 8
+        input_dim = 3
+        condition_dim = 5
+        num_samples = 100
+
+        mdn_net = MultivariateGaussianMDN(
+            features=input_dim,
+            context_features=condition_dim,
+            hidden_features=20,
+            num_components=4,
+        )
+        estimator = MixtureDensityEstimator(
+            net=mdn_net,
+            input_shape=torch.Size([input_dim]),
+            condition_shape=torch.Size([condition_dim]),
+        )
+
+        condition = torch.randn(batch_size, condition_dim)
+        samples = estimator.sample(torch.Size([num_samples]), condition)
+
+        # sbi convention: (*sample_shape, batch_dim, *input_shape)
+        assert samples.shape == (num_samples, batch_size, input_dim)
+
+    def test_sample_shape_multi_dim(self):
+        """Test sample with multi-dimensional sample_shape."""
+        batch_size = 4
+        input_dim = 2
+        condition_dim = 3
+
+        mdn_net = MultivariateGaussianMDN(
+            features=input_dim,
+            context_features=condition_dim,
+            hidden_features=20,
+            num_components=4,
+        )
+        estimator = MixtureDensityEstimator(
+            net=mdn_net,
+            input_shape=torch.Size([input_dim]),
+            condition_shape=torch.Size([condition_dim]),
+        )
+
+        condition = torch.randn(batch_size, condition_dim)
+        samples = estimator.sample(torch.Size([10, 5]), condition)
+
+        # sbi convention: (*sample_shape, batch_dim, *input_shape)
+        assert samples.shape == (10, 5, batch_size, input_dim)
+
+    def test_sample_finite(self):
+        """Test that samples are finite."""
+        mdn_net = MultivariateGaussianMDN(
+            features=3,
+            context_features=5,
+            hidden_features=20,
+            num_components=4,
+        )
+        estimator = MixtureDensityEstimator(
+            net=mdn_net,
+            input_shape=torch.Size([3]),
+            condition_shape=torch.Size([5]),
+        )
+
+        condition = torch.randn(8, 5)
+        samples = estimator.sample(torch.Size([100]), condition)
+
+        assert torch.all(torch.isfinite(samples))
+
+
+class TestMixtureDensityEstimatorGetMog:
+    """Test MixtureDensityEstimator get_mog method."""
+
+    def test_get_mog_returns_mog(self):
+        """Test that get_mog returns a MoG object."""
+        mdn_net = MultivariateGaussianMDN(
+            features=3,
+            context_features=5,
+            hidden_features=20,
+            num_components=4,
+        )
+        estimator = MixtureDensityEstimator(
+            net=mdn_net,
+            input_shape=torch.Size([3]),
+            condition_shape=torch.Size([5]),
+        )
+
+        condition = torch.randn(8, 5)
+        mog = estimator.get_mog(condition)
+
+        assert isinstance(mog, MoG)
+        assert mog.batch_shape == torch.Size([8])
+        assert mog.num_components == 4
+        assert mog.dim == 3
+
+    def test_get_mog_with_embedding_net(self):
+        """Test get_mog applies embedding network."""
+        embedding_net = nn.Linear(10, 5)
+        mdn_net = MultivariateGaussianMDN(
+            features=3,
+            context_features=5,
+            hidden_features=20,
+            num_components=4,
+        )
+        estimator = MixtureDensityEstimator(
+            net=mdn_net,
+            input_shape=torch.Size([3]),
+            condition_shape=torch.Size([10]),
+            embedding_net=embedding_net,
+        )
+
+        # Should accept raw condition shape
+        condition = torch.randn(8, 10)
+        mog = estimator.get_mog(condition)
+
+        assert isinstance(mog, MoG)
+        assert mog.batch_shape == torch.Size([8])
+
+
+class TestMixtureDensityEstimatorSampleAndLogProb:
+    """Test MixtureDensityEstimator sample_and_log_prob method."""
+
+    def test_sample_and_log_prob_consistency(self):
+        """Test that sample_and_log_prob is consistent with separate calls."""
+        mdn_net = MultivariateGaussianMDN(
+            features=2,
+            context_features=3,
+            hidden_features=20,
+            num_components=4,
+        )
+        estimator = MixtureDensityEstimator(
+            net=mdn_net,
+            input_shape=torch.Size([2]),
+            condition_shape=torch.Size([3]),
+        )
+
+        torch.manual_seed(42)
+        condition = torch.randn(4, 3)
+
+        # Get samples and log_probs in one call
+        torch.manual_seed(123)
+        samples, log_probs = estimator.sample_and_log_prob(
+            torch.Size([10]), condition
+        )
+
+        # Compute log_probs separately
+        log_probs_separate = estimator.log_prob(samples, condition)
+
+        assert samples.shape == (10, 4, 2)
+        assert log_probs.shape == (10, 4)
+        assert torch.allclose(log_probs, log_probs_separate)

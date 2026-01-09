@@ -5,7 +5,7 @@
 
 This module provides:
 - MultivariateGaussianMDN: Neural network that outputs MoG parameters
-- MixtureDensityEstimator: ConditionalDensityEstimator wrapper (TODO: Phase 2)
+- MixtureDensityEstimator: ConditionalDensityEstimator wrapper for sbi integration
 
 The MDN implementation is adapted from pyknos (https://github.com/sbi-dev/pyknos),
 original implementation by Conor M. Durkan et al., licensed under Apache 2.0.
@@ -19,6 +19,7 @@ import torch
 from torch import Tensor, nn
 from torch.nn import functional as F
 
+from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
 from sbi.neural_nets.estimators.mog import MoG
 
 
@@ -251,30 +252,10 @@ class MultivariateGaussianMDN(nn.Module):
             context: Conditioning context, shape (batch_size, context_features).
 
         Returns:
-            Samples, shape (batch_size, *sample_shape, features).
-
-        Note:
-            Output shape differs from MoG.sample() which returns (*sample_shape,
-            batch_size, dim). MDN places batch_size first since it represents
-            conditioning on different observations.
+            Samples, shape (*sample_shape, batch_size, features).
         """
         mog = self.get_mixture_components(context)
-
-        # MoG.sample returns (*sample_shape, batch_size, features)
-        samples = mog.sample(sample_shape)
-
-        # Move batch dimension to front: (*sample_shape, batch_size, features)
-        # -> (batch_size, *sample_shape, features)
-        num_sample_dims = len(sample_shape)
-
-        # Permute: move the batch_size dim (which is after sample_shape dims) to front
-        # From: (s1, s2, ..., batch_size, features) to (batch_size, s1, s2, ..., features)
-        dims = list(range(samples.dim()))
-        batch_dim_idx = num_sample_dims
-        new_dims = [batch_dim_idx] + dims[:batch_dim_idx] + dims[batch_dim_idx + 1:]
-        samples = samples.permute(*new_dims)
-
-        return samples
+        return mog.sample(sample_shape)
 
     def _initialize(self) -> None:
         """Initialize MDN for approximately uniform mixture and identity covariance.
@@ -318,3 +299,160 @@ class MultivariateGaussianMDN(nn.Module):
     def hidden_features(self) -> int:
         """Dimension of hidden representation."""
         return self._hidden_features
+
+
+class MixtureDensityEstimator(ConditionalDensityEstimator):
+    """MDN-based conditional density estimator.
+
+    Wraps a MultivariateGaussianMDN and provides the standard ConditionalDensityEstimator
+    interface for use with sbi's training and inference pipelines.
+
+    The estimator models the conditional distribution p(input | condition) as a
+    Mixture of Gaussians, where the mixture parameters are predicted by a neural
+    network given the condition.
+
+    Example:
+        >>> # Create MDN with 2D input, 5D condition, 10 mixture components
+        >>> mdn_net = MultivariateGaussianMDN(
+        ...     features=2,
+        ...     context_features=5,
+        ...     hidden_features=50,
+        ...     num_components=10,
+        ... )
+        >>> estimator = MixtureDensityEstimator(
+        ...     net=mdn_net,
+        ...     input_shape=torch.Size([2]),
+        ...     condition_shape=torch.Size([5]),
+        ... )
+        >>> # Use for density estimation
+        >>> condition = torch.randn(32, 5)
+        >>> samples = estimator.sample(torch.Size([100]), condition)  # (100, 32, 2)
+        >>> log_prob = estimator.log_prob(samples, condition)  # (100, 32)
+    """
+
+    def __init__(
+        self,
+        net: MultivariateGaussianMDN,
+        input_shape: torch.Size,
+        condition_shape: torch.Size,
+        embedding_net: Optional[nn.Module] = None,
+    ) -> None:
+        """Initialize the mixture density estimator.
+
+        Args:
+            net: MultivariateGaussianMDN that maps conditions to MoG parameters.
+            input_shape: Shape of the input (parameter space), typically (dim,).
+            condition_shape: Shape of the condition (observation space), typically (dim,).
+            embedding_net: Optional network to embed the condition before passing
+                to the MDN. If provided, condition is first transformed by this
+                network. The output dimension must match net.context_features.
+        """
+        super().__init__(net, input_shape, condition_shape)
+        self._embedding_net = embedding_net if embedding_net is not None else nn.Identity()
+
+        # Validate that embedding_net output matches MDN input if embedding is provided
+        if embedding_net is not None:
+            with torch.no_grad():
+                test_input = torch.randn(1, *condition_shape)
+                test_output = self._embedding_net(test_input)
+                embedded_dim = test_output.shape[-1]
+            if embedded_dim != net.context_features:
+                raise ValueError(
+                    f"embedding_net output dimension ({embedded_dim}) does not match "
+                    f"MDN context_features ({net.context_features})"
+                )
+
+    @property
+    def embedding_net(self) -> nn.Module:
+        """Return the embedding network."""
+        return self._embedding_net
+
+    def log_prob(self, input: Tensor, condition: Tensor, **kwargs) -> Tensor:
+        """Compute log probability of inputs given conditions.
+
+        Args:
+            input: Inputs to evaluate, shape (sample_dim, batch_dim, *input_shape)
+                or (batch_dim, *input_shape).
+            condition: Conditions, shape (batch_dim, *condition_shape).
+
+        Returns:
+            Log probabilities. Shape (sample_dim, batch_dim) if input has sample_dim,
+            otherwise (batch_dim,).
+        """
+        self._check_condition_shape(condition)
+        self._check_input_shape(input)
+
+        # Embed condition
+        embedded_condition = self._embedding_net(condition)
+
+        # Handle input with or without sample dimension
+        has_sample_dim = input.dim() > len(self.input_shape) + 1
+        if not has_sample_dim:
+            input = input.unsqueeze(0)
+
+        sample_dim = input.shape[0]
+        batch_dim = input.shape[1]
+
+        # Get MoG parameters
+        mog = self.net.get_mixture_components(embedded_condition)
+
+        # MoG.log_prob handles (sample_dim, batch_dim, dim) input
+        log_probs = mog.log_prob(input)  # (sample_dim, batch_dim)
+
+        if not has_sample_dim:
+            log_probs = log_probs.squeeze(0)
+
+        return log_probs
+
+    def loss(self, input: Tensor, condition: Tensor, **kwargs) -> Tensor:
+        """Compute training loss (negative log probability).
+
+        Args:
+            input: Inputs, shape (batch_dim, *input_shape).
+            condition: Conditions, shape (batch_dim, *condition_shape).
+
+        Returns:
+            Loss per batch element, shape (batch_dim,).
+        """
+        # Add sample dimension, compute log_prob, remove sample dimension
+        log_prob = self.log_prob(input.unsqueeze(0), condition)
+        return -log_prob.squeeze(0)
+
+    def sample(self, sample_shape: torch.Size, condition: Tensor, **kwargs) -> Tensor:
+        """Sample from the conditional distribution.
+
+        Args:
+            sample_shape: Shape prefix for samples.
+            condition: Conditions, shape (batch_dim, *condition_shape).
+
+        Returns:
+            Samples, shape (*sample_shape, batch_dim, *input_shape).
+        """
+        self._check_condition_shape(condition)
+
+        # Embed condition
+        embedded_condition = self._embedding_net(condition)
+
+        # Get MoG parameters
+        mog = self.net.get_mixture_components(embedded_condition)
+
+        # MoG.sample returns (*sample_shape, batch_dim, dim) - matches sbi convention
+        samples = mog.sample(sample_shape)
+
+        return samples
+
+    def get_mog(self, condition: Tensor) -> MoG:
+        """Extract MoG parameters for a given condition.
+
+        Useful for accessing the raw mixture parameters, e.g., for
+        SNPE-A correction or analysis.
+
+        Args:
+            condition: Conditions, shape (batch_dim, *condition_shape).
+
+        Returns:
+            MoG object containing mixture parameters.
+        """
+        self._check_condition_shape(condition)
+        embedded_condition = self._embedding_net(condition)
+        return self.net.get_mixture_components(embedded_condition)
