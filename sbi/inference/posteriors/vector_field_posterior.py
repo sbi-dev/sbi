@@ -164,6 +164,7 @@ class VectorFieldPosterior(NeuralPosterior):
         show_progress_bars: bool = True,
         reject_outside_prior: bool = True,
         max_sampling_time: Optional[float] = None,
+        return_partial_on_timeout: bool = False,
     ) -> Tensor:
         r"""Return samples from posterior distribution $p(\theta|x)$.
 
@@ -209,6 +210,9 @@ class VectorFieldPosterior(NeuralPosterior):
                 If exceeded, sampling is aborted and a RuntimeError is raised. Only
                 applies when `reject_outside_prior=True` (no effect otherwise since
                 direct sampling does not use rejection).
+            return_partial_on_timeout: If True and `max_sampling_time` is exceeded,
+                return the samples collected so far instead of raising a RuntimeError.
+                A warning will be issued. Only applies when `reject_outside_prior=True`.
         """
 
         if sample_with is None:
@@ -235,6 +239,7 @@ class VectorFieldPosterior(NeuralPosterior):
                     show_progress_bars=show_progress_bars,
                     max_sampling_batch_size=max_sampling_batch_size,
                     max_sampling_time=max_sampling_time,
+                    return_partial_on_timeout=return_partial_on_timeout,
                 )
             else:
                 # Bypass rejection sampling entirely.
@@ -259,6 +264,7 @@ class VectorFieldPosterior(NeuralPosterior):
                     max_sampling_batch_size=max_sampling_batch_size,
                     proposal_sampling_kwargs=proposal_sampling_kwargs,
                     max_sampling_time=max_sampling_time,
+                    return_partial_on_timeout=return_partial_on_timeout,
                 )
             else:
                 # Bypass rejection sampling entirely.
@@ -459,6 +465,7 @@ class VectorFieldPosterior(NeuralPosterior):
         show_progress_bars: bool = True,
         reject_outside_prior: bool = True,
         max_sampling_time: Optional[float] = None,
+        return_partial_on_timeout: bool = False,
     ) -> Tensor:
         r"""Given a batch of observations [x_1, ..., x_B] this function samples from
         posteriors $p(\theta|x_1)$, ... ,$p(\theta|x_B)$, in a batched (i.e. vectorized)
@@ -488,6 +495,9 @@ class VectorFieldPosterior(NeuralPosterior):
             max_sampling_time: Optional maximum allowed sampling time in seconds.
                 If exceeded, sampling is aborted and a RuntimeError is raised. Only
                 applies when `reject_outside_prior=True`.
+            return_partial_on_timeout: If True and `max_sampling_time` is exceeded,
+                return the samples collected so far instead of raising a RuntimeError.
+                A warning will be issued. Only applies when `reject_outside_prior=True`.
 
         Returns:
             Samples from the posteriors of shape (*sample_shape, B, *input_shape)
@@ -525,6 +535,7 @@ class VectorFieldPosterior(NeuralPosterior):
                     show_progress_bars=show_progress_bars,
                     max_sampling_batch_size=max_sampling_batch_size,
                     max_sampling_time=max_sampling_time,
+                    return_partial_on_timeout=return_partial_on_timeout,
                 )
             else:
                 # Bypass rejection sampling.
@@ -553,6 +564,7 @@ class VectorFieldPosterior(NeuralPosterior):
                     max_sampling_batch_size=max_sampling_batch_size,
                     proposal_sampling_kwargs=proposal_sampling_kwargs,
                     max_sampling_time=max_sampling_time,
+                    return_partial_on_timeout=return_partial_on_timeout,
                 )
             else:
                 # Bypass rejection sampling.
