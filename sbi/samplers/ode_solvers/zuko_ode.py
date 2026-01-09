@@ -23,12 +23,12 @@ class ZukoNeuralODE(NeuralODE):
         net: nn.Module,
         mean_base: Tensor,
         std_base: Tensor,
+        condition_shape: Size,
         t_min: float = 0.0,
         t_max: float = 1.0,
         atol: float = 1e-6,
         rtol: float = 1e-5,
         exact: bool = True,
-        condition_shape: Size = Size([1]),
     ) -> None:
         r"""
         Initialize the ZukoNeuralODE class.
@@ -52,13 +52,16 @@ class ZukoNeuralODE(NeuralODE):
                 Expected shape: (1, theta_dim).
             std_base: The std of the base distribution.
                 Expected shape: (1, theta_dim).
+            condition_shape: The event shape of the condition tensor (excluding batch
+                dimensions). For example, for 2D image conditions with shape
+                (batch, H, W), use Size([H, W]). For 1D vector conditions with
+                shape (batch, dim), use Size([dim]).
             t_min: The minimum time value for the ODE solver.
             t_max: The maximum time value for the ODE solver.
             atol: The absolute tolerance for the ODE solver.
             rtol: The relative tolerance for the ODE solver.
             exact: Whether the exact log-determinant of the Jacobian or an unbiased
-            stochastic estimate thereof is calculated.
-            condition_shape: The shape of the condition tensor.
+                stochastic estimate thereof is calculated.
         """
 
         super().__init__(

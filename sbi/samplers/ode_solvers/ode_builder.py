@@ -5,7 +5,7 @@
 Builder for ODE solvers.
 """
 
-from torch import Tensor, nn
+from torch import Size, Tensor, nn
 
 from sbi.samplers.ode_solvers.base import NeuralODE, NeuralODEFunc
 from sbi.samplers.ode_solvers.zuko_ode import ZukoNeuralODE
@@ -16,6 +16,7 @@ def build_neural_ode(
     net: nn.Module,
     mean_base: Tensor,
     std_base: Tensor,
+    condition_shape: Size,
     backend: str = "zuko",
     t_min: float = 0.0,
     t_max: float = 1.0,
@@ -35,6 +36,10 @@ def build_neural_ode(
             but is used to track the parameters of the neural network.
         mean_base: The mean of the base distribution.
         std_base: The std of the base distribution.
+        condition_shape: The event shape of the condition tensor (excluding batch
+            dimensions). For example, for 2D image conditions with shape
+            (batch, H, W), use Size([H, W]). For 1D vector conditions with
+            shape (batch, dim), use Size([dim]).
         backend: The backend to be used. Currently only "zuko" is supported.
         t_min: The minimum time value.
         t_max: The maximum time value.
@@ -47,6 +52,8 @@ def build_neural_ode(
         ValueError: If the backend is not supported.
     """
     if backend == "zuko":
-        return ZukoNeuralODE(f, net, mean_base, std_base, t_min, t_max, **kwargs)
+        return ZukoNeuralODE(
+            f, net, mean_base, std_base, condition_shape, t_min, t_max, **kwargs
+        )
     else:
         raise ValueError(f"Backend {backend} not supported")
