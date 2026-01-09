@@ -106,10 +106,22 @@ class NeuralPosterior:
         sample_shape: Shape = torch.Size(),
         x: Optional[Tensor] = None,
         show_progress_bars: bool = True,
-        mcmc_method: Optional[str] = None,
-        mcmc_parameters: Optional[Dict[str, Any]] = None,
+        **kwargs: Any,
     ) -> Tensor:
-        """See child classes for docstring."""
+        r"""Draw samples from the approximate posterior distribution $p(\theta|x)$.
+
+        Args:
+            sample_shape: Shape of samples to draw.
+            x: Conditioning observation $x_o$. If not provided, uses the default
+                `x` set via `.set_default_x()`.
+            show_progress_bars: Whether to show a progress bar during sampling.
+            **kwargs: Additional keyword arguments passed to the specific
+                posterior's sampling method. See the docstring of the specific
+                posterior class for available options.
+
+        Returns:
+            Samples from the posterior with shape `(*sample_shape, *theta_shape)`.
+        """
         pass
 
     @abstractmethod
@@ -117,10 +129,24 @@ class NeuralPosterior:
         self,
         sample_shape: Shape,
         x: Tensor,
-        max_sampling_batch_size: int = 10_000,
         show_progress_bars: bool = True,
+        **kwargs: Any,
     ) -> Tensor:
-        """See child classes for docstring."""
+        r"""Draw samples from the posteriors for a batch of different xs.
+
+        Given a batch of observations `[x_1, ..., x_B]`, this method samples from
+        posteriors $p(\theta|x_1), \ldots, p(\theta|x_B)$ in a vectorized manner.
+
+        Args:
+            sample_shape: Shape of samples to draw for each observation.
+            x: Batch of observations with shape `(batch_dim, *event_shape_x)`.
+            show_progress_bars: Whether to show a progress bar during sampling.
+            **kwargs: Additional keyword arguments passed to the specific
+                posterior's sampling method.
+
+        Returns:
+            Samples with shape `(*sample_shape, batch_dim, *theta_shape)`.
+        """
         pass
 
     @property

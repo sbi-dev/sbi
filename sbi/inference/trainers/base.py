@@ -1288,7 +1288,7 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
             state_dict: State to be restored.
         """
         state_dict["_summary_writer"] = self._default_summary_writer()
-        self.__dict__ = state_dict
+        vars(self).update(state_dict)
 
 
 def check_if_proposal_has_default_x(proposal: Any):
