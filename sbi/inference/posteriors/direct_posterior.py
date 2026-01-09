@@ -141,6 +141,7 @@ class DirectPosterior(NeuralPosterior):
         show_progress_bars: bool = True,
         reject_outside_prior: bool = True,
         max_sampling_time: Optional[float] = None,
+        return_partial_on_timeout: bool = False,
     ) -> Tensor:
         r"""Return samples from posterior distribution $p(\theta|x)$.
 
@@ -159,6 +160,9 @@ class DirectPosterior(NeuralPosterior):
                 If exceeded, sampling is aborted and a RuntimeError is raised. Only
                 applies when `reject_outside_prior=True` (no effect otherwise since
                 direct sampling is fast).
+            return_partial_on_timeout: If True and `max_sampling_time` is exceeded,
+                return the samples collected so far instead of raising a RuntimeError.
+                A warning will be issued. Only applies when `reject_outside_prior=True`.
         """
         num_samples = torch.Size(sample_shape).numel()
         x = self._x_else_default_x(x)
@@ -198,6 +202,7 @@ class DirectPosterior(NeuralPosterior):
                 proposal_sampling_kwargs={"condition": x},
                 alternative_method="build_posterior(..., sample_with='mcmc')",
                 max_sampling_time=max_sampling_time,
+                return_partial_on_timeout=return_partial_on_timeout,
             )[0]
         else:
             # Bypass rejection sampling entirely.
@@ -217,6 +222,7 @@ class DirectPosterior(NeuralPosterior):
         show_progress_bars: bool = True,
         reject_outside_prior: bool = True,
         max_sampling_time: Optional[float] = None,
+        return_partial_on_timeout: bool = False,
     ) -> Tensor:
         r"""Given a batch of observations [x_1, ..., x_B] this function samples from
         posteriors $p(\theta|x_1)$, ... ,$p(\theta|x_B)$, in a batched (i.e. vectorized)
@@ -236,6 +242,9 @@ class DirectPosterior(NeuralPosterior):
             max_sampling_time: Optional maximum allowed sampling time in seconds.
                 If exceeded, sampling is aborted and a RuntimeError is raised. Only
                 applies when `reject_outside_prior=True`.
+            return_partial_on_timeout: If True and `max_sampling_time` is exceeded,
+                return the samples collected so far instead of raising a RuntimeError.
+                A warning will be issued. Only applies when `reject_outside_prior=True`.
 
         Returns:
             Samples from the posteriors of shape (*sample_shape, B, *input_shape)
@@ -282,6 +291,7 @@ class DirectPosterior(NeuralPosterior):
                 proposal_sampling_kwargs={"condition": x},
                 alternative_method="build_posterior(..., sample_with='mcmc')",
                 max_sampling_time=max_sampling_time,
+                return_partial_on_timeout=return_partial_on_timeout,
             )[0]
         else:
             # Bypass rejection sampling entirely.
