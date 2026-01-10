@@ -58,11 +58,13 @@ class MoG:
         # Validate tensor dimensions
         if self.logits.dim() != 2:
             raise ValueError(
-                f"logits must be 2D (batch_size, num_components), got {self.logits.dim()}D"
+                f"logits must be 2D (batch_size, num_components), "
+                f"got {self.logits.dim()}D"
             )
         if self.means.dim() != 3:
             raise ValueError(
-                f"means must be 3D (batch_size, num_components, dim), got {self.means.dim()}D"
+                f"means must be 3D (batch_size, num_components, dim), "
+                f"got {self.means.dim()}D"
             )
         if self.precisions.dim() != 4:
             raise ValueError(
@@ -123,8 +125,8 @@ class MoG:
         else:
             if self.precision_factors.shape != self.precisions.shape:
                 raise ValueError(
-                    f"precision_factors shape {self.precision_factors.shape} must match "
-                    f"precisions shape {self.precisions.shape}"
+                    f"precision_factors shape {self.precision_factors.shape} must "
+                    f"match precisions shape {self.precisions.shape}"
                 )
             if not torch.all(torch.isfinite(self.precision_factors)):
                 raise ValueError("precision_factors contains NaN or Inf values")
@@ -196,8 +198,8 @@ class MoG:
         else:
             squeeze_output = False
 
-        sample_size = inputs.shape[0]
-        batch_size = inputs.shape[1]
+        inputs.shape[0]
+        inputs.shape[1]
 
         # Expand inputs for broadcasting with mixture components
         # inputs: (sample_size, batch_size, 1, dim)
@@ -218,10 +220,13 @@ class MoG:
         diff_col = diff.unsqueeze(-1)
 
         # quadratic: (sample_size, batch_size, num_components)
-        quadratic = torch.matmul(
-            torch.matmul(diff_col.transpose(-2, -1), precisions_expanded),
-            diff_col
-        ).squeeze(-1).squeeze(-1)
+        quadratic = (
+            torch.matmul(
+                torch.matmul(diff_col.transpose(-2, -1), precisions_expanded), diff_col
+            )
+            .squeeze(-1)
+            .squeeze(-1)
+        )
 
         # Compute log determinant of precision (= -log det of covariance)
         # Use sum of log diagonal of precision factors if available
@@ -229,7 +234,7 @@ class MoG:
             # sumlogdiag: (batch_size, num_components)
             sumlogdiag = torch.sum(
                 torch.log(torch.diagonal(self.precision_factors, dim1=-2, dim2=-1)),
-                dim=-1
+                dim=-1,
             )
         else:
             # Fall back to computing from precision matrices
@@ -299,8 +304,7 @@ class MoG:
         # To get samples from N(mu, Sigma) where Sigma^{-1} = A^T A,
         # we compute: mu + A^{-1} @ z, where z ~ N(0, I)
         z = torch.randn(
-            batch_size, num_samples, self.dim, 1,
-            device=self.device, dtype=self.dtype
+            batch_size, num_samples, self.dim, 1, device=self.device, dtype=self.dtype
         )
 
         # Solve A @ x = z for x (i.e., x = A^{-1} @ z)
@@ -392,8 +396,8 @@ class MoG:
         cond_precfs = precfs_xx
         cond_precs = precs_xx
 
-        # Update mixture weights using marginal likelihood of y
-        # p(X|Y=y) = p(Y=y, X) / p(Y=y) => weights updated proportional to p(y | component)
+        # Update mixture weights using marginal likelihood of y:
+        # p(X|Y=y) = p(Y=y, X) / p(Y=y) => weights ~ p(y | component)
         diags_yy = torch.diagonal(precfs_yy, dim1=-2, dim2=-1)
         sumlogdiag_yy = torch.sum(torch.log(diags_yy), dim=-1)
 
@@ -406,12 +410,12 @@ class MoG:
         # New (unnormalized) log weights: log(w_k * p(y|k)) = log(w_k) + log(p(y|k))
         new_log_weights = self.logits + log_prob_y_per_component
         # Normalize
-        new_logits = new_log_weights - torch.logsumexp(new_log_weights, dim=-1, keepdim=True)
+        new_logits = new_log_weights - torch.logsumexp(
+            new_log_weights, dim=-1, keepdim=True
+        )
 
         # Compute sumlogdiag for conditional
-        cond_sumlogdiag = torch.sum(
-            torch.log(torch.diagonal(cond_precfs, dim1=-2, dim2=-1)), dim=-1
-        )
+        torch.sum(torch.log(torch.diagonal(cond_precfs, dim1=-2, dim2=-1)), dim=-1)
 
         return MoG(
             logits=new_logits,
@@ -450,10 +454,11 @@ class MoG:
 
         # quadratic form
         diff_col = diff.unsqueeze(-1)  # (batch_size, num_components, dim, 1)
-        quad = torch.matmul(
-            torch.matmul(diff_col.transpose(-2, -1), precisions),
-            diff_col
-        ).squeeze(-1).squeeze(-1)  # (batch_size, num_components)
+        quad = (
+            torch.matmul(torch.matmul(diff_col.transpose(-2, -1), precisions), diff_col)
+            .squeeze(-1)
+            .squeeze(-1)
+        )  # (batch_size, num_components)
 
         # log probability per component (no mixture weights)
         log_norm = -0.5 * dim * np.log(2 * np.pi)
@@ -522,7 +527,7 @@ class MoG:
             covariance = covariance.unsqueeze(0)  # (1, dim, dim)
 
         batch_size = mean.shape[0]
-        dim = mean.shape[1]
+        mean.shape[1]
 
         # Add component dimension
         means = mean.unsqueeze(1)  # (batch_size, 1, dim)

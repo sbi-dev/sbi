@@ -266,13 +266,8 @@ class TestMixtureDensityEstimatorFunctional:
             # Sample from chosen component
             samples = torch.zeros(batch_size, features)
             for i in range(batch_size):
-                if component[i] == 0:
-                    mean = mean1[i]
-                else:
-                    mean = mean2[i]
-                samples[i] = torch.distributions.MultivariateNormal(
-                    mean, cov
-                ).sample()
+                mean = mean1[i] if component[i] == 0 else mean2[i]
+                samples[i] = torch.distributions.MultivariateNormal(mean, cov).sample()
 
             return samples
 
@@ -301,15 +296,15 @@ class TestMixtureDensityEstimatorFunctional:
         num_epochs = 100
 
         estimator.train()
-        for epoch in range(num_epochs):
+        for _epoch in range(num_epochs):
             # Shuffle data
             perm = torch.randperm(num_train)
             train_context_shuffled = train_context[perm]
             train_samples_shuffled = train_samples[perm]
 
             for i in range(0, num_train, batch_size):
-                batch_context = train_context_shuffled[i:i + batch_size]
-                batch_samples = train_samples_shuffled[i:i + batch_size]
+                batch_context = train_context_shuffled[i : i + batch_size]
+                batch_samples = train_samples_shuffled[i : i + batch_size]
 
                 optimizer.zero_grad()
                 loss = estimator.loss(batch_samples, batch_context).mean()
@@ -320,7 +315,7 @@ class TestMixtureDensityEstimatorFunctional:
         estimator.eval()
         test_context = torch.randn(1, context_features)  # Single test context
 
-        # Get samples from trained estimator (sbi convention: sample_shape, batch, input)
+        # Get samples from trained estimator (sbi: sample_shape, batch, input)
         with torch.no_grad():
             samples = estimator.sample(torch.Size([num_test_samples]), test_context)
             # Shape: (num_test_samples, 1, features) -> squeeze batch dim
@@ -361,8 +356,9 @@ class TestMixtureDensityEstimatorFunctional:
 
         # Generate training data
         train_context = torch.randn(num_train, context_features)
-        train_samples = torch.stack([sample_true(c.unsqueeze(0)).squeeze(0)
-                                     for c in train_context])
+        train_samples = torch.stack([
+            sample_true(c.unsqueeze(0)).squeeze(0) for c in train_context
+        ])
 
         # Create MixtureDensityEstimator with single component
         mdn_net = MultivariateGaussianMDN(
@@ -384,8 +380,8 @@ class TestMixtureDensityEstimatorFunctional:
         for _ in range(50):
             perm = torch.randperm(num_train)
             for i in range(0, num_train, 128):
-                batch_ctx = train_context[perm[i:i + 128]]
-                batch_x = train_samples[perm[i:i + 128]]
+                batch_ctx = train_context[perm[i : i + 128]]
+                batch_x = train_samples[perm[i : i + 128]]
 
                 optimizer.zero_grad()
                 loss = estimator.loss(batch_x, batch_ctx).mean()
@@ -467,10 +463,13 @@ class TestMixtureDensityEstimatorCreation:
 class TestMixtureDensityEstimatorLogProb:
     """Test MixtureDensityEstimator log_prob method."""
 
-    @pytest.mark.parametrize("input_shape,expected_shape", [
-        ((8, 3), (8,)),  # 2D: (batch_dim, input_dim)
-        ((10, 8, 3), (10, 8)),  # 3D: (sample_dim, batch_dim, input_dim)
-    ])
+    @pytest.mark.parametrize(
+        "input_shape,expected_shape",
+        [
+            ((8, 3), (8,)),  # 2D: (batch_dim, input_dim)
+            ((10, 8, 3), (10, 8)),  # 3D: (sample_dim, batch_dim, input_dim)
+        ],
+    )
     def test_log_prob_shape(self, input_shape, expected_shape):
         """Test log_prob output shape for different input shapes."""
         batch_size = 8
@@ -551,10 +550,13 @@ class TestMixtureDensityEstimatorLoss:
 class TestMixtureDensityEstimatorSample:
     """Test MixtureDensityEstimator sample method."""
 
-    @pytest.mark.parametrize("sample_shape,expected_shape", [
-        (torch.Size([100]), (100, 8, 3)),  # 1D sample_shape
-        (torch.Size([10, 5]), (10, 5, 8, 3)),  # 2D sample_shape
-    ])
+    @pytest.mark.parametrize(
+        "sample_shape,expected_shape",
+        [
+            (torch.Size([100]), (100, 8, 3)),  # 1D sample_shape
+            (torch.Size([10, 5]), (10, 5, 8, 3)),  # 2D sample_shape
+        ],
+    )
     def test_sample_shape(self, sample_shape, expected_shape):
         """Test sample output shape follows sbi convention."""
         batch_size = 8
@@ -652,9 +654,7 @@ class TestMixtureDensityEstimatorSampleAndLogProb:
 
         # Get samples and log_probs in one call
         torch.manual_seed(123)
-        samples, log_probs = estimator.sample_and_log_prob(
-            torch.Size([10]), condition
-        )
+        samples, log_probs = estimator.sample_and_log_prob(torch.Size([10]), condition)
 
         # Compute log_probs separately
         log_probs_separate = estimator.log_prob(samples, condition)
@@ -698,7 +698,9 @@ class TestMixtureDensityEstimatorCorrection:
             high=torch.ones(2),
         )
 
-        with pytest.raises(ValueError, match="must be MultivariateNormal or BoxUniform"):
+        with pytest.raises(
+            ValueError, match="must be MultivariateNormal or BoxUniform"
+        ):
             estimator.apply_correction(proposal_mog, invalid_prior)
 
 
@@ -757,6 +759,7 @@ class TestSNPEACorrectionMath:
             corrected_mog.precisions, expected_precision, atol=1e-4
         ), "Posterior precision should equal prior precision when proposal==density"
 
+
 class TestBoxUniformPriorCorrection:
     """Test SNPE-A correction with BoxUniform (uniform) priors."""
 
@@ -779,7 +782,8 @@ class TestBoxUniformPriorCorrection:
         proposal_mog = MoG(
             logits=torch.zeros(1, 2),
             means=torch.zeros(1, 2, 2),
-            precisions=0.5 * torch.eye(2).unsqueeze(0).unsqueeze(0).expand(1, 2, -1, -1),
+            precisions=0.5
+            * torch.eye(2).unsqueeze(0).unsqueeze(0).expand(1, 2, -1, -1),
         )
         prior = BoxUniform(low=torch.zeros(2), high=torch.ones(2))
 
@@ -814,9 +818,11 @@ class TestManyComponentProposal:
         proposal_mog = MoG(
             logits=torch.randn(1, num_proposal_components),
             means=torch.randn(1, num_proposal_components, dim) * 0.1,
-            precisions=0.1 * torch.eye(dim).unsqueeze(0).unsqueeze(0).expand(
-                1, num_proposal_components, -1, -1
-            ),
+            precisions=0.1
+            * torch.eye(dim)
+            .unsqueeze(0)
+            .unsqueeze(0)
+            .expand(1, num_proposal_components, -1, -1),
         )
         prior = torch.distributions.MultivariateNormal(
             loc=torch.zeros(dim),
@@ -872,5 +878,7 @@ class TestMoGPriorValidation:
             precisions=torch.eye(2).unsqueeze(0).unsqueeze(0),
         )
 
-        with pytest.raises(ValueError, match="must be MultivariateNormal or BoxUniform"):
+        with pytest.raises(
+            ValueError, match="must be MultivariateNormal or BoxUniform"
+        ):
             estimator.apply_correction(proposal_mog, mog_prior)

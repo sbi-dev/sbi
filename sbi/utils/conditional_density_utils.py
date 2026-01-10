@@ -14,7 +14,6 @@ from sbi.inference.potentials.base_potential import BasePotential
 from sbi.neural_nets.estimators.mixture_density_estimator import (
     MixtureDensityEstimator,
 )
-from sbi.neural_nets.estimators.mog import MoG
 from sbi.utils.torchutils import ensure_theta_batched
 from sbi.utils.user_input_checks import process_x
 
@@ -181,12 +180,17 @@ def extract_and_transform_mog(
         sumlogdiag: Sum of the log of the diagonal of the precision factors
             of the new conditional distribution. (batch_size, n_mixtures)
     """
+    if context is None:
+        raise ValueError("context must be provided for extract_and_transform_mog")
+
     # Get uncorrected MoG (raw density estimator output in z-scored space)
     mog = estimator.get_uncorrected_mog(context)
 
     norm_logits = mog.log_weights
     means = mog.means
+    # precision_factors is guaranteed non-None after MoG.__post_init__
     precfs = mog.precision_factors
+    assert precfs is not None  # For type checker
 
     # Transform means and precision factors to original space if z-scoring is enabled
     if estimator.has_input_transform:
@@ -324,10 +328,11 @@ def _log_prob_gaussian_per_component(
 
     # quadratic form
     diff_col = diff.unsqueeze(-1)  # (batch_size, num_components, dim, 1)
-    quad = torch.matmul(
-        torch.matmul(diff_col.transpose(-2, -1), precisions),
-        diff_col
-    ).squeeze(-1).squeeze(-1)  # (batch_size, num_components)
+    quad = (
+        torch.matmul(torch.matmul(diff_col.transpose(-2, -1), precisions), diff_col)
+        .squeeze(-1)
+        .squeeze(-1)
+    )  # (batch_size, num_components)
 
     # log probability per component (no mixture weights)
     log_norm = -0.5 * dim * np.log(2 * np.pi)
