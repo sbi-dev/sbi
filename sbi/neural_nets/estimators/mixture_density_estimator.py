@@ -17,7 +17,7 @@ from typing import Optional, Union
 import numpy as np
 import torch
 from torch import Tensor, nn
-from torch.distributions import Distribution, MultivariateNormal
+from torch.distributions import MultivariateNormal
 from torch.nn import functional as F
 
 from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
@@ -220,9 +220,9 @@ class MultivariateGaussianMDN(nn.Module):
         )
 
         # Add epsilon to diagonal for numerical stability
-        precisions[
-            ..., torch.arange(self._features), torch.arange(self._features)
-        ] += self._epsilon
+        precisions[..., torch.arange(self._features), torch.arange(self._features)] += (
+            self._epsilon
+        )
 
         return MoG(
             logits=logits,
@@ -306,8 +306,9 @@ class MultivariateGaussianMDN(nn.Module):
 class MixtureDensityEstimator(ConditionalDensityEstimator):
     """MDN-based conditional density estimator.
 
-    Wraps a MultivariateGaussianMDN and provides the standard ConditionalDensityEstimator
-    interface for use with sbi's training and inference pipelines.
+    Wraps a MultivariateGaussianMDN and provides the standard
+    ConditionalDensityEstimator interface for use with sbi's training and
+    inference pipelines.
 
     The estimator models the conditional distribution p(input | condition) as a
     Mixture of Gaussians, where the mixture parameters are predicted by a neural
@@ -348,18 +349,22 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
         Args:
             net: MultivariateGaussianMDN that maps conditions to MoG parameters.
             input_shape: Shape of the input (parameter space), typically (dim,).
-            condition_shape: Shape of the condition (observation space), typically (dim,).
+            condition_shape: Shape of the condition (observation space),
+                typically (dim,).
             embedding_net: Optional network to embed the condition before passing
                 to the MDN. If provided, condition is first transformed by this
                 network. The output dimension must match net.context_features.
             transform_input: Optional tensor of shape (2, input_dim) containing
                 [shift, scale] for z-score transformation of inputs. If provided,
                 inputs are transformed as: z = (x - shift) / scale before density
-                evaluation, and samples are inverse transformed as: x = z * scale + shift.
+                evaluation, and samples are inverse transformed as:
+                x = z * scale + shift.
                 This is used for z-scoring inputs to improve numerical stability.
         """
         super().__init__(net, input_shape, condition_shape)
-        self._embedding_net = embedding_net if embedding_net is not None else nn.Identity()
+        self._embedding_net = (
+            embedding_net if embedding_net is not None else nn.Identity()
+        )
 
         # Validate that embedding_net output matches MDN input if embedding is provided
         if embedding_net is not None:
@@ -373,17 +378,19 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
                     f"MDN context_features ({net.context_features})"
                 )
 
-        # Store z-score transform parameters as buffers (not trained, but moved with model)
+        # Store z-score transform parameters as buffers (not trained, moved with model)
         if transform_input is not None:
             if transform_input.shape[0] != 2:
                 raise ValueError(
-                    f"transform_input must have shape (2, input_dim), got {transform_input.shape}"
+                    f"transform_input must have shape (2, input_dim), "
+                    f"got {transform_input.shape}"
                 )
             scale = transform_input[1]
             if not torch.all(scale > 0):
                 raise ValueError(
                     "transform_input scale (second row) must be strictly positive, "
-                    f"got values in range [{scale.min().item():.6f}, {scale.max().item():.6f}]"
+                    f"got values in range [{scale.min().item():.6f}, "
+                    f"{scale.max().item():.6f}]"
                 )
             self.register_buffer("_transform_shift", transform_input[0])
             self.register_buffer("_transform_scale", scale)
@@ -618,9 +625,10 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
             self._prior_mog = None
             self._prior_is_uniform = True
         elif isinstance(prior, MultivariateNormal):
-            self._prior_mog = MoG.from_gaussian(
-                prior.mean, prior.covariance_matrix
-            ).detach()
+            # Note: covariance_matrix is a Tensor but PyTorch stubs type it as property
+            cov = prior.covariance_matrix
+            assert isinstance(cov, Tensor)  # For type checker
+            self._prior_mog = MoG.from_gaussian(prior.mean, cov).detach()
             self._prior_is_uniform = False
         else:
             raise ValueError(
@@ -756,8 +764,8 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
         except torch.linalg.LinAlgError as e:
             raise ValueError(
                 "Failed to compute Cholesky decomposition during SNPE-A correction. "
-                "This indicates numerical instability in the posterior precision matrix. "
-                f"Original error: {e}"
+                "This indicates numerical instability in the posterior precision "
+                f"matrix. Original error: {e}"
             ) from e
 
         return MoG(
@@ -827,9 +835,7 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
         )
         exponent_density_rep = exponent_density.repeat(1, num_comps_proposal)
 
-        exponent = -0.5 * (
-            exponent_density_rep - exponent_proposal_rep - exponent_post
-        )
+        exponent = -0.5 * (exponent_density_rep - exponent_proposal_rep - exponent_post)
 
         return logit_factors + log_sqrt_det_ratio + exponent
 
@@ -878,9 +884,9 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
         try:
             # Cholesky will raise LinAlgError if not positive definite
             torch.linalg.cholesky(prec)
-        except torch.linalg.LinAlgError:
+        except torch.linalg.LinAlgError as e:
             raise ValueError(
                 f"Precision matrix of {name} is not positive definite. "
                 "This is a known issue with SNPE-A when the proposal and density "
                 "estimator don't align well. Try different hyperparameters."
-            )
+            ) from e

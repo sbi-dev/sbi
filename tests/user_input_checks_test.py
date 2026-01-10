@@ -18,12 +18,11 @@ from torch.distributions import (
     Uniform,
 )
 
+from sbi.inference import NPE_A, NPE_C, simulate_for_sbi
+from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.neural_nets.estimators.mixture_density_estimator import (
     MultivariateGaussianMDN,
 )
-
-from sbi.inference import NPE_A, NPE_C, simulate_for_sbi
-from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.simulators import linear_gaussian
 from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
 from sbi.utils import mcmc_transform, within_support

@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import pytest
 import torch
-from torch import Tensor
 from torch.distributions import MultivariateNormal
 
 from sbi.neural_nets.estimators.mog import MoG
@@ -26,10 +25,12 @@ class TestMoGBasics:
         L = torch.randn(batch_size, num_components, dim, dim)
         precision_factors = torch.triu(L)
         # Ensure positive diagonal
-        precision_factors[..., range(dim), range(dim)] = torch.abs(
-            precision_factors[..., range(dim), range(dim)]
-        ) + 0.1
-        precisions = torch.matmul(precision_factors.transpose(-2, -1), precision_factors)
+        precision_factors[..., range(dim), range(dim)] = (
+            torch.abs(precision_factors[..., range(dim), range(dim)]) + 0.1
+        )
+        precisions = torch.matmul(
+            precision_factors.transpose(-2, -1), precision_factors
+        )
 
         mog = MoG(
             logits=logits,
@@ -67,7 +68,7 @@ class TestMoGLogProb:
         # Create positive definite covariance
         L = torch.randn(batch_size, dim, dim)
         cov = torch.matmul(L, L.transpose(-2, -1)) + 0.1 * torch.eye(dim)
-        precision = torch.linalg.inv(cov)
+        torch.linalg.inv(cov)
 
         # Create MoG from Gaussian
         mog = MoG.from_gaussian(mean, cov)
@@ -86,10 +87,13 @@ class TestMoGLogProb:
 
         assert torch.allclose(mog_log_prob, mvn_log_prob, atol=1e-4)
 
-    @pytest.mark.parametrize("input_shape,expected_shape", [
-        ((4, 2), (4,)),  # 2D input: (batch_size, dim)
-        ((10, 4, 2), (10, 4)),  # 3D input: (sample_size, batch_size, dim)
-    ])
+    @pytest.mark.parametrize(
+        "input_shape,expected_shape",
+        [
+            ((4, 2), (4,)),  # 2D input: (batch_size, dim)
+            ((10, 4, 2), (10, 4)),  # 3D input: (sample_size, batch_size, dim)
+        ],
+    )
     def test_log_prob_shape(self, input_shape, expected_shape):
         """Test log_prob output shape for different input shapes."""
         batch_size, num_components, dim = 4, 3, 2
@@ -105,11 +109,14 @@ class TestMoGLogProb:
 class TestMoGSample:
     """Test MoG sampling."""
 
-    @pytest.mark.parametrize("sample_shape,expected_shape", [
-        (torch.Size([]), (4, 2)),  # Default (empty) sample_shape
-        (torch.Size([100]), (100, 4, 2)),  # 1D sample_shape
-        (torch.Size([10, 20]), (10, 20, 4, 2)),  # 2D sample_shape
-    ])
+    @pytest.mark.parametrize(
+        "sample_shape,expected_shape",
+        [
+            (torch.Size([]), (4, 2)),  # Default (empty) sample_shape
+            (torch.Size([100]), (100, 4, 2)),  # 1D sample_shape
+            (torch.Size([10, 20]), (10, 20, 4, 2)),  # 2D sample_shape
+        ],
+    )
     def test_sample_shape(self, sample_shape, expected_shape):
         """Test sample shape with various sample_shape values."""
         batch_size, num_components, dim = 4, 3, 2
@@ -121,14 +128,16 @@ class TestMoGSample:
 
     def test_sample_mean_convergence(self):
         """Test that sample mean converges to mixture mean."""
-        batch_size, num_components, dim = 1, 2, 2
+        _batch_size, _num_components, dim = 1, 2, 2
         num_samples = 10000
 
         # Create a simple MoG with known mean
         logits = torch.tensor([[0.0, 0.0]])  # Equal weights
         means = torch.tensor([[[1.0, 2.0], [-1.0, -2.0]]])  # Mean of mixture = [0, 0]
         precisions = torch.eye(dim).unsqueeze(0).unsqueeze(0).expand(1, 2, -1, -1)
-        precision_factors = torch.eye(dim).unsqueeze(0).unsqueeze(0).expand(1, 2, -1, -1)
+        precision_factors = (
+            torch.eye(dim).unsqueeze(0).unsqueeze(0).expand(1, 2, -1, -1)
+        )
 
         mog = MoG(
             logits=logits,
@@ -260,26 +269,23 @@ def _create_random_mog(
     means = torch.randn(batch_size, num_components, dim, device=device)
 
     # Create valid precision factors (upper triangular with positive diagonal)
-    precision_factors = torch.zeros(
-        batch_size, num_components, dim, dim, device=device
-    )
+    precision_factors = torch.zeros(batch_size, num_components, dim, dim, device=device)
     # Fill upper triangular
     for i in range(dim):
         for j in range(i, dim):
             if i == j:
                 # Diagonal: positive values
-                precision_factors[..., i, j] = torch.abs(
-                    torch.randn(batch_size, num_components, device=device)
-                ) + 0.5
+                precision_factors[..., i, j] = (
+                    torch.abs(torch.randn(batch_size, num_components, device=device))
+                    + 0.5
+                )
             else:
                 # Off-diagonal: any values
-                precision_factors[..., i, j] = torch.randn(
-                    batch_size, num_components, device=device
-                ) * 0.1
+                precision_factors[..., i, j] = (
+                    torch.randn(batch_size, num_components, device=device) * 0.1
+                )
 
-    precisions = torch.matmul(
-        precision_factors.transpose(-2, -1), precision_factors
-    )
+    precisions = torch.matmul(precision_factors.transpose(-2, -1), precision_factors)
 
     return MoG(
         logits=logits,
@@ -306,9 +312,12 @@ class TestMoGNumericalStability:
         Q, _ = torch.linalg.qr(torch.randn(dim, dim))  # Random orthogonal matrix
         base_precision = Q @ torch.diag(eigenvalues) @ Q.T
 
-        precisions = base_precision.unsqueeze(0).unsqueeze(0).expand(
-            batch_size, num_components, -1, -1
-        ).clone()
+        precisions = (
+            base_precision.unsqueeze(0)
+            .unsqueeze(0)
+            .expand(batch_size, num_components, -1, -1)
+            .clone()
+        )
 
         # MoG should handle this via epsilon stabilization in Cholesky
         mog = MoG(logits=logits, means=means, precisions=precisions)
@@ -328,8 +337,11 @@ class TestMoGNumericalStability:
         logits = torch.randn(batch_size, num_components)
         logits[0, 0] = float("nan")
         means = torch.randn(batch_size, num_components, dim)
-        precisions = torch.eye(dim).unsqueeze(0).unsqueeze(0).expand(
-            batch_size, num_components, -1, -1
+        precisions = (
+            torch.eye(dim)
+            .unsqueeze(0)
+            .unsqueeze(0)
+            .expand(batch_size, num_components, -1, -1)
         )
 
         with pytest.raises(ValueError, match="logits contains NaN"):
@@ -342,8 +354,11 @@ class TestMoGNumericalStability:
         logits = torch.randn(batch_size, num_components)
         means = torch.randn(batch_size, num_components, dim)
         means[0, 0, 0] = float("inf")
-        precisions = torch.eye(dim).unsqueeze(0).unsqueeze(0).expand(
-            batch_size, num_components, -1, -1
+        precisions = (
+            torch.eye(dim)
+            .unsqueeze(0)
+            .unsqueeze(0)
+            .expand(batch_size, num_components, -1, -1)
         )
 
         with pytest.raises(ValueError, match="means contains NaN"):
@@ -355,9 +370,13 @@ class TestMoGNumericalStability:
 
         logits = torch.randn(batch_size, num_components)
         means = torch.randn(batch_size, num_components, dim)
-        precisions = torch.eye(dim).unsqueeze(0).unsqueeze(0).expand(
-            batch_size, num_components, -1, -1
-        ).clone()
+        precisions = (
+            torch.eye(dim)
+            .unsqueeze(0)
+            .unsqueeze(0)
+            .expand(batch_size, num_components, -1, -1)
+            .clone()
+        )
         precisions[0, 0, 0, 0] = float("nan")
 
         with pytest.raises(ValueError, match="precisions contains NaN"):
@@ -375,9 +394,12 @@ class TestMoGNumericalStability:
         Q, _ = torch.linalg.qr(torch.randn(dim, dim))
         bad_precision = Q @ torch.diag(eigenvalues) @ Q.T
 
-        precisions = bad_precision.unsqueeze(0).unsqueeze(0).expand(
-            batch_size, num_components, -1, -1
-        ).clone()
+        precisions = (
+            bad_precision.unsqueeze(0)
+            .unsqueeze(0)
+            .expand(batch_size, num_components, -1, -1)
+            .clone()
+        )
 
         with pytest.raises(ValueError, match="Cholesky decomposition"):
             MoG(logits=logits, means=means, precisions=precisions)
@@ -393,9 +415,12 @@ class TestMoGNumericalStability:
         # but well-conditioned overall
         precision = torch.eye(dim) * 1.0
         precision[0, 0] = 1e-4  # Small but not zero
-        precisions = precision.unsqueeze(0).unsqueeze(0).expand(
-            batch_size, num_components, -1, -1
-        ).clone()
+        precisions = (
+            precision.unsqueeze(0)
+            .unsqueeze(0)
+            .expand(batch_size, num_components, -1, -1)
+            .clone()
+        )
 
         mog = MoG(logits=logits, means=means, precisions=precisions)
 

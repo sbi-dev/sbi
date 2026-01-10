@@ -22,7 +22,6 @@ from sbi.neural_nets.estimators.mixture_density_estimator import (
     MixtureDensityEstimator,
     MultivariateGaussianMDN,
 )
-from sbi.neural_nets.estimators.mog import MoG
 from sbi.sbi_types import TensorBoardSummaryWriter
 from sbi.utils.sbiutils import del_entries
 from sbi.utils.torchutils import BoxUniform
@@ -262,7 +261,8 @@ class NPE_A(PosteriorEstimatorTrainer):
         # Validate density estimator type
         if not isinstance(density_estimator, MixtureDensityEstimator):
             raise TypeError(
-                f"NPE_A requires MixtureDensityEstimator, got {type(density_estimator).__name__}. "
+                "NPE_A requires MixtureDensityEstimator, "
+                f"got {type(density_estimator).__name__}. "
                 "Use density_estimator='mdn_snpe_a' when initializing NPE_A."
             )
 
@@ -279,10 +279,11 @@ class NPE_A(PosteriorEstimatorTrainer):
                 )
         else:
             if not isinstance(self._proposal_roundwise[-1], DirectPosterior):
+                proposal_type = type(self._proposal_roundwise[-1]).__name__
                 raise TypeError(
                     "The proposal you passed to `append_simulations` is neither the "
                     "prior nor a `DirectPosterior`. SNPE-A currently only supports "
-                    f"these scenarios. Got {type(self._proposal_roundwise[-1]).__name__}"
+                    f"these scenarios. Got {proposal_type}"
                 )
             proposal = self._proposal_roundwise[-1]
 
@@ -339,7 +340,8 @@ class NPE_A(PosteriorEstimatorTrainer):
 
         Mathematical background:
             For z-score transform: z = (theta - shift) / scale
-            If theta ~ N(mu, Sigma), then z ~ N((mu - shift) / scale, Sigma / (scale ⊗ scale))
+            If theta ~ N(mu, Sigma), then:
+            z ~ N((mu - shift) / scale, Sigma / (scale ⊗ scale))
             where (scale ⊗ scale)_ij = scale_i * scale_j
 
         Args:
@@ -405,13 +407,13 @@ class NPE_A(PosteriorEstimatorTrainer):
                     "This may indicate numerical issues with the z-score transform. "
                     f"Original error: {e}"
                 ) from e
-        elif isinstance(z_scored_prior, BoxUniform):
-            # Check that bounds are valid (low < high)
-            if not torch.all(z_scored_prior.low < z_scored_prior.high):
-                raise ValueError(
-                    "Z-scored prior bounds are invalid (low >= high). "
-                    "This may indicate issues with the z-score transform parameters."
-                )
+        elif isinstance(z_scored_prior, BoxUniform) and not torch.all(
+            z_scored_prior.low < z_scored_prior.high
+        ):
+            raise ValueError(
+                "Z-scored prior bounds are invalid (low >= high). "
+                "This may indicate issues with the z-score transform parameters."
+            )
 
     def build_posterior(
         self,
@@ -491,7 +493,8 @@ class NPE_A(PosteriorEstimatorTrainer):
         """
         if not isinstance(self._neural_net, MixtureDensityEstimator):
             raise TypeError(
-                f"Expected MixtureDensityEstimator, got {type(self._neural_net).__name__}. "
+                "Expected MixtureDensityEstimator, "
+                f"got {type(self._neural_net).__name__}. "
                 "Use density_estimator='mdn_snpe_a' when initializing NPE_A."
             )
 

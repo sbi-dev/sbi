@@ -206,8 +206,9 @@ def test_average_cond_coeff_matrix():
 
 
 @pytest.mark.skip(
-    reason="Test relies on NPE_C internal methods that need updating for new MDN structure. "
-    "SNPE-A transformation testing is covered by mixture_density_estimator_test.py."
+    reason="Test relies on NPE_C internal methods that need updating for new "
+    "MDN structure. SNPE-A transformation testing is covered by "
+    "mixture_density_estimator_test.py."
 )
 @pytest.mark.parametrize("snpe_method", ("snpe_c",))
 def test_gaussian_transforms(snpe_method: str, plot_results: bool = False):

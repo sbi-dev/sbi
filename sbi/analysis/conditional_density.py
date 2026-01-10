@@ -209,9 +209,7 @@ class ConditionedMDN:
         """
         condition = atleast_2d_float32_tensor(condition)
 
-        logits, means, precfs, _ = extract_and_transform_mog(
-            estimator=mdn, context=x_o
-        )
+        logits, means, precfs, _ = extract_and_transform_mog(estimator=mdn, context=x_o)
         cond_logits, cond_means, cond_precfs, _ = condition_mog(
             condition, dims_to_sample, logits, means, precfs
         )
@@ -238,7 +236,7 @@ class ConditionedMDN:
         # MoG.sample returns (*sample_shape, batch_size, dim)
         # Since this is a single conditioned distribution, batch_size=1
         # We squeeze out the batch dimension for convenience
-        samples = self._mog.sample(sample_shape)
+        samples = self._mog.sample(torch.Size(sample_shape))
         # Squeeze batch dimension (which is always 1 for ConditionedMDN)
         samples = samples.squeeze(-2)
         return samples.detach()
