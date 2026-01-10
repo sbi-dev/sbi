@@ -338,6 +338,7 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
         input_shape: torch.Size,
         condition_shape: torch.Size,
         embedding_net: Optional[nn.Module] = None,
+        transform_input: Optional[Tensor] = None,
     ) -> None:
         """Initialize the mixture density estimator.
 
@@ -348,6 +349,11 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
             embedding_net: Optional network to embed the condition before passing
                 to the MDN. If provided, condition is first transformed by this
                 network. The output dimension must match net.context_features.
+            transform_input: Optional tensor of shape (2, input_dim) containing
+                [shift, scale] for z-score transformation of inputs. If provided,
+                inputs are transformed as: z = (x - shift) / scale before density
+                evaluation, and samples are inverse transformed as: x = z * scale + shift.
+                This is used for z-scoring inputs to improve numerical stability.
         """
         super().__init__(net, input_shape, condition_shape)
         self._embedding_net = embedding_net if embedding_net is not None else nn.Identity()
@@ -364,6 +370,24 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
                     f"MDN context_features ({net.context_features})"
                 )
 
+        # Store z-score transform parameters as buffers (not trained, but moved with model)
+        if transform_input is not None:
+            if transform_input.shape[0] != 2:
+                raise ValueError(
+                    f"transform_input must have shape (2, input_dim), got {transform_input.shape}"
+                )
+            scale = transform_input[1]
+            if not torch.all(scale > 0):
+                raise ValueError(
+                    "transform_input scale (second row) must be strictly positive, "
+                    f"got values in range [{scale.min().item():.6f}, {scale.max().item():.6f}]"
+                )
+            self.register_buffer("_transform_shift", transform_input[0])
+            self.register_buffer("_transform_scale", scale)
+        else:
+            self.register_buffer("_transform_shift", None)
+            self.register_buffer("_transform_scale", None)
+
         # SNPE-A correction state (None means no correction applied)
         self._proposal_mog: Optional[MoG] = None
         self._prior_mog: Optional[MoG] = None  # None for uniform priors
@@ -374,10 +398,49 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
         """Return the embedding network."""
         return self._embedding_net
 
+    @property
+    def has_input_transform(self) -> bool:
+        """Whether input z-score transform is enabled."""
+        return self._transform_shift is not None
+
+    def _transform_input(self, input: Tensor) -> Tensor:
+        """Apply z-score transform to input: z = (x - shift) / scale."""
+        if not self.has_input_transform:
+            return input
+        return (input - self._transform_shift) / self._transform_scale
+
+    def _inverse_transform_input(self, z: Tensor) -> Tensor:
+        """Apply inverse z-score transform: x = z * scale + shift."""
+        if not self.has_input_transform:
+            return z
+        return z * self._transform_scale + self._transform_shift
+
+    def _log_det_jacobian(self, input: Tensor) -> Tensor:
+        """Compute log determinant of Jacobian for the z-score transform.
+
+        For affine transform z = (x - shift) / scale, the Jacobian is:
+        dz/dx = 1/scale (diagonal matrix)
+        log|det(dz/dx)| = -sum(log(scale))
+
+        When computing p(x), we need: log p(x) = log p(z) + log|det(dz/dx)|
+        This method returns log|det(dz/dx)| = -sum(log(scale)).
+
+        Args:
+            input: Input tensor, used to determine device and dtype.
+
+        Returns:
+            Log determinant of Jacobian (scalar), on the same device as input.
+        """
+        if not self.has_input_transform:
+            return torch.zeros(1, device=input.device, dtype=input.dtype).squeeze()
+        return -torch.log(self._transform_scale).sum()
+
     def log_prob(self, input: Tensor, condition: Tensor, **kwargs) -> Tensor:
         """Compute log probability of inputs given conditions.
 
         If SNPE-A correction is applied, returns corrected log probability.
+        If input transform is set, inputs are z-scored before density evaluation
+        and the log-det-jacobian is subtracted from the log probability.
 
         Args:
             input: Inputs to evaluate, shape (sample_dim, batch_dim, *input_shape)
@@ -396,11 +459,17 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
         if not has_sample_dim:
             input = input.unsqueeze(0)
 
+        # Apply z-score transform to input if enabled
+        transformed_input = self._transform_input(input)
+
         # Get MoG (corrected if correction is applied)
         mog = self._get_mog_internal(condition)
 
         # MoG.log_prob handles (sample_dim, batch_dim, dim) input
-        log_probs = mog.log_prob(input)  # (sample_dim, batch_dim)
+        # Change of variables: log p(x) = log p(z) + log|det(dz/dx)|
+        # where z = (x - shift) / scale and log|det(dz/dx)| = -sum(log(scale))
+        log_probs = mog.log_prob(transformed_input)  # (sample_dim, batch_dim)
+        log_probs = log_probs + self._log_det_jacobian(input)
 
         if not has_sample_dim:
             log_probs = log_probs.squeeze(0)
@@ -425,6 +494,7 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
         """Sample from the conditional distribution.
 
         If SNPE-A correction is applied, samples from the corrected distribution.
+        If input transform is set, samples are inverse transformed (un-z-scored).
 
         Args:
             sample_shape: Shape prefix for samples.
@@ -440,6 +510,9 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
 
         # MoG.sample returns (*sample_shape, batch_dim, dim) - matches sbi convention
         samples = mog.sample(sample_shape)
+
+        # Apply inverse transform to get samples in original space
+        samples = self._inverse_transform_input(samples)
 
         return samples
 
