@@ -4,8 +4,6 @@
 from typing import Callable, Dict, Literal, Optional, Union
 
 import torch
-from pyknos.mdn.mdn import MultivariateGaussianMDN as mdn
-from pyknos.nflows.transforms import CompositeTransform
 from torch import Tensor, eye, ones
 from torch.distributions import Distribution, MultivariateNormal, Uniform
 
@@ -17,6 +15,10 @@ from sbi.neural_nets.estimators.base import (
     ConditionalDensityEstimator,
     ConditionalEstimatorBuilder,
 )
+from sbi.neural_nets.estimators.mixture_density_estimator import (
+    MixtureDensityEstimator,
+)
+from sbi.neural_nets.estimators.mog import MoG
 from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
     reshape_to_sample_batch_event,
@@ -30,7 +32,6 @@ from sbi.utils import (
     del_entries,
     repeat_rows,
 )
-from sbi.utils.sbiutils import mog_log_prob
 from sbi.utils.torchutils import BoxUniform, assert_all_finite
 
 
@@ -186,8 +187,8 @@ class NPE_C(PosteriorEstimatorTrainer):
             proposal = self._proposal_roundwise[-1]
             self.use_non_atomic_loss = (
                 isinstance(proposal, DirectPosterior)
-                and isinstance(proposal.posterior_estimator.net._distribution, mdn)
-                and isinstance(self._neural_net.net._distribution, mdn)
+                and isinstance(proposal.posterior_estimator, MixtureDensityEstimator)
+                and isinstance(self._neural_net, MixtureDensityEstimator)
                 and check_dist_class(
                     self._prior, class_to_check=(Uniform, MultivariateNormal)
                 )[0]
@@ -206,17 +207,16 @@ class NPE_C(PosteriorEstimatorTrainer):
         """Set state variables that are used at each training step of non-atomic SNPE-C.
 
         Three things are computed:
-        1) Check if z-scoring was requested. To do so, we check if the `_transform`
-            argument of the net had been a `CompositeTransform`. See pyknos mdn.py.
+        1) Check if z-scoring was requested. We check if the MixtureDensityEstimator
+            has an input transform enabled via the has_input_transform property.
         2) Define a (potentially standardized) prior. It's standardized if z-scoring
             had been requested.
         3) Compute (Precision * mean) for the prior. This quantity is used at every
             training step if the prior is Gaussian.
         """
-
-        self.z_score_theta = isinstance(
-            self._neural_net.net._transform, CompositeTransform
-        )
+        # Check if z-scoring is enabled on the MixtureDensityEstimator
+        assert isinstance(self._neural_net, MixtureDensityEstimator)
+        self.z_score_theta = self._neural_net.has_input_transform
 
         self._set_maybe_z_scored_prior()
 
@@ -246,16 +246,17 @@ class NPE_C(PosteriorEstimatorTrainer):
         """
 
         if self.z_score_theta:
-            scale = self._neural_net.net._transform._transforms[0]._scale
-            shift = self._neural_net.net._transform._transforms[0]._shift
+            # Get z-score parameters from the MixtureDensityEstimator
+            # The transform is: z = (theta - shift) / scale
+            # where shift = mean (estimated from samples) and scale = std (estimated)
+            assert isinstance(self._neural_net, MixtureDensityEstimator)
+            shift = self._neural_net._transform_shift
+            scale = self._neural_net._transform_scale
 
-            # Following the definintion of the linear transform in
-            # `standardizing_transform` in `sbiutils.py`:
-            # shift=-mean / std
-            # scale=1 / std
-            # Solving these equations for mean and std:
-            estim_prior_std = 1 / scale
-            estim_prior_mean = -shift * estim_prior_std
+            # The MixtureDensityEstimator uses: z = (theta - shift) / scale
+            # where shift = mean and scale = std (estimated from training data)
+            estim_prior_mean = shift
+            estim_prior_std = scale
 
             # Compute the discrepancy of the true prior mean and std and the mean and
             # std that was empirically estimated from samples.
@@ -301,12 +302,10 @@ class NPE_C(PosteriorEstimatorTrainer):
         """
 
         if self.use_non_atomic_loss:
-            if not (
-                hasattr(self._neural_net.net, "_distribution")
-                and isinstance(self._neural_net.net._distribution, mdn)
-            ):
+            if not isinstance(self._neural_net, MixtureDensityEstimator):
                 raise ValueError(
-                    "The density estimator must be a MDNtext for non-atomic loss."
+                    "The density estimator must be a MixtureDensityEstimator "
+                    "for non-atomic loss."
                 )
 
             return self._log_prob_proposal_posterior_mog(theta, x, proposal)
@@ -433,24 +432,22 @@ class NPE_C(PosteriorEstimatorTrainer):
         Returns:
             Log-probability of the proposal posterior.
         """
+        # Get the proposal MoG at the default_x
+        # Use get_uncorrected_mog to avoid any prior correction being applied
+        assert isinstance(proposal.posterior_estimator, MixtureDensityEstimator)
+        mog_p = proposal.posterior_estimator.get_uncorrected_mog(proposal.default_x)
+        norm_logits_p = mog_p.log_weights  # Already normalized
+        m_p = mog_p.means
+        prec_p = mog_p.precisions
 
-        # Evaluate the proposal. MDNs do not have functionality to run the embedding_net
-        # and then get the mixture_components (**without** calling log_prob()). Hence,
-        # we call them separately here.
-        encoded_x = proposal.posterior_estimator.net._embedding_net(proposal.default_x)
-        dist = (
-            proposal.posterior_estimator.net._distribution
-        )  # defined to avoid ugly black formatting.
-        logits_p, m_p, prec_p, _, _ = dist.get_mixture_components(encoded_x)
-        norm_logits_p = logits_p - torch.logsumexp(logits_p, dim=-1, keepdim=True)
+        # Get the density estimator MoG at the training data x
+        assert isinstance(self._neural_net, MixtureDensityEstimator)
+        mog_d = self._neural_net.get_uncorrected_mog(x)
+        norm_logits_d = mog_d.log_weights  # Already normalized
+        m_d = mog_d.means
+        prec_d = mog_d.precisions
 
-        # Evaluate the density estimator.
-        encoded_x = self._neural_net.net._embedding_net(x)
-        dist = self._neural_net.net._distribution  # defined to avoid black formatting.
-        logits_d, m_d, prec_d, _, _ = dist.get_mixture_components(encoded_x)
-        norm_logits_d = logits_d - torch.logsumexp(logits_d, dim=-1, keepdim=True)
-
-        # z-score theta if it z-scoring had been requested.
+        # z-score theta if z-scoring was requested.
         theta = self._maybe_z_score_theta(theta)
 
         # Compute the MoG parameters of the proposal posterior.
@@ -463,8 +460,18 @@ class NPE_C(PosteriorEstimatorTrainer):
             norm_logits_p, m_p, prec_p, norm_logits_d, m_d, prec_d
         )
 
+        # Create MoG for proposal posterior and compute log_prob
+        # We need precision_factors for MoG, compute via Cholesky
+        precf_pp = torch.linalg.cholesky(prec_pp, upper=True)
+        mog_pp = MoG(
+            logits=logits_pp,
+            means=m_pp,
+            precisions=prec_pp,
+            precision_factors=precf_pp,
+        )
+
         # Compute the log_prob of theta under the product.
-        log_prob_proposal_posterior = mog_log_prob(theta, logits_pp, m_pp, prec_pp)
+        log_prob_proposal_posterior = mog_pp.log_prob(theta)
         assert_all_finite(
             log_prob_proposal_posterior,
             """the evaluation of the MoG proposal posterior. This is likely due to a
@@ -611,7 +618,8 @@ class NPE_C(PosteriorEstimatorTrainer):
         """Return potentially standardized theta if z-scoring was requested."""
 
         if self.z_score_theta:
-            theta, _ = self._neural_net.net._transform(theta)
+            assert isinstance(self._neural_net, MixtureDensityEstimator)
+            theta = self._neural_net._transform_input(theta)
 
         return theta
 

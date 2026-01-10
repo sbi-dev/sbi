@@ -8,7 +8,6 @@ from typing import Callable, Tuple
 import numpy as np
 import pytest
 import torch
-from pyknos.mdn.mdn import MultivariateGaussianMDN
 from torch import Tensor, eye, nn, ones, zeros
 from torch.distributions import (
     Beta,
@@ -17,6 +16,10 @@ from torch.distributions import (
     Gamma,
     MultivariateNormal,
     Uniform,
+)
+
+from sbi.neural_nets.estimators.mixture_density_estimator import (
+    MultivariateGaussianMDN,
 )
 
 from sbi.inference import NPE_A, NPE_C, simulate_for_sbi

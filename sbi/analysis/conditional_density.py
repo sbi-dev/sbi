@@ -6,11 +6,14 @@ from warnings import warn
 
 import torch
 import torch.distributions.transforms as torch_tf
-from pyknos.mdn.mdn import MultivariateGaussianMDN
 from torch import Tensor
 from torch.distributions import Distribution
 
 from sbi.inference.potentials.base_potential import BasePotential
+from sbi.neural_nets.estimators.mixture_density_estimator import (
+    MixtureDensityEstimator,
+)
+from sbi.neural_nets.estimators.mog import MoG
 from sbi.sbi_types import Shape, TorchTransform
 from sbi.utils.conditional_density_utils import (
     ConditionedPotential,
@@ -186,7 +189,7 @@ def conditional_corrcoeff(
 class ConditionedMDN:
     def __init__(
         self,
-        mdn,
+        mdn: MixtureDensityEstimator,
         x_o: Tensor,
         condition: Tensor,
         dims_to_sample: List[int],
@@ -194,9 +197,7 @@ class ConditionedMDN:
         r"""Class that can sample and evaluate a conditional mixture-of-gaussians.
 
         Args:
-            mdn Mixture density network that models $p(\theta|x). We use the normflows
-                implementation of MDNs. Type is `NFlowsFlow`, type hint removed to
-                avoid circular import, see #1140.
+            mdn: MixtureDensityEstimator that models $p(\theta|x)$.
             x_o: The datapoint at which the `net` is evaluated.
             condition: Parameter set that all dimensions not specified in
                 `dims_to_sample` will be fixed to. Should contain dim_theta elements,
@@ -208,30 +209,43 @@ class ConditionedMDN:
         """
         condition = atleast_2d_float32_tensor(condition)
 
-        logits, means, precfs, _ = extract_and_transform_mog(net=mdn.net, context=x_o)
+        logits, means, precfs, sumlogdiag = extract_and_transform_mog(
+            estimator=mdn, context=x_o
+        )
         self.logits, self.means, self.precfs, self.sumlogdiag = condition_mog(
             condition, dims_to_sample, logits, means, precfs
         )
         self.prec = self.precfs.transpose(3, 2) @ self.precfs
 
-    def sample(self, sample_shape: Shape = torch.Size()) -> Tensor:
-        num_samples = torch.Size(sample_shape).numel()
-        samples = MultivariateGaussianMDN.sample_mog(
-            num_samples, self.logits, self.means, self.precfs
+        # Store the conditioned MoG for sampling and evaluation
+        self._mog = MoG(
+            logits=self.logits,
+            means=self.means,
+            precisions=self.prec,
+            precision_factors=self.precfs,
         )
-        return samples.detach().reshape((*sample_shape, -1))
+
+    def sample(self, sample_shape: Shape = torch.Size()) -> Tensor:
+        samples = self._mog.sample(sample_shape)
+        return samples.detach()
 
     def log_prob(self, theta: Tensor) -> Tensor:
-        batch_size, dim = theta.shape
+        """Evaluate log probability of theta under the conditioned MoG.
 
-        log_prob = MultivariateGaussianMDN.log_prob_mog(
-            theta,
-            self.logits.repeat(batch_size, 1),
-            self.means.repeat(batch_size, 1, 1),
-            self.prec.repeat(batch_size, 1, 1, 1),
-            self.sumlogdiag.repeat(batch_size, 1),
-        )
-        return log_prob
+        Args:
+            theta: Parameters to evaluate, shape (dim,) or (batch_size, dim).
+
+        Returns:
+            Log probabilities, shape () or (batch_size,).
+        """
+        # Ensure theta has batch dimension
+        if theta.dim() == 1:
+            theta = theta.unsqueeze(0)
+
+        # MoG.log_prob handles broadcasting correctly:
+        # If self._mog has batch_size=1 and theta has batch_size=N,
+        # it broadcasts the MoG parameters to match theta's batch dimension.
+        return self._mog.log_prob(theta)
 
 
 def conditonal_potential(
