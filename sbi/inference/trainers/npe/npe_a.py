@@ -7,8 +7,6 @@ from functools import partial
 from typing import Any, Callable, Dict, Literal, Optional, Union
 
 import torch
-from pyknos.mdn.mdn import MultivariateGaussianMDN
-from pyknos.nflows.transforms import CompositeTransform
 from torch import Tensor
 from torch.distributions import Distribution, MultivariateNormal
 
@@ -20,15 +18,14 @@ from sbi.neural_nets.estimators.base import (
     ConditionalDensityEstimator,
     ConditionalEstimatorBuilder,
 )
-from sbi.sbi_types import TensorBoardSummaryWriter
-from sbi.utils import torchutils
-from sbi.utils.sbiutils import (
-    batched_mixture_mv,
-    batched_mixture_vmv,
-    del_entries,
-    mog_log_prob,
+from sbi.neural_nets.estimators.mixture_density_estimator import (
+    MixtureDensityEstimator,
+    MultivariateGaussianMDN,
 )
-from sbi.utils.torchutils import BoxUniform, assert_all_finite, atleast_2d
+from sbi.neural_nets.estimators.mog import MoG
+from sbi.sbi_types import TensorBoardSummaryWriter
+from sbi.utils.sbiutils import del_entries
+from sbi.utils.torchutils import BoxUniform
 
 
 class NPE_A(PosteriorEstimatorTrainer):
@@ -237,57 +234,184 @@ class NPE_A(PosteriorEstimatorTrainer):
 
     def correct_for_proposal(
         self,
-        density_estimator: Optional[torch.nn.Module] = None,
-    ) -> "NPE_A_MDN":
+        density_estimator: Optional[MixtureDensityEstimator] = None,
+    ) -> MixtureDensityEstimator:
         r"""Build mixture of Gaussians that approximates the posterior.
 
-        Returns a `NPE_A_MDN` object, which applies the posthoc-correction required in
-        SNPE-A.
+        Applies the SNPE-A post-hoc correction to the density estimator and
+        returns it. For round 0 (when proposal is prior), no correction is needed.
+        For later rounds, the correction compensates for training on samples from
+        the proposal distribution rather than the prior.
 
         Args:
             density_estimator: The density estimator that the posterior is based on.
                 If `None`, use the latest neural density estimator that was trained.
 
         Returns:
-            Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods.
+            MixtureDensityEstimator with correction applied (if needed).
+
+        Raises:
+            TypeError: If density_estimator is not a MixtureDensityEstimator or
+                if the prior/proposal types are not supported.
+            ValueError: If the proposal posterior doesn't have default_x set or
+                if default_x has batch size != 1.
         """
         if density_estimator is None:
-            density_estimator = deepcopy(
-                self._neural_net
-            )  # PosteriorEstimator.train() also returns a deepcopy, mimic this here
-            # If internal net is used device is defined.
-            device = self._device
-        else:
-            # Otherwise, infer it from the device of the net parameters.
-            device = str(next(density_estimator.parameters()).device)
+            density_estimator = deepcopy(self._neural_net)
 
-        # Set proposal of the density estimator.
-        # This also evokes the z-scoring correction if necessary.
+        # Validate density estimator type
+        if not isinstance(density_estimator, MixtureDensityEstimator):
+            raise TypeError(
+                f"NPE_A requires MixtureDensityEstimator, got {type(density_estimator).__name__}. "
+                "Use density_estimator='mdn_snpe_a' when initializing NPE_A."
+            )
+
+        # Determine the proposal for this round
         if (
             self._proposal_roundwise[-1] is self._prior
             or self._proposal_roundwise[-1] is None
         ):
             proposal = self._prior
-            assert isinstance(
-                proposal, (MultivariateNormal, BoxUniform)
-            ), """Prior must be `torch.distributions.MultivariateNormal` or `sbi.utils.
-                BoxUniform`"""
+            if not isinstance(proposal, (MultivariateNormal, BoxUniform)):
+                raise TypeError(
+                    "Prior must be `torch.distributions.MultivariateNormal` or "
+                    f"`sbi.utils.BoxUniform`, got {type(proposal).__name__}"
+                )
         else:
-            assert isinstance(
-                self._proposal_roundwise[-1], DirectPosterior
-            ), """The proposal you passed to `append_simulations` is neither the prior
-                nor a `DirectPosterior`. SNPE-A currently only supports these scenarios.
-                """
+            if not isinstance(self._proposal_roundwise[-1], DirectPosterior):
+                raise TypeError(
+                    "The proposal you passed to `append_simulations` is neither the "
+                    "prior nor a `DirectPosterior`. SNPE-A currently only supports "
+                    f"these scenarios. Got {type(self._proposal_roundwise[-1]).__name__}"
+                )
             proposal = self._proposal_roundwise[-1]
 
-        # Create the NPE_A_MDN
-        wrapped_density_estimator = NPE_A_MDN(
-            flow=density_estimator,  # type: ignore
-            proposal=proposal,
-            prior=self._prior,
-            device=device,
-        )
-        return wrapped_density_estimator
+        # First round: proposal is prior, no correction needed
+        if isinstance(proposal, (MultivariateNormal, BoxUniform)):
+            return density_estimator
+
+        # Later rounds: proposal is DirectPosterior from previous round
+        # Get the default_x from the proposal (needed to evaluate the proposal MoG)
+        default_x = proposal.default_x
+        if default_x is None:
+            raise ValueError(
+                "Proposal posterior must have a default_x set for SNPE-A correction."
+            )
+
+        # Validate batch size - SNPE-A only supports single observation
+        if default_x.shape[0] != 1:
+            raise ValueError(
+                f"SNPE-A requires default_x batch size of 1, got {default_x.shape[0]}. "
+                "SNPE-A only supports single observations for correction."
+            )
+
+        # Get the proposal MoG from the previous round's posterior
+        proposal_estimator = proposal.posterior_estimator
+        if not isinstance(proposal_estimator, MixtureDensityEstimator):
+            raise TypeError(
+                f"Proposal posterior estimator must be MixtureDensityEstimator, "
+                f"got {type(proposal_estimator).__name__}. Multi-round SNPE-A "
+                "requires consistent use of MixtureDensityEstimator across rounds."
+            )
+
+        proposal_mog = proposal_estimator.get_mog(default_x)
+
+        # Compute the z-scored prior if z-scoring is enabled
+        z_scored_prior = self._compute_z_scored_prior(density_estimator)
+
+        # Validate z-scored prior
+        self._validate_z_scored_prior(z_scored_prior)
+
+        # Apply the correction
+        density_estimator.apply_correction(proposal_mog.detach(), z_scored_prior)
+
+        return density_estimator
+
+    def _compute_z_scored_prior(
+        self, density_estimator: MixtureDensityEstimator
+    ) -> Union[MultivariateNormal, BoxUniform]:
+        """Compute the prior transformed to z-scored space if z-scoring is enabled.
+
+        For SNPE-A correction, the prior needs to be in the same coordinate system
+        as the density estimator's output. When z-scoring is applied to inputs,
+        the density estimator outputs MoG parameters in z-scored space, so the
+        prior must also be transformed to z-scored space.
+
+        Mathematical background:
+            For z-score transform: z = (theta - shift) / scale
+            If theta ~ N(mu, Sigma), then z ~ N((mu - shift) / scale, Sigma / (scale ⊗ scale))
+            where (scale ⊗ scale)_ij = scale_i * scale_j
+
+        Args:
+            density_estimator: The MixtureDensityEstimator (to get z-score parameters).
+
+        Returns:
+            The (potentially z-scored) prior distribution.
+        """
+        if not density_estimator.has_input_transform:
+            # No z-scoring, return original prior
+            return self._prior
+
+        # Get the z-score transform parameters
+        # In our convention: z = (theta - shift) / scale
+        # where shift = estimated mean, scale = estimated std
+        shift = density_estimator._transform_shift
+        scale = density_estimator._transform_scale
+
+        if isinstance(self._prior, MultivariateNormal):
+            # Transform mean and covariance to z-space
+            prior_mean = self._prior.mean
+            prior_cov = self._prior.covariance_matrix
+
+            # Z-scored mean: (mu - shift) / scale
+            z_mean = (prior_mean - shift) / scale
+
+            # Z-scored covariance: Sigma_z[i,j] = Sigma[i,j] / (scale_i * scale_j)
+            scale_outer = scale.unsqueeze(-1) * scale.unsqueeze(-2)
+            z_cov = prior_cov / scale_outer
+
+            return MultivariateNormal(z_mean, z_cov)
+
+        elif isinstance(self._prior, BoxUniform):
+            # Transform bounds to z-space
+            z_low = (self._prior.low - shift) / scale
+            z_high = (self._prior.high - shift) / scale
+            return BoxUniform(z_low, z_high)
+
+        else:
+            raise TypeError(
+                f"Prior must be MultivariateNormal or BoxUniform, "
+                f"got {type(self._prior).__name__}"
+            )
+
+    def _validate_z_scored_prior(
+        self, z_scored_prior: Union[MultivariateNormal, BoxUniform]
+    ) -> None:
+        """Validate that the z-scored prior has valid parameters.
+
+        Args:
+            z_scored_prior: The z-scored prior to validate.
+
+        Raises:
+            ValueError: If the z-scored prior has invalid parameters.
+        """
+        if isinstance(z_scored_prior, MultivariateNormal):
+            # Check that covariance is positive definite
+            try:
+                torch.linalg.cholesky(z_scored_prior.covariance_matrix)
+            except RuntimeError as e:
+                raise ValueError(
+                    "Z-scored prior covariance is not positive definite. "
+                    "This may indicate numerical issues with the z-score transform. "
+                    f"Original error: {e}"
+                ) from e
+        elif isinstance(z_scored_prior, BoxUniform):
+            # Check that bounds are valid (low < high)
+            if not torch.all(z_scored_prior.low < z_scored_prior.high):
+                raise ValueError(
+                    "Z-scored prior bounds are invalid (low >= high). "
+                    "This may indicate issues with the z-score transform parameters."
+                )
 
     def build_posterior(
         self,
@@ -350,590 +474,71 @@ class NPE_A(PosteriorEstimatorTrainer):
         return self._neural_net.log_prob(theta, x)
 
     def _expand_mog(self, eps: float = 1e-5):
-        """
-        Replicate a singe Gaussian trained with Algorithm 1 before continuing
-        with Algorithm 2. The weights and biases of the associated MDN layers
-        are repeated `num_components` times, slightly perturbed to break the
-        symmetry such that the gradients in the subsequent training are not
-        all identical.
+        """Replicate a single Gaussian to multiple components for final round.
+
+        In SNPE-A, Algorithm 1 trains a single-component Gaussian. Before the
+        final round (Algorithm 2), this method expands it to `num_components`
+        mixture components by replicating the output layer parameters and adding
+        small perturbations to break symmetry.
 
         Args:
-            eps: Standard deviation for the random perturbation.
+            eps: Standard deviation for the random perturbation added to break
+                symmetry between replicated components.
+
+        Raises:
+            TypeError: If the neural network is not a MixtureDensityEstimator
+                or doesn't contain a MultivariateGaussianMDN.
         """
-        assert isinstance(self._neural_net.net._distribution, MultivariateGaussianMDN)
+        if not isinstance(self._neural_net, MixtureDensityEstimator):
+            raise TypeError(
+                f"Expected MixtureDensityEstimator, got {type(self._neural_net).__name__}. "
+                "Use density_estimator='mdn_snpe_a' when initializing NPE_A."
+            )
 
-        # Increase the number of components
-        self._neural_net.net._distribution._num_components = self._num_components
+        mdn_net = self._neural_net.net
+        if not isinstance(mdn_net, MultivariateGaussianMDN):
+            raise TypeError(
+                f"Expected MultivariateGaussianMDN, got {type(mdn_net).__name__}"
+            )
 
-        # Expand the 1-dim Gaussian.
+        # Update the number of components in the MDN
+        mdn_net._num_components = self._num_components
+
+        # Define the exact parameter paths that need expansion
+        # These are the output layers of the MDN that produce per-component outputs
+        expansion_layer_names = {
+            "net._logits_layer",
+            "net._means_layer",
+            "net._unconstrained_diagonal_layer",
+        }
+        # Upper layer only exists for dim > 1
+        if mdn_net._upper_layer is not None:
+            expansion_layer_names.add("net._upper_layer")
+
+        # Track which parameters were expanded for validation
+        expanded_params = set()
+
         for name, param in self._neural_net.named_parameters():
-            if any(
-                key in name for key in ["logits", "means", "unconstrained", "upper"]
-            ):
-                if "bias" in name:
+            # Check if this parameter belongs to one of the expansion layers
+            layer_prefix = ".".join(name.rsplit(".", 1)[:-1])  # Remove .weight/.bias
+            if layer_prefix in expansion_layer_names:
+                if name.endswith(".bias"):
                     param.data = param.data.repeat(self._num_components)
                     param.data.add_(torch.randn_like(param.data) * eps)
-                    param.grad = None  # let autograd construct a new gradient
-                elif "weight" in name:
+                    param.grad = None  # Let autograd construct a new gradient
+                    expanded_params.add(name)
+                elif name.endswith(".weight"):
                     param.data = param.data.repeat(self._num_components, 1)
                     param.data.add_(torch.randn_like(param.data) * eps)
-                    param.grad = None  # let autograd construct a new gradient
+                    param.grad = None
+                    expanded_params.add(name)
 
-
-class NPE_A_MDN(ConditionalDensityEstimator):
-    """Generates a posthoc-corrected MDN which approximates the posterior.
-
-    TODO: Adapt this class to the new `DensityEstimator` interface. Maybe even to a
-          common MDN interface. See #989.
-
-    This class takes as input the density estimator (abbreviated with `_d` suffix, aka
-    the proposal posterior) and the proposal prior (abbreviated with `_pp` suffix) from
-    which the simulations were drawn. It uses the algorithm presented in SNPE-A [1] to
-    compute the approximate posterior (abbreviated with `_p` suffix) from the two. The
-    approximate posterior is a MoG. This class also implements log-prob calculation
-    sampling from the approximate posterior. It inherits from `nn.Module` since the
-    constructor of `DirectPosterior` expects the argument `neural_net` to be a
-    `nn.Module`.
-
-    [1] _Fast epsilon-free Inference of Simulation Models with Bayesian Conditional
-        Density Estimation_, Papamakarios et al., NeurIPS 2016,
-        https://arxiv.org/abs/1605.06376.
-    """
-
-    def __init__(
-        self,
-        flow: ConditionalDensityEstimator,
-        proposal: Union["BoxUniform", "MultivariateNormal", "DirectPosterior"],
-        prior: Distribution,
-        device: str,
-    ):
-        """Constructor.
-
-        Args:
-            flow: The trained normalizing flow, passed when building the posterior.
-            proposal: The proposal distribution.
-            prior: The prior distribution.
-        """
-        # Call nn.Module's constructor.
-
-        super().__init__(flow, flow.input_shape, flow.condition_shape)
-
-        self._neural_net = flow
-        self._prior = prior
-        self._device = device
-
-        # Set the proposal using the `default_x`.
-        if isinstance(proposal, (BoxUniform, MultivariateNormal)):
-            self._apply_correction = False
-        else:
-            # Add iid dimension.
-            default_x = proposal.default_x  # type: ignore
-            self._apply_correction = True
-            (
-                logits_pp,
-                m_pp,
-                prec_pp,
-            ) = proposal.posterior_estimator._posthoc_correction(default_x)
-            self._logits_pp, self._m_pp, self._prec_pp = (
-                logits_pp.detach(),
-                m_pp.detach(),
-                prec_pp.detach(),
+        # Validate that we expanded the expected parameters
+        expected_count = len(expansion_layer_names) * 2  # weight + bias per layer
+        if len(expanded_params) != expected_count:
+            warnings.warn(
+                f"Expected to expand {expected_count} parameters but expanded "
+                f"{len(expanded_params)}. Expanded: {expanded_params}",
+                UserWarning,
+                stacklevel=2,
             )
-
-        # Take care of z-scoring, pre-compute and store prior terms.
-        self._set_state_for_mog_proposal()
-
-    def log_prob(self, inputs: Tensor, condition: Tensor, **kwargs) -> Tensor:
-        """Compute the log-probability of the approximate posterior.
-
-        Args:
-            inputs: Input values
-            condition: Condition values
-
-        Returns:
-            log_prob p(inputs|condition)
-        """
-        inputs, condition = inputs.to(self._device), condition.to(self._device)
-
-        if not self._apply_correction:
-            return self._neural_net.log_prob(inputs, condition)
-        else:
-            # When we want to compute the approx. posterior, a proposal prior \tilde{p}
-            # has already been observed. To analytically calculate the log-prob of the
-            # Gaussian, we first need to compute the mixture components.
-
-            # Compute the mixture components of the proposal posterior.
-            logits_pp, m_pp, prec_pp = self._posthoc_correction(condition)
-
-            # z-score theta if it z-scoring had been requested.
-            theta = self._maybe_z_score_theta(inputs)
-
-            # Compute the log_prob of theta under the product.
-            log_prob_proposal_posterior = mog_log_prob(theta, logits_pp, m_pp, prec_pp)
-            assert_all_finite(log_prob_proposal_posterior, "proposal posterior eval")
-            return log_prob_proposal_posterior  # \hat{p} from eq (3) in [1]
-
-    def loss(self, inputs, condition, **kwargs) -> Tensor:
-        return -self.log_prob(inputs, condition, **kwargs)
-
-    def sample(self, sample_shape: torch.Size, condition: Tensor, **kwargs) -> Tensor:
-        """Sample from the approximate posterior.
-
-        Args:
-            sample_shape: Shape of the samples.
-            condition: Condition values.
-
-        Returns:
-            Samples from the approximate posterior.
-        """
-
-        condition = condition.to(self._device)
-
-        if not self._apply_correction:
-            samples = self._neural_net.sample(sample_shape, condition=condition)
-            return samples
-        else:
-            # When we want to sample from the approx. posterior, a proposal prior
-            # \tilde{p} has already been observed. To analytically calculate the
-            # log-prob of the Gaussian, we first need to compute the mixture components.
-            num_samples = torch.Size(sample_shape).numel()
-            condition_ndim = len(self.condition_shape)
-            batch_size = condition.shape[:-condition_ndim]
-            batch_size = torch.Size(batch_size).numel()
-            samples = self._sample_approx_posterior_mog(
-                num_samples, condition, batch_size
-            )
-            # NOTE: New batching convention: (batch_dim, sample_dim, *event_shape)
-            samples = samples.transpose(0, 1)
-            return samples
-
-    def _sample_approx_posterior_mog(
-        self, num_samples, x: Tensor, batch_size: int
-    ) -> Tensor:
-        r"""Sample from the approximate posterior.
-
-        Args:
-            num_samples: Desired number of samples.
-            x: Conditioning context for posterior $p(\theta|x)$.
-            batch_size: Batch size for sampling.
-
-        Returns:
-            Samples from the approximate mixture of Gaussians posterior.
-        """
-
-        # Compute the mixture components of the posterior.
-        logits_p, m_p, prec_p = self._posthoc_correction(x)
-
-        # Compute the precision factors which represent the upper triangular matrix
-        # of the cholesky decomposition of the prec_p.
-        prec_factors_p = torch.linalg.cholesky(prec_p, upper=True)
-
-        assert logits_p.ndim == 2
-        assert m_p.ndim == 3
-        assert prec_p.ndim == 4
-        assert prec_factors_p.ndim == 4
-
-        # Replicate to use batched sampling from pyknos.
-        if batch_size is not None and batch_size > 1:
-            logits_p = logits_p.repeat(batch_size, 1)
-            m_p = m_p.repeat(batch_size, 1, 1)
-            prec_factors_p = prec_factors_p.repeat(batch_size, 1, 1, 1)
-
-        # Get (optionally z-scored) MoG samples.
-        theta = MultivariateGaussianMDN.sample_mog(
-            num_samples, logits_p, m_p, prec_factors_p
-        )
-
-        embedded_context = self._neural_net.net._embedding_net(x)
-        if embedded_context is not None:
-            # Merge the context dimension with sample dimension in order to
-            # apply the transform.
-            theta = torchutils.merge_leading_dims(theta, num_dims=2)
-            embedded_context = torchutils.repeat_rows(
-                embedded_context, num_reps=num_samples
-            )
-
-        theta, _ = self._neural_net.net._transform.inverse(
-            theta, context=embedded_context
-        )
-
-        if embedded_context is not None:
-            # Split the context dimension from sample dimension.
-            theta = torchutils.split_leading_dim(theta, shape=[-1, num_samples])
-
-        return theta
-
-    def _posthoc_correction(self, x: Tensor):
-        """
-        Compute the mixture components of the posterior given the current density
-        estimator and the proposal.
-
-        Args:
-            x: Conditioning context for posterior, shape
-                `(batch_dim, *event_shape)`.
-
-        Returns:
-            Mixture components of the posterior.
-        """
-        # Remove the batch dimension of `x` (SNPE-A always has a single `x`).
-        assert x.shape[0] == 1, (
-            f"Batchsize of `x_o` == {x.shape[0]}. SNPE-A only supports a single `x_o`."
-        )
-        x = x.squeeze(dim=0)
-
-        # Evaluate the density estimator.
-        embedded_x = self._neural_net.net._embedding_net(x)
-        dist = self._neural_net.net._distribution  # defined to avoid black formatting.
-        logits_d, m_d, prec_d, _, _ = dist.get_mixture_components(embedded_x)
-        norm_logits_d = logits_d - torch.logsumexp(logits_d, dim=-1, keepdim=True)
-        norm_logits_d = atleast_2d(norm_logits_d)
-
-        # The following if case is needed because, in the constructor, we call
-        # `_posthoc_correction` regardless of whether the `proposal` itself had a
-        # `proposal` or not.
-        if not self._apply_correction:
-            return norm_logits_d, m_d, prec_d
-        else:
-            logits_pp, m_pp, prec_pp = (
-                self._logits_pp,
-                self._m_pp,
-                self._prec_pp,
-            )
-
-        # Compute the MoG parameters of the posterior.
-        logits_p, m_p, prec_p, cov_p = self._proposal_posterior_transformation(
-            logits_pp, m_pp, prec_pp, norm_logits_d, m_d, prec_d
-        )
-        logits_p = atleast_2d(logits_p)
-        return logits_p, m_p, prec_p
-
-    def _proposal_posterior_transformation(
-        self,
-        logits_pp: Tensor,
-        means_pp: Tensor,
-        precisions_pp: Tensor,
-        logits_d: Tensor,
-        means_d: Tensor,
-        precisions_d: Tensor,
-    ):
-        r"""Transforms the proposal posterior (the MDN) into the posterior.
-
-        The approximate posterior is:
-        $p(\theta|x) = 1/Z * q(\theta|x) * p(\theta) / prop(\theta)$
-        In words: posterior = proposal posterior estimate * prior / proposal.
-
-        Since the proposal posterior estimate and the proposal are MoG, and the
-        prior is either Gaussian or uniform, we can solve this in closed-form.
-
-        This function implements Appendix C from [1], and is highly similar to
-        `SNPE_C._automatic_posterior_transformation()`.
-
-        Args:
-            logits_pp: Component weight of each Gaussian of the proposal prior.
-            means_pp: Mean of each Gaussian of the proposal prior.
-            precisions_pp: Precision matrix of each Gaussian of the proposal prior.
-            logits_d: Component weight for each Gaussian of the density estimator.
-            means_d: Mean of each Gaussian of the density estimator.
-            precisions_d: Precision matrix of each Gaussian of the density estimator.
-
-        Returns: (Component weight, mean, precision matrix, covariance matrix) of each
-            Gaussian of the approximate posterior.
-        """
-        precisions_post, covariances_post = self._precisions_posterior(
-            precisions_pp, precisions_d
-        )
-
-        means_post = self._means_posterior(
-            covariances_post, means_pp, precisions_pp, means_d, precisions_d
-        )
-
-        logits_post = NPE_A_MDN._logits_posterior(
-            means_post,
-            precisions_post,
-            covariances_post,
-            logits_pp,
-            means_pp,
-            precisions_pp,
-            logits_d,
-            means_d,
-            precisions_d,
-        )
-
-        return logits_post, means_post, precisions_post, covariances_post
-
-    def _set_state_for_mog_proposal(self) -> None:
-        """
-        Set state variables of the NPE_A_MDN instance every time `set_proposal()`
-        is called, i.e. every time a posterior is build using
-        `SNPE_A.build_posterior()`.
-
-        This function is almost identical to `SNPE_C._set_state_for_mog_proposal()`.
-
-        Three things are computed:
-        1) Check if z-scoring was requested. To do so, we check if the `_transform`
-            argument of the net had been a `CompositeTransform`. See pyknos mdn.py.
-        2) Define a (potentially standardized) prior. It's standardized if z-scoring
-            had been requested.
-        3) Compute (Precision * mean) for the prior. This quantity is used at every
-            training step if the prior is Gaussian.
-        """
-
-        self.z_score_theta = isinstance(
-            self._neural_net.net._transform, CompositeTransform
-        )
-
-        self._set_maybe_z_scored_prior()
-
-        if isinstance(self._maybe_z_scored_prior, MultivariateNormal):
-            self.prec_m_prod_prior = torch.mv(
-                self._maybe_z_scored_prior.precision_matrix,  # type: ignore
-                self._maybe_z_scored_prior.loc,  # type: ignore
-            )
-
-    def _set_maybe_z_scored_prior(self) -> None:
-        r"""
-        Compute and store potentially standardized prior (if z-scoring was requested).
-
-        This function is highly similar to `SNPE_C._set_maybe_z_scored_prior()`.
-
-        The proposal posterior is:
-        $p(\theta|x) = 1/Z * q(\theta|x) * prop(\theta) / p(\theta)$
-
-        Let's denote z-scored theta by `a`: a = (theta - mean) / std
-        Then $p'(a|x) = 1/Z_2 * q'(a|x) * prop'(a) / p'(a)$
-
-        The ' indicates that the evaluation occurs in standardized space. The constant
-        scaling factor has been absorbed into $Z_2$.
-        From the above equation, we see that we need to evaluate the prior **in
-        standardized space**. We build the standardized prior in this function.
-
-        The standardize transform that is applied to the samples theta does not use
-        the exact prior mean and std (due to implementation issues). Hence, the z-scored
-        prior will not be exactly have mean=0 and std=1.
-        """
-        if self.z_score_theta:
-            scale = self._neural_net.net._transform._transforms[0]._scale
-            shift = self._neural_net.net._transform._transforms[0]._shift
-
-            # Following the definition of the linear transform in
-            # `standardizing_transform` in `sbiutils.py`:
-            # shift=-mean / std
-            # scale=1 / std
-            # Solving these equations for mean and std:
-            estim_prior_std = 1 / scale
-            estim_prior_mean = -shift * estim_prior_std
-
-            # Compute the discrepancy of the true prior mean and std and the mean and
-            # std that was empirically estimated from samples.
-            # N(theta|m,s) = N((theta-m_e)/s_e|(m-m_e)/s_e, s/s_e)
-            # Above: m,s are true prior mean and std. m_e,s_e are estimated prior mean
-            # and std (estimated from samples and used to build standardize transform).
-            almost_zero_mean = (self._prior.mean - estim_prior_mean) / estim_prior_std
-            almost_one_std = torch.sqrt(self._prior.variance) / estim_prior_std
-
-            if isinstance(self._prior, MultivariateNormal):
-                self._maybe_z_scored_prior = MultivariateNormal(
-                    almost_zero_mean, torch.diag(almost_one_std)
-                )
-            else:
-                range_ = torch.sqrt(almost_one_std * 3.0)
-                self._maybe_z_scored_prior = BoxUniform(
-                    almost_zero_mean - range_, almost_zero_mean + range_
-                )
-        else:
-            self._maybe_z_scored_prior = self._prior
-
-    def _maybe_z_score_theta(self, theta: Tensor) -> Tensor:
-        """Return potentially standardized theta if z-scoring was requested."""
-
-        if self.z_score_theta:
-            theta, _ = self._neural_net.net._transform(theta)
-
-        return theta
-
-    def _precisions_posterior(self, precisions_pp: Tensor, precisions_d: Tensor):
-        r"""Return the precisions and covariances of the MoG posterior.
-
-        As described at the end of Appendix C in [1], it can happen that the
-        proposal's precision matrix is not positive definite.
-
-        $S_k^\prime = ( S_k^{-1} - S_0^{-1} )^{-1}$
-        (see eq (23) in Appendix C of [1])
-
-        Args:
-            precisions_pp: Precision matrices of the proposal prior.
-            precisions_d: Precision matrices of the density estimator.
-
-        Returns: (Precisions, Covariances) of the MoG posterior.
-        """
-
-        num_comps_p = precisions_pp.shape[1]
-        num_comps_d = precisions_d.shape[1]
-
-        # Check if precision matrices are positive definite.
-        for batches in precisions_pp:
-            for pprior in batches:
-                eig_pprior = torch.linalg.eigvalsh(pprior, UPLO="U")
-                if not (eig_pprior > 0).all():
-                    raise AssertionError(
-                        "The precision matrix of the proposal is not positive definite!"
-                    )
-        for batches in precisions_d:
-            for d in batches:
-                eig_d = torch.linalg.eigvalsh(d, UPLO="U")
-                if not (eig_d > 0).all():
-                    raise AssertionError(
-                        "The precision matrix of the density estimator is not "
-                        "positive definite!"
-                    )
-
-        precisions_pp_rep = precisions_pp.repeat_interleave(num_comps_d, dim=1)
-        precisions_d_rep = precisions_d.repeat(1, num_comps_p, 1, 1)
-
-        precisions_p = precisions_d_rep - precisions_pp_rep
-        if isinstance(self._maybe_z_scored_prior, MultivariateNormal):
-            precisions_p += self._maybe_z_scored_prior.precision_matrix
-
-        # Check if precision matrix is positive definite.
-        for _, batches in enumerate(precisions_p):
-            for _, pp in enumerate(batches):
-                eig_pp = torch.linalg.eigvalsh(pp, UPLO="U")
-                if not (eig_pp > 0).all():
-                    raise AssertionError(
-                        "The precision matrix of a posterior is not positive "
-                        "definite! This is a known issue for SNPE-A. Either try a "
-                        "different parameter setting, e.g. a different number of "
-                        "mixture components (when contracting SNPE-A), or a different "
-                        "value for the parameter perturbation (when building the "
-                        "posterior)."
-                    )
-
-        covariances_p = torch.inverse(precisions_p)
-        return precisions_p, covariances_p
-
-    def _means_posterior(
-        self,
-        covariances_p: Tensor,
-        means_pp: Tensor,
-        precisions_pp: Tensor,
-        means_d: Tensor,
-        precisions_d: Tensor,
-    ):
-        r"""Return the means of the MoG posterior.
-
-        $m_k^\prime = S_k^\prime ( S_k^{-1} m_k - S_0^{-1} m_0 )$
-        (see eq (24) in Appendix C of [1])
-
-        Args:
-            covariances_post: Covariance matrices of the MoG posterior.
-            means_pp: Means of the proposal prior.
-            precisions_pp: Precision matrices of the proposal prior.
-            means_d: Means of the density estimator.
-            precisions_d: Precision matrices of the density estimator.
-
-        Returns: Means of the MoG posterior.
-        """
-
-        num_comps_pp = precisions_pp.shape[1]
-        num_comps_d = precisions_d.shape[1]
-
-        # Compute the products P_k * m_k and P_0 * m_0.
-        prec_m_prod_pp = batched_mixture_mv(precisions_pp, means_pp)
-        prec_m_prod_d = batched_mixture_mv(precisions_d, means_d)
-
-        # Repeat them to allow for matrix operations: same trick as for the precisions.
-        prec_m_prod_pp_rep = prec_m_prod_pp.repeat_interleave(num_comps_d, dim=1)
-        prec_m_prod_d_rep = prec_m_prod_d.repeat(1, num_comps_pp, 1)
-
-        # Compute the means P_k^prime * (P_k * m_k - P_0 * m_0).
-        summed_cov_m_prod_rep = prec_m_prod_d_rep - prec_m_prod_pp_rep
-        if isinstance(self._maybe_z_scored_prior, MultivariateNormal):
-            summed_cov_m_prod_rep += self.prec_m_prod_prior
-
-        means_p = batched_mixture_mv(covariances_p, summed_cov_m_prod_rep)
-        return means_p
-
-    @staticmethod
-    def _logits_posterior(
-        means_post: Tensor,
-        precisions_post: Tensor,
-        covariances_post: Tensor,
-        logits_pp: Tensor,
-        means_pp: Tensor,
-        precisions_pp: Tensor,
-        logits_d: Tensor,
-        means_d: Tensor,
-        precisions_d: Tensor,
-    ):
-        r"""Return the component weights (i.e. logits) of the MoG posterior.
-
-        $\alpha_k^\prime = \frac{ \alpha_k exp(-0.5 c_k) }{ \sum{j} \alpha_j exp(-0.5
-        c_j) } $
-        with
-        $c_k = logdet(S_k) - logdet(S_0) - logdet(S_k^\prime) +
-             + m_k^T P_k m_k - m_0^T P_0 m_0 - m_k^\prime^T P_k^\prime m_k^\prime$
-        (see eqs. (25, 26) in Appendix C of [1])
-
-        Args:
-            means_post: Means of the posterior.
-            precisions_post: Precision matrices of the posterior.
-            covariances_post: Covariance matrices of the posterior.
-            logits_pp: Component weights (i.e. logits) of the proposal prior.
-            means_pp: Means of the proposal prior.
-            precisions_pp: Precision matrices of the proposal prior.
-            logits_d: Component weights (i.e. logits) of the density estimator.
-            means_d: Means of the density estimator.
-            precisions_d: Precision matrices of the density estimator.
-
-        Returns: Component weights of the proposal posterior.
-        """
-
-        num_comps_pp = precisions_pp.shape[1]
-        num_comps_d = precisions_d.shape[1]
-
-        # Compute the ratio of the logits similar to eq (10) in Appendix A.1 of [2]
-        logits_pp_rep = logits_pp.repeat_interleave(num_comps_d, dim=1)
-        logits_d_rep = logits_d.repeat(1, num_comps_pp)
-        logit_factors = logits_d_rep - logits_pp_rep
-
-        # Compute the log-determinants
-        logdet_covariances_post = torch.logdet(covariances_post)
-        logdet_covariances_pp = -torch.logdet(precisions_pp)
-        logdet_covariances_d = -torch.logdet(precisions_d)
-
-        # Repeat the proposal and density estimator terms such that there are LK terms.
-        # Same trick as has been used above.
-        logdet_covariances_pp_rep = logdet_covariances_pp.repeat_interleave(
-            num_comps_d, dim=1
-        )
-        logdet_covariances_d_rep = logdet_covariances_d.repeat(1, num_comps_pp)
-
-        log_sqrt_det_ratio = 0.5 * (  # similar to eq (14) in Appendix A.1 of [2]
-            logdet_covariances_post
-            + logdet_covariances_pp_rep
-            - logdet_covariances_d_rep
-        )
-
-        # Compute for proposal, density estimator, and proposal posterior:
-        exponent_pp = batched_mixture_vmv(
-            precisions_pp,
-            means_pp,  # m_0 in eq (26) in Appendix C of [1]
-        )
-        exponent_d = batched_mixture_vmv(
-            precisions_d,
-            means_d,  # m_k in eq (26) in Appendix C of [1]
-        )
-        exponent_post = batched_mixture_vmv(
-            precisions_post,
-            means_post,  # m_k^\prime in eq (26) in Appendix C of [1]
-        )
-
-        # Extend proposal and density estimator exponents to get LK terms.
-        exponent_pp_rep = exponent_pp.repeat_interleave(num_comps_d, dim=1)
-        exponent_d_rep = exponent_d.repeat(1, num_comps_pp)
-        exponent = -0.5 * (
-            exponent_d_rep - exponent_pp_rep - exponent_post  # eq (26) in [1]
-        )
-
-        logits_post = logit_factors + log_sqrt_det_ratio + exponent
-        return logits_post
