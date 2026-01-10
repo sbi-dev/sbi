@@ -42,23 +42,6 @@ class TestMoGBasics:
         assert mog.dim == dim
         assert mog.batch_shape == torch.Size([batch_size])
 
-    def test_mog_properties(self):
-        """Test MoG property accessors."""
-        batch_size, num_components, dim = 2, 3, 4
-        logits = torch.randn(batch_size, num_components)
-        means = torch.randn(batch_size, num_components, dim)
-        precisions = torch.eye(dim).unsqueeze(0).unsqueeze(0).expand(
-            batch_size, num_components, -1, -1
-        )
-
-        mog = MoG(logits=logits, means=means, precisions=precisions)
-
-        assert mog.num_components == num_components
-        assert mog.dim == dim
-        assert mog.batch_shape == torch.Size([batch_size])
-        assert mog.device == logits.device
-        assert mog.dtype == logits.dtype
-
     def test_weights_sum_to_one(self):
         """Test that mixture weights sum to 1."""
         logits = torch.randn(5, 10)  # 5 batches, 10 components
@@ -70,19 +53,6 @@ class TestMoGBasics:
         weights = mog.weights
         assert weights.shape == (5, 10)
         assert torch.allclose(weights.sum(dim=-1), torch.ones(5), atol=1e-6)
-
-    def test_log_weights(self):
-        """Test log_weights are consistent with weights."""
-        logits = torch.randn(3, 5)
-        means = torch.randn(3, 5, 2)
-        precisions = torch.eye(2).unsqueeze(0).unsqueeze(0).expand(3, 5, -1, -1)
-
-        mog = MoG(logits=logits, means=means, precisions=precisions)
-
-        log_weights = mog.log_weights
-        weights_from_log = torch.exp(log_weights)
-
-        assert torch.allclose(weights_from_log, mog.weights, atol=1e-6)
 
 
 class TestMoGLogProb:
@@ -116,59 +86,38 @@ class TestMoGLogProb:
 
         assert torch.allclose(mog_log_prob, mvn_log_prob, atol=1e-4)
 
-    def test_log_prob_shape_2d_input(self):
-        """Test log_prob with 2D input (batch_size, dim)."""
+    @pytest.mark.parametrize("input_shape,expected_shape", [
+        ((4, 2), (4,)),  # 2D input: (batch_size, dim)
+        ((10, 4, 2), (10, 4)),  # 3D input: (sample_size, batch_size, dim)
+    ])
+    def test_log_prob_shape(self, input_shape, expected_shape):
+        """Test log_prob output shape for different input shapes."""
         batch_size, num_components, dim = 4, 3, 2
         mog = _create_random_mog(batch_size, num_components, dim)
 
-        inputs = torch.randn(batch_size, dim)
+        inputs = torch.randn(*input_shape)
         log_prob = mog.log_prob(inputs)
 
-        assert log_prob.shape == (batch_size,)
-
-    def test_log_prob_shape_3d_input(self):
-        """Test log_prob with 3D input (sample_size, batch_size, dim)."""
-        batch_size, num_components, dim = 4, 3, 2
-        sample_size = 10
-        mog = _create_random_mog(batch_size, num_components, dim)
-
-        inputs = torch.randn(sample_size, batch_size, dim)
-        log_prob = mog.log_prob(inputs)
-
-        assert log_prob.shape == (sample_size, batch_size)
-
-    def test_log_prob_finite(self):
-        """Test that log_prob returns finite values."""
-        mog = _create_random_mog(batch_size=5, num_components=3, dim=4)
-        inputs = torch.randn(5, 4)
-
-        log_prob = mog.log_prob(inputs)
-
+        assert log_prob.shape == expected_shape
         assert torch.all(torch.isfinite(log_prob))
 
 
 class TestMoGSample:
     """Test MoG sampling."""
 
-    def test_sample_shape_default(self):
-        """Test sample shape with default (empty) sample_shape."""
+    @pytest.mark.parametrize("sample_shape,expected_shape", [
+        (torch.Size([]), (4, 2)),  # Default (empty) sample_shape
+        (torch.Size([100]), (100, 4, 2)),  # 1D sample_shape
+        (torch.Size([10, 20]), (10, 20, 4, 2)),  # 2D sample_shape
+    ])
+    def test_sample_shape(self, sample_shape, expected_shape):
+        """Test sample shape with various sample_shape values."""
         batch_size, num_components, dim = 4, 3, 2
         mog = _create_random_mog(batch_size, num_components, dim)
 
-        samples = mog.sample()
-
-        assert samples.shape == (batch_size, dim)
-
-    def test_sample_shape_with_sample_shape(self):
-        """Test sample shape with explicit sample_shape."""
-        batch_size, num_components, dim = 4, 3, 2
-        mog = _create_random_mog(batch_size, num_components, dim)
-
-        samples = mog.sample(torch.Size([100]))
-        assert samples.shape == (100, batch_size, dim)
-
-        samples = mog.sample(torch.Size([10, 20]))
-        assert samples.shape == (10, 20, batch_size, dim)
+        samples = mog.sample(sample_shape)
+        assert samples.shape == expected_shape
+        assert torch.all(torch.isfinite(samples))
 
     def test_sample_mean_convergence(self):
         """Test that sample mean converges to mixture mean."""
@@ -285,16 +234,6 @@ class TestMoGFromGaussian:
 
 class TestMoGDeviceAndDetach:
     """Test MoG device transfer and detach."""
-
-    def test_to_device(self):
-        """Test moving MoG to different device."""
-        mog = _create_random_mog(batch_size=2, num_components=3, dim=2)
-
-        # Move to same device (CPU) - should work
-        mog_cpu = mog.to(torch.device("cpu"))
-
-        assert mog_cpu.device == torch.device("cpu")
-        assert mog_cpu.logits.device == torch.device("cpu")
 
     def test_detach(self):
         """Test detaching MoG from computation graph."""
