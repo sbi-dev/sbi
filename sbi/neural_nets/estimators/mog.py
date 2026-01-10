@@ -50,8 +50,11 @@ class MoG:
     precisions: Tensor
     precision_factors: Optional[Tensor] = None
 
-    def __post_init__(self):
-        """Validate tensor shapes and compute precision_factors if missing."""
+    # Small constant for numerical stability in Cholesky decomposition
+    _CHOLESKY_EPSILON: float = 1e-6
+
+    def __post_init__(self) -> None:
+        """Validate tensor shapes, check for NaN/Inf, and compute precision_factors."""
         # Validate tensor dimensions
         if self.logits.dim() != 2:
             raise ValueError(
@@ -87,11 +90,34 @@ class MoG:
                 f"got {self.precisions.shape[2:]}"
             )
 
+        # Validate no NaN or Inf values in input tensors
+        if not torch.all(torch.isfinite(self.logits)):
+            raise ValueError("logits contains NaN or Inf values")
+        if not torch.all(torch.isfinite(self.means)):
+            raise ValueError("means contains NaN or Inf values")
+        if not torch.all(torch.isfinite(self.precisions)):
+            raise ValueError("precisions contains NaN or Inf values")
+
         # Compute precision_factors if not provided
         # precision = A^T @ A where A is upper triangular (precision_factors)
         if self.precision_factors is None:
-            # Use Cholesky: precision = L @ L^T, so A = L^T (upper triangular)
-            L = torch.linalg.cholesky(self.precisions)
+            # Add small epsilon to diagonal for numerical stability
+            eye = torch.eye(
+                dim, device=self.precisions.device, dtype=self.precisions.dtype
+            )
+            precisions_stabilized = self.precisions + self._CHOLESKY_EPSILON * eye
+
+            try:
+                # Use Cholesky: precision = L @ L^T, so A = L^T (upper triangular)
+                L = torch.linalg.cholesky(precisions_stabilized)
+            except torch.linalg.LinAlgError as e:
+                raise ValueError(
+                    "Failed to compute Cholesky decomposition of precision matrix. "
+                    "This indicates the precision matrix is not positive definite. "
+                    "Check that your MoG parameters are valid. "
+                    f"Original error: {e}"
+                ) from e
+
             # Note: need to use object.__setattr__ for frozen dataclass
             object.__setattr__(self, 'precision_factors', L.transpose(-2, -1))
         else:
@@ -100,6 +126,8 @@ class MoG:
                     f"precision_factors shape {self.precision_factors.shape} must match "
                     f"precisions shape {self.precisions.shape}"
                 )
+            if not torch.all(torch.isfinite(self.precision_factors)):
+                raise ValueError("precision_factors contains NaN or Inf values")
 
     @property
     def num_components(self) -> int:
@@ -354,9 +382,10 @@ class MoG:
         mu_y_col = mu_y.unsqueeze(-1)  # (batch_size, num_components, num_fixed, 1)
         diff_y = y_expanded - mu_y_col
 
-        # precs_xx_inv @ precs_xy @ diff_y
-        precs_xx_inv = torch.inverse(precs_xx)
-        adjustment = torch.matmul(precs_xx_inv, torch.matmul(precs_xy, diff_y))
+        # Compute precs_xx_inv @ precs_xy @ diff_y using solve for numerical stability
+        # solve(A, B) computes A^{-1} @ B more stably than inv(A) @ B
+        rhs = torch.matmul(precs_xy, diff_y)
+        adjustment = torch.linalg.solve(precs_xx, rhs)
         cond_means = mu_x - adjustment.squeeze(-1)
 
         # Conditional precision factors are just precfs_xx (precision doesn't change)

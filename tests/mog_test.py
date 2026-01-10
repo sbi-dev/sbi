@@ -348,3 +348,127 @@ def _create_random_mog(
         precisions=precisions,
         precision_factors=precision_factors,
     )
+
+
+class TestMoGNumericalStability:
+    """Test MoG numerical stability with ill-conditioned matrices."""
+
+    def test_ill_conditioned_precision_with_epsilon_stabilization(self):
+        """Test that MoG handles ill-conditioned precision matrices via epsilon."""
+        batch_size, num_components, dim = 2, 3, 4
+
+        # Create an ill-conditioned precision matrix
+        # (one eigenvalue much smaller than others)
+        logits = torch.randn(batch_size, num_components)
+        means = torch.randn(batch_size, num_components, dim)
+
+        # Create nearly singular precision (condition number ~1e6)
+        eigenvalues = torch.tensor([1e-6, 0.1, 1.0, 10.0])
+        Q, _ = torch.linalg.qr(torch.randn(dim, dim))  # Random orthogonal matrix
+        base_precision = Q @ torch.diag(eigenvalues) @ Q.T
+
+        precisions = base_precision.unsqueeze(0).unsqueeze(0).expand(
+            batch_size, num_components, -1, -1
+        ).clone()
+
+        # MoG should handle this via epsilon stabilization in Cholesky
+        mog = MoG(logits=logits, means=means, precisions=precisions)
+
+        # Should be able to compute log_prob and sample without errors
+        test_samples = torch.randn(10, batch_size, dim)
+        log_probs = mog.log_prob(test_samples)
+        assert torch.all(torch.isfinite(log_probs))
+
+        samples = mog.sample((5,))
+        assert torch.all(torch.isfinite(samples))
+
+    def test_nan_logits_rejected(self):
+        """Test that NaN values in logits are rejected."""
+        batch_size, num_components, dim = 2, 3, 4
+
+        logits = torch.randn(batch_size, num_components)
+        logits[0, 0] = float("nan")
+        means = torch.randn(batch_size, num_components, dim)
+        precisions = torch.eye(dim).unsqueeze(0).unsqueeze(0).expand(
+            batch_size, num_components, -1, -1
+        )
+
+        with pytest.raises(ValueError, match="logits contains NaN"):
+            MoG(logits=logits, means=means, precisions=precisions)
+
+    def test_inf_means_rejected(self):
+        """Test that Inf values in means are rejected."""
+        batch_size, num_components, dim = 2, 3, 4
+
+        logits = torch.randn(batch_size, num_components)
+        means = torch.randn(batch_size, num_components, dim)
+        means[0, 0, 0] = float("inf")
+        precisions = torch.eye(dim).unsqueeze(0).unsqueeze(0).expand(
+            batch_size, num_components, -1, -1
+        )
+
+        with pytest.raises(ValueError, match="means contains NaN"):
+            MoG(logits=logits, means=means, precisions=precisions)
+
+    def test_nan_precisions_rejected(self):
+        """Test that NaN values in precisions are rejected."""
+        batch_size, num_components, dim = 2, 3, 4
+
+        logits = torch.randn(batch_size, num_components)
+        means = torch.randn(batch_size, num_components, dim)
+        precisions = torch.eye(dim).unsqueeze(0).unsqueeze(0).expand(
+            batch_size, num_components, -1, -1
+        ).clone()
+        precisions[0, 0, 0, 0] = float("nan")
+
+        with pytest.raises(ValueError, match="precisions contains NaN"):
+            MoG(logits=logits, means=means, precisions=precisions)
+
+    def test_non_positive_definite_precision_rejected(self):
+        """Test that non-positive-definite precisions are rejected."""
+        batch_size, num_components, dim = 2, 3, 4
+
+        logits = torch.randn(batch_size, num_components)
+        means = torch.randn(batch_size, num_components, dim)
+
+        # Create a non-positive-definite matrix (negative eigenvalue)
+        eigenvalues = torch.tensor([-1.0, 0.1, 1.0, 10.0])
+        Q, _ = torch.linalg.qr(torch.randn(dim, dim))
+        bad_precision = Q @ torch.diag(eigenvalues) @ Q.T
+
+        precisions = bad_precision.unsqueeze(0).unsqueeze(0).expand(
+            batch_size, num_components, -1, -1
+        ).clone()
+
+        with pytest.raises(ValueError, match="Cholesky decomposition"):
+            MoG(logits=logits, means=means, precisions=precisions)
+
+    def test_conditioning_with_near_singular_precision(self):
+        """Test that conditioning works with near-singular precisions."""
+        batch_size, num_components, dim = 1, 2, 4
+
+        logits = torch.zeros(batch_size, num_components)
+        means = torch.zeros(batch_size, num_components, dim)
+
+        # Create a precision matrix that is nearly singular in one block
+        # but well-conditioned overall
+        precision = torch.eye(dim) * 1.0
+        precision[0, 0] = 1e-4  # Small but not zero
+        precisions = precision.unsqueeze(0).unsqueeze(0).expand(
+            batch_size, num_components, -1, -1
+        ).clone()
+
+        mog = MoG(logits=logits, means=means, precisions=precisions)
+
+        # Condition on dimensions 2 and 3 (keep dimensions 0 and 1 free)
+        # dims_to_sample specifies which dimensions to KEEP (not condition on)
+        dims_to_sample = [0, 1]
+        # condition tensor has values for ALL dimensions, free dims will be ignored
+        condition_values = torch.zeros(batch_size, dim)
+
+        conditioned_mog = mog.condition(condition_values, dims_to_sample)
+
+        # Verify results are finite
+        assert torch.all(torch.isfinite(conditioned_mog.logits))
+        assert torch.all(torch.isfinite(conditioned_mog.means))
+        assert torch.all(torch.isfinite(conditioned_mog.precisions))

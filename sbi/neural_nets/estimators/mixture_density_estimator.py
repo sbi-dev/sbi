@@ -332,6 +332,9 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
         >>> log_prob = estimator.log_prob(samples, condition)  # (100, 32)
     """
 
+    # Small constant for numerical stability in matrix operations
+    _STABILITY_EPSILON: float = 1e-6
+
     def __init__(
         self,
         net: MultivariateGaussianMDN,
@@ -415,21 +418,32 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
             return z
         return z * self._transform_scale + self._transform_shift
 
-    def _log_det_jacobian(self, input: Tensor) -> Tensor:
-        """Compute log determinant of Jacobian for the z-score transform.
+    def _log_det_jacobian_forward(self, input: Tensor) -> Tensor:
+        """Compute log determinant of Jacobian for the forward z-score transform.
 
-        For affine transform z = (x - shift) / scale, the Jacobian is:
-        dz/dx = 1/scale (diagonal matrix)
-        log|det(dz/dx)| = -sum(log(scale))
+        For the forward affine transform z = (x - shift) / scale:
+            - The Jacobian matrix is: dz/dx = diag(1/scale)
+            - The determinant is: |det(dz/dx)| = prod(1/scale)
+            - The log determinant is: log|det(dz/dx)| = -sum(log(scale))
 
-        When computing p(x), we need: log p(x) = log p(z) + log|det(dz/dx)|
-        This method returns log|det(dz/dx)| = -sum(log(scale)).
+        Change of Variables Formula:
+            When we have a density p_z(z) and want p_x(x), we use:
+            p_x(x) = p_z(z(x)) * |det(dz/dx)|
+
+            In log space:
+            log p_x(x) = log p_z(z(x)) + log|det(dz/dx)|
+
+            Since log|det(dz/dx)| = -sum(log(scale)), we have:
+            log p_x(x) = log p_z(z) - sum(log(scale))
+
+        This method returns log|det(dz/dx)| = -sum(log(scale)), which should
+        be ADDED to log p_z(z) to get log p_x(x).
 
         Args:
             input: Input tensor, used to determine device and dtype.
 
         Returns:
-            Log determinant of Jacobian (scalar), on the same device as input.
+            Log determinant of forward Jacobian (scalar), on the same device as input.
         """
         if not self.has_input_transform:
             return torch.zeros(1, device=input.device, dtype=input.dtype).squeeze()
@@ -469,7 +483,7 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
         # Change of variables: log p(x) = log p(z) + log|det(dz/dx)|
         # where z = (x - shift) / scale and log|det(dz/dx)| = -sum(log(scale))
         log_probs = mog.log_prob(transformed_input)  # (sample_dim, batch_dim)
-        log_probs = log_probs + self._log_det_jacobian(input)
+        log_probs = log_probs + self._log_det_jacobian_forward(input)
 
         if not has_sample_dim:
             log_probs = log_probs.squeeze(0)
@@ -682,11 +696,19 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
             )
             prec_post = prec_post + prec_prior_rep
 
-        # Check positive definiteness using Cholesky (more efficient than eigenvalues)
-        self._check_precision_positive_definite(prec_post, "posterior")
+        # Add small epsilon to diagonal for numerical stability
+        dim = prec_post.shape[-1]
+        eye = torch.eye(dim, device=prec_post.device, dtype=prec_post.dtype)
+        prec_post_stabilized = prec_post + self._STABILITY_EPSILON * eye
 
-        # Compute posterior covariances
-        cov_post = torch.linalg.inv(prec_post)
+        # Check positive definiteness using Cholesky (more efficient than eigenvalues)
+        self._check_precision_positive_definite(prec_post_stabilized, "posterior")
+
+        # Compute posterior covariances using solve for numerical stability
+        # Instead of cov = inv(prec), we use cov = solve(prec, I) which is more stable
+        batch_shape = prec_post_stabilized.shape[:-2]
+        eye_expanded = eye.expand(*batch_shape, dim, dim)
+        cov_post = torch.linalg.solve(prec_post_stabilized, eye_expanded)
 
         # Compute posterior means (Eq. 24)
         # mean_post = cov_post @ (prec_density @ mean_density
@@ -728,13 +750,20 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
             num_comps_density,
         )
 
-        # Compute precision factors from precisions using Cholesky
-        precf_post = torch.linalg.cholesky(prec_post, upper=True)
+        # Compute precision factors from stabilized precisions using Cholesky
+        try:
+            precf_post = torch.linalg.cholesky(prec_post_stabilized, upper=True)
+        except torch.linalg.LinAlgError as e:
+            raise ValueError(
+                "Failed to compute Cholesky decomposition during SNPE-A correction. "
+                "This indicates numerical instability in the posterior precision matrix. "
+                f"Original error: {e}"
+            ) from e
 
         return MoG(
             logits=logits_post,
             means=mean_post,
-            precisions=prec_post,
+            precisions=prec_post_stabilized,
             precision_factors=precf_post,
         )
 
