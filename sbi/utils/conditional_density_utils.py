@@ -274,9 +274,11 @@ def condition_mog(
     precs_xy = precs[:, :, mask]
     precs_xy = precs_xy[:, :, :, ~mask]
 
-    cond_means = mu_x - (
-        torch.inverse(precs_xx) @ precs_xy @ (y - mu_y).view(1, n_mixtures, -1, 1)
-    ).view(1, n_mixtures, -1)
+    # Compute conditional means using solve for numerical stability
+    # cond_means = mu_x - precs_xx^{-1} @ precs_xy @ (y - mu_y)
+    rhs = precs_xy @ (y - mu_y).view(1, n_mixtures, -1, 1)
+    adjustment = torch.linalg.solve(precs_xx, rhs)
+    cond_means = mu_x - adjustment.view(1, n_mixtures, -1)
 
     # Compute log probability of y under each marginal component
     # Using the formula for Gaussian log prob

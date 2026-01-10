@@ -209,24 +209,38 @@ class ConditionedMDN:
         """
         condition = atleast_2d_float32_tensor(condition)
 
-        logits, means, precfs, sumlogdiag = extract_and_transform_mog(
+        logits, means, precfs, _ = extract_and_transform_mog(
             estimator=mdn, context=x_o
         )
-        self.logits, self.means, self.precfs, self.sumlogdiag = condition_mog(
+        cond_logits, cond_means, cond_precfs, _ = condition_mog(
             condition, dims_to_sample, logits, means, precfs
         )
-        self.prec = self.precfs.transpose(3, 2) @ self.precfs
+        cond_prec = cond_precfs.transpose(3, 2) @ cond_precfs
 
         # Store the conditioned MoG for sampling and evaluation
         self._mog = MoG(
-            logits=self.logits,
-            means=self.means,
-            precisions=self.prec,
-            precision_factors=self.precfs,
+            logits=cond_logits,
+            means=cond_means,
+            precisions=cond_prec,
+            precision_factors=cond_precfs,
         )
 
     def sample(self, sample_shape: Shape = torch.Size()) -> Tensor:
+        """Sample from the conditioned MoG.
+
+        Args:
+            sample_shape: Shape prefix for samples.
+
+        Returns:
+            Samples, shape (*sample_shape, dim) where dim is the number of
+            free dimensions (those in dims_to_sample).
+        """
+        # MoG.sample returns (*sample_shape, batch_size, dim)
+        # Since this is a single conditioned distribution, batch_size=1
+        # We squeeze out the batch dimension for convenience
         samples = self._mog.sample(sample_shape)
+        # Squeeze batch dimension (which is always 1 for ConditionedMDN)
+        samples = samples.squeeze(-2)
         return samples.detach()
 
     def log_prob(self, theta: Tensor) -> Tensor:
