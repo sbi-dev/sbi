@@ -329,7 +329,7 @@ class DirectPosterior(NeuralPosterior):
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
         theta_density_estimator = reshape_to_sample_batch_event(
-            theta, theta.shape[1:], leading_is_sample=True
+            theta, self.posterior_estimator.input_shape, leading_is_sample=True
         )
         x_density_estimator = reshape_to_batch_event(
             x, event_shape=self.posterior_estimator.condition_shape
