@@ -9,6 +9,8 @@ import pytest
 import torch
 from torch import nn
 
+
+from sbi.inference.trainers.npe.npe_a import _correct_for_proposal
 from sbi.neural_nets.estimators.mixture_density_estimator import (
     MixtureDensityEstimator,
     MultivariateGaussianMDN,
@@ -583,10 +585,10 @@ class TestMixtureDensityEstimatorSample:
         assert torch.all(torch.isfinite(samples))
 
 
-class TestMixtureDensityEstimatorGetMog:
-    """Test MixtureDensityEstimator get_mog method."""
+class TestMixtureDensityEstimatorGetUncorrectedMog:
+    """Test MixtureDensityEstimator get_uncorrected_mog method."""
 
-    def test_get_mog_returns_mog(self):
+    def test_get_uncorrected_mog_returns_mog(self):
         """Test that get_mog returns a MoG object."""
         mdn_net = MultivariateGaussianMDN(
             features=3,
@@ -601,15 +603,15 @@ class TestMixtureDensityEstimatorGetMog:
         )
 
         condition = torch.randn(8, 5)
-        mog = estimator.get_mog(condition)
+        mog = estimator.get_uncorrected_mog(condition)
 
         assert isinstance(mog, MoG)
         assert mog.batch_shape == torch.Size([8])
         assert mog.num_components == 4
         assert mog.dim == 3
 
-    def test_get_mog_with_embedding_net(self):
-        """Test get_mog applies embedding network."""
+    def test_get_uncorrected_mog_with_embedding_net(self):
+        """Test get_uncorrected_mog applies embedding network."""
         embedding_net = nn.Linear(10, 5)
         mdn_net = MultivariateGaussianMDN(
             features=3,
@@ -626,7 +628,7 @@ class TestMixtureDensityEstimatorGetMog:
 
         # Should accept raw condition shape
         condition = torch.randn(8, 10)
-        mog = estimator.get_mog(condition)
+        mog = estimator.get_uncorrected_mog(condition)
 
         assert isinstance(mog, MoG)
         assert mog.batch_shape == torch.Size([8])
@@ -669,43 +671,13 @@ class TestMixtureDensityEstimatorSampleAndLogProb:
 # ============================================================================
 
 
-class TestMixtureDensityEstimatorCorrection:
-    """Test SNPE-A correction methods in MixtureDensityEstimator."""
-
-    def test_apply_correction_invalid_prior_raises(self):
-        """Test that apply_correction raises for invalid prior type."""
-        mdn_net = MultivariateGaussianMDN(
-            features=2,
-            context_features=3,
-            hidden_features=20,
-            num_components=2,
-        )
-        estimator = MixtureDensityEstimator(
-            net=mdn_net,
-            input_shape=torch.Size([2]),
-            condition_shape=torch.Size([3]),
-        )
-
-        proposal_mog = MoG(
-            logits=torch.zeros(1, 2),
-            means=torch.zeros(1, 2, 2),
-            precisions=torch.eye(2).unsqueeze(0).unsqueeze(0).expand(1, 2, -1, -1),
-        )
-
-        # Using a Uniform distribution (not supported)
-        invalid_prior = torch.distributions.Uniform(
-            low=torch.zeros(2),
-            high=torch.ones(2),
-        )
-
-        with pytest.raises(
-            ValueError, match="must be MultivariateNormal or BoxUniform"
-        ):
-            estimator.apply_correction(proposal_mog, invalid_prior)
-
-
 class TestSNPEACorrectionMath:
-    """Regression tests for SNPE-A correction math (Eqs. 23-26)."""
+    """Regression tests for SNPE-A correction math (Eqs. 23-26).
+
+    These tests verify the _correct_for_proposal function from npe_a.py,
+    which implements the analytical posterior correction from Appendix C
+    of Papamakarios et al. 2016 (SNPE-A paper).
+    """
 
     def test_correction_single_component_identity(self):
         """Test correction when proposal equals density (should return prior-weighted).
@@ -715,7 +687,7 @@ class TestSNPEACorrectionMath:
         torch.manual_seed(42)
         dim = 2
 
-        # Create estimator
+        # Create estimator to get a density MoG
         mdn_net = MultivariateGaussianMDN(
             features=dim,
             context_features=3,
@@ -740,17 +712,14 @@ class TestSNPEACorrectionMath:
             precision_factors=density_mog.precision_factors.clone(),
         )
 
-        # Prior: standard Gaussian
-        prior = torch.distributions.MultivariateNormal(
-            loc=torch.zeros(dim),
-            covariance_matrix=torch.eye(dim),
+        # Prior: standard Gaussian (as MoG)
+        prior_mog = MoG.from_gaussian(
+            mean=torch.zeros(dim),
+            covariance=torch.eye(dim),
         )
 
-        # Apply correction
-        estimator.apply_correction(proposal_mog, prior)
-
-        # Get corrected MoG
-        corrected_mog = estimator.get_mog(condition)
+        # Apply correction using the pure function
+        corrected_mog = _correct_for_proposal(density_mog, proposal_mog, prior_mog)
 
         # With proposal == density, the posterior precision should be:
         # prec_post = prec_density - prec_proposal + prec_prior = prec_prior
@@ -761,36 +730,43 @@ class TestSNPEACorrectionMath:
 
 
 class TestBoxUniformPriorCorrection:
-    """Test SNPE-A correction with BoxUniform (uniform) priors."""
+    """Test SNPE-A correction with uniform priors (prior_mog=None)."""
 
-    def test_apply_correction_with_boxuniform_prior(self):
-        """Test that apply_correction accepts BoxUniform prior."""
-        from sbi.utils.torchutils import BoxUniform
+    def test_correction_with_uniform_prior(self):
+        """Test that correction works with prior_mog=None (uniform prior)."""
+        dim = 2
 
-        mdn_net = MultivariateGaussianMDN(
-            features=2,
-            context_features=3,
-            hidden_features=20,
-            num_components=2,
-        )
-        estimator = MixtureDensityEstimator(
-            net=mdn_net,
-            input_shape=torch.Size([2]),
-            condition_shape=torch.Size([3]),
+        # Create simple MoGs for testing
+        density_mog = MoG(
+            logits=torch.zeros(1, 2),
+            means=torch.randn(1, 2, dim),
+            precisions=torch.eye(dim).unsqueeze(0).unsqueeze(0).expand(1, 2, -1, -1),
         )
 
         proposal_mog = MoG(
             logits=torch.zeros(1, 2),
-            means=torch.zeros(1, 2, 2),
+            means=torch.zeros(1, 2, dim),
             precisions=0.5
-            * torch.eye(2).unsqueeze(0).unsqueeze(0).expand(1, 2, -1, -1),
+            * torch.eye(dim).unsqueeze(0).unsqueeze(0).expand(1, 2, -1, -1),
         )
-        prior = BoxUniform(low=torch.zeros(2), high=torch.ones(2))
 
-        # Should not raise
-        estimator.apply_correction(proposal_mog, prior)
-        assert estimator.correction_applied
-        assert estimator._prior_is_uniform
+        # Correction with uniform prior (prior_mog=None)
+        # For uniform priors, prec_prior = 0, so:
+        # prec_post = prec_density - prec_proposal
+        corrected_mog = _correct_for_proposal(density_mog, proposal_mog, prior_mog=None)
+
+        # Should have 2 * 2 = 4 components
+        assert corrected_mog.num_components == 4
+        assert corrected_mog.batch_shape == torch.Size([1])
+
+        # Samples and log_prob should work
+        samples = corrected_mog.sample(torch.Size([50]))
+        assert samples.shape == (50, 1, dim)
+        assert torch.all(torch.isfinite(samples))
+
+        log_prob = corrected_mog.log_prob(samples)
+        assert log_prob.shape == (50, 1)
+        assert torch.all(torch.isfinite(log_prob))
 
 
 class TestManyComponentProposal:
@@ -801,18 +777,23 @@ class TestManyComponentProposal:
         torch.manual_seed(42)
         dim = 2
         num_proposal_components = 10
+        num_density_components = 2
 
+        # Create density MoG (from estimator)
         mdn_net = MultivariateGaussianMDN(
             features=dim,
             context_features=3,
             hidden_features=20,
-            num_components=2,  # Density has 2 components
+            num_components=num_density_components,
         )
         estimator = MixtureDensityEstimator(
             net=mdn_net,
             input_shape=torch.Size([dim]),
             condition_shape=torch.Size([3]),
         )
+
+        condition = torch.randn(1, 3)
+        density_mog = estimator.get_uncorrected_mog(condition)
 
         # Create 10-component proposal (typical final round of SNPE-A)
         proposal_mog = MoG(
@@ -824,61 +805,28 @@ class TestManyComponentProposal:
             .unsqueeze(0)
             .expand(1, num_proposal_components, -1, -1),
         )
-        prior = torch.distributions.MultivariateNormal(
-            loc=torch.zeros(dim),
-            covariance_matrix=torch.eye(dim),
+
+        # Prior as MoG
+        prior_mog = MoG.from_gaussian(
+            mean=torch.zeros(dim),
+            covariance=torch.eye(dim),
         )
 
-        estimator.apply_correction(proposal_mog, prior)
-
-        condition = torch.randn(1, 3)
-        corrected_mog = estimator.get_mog(condition)
+        # Apply correction
+        corrected_mog = _correct_for_proposal(density_mog, proposal_mog, prior_mog)
 
         # Posterior should have 10 * 2 = 20 components
-        assert corrected_mog.num_components == num_proposal_components * 2
+        assert (
+            corrected_mog.num_components
+            == num_proposal_components * num_density_components
+        )
         assert corrected_mog.batch_shape == torch.Size([1])
 
         # Samples and log_prob should work
-        samples = estimator.sample(torch.Size([50]), condition)
+        samples = corrected_mog.sample(torch.Size([50]))
         assert samples.shape == (50, 1, dim)
         assert torch.all(torch.isfinite(samples))
 
-        log_prob = estimator.log_prob(samples, condition)
+        log_prob = corrected_mog.log_prob(samples)
         assert log_prob.shape == (50, 1)
         assert torch.all(torch.isfinite(log_prob))
-
-
-class TestMoGPriorValidation:
-    """Test validation of MoG priors (not supported)."""
-
-    def test_mog_prior_raises(self):
-        """Test that MoG prior raises ValueError (not supported)."""
-        mdn_net = MultivariateGaussianMDN(
-            features=2,
-            context_features=3,
-            hidden_features=20,
-            num_components=2,
-        )
-        estimator = MixtureDensityEstimator(
-            net=mdn_net,
-            input_shape=torch.Size([2]),
-            condition_shape=torch.Size([3]),
-        )
-
-        proposal_mog = MoG(
-            logits=torch.zeros(1, 2),
-            means=torch.zeros(1, 2, 2),
-            precisions=torch.eye(2).unsqueeze(0).unsqueeze(0).expand(1, 2, -1, -1),
-        )
-
-        # MoG prior (not supported - use MultivariateNormal instead)
-        mog_prior = MoG(
-            logits=torch.zeros(1, 1),
-            means=torch.zeros(1, 1, 2),
-            precisions=torch.eye(2).unsqueeze(0).unsqueeze(0),
-        )
-
-        with pytest.raises(
-            ValueError, match="must be MultivariateNormal or BoxUniform"
-        ):
-            estimator.apply_correction(proposal_mog, mog_prior)

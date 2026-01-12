@@ -103,6 +103,6 @@ target/
 uv.lock
 .python-version
 
-# Serena cache
+# tools cache
 .serena/
 .claude/

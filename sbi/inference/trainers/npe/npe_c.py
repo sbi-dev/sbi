@@ -433,8 +433,8 @@ class NPE_C(PosteriorEstimatorTrainer):
             Log-probability of the proposal posterior.
         """
         # Get the proposal MoG at the default_x
-        # Use get_uncorrected_mog to avoid any prior correction being applied
         assert isinstance(proposal.posterior_estimator, MixtureDensityEstimator)
+        assert proposal.default_x is not None, "Proposal must have default_x set"
         mog_p = proposal.posterior_estimator.get_uncorrected_mog(proposal.default_x)
         norm_logits_p = mog_p.log_weights  # Already normalized
         m_p = mog_p.means

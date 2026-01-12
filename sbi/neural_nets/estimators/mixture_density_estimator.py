@@ -12,17 +12,15 @@ original implementation by Conor M. Durkan et al., licensed under Apache 2.0.
 Based on: C. M. Bishop, "Mixture Density Networks", NCRG Report (1994)
 """
 
-from typing import Optional, Union
+from typing import Optional
 
 import numpy as np
 import torch
 from torch import Tensor, nn
-from torch.distributions import MultivariateNormal
 from torch.nn import functional as F
 
 from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
 from sbi.neural_nets.estimators.mog import MoG
-from sbi.utils.torchutils import BoxUniform
 
 
 class MultivariateGaussianMDN(nn.Module):
@@ -333,9 +331,6 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
         >>> log_prob = estimator.log_prob(samples, condition)  # (100, 32)
     """
 
-    # Small constant for numerical stability in matrix operations
-    _STABILITY_EPSILON: float = 1e-6
-
     def __init__(
         self,
         net: MultivariateGaussianMDN,
@@ -398,11 +393,6 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
             self.register_buffer("_transform_shift", None)
             self.register_buffer("_transform_scale", None)
 
-        # SNPE-A correction state (None means no correction applied)
-        self._proposal_mog: Optional[MoG] = None
-        self._prior_mog: Optional[MoG] = None  # None for uniform priors
-        self._prior_is_uniform: bool = False
-
     @property
     def embedding_net(self) -> nn.Module:
         """Return the embedding network."""
@@ -459,9 +449,8 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
     def log_prob(self, input: Tensor, condition: Tensor, **kwargs) -> Tensor:
         """Compute log probability of inputs given conditions.
 
-        If SNPE-A correction is applied, returns corrected log probability.
         If input transform is set, inputs are z-scored before density evaluation
-        and the log-det-jacobian is subtracted from the log probability.
+        and the log-det-jacobian is added to the log probability.
 
         Args:
             input: Inputs to evaluate, shape (sample_dim, batch_dim, *input_shape)
@@ -483,8 +472,8 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
         # Apply z-score transform to input if enabled
         transformed_input = self._transform_input(input)
 
-        # Get MoG (corrected if correction is applied)
-        mog = self._get_mog_internal(condition)
+        # Get MoG from network
+        mog = self.get_uncorrected_mog(condition)
 
         # MoG.log_prob handles (sample_dim, batch_dim, dim) input
         # Change of variables: log p(x) = log p(z) + log|det(dz/dx)|
@@ -514,7 +503,6 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
     def sample(self, sample_shape: torch.Size, condition: Tensor, **kwargs) -> Tensor:
         """Sample from the conditional distribution.
 
-        If SNPE-A correction is applied, samples from the corrected distribution.
         If input transform is set, samples are inverse transformed (un-z-scored).
 
         Args:
@@ -526,8 +514,8 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
         """
         self._check_condition_shape(condition)
 
-        # Get MoG (corrected if correction is applied)
-        mog = self._get_mog_internal(condition)
+        # Get MoG from network
+        mog = self.get_uncorrected_mog(condition)
 
         # MoG.sample returns (*sample_shape, batch_dim, dim) - matches sbi convention
         samples = mog.sample(sample_shape)
@@ -537,11 +525,8 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
 
         return samples
 
-    def get_mog(self, condition: Tensor) -> MoG:
+    def get_uncorrected_mog(self, condition: Tensor) -> MoG:
         """Extract MoG parameters for a given condition.
-
-        If SNPE-A correction is applied, returns the corrected MoG.
-        Use `get_uncorrected_mog()` to get the raw density estimator output.
 
         Args:
             condition: Conditions, shape (batch_dim, *condition_shape).
@@ -549,344 +534,6 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
         Returns:
             MoG object containing mixture parameters.
         """
-        return self._get_mog_internal(condition)
-
-    def get_uncorrected_mog(self, condition: Tensor) -> MoG:
-        """Extract raw MoG parameters (without SNPE-A correction).
-
-        Args:
-            condition: Conditions, shape (batch_dim, *condition_shape).
-
-        Returns:
-            MoG object containing raw density estimator output.
-        """
         self._check_condition_shape(condition)
         embedded_condition = self._embedding_net(condition)
         return self.net.get_mixture_components(embedded_condition)
-
-    def _get_mog_internal(self, condition: Tensor) -> MoG:
-        """Get MoG, applying correction if set.
-
-        Args:
-            condition: Conditions, shape (batch_dim, *condition_shape).
-
-        Returns:
-            MoG object (corrected if correction is applied).
-        """
-        self._check_condition_shape(condition)
-        embedded_condition = self._embedding_net(condition)
-        density_mog = self.net.get_mixture_components(embedded_condition)
-
-        if not self.correction_applied:
-            return density_mog
-        else:
-            return self._compute_corrected_mog(density_mog)
-
-    # =========================================================================
-    # SNPE-A Correction Methods
-    # =========================================================================
-
-    @property
-    def correction_applied(self) -> bool:
-        """Whether SNPE-A correction is currently applied."""
-        # Only check proposal - prior_mog can be None for uniform priors
-        return self._proposal_mog is not None
-
-    def apply_correction(
-        self,
-        proposal_mog: MoG,
-        prior: Union[MultivariateNormal, BoxUniform],
-    ) -> None:
-        """Apply SNPE-A posterior correction.
-
-        After calling this, log_prob(), sample(), and get_mog() return
-        corrected values. Implements Appendix C of Papamakarios et al. 2016.
-
-        The correction computes the true posterior from the proposal posterior:
-            posterior = density_estimator * prior / proposal
-
-        For uniform (BoxUniform) priors, the prior term is omitted from the
-        correction formula, as uniform distributions have zero precision
-        (infinite covariance) within their bounds.
-
-        Args:
-            proposal_mog: MoG from previous round's posterior (the proposal
-                distribution used to generate training data).
-            prior: Prior distribution. Must be MultivariateNormal or BoxUniform.
-
-        Raises:
-            ValueError: If prior is not a supported type.
-        """
-        # Handle different prior types
-        if isinstance(prior, BoxUniform):
-            # For uniform priors, the correction formula simplifies:
-            # posterior = density * prior / proposal
-            # Since uniform has zero precision, prior term is omitted
-            self._prior_mog = None
-            self._prior_is_uniform = True
-        elif isinstance(prior, MultivariateNormal):
-            # Note: covariance_matrix is a Tensor but PyTorch stubs type it as property
-            cov = prior.covariance_matrix
-            assert isinstance(cov, Tensor)  # For type checker
-            self._prior_mog = MoG.from_gaussian(prior.mean, cov).detach()
-            self._prior_is_uniform = False
-        else:
-            raise ValueError(
-                f"prior must be MultivariateNormal or BoxUniform, "
-                f"got {type(prior).__name__}"
-            )
-
-        # Store detached copy of proposal
-        self._proposal_mog = proposal_mog.detach()
-
-    def clear_correction(self) -> None:
-        """Remove SNPE-A correction.
-
-        After calling this, log_prob(), sample(), and get_mog() return
-        uncorrected density estimator output.
-        """
-        self._proposal_mog = None
-        self._prior_mog = None
-        self._prior_is_uniform = False
-
-    def _compute_corrected_mog(self, density_mog: MoG) -> MoG:
-        """Compute corrected MoG using stored proposal and prior.
-
-        Implements the analytical correction from Appendix C of
-        Papamakarios et al. 2016 (SNPE-A paper).
-
-        The posterior is computed as:
-            posterior = density_estimator * prior / proposal
-
-        Since all are MoGs, this can be done in closed form.
-        If proposal has L components and density has K components,
-        the posterior has L*K components.
-
-        For uniform priors, the prior term is omitted (zero precision).
-
-        Args:
-            density_mog: MoG from the density estimator for current observation.
-
-        Returns:
-            Corrected MoG representing the posterior.
-
-        Raises:
-            RuntimeError: If correction is not applied (no proposal set).
-            ValueError: If posterior precision is not positive definite.
-        """
-        if self._proposal_mog is None:
-            raise RuntimeError(
-                "Cannot compute corrected MoG: no correction applied. "
-                "Call apply_correction() first."
-            )
-
-        proposal = self._proposal_mog
-        prior = self._prior_mog  # Can be None for uniform priors
-
-        # Get the number of components
-        num_comps_proposal = proposal.num_components
-        num_comps_density = density_mog.num_components
-
-        # Compute posterior precisions (Eq. 23)
-        # prec_post = prec_density - prec_proposal + prec_prior
-        # For uniform priors, prec_prior = 0
-        prec_proposal_rep = proposal.precisions.repeat_interleave(
-            num_comps_density, dim=1
-        )
-        prec_density_rep = density_mog.precisions.repeat(1, num_comps_proposal, 1, 1)
-
-        prec_post = prec_density_rep - prec_proposal_rep
-
-        # Add prior precision term only for Gaussian priors
-        if prior is not None:
-            prec_prior_rep = prior.precisions.repeat(
-                1, num_comps_proposal * num_comps_density, 1, 1
-            )
-            prec_post = prec_post + prec_prior_rep
-
-        # Add small epsilon to diagonal for numerical stability
-        dim = prec_post.shape[-1]
-        eye = torch.eye(dim, device=prec_post.device, dtype=prec_post.dtype)
-        prec_post_stabilized = prec_post + self._STABILITY_EPSILON * eye
-
-        # Check positive definiteness using Cholesky (more efficient than eigenvalues)
-        self._check_precision_positive_definite(prec_post_stabilized, "posterior")
-
-        # Compute posterior covariances using solve for numerical stability
-        # Instead of cov = inv(prec), we use cov = solve(prec, I) which is more stable
-        batch_shape = prec_post_stabilized.shape[:-2]
-        eye_expanded = eye.expand(*batch_shape, dim, dim)
-        cov_post = torch.linalg.solve(prec_post_stabilized, eye_expanded)
-
-        # Compute posterior means (Eq. 24)
-        # mean_post = cov_post @ (prec_density @ mean_density
-        #                         - prec_proposal @ mean_proposal
-        #                         + prec_prior @ mean_prior)
-        # For uniform priors, prec_prior @ mean_prior = 0
-        prec_mean_proposal = self._batched_mv(proposal.precisions, proposal.means)
-        prec_mean_density = self._batched_mv(density_mog.precisions, density_mog.means)
-
-        prec_mean_proposal_rep = prec_mean_proposal.repeat_interleave(
-            num_comps_density, dim=1
-        )
-        prec_mean_density_rep = prec_mean_density.repeat(1, num_comps_proposal, 1)
-
-        summed_prec_mean = prec_mean_density_rep - prec_mean_proposal_rep
-
-        # Add prior mean term only for Gaussian priors
-        if prior is not None:
-            prec_mean_prior = self._batched_mv(prior.precisions, prior.means)
-            prec_mean_prior_rep = prec_mean_prior.repeat(
-                1, num_comps_proposal * num_comps_density, 1
-            )
-            summed_prec_mean = summed_prec_mean + prec_mean_prior_rep
-
-        mean_post = self._batched_mv(cov_post, summed_prec_mean)
-
-        # Compute posterior logits (Eqs. 25-26)
-        logits_post = self._compute_posterior_logits(
-            mean_post,
-            prec_post,
-            cov_post,
-            proposal.logits,
-            proposal.means,
-            proposal.precisions,
-            density_mog.logits,
-            density_mog.means,
-            density_mog.precisions,
-            num_comps_proposal,
-            num_comps_density,
-        )
-
-        # Compute precision factors from stabilized precisions using Cholesky
-        try:
-            precf_post = torch.linalg.cholesky(prec_post_stabilized, upper=True)
-        except torch.linalg.LinAlgError as e:
-            raise ValueError(
-                "Failed to compute Cholesky decomposition during SNPE-A correction. "
-                "This indicates numerical instability in the posterior precision "
-                f"matrix. Original error: {e}"
-            ) from e
-
-        return MoG(
-            logits=logits_post,
-            means=mean_post,
-            precisions=prec_post_stabilized,
-            precision_factors=precf_post,
-        )
-
-    def _compute_posterior_logits(
-        self,
-        mean_post: Tensor,
-        prec_post: Tensor,
-        cov_post: Tensor,
-        logits_proposal: Tensor,
-        mean_proposal: Tensor,
-        prec_proposal: Tensor,
-        logits_density: Tensor,
-        mean_density: Tensor,
-        prec_density: Tensor,
-        num_comps_proposal: int,
-        num_comps_density: int,
-    ) -> Tensor:
-        """Compute posterior logits using Eqs. 25-26 from SNPE-A paper.
-
-        The logits are computed as:
-            logits_post = logits_density - logits_proposal
-                          + 0.5 * (logdet(cov_post) + logdet(cov_proposal)
-                                   - logdet(cov_density))
-                          - 0.5 * (m_d^T P_d m_d - m_p^T P_p m_p
-                                   - m_post^T P_post m_post)
-
-        Uses torch.linalg.slogdet for numerical stability.
-        """
-        # Compute logit factors
-        logits_proposal_rep = logits_proposal.repeat_interleave(
-            num_comps_density, dim=1
-        )
-        logits_density_rep = logits_density.repeat(1, num_comps_proposal)
-        logit_factors = logits_density_rep - logits_proposal_rep
-
-        # Compute log-determinant terms using slogdet for numerical stability
-        # slogdet returns (sign, logabsdet) - for positive definite matrices sign=1
-        _, logdet_cov_post = torch.linalg.slogdet(cov_post)
-        # logdet(cov) = -logdet(prec) for inverse relationship
-        _, logdet_prec_proposal = torch.linalg.slogdet(prec_proposal)
-        _, logdet_prec_density = torch.linalg.slogdet(prec_density)
-        logdet_cov_proposal = -logdet_prec_proposal
-        logdet_cov_density = -logdet_prec_density
-
-        logdet_cov_proposal_rep = logdet_cov_proposal.repeat_interleave(
-            num_comps_density, dim=1
-        )
-        logdet_cov_density_rep = logdet_cov_density.repeat(1, num_comps_proposal)
-
-        log_sqrt_det_ratio = 0.5 * (
-            logdet_cov_post + logdet_cov_proposal_rep - logdet_cov_density_rep
-        )
-
-        # Compute quadratic form terms (m^T P m)
-        exponent_proposal = self._batched_vmv(prec_proposal, mean_proposal)
-        exponent_density = self._batched_vmv(prec_density, mean_density)
-        exponent_post = self._batched_vmv(prec_post, mean_post)
-
-        exponent_proposal_rep = exponent_proposal.repeat_interleave(
-            num_comps_density, dim=1
-        )
-        exponent_density_rep = exponent_density.repeat(1, num_comps_proposal)
-
-        exponent = -0.5 * (exponent_density_rep - exponent_proposal_rep - exponent_post)
-
-        return logit_factors + log_sqrt_det_ratio + exponent
-
-    @staticmethod
-    def _batched_mv(matrix: Tensor, vector: Tensor) -> Tensor:
-        """Batched matrix-vector product with component dimension.
-
-        Args:
-            matrix: Shape (batch, num_components, dim, dim).
-            vector: Shape (batch, num_components, dim).
-
-        Returns:
-            Product of shape (batch, num_components, dim).
-        """
-        return torch.einsum("bcij,bcj->bci", matrix, vector)
-
-    @staticmethod
-    def _batched_vmv(matrix: Tensor, vector: Tensor) -> Tensor:
-        """Batched vector-matrix-vector product (quadratic form).
-
-        Args:
-            matrix: Shape (batch, num_components, dim, dim).
-            vector: Shape (batch, num_components, dim).
-
-        Returns:
-            Quadratic form v^T M v of shape (batch, num_components).
-        """
-        mv = torch.einsum("bcij,bcj->bci", matrix, vector)
-        return torch.einsum("bci,bci->bc", vector, mv)
-
-    @staticmethod
-    def _check_precision_positive_definite(prec: Tensor, name: str) -> None:
-        """Check that precision matrices are positive definite.
-
-        Uses Cholesky decomposition for efficient checking. This is O(n^3)
-        compared to O(n^3) for eigendecomposition, but with a smaller constant
-        factor in practice.
-
-        Args:
-            prec: Precision matrices of shape (batch, num_components, dim, dim).
-            name: Name for error message.
-
-        Raises:
-            ValueError: If any precision matrix is not positive definite.
-        """
-        try:
-            # Cholesky will raise LinAlgError if not positive definite
-            torch.linalg.cholesky(prec)
-        except torch.linalg.LinAlgError as e:
-            raise ValueError(
-                f"Precision matrix of {name} is not positive definite. "
-                "This is a known issue with SNPE-A when the proposal and density "
-                "estimator don't align well. Try different hyperparameters."
-            ) from e

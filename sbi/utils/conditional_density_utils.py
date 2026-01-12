@@ -183,7 +183,7 @@ def extract_and_transform_mog(
     if context is None:
         raise ValueError("context must be provided for extract_and_transform_mog")
 
-    # Get uncorrected MoG (raw density estimator output in z-scored space)
+    # Get MoG (raw density estimator output in z-scored space)
     mog = estimator.get_uncorrected_mog(context)
 
     norm_logits = mog.log_weights

@@ -198,9 +198,6 @@ class MoG:
         else:
             squeeze_output = False
 
-        inputs.shape[0]
-        inputs.shape[1]
-
         # Expand inputs for broadcasting with mixture components
         # inputs: (sample_size, batch_size, 1, dim)
         inputs_expanded = inputs.unsqueeze(2)
