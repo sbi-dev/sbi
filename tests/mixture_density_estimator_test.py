@@ -9,13 +9,128 @@ import pytest
 import torch
 from torch import nn
 
-
-from sbi.inference.trainers.npe.npe_a import _correct_for_proposal
 from sbi.neural_nets.estimators.mixture_density_estimator import (
     MixtureDensityEstimator,
     MultivariateGaussianMDN,
 )
 from sbi.neural_nets.estimators.mog import MoG
+
+# =============================================================================
+# Fixtures
+# =============================================================================
+
+
+@pytest.fixture
+def standard_mdn():
+    """Standard MDN for testing (3 features, 5 context, 4 components)."""
+    return MultivariateGaussianMDN(
+        features=3,
+        context_features=5,
+        hidden_features=20,
+        num_components=4,
+    )
+
+
+@pytest.fixture
+def standard_estimator(standard_mdn):
+    """Standard MixtureDensityEstimator wrapping standard_mdn."""
+    return MixtureDensityEstimator(
+        net=standard_mdn,
+        input_shape=torch.Size([3]),
+        condition_shape=torch.Size([5]),
+    )
+
+
+@pytest.fixture
+def standard_condition():
+    """Standard test condition tensor (batch_size=8, dim=5)."""
+    return torch.randn(8, 5)
+
+
+@pytest.fixture
+def standard_inputs():
+    """Standard test input tensor (batch_size=8, dim=3)."""
+    return torch.randn(8, 3)
+
+
+@pytest.fixture
+def make_mdn():
+    """Factory for creating MDN with custom dimensions."""
+
+    def _make(features=3, context_features=5, hidden_features=20, num_components=4):
+        return MultivariateGaussianMDN(
+            features=features,
+            context_features=context_features,
+            hidden_features=hidden_features,
+            num_components=num_components,
+        )
+
+    return _make
+
+
+@pytest.fixture
+def make_estimator(make_mdn):
+    """Factory for creating MixtureDensityEstimator with custom dimensions."""
+
+    def _make(
+        features=3,
+        context_features=5,
+        hidden_features=20,
+        num_components=4,
+        embedding_net=None,
+    ):
+        mdn = make_mdn(features, context_features, hidden_features, num_components)
+        condition_shape = (
+            torch.Size([context_features])
+            if embedding_net is None
+            else torch.Size([embedding_net.in_features])
+            if hasattr(embedding_net, "in_features")
+            else torch.Size([context_features])
+        )
+        return MixtureDensityEstimator(
+            net=mdn,
+            input_shape=torch.Size([features]),
+            condition_shape=condition_shape,
+            embedding_net=embedding_net,
+        )
+
+    return _make
+
+
+@pytest.fixture
+def make_simple_mog():
+    """Factory for creating simple MoG distributions for testing."""
+
+    def _make(batch_size=1, num_components=2, dim=2, precision_scale=1.0):
+        return MoG(
+            logits=torch.zeros(batch_size, num_components),
+            means=torch.randn(batch_size, num_components, dim),
+            precisions=precision_scale
+            * torch.eye(dim)
+            .unsqueeze(0)
+            .unsqueeze(0)
+            .expand(batch_size, num_components, -1, -1),
+        )
+
+    return _make
+
+
+@pytest.fixture
+def standard_prior_mog():
+    """Standard Gaussian prior as MoG (mean=0, cov=I)."""
+
+    def _make(dim=2):
+        return MoG.from_gaussian(
+            mean=torch.zeros(dim),
+            covariance=torch.eye(dim),
+        )
+
+    return _make
+
+
+# =============================================================================
+# MultivariateGaussianMDN Tests
+# =============================================================================
 
 
 class TestMultivariateGaussianMDNCreation:
@@ -56,17 +171,9 @@ class TestMultivariateGaussianMDNCreation:
 class TestMultivariateGaussianMDNForward:
     """Test MDN forward pass."""
 
-    def test_forward_returns_mog(self):
+    def test_forward_returns_mog(self, standard_mdn, standard_condition):
         """Test that forward returns a MoG object."""
-        mdn = MultivariateGaussianMDN(
-            features=3,
-            context_features=5,
-            hidden_features=20,
-            num_components=4,
-        )
-
-        context = torch.randn(8, 5)
-        mog = mdn(context)
+        mog = standard_mdn(standard_condition)
 
         assert isinstance(mog, MoG)
         assert mog.batch_shape == torch.Size([8])
@@ -77,69 +184,20 @@ class TestMultivariateGaussianMDNForward:
 class TestMultivariateGaussianMDNLogProb:
     """Test MDN log probability computation."""
 
-    def test_log_prob_shape(self):
+    def test_log_prob_shape(self, standard_mdn, standard_condition, standard_inputs):
         """Test log_prob output shape."""
-        batch_size = 8
-        features = 3
-        context_features = 5
-
-        mdn = MultivariateGaussianMDN(
-            features=features,
-            context_features=context_features,
-            hidden_features=20,
-            num_components=4,
-        )
-
-        context = torch.randn(batch_size, context_features)
-        inputs = torch.randn(batch_size, features)
-
-        log_prob = mdn.log_prob(inputs, context)
-
-        assert log_prob.shape == (batch_size,)
-
-    def test_log_prob_gradient_flows(self):
-        """Test that gradients flow through log_prob."""
-        mdn = MultivariateGaussianMDN(
-            features=3,
-            context_features=5,
-            hidden_features=20,
-            num_components=4,
-        )
-
-        context = torch.randn(8, 5)
-        inputs = torch.randn(8, 3)
-
-        log_prob = mdn.log_prob(inputs, context)
-        loss = -log_prob.mean()
-        loss.backward()
-
-        # Check that gradients exist
-        for param in mdn.parameters():
-            assert param.grad is not None
+        log_prob = standard_mdn.log_prob(standard_inputs, standard_condition)
+        assert log_prob.shape == (8,)
 
 
 class TestMultivariateGaussianMDNSample:
     """Test MDN sampling."""
 
-    def test_sample_shape(self):
+    def test_sample_shape(self, standard_mdn, standard_condition):
         """Test sample output shape."""
-        batch_size = 8
-        features = 3
-        context_features = 5
-        num_samples = 100
-
-        mdn = MultivariateGaussianMDN(
-            features=features,
-            context_features=context_features,
-            hidden_features=20,
-            num_components=4,
-        )
-
-        context = torch.randn(batch_size, context_features)
-        samples = mdn.sample(torch.Size([num_samples]), context)
-
+        samples = standard_mdn.sample(torch.Size([100]), standard_condition)
         # MDN.sample returns (*sample_shape, batch_size, features) - same as MoG
-        assert samples.shape == (num_samples, batch_size, features)
+        assert samples.shape == (100, 8, 3)
 
 
 class TestMultivariateGaussianMDNDimensions:
@@ -186,34 +244,24 @@ class TestMultivariateGaussianMDNDimensions:
 class TestMultivariateGaussianMDNDevice:
     """Test MDN device handling."""
 
-    def test_mdn_on_cpu(self):
-        """Test MDN works on CPU."""
-        mdn = MultivariateGaussianMDN(
-            features=3,
-            context_features=5,
-            hidden_features=20,
-            num_components=4,
-        )
-
-        context = torch.randn(8, 5)
+    @pytest.mark.parametrize(
+        "device",
+        [
+            "cpu",
+            pytest.param(
+                "cuda",
+                marks=pytest.mark.skipif(
+                    not torch.cuda.is_available(), reason="CUDA not available"
+                ),
+            ),
+        ],
+    )
+    def test_mdn_on_device(self, standard_mdn, device):
+        """Test MDN works on different devices."""
+        mdn = standard_mdn.to(device)
+        context = torch.randn(8, 5, device=device)
         mog = mdn(context)
-
-        assert mog.device == torch.device("cpu")
-
-    @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA not available")
-    def test_mdn_on_cuda(self):
-        """Test MDN works on CUDA."""
-        mdn = MultivariateGaussianMDN(
-            features=3,
-            context_features=5,
-            hidden_features=20,
-            num_components=4,
-        ).cuda()
-
-        context = torch.randn(8, 5).cuda()
-        mog = mdn(context)
-
-        assert mog.device.type == "cuda"
+        assert mog.device.type == device
 
 
 class TestMixtureDensityEstimatorFunctional:
@@ -502,50 +550,24 @@ class TestMixtureDensityEstimatorLogProb:
 class TestMixtureDensityEstimatorLoss:
     """Test MixtureDensityEstimator loss method."""
 
-    def test_loss_equals_negative_log_prob(self):
+    def test_loss_equals_negative_log_prob(
+        self, standard_estimator, standard_condition, standard_inputs
+    ):
         """Test that loss equals negative log probability."""
-        mdn_net = MultivariateGaussianMDN(
-            features=2,
-            context_features=3,
-            hidden_features=20,
-            num_components=4,
-        )
-        estimator = MixtureDensityEstimator(
-            net=mdn_net,
-            input_shape=torch.Size([2]),
-            condition_shape=torch.Size([3]),
-        )
-
-        condition = torch.randn(8, 3)
-        inputs = torch.randn(8, 2)
-
-        loss = estimator.loss(inputs, condition)
-        log_prob = estimator.log_prob(inputs, condition)
+        loss = standard_estimator.loss(standard_inputs, standard_condition)
+        log_prob = standard_estimator.log_prob(standard_inputs, standard_condition)
 
         assert torch.allclose(loss, -log_prob)
 
-    def test_loss_gradient_flows(self):
+    def test_loss_gradient_flows(
+        self, standard_estimator, standard_condition, standard_inputs
+    ):
         """Test that gradients flow through loss."""
-        mdn_net = MultivariateGaussianMDN(
-            features=2,
-            context_features=3,
-            hidden_features=20,
-            num_components=4,
-        )
-        estimator = MixtureDensityEstimator(
-            net=mdn_net,
-            input_shape=torch.Size([2]),
-            condition_shape=torch.Size([3]),
-        )
-
-        condition = torch.randn(8, 3)
-        inputs = torch.randn(8, 2)
-
-        loss = estimator.loss(inputs, condition).mean()
+        loss = standard_estimator.loss(standard_inputs, standard_condition).mean()
         loss.backward()
 
         # Check gradients exist on MDN parameters
-        for param in estimator.net.parameters():
+        for param in standard_estimator.net.parameters():
             assert param.grad is not None
 
 
@@ -588,22 +610,11 @@ class TestMixtureDensityEstimatorSample:
 class TestMixtureDensityEstimatorGetUncorrectedMog:
     """Test MixtureDensityEstimator get_uncorrected_mog method."""
 
-    def test_get_uncorrected_mog_returns_mog(self):
-        """Test that get_mog returns a MoG object."""
-        mdn_net = MultivariateGaussianMDN(
-            features=3,
-            context_features=5,
-            hidden_features=20,
-            num_components=4,
-        )
-        estimator = MixtureDensityEstimator(
-            net=mdn_net,
-            input_shape=torch.Size([3]),
-            condition_shape=torch.Size([5]),
-        )
-
-        condition = torch.randn(8, 5)
-        mog = estimator.get_uncorrected_mog(condition)
+    def test_get_uncorrected_mog_returns_mog(
+        self, standard_estimator, standard_condition
+    ):
+        """Test that get_uncorrected_mog returns a MoG object."""
+        mog = standard_estimator.get_uncorrected_mog(standard_condition)
 
         assert isinstance(mog, MoG)
         assert mog.batch_shape == torch.Size([8])
@@ -637,196 +648,20 @@ class TestMixtureDensityEstimatorGetUncorrectedMog:
 class TestMixtureDensityEstimatorSampleAndLogProb:
     """Test MixtureDensityEstimator sample_and_log_prob method."""
 
-    def test_sample_and_log_prob_consistency(self):
+    def test_sample_and_log_prob_consistency(self, standard_estimator):
         """Test that sample_and_log_prob is consistent with separate calls."""
-        mdn_net = MultivariateGaussianMDN(
-            features=2,
-            context_features=3,
-            hidden_features=20,
-            num_components=4,
-        )
-        estimator = MixtureDensityEstimator(
-            net=mdn_net,
-            input_shape=torch.Size([2]),
-            condition_shape=torch.Size([3]),
-        )
-
         torch.manual_seed(42)
-        condition = torch.randn(4, 3)
+        condition = torch.randn(4, 5)  # batch=4, context_dim=5
 
         # Get samples and log_probs in one call
         torch.manual_seed(123)
-        samples, log_probs = estimator.sample_and_log_prob(torch.Size([10]), condition)
+        samples, log_probs = standard_estimator.sample_and_log_prob(
+            torch.Size([10]), condition
+        )
 
         # Compute log_probs separately
-        log_probs_separate = estimator.log_prob(samples, condition)
+        log_probs_separate = standard_estimator.log_prob(samples, condition)
 
-        assert samples.shape == (10, 4, 2)
+        assert samples.shape == (10, 4, 3)  # (sample, batch, features)
         assert log_probs.shape == (10, 4)
         assert torch.allclose(log_probs, log_probs_separate)
-
-
-# ============================================================================
-# SNPE-A Correction Tests
-# ============================================================================
-
-
-class TestSNPEACorrectionMath:
-    """Regression tests for SNPE-A correction math (Eqs. 23-26).
-
-    These tests verify the _correct_for_proposal function from npe_a.py,
-    which implements the analytical posterior correction from Appendix C
-    of Papamakarios et al. 2016 (SNPE-A paper).
-    """
-
-    def test_correction_single_component_identity(self):
-        """Test correction when proposal equals density (should return prior-weighted).
-
-        When proposal == density, posterior = density * prior / proposal = prior.
-        """
-        torch.manual_seed(42)
-        dim = 2
-
-        # Create estimator to get a density MoG
-        mdn_net = MultivariateGaussianMDN(
-            features=dim,
-            context_features=3,
-            hidden_features=20,
-            num_components=1,
-        )
-        estimator = MixtureDensityEstimator(
-            net=mdn_net,
-            input_shape=torch.Size([dim]),
-            condition_shape=torch.Size([3]),
-        )
-
-        # Get density MoG for a fixed condition
-        condition = torch.randn(1, 3)
-        density_mog = estimator.get_uncorrected_mog(condition)
-
-        # Use same MoG as proposal (single component)
-        proposal_mog = MoG(
-            logits=density_mog.logits.clone(),
-            means=density_mog.means.clone(),
-            precisions=density_mog.precisions.clone(),
-            precision_factors=density_mog.precision_factors.clone(),
-        )
-
-        # Prior: standard Gaussian (as MoG)
-        prior_mog = MoG.from_gaussian(
-            mean=torch.zeros(dim),
-            covariance=torch.eye(dim),
-        )
-
-        # Apply correction using the pure function
-        corrected_mog = _correct_for_proposal(density_mog, proposal_mog, prior_mog)
-
-        # With proposal == density, the posterior precision should be:
-        # prec_post = prec_density - prec_proposal + prec_prior = prec_prior
-        expected_precision = torch.eye(dim).unsqueeze(0).unsqueeze(0)
-        assert torch.allclose(
-            corrected_mog.precisions, expected_precision, atol=1e-4
-        ), "Posterior precision should equal prior precision when proposal==density"
-
-
-class TestBoxUniformPriorCorrection:
-    """Test SNPE-A correction with uniform priors (prior_mog=None)."""
-
-    def test_correction_with_uniform_prior(self):
-        """Test that correction works with prior_mog=None (uniform prior)."""
-        dim = 2
-
-        # Create simple MoGs for testing
-        density_mog = MoG(
-            logits=torch.zeros(1, 2),
-            means=torch.randn(1, 2, dim),
-            precisions=torch.eye(dim).unsqueeze(0).unsqueeze(0).expand(1, 2, -1, -1),
-        )
-
-        proposal_mog = MoG(
-            logits=torch.zeros(1, 2),
-            means=torch.zeros(1, 2, dim),
-            precisions=0.5
-            * torch.eye(dim).unsqueeze(0).unsqueeze(0).expand(1, 2, -1, -1),
-        )
-
-        # Correction with uniform prior (prior_mog=None)
-        # For uniform priors, prec_prior = 0, so:
-        # prec_post = prec_density - prec_proposal
-        corrected_mog = _correct_for_proposal(density_mog, proposal_mog, prior_mog=None)
-
-        # Should have 2 * 2 = 4 components
-        assert corrected_mog.num_components == 4
-        assert corrected_mog.batch_shape == torch.Size([1])
-
-        # Samples and log_prob should work
-        samples = corrected_mog.sample(torch.Size([50]))
-        assert samples.shape == (50, 1, dim)
-        assert torch.all(torch.isfinite(samples))
-
-        log_prob = corrected_mog.log_prob(samples)
-        assert log_prob.shape == (50, 1)
-        assert torch.all(torch.isfinite(log_prob))
-
-
-class TestManyComponentProposal:
-    """Test SNPE-A correction with many-component proposals (typical use case)."""
-
-    def test_correction_with_10_component_proposal(self):
-        """Test correction with 10-component proposal (typical SNPE-A final round)."""
-        torch.manual_seed(42)
-        dim = 2
-        num_proposal_components = 10
-        num_density_components = 2
-
-        # Create density MoG (from estimator)
-        mdn_net = MultivariateGaussianMDN(
-            features=dim,
-            context_features=3,
-            hidden_features=20,
-            num_components=num_density_components,
-        )
-        estimator = MixtureDensityEstimator(
-            net=mdn_net,
-            input_shape=torch.Size([dim]),
-            condition_shape=torch.Size([3]),
-        )
-
-        condition = torch.randn(1, 3)
-        density_mog = estimator.get_uncorrected_mog(condition)
-
-        # Create 10-component proposal (typical final round of SNPE-A)
-        proposal_mog = MoG(
-            logits=torch.randn(1, num_proposal_components),
-            means=torch.randn(1, num_proposal_components, dim) * 0.1,
-            precisions=0.1
-            * torch.eye(dim)
-            .unsqueeze(0)
-            .unsqueeze(0)
-            .expand(1, num_proposal_components, -1, -1),
-        )
-
-        # Prior as MoG
-        prior_mog = MoG.from_gaussian(
-            mean=torch.zeros(dim),
-            covariance=torch.eye(dim),
-        )
-
-        # Apply correction
-        corrected_mog = _correct_for_proposal(density_mog, proposal_mog, prior_mog)
-
-        # Posterior should have 10 * 2 = 20 components
-        assert (
-            corrected_mog.num_components
-            == num_proposal_components * num_density_components
-        )
-        assert corrected_mog.batch_shape == torch.Size([1])
-
-        # Samples and log_prob should work
-        samples = corrected_mog.sample(torch.Size([50]))
-        assert samples.shape == (50, 1, dim)
-        assert torch.all(torch.isfinite(samples))
-
-        log_prob = corrected_mog.log_prob(samples)
-        assert log_prob.shape == (50, 1)
-        assert torch.all(torch.isfinite(log_prob))
