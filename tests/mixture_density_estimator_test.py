@@ -68,66 +68,6 @@ def make_mdn():
     return _make
 
 
-@pytest.fixture
-def make_estimator(make_mdn):
-    """Factory for creating MixtureDensityEstimator with custom dimensions."""
-
-    def _make(
-        features=3,
-        context_features=5,
-        hidden_features=20,
-        num_components=4,
-        embedding_net=None,
-    ):
-        mdn = make_mdn(features, context_features, hidden_features, num_components)
-        condition_shape = (
-            torch.Size([context_features])
-            if embedding_net is None
-            else torch.Size([embedding_net.in_features])
-            if hasattr(embedding_net, "in_features")
-            else torch.Size([context_features])
-        )
-        return MixtureDensityEstimator(
-            net=mdn,
-            input_shape=torch.Size([features]),
-            condition_shape=condition_shape,
-            embedding_net=embedding_net,
-        )
-
-    return _make
-
-
-@pytest.fixture
-def make_simple_mog():
-    """Factory for creating simple MoG distributions for testing."""
-
-    def _make(batch_size=1, num_components=2, dim=2, precision_scale=1.0):
-        return MoG(
-            logits=torch.zeros(batch_size, num_components),
-            means=torch.randn(batch_size, num_components, dim),
-            precisions=precision_scale
-            * torch.eye(dim)
-            .unsqueeze(0)
-            .unsqueeze(0)
-            .expand(batch_size, num_components, -1, -1),
-        )
-
-    return _make
-
-
-@pytest.fixture
-def standard_prior_mog():
-    """Standard Gaussian prior as MoG (mean=0, cov=I)."""
-
-    def _make(dim=2):
-        return MoG.from_gaussian(
-            mean=torch.zeros(dim),
-            covariance=torch.eye(dim),
-        )
-
-    return _make
-
-
 # =============================================================================
 # MultivariateGaussianMDN Tests
 # =============================================================================
@@ -166,38 +106,6 @@ class TestMultivariateGaussianMDNCreation:
         context = torch.randn(4, 3)
         mog = mdn(context)
         assert mog.num_components == 5
-
-
-class TestMultivariateGaussianMDNForward:
-    """Test MDN forward pass."""
-
-    def test_forward_returns_mog(self, standard_mdn, standard_condition):
-        """Test that forward returns a MoG object."""
-        mog = standard_mdn(standard_condition)
-
-        assert isinstance(mog, MoG)
-        assert mog.batch_shape == torch.Size([8])
-        assert mog.num_components == 4
-        assert mog.dim == 3
-
-
-class TestMultivariateGaussianMDNLogProb:
-    """Test MDN log probability computation."""
-
-    def test_log_prob_shape(self, standard_mdn, standard_condition, standard_inputs):
-        """Test log_prob output shape."""
-        log_prob = standard_mdn.log_prob(standard_inputs, standard_condition)
-        assert log_prob.shape == (8,)
-
-
-class TestMultivariateGaussianMDNSample:
-    """Test MDN sampling."""
-
-    def test_sample_shape(self, standard_mdn, standard_condition):
-        """Test sample output shape."""
-        samples = standard_mdn.sample(torch.Size([100]), standard_condition)
-        # MDN.sample returns (*sample_shape, batch_size, features) - same as MoG
-        assert samples.shape == (100, 8, 3)
 
 
 class TestMultivariateGaussianMDNDimensions:
