@@ -1,9 +1,9 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+from copy import deepcopy
 from typing import Callable, Literal, Optional, Union
 
-import numpy as np
 import torch
 from torch import Tensor, nn
 from torch.distributions import Distribution
@@ -128,31 +128,28 @@ class AmortizedVIPosterior(NeuralPosterior):
         learning_rate: float = 1e-3,
         gamma: float = 0.999,
         max_num_iters: int = 500,
-        min_num_iters: int = 10,
         clip_value: float = 5.0,
         batch_size: int = 64,
+        validation_fraction: float = 0.1,
+        stop_after_iters: int = 20,
         show_progress_bar: bool = True,
-        check_for_convergence: bool = True,
-        convergence_eps: float = 1e-4,
         retrain_from_scratch: bool = False,
     ) -> "AmortizedVIPosterior":
         """Train the conditional flow q(θ|x) by optimizing ELBO.
 
         Args:
             theta: Training θ values from simulations (num_sims, θ_dim).
-                Used for z-scoring when building the flow.
             x: Training x values from simulations (num_sims, x_dim).
-                The ELBO is optimized over batches of these x values.
             n_particles: Number of samples to estimate ELBO per x.
             learning_rate: Learning rate for Adam optimizer.
             gamma: Learning rate decay per iteration.
             max_num_iters: Maximum training iterations.
-            min_num_iters: Minimum iterations before convergence check.
             clip_value: Gradient clipping threshold.
             batch_size: Number of x values per training batch.
+            validation_fraction: Fraction of data to use for validation.
+            stop_after_iters: Stop training after this many iterations without
+                improvement in validation loss.
             show_progress_bar: Whether to show progress.
-            check_for_convergence: Whether to check for early stopping.
-            convergence_eps: Convergence threshold for loss change.
             retrain_from_scratch: If True, rebuild the flow from scratch.
 
         Returns:
@@ -161,56 +158,80 @@ class AmortizedVIPosterior(NeuralPosterior):
         theta = atleast_2d_float32_tensor(theta).to(self._device)
         x = atleast_2d_float32_tensor(x).to(self._device)
 
-        # Build or rebuild the conditional flow
+        # Split into training and validation sets
+        num_examples = len(theta)
+        num_val = int(validation_fraction * num_examples)
+        num_train = num_examples - num_val
+
+        permuted_indices = torch.randperm(num_examples, device=self._device)
+        train_indices = permuted_indices[:num_train]
+        val_indices = permuted_indices[num_train:]
+
+        theta_train, x_train = theta[train_indices], x[train_indices]
+        x_val = x[val_indices]  # Only x needed for validation (θ sampled from q)
+
+        # Build or rebuild the conditional flow (z-score on training data only)
         if self._q is None or retrain_from_scratch:
-            # Use subset for z-scoring
-            n_zscore = min(100, len(theta))
-            self._q = self._build_q(theta[:n_zscore], x[:n_zscore])
+            self._q = self._build_q(theta_train, x_train)
             self._q.to(self._device)
 
         # Setup optimizer
         optimizer = Adam(self._q.parameters(), lr=learning_rate)
         scheduler = ExponentialLR(optimizer, gamma=gamma)
 
-        self._q.train()
+        # Training loop with validation-based early stopping
+        best_val_loss = float("inf")
+        iters_since_improvement = 0
+        best_state_dict = deepcopy(self._q.state_dict())
 
-        # Training loop
         if show_progress_bar:
             iters = tqdm(range(max_num_iters), desc="Amortized VI (ELBO)")
         else:
             iters = range(max_num_iters)
 
-        losses = []
         for iteration in iters:
+            # Training step
+            self._q.train()
             optimizer.zero_grad()
 
-            # Sample batch of x values
-            idx = torch.randint(0, len(x), (batch_size,), device=self._device)
-            x_batch = x[idx]
+            # Sample batch from training set
+            idx = torch.randint(0, num_train, (batch_size,), device=self._device)
+            x_batch = x_train[idx]
 
-            # Compute ELBO
-            loss = self._compute_elbo_loss(x_batch, n_particles)
-
-            loss.backward()
+            train_loss = self._compute_elbo_loss(x_batch, n_particles)
+            train_loss.backward()
             nn.utils.clip_grad_norm_(self._q.parameters(), clip_value)
             optimizer.step()
             scheduler.step()
 
-            losses.append(loss.item())
+            # Compute validation loss
+            self._q.eval()
+            with torch.no_grad():
+                val_loss = self._compute_elbo_loss(x_val, n_particles).item()
+
+            # Check for improvement
+            if val_loss < best_val_loss:
+                best_val_loss = val_loss
+                iters_since_improvement = 0
+                best_state_dict = deepcopy(self._q.state_dict())
+            else:
+                iters_since_improvement += 1
 
             if show_progress_bar:
                 assert isinstance(iters, tqdm)
-                iters.set_postfix({"loss": f"{loss.item():.3f}"})
+                iters.set_postfix({
+                    "train": f"{train_loss.item():.3f}",
+                    "val": f"{val_loss:.3f}",
+                })
 
-            # Check convergence
-            if check_for_convergence and iteration > min_num_iters and len(losses) > 50:
-                recent_mean = np.mean(losses[-50:])
-                older_mean = np.mean(losses[-100:-50])
-                if abs(recent_mean - older_mean) < convergence_eps:
-                    if show_progress_bar:
-                        print(f"\nConverged at iteration {iteration}")
-                    break
+            # Early stopping
+            if iters_since_improvement >= stop_after_iters:
+                if show_progress_bar:
+                    print(f"\nConverged at iteration {iteration}")
+                break
 
+        # Restore best model
+        self._q.load_state_dict(best_state_dict)
         self._q.eval()
         self._trained = True
 
@@ -229,31 +250,32 @@ class AmortizedVIPosterior(NeuralPosterior):
         assert self._q is not None, "q must be built before computing ELBO"
         batch_size = x_batch.shape[0]
 
-        # Get conditional distributions for all x in batch
-        embedded_x = self._q._embedding_net(x_batch)
-        zuko_dists = self._q.net(embedded_x)
+        # Reparameterized samples from q(θ|x) with their log probabilities
+        # Uses public API (sample_and_log_prob uses rsample_and_log_prob internally)
+        # theta_samples shape: (n_particles, batch_size, θ_dim)
+        # log_q shape: (n_particles, batch_size)
+        theta_samples, log_q = self._q.sample_and_log_prob(
+            torch.Size((n_particles,)), condition=x_batch
+        )
 
-        # Reparameterized samples from q(θ|x)
-        # Shape: (n_particles, batch_size, θ_dim)
-        theta_samples = zuko_dists.rsample((n_particles,))
+        # Vectorized evaluation of potential log p(θ|x) for all (θ, x) pairs
+        # Flatten: (n_particles, batch_size, θ_dim) -> (n_particles * batch_size, θ_dim)
+        theta_dim = theta_samples.shape[-1]
+        theta_flat = theta_samples.reshape(n_particles * batch_size, theta_dim)
 
-        # log q(θ|x) - Shape: (n_particles, batch_size)
-        log_q = zuko_dists.log_prob(theta_samples)
+        # Repeat x to match: (batch_size, x_dim) -> (n_particles * batch_size, x_dim)
+        # Each x[j] is repeated n_particles times to pair with theta[:, j, :]
+        x_expanded = x_batch.repeat(n_particles, 1)
 
-        # Evaluate potential log p(θ|x) for each (θ, x) pair
-        log_potential_list = []
-        for i in range(batch_size):
-            x_i = x_batch[i : i + 1]
-            theta_i = theta_samples[:, i, :]  # (n_particles, θ_dim)
-            self.potential_fn.set_x(x_i)
-            log_pot_i = self.potential_fn(theta_i)  # (n_particles,)
-            log_potential_list.append(log_pot_i)
+        # Set x_o for batched evaluation (x_is_iid=False: each θ paired with its x)
+        self.potential_fn.set_x(x_expanded, x_is_iid=False)
+        log_potential_flat = self.potential_fn(theta_flat)
 
-        # Shape: (n_particles, batch_size)
-        log_potential = torch.stack(log_potential_list, dim=1)
+        # Reshape: (n_particles * batch_size,) -> (n_particles, batch_size)
+        log_potential = log_potential_flat.reshape(n_particles, batch_size)
 
         # ELBO = E_q[log p(θ|x) - log q(θ|x)]
-        # Loss = -ELBO
+
         elbo = (log_potential - log_q).mean()
         return -elbo
 

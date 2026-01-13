@@ -303,5 +303,59 @@ def test_amortized_vi_vs_single_x_vi(linear_gaussian_setup):
     assert c2st_amortized < 0.6, f"Amortized VI C2ST too high: {c2st_amortized:.3f}"
 
 
+@pytest.mark.slow
+def test_gradient_flow_through_elbo(linear_gaussian_setup):
+    """Verify gradients flow through ELBO to flow parameters."""
+    from torch.optim import Adam
+
+    setup = linear_gaussian_setup
+
+    posterior = AmortizedVIPosterior(
+        potential_fn=setup["potential_fn"],
+        prior=setup["prior"],
+        q="nsf",
+        num_transforms=2,
+        hidden_features=32,
+    )
+
+    # Build the flow manually (normally done in train())
+    theta = setup["theta"][:500].to("cpu")
+    x = setup["x"][:500].to("cpu")
+    posterior._q = posterior._build_q(theta[:100], x[:100])
+    posterior._q.to("cpu")
+
+    # Store initial parameters
+    initial_params = [p.clone() for p in posterior._q.parameters()]
+
+    # Compute ELBO loss
+    optimizer = Adam(posterior._q.parameters(), lr=1e-3)
+    optimizer.zero_grad()
+
+    # Use small batch for quick test
+    x_batch = x[:8]
+    loss = posterior._compute_elbo_loss(x_batch, n_particles=16)
+
+    # Backward pass
+    loss.backward()
+
+    # Verify gradients exist and are non-zero for all parameters
+    for i, p in enumerate(posterior._q.parameters()):
+        assert p.grad is not None, f"Gradient is None for parameter {i}"
+        assert torch.isfinite(p.grad).all(), f"Gradient has NaN/Inf for parameter {i}"
+        # At least some gradients should be non-trivial
+        assert p.grad.abs().max() > 1e-10, f"Gradient is zero for parameter {i}"
+
+    # Take optimization step
+    optimizer.step()
+
+    # Verify parameters actually changed
+    changed_count = 0
+    for p_init, p_new in zip(initial_params, posterior._q.parameters(), strict=True):
+        if not torch.allclose(p_init, p_new.detach(), atol=1e-8):
+            changed_count += 1
+
+    assert changed_count > 0, "No parameters changed after optimization step"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-m", "slow"])
