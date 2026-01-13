@@ -75,12 +75,21 @@ def calibration_data(basic_setup, badly_trained_npe):
 @pytest.mark.parametrize("cv_folds", (1, 2))
 @pytest.mark.parametrize("num_ensemble", (1, 3))
 @pytest.mark.parametrize("z_score", (True, False))
+@pytest.mark.parametrize(
+    "device",
+    (
+        "cpu",
+        "cuda" if torch.cuda.is_available() else "cpu",
+        "mps" if torch.backends.mps.is_available() else "cpu",
+    ),
+)
 def test_running_lc2st(
     method,
     classifier,
     cv_folds,
     num_ensemble,
     z_score,
+    device,
     calibration_data,
     badly_trained_npe,
 ):
@@ -118,6 +127,7 @@ def test_running_lc2st(
         }
         kwargs_eval = {}
     kwargs_test["classifier"] = classifier
+    kwargs_test["device"] = device
 
     lc2st = method(
         thetas,
@@ -148,6 +158,40 @@ def test_running_lc2st(
     )
     _ = lc2st.p_value(x_o=xs[0], **kwargs_eval)
     _ = lc2st.reject_test(x_o=xs[0], **kwargs_eval)
+
+
+@pytest.mark.gpu
+@pytest.mark.parametrize(
+    "device",
+    [
+        pytest.param(
+            "cuda",
+            marks=pytest.mark.skipif(
+                not torch.cuda.is_available(), reason="cuda is not available"
+            ),
+        ),
+        pytest.param(
+            "mps",
+            marks=pytest.mark.skipif(
+                not (
+                    hasattr(torch.backends, "mps") and torch.backends.mps.is_available()
+                ),
+                reason="mps is not available",
+            ),
+        ),
+    ],
+)
+def test_lc2st_runs_on_requested_device(calibration_data, device):
+    """Test that LC2ST runs on cuda/mps (if available)."""
+
+    thetas = calibration_data["thetas"]
+    xs = calibration_data["xs"]
+    posterior_samples = calibration_data["posterior_samples"]
+
+    lc2st = LC2ST(thetas, xs, posterior_samples, classifier="mlp", device=device)
+    lc2st.train_under_null_hypothesis()
+    lc2st.train_on_observed_data()
+    assert len(lc2st.trained_clfs) > 0
 
 
 @pytest.mark.slow
@@ -278,3 +322,47 @@ def test_lc2st_false_positiv_rate(method, basic_setup, well_trained_npe, set_see
         f"less then {(1 - confidence_level) * 100.0:<.2f}% of the time, "
         f"but was rejected {proportion_rejected * 100.0:<.2f}% of the time."
     )
+
+
+def test_lc2st_classifier_kwargs_defaults(calibration_data):
+    """Test that sbi-specific defaults are applied when classifier_kwargs is None."""
+    thetas = calibration_data["thetas"]
+    xs = calibration_data["xs"]
+    posterior_samples = calibration_data["posterior_samples"]
+
+    lc2st = LC2ST(thetas, xs, posterior_samples, classifier="mlp", device="cpu")
+
+    assert lc2st.clf_kwargs["activation"] == "relu"
+    assert lc2st.clf_kwargs["max_iter"] == 1000
+    assert lc2st.clf_kwargs["early_stopping"] is True
+
+
+def test_lc2st_classifier_kwargs_override(calibration_data):
+    """Test that user overrides merge with defaults correctly
+    and do not mutate global state."""
+    thetas = calibration_data["thetas"]
+    xs = calibration_data["xs"]
+    posterior_samples = calibration_data["posterior_samples"]
+
+    custom_kwargs = {"max_iter": 50}
+    lc2st_override = LC2ST(
+        thetas,
+        xs,
+        posterior_samples,
+        classifier="mlp",
+        classifier_kwargs=custom_kwargs,
+        device="cpu",
+    )
+
+    assert lc2st_override.clf_kwargs["max_iter"] == 50
+    assert lc2st_override.clf_kwargs["activation"] == "relu"
+
+    lc2st_clean = LC2ST(
+        thetas,
+        xs,
+        posterior_samples,
+        classifier="mlp",
+        classifier_kwargs=None,
+        device="cpu",
+    )
+    assert lc2st_clean.clf_kwargs["max_iter"] == 1000
