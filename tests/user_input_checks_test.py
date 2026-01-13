@@ -371,8 +371,8 @@ def test_inference_with_user_sbi_problems(
     # Build posterior.
     if snpe_method == NPE_A:
         if not isinstance(prior, (MultivariateNormal, BoxUniform, DirectPosterior)):
-            with pytest.raises(AssertionError):
-                # NPE-A does not support priors yet.
+            with pytest.raises(TypeError):
+                # NPE-A only supports MultivariateNormal and BoxUniform priors.
                 posterior_estimator = inference.correct_for_proposal()
                 _ = DirectPosterior(
                     posterior_estimator=posterior_estimator, prior=prior
