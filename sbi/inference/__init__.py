@@ -36,6 +36,7 @@ _abc_family = ["ABC", "MCABC", "SMC", "SMCABC"]
 __all__ = _npe_family + _nre_family + _nle_family + _abc_family + ["FMPE", "NPSE"]
 
 from sbi.inference.posteriors import (
+    AmortizedVIPosterior,
     DirectPosterior,
     EnsemblePosterior,
     ImportanceSamplingPosterior,
