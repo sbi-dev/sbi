@@ -105,3 +105,4 @@ uv.lock
 
 # Serena cache
 .serena/
+.claude/

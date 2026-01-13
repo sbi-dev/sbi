@@ -61,7 +61,7 @@ jobs:
       with:
         env_vars: OS,PYTHON
         file: ./coverage.xml
-        flags: unittests
+        flags: fast
         name: codecov-sbi-fast-cpu
         token: ${{ secrets.CODECOV_TOKEN }}
 
