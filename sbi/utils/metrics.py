@@ -7,10 +7,30 @@ from typing import Any, Callable, Dict, Optional, Union
 
 import numpy as np
 import torch
+import torch.nn as nn
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import KFold, cross_val_score
 from sklearn.neural_network import MLPClassifier
 from torch import Tensor
+
+
+class MLPClassifierModule(nn.Module):
+    """PyTorch implementation of a fully-connected multilayer perceptron (MLP)
+    with similar training dynamics."""
+
+    def __init__(self, input_dim, hidden_layer_sizes, output_dim=2):
+        super().__init__()
+        layers = []
+        current_dim = input_dim
+        for hdim in hidden_layer_sizes:
+            layers.append(nn.Linear(current_dim, hdim))
+            layers.append(nn.ReLU())
+            current_dim = hdim
+        layers.append(nn.Linear(current_dim, output_dim))
+        self.sequential = nn.Sequential(*layers)
+
+    def forward(self, X):
+        return self.sequential(X.float())
 
 
 def c2st(
