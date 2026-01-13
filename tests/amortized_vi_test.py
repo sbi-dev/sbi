@@ -297,10 +297,16 @@ def test_amortized_vi_vs_single_x_vi(linear_gaussian_setup):
     single_x_samples = single_x_posterior.sample((1000,))
 
     c2st_amortized = c2st(true_samples, amortized_samples).item()
-    _ = c2st(true_samples, single_x_samples).item()  # unused, kept for comparison
+    c2st_single_x = c2st(true_samples, single_x_samples).item()
 
     # Amortized should be reasonably accurate
     assert c2st_amortized < 0.6, f"Amortized VI C2ST too high: {c2st_amortized:.3f}"
+
+    # Amortized should not be dramatically worse than single-x
+    assert abs(c2st_amortized - c2st_single_x) < 0.15, (
+        f"Amortized VI ({c2st_amortized:.3f}) much worse than "
+        f"single-x VI ({c2st_single_x:.3f})"
+    )
 
 
 @pytest.mark.slow

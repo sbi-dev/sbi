@@ -158,10 +158,39 @@ class AmortizedVIPosterior(NeuralPosterior):
         theta = atleast_2d_float32_tensor(theta).to(self._device)
         x = atleast_2d_float32_tensor(x).to(self._device)
 
+        # Validate inputs
+        if theta.shape[0] != x.shape[0]:
+            raise ValueError(
+                f"Batch size mismatch: theta has {theta.shape[0]} samples, "
+                f"x has {x.shape[0]} samples. They must match."
+            )
+        if len(theta) == 0:
+            raise ValueError("Training data cannot be empty.")
+        if not torch.isfinite(theta).all():
+            raise ValueError("theta contains NaN or Inf values.")
+        if not torch.isfinite(x).all():
+            raise ValueError("x contains NaN or Inf values.")
+
+        # Validate hyperparameters
+        if not 0 < validation_fraction < 1:
+            raise ValueError(
+                f"validation_fraction must be in (0, 1), got {validation_fraction}"
+            )
+        if n_particles <= 0:
+            raise ValueError(f"n_particles must be positive, got {n_particles}")
+        if batch_size <= 0:
+            raise ValueError(f"batch_size must be positive, got {batch_size}")
+
         # Split into training and validation sets
         num_examples = len(theta)
         num_val = int(validation_fraction * num_examples)
         num_train = num_examples - num_val
+
+        if num_train < batch_size:
+            raise ValueError(
+                f"Training set size ({num_train}) is smaller than batch_size "
+                f"({batch_size}). Reduce validation_fraction or batch_size."
+            )
 
         permuted_indices = torch.randperm(num_examples, device=self._device)
         train_indices = permuted_indices[:num_train]
@@ -199,6 +228,16 @@ class AmortizedVIPosterior(NeuralPosterior):
             x_batch = x_train[idx]
 
             train_loss = self._compute_elbo_loss(x_batch, n_particles)
+
+            if not torch.isfinite(train_loss):
+                raise RuntimeError(
+                    f"Training loss became non-finite at iteration {iteration}: "
+                    f"{train_loss.item()}. This indicates numerical instability. Try:\n"
+                    f"  - Reducing learning_rate (currently {learning_rate})\n"
+                    f"  - Reducing n_particles (currently {n_particles})\n"
+                    f"  - Checking your potential_fn for numerical issues"
+                )
+
             train_loss.backward()
             nn.utils.clip_grad_norm_(self._q.parameters(), clip_value)
             optimizer.step()
@@ -362,7 +401,14 @@ class AmortizedVIPosterior(NeuralPosterior):
                 Required for amortized posterior.
 
         Returns:
-            Log probabilities of shape matching batch dimensions.
+            Log probabilities with shape according to broadcasting rules:
+            - theta (N, d), x (N, d') → (N,) element-wise
+            - theta (N, d), x (1, d') → (N,) broadcast x to all theta
+            - theta (1, d), x (M, d') → (M,) broadcast theta to all x
+            - theta (N, d), x (M, d') where N≠M and N,M>1 → ValueError
+
+        Raises:
+            ValueError: If batch dimensions are incompatible.
         """
         if x is None:
             raise ValueError(
@@ -379,12 +425,22 @@ class AmortizedVIPosterior(NeuralPosterior):
         theta = atleast_2d_float32_tensor(theta).to(self._device)
         x = atleast_2d_float32_tensor(x).to(self._device)
 
+        # Validate and broadcast batch dimensions
+        batch_theta, batch_x = theta.shape[0], x.shape[0]
+
+        if batch_theta != batch_x:
+            if batch_x == 1:
+                x = x.expand(batch_theta, -1)
+            elif batch_theta == 1:
+                theta = theta.expand(batch_x, -1)
+            else:
+                raise ValueError(
+                    f"Incompatible batch sizes: theta has {batch_theta}, x has "
+                    f"{batch_x}. Batch sizes must match or one must be 1."
+                )
+
         # ZukoFlow.log_prob expects input (sample_dim, batch_dim, event_dim)
         # and condition (batch_dim, event_dim)
-        # Broadcast x to match theta batch size if needed
-        if x.shape[0] == 1 and theta.shape[0] > 1:
-            x = x.expand(theta.shape[0], -1)
-
         theta_input = theta.unsqueeze(0)  # (1, batch, θ_dim)
         log_prob = self._q.log_prob(theta_input, condition=x)  # (1, batch)
 
@@ -424,7 +480,7 @@ class AmortizedVIPosterior(NeuralPosterior):
         if init_method == "posterior":
             init_samples = self.sample((num_init_samples,), x=x)
         else:
-            init_samples = self._prior.sample((num_init_samples,))
+            init_samples = self._prior.sample((num_init_samples,)).to(self._device)
 
         # Evaluate and select best starting points
         log_probs = self.log_prob(init_samples, x=x)
