@@ -12,7 +12,6 @@ from sklearn.model_selection import KFold
 from sklearn.neural_network import MLPClassifier
 from skorch import NeuralNetClassifier
 from skorch.callbacks import EarlyStopping
-from skorch.dataset import ValidSplit
 from torch import Tensor
 from tqdm import tqdm
 
@@ -93,8 +92,8 @@ class LC2ST:
             permutation: Whether to use the permutation method for the null hypothesis,
                 defaults to True.
             device: The device to use for training the classifier, e.g., "cpu" or
-                "cuda". Defaults to "cpu". GPU support is only available for the
-                MLP classifier.
+                "cuda" or "mps". Defaults to "cpu". GPU support is only available for
+                the MLP classifier.
 
         References:
         [1] : https://arxiv.org/abs/2306.03580, https://github.com/JuliaLinhart/lc2st
@@ -198,7 +197,7 @@ class LC2ST:
                         ),
                     )
                 ],
-                "train_split": ValidSplit(0.1),
+                "train_split": 0.1,
                 "optimizer__weight_decay": 1e-4,
                 "device": self.device,
                 "verbose": 0,
