@@ -14,7 +14,7 @@ import torch
 from torch import eye, ones, zeros
 from torch.distributions import MultivariateNormal
 
-from sbi.inference import NLE, AmortizedVIPosterior
+from sbi.inference import NLE, AmortizedVIPosterior, FlowType
 from sbi.inference.potentials.likelihood_based_potential import (
     likelihood_estimator_based_potential,
 )
@@ -74,7 +74,7 @@ def test_amortized_vi_posterior_training(linear_gaussian_setup):
     posterior = AmortizedVIPosterior(
         potential_fn=setup["potential_fn"],
         prior=setup["prior"],
-        q="nsf",
+        flow_type=FlowType.NSF,
         num_transforms=2,
         hidden_features=32,
     )
@@ -99,7 +99,7 @@ def test_amortized_vi_posterior_accuracy(linear_gaussian_setup):
     posterior = AmortizedVIPosterior(
         potential_fn=setup["potential_fn"],
         prior=setup["prior"],
-        q="nsf",
+        flow_type=FlowType.NSF,
         num_transforms=2,
         hidden_features=32,
     )
@@ -147,7 +147,7 @@ def test_amortized_vi_posterior_batched_sampling(linear_gaussian_setup):
     posterior = AmortizedVIPosterior(
         potential_fn=setup["potential_fn"],
         prior=setup["prior"],
-        q="nsf",
+        flow_type=FlowType.NSF,
         num_transforms=2,
         hidden_features=32,
     )
@@ -178,7 +178,7 @@ def test_amortized_vi_posterior_log_prob(linear_gaussian_setup):
     posterior = AmortizedVIPosterior(
         potential_fn=setup["potential_fn"],
         prior=setup["prior"],
-        q="nsf",
+        flow_type=FlowType.NSF,
         num_transforms=2,
         hidden_features=32,
     )
@@ -211,7 +211,7 @@ def test_amortized_vi_requires_x_for_sampling(linear_gaussian_setup):
     posterior = AmortizedVIPosterior(
         potential_fn=setup["potential_fn"],
         prior=setup["prior"],
-        q="nsf",
+        flow_type=FlowType.NSF,
     )
 
     posterior.train(
@@ -234,7 +234,7 @@ def test_amortized_vi_requires_training_before_sampling(linear_gaussian_setup):
     posterior = AmortizedVIPosterior(
         potential_fn=setup["potential_fn"],
         prior=setup["prior"],
-        q="nsf",
+        flow_type=FlowType.NSF,
     )
 
     # Should raise RuntimeError when not trained
@@ -253,7 +253,7 @@ def test_amortized_vi_vs_single_x_vi(linear_gaussian_setup):
     amortized_posterior = AmortizedVIPosterior(
         potential_fn=setup["potential_fn"],
         prior=setup["prior"],
-        q="nsf",
+        flow_type=FlowType.NSF,
         num_transforms=2,
         hidden_features=32,
     )
@@ -319,7 +319,7 @@ def test_gradient_flow_through_elbo(linear_gaussian_setup):
     posterior = AmortizedVIPosterior(
         potential_fn=setup["potential_fn"],
         prior=setup["prior"],
-        q="nsf",
+        flow_type=FlowType.NSF,
         num_transforms=2,
         hidden_features=32,
     )
@@ -327,14 +327,18 @@ def test_gradient_flow_through_elbo(linear_gaussian_setup):
     # Build the flow manually (normally done in train())
     theta = setup["theta"][:500].to("cpu")
     x = setup["x"][:500].to("cpu")
-    posterior._q = posterior._build_q(theta[:100], x[:100])
-    posterior._q.to("cpu")
+    posterior._variational_distribution = posterior._build_variational_distribution(
+        theta[:100], x[:100]
+    )
+    posterior._variational_distribution.to("cpu")
 
     # Store initial parameters
-    initial_params = [p.clone() for p in posterior._q.parameters()]
+    initial_params = [
+        p.clone() for p in posterior._variational_distribution.parameters()
+    ]
 
     # Compute ELBO loss
-    optimizer = Adam(posterior._q.parameters(), lr=1e-3)
+    optimizer = Adam(posterior._variational_distribution.parameters(), lr=1e-3)
     optimizer.zero_grad()
 
     # Use small batch for quick test
@@ -345,7 +349,7 @@ def test_gradient_flow_through_elbo(linear_gaussian_setup):
     loss.backward()
 
     # Verify gradients exist and are non-zero for all parameters
-    for i, p in enumerate(posterior._q.parameters()):
+    for i, p in enumerate(posterior._variational_distribution.parameters()):
         assert p.grad is not None, f"Gradient is None for parameter {i}"
         assert torch.isfinite(p.grad).all(), f"Gradient has NaN/Inf for parameter {i}"
         # At least some gradients should be non-trivial
@@ -356,11 +360,64 @@ def test_gradient_flow_through_elbo(linear_gaussian_setup):
 
     # Verify parameters actually changed
     changed_count = 0
-    for p_init, p_new in zip(initial_params, posterior._q.parameters(), strict=True):
+    params = posterior._variational_distribution.parameters()
+    for p_init, p_new in zip(initial_params, params, strict=True):
         if not torch.allclose(p_init, p_new.detach(), atol=1e-8):
             changed_count += 1
 
     assert changed_count > 0, "No parameters changed after optimization step"
+
+
+@pytest.mark.slow
+def test_amortized_vi_map(linear_gaussian_setup):
+    """Test that MAP estimation returns high-density region."""
+    setup = linear_gaussian_setup
+
+    posterior = AmortizedVIPosterior(
+        potential_fn=setup["potential_fn"],
+        prior=setup["prior"],
+        flow_type=FlowType.NSF,
+        num_transforms=2,
+        hidden_features=32,
+    )
+
+    posterior.train(
+        theta=setup["theta"],
+        x=setup["x"],
+        max_num_iters=500,
+        show_progress_bar=False,
+    )
+
+    # Test MAP for a specific observation
+    x_o = zeros(1, setup["num_dim"])
+
+    # Get MAP estimate
+    map_estimate = posterior.map(x=x_o, num_iter=500, num_to_optimize=50)
+
+    # For linear Gaussian, the MAP equals the posterior mean
+    true_posterior = true_posterior_linear_gaussian_mvn_prior(
+        x_o.squeeze(0),
+        setup["likelihood_shift"],
+        setup["likelihood_cov"],
+        zeros(setup["num_dim"]),
+        eye(setup["num_dim"]),
+    )
+    true_mean = true_posterior.mean
+
+    # MAP should be close to true posterior mean (allowing some tolerance)
+    assert torch.allclose(map_estimate, true_mean, atol=0.3), (
+        f"MAP {map_estimate.tolist()} not close to true mean {true_mean.tolist()}"
+    )
+
+    # MAP should have higher log prob than random samples
+    map_log_prob = posterior.log_prob(map_estimate.unsqueeze(0), x=x_o)
+    random_samples = posterior.sample((100,), x=x_o)
+    random_log_probs = posterior.log_prob(random_samples, x=x_o)
+
+    assert map_log_prob > random_log_probs.median(), (
+        f"MAP log_prob {map_log_prob.item():.3f} not better than "
+        f"median random {random_log_probs.median().item():.3f}"
+    )
 
 
 if __name__ == "__main__":

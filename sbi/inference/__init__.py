@@ -39,6 +39,7 @@ from sbi.inference.posteriors import (
     AmortizedVIPosterior,
     DirectPosterior,
     EnsemblePosterior,
+    FlowType,
     ImportanceSamplingPosterior,
     MCMCPosterior,
     RejectionPosterior,

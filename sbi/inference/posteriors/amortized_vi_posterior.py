@@ -2,7 +2,8 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from copy import deepcopy
-from typing import Callable, Literal, Optional, Union
+from enum import Enum
+from typing import Callable, Optional, Union
 
 import torch
 from torch import Tensor, nn
@@ -20,6 +21,36 @@ from sbi.sbi_types import Shape, TorchTransform
 from sbi.utils.torchutils import atleast_2d_float32_tensor
 
 
+class FlowType(Enum):
+    """Flow architectures for amortized variational inference.
+
+    These flows support efficient log_prob computation required for ELBO-based training.
+    Note: CNF (Continuous Normalizing Flows) is not included as it uses ODE-based
+    log_prob computation which is too slow for ELBO optimization.
+
+    Attributes:
+        NSF: Neural Spline Flow - flexible, good default choice
+        MAF: Masked Autoregressive Flow - fast density evaluation
+        NAF: Neural Autoregressive Flow - deep autoregressive transformations
+        UNAF: Unconstrained Neural Autoregressive Flow
+        SOSPF: Sum-of-Squares Polynomial Flow
+        NICE: Non-linear Independent Components Estimation
+        GF: Gaussianization Flow
+        NCSF: Neural Circular Spline Flow (for circular/periodic data)
+        BPF: Bernstein Polynomial Flow
+    """
+
+    NSF = "NSF"
+    MAF = "MAF"
+    NAF = "NAF"
+    UNAF = "UNAF"
+    SOSPF = "SOSPF"
+    NICE = "NICE"
+    GF = "GF"
+    NCSF = "NCSF"
+    BPF = "BPF"
+
+
 class AmortizedVIPosterior(NeuralPosterior):
     """Amortized Variational Inference posterior with conditional flow q(θ|x).
 
@@ -31,17 +62,22 @@ class AmortizedVIPosterior(NeuralPosterior):
         ELBO(x) = E_q(θ|x)[log p(θ|x) - log q(θ|x)]
 
     where p(θ|x) is the unnormalized posterior from the potential function.
+
+    Note:
+        This class is not thread-safe. The underlying potential function uses
+        stateful `set_x()` calls during training and ELBO computation. Do not
+        use the same instance across multiple threads concurrently.
     """
 
     def __init__(
         self,
         potential_fn: BasePotential,
         prior: Distribution,
-        q: Union[
-            Literal["nsf", "maf", "nice"],
+        flow_type: Union[
+            FlowType,
             ConditionalDensityEstimator,
             Callable[..., ConditionalDensityEstimator],
-        ] = "nsf",
+        ] = FlowType.NSF,
         theta_transform: Optional[TorchTransform] = None,
         device: Union[str, torch.device] = "cpu",
         num_transforms: int = 2,
@@ -52,12 +88,13 @@ class AmortizedVIPosterior(NeuralPosterior):
             potential_fn: Potential function from NLE/NRE defining log p(θ|x).
                 Must support `set_x(x)` to change the conditioning observation.
             prior: Prior distribution p(θ).
-            q: Conditional flow type ("nsf", "maf", "nice") or a custom
-                ConditionalDensityEstimator, or a callable that builds one.
+            flow_type: Flow architecture for the variational distribution.
+                Use FlowType.NSF, FlowType.MAF, or FlowType.NICE for built-in flows,
+                or pass a custom ConditionalDensityEstimator or callable.
             theta_transform: Optional transform for θ. If None, uses identity.
             device: Device for training and sampling.
-            num_transforms: Number of transforms in the flow (if using string q).
-            hidden_features: Hidden layer size in the flow (if using string q).
+            num_transforms: Number of transforms in the flow (if using FlowType).
+            hidden_features: Hidden layer size in the flow (if using FlowType).
         """
         super().__init__(potential_fn, theta_transform, device)
 
@@ -68,12 +105,12 @@ class AmortizedVIPosterior(NeuralPosterior):
         move_all_tensor_to_device(self._prior, device)
 
         # Store flow configuration for later building
-        self._q_type = q
+        self._flow_type = flow_type
         self._num_transforms = num_transforms
         self._hidden_features = hidden_features
 
         # Will be set during training
-        self._q: Optional[ConditionalDensityEstimator] = None
+        self._variational_distribution: Optional[ConditionalDensityEstimator] = None
         self._trained = False
 
         self._purpose = (
@@ -83,16 +120,25 @@ class AmortizedVIPosterior(NeuralPosterior):
         )
 
     @property
-    def q(self) -> Optional[ConditionalDensityEstimator]:
-        """The conditional variational distribution q(θ|x)."""
-        return self._q
+    def variational_distribution(self) -> Optional[ConditionalDensityEstimator]:
+        """The learned conditional flow approximation q(θ|x) to the posterior p(θ|x).
 
-    def _build_q(
+        This is the distribution optimized during training to minimize the ELBO.
+        Returns None if training has not been performed yet.
+        """
+        return self._variational_distribution
+
+    @property
+    def q(self) -> Optional[ConditionalDensityEstimator]:
+        """Alias for variational_distribution (standard VI notation)."""
+        return self.variational_distribution
+
+    def _build_variational_distribution(
         self,
         theta: Tensor,
         x: Tensor,
     ) -> ConditionalDensityEstimator:
-        """Build the conditional flow q(θ|x).
+        """Build the conditional flow for the variational distribution.
 
         Args:
             theta: Sample of θ values for z-scoring (batch_size, θ_dim).
@@ -101,24 +147,20 @@ class AmortizedVIPosterior(NeuralPosterior):
         Returns:
             Conditional density estimator q(θ|x).
         """
-        if isinstance(self._q_type, str):
-            # Map to Zuko flow names
-            flow_name_map = {"nsf": "NSF", "maf": "MAF", "nice": "NICE"}
-            flow_name = flow_name_map.get(self._q_type, self._q_type.upper())
-
+        if isinstance(self._flow_type, FlowType):
             return build_zuko_flow(
-                flow_name,
+                self._flow_type.value,
                 batch_x=theta,  # θ is what we model
                 batch_y=x,  # x is the condition
                 num_transforms=self._num_transforms,
                 hidden_features=self._hidden_features,
             )
-        elif isinstance(self._q_type, ConditionalDensityEstimator):
-            return self._q_type
-        elif callable(self._q_type):
-            return self._q_type(theta, x)
+        elif isinstance(self._flow_type, ConditionalDensityEstimator):
+            return self._flow_type
+        elif callable(self._flow_type):
+            return self._flow_type(theta, x)
         else:
-            raise ValueError(f"Unknown q type: {type(self._q_type)}")
+            raise ValueError(f"Unknown flow_type: {type(self._flow_type)}")
 
     def train(
         self,
@@ -200,18 +242,20 @@ class AmortizedVIPosterior(NeuralPosterior):
         x_val = x[val_indices]  # Only x needed for validation (θ sampled from q)
 
         # Build or rebuild the conditional flow (z-score on training data only)
-        if self._q is None or retrain_from_scratch:
-            self._q = self._build_q(theta_train, x_train)
-            self._q.to(self._device)
+        if self._variational_distribution is None or retrain_from_scratch:
+            self._variational_distribution = self._build_variational_distribution(
+                theta_train, x_train
+            )
+            self._variational_distribution.to(self._device)
 
         # Setup optimizer
-        optimizer = Adam(self._q.parameters(), lr=learning_rate)
+        optimizer = Adam(self._variational_distribution.parameters(), lr=learning_rate)
         scheduler = ExponentialLR(optimizer, gamma=gamma)
 
         # Training loop with validation-based early stopping
         best_val_loss = float("inf")
         iters_since_improvement = 0
-        best_state_dict = deepcopy(self._q.state_dict())
+        best_state_dict = deepcopy(self._variational_distribution.state_dict())
 
         if show_progress_bar:
             iters = tqdm(range(max_num_iters), desc="Amortized VI (ELBO)")
@@ -220,7 +264,7 @@ class AmortizedVIPosterior(NeuralPosterior):
 
         for iteration in iters:
             # Training step
-            self._q.train()
+            self._variational_distribution.train()
             optimizer.zero_grad()
 
             # Sample batch from training set
@@ -239,12 +283,14 @@ class AmortizedVIPosterior(NeuralPosterior):
                 )
 
             train_loss.backward()
-            nn.utils.clip_grad_norm_(self._q.parameters(), clip_value)
+            nn.utils.clip_grad_norm_(
+                self._variational_distribution.parameters(), clip_value
+            )
             optimizer.step()
             scheduler.step()
 
             # Compute validation loss
-            self._q.eval()
+            self._variational_distribution.eval()
             with torch.no_grad():
                 val_loss = self._compute_elbo_loss(x_val, n_particles).item()
 
@@ -252,7 +298,7 @@ class AmortizedVIPosterior(NeuralPosterior):
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
                 iters_since_improvement = 0
-                best_state_dict = deepcopy(self._q.state_dict())
+                best_state_dict = deepcopy(self._variational_distribution.state_dict())
             else:
                 iters_since_improvement += 1
 
@@ -270,8 +316,8 @@ class AmortizedVIPosterior(NeuralPosterior):
                 break
 
         # Restore best model
-        self._q.load_state_dict(best_state_dict)
-        self._q.eval()
+        self._variational_distribution.load_state_dict(best_state_dict)
+        self._variational_distribution.eval()
         self._trained = True
 
         return self
@@ -286,14 +332,16 @@ class AmortizedVIPosterior(NeuralPosterior):
         Returns:
             Negative ELBO (scalar tensor).
         """
-        assert self._q is not None, "q must be built before computing ELBO"
+        assert self._variational_distribution is not None, (
+            "q must be built before computing ELBO"
+        )
         batch_size = x_batch.shape[0]
 
         # Reparameterized samples from q(θ|x) with their log probabilities
         # Uses public API (sample_and_log_prob uses rsample_and_log_prob internally)
         # theta_samples shape: (n_particles, batch_size, θ_dim)
         # log_q shape: (n_particles, batch_size)
-        theta_samples, log_q = self._q.sample_and_log_prob(
+        theta_samples, log_q = self._variational_distribution.sample_and_log_prob(
             torch.Size((n_particles,)), condition=x_batch
         )
 
@@ -344,7 +392,7 @@ class AmortizedVIPosterior(NeuralPosterior):
                 "Use posterior.sample(shape, x=x_observed)."
             )
 
-        if not self._trained or self._q is None:
+        if not self._trained or self._variational_distribution is None:
             raise RuntimeError(
                 "AmortizedVIPosterior must be trained before sampling. "
                 "Call posterior.train(theta, x) first."
@@ -352,8 +400,8 @@ class AmortizedVIPosterior(NeuralPosterior):
 
         x = atleast_2d_float32_tensor(x).to(self._device)
 
-        # Type narrowing assertion (self._q cannot be None after the check above)
-        q = self._q
+        # Type narrowing (self._variational_distribution is not None after check above)
+        q = self._variational_distribution
 
         with torch.no_grad():
             # samples shape: (*sample_shape, batch_size, θ_dim)
@@ -416,7 +464,7 @@ class AmortizedVIPosterior(NeuralPosterior):
                 "Use posterior.log_prob(theta, x=x_observed)."
             )
 
-        if not self._trained or self._q is None:
+        if not self._trained or self._variational_distribution is None:
             raise RuntimeError(
                 "AmortizedVIPosterior must be trained before evaluating log_prob. "
                 "Call posterior.train(theta, x) first."
@@ -442,7 +490,9 @@ class AmortizedVIPosterior(NeuralPosterior):
         # ZukoFlow.log_prob expects input (sample_dim, batch_dim, event_dim)
         # and condition (batch_dim, event_dim)
         theta_input = theta.unsqueeze(0)  # (1, batch, θ_dim)
-        log_prob = self._q.log_prob(theta_input, condition=x)  # (1, batch)
+        log_prob = self._variational_distribution.log_prob(
+            theta_input, condition=x
+        )  # (1, batch)
 
         return log_prob.squeeze(0)  # (batch,)
 
@@ -505,8 +555,8 @@ class AmortizedVIPosterior(NeuralPosterior):
     def to(self, device: Union[str, torch.device]) -> "AmortizedVIPosterior":
         """Move posterior to device."""
         self._device = device
-        if self._q is not None:
-            self._q.to(device)
+        if self._variational_distribution is not None:
+            self._variational_distribution.to(device)
         move_all_tensor_to_device(self.potential_fn, device)
         move_all_tensor_to_device(self._prior, device)
         return self

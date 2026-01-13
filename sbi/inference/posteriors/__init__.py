@@ -1,7 +1,10 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from sbi.inference.posteriors.amortized_vi_posterior import AmortizedVIPosterior
+from sbi.inference.posteriors.amortized_vi_posterior import (
+    AmortizedVIPosterior,
+    FlowType,
+)
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.inference.posteriors.ensemble_posterior import EnsemblePosterior
 from sbi.inference.posteriors.importance_posterior import ImportanceSamplingPosterior
@@ -20,6 +23,7 @@ from sbi.inference.posteriors.vi_posterior import VIPosterior
 
 __all__ = [
     "AmortizedVIPosterior",
+    "FlowType",
     "DirectPosterior",
     "EnsemblePosterior",
     "ImportanceSamplingPosterior",
