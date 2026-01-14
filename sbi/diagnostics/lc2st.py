@@ -59,7 +59,7 @@ class LC2STScores:
 class LC2ST:
     r"""L-C2ST: Local Classifier Two-Sample Test.
 
-    Implementation based on the official code from [1] and the exisiting C2ST
+    Implementation based on the official code from [1] and the existing C2ST
     metric [2], using scikit-learn classifiers.
 
     L-C2ST tests the local consistency of a posterior estimator :math:`q` with
@@ -87,6 +87,25 @@ class LC2ST:
     data. The statistics obtained under (H0) is then compared to the one obtained
     on observed data to compute the p-value, used to decide whether to reject (H0)
     or not.
+
+    Example:
+        >>> lc2st = LC2ST(prior_samples, xs, posterior_samples, num_folds=5)
+        >>> lc2st.train_on_observed_data().train_under_null_hypothesis()
+        >>> p_value = lc2st.p_value(theta_o=theta_obs, x_o=x_obs)
+        >>> rejected = lc2st.reject_test(theta_o=theta_obs, x_o=x_obs, alpha=0.05)
+
+    Note:
+        Training methods can be called in either order:
+
+        - ``train_on_observed_data().train_under_null_hypothesis()`` (recommended)
+        - ``train_under_null_hypothesis().train_on_observed_data()`` (also valid)
+
+        Both orders reach the READY state required for ``p_value()`` and
+        ``reject_test()``.
+
+    References:
+        [1] Linhart et al. (2023), https://arxiv.org/abs/2306.03580
+        [2] Lopez-Paz & Oquab (2017), https://openreview.net/forum?id=SJkXfE5xx
     """
 
     def __init__(
@@ -108,12 +127,12 @@ class LC2ST:
         """Initialize L-C2ST.
 
         Args:
-            prior_samples: Samples from the prior (Q distribution),
+            prior_samples: Required. Samples from the prior (Q distribution),
                 of shape (sample_size, dim). These are compared against
                 posterior_samples (P distribution) by the classifier.
-            xs: Corresponding simulated data, of shape (sample_size, dim_x).
-            posterior_samples: Samples from the estimated posterior (P distribution),
-                of shape (sample_size, dim).
+            xs: Required. Corresponding simulated data, of shape (sample_size, dim_x).
+            posterior_samples: Required. Samples from the estimated posterior
+                (P distribution), of shape (sample_size, dim).
             seed: Seed for the sklearn classifier and the KFold cross validation,
                 defaults to 1.
             num_folds: Number of folds for the cross-validation,
@@ -1091,7 +1110,7 @@ def permute_data(
         seed: random seed, defaults to 1.
 
     Returns:
-        Permuted data [theta_p,theta_qss]
+        Tuple of (theta_p_permuted, theta_q_permuted), each of shape (sample_size, dim).
     """
     # set seed
     torch.manual_seed(seed)
