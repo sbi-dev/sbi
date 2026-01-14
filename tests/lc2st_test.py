@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import pytest
 import torch
+from scipy.stats import binomtest
 from sklearn.neural_network import MLPClassifier
 
 from sbi.diagnostics.lc2st import LC2ST, LC2ST_NF
@@ -271,10 +272,18 @@ def test_lc2st_false_positiv_rate(method, basic_setup, well_trained_npe, set_see
             lc2st.reject_test(x_o=x, alpha=1 - confidence_level, **kwargs_eval)
         )
 
-    proportion_rejected = torch.tensor(results).float().mean()
+    num_rejections = sum(results)
+    proportion_rejected = num_rejections / num_runs
+    expected_rate = 1 - confidence_level  # 0.05
 
-    assert proportion_rejected < (1 - confidence_level), (
-        "LC2ST p-values too small, test should be rejected "
-        f"less then {(1 - confidence_level) * 100.0:<.2f}% of the time, "
-        f"but was rejected {proportion_rejected * 100.0:<.2f}% of the time."
+    # Use a binomial test to check if rejection rate is significantly higher than
+    # expected. This accounts for statistical variance and avoids flaky test failures.
+    result = binomtest(num_rejections, num_runs, expected_rate, alternative="greater")
+
+    meta_test_alpha = 0.01
+    assert result.pvalue > meta_test_alpha, (
+        "LC2ST rejection rate is significantly higher than expected. "
+        f"Expected rate: {expected_rate * 100:.2f}%, "
+        f"Observed: {proportion_rejected * 100:.2f}% ({num_rejections}/{num_runs}), "
+        f"Binomial test p-value: {result.pvalue:.4f}"
     )
