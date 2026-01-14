@@ -67,7 +67,7 @@ class LC2ST:
         Args:
             thetas: Samples from the prior, of shape (sample_size, dim).
             xs: Corresponding simulated data, of shape (sample_size, dim_x).
-            posterior_samples: Samples from the estiamted posterior,
+            posterior_samples: Samples from the estimated posterior,
                 of shape (sample_size, dim)
             seed: Seed for the sklearn classifier and the KFold cross validation,
                 defaults to 1.
@@ -93,11 +93,14 @@ class LC2ST:
         """
 
         # check inputs
-        thetas, xs = remove_nans_and_infs_in_x(thetas, xs)
+        if not (thetas.shape[0] == xs.shape[0] == posterior_samples.shape[0]):
+            raise ValueError(
+                f"Sample size mismatch: thetas has {thetas.shape[0]}, xs has "
+                f"{xs.shape[0]}, posterior_samples has {posterior_samples.shape[0]}. "
+                f"All must have the same number of samples."
+            )
 
-        assert thetas.shape[0] == xs.shape[0] == posterior_samples.shape[0], (
-            "Number of samples must match"
-        )
+        thetas, xs = remove_nans_and_infs_in_x(thetas, xs)
 
         # set observed data for classification
         self.theta_p = posterior_samples
@@ -129,9 +132,11 @@ class LC2ST:
                     'Expected "mlp", "random_forest", '
                     'or a valid scikit-learn classifier class.'
                 )
-        assert issubclass(classifier, BaseEstimator), (
-            "classier must either be a string or a subclass of BaseEstimator."
-        )
+        if not issubclass(classifier, BaseEstimator):
+            raise TypeError(
+                f"classifier must be a string or a subclass of BaseEstimator, "
+                f"got {type(classifier).__name__}."
+            )
         self.clf_class = classifier
 
         # for MLPClassifier, set default parameters
@@ -306,9 +311,11 @@ class LC2ST:
         Returns:
             L-C2ST statistic at `x_o`.
         """
-        assert self.trained_clfs is not None, (
-            "No trained classifiers found. Run `train_on_observed_data` first."
-        )
+        if self.trained_clfs is None:
+            raise RuntimeError(
+                "No trained classifiers found. "
+                "Call train_on_observed_data() before computing statistics."
+            )
         _, scores = self.get_scores(
             theta_o=theta_o,
             x_o=x_o,
@@ -527,7 +534,7 @@ class LC2ST_NF(LC2ST):
         Args:
             thetas: Samples from the prior, of shape (sample_size, dim).
             xs: Corresponding simulated data, of shape (sample_size, dim_x).
-            posterior_samples: Samples from the estiamted posterior,
+            posterior_samples: Samples from the estimated posterior,
                 of shape (sample_size, dim).
             flow_inverse_transform: Inverse transform of the normalizing flow.
                 Takes thetas and xs as input and returns noise.
