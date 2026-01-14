@@ -1,6 +1,9 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import warnings
+from dataclasses import dataclass
+from enum import Enum, auto
 from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
 
 import numpy as np
@@ -12,7 +15,36 @@ from sklearn.neural_network import MLPClassifier
 from torch import Tensor
 from tqdm import tqdm
 
-from sbi.utils.diagnostics_utils import remove_nans_and_infs_in_x
+from sbi.utils.sbiutils import handle_invalid_x
+
+
+class LC2STState(Enum):
+    """Lifecycle states for LC2ST.
+
+    The LC2ST object progresses through these states as training methods are called:
+    - INITIALIZED: Object created but no training performed
+    - OBSERVED_TRAINED: Classifiers trained on observed data
+    - NULL_TRAINED: Classifiers trained under null hypothesis only
+    - READY: Both observed and null classifiers trained, ready for inference
+    """
+
+    INITIALIZED = auto()
+    OBSERVED_TRAINED = auto()
+    NULL_TRAINED = auto()
+    READY = auto()
+
+
+@dataclass
+class LC2STScores:
+    """Structured return type for LC2ST score computations.
+
+    Attributes:
+        scores: Array of LC2ST scores, shape (num_folds,) or (num_folds * num_ensemble,)
+        probabilities: Optional array of predicted probabilities from classifiers
+    """
+
+    scores: np.ndarray
+    probabilities: Optional[np.ndarray] = None
 
 
 class LC2ST:
@@ -50,9 +82,9 @@ class LC2ST:
 
     def __init__(
         self,
-        thetas: Tensor,
-        xs: Tensor,
-        posterior_samples: Tensor,
+        prior_samples: Optional[Tensor] = None,
+        xs: Optional[Tensor] = None,
+        posterior_samples: Optional[Tensor] = None,
         seed: int = 1,
         num_folds: int = 1,
         num_ensemble: int = 1,
@@ -61,14 +93,18 @@ class LC2ST:
         classifier_kwargs: Optional[Dict[str, Any]] = None,
         num_trials_null: int = 100,
         permutation: bool = True,
+        *,
+        thetas: Optional[Tensor] = None,  # Deprecated, use prior_samples
     ) -> None:
         """Initialize L-C2ST.
 
         Args:
-            thetas: Samples from the prior, of shape (sample_size, dim).
+            prior_samples: Samples from the prior (Q distribution),
+                of shape (sample_size, dim). These are compared against
+                posterior_samples (P distribution) by the classifier.
             xs: Corresponding simulated data, of shape (sample_size, dim_x).
-            posterior_samples: Samples from the estimated posterior,
-                of shape (sample_size, dim)
+            posterior_samples: Samples from the estimated posterior (P distribution),
+                of shape (sample_size, dim).
             seed: Seed for the sklearn classifier and the KFold cross validation,
                 defaults to 1.
             num_folds: Number of folds for the cross-validation,
@@ -86,26 +122,55 @@ class LC2ST:
                 defaults to 100.
             permutation: Whether to use the permutation method for the null hypothesis,
                 defaults to True.
+            thetas: Deprecated. Use prior_samples instead.
 
         References:
         [1] : https://arxiv.org/abs/2306.03580, https://github.com/JuliaLinhart/lc2st
         [2] : https://github.com/sbi-dev/sbi/blob/main/sbi/utils/metrics.py
         """
-
-        # check inputs
-        if not (thetas.shape[0] == xs.shape[0] == posterior_samples.shape[0]):
-            raise ValueError(
-                f"Sample size mismatch: thetas has {thetas.shape[0]}, xs has "
-                f"{xs.shape[0]}, posterior_samples has {posterior_samples.shape[0]}. "
-                f"All must have the same number of samples."
+        # Handle deprecated 'thetas' parameter
+        if thetas is not None:
+            warnings.warn(
+                "Parameter 'thetas' is deprecated and will be removed in a future "
+                "version. Use 'prior_samples' instead.",
+                DeprecationWarning,
+                stacklevel=2,
             )
+            if prior_samples is not None:
+                raise ValueError(
+                    "Cannot specify both 'thetas' and 'prior_samples'. "
+                    "Use 'prior_samples' only."
+                )
+            prior_samples = thetas
 
-        thetas, xs = remove_nans_and_infs_in_x(thetas, xs)
+        # Validate required arguments
+        if prior_samples is None:
+            raise ValueError("prior_samples is required.")
+        if xs is None:
+            raise ValueError("xs is required.")
+        if posterior_samples is None:
+            raise ValueError("posterior_samples is required.")
 
-        # set observed data for classification
+        # Remove NaN/Inf values from all tensors (using mask from xs)
+        is_valid_x, num_nans, num_infs = handle_invalid_x(xs, exclude_invalid_x=True)
+        if num_nans > 0 or num_infs > 0:
+            warnings.warn(
+                f"Found {num_nans} NaNs and {num_infs} Infs in xs. "
+                f"These rows will be removed from all input tensors. "
+                f"Only {is_valid_x.sum()} / {len(xs)} samples remain.",
+                stacklevel=2,
+            )
+        prior_samples = prior_samples[is_valid_x]
+        xs = xs[is_valid_x]
+        posterior_samples = posterior_samples[is_valid_x]
+
+        # Validate tensor properties after cleaning
+        self._validate_inputs(prior_samples, xs, posterior_samples, num_folds, seed)
+
+        # Set observed data for classification (P = posterior, Q = prior)
         self.theta_p = posterior_samples
         self.x_p = xs
-        self.theta_q = thetas
+        self.theta_q = prior_samples
         self.x_q = xs
 
         # z-score normalization parameters
@@ -115,54 +180,168 @@ class LC2ST:
         self.x_p_mean = torch.mean(self.x_p, dim=0)
         self.x_p_std = torch.std(self.x_p, dim=0)
 
-        # set parameters for classifier training
-        self.seed = seed
+        # Centralized seed management
+        self._base_seed = seed
+        self.seed = seed  # For backward compatibility
         self.num_folds = num_folds
         self.num_ensemble = num_ensemble
 
-        # initialize classifier
+        # Initialize classifier
+        self.clf_class = self._resolve_classifier(classifier)
+        self.clf_kwargs = self._get_classifier_kwargs(
+            classifier_kwargs, prior_samples.shape[-1]
+        )
+
+        # Initialize state machine
+        self._state = LC2STState.INITIALIZED
+        self.trained_clfs: Optional[List[Any]] = None
+        self.trained_clfs_null: Optional[Dict[int, List[Any]]] = None
+
+        # Parameters for the null hypothesis testing
+        self.num_trials_null = num_trials_null
+        self.permutation = permutation
+        # Can be specified if known and independent of x (see LC2ST_NF)
+        self.null_distribution: Optional[torch.distributions.Distribution] = None
+
+    def _validate_inputs(
+        self,
+        prior_samples: Tensor,
+        xs: Tensor,
+        posterior_samples: Tensor,
+        num_folds: int,
+        seed: int,
+    ) -> None:
+        """Validate input tensors and parameters.
+
+        Args:
+            prior_samples: Samples from the prior.
+            xs: Simulated data.
+            posterior_samples: Samples from the estimated posterior.
+            num_folds: Number of cross-validation folds.
+            seed: Random seed.
+
+        Raises:
+            ValueError: If inputs are invalid.
+            TypeError: If inputs have wrong types.
+        """
+        # Check tensor types
+        if not isinstance(prior_samples, Tensor):
+            raise TypeError(
+                f"prior_samples must be a torch.Tensor, got {type(prior_samples)}."
+            )
+        if not isinstance(xs, Tensor):
+            raise TypeError(f"xs must be a torch.Tensor, got {type(xs)}.")
+        if not isinstance(posterior_samples, Tensor):
+            raise TypeError(
+                f"posterior_samples must be a torch.Tensor, "
+                f"got {type(posterior_samples)}."
+            )
+
+        # Check for empty tensors
+        if prior_samples.shape[0] == 0:
+            raise ValueError("prior_samples cannot be empty.")
+        if xs.shape[0] == 0:
+            raise ValueError("xs cannot be empty.")
+        if posterior_samples.shape[0] == 0:
+            raise ValueError("posterior_samples cannot be empty.")
+
+        # Check sample size consistency
+        if not (prior_samples.shape[0] == xs.shape[0] == posterior_samples.shape[0]):
+            raise ValueError(
+                f"Sample size mismatch: prior_samples has {prior_samples.shape[0]}, "
+                f"xs has {xs.shape[0]}, posterior_samples has "
+                f"{posterior_samples.shape[0]}. All must have the same number "
+                f"of samples."
+            )
+
+        # Check dimension consistency
+        if prior_samples.shape[-1] != posterior_samples.shape[-1]:
+            raise ValueError(
+                f"Dimension mismatch: prior_samples has dimension "
+                f"{prior_samples.shape[-1]}, but posterior_samples has dimension "
+                f"{posterior_samples.shape[-1]}."
+            )
+
+        # Check num_folds
+        if num_folds < 1:
+            raise ValueError(f"num_folds must be >= 1, got {num_folds}.")
+        if num_folds > prior_samples.shape[0]:
+            raise ValueError(
+                f"num_folds ({num_folds}) cannot exceed sample size "
+                f"({prior_samples.shape[0]})."
+            )
+
+        # Check seed
+        if not isinstance(seed, int):
+            raise TypeError(f"seed must be an integer, got {type(seed)}.")
+
+    def _resolve_classifier(
+        self, classifier: Union[str, Type[BaseEstimator]]
+    ) -> Type[BaseEstimator]:
+        """Resolve classifier string or class to a classifier class.
+
+        Args:
+            classifier: Classifier specification (string or class).
+
+        Returns:
+            Resolved classifier class.
+
+        Raises:
+            ValueError: If classifier string is invalid.
+            TypeError: If classifier is not a BaseEstimator subclass.
+        """
         if isinstance(classifier, str):
-            if classifier.lower() == 'mlp':
-                classifier = MLPClassifier
-            elif classifier.lower() == 'random_forest':
-                classifier = RandomForestClassifier
+            if classifier.lower() == "mlp":
+                return MLPClassifier
+            elif classifier.lower() == "random_forest":
+                return RandomForestClassifier
             else:
                 raise ValueError(
-                    f'Invalid classifier: "{classifier}".'
+                    f'Invalid classifier: "{classifier}". '
                     'Expected "mlp", "random_forest", '
-                    'or a valid scikit-learn classifier class.'
+                    "or a valid scikit-learn classifier class."
                 )
         if not issubclass(classifier, BaseEstimator):
             raise TypeError(
                 f"classifier must be a string or a subclass of BaseEstimator, "
                 f"got {type(classifier).__name__}."
             )
-        self.clf_class = classifier
+        return classifier
 
-        # for MLPClassifier, set default parameters
-        if classifier_kwargs is None:
-            if self.clf_class == MLPClassifier:
-                ndim = thetas.shape[-1]
-                self.clf_kwargs = {
-                    "activation": "relu",
-                    "hidden_layer_sizes": (10 * ndim, 10 * ndim),
-                    "max_iter": 1000,
-                    "solver": "adam",
-                    "early_stopping": True,
-                    "n_iter_no_change": 50,
-                }
-            else:
-                self.clf_kwargs: Dict[str, Any] = {}
+    def _get_classifier_kwargs(
+        self, classifier_kwargs: Optional[Dict[str, Any]], ndim: int
+    ) -> Dict[str, Any]:
+        """Get classifier kwargs with sensible defaults.
 
-        # initialize classifiers, will be set after training
-        self.trained_clfs = None
-        self.trained_clfs_null = None
+        Args:
+            classifier_kwargs: User-provided kwargs (may be None).
+            ndim: Dimension of the parameter space.
 
-        # parameters for the null hypothesis testing
-        self.num_trials_null = num_trials_null
-        self.permutation = permutation
-        # can be specified if known and independent of x (see `LC2ST-NF`)
-        self.null_distribution = None
+        Returns:
+            Dictionary of classifier kwargs.
+        """
+        if self.clf_class == MLPClassifier:
+            defaults = {
+                "activation": "relu",
+                "hidden_layer_sizes": (10 * ndim, 10 * ndim),
+                "max_iter": 1000,
+                "solver": "adam",
+                "early_stopping": True,
+                "n_iter_no_change": 50,
+            }
+        else:
+            defaults = {}
+
+        if classifier_kwargs is not None:
+            # Merge user kwargs with defaults (user kwargs take precedence)
+            defaults.update(classifier_kwargs)
+
+        return defaults
+
+    @property
+    def state(self) -> LC2STState:
+        """Return the current state of the LC2ST object."""
+        return self._state
 
     def _train(
         self,
@@ -230,7 +409,7 @@ class LC2ST:
         x_o: Tensor,
         trained_clfs: List[Any],
         return_probs: bool = False,
-    ) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
+    ) -> Union[LC2STScores, np.ndarray, Tuple[np.ndarray, np.ndarray]]:
         """Computes the L-C2ST scores given the trained classifiers.
 
         Mean squared error (MSE) between 0.5 and the predicted probabilities
@@ -242,57 +421,75 @@ class LC2ST:
             x_o: The observation, of shape (,dim_x).
             trained_clfs: List of trained classifiers, of length `num_folds`.
             return_probs: Whether to return the predicted probabilities of being in P,
-                defaults to False.
+                defaults to False. Deprecated: Use the LC2STScores.probabilities
+                attribute instead.
 
-        Returns: one of
-            scores: L-C2ST scores at `x_o`, of shape (`num_folds`,).
-            (probs, scores): Predicted probabilities and L-C2ST scores at `x_o`,
-                each of shape (`num_folds`,).
+        Returns:
+            LC2STScores object containing scores and optionally probabilities.
+            For backward compatibility, if return_probs=True, returns a tuple
+            (probs, scores) instead.
         """
         if x_o.shape == self.x_p_mean.shape:
             x_o = x_o.unsqueeze(0)
 
-        # prepare data
+        # Prepare data
         if self.z_score:
             theta_o = (theta_o - self.theta_p_mean) / self.theta_p_std
             x_o = (x_o - self.x_p_mean) / self.x_p_std
 
-        probs, scores = [], []
+        probs_list, scores_list = [], []
 
-        # evaluate classifiers
+        # Evaluate classifiers
         for clf in trained_clfs:
             proba, score = eval_lc2st(theta_o, x_o, clf, return_proba=True)
-            probs.append(proba)
-            scores.append(score)
-        probs, scores = np.array(probs), np.array(scores)
+            probs_list.append(proba)
+            scores_list.append(score)
+        probs_arr, scores_arr = np.array(probs_list), np.array(scores_list)
 
+        # Backward compatibility: return tuple if return_probs=True
         if return_probs:
-            return probs, scores
-        else:
-            return scores
+            return probs_arr, scores_arr
+
+        # Return structured object
+        return LC2STScores(scores=scores_arr, probabilities=probs_arr)
 
     def train_on_observed_data(
         self, seed: Optional[int] = None, verbosity: int = 1
-    ) -> Union[None, List[Any]]:
+    ) -> "LC2ST":
         """Trains the classifier on the observed data.
 
         Saves the trained classifier(s) as a list of length `num_folds`.
 
         Args:
-            seed: random state of the classifier, defaults to None.
+            seed: Random state of the classifier, defaults to None.
             verbosity: Verbosity level, defaults to 1.
+
+        Returns:
+            self, for method chaining.
         """
-        # set random state
+        # Set random state
         if seed is not None:
             if "random_state" in self.clf_kwargs:
-                print("WARNING: changing the random state of the classifier.")
+                warnings.warn(
+                    "Changing the random state of the classifier.",
+                    UserWarning,
+                    stacklevel=2,
+                )
             self.clf_kwargs["random_state"] = seed
 
-        # train the classifier
+        # Train the classifier
         trained_clfs = self._train(
             self.theta_p, self.theta_q, self.x_p, self.x_q, verbosity=verbosity
         )
         self.trained_clfs = trained_clfs
+
+        # Update state
+        if self._state == LC2STState.NULL_TRAINED:
+            self._state = LC2STState.READY
+        else:
+            self._state = LC2STState.OBSERVED_TRAINED
+
+        return self
 
     def get_statistic_on_observed_data(
         self,
@@ -310,19 +507,25 @@ class LC2ST:
 
         Returns:
             L-C2ST statistic at `x_o`.
+
+        Raises:
+            RuntimeError: If classifiers have not been trained on observed data.
         """
-        if self.trained_clfs is None:
+        if self._state not in (
+            LC2STState.OBSERVED_TRAINED,
+            LC2STState.READY,
+        ):
             raise RuntimeError(
-                "No trained classifiers found. "
+                "Classifiers have not been trained on observed data. "
                 "Call train_on_observed_data() before computing statistics."
             )
-        _, scores = self.get_scores(
+        result = self.get_scores(
             theta_o=theta_o,
             x_o=x_o,
-            trained_clfs=self.trained_clfs,
-            return_probs=True,
+            trained_clfs=self.trained_clfs,  # type: ignore[arg-type]
         )
-        return float(scores.mean())
+        assert isinstance(result, LC2STScores)  # return_probs=False returns LC2STScores
+        return float(result.scores.mean())
 
     def p_value(
         self,
@@ -338,12 +541,27 @@ class LC2ST:
 
         Args:
             theta_o: Samples from the posterior conditioned on the observation `x_o`,
-                of dhape (sample_size, dim).
+                of shape (sample_size, dim).
             x_o: The observation, of shape (, dim_x).
 
         Returns:
             p-value for L-C2ST at `x_o`.
+
+        Raises:
+            RuntimeError: If the LC2ST is not in READY state (both training
+                methods must be called first).
         """
+        if self._state != LC2STState.READY:
+            missing = []
+            if self._state in (LC2STState.INITIALIZED, LC2STState.NULL_TRAINED):
+                missing.append("train_on_observed_data()")
+            if self._state in (LC2STState.INITIALIZED, LC2STState.OBSERVED_TRAINED):
+                missing.append("train_under_null_hypothesis()")
+            raise RuntimeError(
+                f"LC2ST is not ready to compute p-values. "
+                f"Call {' and '.join(missing)} first."
+            )
+
         stat_data = self.get_statistic_on_observed_data(theta_o=theta_o, x_o=x_o)
         _, stats_null = self.get_statistics_under_null_hypothesis(
             theta_o=theta_o, x_o=x_o, return_probs=True, verbosity=0
@@ -372,27 +590,33 @@ class LC2ST:
     def train_under_null_hypothesis(
         self,
         verbosity: int = 1,
-    ) -> None:
+    ) -> "LC2ST":
         """Computes the L-C2ST scores under the null hypothesis (H0).
+
         Saves the trained classifiers for each null trial.
 
         Args:
             verbosity: Verbosity level, defaults to 1.
-        """
 
-        trained_clfs_null = {}
+        Returns:
+            self, for method chaining.
+
+        Raises:
+            ValueError: If permutation is False but no null distribution is set.
+        """
+        trained_clfs_null: Dict[int, List[Any]] = {}
         for t in tqdm(
             range(self.num_trials_null),
             desc=f"Training the classifiers under H0, permutation = {self.permutation}",
             disable=verbosity < 1,
         ):
-            # prepare data
+            # Prepare data
             if self.permutation:
                 joint_p = torch.cat([self.theta_p, self.x_p], dim=1)
                 joint_q = torch.cat([self.theta_q, self.x_q], dim=1)
-                # permute data (same as permuting the labels)
+                # Permute data (same as permuting the labels)
                 joint_p_perm, joint_q_perm = permute_data(joint_p, joint_q, seed=t)
-                # extract the permuted P and Q and x
+                # Extract the permuted P and Q and x
                 theta_p_t, x_p_t = (
                     joint_p_perm[:, : self.theta_p.shape[-1]],
                     joint_p_perm[:, self.theta_p.shape[1] :],
@@ -402,9 +626,11 @@ class LC2ST:
                     joint_q_perm[:, self.theta_q.shape[1] :],
                 )
             else:
-                assert self.null_distribution is not None, (
-                    "You need to provide a null distribution"
-                )
+                if self.null_distribution is None:
+                    raise ValueError(
+                        "A null distribution must be provided when permutation=False. "
+                        "Set null_distribution or use permutation=True."
+                    )
                 theta_p_t = self.null_distribution.sample((self.theta_p.shape[0],))
                 theta_q_t = self.null_distribution.sample((self.theta_p.shape[0],))
                 x_p_t, x_q_t = self.x_p, self.x_q
@@ -415,11 +641,19 @@ class LC2ST:
                 x_p_t = (x_p_t - self.x_p_mean) / self.x_p_std
                 x_q_t = (x_q_t - self.x_p_mean) / self.x_p_std
 
-            # train
+            # Train
             clf_t = self._train(theta_p_t, theta_q_t, x_p_t, x_q_t, verbosity=0)
             trained_clfs_null[t] = clf_t
 
         self.trained_clfs_null = trained_clfs_null
+
+        # Update state
+        if self._state == LC2STState.OBSERVED_TRAINED:
+            self._state = LC2STState.READY
+        elif self._state == LC2STState.INITIALIZED:
+            self._state = LC2STState.NULL_TRAINED
+
+        return self
 
     def get_statistics_under_null_hypothesis(
         self,
@@ -441,16 +675,24 @@ class LC2ST:
         Returns: one of
             scores: L-C2ST scores under (H0).
             (probs, scores): Predicted probabilities and L-C2ST scores under (H0).
-        """
 
-        if self.trained_clfs_null is None:
-            raise ValueError(
-                "You need to train the classifiers under (H0). \
-                    Run `train_under_null_hypothesis`."
+        Raises:
+            RuntimeError: If classifiers have not been trained under null hypothesis.
+            ValueError: If null distribution required but not set.
+        """
+        if self._state not in (LC2STState.NULL_TRAINED, LC2STState.READY):
+            raise RuntimeError(
+                "Classifiers have not been trained under the null hypothesis. "
+                "Call train_under_null_hypothesis() first."
             )
-        else:
-            assert len(self.trained_clfs_null) == self.num_trials_null, (
-                "You need one classifier per trial."
+
+        if (
+            self.trained_clfs_null is None
+            or len(self.trained_clfs_null) != self.num_trials_null
+        ):
+            raise RuntimeError(
+                f"Expected {self.num_trials_null} null classifiers, "
+                f"got {len(self.trained_clfs_null) if self.trained_clfs_null else 0}."
             )
 
         probs_null, stats_null = [], []
@@ -459,46 +701,49 @@ class LC2ST:
             desc=f"Computing T under (H0) - permutation = {self.permutation}",
             disable=verbosity < 1,
         ):
-            # prepare data
+            # Prepare data
             if self.permutation:
                 theta_o_t = theta_o
             else:
-                assert self.null_distribution is not None, (
-                    "You need to provide a null distribution"
-                )
-
+                if self.null_distribution is None:
+                    raise ValueError(
+                        "A null distribution must be provided when permutation=False."
+                    )
                 theta_o_t = self.null_distribution.sample((theta_o.shape[0],))
 
             if self.z_score:
                 theta_o_t = (theta_o_t - self.theta_p_mean) / self.theta_p_std
                 x_o = (x_o - self.x_p_mean) / self.x_p_std
 
-            # evaluate
+            # Evaluate using LC2STScores
             clf_t = self.trained_clfs_null[t]
-            probs, scores = self.get_scores(
-                theta_o=theta_o_t, x_o=x_o, trained_clfs=clf_t, return_probs=True
-            )
-            probs_null.append(probs)
-            stats_null.append(scores.mean())
+            result = self.get_scores(theta_o=theta_o_t, x_o=x_o, trained_clfs=clf_t)
+            assert isinstance(
+                result, LC2STScores
+            )  # return_probs=False returns LC2STScores
+            probs_null.append(result.probabilities)
+            stats_null.append(result.scores.mean())
 
-        probs_null, stats_null = np.array(probs_null), np.array(stats_null)
+        probs_null_arr, stats_null_arr = np.array(probs_null), np.array(stats_null)
 
         if return_probs:
-            return probs_null, stats_null
+            return probs_null_arr, stats_null_arr
         else:
-            return stats_null
+            return stats_null_arr
 
 
 class LC2ST_NF(LC2ST):
     def __init__(
         self,
-        thetas: Tensor,
-        xs: Tensor,
-        posterior_samples: Tensor,
-        flow_inverse_transform: Callable[[Tensor, Tensor], Tensor],
-        flow_base_dist: torch.distributions.Distribution,
+        prior_samples: Optional[Tensor] = None,
+        xs: Optional[Tensor] = None,
+        posterior_samples: Optional[Tensor] = None,
+        flow_inverse_transform: Optional[Callable[[Tensor, Tensor], Tensor]] = None,
+        flow_base_dist: Optional[torch.distributions.Distribution] = None,
         num_eval: int = 10_000,
-        trained_clfs_null: Optional[Dict[str, List[Any]]] = None,
+        trained_clfs_null: Optional[Dict[int, List[Any]]] = None,
+        *,
+        thetas: Optional[Tensor] = None,  # Deprecated, use prior_samples
         **kwargs: Any,
     ) -> None:
         r"""L-C2ST for Normalizing Flows.
@@ -532,29 +777,62 @@ class LC2ST_NF(LC2ST):
           observed data (i.e. `posterior_samples` and `xs`).
 
         Args:
-            thetas: Samples from the prior, of shape (sample_size, dim).
+            prior_samples: Samples from the prior, of shape (sample_size, dim).
             xs: Corresponding simulated data, of shape (sample_size, dim_x).
             posterior_samples: Samples from the estimated posterior,
                 of shape (sample_size, dim).
             flow_inverse_transform: Inverse transform of the normalizing flow.
-                Takes thetas and xs as input and returns noise.
+                Takes prior_samples and xs as input and returns noise.
             flow_base_dist: Base distribution of the normalizing flow.
             num_eval: Number of samples to evaluate the L-C2ST.
             trained_clfs_null: Pre-trained classifiers under the null.
+            thetas: Deprecated. Use prior_samples instead.
             kwargs: Additional arguments for the LC2ST class.
 
         References:
         [1] : https://arxiv.org/abs/2306.03580, https://github.com/JuliaLinhart/lc2st
         """
-        # Apply the inverse transform to the thetas and the posterior samples
+        # Handle deprecated 'thetas' parameter
+        if thetas is not None:
+            warnings.warn(
+                "Parameter 'thetas' is deprecated and will be removed in a future "
+                "version. Use 'prior_samples' instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            if prior_samples is not None:
+                raise ValueError(
+                    "Cannot specify both 'thetas' and 'prior_samples'. "
+                    "Use 'prior_samples' only."
+                )
+            prior_samples = thetas
+
+        # Validate required arguments
+        if prior_samples is None:
+            raise ValueError("prior_samples is required.")
+        if xs is None:
+            raise ValueError("xs is required.")
+        if posterior_samples is None:
+            raise ValueError("posterior_samples is required.")
+        if flow_inverse_transform is None:
+            raise ValueError("flow_inverse_transform is required.")
+        if flow_base_dist is None:
+            raise ValueError("flow_base_dist is required.")
+
+        # Apply the inverse transform to the prior_samples and the posterior samples
         self.flow_inverse_transform = flow_inverse_transform
-        inverse_thetas = flow_inverse_transform(thetas, xs).detach()
+        inverse_prior_samples = flow_inverse_transform(prior_samples, xs).detach()
         inverse_posterior_samples = flow_inverse_transform(
             posterior_samples, xs
         ).detach()
 
         # Initialize the LC2ST class with the inverse transformed samples
-        super().__init__(inverse_thetas, xs, inverse_posterior_samples, **kwargs)
+        super().__init__(
+            prior_samples=inverse_prior_samples,
+            xs=xs,
+            posterior_samples=inverse_posterior_samples,
+            **kwargs,
+        )
 
         # Set the parameters for the null hypothesis testing
         self.null_distribution = flow_base_dist
@@ -570,7 +848,7 @@ class LC2ST_NF(LC2ST):
         trained_clfs: List[Any],
         return_probs: bool = False,
         **kwargs: Any,
-    ) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
+    ) -> Union[LC2STScores, np.ndarray, Tuple[np.ndarray, np.ndarray]]:
         """Computes the L-C2ST scores given the trained classifiers.
 
         Args:
@@ -580,9 +858,9 @@ class LC2ST_NF(LC2ST):
                 defaults to False.
             kwargs: Additional arguments used in the parent class.
 
-        Returns: one of
-            scores: L-C2ST scores at `x_o`.
-            (probs, scores): Predicted probabilities and L-C2ST scores at `x_o`.
+        Returns:
+            LC2STScores object, or for backward compatibility with return_probs=True,
+            a tuple (probs, scores).
         """
         return super().get_scores(
             theta_o=self.theta_o,
@@ -650,19 +928,24 @@ class LC2ST_NF(LC2ST):
     def train_under_null_hypothesis(
         self,
         verbosity: int = 1,
-    ) -> None:
+    ) -> "LC2ST_NF":
         """Computes the L-C2ST scores under the null hypothesis.
+
         Saves the trained classifiers for the null distribution.
 
         Args:
             verbosity: Verbosity level, defaults to 1.
+
+        Returns:
+            self, for method chaining.
         """
         if self.trained_clfs_null is not None:
             raise ValueError(
-                "Classifiers have already been trained under the null \
-                    and can be used to evaluate any new estimator."
+                "Classifiers have already been trained under the null "
+                "and can be used to evaluate any new estimator."
             )
-        return super().train_under_null_hypothesis(verbosity=verbosity)
+        super().train_under_null_hypothesis(verbosity=verbosity)
+        return self
 
     def get_statistics_under_null_hypothesis(
         self,
