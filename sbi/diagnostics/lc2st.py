@@ -17,6 +17,15 @@ from tqdm import tqdm
 
 from sbi.utils.sbiutils import handle_invalid_x
 
+# Default MLP classifier hyperparameters
+DEFAULT_MLP_ACTIVATION = "relu"
+# hidden_layer_sizes = (multiplier * ndim,) * 2
+DEFAULT_MLP_HIDDEN_LAYER_MULTIPLIER = 10
+DEFAULT_MLP_MAX_ITER = 1000
+DEFAULT_MLP_SOLVER = "adam"
+DEFAULT_MLP_EARLY_STOPPING = True
+DEFAULT_MLP_N_ITER_NO_CHANGE = 50
+
 
 class LC2STState(Enum):
     """Lifecycle states for LC2ST.
@@ -175,10 +184,7 @@ class LC2ST:
 
         # z-score normalization parameters
         self.z_score = z_score
-        self.theta_p_mean = torch.mean(self.theta_p, dim=0)
-        self.theta_p_std = torch.std(self.theta_p, dim=0)
-        self.x_p_mean = torch.mean(self.x_p, dim=0)
-        self.x_p_std = torch.std(self.x_p, dim=0)
+        self._setup_normalization()
 
         # Centralized seed management
         self._base_seed = seed
@@ -194,8 +200,8 @@ class LC2ST:
 
         # Initialize state machine
         self._state = LC2STState.INITIALIZED
-        self.trained_clfs: Optional[List[Any]] = None
-        self.trained_clfs_null: Optional[Dict[int, List[Any]]] = None
+        self.trained_clfs: Optional[List[BaseEstimator]] = None
+        self.trained_clfs_null: Optional[Dict[int, List[BaseEstimator]]] = None
 
         # Parameters for the null hypothesis testing
         self.num_trials_null = num_trials_null
@@ -275,6 +281,20 @@ class LC2ST:
         if not isinstance(seed, int):
             raise TypeError(f"seed must be an integer, got {type(seed)}.")
 
+    def _setup_normalization(self) -> None:
+        """Calculate and store z-score normalization parameters.
+
+        Computes mean and standard deviation for theta and x data from the
+        posterior (P) distribution. These parameters are used by _normalize_theta()
+        and _normalize_x() when z_score=True.
+
+        This method should be called after self.theta_p and self.x_p are set.
+        """
+        self.theta_p_mean = torch.mean(self.theta_p, dim=0)
+        self.theta_p_std = torch.std(self.theta_p, dim=0)
+        self.x_p_mean = torch.mean(self.x_p, dim=0)
+        self.x_p_std = torch.std(self.x_p, dim=0)
+
     def _resolve_classifier(
         self, classifier: Union[str, Type[BaseEstimator]]
     ) -> Type[BaseEstimator]:
@@ -321,13 +341,14 @@ class LC2ST:
             Dictionary of classifier kwargs.
         """
         if self.clf_class == MLPClassifier:
+            hidden_size = DEFAULT_MLP_HIDDEN_LAYER_MULTIPLIER * ndim
             defaults = {
-                "activation": "relu",
-                "hidden_layer_sizes": (10 * ndim, 10 * ndim),
-                "max_iter": 1000,
-                "solver": "adam",
-                "early_stopping": True,
-                "n_iter_no_change": 50,
+                "activation": DEFAULT_MLP_ACTIVATION,
+                "hidden_layer_sizes": (hidden_size, hidden_size),
+                "max_iter": DEFAULT_MLP_MAX_ITER,
+                "solver": DEFAULT_MLP_SOLVER,
+                "early_stopping": DEFAULT_MLP_EARLY_STOPPING,
+                "n_iter_no_change": DEFAULT_MLP_N_ITER_NO_CHANGE,
             }
         else:
             defaults = {}
@@ -337,6 +358,32 @@ class LC2ST:
             defaults.update(classifier_kwargs)
 
         return defaults
+
+    def _normalize_theta(self, theta: Tensor) -> Tensor:
+        """Normalize theta samples using stored mean and std.
+
+        Args:
+            theta: Parameter samples of shape (sample_size, dim).
+
+        Returns:
+            Normalized theta if z_score is enabled, otherwise unchanged theta.
+        """
+        if self.z_score:
+            return (theta - self.theta_p_mean) / self.theta_p_std
+        return theta
+
+    def _normalize_x(self, x: Tensor) -> Tensor:
+        """Normalize observation data using stored mean and std.
+
+        Args:
+            x: Observation data of shape (sample_size, dim_x) or (dim_x,).
+
+        Returns:
+            Normalized x if z_score is enabled, otherwise unchanged x.
+        """
+        if self.z_score:
+            return (x - self.x_p_mean) / self.x_p_std
+        return x
 
     @property
     def state(self) -> LC2STState:
@@ -350,7 +397,7 @@ class LC2ST:
         x_p: Tensor,
         x_q: Tensor,
         verbosity: int = 0,
-    ) -> List[Any]:
+    ) -> List[BaseEstimator]:
         """Returns the classifiers trained on observed data.
 
         Args:
@@ -363,14 +410,11 @@ class LC2ST:
         Returns:
             List of trained classifiers for each cv fold.
         """
-
-        # prepare data
-
-        if self.z_score:
-            theta_p = (theta_p - self.theta_p_mean) / self.theta_p_std
-            theta_q = (theta_q - self.theta_p_mean) / self.theta_p_std
-            x_p = (x_p - self.x_p_mean) / self.x_p_std
-            x_q = (x_q - self.x_p_mean) / self.x_p_std
+        # Normalize data
+        theta_p = self._normalize_theta(theta_p)
+        theta_q = self._normalize_theta(theta_q)
+        x_p = self._normalize_x(x_p)
+        x_q = self._normalize_x(x_q)
 
         # initialize classifier
         clf = self.clf_class(**self.clf_kwargs or {})
@@ -391,11 +435,11 @@ class LC2ST:
                 x_p_train, x_q_train = x_p[train_idx], x_q[train_idx]
 
                 # train classifier
-                clf_n = train_lc2st(
+                clf_fold = train_lc2st(
                     theta_p_train, theta_q_train, x_p_train, x_q_train, clf
                 )
 
-                trained_clfs.append(clf_n)
+                trained_clfs.append(clf_fold)
         else:
             # train single classifier
             clf = train_lc2st(theta_p, theta_q, x_p, x_q, clf)
@@ -407,7 +451,7 @@ class LC2ST:
         self,
         theta_o: Tensor,
         x_o: Tensor,
-        trained_clfs: List[Any],
+        trained_clfs: List[BaseEstimator],
         return_probs: bool = False,
     ) -> Union[LC2STScores, np.ndarray, Tuple[np.ndarray, np.ndarray]]:
         """Computes the L-C2ST scores given the trained classifiers.
@@ -432,10 +476,9 @@ class LC2ST:
         if x_o.shape == self.x_p_mean.shape:
             x_o = x_o.unsqueeze(0)
 
-        # Prepare data
-        if self.z_score:
-            theta_o = (theta_o - self.theta_p_mean) / self.theta_p_std
-            x_o = (x_o - self.x_p_mean) / self.x_p_std
+        # Normalize data
+        theta_o = self._normalize_theta(theta_o)
+        x_o = self._normalize_x(x_o)
 
         probs_list, scores_list = [], []
 
@@ -448,6 +491,12 @@ class LC2ST:
 
         # Backward compatibility: return tuple if return_probs=True
         if return_probs:
+            warnings.warn(
+                "The 'return_probs' parameter is deprecated. "
+                "Use LC2STScores.probabilities attribute instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
             return probs_arr, scores_arr
 
         # Return structured object
@@ -471,7 +520,8 @@ class LC2ST:
         if seed is not None:
             if "random_state" in self.clf_kwargs:
                 warnings.warn(
-                    "Changing the random state of the classifier.",
+                    "Overwriting 'random_state' in classifier_kwargs because "
+                    "a 'seed' was provided to train_on_observed_data().",
                     UserWarning,
                     stacklevel=2,
                 )
@@ -604,7 +654,7 @@ class LC2ST:
         Raises:
             ValueError: If permutation is False but no null distribution is set.
         """
-        trained_clfs_null: Dict[int, List[Any]] = {}
+        trained_clfs_null: Dict[int, List[BaseEstimator]] = {}
         for t in tqdm(
             range(self.num_trials_null),
             desc=f"Training the classifiers under H0, permutation = {self.permutation}",
@@ -635,13 +685,7 @@ class LC2ST:
                 theta_q_t = self.null_distribution.sample((self.theta_p.shape[0],))
                 x_p_t, x_q_t = self.x_p, self.x_q
 
-            if self.z_score:
-                theta_p_t = (theta_p_t - self.theta_p_mean) / self.theta_p_std
-                theta_q_t = (theta_q_t - self.theta_p_mean) / self.theta_p_std
-                x_p_t = (x_p_t - self.x_p_mean) / self.x_p_std
-                x_q_t = (x_q_t - self.x_p_mean) / self.x_p_std
-
-            # Train
+            # Train (normalization is handled in _train)
             clf_t = self._train(theta_p_t, theta_q_t, x_p_t, x_q_t, verbosity=0)
             trained_clfs_null[t] = clf_t
 
@@ -711,11 +755,7 @@ class LC2ST:
                     )
                 theta_o_t = self.null_distribution.sample((theta_o.shape[0],))
 
-            if self.z_score:
-                theta_o_t = (theta_o_t - self.theta_p_mean) / self.theta_p_std
-                x_o = (x_o - self.x_p_mean) / self.x_p_std
-
-            # Evaluate using LC2STScores
+            # Evaluate using LC2STScores (normalization is handled in get_scores)
             clf_t = self.trained_clfs_null[t]
             result = self.get_scores(theta_o=theta_o_t, x_o=x_o, trained_clfs=clf_t)
             assert isinstance(
@@ -741,7 +781,7 @@ class LC2ST_NF(LC2ST):
         flow_inverse_transform: Optional[Callable[[Tensor, Tensor], Tensor]] = None,
         flow_base_dist: Optional[torch.distributions.Distribution] = None,
         num_eval: int = 10_000,
-        trained_clfs_null: Optional[Dict[int, List[Any]]] = None,
+        trained_clfs_null: Optional[Dict[int, List[BaseEstimator]]] = None,
         *,
         thetas: Optional[Tensor] = None,  # Deprecated, use prior_samples
         **kwargs: Any,
@@ -845,7 +885,7 @@ class LC2ST_NF(LC2ST):
     def get_scores(
         self,
         x_o: Tensor,
-        trained_clfs: List[Any],
+        trained_clfs: List[BaseEstimator],
         return_probs: bool = False,
         **kwargs: Any,
     ) -> Union[LC2STScores, np.ndarray, Tuple[np.ndarray, np.ndarray]]:
@@ -1065,26 +1105,72 @@ def permute_data(
 
 
 class EnsembleClassifier(BaseEstimator):
-    def __init__(self, clf, num_ensemble=1, verbosity=1):
+    """Ensemble classifier that aggregates predictions from multiple classifiers.
+
+    This class wraps a base classifier and trains multiple instances with different
+    random states, then averages their probability predictions for more robust
+    classification. It follows the sklearn estimator interface.
+
+    Attributes:
+        clf: Base classifier instance to clone for the ensemble.
+        num_ensemble: Number of classifiers in the ensemble.
+        trained_clfs: List of trained classifier instances.
+        verbosity: Verbosity level for progress display (0=silent, 1+=show progress).
+    """
+
+    def __init__(
+        self,
+        clf: BaseEstimator,
+        num_ensemble: int = 1,
+        verbosity: int = 1,
+    ) -> None:
+        """Initialize the ensemble classifier.
+
+        Args:
+            clf: Base classifier instance to clone for ensemble members.
+            num_ensemble: Number of classifiers to train, defaults to 1.
+            verbosity: Verbosity level for progress bar, defaults to 1.
+        """
         self.clf = clf
         self.num_ensemble = num_ensemble
-        self.trained_clfs = []
+        self.trained_clfs: List[Any] = []
         self.verbosity = verbosity
 
-    def fit(self, X, y):
+    def fit(self, X: np.ndarray, y: np.ndarray) -> "EnsembleClassifier":
+        """Train the ensemble of classifiers.
+
+        Each classifier in the ensemble is cloned from the base classifier and
+        trained with a different random state for diversity.
+
+        Args:
+            X: Training features of shape (n_samples, n_features).
+            y: Training labels of shape (n_samples,).
+
+        Returns:
+            self, for method chaining.
+        """
         for n in tqdm(
             range(self.num_ensemble),
             desc="Ensemble training",
             disable=self.verbosity < 1,
         ):
             clf = clone(self.clf)
-            if clf.random_state is not None:  # type: ignore
-                clf.random_state += n  # type: ignore
+            if clf.random_state is not None:  # type: ignore[union-attr]
+                clf.random_state += n  # type: ignore[union-attr]
             else:
-                clf.random_state = n + 1  # type: ignore
-            clf.fit(X, y)  # type: ignore
+                clf.random_state = n + 1  # type: ignore[union-attr]
+            clf.fit(X, y)  # type: ignore[union-attr]
             self.trained_clfs.append(clf)
+        return self
 
-    def predict_proba(self, X):
-        probas = [clf.predict_proba(X) for clf in self.trained_clfs]
+    def predict_proba(self, X: np.ndarray) -> np.ndarray:
+        """Predict class probabilities by averaging ensemble predictions.
+
+        Args:
+            X: Features of shape (n_samples, n_features).
+
+        Returns:
+            Averaged probability predictions of shape (n_samples, n_classes).
+        """
+        probas: List[np.ndarray] = [clf.predict_proba(X) for clf in self.trained_clfs]
         return np.mean(probas, axis=0)
