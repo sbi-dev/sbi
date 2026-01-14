@@ -80,6 +80,7 @@ def cal_data(sim_setup, badly_trained_npe) -> CalibrationData:
     num_cal = 100
     thetas = sim_setup.prior.sample((num_cal,))
     xs = sim_setup.simulator(thetas)
+    # Sample 1 posterior sample per observation; reshape (n, 1, dim) -> (n, dim)
     posterior_samples = (
         badly_trained_npe.sample((1,), xs).reshape(-1, thetas.shape[-1]).detach()
     )
@@ -96,7 +97,8 @@ def lc2st_instance(cal_data) -> LC2ST:
 
 @pytest.fixture
 def theta_o(cal_data, badly_trained_npe) -> Tensor:
-    """Evaluation samples from the posterior."""
+    """Evaluation samples from the posterior at a single observation."""
+    # [None, :] adds batch dim for sample(); reshape flattens (1, n, dim) -> (n, dim)
     return (
         badly_trained_npe.sample((100,), condition=cal_data.xs[0][None, :])
         .reshape(-1, cal_data.thetas.shape[-1])
@@ -116,16 +118,9 @@ def x_o(cal_data) -> Tensor:
 
 
 @pytest.mark.parametrize("method", [LC2ST, LC2ST_NF])
-def test_lc2st_methods(method, cal_data, badly_trained_npe):
+def test_lc2st_methods(method, cal_data, badly_trained_npe, theta_o, x_o):
     """Test that both LC2ST and LC2ST_NF complete full workflow."""
-    num_eval = 100
-
     if method == LC2ST:
-        theta_o = (
-            badly_trained_npe.sample((num_eval,), condition=cal_data.xs[0][None, :])
-            .reshape(-1, cal_data.thetas.shape[-1])
-            .detach()
-        )
         kwargs_init, kwargs_eval = {}, {"theta_o": theta_o}
     else:
         npe = badly_trained_npe
@@ -134,7 +129,7 @@ def test_lc2st_methods(method, cal_data, badly_trained_npe):
             "flow_base_dist": torch.distributions.MultivariateNormal(
                 torch.zeros(2), torch.eye(2)
             ),
-            "num_eval": num_eval,
+            "num_eval": 100,
         }
         kwargs_eval = {}
 
@@ -148,7 +143,6 @@ def test_lc2st_methods(method, cal_data, badly_trained_npe):
     lc2st.train_under_null_hypothesis().train_on_observed_data()
 
     # All output methods should work
-    x_o = cal_data.xs[0]
     assert lc2st.get_statistic_on_observed_data(x_o=x_o, **kwargs_eval) is not None
     null_stats = lc2st.get_statistics_under_null_hypothesis(x_o=x_o, **kwargs_eval)
     assert null_stats is not None
