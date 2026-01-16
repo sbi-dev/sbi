@@ -144,8 +144,9 @@ def test_lc2st_methods(method, cal_data, badly_trained_npe, theta_o, x_o):
 
     # All output methods should work
     assert lc2st.get_statistic_on_observed_data(x_o=x_o, **kwargs_eval) is not None
-    null_stats = lc2st.get_statistics_under_null_hypothesis(x_o=x_o, **kwargs_eval)
-    assert null_stats is not None
+    null_scores = lc2st.get_statistics_under_null_hypothesis(x_o=x_o, **kwargs_eval)
+    assert null_scores is not None
+    assert null_scores.scores is not None
     assert lc2st.p_value(x_o=x_o, **kwargs_eval) is not None
     assert lc2st.reject_test(x_o=x_o, **kwargs_eval) is not None
 
@@ -289,10 +290,6 @@ def test_lc2st_dimension_mismatch():
         )
 
 
-@pytest.mark.xfail(
-    reason="Sample size validation happens after cleaning, causing IndexError",
-    strict=True,
-)
 def test_lc2st_sample_size_mismatch():
     """Test that sample size mismatch raises ValueError."""
     with pytest.raises(ValueError, match="Sample size"):

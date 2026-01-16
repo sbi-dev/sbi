@@ -179,6 +179,9 @@ class LC2ST:
         if posterior_samples is None:
             raise ValueError("posterior_samples is required.")
 
+        # Validate inputs before cleaning to avoid indexing errors
+        self._validate_inputs(prior_samples, xs, posterior_samples, num_folds, seed)
+
         # Remove NaN/Inf values from all tensors (using mask from xs)
         is_valid_x, num_nans, num_infs = handle_invalid_x(xs, exclude_invalid_x=True)
         if num_nans > 0 or num_infs > 0:
@@ -632,10 +635,11 @@ class LC2ST:
             )
 
         stat_data = self.get_statistic_on_observed_data(theta_o=theta_o, x_o=x_o)
-        _, stats_null = self.get_statistics_under_null_hypothesis(
-            theta_o=theta_o, x_o=x_o, return_probs=True, verbosity=0
+        stats_null = self.get_statistics_under_null_hypothesis(
+            theta_o=theta_o, x_o=x_o, verbosity=0
         )
-        return float((stat_data < stats_null).mean())
+        assert isinstance(stats_null, LC2STScores)
+        return float((stat_data < stats_null.scores).mean())
 
     def reject_test(
         self,
@@ -673,6 +677,12 @@ class LC2ST:
         Raises:
             ValueError: If permutation is False but no null distribution is set.
         """
+        if self.trained_clfs_null is not None:
+            raise ValueError(
+                "Classifiers have already been trained under the null "
+                "and can be used to evaluate any new estimator."
+            )
+
         trained_clfs_null: Dict[int, List[BaseEstimator]] = {}
         for t in tqdm(
             range(self.num_trials_null),
@@ -724,7 +734,7 @@ class LC2ST:
         x_o: Tensor,
         return_probs: bool = False,
         verbosity: int = 0,
-    ) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
+    ) -> Union[LC2STScores, np.ndarray, Tuple[np.ndarray, np.ndarray]]:
         """Computes the L-C2ST scores under the null hypothesis.
 
         Args:
@@ -735,9 +745,10 @@ class LC2ST:
                 defaults to False.
             verbosity: Verbosity level, defaults to 1.
 
-        Returns: one of
-            scores: L-C2ST scores under (H0).
-            (probs, scores): Predicted probabilities and L-C2ST scores under (H0).
+        Returns:
+            LC2STScores object containing null statistics and probabilities.
+            For backward compatibility, if return_probs=True, returns a tuple
+            (probs, scores) instead.
 
         Raises:
             RuntimeError: If classifiers have not been trained under null hypothesis.
@@ -777,18 +788,22 @@ class LC2ST:
             # Evaluate using LC2STScores (normalization is handled in get_scores)
             clf_t = self.trained_clfs_null[t]
             result = self.get_scores(theta_o=theta_o_t, x_o=x_o, trained_clfs=clf_t)
-            assert isinstance(
-                result, LC2STScores
-            )  # return_probs=False returns LC2STScores
+            assert isinstance(result, LC2STScores)
             probs_null.append(result.probabilities)
             stats_null.append(result.scores.mean())
 
         probs_null_arr, stats_null_arr = np.array(probs_null), np.array(stats_null)
 
         if return_probs:
+            warnings.warn(
+                "The 'return_probs' parameter is deprecated. "
+                "Use the LC2STScores.probabilities attribute instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
             return probs_null_arr, stats_null_arr
-        else:
-            return stats_null_arr
+
+        return LC2STScores(scores=stats_null_arr, probabilities=probs_null_arr)
 
 
 class LC2ST_NF(LC2ST):
@@ -1012,7 +1027,7 @@ class LC2ST_NF(LC2ST):
         return_probs: bool = False,
         verbosity: int = 0,
         **kwargs: Any,
-    ) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
+    ) -> Union[LC2STScores, np.ndarray, Tuple[np.ndarray, np.ndarray]]:
         """Computes the L-C2ST scores under the null hypothesis.
 
         Args:
