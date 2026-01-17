@@ -2,7 +2,6 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from copy import deepcopy
-from enum import Enum
 from typing import Callable, Optional, Union
 
 import torch
@@ -15,40 +14,11 @@ from tqdm import tqdm
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
+from sbi.neural_nets.factory import ZukoFlowType
 from sbi.neural_nets.net_builders.flow import build_zuko_flow
 from sbi.samplers.vi.vi_utils import move_all_tensor_to_device
 from sbi.sbi_types import Shape, TorchTransform
 from sbi.utils.torchutils import atleast_2d_float32_tensor
-
-
-class FlowType(Enum):
-    """Flow architectures for amortized variational inference.
-
-    These flows support efficient log_prob computation required for ELBO-based training.
-    Note: CNF (Continuous Normalizing Flows) is not included as it uses ODE-based
-    log_prob computation which is too slow for ELBO optimization.
-
-    Attributes:
-        NSF: Neural Spline Flow - flexible, good default choice
-        MAF: Masked Autoregressive Flow - fast density evaluation
-        NAF: Neural Autoregressive Flow - deep autoregressive transformations
-        UNAF: Unconstrained Neural Autoregressive Flow
-        SOSPF: Sum-of-Squares Polynomial Flow
-        NICE: Non-linear Independent Components Estimation
-        GF: Gaussianization Flow
-        NCSF: Neural Circular Spline Flow (for circular/periodic data)
-        BPF: Bernstein Polynomial Flow
-    """
-
-    NSF = "NSF"
-    MAF = "MAF"
-    NAF = "NAF"
-    UNAF = "UNAF"
-    SOSPF = "SOSPF"
-    NICE = "NICE"
-    GF = "GF"
-    NCSF = "NCSF"
-    BPF = "BPF"
 
 
 class AmortizedVIPosterior(NeuralPosterior):
@@ -74,10 +44,10 @@ class AmortizedVIPosterior(NeuralPosterior):
         potential_fn: BasePotential,
         prior: Distribution,
         flow_type: Union[
-            FlowType,
+            ZukoFlowType,
             ConditionalDensityEstimator,
             Callable[..., ConditionalDensityEstimator],
-        ] = FlowType.NSF,
+        ] = ZukoFlowType.NSF,
         theta_transform: Optional[TorchTransform] = None,
         device: Union[str, torch.device] = "cpu",
         num_transforms: int = 2,
@@ -89,12 +59,14 @@ class AmortizedVIPosterior(NeuralPosterior):
                 Must support `set_x(x)` to change the conditioning observation.
             prior: Prior distribution p(θ).
             flow_type: Flow architecture for the variational distribution.
-                Use FlowType.NSF, FlowType.MAF, or FlowType.NICE for built-in flows,
-                or pass a custom ConditionalDensityEstimator or callable.
+                Use ZukoFlowType.NSF, ZukoFlowType.MAF, or ZukoFlowType.NICE for
+                built-in flows, or pass a custom ConditionalDensityEstimator or
+                callable. If a callable is provided, it should accept (theta, x)
+                training batches.
             theta_transform: Optional transform for θ. If None, uses identity.
             device: Device for training and sampling.
-            num_transforms: Number of transforms in the flow (if using FlowType).
-            hidden_features: Hidden layer size in the flow (if using FlowType).
+            num_transforms: Number of transforms in the flow (if using ZukoFlowType).
+            hidden_features: Hidden layer size in the flow (if using ZukoFlowType).
         """
         super().__init__(potential_fn, theta_transform, device)
 
@@ -147,9 +119,9 @@ class AmortizedVIPosterior(NeuralPosterior):
         Returns:
             Conditional density estimator q(θ|x).
         """
-        if isinstance(self._flow_type, FlowType):
+        if isinstance(self._flow_type, ZukoFlowType):
             return build_zuko_flow(
-                self._flow_type.value,
+                self._flow_type.value.upper(),
                 batch_x=theta,  # θ is what we model
                 batch_y=x,  # x is the condition
                 num_transforms=self._num_transforms,
@@ -173,6 +145,8 @@ class AmortizedVIPosterior(NeuralPosterior):
         clip_value: float = 5.0,
         batch_size: int = 64,
         validation_fraction: float = 0.1,
+        validation_batch_size: Optional[int] = None,
+        validation_n_particles: Optional[int] = None,
         stop_after_iters: int = 20,
         show_progress_bar: bool = True,
         retrain_from_scratch: bool = False,
@@ -189,6 +163,10 @@ class AmortizedVIPosterior(NeuralPosterior):
             clip_value: Gradient clipping threshold.
             batch_size: Number of x values per training batch.
             validation_fraction: Fraction of data to use for validation.
+            validation_batch_size: Batch size for validation loss. Defaults to
+                `batch_size`.
+            validation_n_particles: Number of particles for validation loss.
+                Defaults to `n_particles`.
             stop_after_iters: Stop training after this many iterations without
                 improvement in validation loss.
             show_progress_bar: Whether to show progress.
@@ -223,11 +201,30 @@ class AmortizedVIPosterior(NeuralPosterior):
         if batch_size <= 0:
             raise ValueError(f"batch_size must be positive, got {batch_size}")
 
+        if validation_batch_size is None:
+            validation_batch_size = batch_size
+        if validation_n_particles is None:
+            validation_n_particles = n_particles
+
+        if validation_batch_size <= 0:
+            raise ValueError(
+                f"validation_batch_size must be positive, got {validation_batch_size}"
+            )
+        if validation_n_particles <= 0:
+            raise ValueError(
+                f"validation_n_particles must be positive, got {validation_n_particles}"
+            )
+
         # Split into training and validation sets
         num_examples = len(theta)
         num_val = int(validation_fraction * num_examples)
         num_train = num_examples - num_val
 
+        if num_val == 0:
+            raise ValueError(
+                "Validation set is empty. Increase validation_fraction or provide more "
+                "training data."
+            )
         if num_train < batch_size:
             raise ValueError(
                 f"Training set size ({num_train}) is smaller than batch_size "
@@ -240,6 +237,13 @@ class AmortizedVIPosterior(NeuralPosterior):
 
         theta_train, x_train = theta[train_indices], x[train_indices]
         x_val = x[val_indices]  # Only x needed for validation (θ sampled from q)
+
+        if validation_batch_size < x_val.shape[0]:
+            val_batch_indices = torch.randperm(x_val.shape[0], device=self._device)[
+                :validation_batch_size
+            ]
+        else:
+            val_batch_indices = None
 
         # Build or rebuild the conditional flow (z-score on training data only)
         if self._variational_distribution is None or retrain_from_scratch:
@@ -292,7 +296,13 @@ class AmortizedVIPosterior(NeuralPosterior):
             # Compute validation loss
             self._variational_distribution.eval()
             with torch.no_grad():
-                val_loss = self._compute_elbo_loss(x_val, n_particles).item()
+                if val_batch_indices is None:
+                    x_val_batch = x_val
+                else:
+                    x_val_batch = x_val[val_batch_indices]
+                val_loss = self._compute_elbo_loss(
+                    x_val_batch, validation_n_particles
+                ).item()
 
             # Check for improvement
             if val_loss < best_val_loss:
@@ -377,28 +387,24 @@ class AmortizedVIPosterior(NeuralPosterior):
         Args:
             sample_shape: Shape of samples to draw.
             x: Observation(s) to condition on. Shape (x_dim,) or (batch, x_dim).
-                Required for amortized posterior.
+                Uses default x if not provided.
             show_progress_bars: Unused, for API compatibility.
 
         Returns:
-            Samples of shape (*sample_shape, *batch_shape, θ_dim).
+            Samples of shape (*sample_shape, θ_dim) for single observations, or
+            (*sample_shape, batch_size, θ_dim) for batched observations.
 
         Raises:
-            ValueError: If x is not provided or posterior not trained.
+            RuntimeError: If posterior not trained.
+            ValueError: If neither x nor default x is set.
         """
-        if x is None:
-            raise ValueError(
-                "AmortizedVIPosterior requires observation x for sampling. "
-                "Use posterior.sample(shape, x=x_observed)."
-            )
-
         if not self._trained or self._variational_distribution is None:
             raise RuntimeError(
                 "AmortizedVIPosterior must be trained before sampling. "
                 "Call posterior.train(theta, x) first."
             )
 
-        x = atleast_2d_float32_tensor(x).to(self._device)
+        x = atleast_2d_float32_tensor(self._x_else_default_x(x)).to(self._device)
 
         # Type narrowing (self._variational_distribution is not None after check above)
         q = self._variational_distribution
@@ -407,7 +413,7 @@ class AmortizedVIPosterior(NeuralPosterior):
             # samples shape: (*sample_shape, batch_size, θ_dim)
             samples = q.sample(torch.Size(sample_shape), condition=x)
 
-        # If single x was provided (batch_size=1), squeeze that dimension
+        # Match base posterior behavior: drop singleton x batch dimension.
         if x.shape[0] == 1:
             samples = samples.squeeze(-2)
 
@@ -446,7 +452,7 @@ class AmortizedVIPosterior(NeuralPosterior):
         Args:
             theta: Parameter values to evaluate. Shape (θ_dim,) or (batch, θ_dim).
             x: Observation to condition on. Shape (x_dim,) or (batch, x_dim).
-                Required for amortized posterior.
+                Uses default x if not provided.
 
         Returns:
             Log probabilities with shape according to broadcasting rules:
@@ -458,12 +464,6 @@ class AmortizedVIPosterior(NeuralPosterior):
         Raises:
             ValueError: If batch dimensions are incompatible.
         """
-        if x is None:
-            raise ValueError(
-                "AmortizedVIPosterior requires observation x for log_prob. "
-                "Use posterior.log_prob(theta, x=x_observed)."
-            )
-
         if not self._trained or self._variational_distribution is None:
             raise RuntimeError(
                 "AmortizedVIPosterior must be trained before evaluating log_prob. "
@@ -471,7 +471,7 @@ class AmortizedVIPosterior(NeuralPosterior):
             )
 
         theta = atleast_2d_float32_tensor(theta).to(self._device)
-        x = atleast_2d_float32_tensor(x).to(self._device)
+        x = atleast_2d_float32_tensor(self._x_else_default_x(x)).to(self._device)
 
         # Validate and broadcast batch dimensions
         batch_theta, batch_x = theta.shape[0], x.shape[0]
@@ -502,55 +502,44 @@ class AmortizedVIPosterior(NeuralPosterior):
         num_iter: int = 1000,
         num_to_optimize: int = 100,
         learning_rate: float = 0.01,
-        init_method: str = "posterior",
+        init_method: Union[str, Tensor] = "posterior",
         num_init_samples: int = 1000,
+        save_best_every: int = 10,
         show_progress_bars: bool = False,
+        force_update: bool = False,
         **kwargs,
     ) -> Tensor:
         """Find maximum a posteriori (MAP) estimate.
 
         Args:
-            x: Observation to condition on. Required.
+            x: Observation to condition on. If provided, sets default x.
             num_iter: Number of optimization iterations.
             num_to_optimize: Number of initial points to optimize from.
             learning_rate: Learning rate for gradient ascent.
-            init_method: Initialization method ("posterior" or "prior").
+            init_method: Initialization method ("posterior", "proposal", "prior").
             num_init_samples: Number of samples for initialization.
+            save_best_every: Save best MAP value every N iterations.
             show_progress_bars: Whether to show progress.
+            force_update: Whether to force MAP recomputation.
 
         Returns:
             MAP estimate of shape (θ_dim,).
         """
-        if x is None:
-            raise ValueError("AmortizedVIPosterior.map() requires observation x.")
+        if x is not None:
+            x = atleast_2d_float32_tensor(x).to(self._device)
+            self.set_default_x(x)
 
-        x = atleast_2d_float32_tensor(x).to(self._device)
-
-        # Get initial points
-        if init_method == "posterior":
-            init_samples = self.sample((num_init_samples,), x=x)
-        else:
-            init_samples = self._prior.sample((num_init_samples,)).to(self._device)
-
-        # Evaluate and select best starting points
-        log_probs = self.log_prob(init_samples, x=x)
-        _, best_indices = torch.topk(log_probs, num_to_optimize)
-        theta = init_samples[best_indices].clone().requires_grad_(True)
-
-        # Optimize
-        optimizer = Adam([theta], lr=learning_rate)
-
-        for _ in range(num_iter):
-            optimizer.zero_grad()
-            log_prob = self.log_prob(theta, x=x)
-            loss = -log_prob.sum()
-            loss.backward()
-            optimizer.step()
-
-        # Return best
-        final_log_probs = self.log_prob(theta.detach(), x=x)
-        best_idx = final_log_probs.argmax()
-        return theta[best_idx].detach()
+        return super().map(
+            x=None,
+            num_iter=num_iter,
+            num_to_optimize=num_to_optimize,
+            learning_rate=learning_rate,
+            init_method=init_method,
+            num_init_samples=num_init_samples,
+            save_best_every=save_best_every,
+            show_progress_bars=show_progress_bars,
+            force_update=force_update,
+        )
 
     def to(self, device: Union[str, torch.device]) -> "AmortizedVIPosterior":
         """Move posterior to device."""
