@@ -5,9 +5,10 @@ import math
 from typing import Callable, Optional, Union
 
 import torch
+from torch import Tensor, nn
+
 from sbi.neural_nets.estimators.base import ConditionalVectorFieldEstimator
 from sbi.utils.vector_field_utils import VectorFieldNet
-from torch import Tensor, nn
 
 
 class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
