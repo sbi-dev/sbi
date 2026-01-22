@@ -2,7 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import warnings
-from typing import Any, Callable, List, Optional, Tuple, Union
+from typing import Any, Callable, List, Optional, Tuple, Union, overload
 
 import numpy as np
 import torch
@@ -29,7 +29,7 @@ def simulate_for_sbi(
     simulation_batch_size: Union[int, None] = 1,
     seed: Optional[int] = None,
     show_progress_bar: bool = True,
-) -> Tuple[Tensor, Tensor]:
+) -> Tuple[Tensor, Tensor | List[str]]:
     r"""Returns pairs :math:`(\theta, x)` by sampling proposal and running simulations.
 
     This function performs two steps:
@@ -110,8 +110,28 @@ def simulate_for_sbi(
     return theta, x
 
 
+@overload
 def parallelize_simulator(
-    simulator: Optional[Callable[[Theta], Data]] = None,
+    simulator: Callable[[Theta], Data],
+    simulator_is_batched: bool = ...,
+    simulation_batch_size: int = ...,
+    show_progress_bar: bool = ...,
+    seed: Optional[int] = ...,
+) -> Callable[[Theta], Data]: ...
+
+
+@overload
+def parallelize_simulator(
+    simulator: None = None,
+    simulator_is_batched: bool = ...,
+    simulation_batch_size: int = ...,
+    show_progress_bar: bool = ...,
+    seed: Optional[int] = ...,
+) -> Callable[[Callable[[Theta], Data]], Callable[[Theta], Data]]: ...
+
+
+def parallelize_simulator(
+    simulator: Callable[[Theta], Data] | None = None,
     simulator_is_batched: bool = False,
     simulation_batch_size: int = 10,
     show_progress_bar: bool = True,
@@ -242,7 +262,7 @@ def simulate_from_thetas(
     simulation_batch_size: int = 10,
     show_progress_bar: bool = True,
     seed: Optional[int] = None,
-) -> Tuple[Tensor | np.ndarray, Data]:
+) -> Tuple[Theta, Data]:
     r"""
     Execute simulations for a given set of parameters.
 
