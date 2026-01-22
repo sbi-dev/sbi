@@ -3,16 +3,18 @@
 
 from typing import Optional
 
-from pyknos.mdn.mdn import MultivariateGaussianMDN
-from pyknos.nflows import flows, transforms
+import torch
 from torch import Tensor, nn
 
-from sbi.neural_nets.estimators import NFlowsFlow
+from sbi.neural_nets.estimators.mixture_density_estimator import (
+    MixtureDensityEstimator,
+    MultivariateGaussianMDN,
+)
 from sbi.utils.nn_utils import get_numel
 from sbi.utils.sbiutils import (
     standardizing_net,
-    standardizing_transform,
     z_score_parser,
+    z_standardization,
 )
 from sbi.utils.user_input_checks import check_data_device
 
@@ -26,7 +28,7 @@ def build_mdn(
     num_components: int = 10,
     embedding_net: nn.Module = nn.Identity(),
     **kwargs,
-) -> NFlowsFlow:
+) -> MixtureDensityEstimator:
     """Builds MDN p(x|y).
 
     Args:
@@ -47,45 +49,43 @@ def build_mdn(
             relevant for MDNs and are therefore ignored.
 
     Returns:
-        Neural network.
+        MixtureDensityEstimator for conditional density estimation.
     """
     check_data_device(batch_x, batch_y)
     x_numel = get_numel(batch_x, embedding_net=None)
     y_numel = get_numel(batch_y, embedding_net=embedding_net)
 
-    transform = transforms.IdentityTransform()
-
+    # Handle z-scoring for x (input)
+    transform_input = None
     z_score_x_bool, structured_x = z_score_parser(z_score_x)
     if z_score_x_bool:
-        transform_zx = standardizing_transform(batch_x, structured_x)
-        transform = transforms.CompositeTransform([transform_zx, transform])
+        x_mean, x_std = z_standardization(batch_x, structured_x)
+        # Store as [shift, scale] tensor for the estimator
+        transform_input = torch.stack([x_mean, x_std], dim=0)
 
+    # Handle z-scoring for y (condition) via embedding net
     z_score_y_bool, structured_y = z_score_parser(z_score_y)
     if z_score_y_bool:
         embedding_net = nn.Sequential(
             standardizing_net(batch_y, structured_y), embedding_net
         )
 
-    distribution = MultivariateGaussianMDN(
+    # Create the MDN network
+    mdn_net = MultivariateGaussianMDN(
         features=x_numel,
         context_features=y_numel,
         hidden_features=hidden_features,
-        hidden_net=nn.Sequential(
-            nn.Linear(y_numel, hidden_features),
-            nn.ReLU(),
-            nn.Dropout(p=0.0),
-            nn.Linear(hidden_features, hidden_features),
-            nn.ReLU(),
-            nn.Linear(hidden_features, hidden_features),
-            nn.ReLU(),
-        ),
         num_components=num_components,
         custom_initialization=True,
     )
 
-    neural_net = flows.Flow(transform, distribution, embedding_net)
-    flow = NFlowsFlow(
-        neural_net, input_shape=batch_x[0].shape, condition_shape=batch_y[0].shape
+    # Wrap in MixtureDensityEstimator
+    estimator = MixtureDensityEstimator(
+        net=mdn_net,
+        input_shape=batch_x[0].shape,
+        condition_shape=batch_y[0].shape,
+        embedding_net=embedding_net,
+        transform_input=transform_input,
     )
 
-    return flow
+    return estimator
