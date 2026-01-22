@@ -1,3 +1,6 @@
+# This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+
 from copy import deepcopy
 from typing import (
     Callable,
@@ -225,8 +228,8 @@ def adapt_variational_distribution(
     q: PyroTransformedDistribution,
     prior: Distribution,
     link_transform: Callable,
-    parameters: Iterable = [],
-    modules: Iterable = [],
+    parameters: Optional[Iterable] = None,
+    modules: Optional[Iterable] = None,
 ) -> Distribution:
     """This will adapt a distribution to be compatible with DivergenceOptimizers.
     Especially it will make sure that the distribution has parameters and that it
@@ -244,6 +247,10 @@ def adapt_variational_distribution(
         TransformedDistribution: Compatible variational distribution.
 
     """
+    if parameters is None:
+        parameters = []
+    if modules is None:
+        modules = []
 
     # Extract user define parameters
     def parameters_fn():

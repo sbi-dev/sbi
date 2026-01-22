@@ -1,39 +1,80 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Any, Callable, Dict, Optional, Union
+from typing import Any, Dict, Literal, Optional, Union
 
 from torch.distributions import Distribution
 
-from sbi.inference.posteriors import (
-    DirectPosterior,
-    ImportanceSamplingPosterior,
-    MCMCPosterior,
-    RejectionPosterior,
-    VIPosterior,
+from sbi.inference.posteriors.base_posterior import NeuralPosterior
+from sbi.inference.posteriors.posterior_parameters import (
+    DirectPosteriorParameters,
+    ImportanceSamplingPosteriorParameters,
+    MCMCPosteriorParameters,
+    RejectionPosteriorParameters,
+    VIPosteriorParameters,
 )
 from sbi.inference.trainers.npe.npe_c import NPE_C
 from sbi.neural_nets.estimators import MixedDensityEstimator
-from sbi.sbi_types import TensorboardSummaryWriter
+from sbi.neural_nets.estimators.base import ConditionalEstimatorBuilder
+from sbi.sbi_types import TensorBoardSummaryWriter
 from sbi.utils.sbiutils import del_entries
 
 
 class MNPE(NPE_C):
+    r"""Method that can infer discrete and continuous parameters (Mixed NPE).
+
+    MNPE (Mixed Neural Posterior Estimation) is similar to NPE: it directly
+    estimates a distribution over parameters given data. Unlike NPE, it is designed to
+    be applied to parmaeters with mixed types, i.e., continuous and discrete parameters.
+    This can occur, for example, in models with switching components. The emebedding
+    net will only operate on the continuous parameters, note this to design the
+    dimension of the embedding net.
+
+    Example:
+    --------
+
+    ::
+
+        import torch
+        from sbi.inference import MNPE
+
+        dim_theta_discrete = 3
+        dim_theta_continuous = 2
+        dim_theta = 5
+        dim_x = 50
+
+        num_sims = 100
+
+        discrete_theta = torch.randint(low=0, high=2, size=(100, dim_theta_discrete))
+        continuous_theta = torch.randn((num_sims, dim_theta_discrete))
+
+        # Important: the theta must have all continuous paramters first, and
+        # discrete parameters after this.
+        theta = torch.cat([continuous_theta, discrete_theta], dim=1)
+        x = torch.randn((num_sims, dim_x))
+
+        inference = MNPE()
+        _ = inference.append_simulations(theta, x).train()
+
+        posterior = inference.build_posterior()
+
+        x_o = torch.randn((1, dim_x))
+        samples = posterior.sample((100,), x=x_o)
+    """
+
     def __init__(
         self,
         prior: Optional[Distribution] = None,
-        density_estimator: Union[str, Callable] = "mnpe",
+        density_estimator: Union[
+            Literal["mnpe"],
+            ConditionalEstimatorBuilder[MixedDensityEstimator],
+        ] = "mnpe",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
-        summary_writer: Optional[TensorboardSummaryWriter] = None,
+        summary_writer: Optional[TensorBoardSummaryWriter] = None,
         show_progress_bars: bool = True,
     ):
-        r"""Mixed Neural Posterior Estimation (MNPE).
-
-        Like NPE-C, but designed to be applied to data with mixed types, e.g.,
-        continuous parameters and discrete parameters like they occur in models with
-        switching components. The emebedding net will only operate on the continuous
-        parameters, note this to design the dimension of the embedding net.
+        r"""Initialize Mixed Neural Posterior Estimation (MNPE).
 
         Args:
             prior: A probability distribution that expresses prior knowledge about the
@@ -41,12 +82,12 @@ class MNPE(NPE_C):
                 prior must be passed to `.build_posterior()`.
             density_estimator: If it is a string, it must be "mnpe" to use the
                 preconfigured neural nets for MNPE. Alternatively, a function
-                that builds a custom neural network can be provided. The function will
-                be called with the first batch of simulations (theta, x), which can
-                thus be used for shape inference and potentially for z-scoring. It
-                needs to return a PyTorch `nn.Module` implementing the density
-                estimator. The density estimator needs to provide the methods
-                `.log_prob`, `.log_prob_iid()` and `.sample()`.
+                that builds a custom neural network, which adheres to
+                `ConditionalEstimatorBuilder` protocol can be provided. The function
+                will be called with the first batch of simulations (theta, x), which can
+                thus be used for shape inference and potentially for z-scoring. The
+                density estimator needs to provide the methods `.log_prob` and
+                `.sample()` and must return a `MixedDensityEstimator`.
             device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.
@@ -91,21 +132,34 @@ class MNPE(NPE_C):
         self,
         density_estimator: Optional[MixedDensityEstimator] = None,
         prior: Optional[Distribution] = None,
-        sample_with: str = "direct",
-        mcmc_method: str = "slice_np_vectorized",
-        vi_method: str = "rKL",
+        sample_with: Literal[
+            "mcmc", "rejection", "vi", "importance", "direct"
+        ] = "direct",
+        mcmc_method: Literal[
+            "slice_np",
+            "slice_np_vectorized",
+            "hmc_pyro",
+            "nuts_pyro",
+            "slice_pymc",
+            "hmc_pymc",
+            "nuts_pymc",
+        ] = "slice_np_vectorized",
+        vi_method: Literal["rKL", "fKL", "IW", "alpha"] = "rKL",
         direct_sampling_parameters: Optional[Dict[str, Any]] = None,
         mcmc_parameters: Optional[Dict[str, Any]] = None,
         vi_parameters: Optional[Dict[str, Any]] = None,
         rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
         importance_sampling_parameters: Optional[Dict[str, Any]] = None,
-    ) -> Union[
-        MCMCPosterior,
-        RejectionPosterior,
-        VIPosterior,
-        DirectPosterior,
-        ImportanceSamplingPosterior,
-    ]:
+        posterior_parameters: Optional[
+            Union[
+                DirectPosteriorParameters,
+                MCMCPosteriorParameters,
+                VIPosteriorParameters,
+                RejectionPosteriorParameters,
+                ImportanceSamplingPosteriorParameters,
+            ]
+        ] = None,
+    ) -> NeuralPosterior:
         """Build posterior from the neural density estimator.
 
         Args:
@@ -114,10 +168,14 @@ class MNPE(NPE_C):
             prior: Prior distribution.
             sample_with: Method to use for sampling from the posterior. Must be one of
                 [`direct` | `mcmc` | `rejection` | `vi` | `importance`].
-            mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`,
-                `hmc`, `nuts`. Currently defaults to `slice_np` for a custom numpy
-                implementation of slice sampling; select `hmc`, `nuts` or `slice` for
-                Pyro-based sampling.
+            mcmc_method: Method used for MCMC sampling, one of `slice_np`,
+                `slice_np_vectorized`, `hmc_pyro`, `nuts_pyro`, `slice_pymc`,
+                `hmc_pymc`, `nuts_pymc`. `slice_np` is a custom
+                numpy implementation of slice sampling. `slice_np_vectorized` is
+                identical to `slice_np`, but if `num_chains>1`, the chains are
+                vectorized for `slice_np_vectorized` whereas they are run sequentially
+                for `slice_np`. The samplers ending on `_pyro` are using Pyro, and
+                likewise the samplers ending on `_pymc` are using PyMC.
             vi_method: Method used for VI, one of [`rKL`, `fKL`, `IW`, `alpha`].
             direct_sampling_parameters: Additional kwargs passed to `DirectPosterior`.
             mcmc_parameters: Additional kwargs passed to `MCMCPosterior`.
@@ -126,6 +184,13 @@ class MNPE(NPE_C):
                 RejectionPosterior`.
             importance_sampling_parameters: Additional kwargs passed to
                 `ImportanceSamplingPosterior`.
+            posterior_parameters: Configuration passed to the init method for the
+                posterior. Must be one of the following
+                - `VIPosteriorParameters`
+                - `ImportanceSamplingPosteriorParameters`
+                - `MCMCPosteriorParameters`
+                - `DirectPosteriorParameters`
+                - `RejectionPosteriorParameters`
 
         Returns:
             Posterior $p(\theta|x)$ with `.sample()` and `.log_prob()` methods.
@@ -141,6 +206,7 @@ class MNPE(NPE_C):
             density_estimator=density_estimator,
             prior=prior,
             sample_with=sample_with,
+            posterior_parameters=posterior_parameters,
             mcmc_method=mcmc_method,
             vi_method=vi_method,
             direct_sampling_parameters=direct_sampling_parameters,

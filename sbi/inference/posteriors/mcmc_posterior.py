@@ -1,10 +1,11 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+import inspect
 import warnings
 from copy import deepcopy
 from functools import partial
 from math import ceil
-from typing import Any, Callable, Dict, Optional, Union
+from typing import Any, Callable, Dict, Literal, Optional, Union
 from warnings import warn
 
 import arviz as az
@@ -32,12 +33,14 @@ from sbi.samplers.mcmc import (
     sir_init,
 )
 from sbi.sbi_types import Shape, TorchTransform
+from sbi.utils import mcmc_transform
 from sbi.utils.potentialutils import pyro_potential_wrapper, transformed_potential
 from sbi.utils.torchutils import ensure_theta_batched, tensor2numpy
 
 
 class MCMCPosterior(NeuralPosterior):
-    r"""Provides MCMC to sample from the posterior.<br/><br/>
+    r"""Provides MCMC to sample from the posterior.
+
     SNLE or SNRE train neural networks to approximate the likelihood(-ratios).
     `MCMCPosterior` allows to sample from the posterior with MCMC.
     """
@@ -47,16 +50,24 @@ class MCMCPosterior(NeuralPosterior):
         potential_fn: Union[Callable, BasePotential],
         proposal: Any,
         theta_transform: Optional[TorchTransform] = None,
-        method: str = "slice_np_vectorized",
+        method: Literal[
+            "slice_np",
+            "slice_np_vectorized",
+            "hmc_pyro",
+            "nuts_pyro",
+            "slice_pymc",
+            "hmc_pymc",
+            "nuts_pymc",
+        ] = "slice_np_vectorized",
         thin: int = -1,
         warmup_steps: int = 200,
         num_chains: int = 20,
-        init_strategy: str = "resample",
+        init_strategy: Literal["proposal", "sir", "resample"] = "resample",
         init_strategy_parameters: Optional[Dict[str, Any]] = None,
         init_strategy_num_candidates: Optional[int] = None,
         num_workers: int = 1,
-        mp_context: str = "spawn",
-        device: Optional[str] = None,
+        mp_context: Literal["fork", "spawn"] = "spawn",
+        device: Optional[Union[str, torch.device]] = None,
         x_shape: Optional[torch.Size] = None,
     ):
         """
@@ -133,6 +144,7 @@ class MCMCPosterior(NeuralPosterior):
         self._posterior_sampler = None
         # Hardcode parameter name to reduce clutter kwargs.
         self.param_name = "theta"
+        self.x_shape = x_shape
 
         if init_strategy_num_candidates is not None:
             warn(
@@ -151,6 +163,34 @@ class MCMCPosterior(NeuralPosterior):
             "It provides MCMC to .sample() from the posterior and "
             "can evaluate the _unnormalized_ posterior density with .log_prob()."
         )
+
+    def to(self, device: Union[str, torch.device]) -> None:
+        """Moves potential_fn, proposal, x_o and theta_transform to the
+
+        specified device. Reinstantiates the posterior and resets the default x_o.
+
+        Args:
+            device: Device to move the posterior to.
+        """
+        self.device = device
+        self.potential_fn.to(device)  # type: ignore
+        self.proposal.to(device)
+        x_o = None
+        if hasattr(self, "_x") and (self._x is not None):
+            x_o = self._x.to(device)
+
+        self.theta_transform = mcmc_transform(self.proposal, device=device)
+
+        super().__init__(
+            self.potential_fn,
+            theta_transform=self.theta_transform,
+            device=device,
+            x_shape=self.x_shape,
+        )
+        # super().__init__ erases the self._x, so we need to set it again
+        if x_o is not None:
+            self.set_default_x(x_o)
+        self.potential_ = self._prepare_potential(self.method)
 
     @property
     def mcmc_method(self) -> str:
@@ -263,9 +303,9 @@ class MCMCPosterior(NeuralPosterior):
         )
         if init_strategy_num_candidates is not None:
             warn(
-                "Passing `init_strategy_num_candidates` is deprecated as of sbi "
-                "v0.19.0. Instead, use e.g., "
-                f"`init_strategy_parameters={'num_candidate_samples': 1000}`",
+                f"Passing `init_strategy_num_candidates` is deprecated as of sbi \
+                v0.19.0. Instead, use e.g., \
+                `init_strategy_parameters={'num_candidate_samples': 1000}`",
                 stacklevel=2,
             )
             self.init_strategy_parameters["num_candidate_samples"] = (
@@ -1110,3 +1150,80 @@ def _maybe_use_dict_entry(default: Any, key: str, dict_to_check: Dict) -> Any:
     """
     attribute = dict_to_check.get(key, default)
     return attribute
+
+
+def _num_required_args(func):
+    """
+    Utility for counting the number of positional args in a function.
+
+    This function counts each parameter in the signature that are positional -- ie.
+        (1) cannot only be passed in as keyword arguments
+        (2) do not have a default value
+
+    Args:
+        func: A callable function.
+
+    Returns:
+        Number of required positional arguments.
+    """
+    sig = inspect.signature(func)
+    return sum(
+        1
+        for param in sig.parameters.values()
+        if param.kind
+        in (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD)
+        and param.default is inspect._empty
+    )
+
+
+def build_from_potential(
+    potential_fn: Callable, prior: Any, x: Optional[Tensor] = None, **kwargs
+) -> MCMCPosterior:
+    """
+    Returns a sampler from a MCMCPosterior object, given user-defined potential
+    function and prior.
+
+    The user-defined potential can be conditional (accepts theta and x as positional
+    arguments) or unconditional (accepting only theta).
+
+    Args:
+        potential_fn: User defined potential function. Must be of type Callable.
+        prior: Prior distribution for parameter transformation and initialization.
+        x: Conditional x value. Provided if using a conditional potential function.
+
+    Returns:
+        Callable sampling function from MCMCPosterior object.
+    """
+    # build transformation to unrestricted space for sampling
+    transform = mcmc_transform(prior)
+
+    # potential_fn must take 1 or 2 required arguments: (theta) or (theta, x)
+    num_args = _num_required_args(potential_fn)
+    assert num_args > 0 and num_args < 3, (
+        "potential_fn must take 1-2 required arguments"
+    )
+    is_conditional = num_args == 2
+
+    if is_conditional:
+        # you could remove this and require use to set x before calling sample
+        assert x is not None, "x must be provided if potential_fn is conditional"
+        posterior = MCMCPosterior(potential_fn, prior, theta_transform=transform)
+        posterior.set_default_x(x)
+
+    else:
+        warn(
+            "x has not been provided. Using unconditional potential function.",
+            UserWarning,
+            stacklevel=2,
+        )
+
+        # define an unconditional potential function (ignores x)
+        def unconditional_potential_fn(theta, x):
+            return potential_fn(theta)
+
+        posterior = MCMCPosterior(
+            unconditional_potential_fn, prior, theta_transform=transform, **kwargs
+        )
+        posterior.set_default_x(torch.zeros(1))  # set default_x to dummy value
+
+    return posterior

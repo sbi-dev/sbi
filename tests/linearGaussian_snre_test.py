@@ -3,9 +3,8 @@
 
 from __future__ import annotations
 
-import sys
+from dataclasses import asdict
 
-import pymc
 import pytest
 from torch import eye, ones, zeros
 from torch.distributions import MultivariateNormal
@@ -23,7 +22,8 @@ from sbi.inference import (
     VIPosterior,
     ratio_estimator_based_potential,
 )
-from sbi.inference.trainers.nre.nre_base import RatioEstimator
+from sbi.inference.posteriors.posterior_parameters import MCMCPosteriorParameters
+from sbi.neural_nets.ratio_estimators import RatioEstimator
 from sbi.simulators.linear_gaussian import (
     diagonal_linear_gaussian,
     linear_gaussian,
@@ -31,8 +31,8 @@ from sbi.simulators.linear_gaussian import (
     samples_true_posterior_linear_gaussian_uniform_prior,
     true_posterior_linear_gaussian_mvn_prior,
 )
+from sbi.utils.metrics import check_c2st
 from tests.test_utils import (
-    check_c2st,
     get_dkl_gaussian_prior,
     get_prob_outside_uniform_prior,
 )
@@ -44,7 +44,7 @@ from tests.test_utils import (
 def test_api_nre_multiple_trials_and_rounds_map(
     num_dim: int,
     nre_method: RatioEstimator,
-    mcmc_params_fast: dict,
+    mcmc_params_fast: MCMCPosteriorParameters,
     num_rounds: int = 2,
     num_samples: int = 12,
     num_simulations: int = 100,
@@ -65,8 +65,7 @@ def test_api_nre_multiple_trials_and_rounds_map(
         for num_trials in [1, 3]:
             x_o = zeros((num_trials, num_dim))
             posterior = inference.build_posterior(
-                mcmc_method="slice_np_vectorized",
-                mcmc_parameters=mcmc_params_fast,
+                posterior_parameters=mcmc_params_fast
             ).set_default_x(x_o)
             posterior.sample(sample_shape=(num_samples,))
         proposals.append(posterior)
@@ -76,7 +75,7 @@ def test_api_nre_multiple_trials_and_rounds_map(
 @pytest.mark.mcmc
 @pytest.mark.parametrize("nre_method", (NRE_B, NRE_C))
 def test_c2st_sre_on_linearGaussian(
-    nre_method: RatioEstimator, mcmc_params_accurate: dict
+    nre_method: RatioEstimator, mcmc_params_accurate: MCMCPosteriorParameters
 ):
     """Test whether SRE infers well a simple example with available ground truth.
 
@@ -128,8 +127,7 @@ def test_c2st_sre_on_linearGaussian(
         potential_fn=potential_fn,
         theta_transform=theta_transform,
         proposal=prior,
-        method="slice_np_vectorized",
-        **mcmc_params_accurate,
+        **asdict(mcmc_params_accurate),
     )
     samples = posterior.sample((num_samples,))
 
@@ -146,7 +144,7 @@ def test_c2st_nre_variants_on_linearGaussian_with_multiple_trials(
     nre_method: RatioEstimator,
     prior_str: str,
     num_trials: int,
-    mcmc_params_accurate: dict,
+    mcmc_params_accurate: MCMCPosteriorParameters,
 ):
     """Test C2ST and MAP accuracy of NRE variants on linear gaussian.
 
@@ -197,8 +195,7 @@ def test_c2st_nre_variants_on_linearGaussian_with_multiple_trials(
         potential_fn=potential_fn,
         theta_transform=theta_transform,
         proposal=prior,
-        method="slice_np_vectorized",
-        **mcmc_params_accurate,
+        **asdict(mcmc_params_accurate),
     )
     samples = posterior.sample(sample_shape=(num_samples,))
 
@@ -320,18 +317,7 @@ def test_c2st_multi_round_snr_on_linearGaussian_vi(
         pytest.param("slice_np", "uniform", marks=pytest.mark.mcmc),
         pytest.param("slice_np_vectorized", "gaussian", marks=pytest.mark.mcmc),
         pytest.param("slice_np_vectorized", "uniform", marks=pytest.mark.mcmc),
-        pytest.param(
-            "nuts_pymc",
-            "gaussian",
-            marks=(
-                pytest.mark.mcmc,
-                pytest.mark.skipif(
-                    condition=sys.version_info >= (3, 10)
-                    and pymc.__version__ >= "5.20.1",
-                    reason="Inconsistent behaviour with pymc>=5.20.1 and python>=3.10",
-                ),
-            ),
-        ),
+        pytest.param("nuts_pymc", "gaussian", marks=pytest.mark.mcmc),
         pytest.param("nuts_pyro", "uniform", marks=pytest.mark.mcmc),
         pytest.param("hmc_pyro", "gaussian", marks=pytest.mark.mcmc),
         ("rejection", "uniform"),
@@ -349,7 +335,7 @@ def test_c2st_multi_round_snr_on_linearGaussian_vi(
     ),
 )
 def test_api_sre_sampling_methods(
-    sampling_method: str, prior_str: str, mcmc_params_fast: dict
+    sampling_method: str, prior_str: str, mcmc_params_fast: MCMCPosteriorParameters
 ):
     """Test leakage correction both for MCMC and rejection sampling.
 
@@ -400,12 +386,12 @@ def test_api_sre_sampling_methods(
         or "nuts" in sampling_method
         or "hmc" in sampling_method
     ):
+        mcmc_params_fast = mcmc_params_fast.with_param(method=sampling_method)
         posterior = MCMCPosterior(
             potential_fn,
             proposal=prior,
             theta_transform=theta_transform,
-            method=sampling_method,
-            **mcmc_params_fast,
+            **asdict(mcmc_params_fast),
         )
     elif sample_with == "importance":
         posterior = ImportanceSamplingPosterior(

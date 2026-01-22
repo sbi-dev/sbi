@@ -29,10 +29,14 @@ jobs:
         fetch-depth: 0
         lfs: false
 
-    - name: Install uv and set the python version
-      uses: astral-sh/setup-uv@v5
+    - name: Set up Python
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
+
+    - name: Set up uv
+      uses: astral-sh/setup-uv@v5
+      with:
         enable-cache: true
         cache-dependency-glob: "pyproject.toml"
 
@@ -40,13 +44,19 @@ jobs:
       run: uv sync --extra dev
 
     - name: Run the fast and the slow CPU tests with coverage
-      run: uv run pytest -v -x -n auto -m "not gpu" --cov=sbi --cov-report=xml tests/
+      run: uv run pytest -v -x -n auto -m "not gpu" --cov=sbi --cov-report=xml --junitxml=junit.xml -o junit_family=legacy tests/
 
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v4-beta
+      uses: codecov/codecov-action@v4
       with:
         env_vars: OS,PYTHON
         file: ./coverage.xml
-        flags: unittests
+        flags: full
         name: codecov-sbi-all-cpu
+        token: ${{ secrets.CODECOV_TOKEN }}
+
+    - name: Upload test results to Codecov
+      if: ${{ !cancelled() }}
+      uses: codecov/test-results-action@v1
+      with:
         token: ${{ secrets.CODECOV_TOKEN }}

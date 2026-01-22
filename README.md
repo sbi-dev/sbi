@@ -1,16 +1,16 @@
 [![PyPI version](https://badge.fury.io/py/sbi.svg)](https://badge.fury.io/py/sbi)
 [![Conda Version](https://img.shields.io/conda/vn/conda-forge/sbi.svg)](https://github.com/conda-forge/sbi-feedstock)
-[![Contributions welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat)](https://github.com/sbi-dev/sbi/blob/master/CONTRIBUTING.md)
-[![Tests](https://github.com/sbi-dev/sbi/actions/workflows/ci.yml/badge.svg)](https://github.com/sbi-dev/sbi/actions)
+[![Contributions welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat)](https://sbi.readthedocs.io/en/latest/contributing.html)
+[![Tests](https://github.com/sbi-dev/sbi/actions/workflows/cd.yml/badge.svg)](https://github.com/sbi-dev/sbi/actions)
 [![codecov](https://codecov.io/gh/sbi-dev/sbi/branch/main/graph/badge.svg)](https://codecov.io/gh/sbi-dev/sbi)
 [![GitHub license](https://img.shields.io/github/license/sbi-dev/sbi)](https://github.com/sbi-dev/sbi/blob/master/LICENSE.txt)
-[![DOI](https://joss.theoj.org/papers/10.21105/joss.02505/status.svg)](https://doi.org/10.21105/joss.02505)
+[![DOI](https://joss.theoj.org/papers/10.21105/joss.07754/status.svg)](https://doi.org/10.21105/joss.07754)
 [![NumFOCUS affiliated](https://camo.githubusercontent.com/a0f197cee66ccd8ed498cf64e9f3f384c78a072fe1e65bada8d3015356ac7599/68747470733a2f2f696d672e736869656c64732e696f2f62616467652f4e756d464f4355532d616666696c696174656425323070726f6a6563742d6f72616e67652e7376673f7374796c653d666c617426636f6c6f72413d45313532334426636f6c6f72423d303037443841)](https://numfocus.org/sponsored-projects/affiliated-projects)
 
 ## `sbi`: Simulation-Based Inference
 
-[Getting Started](https://sbi-dev.github.io/sbi/latest/tutorials/00_getting_started/) |
-[Documentation](https://sbi-dev.github.io/sbi/) | [Discord Server](https://discord.gg/eEeVPSvWKy)
+[Getting Started](https://sbi.readthedocs.io/en/latest/tutorials/00_getting_started.html) |
+[Documentation](https://sbi.readthedocs.io/en/latest/) | [Discord Server](https://discord.gg/VPkV7XPj7k)
 
 `sbi` is a Python package for simulation-based inference, designed to meet the needs of
 both researchers and practitioners. Whether you need fine-grained control or an
@@ -92,7 +92,31 @@ and to install into a particular conda environment with [`conda`](https://docs.c
 conda install --channel conda-forge sbi
 ```
 
-### Test the installation
+If [`uv`](http://docs.astral.sh/uv/) is installed on the system, an environment for installing `sbi` can be created as follows:
+
+```bash
+uv venv -p 3.10
+```
+
+Then activate the virtual enviroment by running:
+
+- For `macOS` or `Linux` users
+  ```bash
+  source .venv/bin/activate
+  ```
+
+- For `Windows` users
+  ```bash
+  .venv\Scripts\activate
+  ```
+
+To install `sbi` run
+
+```bash
+uv add sbi
+```
+
+### Testing the installation
 
 Open a Python prompt and run
 
@@ -112,6 +136,8 @@ You can also access and run these tutorials directly in your browser by opening
 “Code” button on the GitHub repository and select “Open with Codespaces.” This provides
 a fully functional environment where you can explore `sbi` through Jupyter notebooks.
 
+You might also find this tutorial paper useful: [Deistler, M., Boelts, J., Steinbach, P., Moss, G., Moreau, T., Gloeckler, M., ... & Macke, J. H. (2025). Simulation-based inference: A practical guide. arXiv preprint arXiv:2508.12939.](https://arxiv.org/abs/2508.12939). It describes the SBI workflow and offers practical guidelines and diagnostic tools for every stage of the process: from setting up the simulator and prior, choosing and training inference networks, to performing inference and validating the results. It also includes several worked examples.
+
 ## Inference Algorithms
 
 The following inference algorithms are currently available. You can find instructions on
@@ -126,6 +152,11 @@ how to run each of these methods
   Estimation_](https://proceedings.neurips.cc/paper/2016/hash/6aca97005c68f1206823815f66102863-Abstract.html)
   (NeurIPS 2016).
 
+- [`(S)NPE_B`](https://sbi-dev.github.io/sbi/latest/reference/#sbi.inference.trainers.npe.npe_b.NPE_B)
+  from Lueckmann JM, Goncalves P, Bassetto G, Öcal K, Nonnenmacher M, and Macke J [_Flexible
+  statistical inference for mechanistic models of neural dynamics_](https://arxiv.org/abs/1711.01861)
+  (NeurIPS 2017).
+
 - [`(S)NPE_C`](https://sbi-dev.github.io/sbi/latest/reference/#sbi.inference.trainers.npe.npe_c.NPE_C)
   or `APT` from Greenberg D, Nonnenmacher M, and Macke J [_Automatic Posterior
   Transformation for likelihood-free inference_](https://arxiv.org/abs/1905.07488) (ICML
@@ -135,13 +166,13 @@ how to run each of these methods
   and hassle-free simulation-based inference_](https://arxiv.org/abs/2210.04815)
   (NeurIPS 2022).
 
-- [`FMPE`](https://sbi-dev.github.io/sbi/latest/reference/#sbi.inference.trainers.fmpe.fmpe.FMPE)
+- [`FMPE`](https://sbi-dev.github.io/sbi/latest/reference/#sbi.inference.trainers.vfpe.fmpe.FMPE)
   from Wildberger, J., Dax, M., Buchholz, S., Green, S., Macke, J. H., & Schölkopf, B.
   [_Flow matching for scalable simulation-based
   inference_](https://proceedings.neurips.cc/paper_files/paper/2023/hash/3663ae53ec078860bb0b9c6606e092a0-Abstract-Conference.html).
   (NeurIPS 2023).
 
-- [`NPSE`](https://sbi-dev.github.io/sbi/latest/reference/#sbi.inference.trainers.npse.npse.NPSE) from
+- [`NPSE`](https://sbi-dev.github.io/sbi/latest/reference/#sbi.inference.trainers.vfpe.npse.NPSE) from
   Geffner, T., Papamakarios, G., & Mnih, A. [_Compositional score modeling for
   simulation-based inference_](https://proceedings.mlr.press/v202/geffner23a.html).
   (ICML 2023)
@@ -190,15 +221,16 @@ how to run each of these methods
 We welcome any feedback on how `sbi` is working for your inference problems (see
 [Discussions](https://github.com/sbi-dev/sbi/discussions)) and are happy to receive bug
 reports, pull requests, and other feedback (see
-[contribute](https://sbi-dev.github.io/sbi/latest/contribute/)). We wish to maintain a positive
-community; please read our [Code of Conduct](CODE_OF_CONDUCT.md).
+[contribute](https://sbi-dev.github.io/sbi/latest/contribute/)). We wish to maintain a
+positive and respectful community; please read our [Code of
+Conduct](CODE_OF_CONDUCT.md).
 
 ## Acknowledgments
 
 `sbi` is the successor (using PyTorch) of the
 [`delfi`](https://github.com/mackelab/delfi) package. It started as a fork of Conor M.
 Durkan's `lfi`. `sbi` runs as a community project. See also
-[credits](https://github.com/sbi-dev/sbi/blob/master/docs/docs/credits.md).
+[credits](https://github.com/sbi-dev/sbi/blob/master/docs/credits.md).
 
 ## Support
 
@@ -213,9 +245,33 @@ Institute for Europe, and by NumFOCUS.
 
 ## Citation
 
-If you use `sbi` consider citing the [sbi software
-paper](https://doi.org/10.21105/joss.02505), in addition to the original research
-articles describing the specific sbi-algorithm(s) you are using.
+The `sbi` package has grown and improved significantly since its initial release, with
+contributions from a large and diverse community. To reflect these developments and the
+expanded functionality, we published an [updated JOSS
+paper](https://doi.org/10.21105/joss.07754). We encourage you to cite this
+newer version as the primary reference:
+
+```latex
+@article{BoeltsDeistler_sbi_2025,
+  doi = {10.21105/joss.07754},
+  url = {https://doi.org/10.21105/joss.07754},
+  year = {2025},
+  publisher = {The Open Journal},
+  volume = {10},
+  number = {108},
+  pages = {7754},
+  author = {Jan Boelts and Michael Deistler and Manuel Gloeckler and Álvaro Tejero-Cantero and Jan-Matthis Lueckmann and Guy Moss and Peter Steinbach and Thomas Moreau and Fabio Muratore and Julia Linhart and Conor Durkan and Julius Vetter and Benjamin Kurt Miller and Maternus Herold and Abolfazl Ziaeemehr and Matthijs Pals and Theo Gruner and Sebastian Bischoff and Nastya Krouglova and Richard Gao and Janne K. Lappalainen and Bálint Mucsányi and Felix Pei and Auguste Schulz and Zinovia Stefanidi and Pedro Rodrigues and Cornelius Schröder and Faried Abu Zaid and Jonas Beck and Jaivardhan Kapoor and David S. Greenberg and Pedro J. Gonçalves and Jakob H. Macke},
+  title = {sbi reloaded: a toolkit for simulation-based inference workflows},
+  journal = {Journal of Open Source Software}
+}
+```
+
+This updated paper, with its expanded author list, reflects the broader community
+contributions and the package's enhanced capabilities in releases
+[0.23.0](https://github.com/sbi-dev/sbi/releases/tag/v0.23.3) and later.
+
+If you are using a version of `sbi` prior to 0.23.0, please cite the original sbi
+software paper:
 
 ```latex
 @article{tejero-cantero2020sbi,
@@ -232,7 +288,9 @@ articles describing the specific sbi-algorithm(s) you are using.
 }
 ```
 
-The above citation refers to the original version of the `sbi` project and has a
-persistent DOI. Additionally, new releases of `sbi` are citable via
-[Zenodo](https://zenodo.org/record/3993098), where we create a new DOI for every
-release.
+Regardless of which software paper you cite, please also remember to cite the original
+research articles describing the specific sbi-algorithm(s) you are using.
+
+Specific releases of `sbi` are also citable via
+[Zenodo](https://zenodo.org/records/15034786), where we generate a new software DOI for
+each release.

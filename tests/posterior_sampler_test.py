@@ -3,9 +3,8 @@
 
 from __future__ import annotations
 
-import sys
+from dataclasses import asdict
 
-import pymc
 import pytest
 from pyro.infer.mcmc import MCMC
 from torch import Tensor, eye, zeros
@@ -16,6 +15,7 @@ from sbi.inference import (
     MCMCPosterior,
     likelihood_estimator_based_potential,
 )
+from sbi.inference.posteriors.posterior_parameters import MCMCPosteriorParameters
 from sbi.samplers.mcmc import PyMCSampler, SliceSamplerSerial, SliceSamplerVectorized
 from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
 
@@ -28,13 +28,7 @@ from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
         "slice_np_vectorized",
         "nuts_pyro",
         "hmc_pyro",
-        pytest.param(
-            "nuts_pymc",
-            marks=pytest.mark.skipif(
-                condition=sys.version_info >= (3, 10) and pymc.__version__ >= "5.20.1",
-                reason="Inconsistent behaviour with pymc>=5.20.1 and python>=3.10",
-            ),
-        ),
+        "nuts_pymc",
         "hmc_pymc",
         "slice_pymc",
     ),
@@ -44,7 +38,7 @@ def test_api_posterior_sampler_set(
     sampling_method: str,
     num_chains: int,
     set_seed,
-    mcmc_params_fast: dict,
+    mcmc_params_fast: MCMCPosteriorParameters,
     num_dim: int = 2,
     num_samples: int = 42,
     num_trials: int = 2,
@@ -52,7 +46,9 @@ def test_api_posterior_sampler_set(
 ):
     """Runs SNL and checks that posterior_sampler is correctly set."""
     x_o = zeros((num_trials, num_dim))
-    mcmc_params_fast["num_chains"] = num_chains
+    mcmc_params_fast = mcmc_params_fast.with_param(
+        num_chains=num_chains, method=sampling_method
+    )
 
     prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
     simulator = diagonal_linear_gaussian
@@ -68,9 +64,8 @@ def test_api_posterior_sampler_set(
     posterior = MCMCPosterior(
         potential_fn,
         theta_transform=transform,
-        method=sampling_method,
         proposal=prior,
-        **mcmc_params_fast,
+        **asdict(mcmc_params_fast),
     )
 
     assert posterior.posterior_sampler is None

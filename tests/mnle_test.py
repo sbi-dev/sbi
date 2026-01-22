@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+from dataclasses import asdict
 from typing import Union
 
 import pytest
@@ -10,6 +11,7 @@ from torch import Tensor
 from torch.distributions import Beta, Binomial, Distribution, Gamma
 
 from sbi.inference import MNLE, MCMCPosterior
+from sbi.inference.posteriors.posterior_parameters import MCMCPosteriorParameters
 from sbi.inference.posteriors.rejection_posterior import RejectionPosterior
 from sbi.inference.posteriors.vi_posterior import VIPosterior
 from sbi.inference.potentials.base_potential import BasePotential
@@ -20,9 +22,9 @@ from sbi.inference.potentials.likelihood_based_potential import (
 from sbi.neural_nets import likelihood_nn
 from sbi.neural_nets.embedding_nets import FCEmbedding
 from sbi.utils import BoxUniform, mcmc_transform
+from sbi.utils.metrics import check_c2st
 from sbi.utils.torchutils import atleast_2d, process_device
 from sbi.utils.user_input_checks_utils import MultipleIndependent
-from tests.test_utils import check_c2st
 
 
 # toy simulator for mixed data
@@ -55,7 +57,7 @@ def mixed_simulator_with_conditions(
 @pytest.mark.parametrize("device", ("cpu", "gpu"))
 def test_mnle_on_device(
     device,
-    mcmc_params_fast: dict,
+    mcmc_params_fast: MCMCPosteriorParameters,
     num_simulations: int = 100,
     mcmc_method: str = "slice_np",
 ):
@@ -85,7 +87,7 @@ def test_mnle_on_device(
         x=x[0],
         show_progress_bars=False,
         mcmc_method=mcmc_method,
-        **mcmc_params_fast,
+        **asdict(mcmc_params_fast),
     )
 
 
@@ -94,7 +96,12 @@ def test_mnle_on_device(
 )
 @pytest.mark.parametrize("flow_model", ("mdn", "nsf", "zuko_nsf"))
 @pytest.mark.parametrize("z_score_theta", ("independent", "none"))
-def test_mnle_api(flow_model: str, sampler, mcmc_params_fast: dict, z_score_theta: str):
+def test_mnle_api(
+    flow_model: str,
+    sampler,
+    mcmc_params_fast: MCMCPosteriorParameters,
+    z_score_theta: str,
+):
     """Test MNLE API."""
     # Generate mixed data.
     num_simulations = 10
@@ -128,12 +135,13 @@ def test_mnle_api(flow_model: str, sampler, mcmc_params_fast: dict, z_score_thet
         posterior.train().sample((1,))
     elif isinstance(posterior, RejectionPosterior):
         posterior.sample((1,))
-    else:
+    elif isinstance(posterior, MCMCPosterior):
+        mcmc_params_fast = mcmc_params_fast.with_param(
+            init_strategy="proposal", method="hmc_pyro"
+        )
         posterior.sample(
             (1,),
-            init_strategy="proposal",
-            method="hmc_pyro",
-            **mcmc_params_fast,
+            **asdict(mcmc_params_fast),
         )
 
 
@@ -144,7 +152,10 @@ def test_mnle_api(flow_model: str, sampler, mcmc_params_fast: dict, z_score_thet
 @pytest.mark.parametrize("num_trials", [5, 10])
 @pytest.mark.parametrize("flow_model", ("nsf", "zuko_nsf"))
 def test_mnle_accuracy_with_different_samplers_and_trials(
-    flow_model: str, sampler, num_trials: int, mcmc_params_accurate: dict
+    flow_model: str,
+    sampler,
+    num_trials: int,
+    mcmc_params_accurate: MCMCPosteriorParameters,
 ):
     """Test MNLE c2st accuracy for different samplers and number of trials."""
 
@@ -178,11 +189,13 @@ def test_mnle_accuracy_with_different_samplers_and_trials(
         BinomialGammaPotential(prior, atleast_2d(x_o)),
         theta_transform=transform,
         proposal=prior,
-        **mcmc_params_accurate,
+        **asdict(mcmc_params_accurate),
     ).sample((num_samples,), show_progress_bars=False)
 
     posterior = trainer.build_posterior(
-        prior=prior, sample_with=sampler, mcmc_parameters=mcmc_params_accurate
+        prior=prior,
+        sample_with=sampler,
+        posterior_parameters=mcmc_params_accurate if sampler == "mcmc" else None,
     )
     posterior.set_default_x(x_o)
     if sampler == "vi":
@@ -191,7 +204,7 @@ def test_mnle_accuracy_with_different_samplers_and_trials(
     mnle_posterior_samples = posterior.sample(
         sample_shape=(num_samples,),
         show_progress_bars=True,
-        **mcmc_params_accurate if sampler == "mcmc" else {},
+        **asdict(mcmc_params_accurate) if sampler == "mcmc" else {},
     )
 
     check_c2st(
@@ -267,7 +280,9 @@ class BinomialGammaPotential(BasePotential):
 
 @pytest.mark.slow
 @pytest.mark.mcmc
-def test_mnle_with_experimental_conditions(mcmc_params_accurate: dict):
+def test_mnle_with_experimental_conditions(
+    mcmc_params_accurate: MCMCPosteriorParameters,
+):
     """Test MNLE c2st accuracy when conditioned on a subset of the parameters, e.g.,
     experimental conditions.
 
@@ -277,7 +292,7 @@ def test_mnle_with_experimental_conditions(mcmc_params_accurate: dict):
     """
     num_simulations = 10000
     num_samples = 1000
-    mcmc_params_accurate["num_chains"] = 100
+    mcmc_params_accurate = mcmc_params_accurate.with_param(num_chains=100)
 
     proposal = MultipleIndependent(
         [
@@ -303,7 +318,7 @@ def test_mnle_with_experimental_conditions(mcmc_params_accurate: dict):
 
     x_o = mixed_simulator_with_conditions(theta_and_conditions_o, last_idx_parameters)
 
-    mcmc_kwargs = dict(init_strategy="proposal", **mcmc_params_accurate)
+    mcmc_params_accurate = mcmc_params_accurate.with_param(init_strategy="proposal")
 
     # Get True posterior.
     prior = MultipleIndependent(
@@ -320,7 +335,7 @@ def test_mnle_with_experimental_conditions(mcmc_params_accurate: dict):
         ),
         theta_transform=prior_transform,
         proposal=prior,
-        **mcmc_kwargs,
+        **asdict(mcmc_params_accurate),
     ).sample((num_samples,), x=x_o)
 
     # MNLE
@@ -340,7 +355,7 @@ def test_mnle_with_experimental_conditions(mcmc_params_accurate: dict):
         potential_fn=conditioned_potential_fn,
         theta_transform=prior_transform,
         proposal=prior,
-        **mcmc_kwargs,
+        **asdict(mcmc_params_accurate),
     ).sample((num_samples,), x=x_o)
 
     check_c2st(

@@ -1,3 +1,6 @@
+# This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -324,15 +327,13 @@ class DivergenceOptimizer(ABC):
 
     def update(self, kwargs: Dict):
         """Updates the hyperparameters and scheduler/optimizer kwargs"""
-        # print(kwargs)
-        paras = self.__dict__
         for key, val in kwargs.items():
             if key == "retain_graph":
                 self.retain_graph = val
             if key == "learning_rate":
                 self.learning_rate = val
             if key in self.HYPER_PARAMETERS:
-                paras[key] = val
+                setattr(self, key, val)
 
             if key == "self":
                 posterior = kwargs[key]

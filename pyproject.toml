@@ -32,7 +32,6 @@ dependencies = [
     "arviz",
     "joblib>=1.0.0",
     "matplotlib",
-    "notebook <= 6.4.12",
     "numpy",
     "pillow",
     "pyknos>=0.16.0",
@@ -44,10 +43,13 @@ dependencies = [
     "tqdm",
     "pymc>=5.0.0",
     "zuko>=1.2.0",
+    "ipywidgets>=8.1.7",
 ]
 
 [project.optional-dependencies]
+notebook = ["notebook<=6.4.12"]
 doc = [
+    "sbi[notebook]",
     # Documentation
     "ipython <= 8.9.0",
     "jupyter_contrib_nbextensions",
@@ -64,6 +66,7 @@ doc = [
     "sphinx-autobuild",
     "sphinx_autodoc_typehints",
     "sphinx-math-dollar",
+    "sphinx-design",
     "myst-nb",
     "jupytext",
     "sphinx-book-theme",
@@ -78,10 +81,12 @@ dev = [
     # Test
     "pytest",
     "pytest-cov",
+    "pytest-harvest",
+	"pytest-mock",
+    "pytest-split",
     "pytest-testmon",
     "pytest-xdist",
-    "pytest-harvest",
-    "pytest-split",
+    "sbi[notebook]",  # for tutorial tests.
     "torchtestcase",
 ]
 
@@ -116,13 +121,15 @@ ignore = [
 [tool.ruff.lint.extend-per-file-ignores]
 "__init__.py" = ["E402", "F401", "F403"]  # allow unused imports and undefined names
 "test_*.py" = ["F403", "F405"]
-"docs/tutorials/*.ipynb" = ["E501"]  # allow long lines in notebooks
+"docs/tutorials/*.ipynb" = ["E501", "E402"]  # allow long lines & unsorted imports
+"docs/advanced_tutorials/*.ipynb" = ["E501", "E402"]
+"docs/how_to_guide/*.ipynb" = ["E501", "E402"]
 
 [tool.ruff.lint.isort]
 case-sensitive = true
 lines-between-types = 0  # like isort default.
 relative-imports-order = "furthest-to-closest"  # like isort default.
-known-first-party = ["sbi", "tests", "docs/tutorials"]
+known-first-party = ["sbi", "tests", "docs/tutorials", "docs/advanced_tutorials", "docs/how_to_guide"]
 
 [tool.ruff.format]
 exclude = ["*.ipynb"]
@@ -150,7 +157,7 @@ xfail_strict = true
 [tool.pyright]
 include = ["sbi"]
 exclude = ["**/__pycache__", "**/__node_modules__", ".git", "docs", "mkdocs", "tests"]
-python_version = "3.10"
+pythonVersion = "3.10"
 reportUnsupportedDunderAll = false
 reportGeneralTypeIssues = false
 reportInvalidTypeForm = false

@@ -178,6 +178,10 @@ def test_reinterpreted_batch_dim_prior():
                 UserNumpyUniform(zeros(3), ones(3), return_numpy=False),
                 Uniform(zeros(1), ones(1)),
             ],  # combination of multiple independent custom priors
+            marks=pytest.mark.xfail(
+                reason="custom priors cannot be used in MultipleIndependent priors "
+                "(unless they support .to)."
+            ),
         ),
     ),
 )
@@ -206,6 +210,21 @@ def test_process_prior(prior):
         (ones(10, 3), torch.Size([10, 3])),  # 2D data / iid NPE
         pytest.param(ones(10, 3), None),  # 2D data / iid NPE without x_shape
         (ones(10, 10), torch.Size([10])),  # iid likelihood based
+        pytest.param(
+            torch.cat([ones(3), torch.tensor([float("nan")]), ones(3)]),  # contains nan
+            torch.Size([7]),
+            marks=pytest.mark.xfail(
+                reason="process_x must raise error if x contains NaNs or Infs."
+            ),
+        ),
+        pytest.param(
+            # contains inf
+            torch.cat([ones(3), torch.tensor([float("inf")]), ones(3)]).expand(10, -1),
+            torch.Size([7]),
+            marks=pytest.mark.xfail(
+                reason="process_x must raise error if x contains NaNs or Infs."
+            ),
+        ),
     ),
 )
 def test_process_x(x, x_shape):
@@ -389,11 +408,11 @@ def test_inference_with_user_sbi_problems(
             [Uniform(0, 1), Beta(1, 2)], marks=pytest.mark.xfail
         ),  # scalar dists.
         [Uniform(zeros(1), ones(1)), Uniform(zeros(1), ones(1))],
-        (
+        [
             Gamma(ones(1), ones(1)),
             Uniform(zeros(1), ones(1)),
             Beta(ones(1), 2 * ones(1)),
-        ),
+        ],
         [MultivariateNormal(zeros(3), eye(3)), Gamma(ones(1), ones(1))],
     ],
 )

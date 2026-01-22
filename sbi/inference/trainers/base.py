@@ -1,21 +1,63 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import time
+import warnings
 from abc import ABC, abstractmethod
 from copy import deepcopy
+from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional, Tuple, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Generic,
+    List,
+    Literal,
+    Optional,
+    Sequence,
+    Tuple,
+    Union,
+    overload,
+)
 from warnings import warn
 
 import torch
 from torch import Tensor
 from torch.distributions import Distribution
+from torch.nn.utils.clip_grad import clip_grad_norm_
+from torch.optim.adam import Adam
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard.writer import SummaryWriter
+from typing_extensions import Self
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
+from sbi.inference.posteriors.direct_posterior import DirectPosterior
+from sbi.inference.posteriors.importance_posterior import ImportanceSamplingPosterior
+from sbi.inference.posteriors.mcmc_posterior import MCMCPosterior
+from sbi.inference.posteriors.posterior_parameters import (
+    DirectPosteriorParameters,
+    ImportanceSamplingPosteriorParameters,
+    MCMCPosteriorParameters,
+    PosteriorParameters,
+    RejectionPosteriorParameters,
+    VIPosteriorParameters,
+    VectorFieldPosteriorParameters,
+)
+from sbi.inference.posteriors.rejection_posterior import RejectionPosterior
+from sbi.inference.posteriors.vector_field_posterior import VectorFieldPosterior
+from sbi.inference.posteriors.vi_posterior import VIPosterior
+from sbi.inference.potentials.base_potential import BasePotential
+from sbi.inference.trainers._contracts import LossArgs, StartIndexContext, TrainConfig
+from sbi.neural_nets.estimators.base import (
+    ConditionalDensityEstimator,
+    ConditionalEstimator,
+    ConditionalEstimatorType,
+    ConditionalVectorFieldEstimator,
+)
+from sbi.sbi_types import TorchTransform
 from sbi.utils import (
     check_prior,
     get_log_root,
@@ -124,7 +166,7 @@ def infer(
     return posterior
 
 
-class NeuralInference(ABC):
+class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
     """Abstract base class for neural inference methods."""
 
     def __init__(
@@ -174,11 +216,8 @@ class NeuralInference(ABC):
 
         self._round = 0
         self._val_loss = float("Inf")
-
-        # XXX We could instantiate here the Posterior for all children. Two problems:
-        #     1. We must dispatch to right PotentialProvider for mcmc based on name
-        #     2. `method_family` cannot be resolved only from `self.__class__.__name__`,
-        #         since SRE, AALR demand different handling but are both in SRE class.
+        self._best_val_loss = float("Inf")
+        self._epochs_since_last_improvement = 0
 
         self._summary_writer = (
             self._default_summary_writer() if summary_writer is None else summary_writer
@@ -193,34 +232,9 @@ class NeuralInference(ABC):
             epoch_durations_sec=[],
         )
 
-    def get_simulations(
-        self,
-        starting_round: int = 0,
-    ) -> Tuple[Tensor, Tensor, Tensor]:
-        r"""Returns all $\theta$, $x$, and prior_masks from rounds >= `starting_round`.
-
-        If requested, do not return invalid data.
-
-        Args:
-            starting_round: The earliest round to return samples from (we start counting
-                from zero).
-            warn_on_invalid: Whether to give out a warning if invalid simulations were
-                found.
-
-        Returns: Parameters, simulation outputs, prior masks.
-        """
-
-        theta = get_simulations_since_round(
-            self._theta_roundwise, self._data_round_index, starting_round
-        )
-        x = get_simulations_since_round(
-            self._x_roundwise, self._data_round_index, starting_round
-        )
-        prior_masks = get_simulations_since_round(
-            self._prior_masks, self._data_round_index, starting_round
-        )
-
-        return theta, x, prior_masks
+    @property
+    def summary(self):
+        return self._summary
 
     @abstractmethod
     def append_simulations(
@@ -231,7 +245,7 @@ class NeuralInference(ABC):
         from_round: int = 0,
         algorithm: Optional[str] = None,
         data_device: Optional[str] = None,
-    ) -> "NeuralInference":
+    ) -> Self:
         r"""Store parameters and simulation outputs to use them for later training.
 
         Data are stored as entries in lists for each type of variable (parameter/data).
@@ -303,8 +317,82 @@ class NeuralInference(ABC):
         discard_prior_samples: bool = False,
         retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
-    ) -> NeuralPosterior:
-        raise NotImplementedError
+    ) -> ConditionalEstimatorType: ...
+
+    @abstractmethod
+    def _initialize_neural_network(
+        self, retrain_from_scratch: bool, start_idx: int
+    ) -> None:
+        """Initialize (or reinitialize) the neural network for the current round."""
+        ...
+
+    @abstractmethod
+    def _get_start_index(self, context: StartIndexContext) -> int:
+        """Get the starting index for the current round."""
+        ...
+
+    @overload
+    def _get_losses(self, batch: Sequence[Tensor]) -> Tensor:
+        """
+        Called when the trainer does not require additional loss arguments
+        (e.g., NLE).
+        """
+        ...
+
+    @overload
+    def _get_losses(self, batch: Sequence[Tensor], loss_args: LossArgs) -> Tensor:
+        """Called when the trainer requires additional loss parameters via loss_args."""
+        ...
+
+    @abstractmethod
+    def _get_losses(
+        self, batch: Sequence[Tensor], loss_args: LossArgs | None = None
+    ) -> Tensor:
+        """Return per-sample loss tensor for a training/validation batch."""
+        ...
+
+    @abstractmethod
+    def _get_potential_function(
+        self,
+        prior: Distribution,
+        estimator: ConditionalEstimator,
+    ) -> Tuple[BasePotential, TorchTransform]:
+        """Subclass-specific potential creation"""
+        ...
+
+    @abstractmethod
+    def _loss(self, *args, **kwargs) -> Tensor:
+        """Compute scalar loss given subclass-specific inputs."""
+        ...
+
+    def get_simulations(
+        self,
+        starting_round: int = 0,
+    ) -> Tuple[Tensor, Tensor, Tensor]:
+        r"""Returns all $\theta$, $x$, and prior_masks from rounds >= `starting_round`.
+
+        If requested, do not return invalid data.
+
+        Args:
+            starting_round: The earliest round to return samples from (we start counting
+                from zero).
+            warn_on_invalid: Whether to give out a warning if invalid simulations were
+                found.
+
+        Returns: Parameters, simulation outputs, prior masks.
+        """
+
+        theta = get_simulations_since_round(
+            self._theta_roundwise, self._data_round_index, starting_round
+        )
+        x = get_simulations_since_round(
+            self._x_roundwise, self._data_round_index, starting_round
+        )
+        prior_masks = get_simulations_since_round(
+            self._prior_masks, self._data_round_index, starting_round
+        )
+
+        return theta, x, prior_masks
 
     def get_dataloaders(
         self,
@@ -341,7 +429,7 @@ class NeuralInference(ABC):
         num_validation_examples = num_examples - num_training_examples
 
         if not resume_training:
-            # Seperate indicies for training and validation
+            # Separate indices for training and validation
             permuted_indices = torch.randperm(num_examples)
             self.train_indices, self.val_indices = (
                 permuted_indices[:num_training_examples],
@@ -371,6 +459,648 @@ class NeuralInference(ABC):
         val_loader = data.DataLoader(dataset, **val_loader_kwargs)
 
         return train_loader, val_loader
+
+    def build_posterior(
+        self,
+        estimator: Optional[ConditionalEstimator],
+        prior: Optional[Distribution],
+        sample_with: Literal[
+            "mcmc", "rejection", "vi", "importance", "direct", "sde", "ode"
+        ],
+        posterior_parameters: Optional[PosteriorParameters],
+        **kwargs,
+    ) -> NeuralPosterior:
+        r"""Method for building posteriors.
+
+        This method serves as a base method for constructing a posterior based
+        on a given estimator and prior. The posterior can be sampled using one of
+        several inference methods specified by `sample_with`.
+
+        Args:
+            estimator: The estimator that the posterior is based on.
+            prior: A probability distribution that expresses prior knowledge about the
+                parameters, e.g. which ranges are meaningful for them. Must be a PyTorch
+                distribution, see FAQ for details on how to use custom distributions.
+            sample_with: The inference method to use. Must be one of:
+                - "mcmc"
+                - "rejection"
+                - "vi"
+                - "importance"
+                - "direct"
+                - "sde"
+                - "ode"
+            posterior_parameters: Configuration passed to the init method for the
+                posterior. Must be of type PosteriorParameters.
+            **kwargs: Additional method-specific parameters.
+
+        Returns:
+            NeuralPosterior object.
+        """
+
+        prior = self._resolve_prior(prior)
+        estimator, device = self._resolve_estimator(estimator)
+
+        posterior_parameters = self._resolve_posterior_parameters(
+            sample_with, posterior_parameters, **kwargs
+        )
+
+        self._posterior = self._create_posterior(
+            estimator,
+            prior,
+            sample_with,
+            device,
+            posterior_parameters,
+        )
+
+        # Store models at end of each round.
+        self._model_bank.append(deepcopy(self._posterior))
+
+        return deepcopy(self._posterior)
+
+    def _resolve_prior(self, prior: Optional[Distribution]) -> Distribution:
+        """
+        Resolves the prior distribution to use.
+
+        If a prior is passed, it is validated and returned.
+        If not passed, attempts to use the stored `self._prior`.
+        Raises a ValueError if no valid prior is available.
+
+        Args:
+            prior: Optional prior distribution to resolve.
+
+        Returns:
+            A valid prior distribution.
+        """
+
+        if prior is None:
+            if self._prior is None:
+                cls_name = self.__class__.__name__
+                raise ValueError(
+                    f"""You did not pass a prior. You have to pass the prior either at
+                    initialization `inference = {cls_name}(prior)` or to `
+                    .build_posterior (prior=prior)`."""
+                )
+            prior = self._prior
+        else:
+            check_prior(prior)
+
+        return prior
+
+    def _resolve_estimator(
+        self, estimator: Optional[ConditionalEstimator]
+    ) -> Tuple[ConditionalEstimator, str]:
+        """
+        Resolves the estimator and determines its device.
+
+        If no estimator is provided, the internal neural net (`self._neural_net`)
+        is used and the device is taken from `self._device`. Otherwise, validates
+        the passed estimator and infers its device.
+
+        Args:
+            estimator: Optional estimator to use.
+
+        Returns:
+            A tuple of (estimator, device).
+        """
+
+        if estimator is None:
+            assert self._neural_net is not None, (
+                "Provide an estimator or initialize self._neural_net."
+            )
+            estimator = self._neural_net
+            # If internal net is used device is defined.
+            device = self._device
+        else:
+            if not isinstance(estimator, ConditionalEstimator):
+                raise TypeError(
+                    "estimator must be ConditionalEstimator,"
+                    f" got {type(estimator).__name__}",
+                )
+            # Otherwise, infer it from the device of the net parameters.
+            device = str(next(estimator.parameters()).device)
+
+        return estimator, device
+
+    def _resolve_posterior_parameters(
+        self,
+        sample_with: Literal[
+            "mcmc", "rejection", "vi", "importance", "direct", "sde", "ode"
+        ],
+        posterior_parameters: Optional[PosteriorParameters],
+        **kwargs,
+    ) -> PosteriorParameters:
+        """
+        Resolve posterior parameters based on the sampling strategy.
+
+        If `posterior_parameters` is provided, it is returned directly.
+
+        If `posterior_parameters` is not provided, this method extracts
+        sampling-specific parameters from `kwargs` using predefined keys
+        to instantiate the appropriate posterior parameters dataclass.
+
+        Raises:
+            NotImplementedError: If an unsupported `sample_with` method is provided.
+            ValueError: If posterior_parameter and a configuration dictionary are passed
+                together.
+
+        Args:
+            sample_with: The posterior sampling method to use.
+            posterior_parameters: Optional preconstructed posterior parameter object.
+            **kwargs: Additional parameters to construct the posterior parameters.
+
+        Returns:
+            A dataclass instance containing the resolved posterior
+            parameters.
+        """
+
+        deprecated_params = self._resolve_deprecated_posterior_parameters(**kwargs)
+
+        if posterior_parameters is not None:
+            self._validate_no_duplicate_parameters(deprecated_params)
+            self._validate_posterior_parameters_consistency(
+                posterior_parameters, **kwargs
+            )
+        else:
+            self._raise_deprecation_warning(deprecated_params, **kwargs)
+            posterior_parameters = self._build_posterior_parameters(
+                sample_with, **kwargs
+            )
+
+        return posterior_parameters
+
+    def _build_posterior_parameters(
+        self,
+        sample_with: Literal[
+            "mcmc", "rejection", "vi", "importance", "direct", "sde", "ode"
+        ],
+        **kwargs,
+    ) -> PosteriorParameters:
+        """
+        Resolve parameters passed through kwargs and convert into a
+        subclass of PosteriorParameters.
+
+        Args:
+            sample_with: The posterior sampling method to use.
+            **kwargs: Additional parameters to construct the posterior parameters.
+        Returns
+            A dataclass instance containing the resolved posterior
+            parameters.
+        """
+
+        if sample_with == "direct":
+            params = kwargs.get("direct_sampling_parameters", {}) or {}
+            posterior_parameters = DirectPosteriorParameters(**params)
+        elif sample_with == "mcmc":
+            params = kwargs.get("mcmc_parameters", {}) or {}
+            posterior_parameters = MCMCPosteriorParameters(
+                method=kwargs.get("mcmc_method", "slice_np_vectorized"), **params
+            )
+        elif sample_with in ("ode", "sde"):
+            params = kwargs.get("vectorfield_sampling_parameters", {}) or {}
+            posterior_parameters = VectorFieldPosteriorParameters(**params)
+        elif sample_with == "rejection":
+            params = kwargs.get("rejection_sampling_parameters", {}) or {}
+            posterior_parameters = RejectionPosteriorParameters(**params)
+        elif sample_with == "vi":
+            params = kwargs.get("vi_parameters", {}) or {}
+            posterior_parameters = VIPosteriorParameters(
+                vi_method=kwargs.get("vi_method", "rKL"), **params
+            )
+        elif sample_with == "importance":
+            params = kwargs.get("importance_sampling_parameters", {}) or {}
+            posterior_parameters = ImportanceSamplingPosteriorParameters(**params)
+        else:
+            raise NotImplementedError(
+                "Posterior parameter construction not implemented for",
+                f"'{sample_with}'",
+            )
+
+        return posterior_parameters
+
+    def _resolve_deprecated_posterior_parameters(self, **kwargs) -> List[str]:
+        """
+        Identify deprecated posterior construction parameters
+        provided to the method.
+
+        Args:
+            **kwargs: Keyword arguments potentially containing deprecated
+                      posterior parameters.
+
+        Returns:
+            A list of names of deprecated posterior parameters that were provided.
+        """
+
+        deprecated_params = {
+            "direct_sampling_parameters",
+            "mcmc_parameters",
+            "vectorfield_sampling_parameters",
+            "rejection_sampling_parameters",
+            "vi_parameters",
+            "importance_sampling_parameters",
+        }
+
+        # Check if any deprecated parameters were provided
+        provided_deprecated_params = [
+            param for param in deprecated_params if kwargs.get(param) is not None
+        ]
+
+        return provided_deprecated_params
+
+    def _raise_deprecation_warning(
+        self, deprecated_params: List[str], **kwargs
+    ) -> None:
+        """
+        Raise a deprecation warning if a deprecated posterior parameters or
+        non-default arguments are used.
+
+        Args:
+            deprecated_params: List of deprecated posterior parameter names provided.
+            **kwargs: Additional keyword arguments.
+        """
+
+        deprecated_params = deprecated_params.copy()
+        default_mcmc_method = "slice_np_vectorized"
+        default_vi_method = "rKL"
+
+        # Check if deprecated parameters are used
+        if (
+            kwargs.get("mcmc_method") is not None
+            and kwargs.get("mcmc_method") != default_mcmc_method
+        ):
+            deprecated_params.append("mcmc_method")
+        if (
+            kwargs.get("vi_method") is not None
+            and kwargs.get("vi_method") != default_vi_method
+        ):
+            deprecated_params.append("vi_method")
+
+        if deprecated_params:
+            warnings.warn(
+                f"The following arguments are deprecated and"
+                " will be removed in a future version: "
+                f"{', '.join(deprecated_params)}. Please use `posterior_parameters`"
+                " instead. Refer to this guide for details:\n"
+                "https://sbi.readthedocs.io/en/latest/how_to_guide/19_posterior_parameters.html#",
+                FutureWarning,
+                stacklevel=2,
+            )
+
+    def _validate_no_duplicate_parameters(self, deprecated_params: List[str]) -> None:
+        """
+        Validate that deprecated and new-style posterior parameters are not used
+        together.
+
+        Args:
+            deprecated_params: List of deprecated posterior parameter names provided.
+
+        Raises:
+            ValueError: If both deprecated parameters and new-style
+                        `posterior_parameters`are used in the same call.
+        """
+
+        if deprecated_params:
+            raise ValueError(
+                f"Cannot use both old-style parameters {deprecated_params} "
+                f"and new-style posterior_parameters. Please use only one approach."
+            )
+
+    def _validate_posterior_parameters_consistency(
+        self, posterior_parameters: PosteriorParameters, **kwargs
+    ) -> None:
+        """
+        This method raises a warning for mismatches between values passed in
+        mcmc_method and MCMCPosteriorParameters.method, or vi_method and
+        VIPosteriorParameters.vi_method.
+
+        Args:
+            posterior_parameters: Configuration passed to the init method for the
+                posterior.
+            kwargs: keyword arguments passed from build_posterior method.
+        """
+
+        if not isinstance(posterior_parameters, PosteriorParameters):
+            raise TypeError(
+                "posterior_parameters must be PosteriorParameters,"
+                f" got {type(posterior_parameters).__name__}",
+            )
+        elif isinstance(posterior_parameters, MCMCPosteriorParameters):
+            mcmc_method = kwargs.get("mcmc_method")
+            if (
+                mcmc_method != "slice_np_vectorized"
+                and posterior_parameters.method != mcmc_method
+            ):
+                warnings.warn(
+                    f"Conflicting mcmc_method='{mcmc_method}' ignored in favor of "
+                    f"posterior_parameters.method='{posterior_parameters.method}'",
+                    stacklevel=2,
+                )
+        elif isinstance(posterior_parameters, VIPosteriorParameters):
+            vi_method = kwargs.get("vi_method")
+            if vi_method != "rKL" and posterior_parameters.vi_method != vi_method:
+                warnings.warn(
+                    f"Conflicting vi_method='{vi_method}' ignored in favor of "
+                    f"posterior_parameters.vi_method='{posterior_parameters.vi_method}'",
+                    stacklevel=2,
+                )
+
+    def _create_posterior(
+        self,
+        estimator: ConditionalEstimator,
+        prior: Distribution,
+        sample_with: Literal[
+            "mcmc", "rejection", "vi", "importance", "direct", "sde", "ode"
+        ],
+        device: Union[str, torch.device],
+        posterior_parameters: PosteriorParameters,
+    ) -> NeuralPosterior:
+        """
+        Create a posterior object using the specified inference method.
+
+        Depending on the value of `sample_with`, this method instantiates one of the
+        supported posterior inference strategies.
+
+        Args:
+            estimator: The estimator that the posterior is based on.
+            prior: A probability distribution that expresses prior knowledge about the
+                parameters, e.g. which ranges are meaningful for them. Must be a PyTorch
+                distribution, see FAQ for details on how to use custom distributions.
+            sample_with: The inference method to use. Must be one of:
+                - "mcmc"
+                - "rejection"
+                - "vi"
+                - "importance"
+                - "direct"
+                - "sde"
+                - "ode"
+            device: torch device on which to train the neural net and on which to
+                perform all posterior operations, e.g. gpu or cpu.
+            posterior_parameters: Configuration passed to the init method for the
+                posterior. Must be of type PosteriorParameters.
+
+        Returns:
+            NeuralPosterior object.
+        """
+
+        if isinstance(posterior_parameters, DirectPosteriorParameters):
+            posterior_estimator = estimator
+            if not isinstance(posterior_estimator, ConditionalDensityEstimator):
+                raise TypeError(
+                    f"Expected posterior_estimator to be an instance of "
+                    " ConditionalDensityEstimator, "
+                    f"but got {type(posterior_estimator).__name__} instead."
+                )
+            posterior = DirectPosterior(
+                posterior_estimator=posterior_estimator,
+                prior=prior,
+                device=device,
+                **asdict(posterior_parameters),
+            )
+        elif isinstance(posterior_parameters, VectorFieldPosteriorParameters):
+            vector_field_estimator = estimator
+            if not isinstance(vector_field_estimator, ConditionalVectorFieldEstimator):
+                raise TypeError(
+                    f"Expected vector_field_estimator to be an instance of "
+                    " ConditionalVectorFieldEstimator, "
+                    f"but got {type(vector_field_estimator).__name__} instead."
+                )
+            if sample_with not in ("ode", "sde"):
+                raise ValueError(
+                    "`sample_with` must be either",
+                    f" 'ode' or 'sde', got '{sample_with}'",
+                )
+            posterior = VectorFieldPosterior(
+                vector_field_estimator=vector_field_estimator,
+                prior=prior,
+                device=device,
+                sample_with=sample_with,
+                **asdict(posterior_parameters),
+            )
+        else:
+            # Posteriors requiring potential_fn and theta_transform
+            potential_fn, theta_transform = self._get_potential_function(
+                prior, estimator
+            )
+            if isinstance(posterior_parameters, MCMCPosteriorParameters):
+                posterior = MCMCPosterior(
+                    potential_fn=potential_fn,
+                    theta_transform=theta_transform,
+                    proposal=prior,
+                    device=device,
+                    **asdict(posterior_parameters),
+                )
+            elif isinstance(posterior_parameters, RejectionPosteriorParameters):
+                posterior = RejectionPosterior(
+                    potential_fn=potential_fn,
+                    proposal=prior,
+                    device=device,
+                    **asdict(posterior_parameters),
+                )
+            elif isinstance(posterior_parameters, VIPosteriorParameters):
+                posterior = VIPosterior(
+                    potential_fn=potential_fn,
+                    theta_transform=theta_transform,
+                    prior=prior,
+                    device=device,
+                    **asdict(posterior_parameters),
+                )
+            elif isinstance(
+                posterior_parameters, ImportanceSamplingPosteriorParameters
+            ):
+                posterior = ImportanceSamplingPosterior(
+                    potential_fn=potential_fn,
+                    proposal=prior,
+                    device=device,
+                    **asdict(posterior_parameters),
+                )
+            else:
+                raise NotImplementedError(
+                    "Sampling method not implemented for",
+                    f"'{posterior_parameters}'",
+                )
+        return posterior
+
+    def _run_training_loop(
+        self,
+        train_loader: data.DataLoader,
+        val_loader: data.DataLoader,
+        train_config: TrainConfig,
+        loss_args: LossArgs | None = None,
+        summarization_kwargs: Optional[Dict[str, Any]] = None,
+    ) -> ConditionalEstimatorType:
+        """
+        Run the main training loop for the neural network, including epoch-wise
+        training, validation, and convergence checking.
+
+        Args:
+            train_loader: Dataloader for training.
+            val_loader: Dataloader for validation.
+            train_config: TrainConfig dataclass configuration for the core training
+                path.
+            loss_args: Additional arguments passed to self._loss fn.
+            summarization_kwargs: Additional kwargs passed to self._summarize_epoch fn.
+        """
+
+        if summarization_kwargs is None:
+            summarization_kwargs = {}
+
+        assert self._neural_net is not None
+
+        # Move entire net to device for training.
+        self._neural_net.to(self._device)
+
+        if not train_config.resume_training:
+            self.optimizer = Adam(
+                list(self._neural_net.parameters()),
+                lr=train_config.learning_rate,
+            )
+            self.epoch, self.val_loss = 0, float("Inf")
+
+        while self.epoch <= train_config.max_num_epochs and not self._converged(
+            self.epoch, train_config.stop_after_epochs
+        ):
+            # Train for a single epoch.
+            self._neural_net.train()
+            epoch_start_time = time.time()
+            train_loss = self._train_epoch(
+                train_loader, train_config.clip_max_norm, loss_args
+            )
+
+            # Calculate validation performance.
+            self._neural_net.eval()
+
+            self._val_loss = self._validate_epoch(val_loader, loss_args)
+
+            self._summarize_epoch(
+                train_loss, self._val_loss, epoch_start_time, summarization_kwargs
+            )
+
+            self.epoch += 1
+            self._maybe_show_progress(self._show_progress_bars, self.epoch)
+
+        self._report_convergence_at_end(
+            self.epoch, train_config.stop_after_epochs, train_config.max_num_epochs
+        )
+
+        # Update summary.
+        self._summary["epochs_trained"].append(self.epoch)
+        self._summary["best_validation_loss"].append(self._best_val_loss)
+
+        # Update TensorBoard and summary dict.
+        self._summarize(round_=self._round)
+
+        # Update description for progress bar.
+        if train_config.show_train_summary:
+            print(self._describe_round(self._round, self._summary))
+
+        # Avoid keeping the gradients in the resulting network, which can
+        # cause memory leakage when benchmarking.
+        self._neural_net.zero_grad(set_to_none=True)
+
+        return deepcopy(self._neural_net)
+
+    def _train_epoch(
+        self,
+        train_loader: data.DataLoader,
+        clip_max_norm: Optional[float],
+        loss_args: LossArgs | None,
+    ) -> float:
+        """
+        Perform a single training epoch over the provided training data.
+
+        Args:
+            train_loader: Dataloader for training.
+            clip_max_norm: Value at which to clip the total gradient norm in order to
+                prevent exploding gradients. Use None for no clipping.
+            loss_args: Additional arguments passed to self._loss fn.
+
+        Returns:
+            The average training loss over all samples in the epoch.
+        """
+
+        assert self._neural_net is not None
+
+        train_loss_sum = 0
+        for batch in train_loader:
+            self.optimizer.zero_grad()
+            if loss_args is None:
+                train_losses = self._get_losses(batch=batch)
+            else:
+                train_losses = self._get_losses(batch=batch, loss_args=loss_args)
+            train_loss = torch.mean(train_losses)
+            train_loss_sum += train_losses.sum().item()
+
+            train_loss.backward()
+            if clip_max_norm is not None:
+                clip_grad_norm_(
+                    self._neural_net.parameters(),
+                    max_norm=clip_max_norm,
+                )
+            self.optimizer.step()
+
+        train_loss_average = train_loss_sum / (
+            len(train_loader) * train_loader.batch_size  # type: ignore
+        )
+
+        return train_loss_average
+
+    def _validate_epoch(
+        self,
+        val_loader: data.DataLoader,
+        loss_args: LossArgs | None,
+    ) -> float:
+        """
+        Perform a single validation epoch over the provided validation data.
+
+        Args:
+            val_loader: Dataloader for validation.
+            loss_args: Additional arguments passed to self._loss fn.
+
+        Returns:
+            The average validation loss over all samples in the epoch.
+        """
+
+        val_loss_sum = 0
+        with torch.no_grad():
+            for batch in val_loader:
+                if loss_args is None:
+                    val_losses = self._get_losses(batch=batch)
+                else:
+                    val_losses = self._get_losses(batch=batch, loss_args=loss_args)
+                val_loss_sum += val_losses.sum().item()
+
+        # Take mean over all validation samples.
+        val_loss = val_loss_sum / (
+            len(val_loader) * val_loader.batch_size  # type: ignore
+        )
+
+        return val_loss
+
+    def _summarize_epoch(
+        self,
+        train_loss: float,
+        val_loss: float,
+        epoch_start_time: float,
+        summarization_kwargs: Dict[str, Any],
+    ) -> None:
+        """
+        Update internal summaries after a single training epoch.
+
+        Records training and validation losses, as well as the duration of the epoch,
+        in `self._summary` dictionary.
+
+        Args:
+            train_loss: The average training loss for the epoch.
+            val_loss: The average validation loss for the epoch.
+            epoch_start_time: Timestamp when the epoch started, used to compute
+                duration.
+            summarization_kwargs: Additional keyword arguments for customizing
+                the summarization.
+        """
+
+        self._summary["training_loss"].append(train_loss)
+        # Log validation loss for every epoch.
+        self._summary["validation_loss"].append(val_loss)
+        self._summary["epoch_durations_sec"].append(time.time() - epoch_start_time)
 
     def _converged(self, epoch: int, stop_after_epochs: int) -> bool:
         """Return whether the training converged yet and save best model state so far.
@@ -413,30 +1143,6 @@ class NeuralInference(ABC):
         )
         return SummaryWriter(logdir)
 
-    @staticmethod
-    def _describe_round(round_: int, summary: Dict[str, list]) -> str:
-        epochs = summary["epochs_trained"][-1]
-        best_validation_loss = summary["best_validation_loss"][-1]
-
-        description = f"""
-        -------------------------
-        ||||| ROUND {round_ + 1} STATS |||||:
-        -------------------------
-        Epochs trained: {epochs}
-        Best validation performance: {best_validation_loss:.4f}
-        -------------------------
-        """
-
-        return description
-
-    @staticmethod
-    def _maybe_show_progress(show: bool, epoch: int) -> None:
-        if show:
-            # end="\r" deletes the print statement when a new one appears.
-            # https://stackoverflow.com/questions/3419984/. `\r` in the beginning due
-            # to #330.
-            print("\r", f"Training neural network. Epochs trained: {epoch}", end="")
-
     def _report_convergence_at_end(
         self, epoch: int, stop_after_epochs: int, max_num_epochs: int
     ) -> None:
@@ -448,7 +1154,7 @@ class NeuralInference(ABC):
             )
         elif max_num_epochs == epoch:
             warn(
-                "Maximum number of epochs `max_num_epochs={max_num_epochs}` reached,"
+                f"Maximum number of epochs `max_num_epochs={max_num_epochs}` reached,"
                 "but network has not yet fully converged. Consider increasing it.",
                 stacklevel=2,
             )
@@ -523,9 +1229,29 @@ class NeuralInference(ABC):
 
         self._summary_writer.flush()
 
-    @property
-    def summary(self):
-        return self._summary
+    @staticmethod
+    def _describe_round(round_: int, summary: Dict[str, list]) -> str:
+        epochs = summary["epochs_trained"][-1]
+        best_validation_loss = summary["best_validation_loss"][-1]
+
+        description = f"""
+        -------------------------
+        ||||| ROUND {round_ + 1} STATS |||||:
+        -------------------------
+        Epochs trained: {epochs}
+        Best validation performance: {best_validation_loss:.4f}
+        -------------------------
+        """
+
+        return description
+
+    @staticmethod
+    def _maybe_show_progress(show: bool, epoch: int) -> None:
+        if show:
+            # end="\r" deletes the print statement when a new one appears.
+            # https://stackoverflow.com/questions/3419984/. `\r` in the beginning due
+            # to #330.
+            print("\r", f"Training neural network. Epochs trained: {epoch}", end="")
 
     def __getstate__(self) -> Dict:
         """Returns the state of the object that is supposed to be pickled.
@@ -562,7 +1288,7 @@ class NeuralInference(ABC):
             state_dict: State to be restored.
         """
         state_dict["_summary_writer"] = self._default_summary_writer()
-        self.__dict__ = state_dict
+        vars(self).update(state_dict)
 
 
 def check_if_proposal_has_default_x(proposal: Any):

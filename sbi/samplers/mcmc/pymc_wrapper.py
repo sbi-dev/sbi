@@ -1,3 +1,6 @@
+# This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+
 from typing import Any, Callable, Optional
 
 import numpy as np
@@ -62,8 +65,8 @@ class PyMCPotential(pt.Op):  # type: ignore
         # call the potential function
         energy = self.potential_fn(params, track_gradients=self.track_gradients)
 
-        # output the log-likelihood
-        outputs[0][0] = tensor2numpy(energy).astype(np.float64)
+        # output the log-likelihood, PyMC requires a scalar for the energy
+        outputs[0][0] = tensor2numpy(energy.squeeze()).astype(np.float64)
 
         # compute and record gradients if desired
         if self.track_gradients:

@@ -1,7 +1,8 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from logging import warning
+import warnings
+from functools import partial
 from typing import Any, Callable, Dict, Optional, Union
 
 import numpy as np
@@ -123,6 +124,17 @@ def c2st(
     return torch.from_numpy(scores).mean()
 
 
+def check_c2st(x: Tensor, y: Tensor, alg: str, tol: float = 0.1) -> None:
+    """Compute classification based two-sample test accuracy and assert it close to
+    chance."""
+
+    score = c2st(x, y).item()
+
+    assert (0.5 - tol) <= score <= (0.5 + tol), (
+        f"{alg}'s c2st={score:.2f} is too far from the desired near-chance performance."
+    )
+
+
 def unbiased_mmd_squared(x: Tensor, y: Tensor, scale: Optional[float] = None):
     """Unbiased approximation of the squared maximum-mean discrepancy (MMD) [1].
     The sample-based MMD relies on kernel evaluations between x_i and y_i. This
@@ -161,6 +173,8 @@ def unbiased_mmd_squared(x: Tensor, y: Tensor, scale: Optional[float] = None):
     yy = f(y, y)
 
     s = torch.median(torch.sqrt(torch.cat((xx, xy, yy)))) if scale is None else scale
+    # Add small epsilon to prevent division by zero when distributions are identical
+    s = torch.clamp(s, min=1e-8) if isinstance(s, torch.Tensor) else max(s, 1e-8)
     c = -0.5 / (s**2)
 
     k = lambda a: torch.sum(torch.exp(c * a))
@@ -352,10 +366,11 @@ def regularized_ot_dual(
         if torch.all(terminated):
             break
         if iters.max() == max_iter:
-            warning(
+            warnings.warn(
                 f"Sinkhorn iterations did not converge within {max_iter} iterations. "
                 f"Consider a bigger regularization parameter 'epsilon' "
-                "or increasing 'max_iter'."
+                "or increasing 'max_iter'.",
+                stacklevel=2,
             )
             break
         iters = torch.where(terminated, iters, iters + 1)
@@ -450,56 +465,203 @@ def posterior_zscore(
     return torch.abs((post_mean - true_theta) / post_std)
 
 
-def _test():
-    n = 2500
-    x, y = torch.randn(n, 5), torch.randn(n, 5)
-    print(unbiased_mmd_squared(x, y), biased_mmd(x, y))
-    # mmd(x, y), sq_maximum_mean_discrepancy(tensor2numpy(x), tensor2numpy(y))
-    # mmd_hypothesis_test(x, y, alpha=0.0001)
-    # unbiased_mmd_squared_hypothesis_test(x, y)
-
-
-def l2(x: Tensor, y: Tensor, axis=-1) -> Tensor:
+def l2(x: Tensor, y: Tensor, axis: int = -1) -> Tensor:
     """
-    Calculates the L2 distance between two tensors. Note, we cannot use the
-    torch.nn.MSELoss function as this sums across the batch dimension AND the
-    dimension given by <axis>. For tarp, we only require to sum across
-    the <axis> dimension.
+    Calculates the L2 (Euclidean) distance between two tensors.
 
     Args:
         x (Tensor): The first tensor.
         y (Tensor): The second tensor.
         axis (int, optional): The axis along which to calculate the L2 distance.
-                Defaults to -1.
+            Defaults to -1.
+
     Returns:
         Tensor: A tensor containing the L2 distance between x and y along the
-                specified axis.
+            specified axis.
     """
     return torch.sqrt(torch.sum((x - y) ** 2, dim=axis))
 
 
-def l1(x: Tensor, y: Tensor, axis=-1) -> Tensor:
+def l1(x: Tensor, y: Tensor, axis: int = -1) -> Tensor:
     """
-    Calculates the L1 distance between two tensors. Note, we cannot use the
-    torch.nn.L1Loss function as this sums across the batch dimension AND the
-    dimension given by <axis>. For tarp, we only require to sum across
-    the <axis> dimension.
+    Calculates the L1 (Manhattan) distance between two tensors, averaged over
+    the specified axis.
 
     Args:
         x (Tensor): The first tensor.
         y (Tensor): The second tensor.
         axis (int, optional): The axis along which to calculate the L1 distance.
-                Defaults to -1.
+            Defaults to -1.
+
     Returns:
         Tensor: A tensor containing the L1 distance between x and y along the
-                specified axis.
+            specified axis.
     """
-    return torch.sum(torch.abs(x - y), dim=axis)
+    return torch.mean(torch.abs(x - y), dim=axis)
 
 
-def main():
-    _test()
+class Distance:
+    """A wrapper for distance functions to be used with ABC methods."""
+
+    def __init__(
+        self,
+        distance: Union[str, Callable],
+        requires_iid_data: Optional[bool] = None,
+        distance_kwargs: Optional[Dict] = None,
+        batch_size: int = -1,
+    ):
+        """
+        Args:
+            distance: Distance function to compare observed and simulated data. Can be
+                a custom callable function or one of `l1`, `l2`, `mse`,
+                `mmd`, `wasserstein`.
+            requires_iid_data: Whether to allow conditioning on iid sampled data or not.
+                Typically, this information is inferred by the choice of the distance,
+                but in case a custom distance is used, this information is pivotal.
+            distance_kwargs: Configurations parameters for the distances. In particular
+                useful for the MMD and Wasserstein distance.
+            batch_size: Number of simulations that the distance function
+                evaluates against the reference observations at once. If -1, we evaluate
+                all simulations at the same time.
+        """
+        self.distance_kwargs = distance_kwargs or {}
+        self.batch_size = batch_size
+
+        if callable(distance):
+            if requires_iid_data is None:
+                warnings.warn(
+                    "Please specify if your the custom distance requires "
+                    "iid data or is evaluated between single datapoints. "
+                    "By default, we assume that `requires_iid_data=False`",
+                    stacklevel=2,
+                )
+                requires_iid_data = False
+            self.distance_fn = distance
+            self._requires_iid_data = requires_iid_data
+        else:
+            implemented_pairwise_distances = ["l1", "l2", "mse"]
+            implemented_statistical_distances = ["mmd", "wasserstein"]
+
+            assert (
+                distance
+                in implemented_pairwise_distances + implemented_statistical_distances
+            ), f"{distance} must be one of "
+            f"{implemented_pairwise_distances + implemented_statistical_distances}."
+
+            self._requires_iid_data = distance in implemented_statistical_distances
+
+            distance_functions = {
+                "mse": mse_distance,
+                "l2": l2,
+                "l1": l1,
+                "mmd": partial(mmd_distance, **self.distance_kwargs),
+                "wasserstein": partial(wasserstein_distance, **self.distance_kwargs),
+            }
+            try:
+                self.distance_fn = distance_functions[distance]
+            except KeyError as exc:
+                raise KeyError(f"Distance {distance} not supported.") from exc
+
+    def __call__(self, x_o: Tensor, x: Tensor) -> Tensor:
+        """Distance evaluation between the reference data and the simulated data.
+
+        Args:
+            x_o: Reference data
+            x: Simulated data
+        """
+        if self.requires_iid_data:
+            assert x.ndim >= 3, "simulated data needs batch dimension"
+            assert x_o.ndim + 1 == x.ndim
+        else:
+            assert x.ndim >= 2, "simulated data needs batch dimension"
+        if self.batch_size == -1:
+            return self.distance_fn(x_o, x)
+        else:
+            return self._batched_distance(x_o, x)
+
+    def _batched_distance(self, x_o: Tensor, x: Tensor) -> Tensor:
+        """Evaluate the distance is mini-batches.
+        Especially for statistical distances, batching over two empirical
+        datasets can lead to memory overflow. Batching can help to resolve
+        the memory problems.
+
+        Args:
+            x_o: Reference data
+            x: Simulated data
+        """
+        from tqdm import tqdm
+
+        num_batches = x.shape[0] // self.batch_size - 1
+        remaining = x.shape[0] % self.batch_size
+        if remaining == 0:
+            remaining = self.batch_size
+
+        distances = torch.empty(x.shape[0])
+        for i in tqdm(range(num_batches)):
+            distances[self.batch_size * i : (i + 1) * self.batch_size] = (
+                self.distance_fn(
+                    x_o, x[self.batch_size * i : (i + 1) * self.batch_size]
+                )
+            )
+        if remaining > 0:
+            distances[-remaining:] = self.distance_fn(x_o, x[-remaining:])
+
+        return distances
+
+    @property
+    def requires_iid_data(self):
+        return self._requires_iid_data
 
 
-if __name__ == "__main__":
-    main()
+def mse_distance(x_o: Tensor, x: Tensor) -> Tensor:
+    """Calculates the Mean Squared Error (MSE) distance between two tensors.
+
+    Args:
+        x_o: The observed data tensor.
+        x: The simulated data tensor.
+
+    Returns:
+        The MSE distance.
+    """
+    return torch.mean((x_o - x) ** 2, dim=-1)
+
+
+def mmd_distance(x_o: Tensor, x: Tensor, scale: Optional[float] = None) -> Tensor:
+    """Calculates the Maximum Mean Discrepancy (MMD) distance between two tensors.
+
+    Args:
+        x_o: The observed data tensor.
+        x: The simulated data tensor.
+        scale: Optional scale parameter for the MMD calculation.
+
+    Returns:
+        The MMD distance.
+    """
+
+    dist_fn = partial(unbiased_mmd_squared, scale=scale)
+    return torch.vmap(dist_fn, in_dims=(None, 0))(x_o, x)
+
+
+def wasserstein_distance(
+    x_o: Tensor,
+    x: Tensor,
+    epsilon: float = 1e-3,
+    max_iter: int = 1000,
+    tol: float = 1e-9,
+) -> Tensor:
+    """Calculates the Wasserstein-2 distance between two tensors.
+
+    Args:
+        x_o: The observed data tensor.
+        x: The simulated data tensor.
+        epsilon: Regularization parameter for the Sinkhorn algorithm.
+        max_iter: Maximum number of iterations for the Sinkhorn algorithm.
+        tol: Tolerance for the Sinkhorn algorithm.
+
+    Returns:
+        The Wasserstein-2 distance.
+    """
+    batched_x_o = x_o.repeat((x.shape[0], *[1] * len(x_o.shape)))
+    return wasserstein_2_squared(
+        batched_x_o, x, epsilon=epsilon, max_iter=max_iter, tol=tol
+    )

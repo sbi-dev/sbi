@@ -5,7 +5,17 @@ import logging
 import random
 import warnings
 from math import pi
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Type, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Sequence,
+    Tuple,
+    Type,
+    Union,
+)
 
 import numpy as np
 import pyknos.nflows.transforms as nflows_tf
@@ -25,7 +35,6 @@ from torch.distributions import (
 from torch.optim.adam import Adam
 
 from sbi.sbi_types import TorchTransform
-from sbi.utils.torchutils import atleast_2d
 
 
 def warn_if_zscoring_changes_data(x: Tensor, duplicate_tolerance: float = 0.1) -> None:
@@ -101,7 +110,9 @@ def clamp_and_warn(name: str, value: float, min_val: float, max_val: float) -> f
     return clamped_val
 
 
-def z_score_parser(z_score_flag: Optional["str"]) -> Tuple[bool, bool]:
+def z_score_parser(
+    z_score_flag: Optional[str] = None,
+) -> Tuple[bool, bool]:
     """Parses string z-score flag into booleans.
 
     Converts string flag into booleans denoting whether to z-score or not, and whether
@@ -133,11 +144,15 @@ def z_score_parser(z_score_flag: Optional["str"]) -> Tuple[bool, bool]:
         # Got one of two valid z-scoring methods.
         z_score_bool = True
         structured_data = z_score_flag == "structured"
-
+    elif z_score_flag == "transform_to_unconstrained":
+        # Dependent on the distribution, the biject_to function
+        # will provide e.g., a logit, exponential of z-scored distribution.
+        z_score_bool, structured_data = False, False
     else:
         # Return warning due to invalid option, defaults to not z-scoring.
         raise ValueError(
-            "Invalid z-scoring option. Use 'none', 'independent', or 'structured'."
+            "Invalid z-scoring option. Use 'none', 'independent' "
+            "'structured' or 'transform_to_unconstrained'."
         )
 
     return z_score_bool, structured_data
@@ -193,6 +208,35 @@ def standardizing_transform_zuko(
         AffineTransform,
         loc=-t_mean / t_std,
         scale=1 / t_std,
+        buffer=True,
+    )
+
+
+class CallableTransform:
+    """Wraps a PyTorch Transform to be used in Zuko UnconditionalTransform."""
+
+    def __init__(self, transform):
+        self.transform = transform
+
+    def __call__(self):
+        return self.transform
+
+
+def biject_transform_zuko(
+    transform: TorchTransform,
+) -> zuko.flows.UnconditionalTransform:
+    """
+    Wraps a pytorch transform in a Zuko unconditional transfrom on a bounded interval.
+
+    Args:
+        transform: a bijective transformation for Zuko, depending on the input
+        (e.g., logit, exponential or z-scored)
+
+    Returns:
+        Zuko bijective transformation
+    """
+    return zuko.flows.UnconditionalTransform(
+        CallableTransform(transform),
         buffer=True,
     )
 
@@ -284,7 +328,7 @@ def standardizing_net(
         # Compute per-dimension (independent) mean.
         t_mean = torch.mean(batch_t[is_valid_t], dim=0)
 
-    if len(batch_t > 1):
+    if len(batch_t) > 1:
         if structured_dims:
             # Compute std per-sample first.
             sample_std = torch.std(batch_t[is_valid_t], dim=1)
@@ -626,6 +670,38 @@ def within_support(distribution: Any, samples: Tensor) -> Tensor:
         return torch.isfinite(distribution.log_prob(samples))
 
 
+def warn_if_outside_prior_support(
+    prior: Any,
+    samples: Tensor,
+    threshold: float = 0.05,
+    stacklevel: int = 3,
+) -> None:
+    """Warn if a significant fraction of samples lie outside prior support.
+
+    This is useful when rejection sampling is bypassed (e.g., with
+    `reject_outside_prior=False`) to alert users that samples may not respect
+    prior constraints.
+
+    Args:
+        prior: Prior distribution to check support against.
+        samples: Samples to check, will be reshaped to (-1, event_dim).
+        threshold: Fraction of out-of-support samples above which to trigger
+            the warning. Default is 0.05 (5%).
+        stacklevel: Stack level for the warning. Default is 3, which accounts
+            for this function being called from a posterior's sample method.
+    """
+    flat_samples = samples.reshape(-1, samples.shape[-1])
+    in_support = within_support(prior, flat_samples)
+    frac_outside = 1.0 - in_support.float().mean().item()
+    if frac_outside > threshold:
+        warnings.warn(
+            f"{frac_outside:.1%} of samples drawn with reject_outside_prior="
+            f"False lie outside the prior support. This may lead to incorrect "
+            f"inference.",
+            stacklevel=stacklevel,
+        )
+
+
 def match_theta_and_x_batch_shapes(theta: Tensor, x: Tensor) -> Tuple[Tensor, Tensor]:
     r"""Return $\theta$ and `x` with batch shape matched to each other.
     When `x` is just a single observation it is repeated for all entries in the
@@ -665,7 +741,7 @@ def mcmc_transform(
     prior: Distribution,
     num_prior_samples_for_zscoring: int = 1000,
     enable_transform: bool = True,
-    device: str = "cpu",
+    device: Union[str, torch.device] = "cpu",
     **kwargs,
 ) -> TorchTransform:
     """
@@ -676,7 +752,7 @@ def mcmc_transform(
 
     It does two things:
     1) When the prior support is bounded, it transforms the parameters into unbounded
-        space.
+    space.
     2) It z-scores the parameters such that MCMC is performed in a z-scored space.
 
     Args:
@@ -783,7 +859,12 @@ def check_transform(
 ) -> None:
     """Check validity of transformed and re-transformed samples."""
 
-    theta = prior.sample(torch.Size((2,)))
+    # check transform with prior samples
+    try:
+        theta = prior.sample(torch.Size((2,)))
+    except NotImplementedError:
+        # Prior has no sampling method, use the prior mean instead
+        theta = prior.mean.repeat(2, *[1] * prior.mean.dim())
 
     theta_unconstrained = transform.inv(theta)
     assert (
@@ -811,6 +892,19 @@ class ImproperEmpirical(Empirical):
     criterion.
     """
 
+    def __init__(self, values: Tensor, log_weights: Optional[Tensor] = None):
+        super().__init__(values, log_weights=log_weights)
+        # Warn if extremely large to inform about memory/serialization cost.
+        self._mean = self._compute_mean(values, log_weights)
+        self._variance = self._compute_variance(values, log_weights)
+
+    def sample(self, sample_shape=torch.Size()):
+        raise NotImplementedError(
+            "Sampling from ImproperEmpirical is not supported. If you are using "
+            "likelihood or ratio estimation, or multi-round inference, you need to "
+            "define a prior distribution."
+        )
+
     def log_prob(self, value: Tensor) -> Tensor:
         """
         Return ones as a constant log-prob for each input.
@@ -821,8 +915,79 @@ class ImproperEmpirical(Empirical):
         Returns:
             Tensor of as many ones as there were parameter sets.
         """
-        value = atleast_2d(value)
-        return zeros(value.shape[0])
+        raise NotImplementedError(
+            "Evaluating log_prob from ImproperEmpirical is not supported. If you are "
+            "using likelihood or ratio estimation, or multi-round inference, you need "
+            "to define a prior distribution."
+        )
+
+    def _compute_mean(self, values: Tensor, weights: Optional[Tensor] = None) -> Tensor:
+        """
+        Return the mean of the empirical distribution.
+
+        Args:
+            values: The empirical samples.
+            weights: Optional weights for the samples.
+
+        Returns:
+            The mean of the empirical distribution.
+        """
+        if weights is None:
+            return torch.mean(values, dim=0)
+        else:
+            normalized_weights = torch.nn.functional.softmax(weights, dim=0)
+            return torch.sum(normalized_weights.unsqueeze(-1) * values, dim=0)
+
+    def _compute_variance(
+        self, values: Tensor, weights: Optional[Tensor] = None
+    ) -> Tensor:
+        """
+        Return the standard deviation of the empirical distribution.
+
+        Args:
+            values: The empirical samples.
+            weights: Optional weights for the samples.
+
+        Returns:
+            The standard deviation of the empirical distribution.
+        """
+        if weights is None:
+            variance = torch.var(values, dim=0)
+        else:
+            normalized_weights = torch.nn.functional.softmax(weights, dim=0)
+            variance = torch.sum(
+                normalized_weights.unsqueeze(-1) * (values - self._mean) ** 2,
+                dim=0,
+            )
+            # bias correction
+            variance = variance / (1 - torch.sum(normalized_weights**2))
+        return variance
+
+    @property
+    def mean(self) -> Tensor:
+        return self._mean
+
+    @property
+    def variance(self) -> Tensor:
+        return self._variance
+
+    @property
+    def stddev(self) -> Tensor:
+        return torch.sqrt(self._variance)
+
+    def to(self, device: Union[str, torch.device]) -> None:
+        """
+        Move the distribution to a different device.
+
+        Args:
+            device: The device to move the distribution to.
+
+        Returns:
+            The distribution on the specified device.
+        """
+        self._mean = self._mean.to(device)
+        self._variance = self._variance.to(device)
+        super().to(device)
 
 
 def mog_log_prob(
@@ -921,6 +1086,7 @@ def gradient_ascent(
         theta_transform = theta_transform
 
     init_probs = potential_fn(inits).detach()
+    inits = inits.to(init_probs.device)
 
     # Pick the `num_to_optimize` best init locations.
     sort_indices = torch.argsort(init_probs, dim=0)

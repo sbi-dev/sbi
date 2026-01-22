@@ -3,9 +3,8 @@
 
 from __future__ import annotations
 
-import sys
+from dataclasses import asdict
 
-import pymc
 import pytest
 import torch
 from torch import eye, ones, zeros
@@ -19,6 +18,7 @@ from sbi.inference import (
     VIPosterior,
     likelihood_estimator_based_potential,
 )
+from sbi.inference.posteriors.posterior_parameters import MCMCPosteriorParameters
 from sbi.neural_nets import likelihood_nn
 from sbi.simulators.linear_gaussian import (
     diagonal_linear_gaussian,
@@ -28,15 +28,16 @@ from sbi.simulators.linear_gaussian import (
     true_posterior_linear_gaussian_mvn_prior,
 )
 from sbi.utils import BoxUniform
+from sbi.utils.metrics import check_c2st
 from sbi.utils.user_input_checks import process_prior
 
-from .test_utils import check_c2st, get_prob_outside_uniform_prior
+from .test_utils import get_prob_outside_uniform_prior
 
 
 @pytest.mark.parametrize("num_dim", (1,))  # dim 3 is tested below.
 @pytest.mark.parametrize("prior_str", ("uniform", "gaussian"))
 def test_api_nle_multiple_trials_and_rounds_map(
-    num_dim: int, prior_str: str, mcmc_params_fast: dict
+    num_dim: int, prior_str: str, mcmc_params_fast: MCMCPosteriorParameters
 ):
     """Test NLE API with 2 rounds, different priors num trials and MAP."""
     num_rounds = 2
@@ -63,8 +64,7 @@ def test_api_nle_multiple_trials_and_rounds_map(
         for num_trials in [1, 3]:
             x_o = zeros((num_trials, num_dim))
             posterior = inference.build_posterior(
-                mcmc_method="slice_np_vectorized",
-                mcmc_parameters=mcmc_params_fast,
+                posterior_parameters=mcmc_params_fast
             ).set_default_x(x_o)
             posterior.sample(sample_shape=(num_samples,))
         proposals.append(posterior)
@@ -72,7 +72,7 @@ def test_api_nle_multiple_trials_and_rounds_map(
 
 
 def test_c2st_nle_on_linear_gaussian_different_dims(
-    mcmc_params_accurate: dict, model_str="maf"
+    mcmc_params_accurate: MCMCPosteriorParameters, model_str="maf"
 ):
     """Test NLE on linear Gaussian task with different theta and x dims."""
 
@@ -123,8 +123,7 @@ def test_c2st_nle_on_linear_gaussian_different_dims(
         proposal=prior,
         potential_fn=potential_fn,
         theta_transform=theta_transform,
-        method="slice_np_vectorized",
-        **mcmc_params_accurate,
+        **asdict(mcmc_params_accurate),
     )
     samples = posterior.sample((num_samples,))
 
@@ -137,7 +136,10 @@ def test_c2st_nle_on_linear_gaussian_different_dims(
 @pytest.mark.parametrize("prior_str", ("uniform", "gaussian"))
 @pytest.mark.parametrize("model_str", ("maf", "zuko_maf"))
 def test_c2st_and_map_nle_on_linearGaussian_different(
-    num_dim: int, prior_str: str, model_str: str, mcmc_params_accurate: dict
+    num_dim: int,
+    prior_str: str,
+    model_str: str,
+    mcmc_params_accurate: MCMCPosteriorParameters,
 ):
     """Test SNL on linear Gaussian, comparing to ground truth posterior via c2st.
 
@@ -199,8 +201,7 @@ def test_c2st_and_map_nle_on_linearGaussian_different(
             proposal=prior,
             potential_fn=potential_fn,
             theta_transform=theta_transform,
-            method="slice_np_vectorized",
-            **mcmc_params_accurate,
+            **asdict(mcmc_params_accurate),
         )
 
         samples = posterior.sample(sample_shape=(num_samples,))
@@ -268,7 +269,7 @@ def test_map_with_multiple_independent_prior(use_transform):
 @pytest.mark.slow
 @pytest.mark.parametrize("num_trials", (1, 3))
 def test_c2st_multi_round_nle_on_linearGaussian(
-    num_trials: int, mcmc_params_accurate: dict
+    num_trials: int, mcmc_params_accurate: MCMCPosteriorParameters
 ):
     """Test SNL on linear Gaussian, comparing to ground truth posterior via c2st."""
 
@@ -305,8 +306,7 @@ def test_c2st_multi_round_nle_on_linearGaussian(
         proposal=prior,
         potential_fn=potential_fn,
         theta_transform=theta_transform,
-        method="slice_np_vectorized",
-        **mcmc_params_accurate,
+        **asdict(mcmc_params_accurate),
     )
 
     theta = posterior1.sample((num_simulations_per_round,))
@@ -320,8 +320,7 @@ def test_c2st_multi_round_nle_on_linearGaussian(
         proposal=prior,
         potential_fn=potential_fn,
         theta_transform=theta_transform,
-        method="slice_np_vectorized",
-        **mcmc_params_accurate,
+        **asdict(mcmc_params_accurate),
     )
 
     samples = posterior.sample(sample_shape=(num_samples,))
@@ -396,18 +395,7 @@ def test_c2st_multi_round_nle_on_linearGaussian_vi(num_trials: int):
         pytest.param("slice_np", "uniform", marks=pytest.mark.mcmc),
         pytest.param("slice_np_vectorized", "gaussian", marks=pytest.mark.mcmc),
         pytest.param("slice_np_vectorized", "uniform", marks=pytest.mark.mcmc),
-        pytest.param(
-            "nuts_pymc",
-            "gaussian",
-            marks=(
-                pytest.mark.mcmc,
-                pytest.mark.skipif(
-                    condition=sys.version_info >= (3, 10)
-                    and pymc.__version__ >= "5.20.1",
-                    reason="Inconsistent behaviour with pymc>=5.20.1 and python>=3.10",
-                ),
-            ),
-        ),
+        pytest.param("nuts_pymc", "gaussian", marks=pytest.mark.mcmc),
         pytest.param("nuts_pyro", "uniform", marks=pytest.mark.mcmc),
         pytest.param("hmc_pymc", "gaussian", marks=pytest.mark.mcmc),
         ("rejection", "uniform"),
@@ -426,7 +414,10 @@ def test_c2st_multi_round_nle_on_linearGaussian_vi(num_trials: int):
 )
 @pytest.mark.parametrize("init_strategy", ("proposal", "resample", "sir"))
 def test_api_nle_sampling_methods(
-    sampling_method: str, prior_str: str, init_strategy: str, mcmc_params_fast: dict
+    sampling_method: str,
+    prior_str: str,
+    init_strategy: str,
+    mcmc_params_fast: MCMCPosteriorParameters,
 ):
     """Runs SNL on linear Gaussian and tests sampling from posterior via mcmc.
 
@@ -478,13 +469,14 @@ def test_api_nle_sampling_methods(
         or "nuts" in sampling_method
         or "hmc" in sampling_method
     ):
+        mcmc_params_fast = mcmc_params_fast.with_param(
+            method=sampling_method, init_strategy=init_strategy
+        )
         posterior = MCMCPosterior(
             potential_fn,
             proposal=prior,
             theta_transform=theta_transform,
-            method=sampling_method,
-            init_strategy=init_strategy,
-            **mcmc_params_fast,
+            **asdict(mcmc_params_fast),
         )
     elif sample_with == "importance":
         posterior = ImportanceSamplingPosterior(
@@ -501,3 +493,89 @@ def test_api_nle_sampling_methods(
         posterior.train(max_num_iters=10)
 
     posterior.sample(sample_shape=(num_samples,), show_progress_bars=False)
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("num_dim", (2,))
+@pytest.mark.parametrize("prior_str", ("uniform", "gaussian"))
+@pytest.mark.parametrize("model_str", ("zuko_maf", "zuko_nsf"))
+def test_c2st_nle_unconstrained_space(
+    num_dim: int, prior_str: str, model_str: str, mcmc_params_accurate: dict
+):
+    """Test SNL on linear Gaussian in unconstrained space.
+
+    Args:
+        num_dim: parameter dimension of the gaussian model
+        prior_str: one of "gaussian" or "uniform"
+
+    """
+    num_samples = 500
+    num_simulations = 3000
+
+    # likelihood_mean will be likelihood_shift+theta
+    likelihood_shift = -1.0 * ones(num_dim)
+    # Use increased cov to avoid too small posterior cov for many trials.
+    likelihood_cov = 0.8 * eye(num_dim)
+
+    if prior_str == "gaussian":
+        prior_mean = zeros(num_dim)
+        prior_cov = eye(num_dim)
+        prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
+    else:
+        prior = BoxUniform(-2.0 * ones(num_dim), 2.0 * ones(num_dim))
+
+    def simulator(theta):
+        return linear_gaussian(theta, likelihood_shift, likelihood_cov)
+
+    theta = prior.sample((num_simulations,))
+    x = simulator(theta)
+
+    # Estimate prior on x.
+    x_dist = BoxUniform(low=x.min(dim=0)[0], high=x.max(dim=0)[0])
+
+    # Use likelihood_nn with z_score_theta="transform_to_unconstrained"
+    density_estimator = likelihood_nn(
+        model_str,
+        hidden_features=60,
+        num_transforms=3,
+        z_score_x="transform_to_unconstrained",
+        x_dist=x_dist,
+    )
+    inference = NLE(density_estimator=density_estimator)
+
+    likelihood_estimator = inference.append_simulations(theta, x).train()
+
+    # Test inference amortized over trials.
+    x_o = zeros((1, num_dim))
+    if prior_str == "gaussian":
+        gt_posterior = true_posterior_linear_gaussian_mvn_prior(
+            x_o, likelihood_shift, likelihood_cov, prior_mean, prior_cov
+        )
+        target_samples = gt_posterior.sample((num_samples,))
+    elif prior_str == "uniform":
+        target_samples = samples_true_posterior_linear_gaussian_uniform_prior(
+            x_o,
+            likelihood_shift,
+            likelihood_cov,
+            prior=prior,
+            num_samples=num_samples,
+        )
+
+    potential_fn, theta_transform = likelihood_estimator_based_potential(
+        prior=prior, likelihood_estimator=likelihood_estimator, x_o=x_o
+    )
+    posterior = MCMCPosterior(
+        proposal=prior,
+        potential_fn=potential_fn,
+        theta_transform=theta_transform,
+        **asdict(mcmc_params_accurate),
+    )
+
+    samples = posterior.sample(sample_shape=(num_samples,))
+
+    # Check performance based on c2st accuracy.
+    check_c2st(
+        samples,
+        target_samples,
+        alg=f"nle_a-{prior_str}-prior-{model_str}",
+    )

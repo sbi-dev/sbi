@@ -1,6 +1,8 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+from typing import get_args
+
 import numpy as np
 import pytest
 import torch
@@ -9,7 +11,13 @@ from matplotlib.figure import Figure
 from matplotlib.pyplot import close, subplots
 from torch.utils.tensorboard.writer import SummaryWriter
 
+import sbi.analysis.plot as plt
 from sbi.analysis import pairplot, plot_summary, sbc_rank_plot
+from sbi.analysis.plotting_classes import (
+    FigOptions,
+    HistDiagOptions,
+    HistOffDiagOptions,
+)
 from sbi.inference import NLE, NPE, NRE
 from sbi.utils import BoxUniform
 
@@ -157,4 +165,197 @@ def test_sbc_rank_plot(num_parameters, num_cols, custom_figure, plot_type):
             )
         else:
             assert ax.shape == (num_parameters,)
+    close()
+
+
+def test_plotting_dataclass_overrides_defaults(mocker):
+    """
+    Verify that custom keyword arguments in `HistOffDiagOptions` correctly
+    override the default values when passed to `pairplot`.
+    """
+
+    posterior_samples = torch.randn(100, 3)
+    hist_off_diag_options = HistOffDiagOptions(
+        np_hist_kwargs=dict(bins=40), mpl_kwargs=dict(origin="upper")
+    )
+
+    spy = mocker.spy(plt, "plt_hist_2d")
+    _ = pairplot(
+        samples=posterior_samples,
+        upper="hist",
+        upper_kwargs=hist_off_diag_options,
+    )
+
+    assert spy.call_count > 0
+
+    args, _ = spy.call_args
+    off_diag_kwargs = args[5]
+
+    # Default values set in HistOffDiagOptions dataclass
+    assert off_diag_kwargs["mpl_kwargs"]["cmap"] == 'viridis'
+    assert off_diag_kwargs["np_hist_kwargs"]["density"] is False
+
+    # Updated values
+    assert off_diag_kwargs["mpl_kwargs"]["origin"] == 'upper'
+    assert off_diag_kwargs["np_hist_kwargs"]["bins"] == 40
+
+    close()
+
+
+def test_plotting_fails_for_insufficient_sample_label_length():
+    """
+    Ensure that `pairplot` raises a `ValueError` when the number of provided
+    sample labels is fewer than the number of sample dimensions.
+    """
+
+    posterior_samples = torch.randn(100, 3)
+    fig_options = FigOptions(legend=True, samples_labels=[])
+
+    with pytest.raises(ValueError, match="Provide at least as many labels as samples."):
+        _ = pairplot(samples=posterior_samples, fig_kwargs=fig_options)
+
+    close()
+
+
+def test_pairplot_warns_on_offdiag_argument():
+    """
+    Verify that `pairplot` raises a warning when using the `offdiag` argument.
+    """
+
+    posterior_samples = torch.randn(100, 3)
+
+    with pytest.warns():
+        _ = pairplot(samples=posterior_samples, offdiag="contour")
+
+    close()
+
+
+def test_pairplot_raises_error_on_offdiag_and_upper_conflict():
+    """
+    Verify that `pairplot` raises a ValueError when using the `offdiag`
+    and `upper` argument together.
+    """
+
+    posterior_samples = torch.randn(100, 3)
+
+    with pytest.raises(ValueError):
+        _ = pairplot(samples=posterior_samples, offdiag="contour", upper="scatter")
+
+    close()
+
+
+@pytest.mark.parametrize("square_subplots", (True, False))
+def test_plotting_subplot_aspect(square_subplots):
+    """
+    Verify that the subplot aspect ratio is set correctly based on the
+    `square_subplots` option in `FigOptions`.
+    """
+
+    posterior_samples = torch.randn(100, 3)
+    fig_options = FigOptions(square_subplots=square_subplots)
+
+    _, axes = pairplot(samples=posterior_samples, fig_kwargs=fig_options)
+
+    axes = axes.flatten()
+
+    for ax in axes:
+        aspect = ax.get_box_aspect()
+        if square_subplots:
+            assert aspect == 1.0
+        else:
+            assert aspect is None
+
+    close()
+
+
+valid_diag_kwargs = [{}, HistDiagOptions(), None, [{}, HistDiagOptions(), None]]
+valid_off_diag_kwargs = [
+    {},
+    HistOffDiagOptions(),
+    None,
+    [{}, HistOffDiagOptions(), None],
+]
+
+invalid_kwargs_inputs = [False]
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        # invalid cases
+        *[
+            pytest.param(
+                {"diag_kwargs": value}, marks=pytest.mark.xfail(raises=TypeError)
+            )
+            for value in invalid_kwargs_inputs
+        ],
+        *[
+            pytest.param(
+                {"upper_kwargs": value}, marks=pytest.mark.xfail(raises=TypeError)
+            )
+            for value in invalid_kwargs_inputs
+        ],
+        *[
+            pytest.param(
+                {"lower_kwargs": value}, marks=pytest.mark.xfail(raises=TypeError)
+            )
+            for value in invalid_kwargs_inputs
+        ],
+        # valid cases
+        *[({"diag_kwargs": v}) for v in valid_diag_kwargs],
+        *[({"lower_kwargs": v}) for v in valid_off_diag_kwargs],
+        *[({"upper_kwargs": v}) for v in valid_off_diag_kwargs],
+    ],
+)
+def test_plotting_kwargs_validation(kwargs):
+    """
+    Validate that `pairplot` correctly enforces the types of `diag_kwargs`,
+    `upper_kwargs`, and `lower_kwargs`.
+    """
+    posterior_samples = torch.randn(100, 3)
+
+    _ = pairplot(samples=posterior_samples, **kwargs)
+
+    close()
+
+
+valid_diag_options = get_args(plt.DiagLiteral) + (None, ["hist", None])
+valid_upper_options = get_args(plt.UpperLiteral) + (None, ["scatter", None])
+valid_lower_options = get_args(plt.LowerLiteral) + (None, ["hist", None])
+
+invalid_inputs = ["", [""]]
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        # invalid inputs
+        *[
+            pytest.param({"diag": value}, marks=pytest.mark.xfail(raises=ValueError))
+            for value in invalid_inputs
+        ],
+        *[
+            pytest.param({"upper": value}, marks=pytest.mark.xfail(raises=ValueError))
+            for value in invalid_inputs
+        ],
+        *[
+            pytest.param({"lower": value}, marks=pytest.mark.xfail(raises=ValueError))
+            for value in invalid_inputs
+        ],
+        # valid inputs
+        *[({"diag": value}) for value in valid_diag_options],
+        *[({"upper": value}) for value in valid_upper_options],
+        *[({"lower": value}) for value in valid_lower_options],
+    ],
+)
+def test_plotting_style_arguments_validation(kwargs):
+    """
+    Check that the `pairplot` function correctly validates plotting
+    style arguments.
+    """
+
+    posterior_samples = torch.randn(100, 3)
+
+    _ = pairplot(samples=posterior_samples, **kwargs)
+
     close()

@@ -1,46 +1,54 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Callable, Dict, Optional, Tuple, Union
+from typing import Dict, Optional, Sequence, Tuple, Union
 
 import torch
-from torch import Tensor, nn
+from torch import Tensor
 from torch.distributions import Distribution
 
-from sbi.inference.trainers.nre.nre_base import RatioEstimator
-from sbi.sbi_types import TensorboardSummaryWriter
+from sbi.inference.trainers._contracts import LossArgs, LossArgsNRE_C
+from sbi.inference.trainers.nre.nre_base import (
+    RatioEstimatorTrainer,
+)
+from sbi.neural_nets.estimators.base import ConditionalEstimatorBuilder
+from sbi.neural_nets.ratio_estimators import RatioEstimator
+from sbi.sbi_types import TensorBoardSummaryWriter
 from sbi.utils.sbiutils import del_entries
 from sbi.utils.torchutils import assert_all_finite
 
 
-class NRE_C(RatioEstimator):
+class NRE_C(RatioEstimatorTrainer):
+    r"""NRE-C [1] is a generalization of amortized versions of NRE_A and NRE_B.
+
+    NRE-C:
+    (1) Like NRE_B, features a "multiclass" loss function where several marginally
+    drawn parameter-data pairs are contrasted against a jointly drawn pair.
+
+    (2) Like AALR/NRE_A (i.e., the non-sequential version of NRE_A), it encourages
+    the approximate ratio :math:`p(\theta,x)/p(\theta)p(x)`, accessed through
+    `.potential()` within `sbi`, to be exact at optimum. This addresses the
+    issue that NRE_B estimates this ratio only up to an arbitrary function
+    (normalizing constant) of the data :math:`x`.
+
+    Just like for all ratio estimation algorithms, the sequential version of NRE_C
+    will be estimated only up to a function (normalizing constant) of the data
+    :math:`x` in rounds after the first.
+
+    [1] *Contrastive Neural Ratio Estimation*, Benajmin Kurt Miller, et. al.,
+        NeurIPS 2022, https://arxiv.org/abs/2210.06170
+    """
+
     def __init__(
         self,
         prior: Optional[Distribution] = None,
-        classifier: Union[str, Callable] = "resnet",
+        classifier: Union[str, ConditionalEstimatorBuilder[RatioEstimator]] = "resnet",
         device: str = "cpu",
         logging_level: Union[int, str] = "warning",
-        summary_writer: Optional[TensorboardSummaryWriter] = None,
+        summary_writer: Optional[TensorBoardSummaryWriter] = None,
         show_progress_bars: bool = True,
     ):
-        r"""NRE-C[1] is a generalization of the non-sequential (amortized) versions of
-        NRE_A and NRE_B. We call the algorithm NRE_C within `sbi`.
-
-        NRE-C:
-        (1) like NRE_B, features a "multiclass" loss function where several marginally
-            drawn parameter-data pairs are contrasted against a jointly drawn pair.
-        (2) like AALR/NRE_A, i.e., the non-sequential version of NRE_A, it encourages
-            the approximate ratio $p(\theta,x)/p(\theta)p(x)$, accessed through
-            `.potential()` within `sbi`, to be exact at optimum. This addresses the
-            issue that NRE_B estimates this ratio only up to an arbitrary function
-            (normalizing constant) of the data $x$.
-
-        Just like for all ratio estimation algorithms, the sequential version of NRE_C
-        will be estimated only up to a function (normalizing constant) of the data $x$
-        in rounds after the first.
-
-        [1] _Contrastive Neural Ratio Estimation_, Benajmin Kurt Miller, et. al.,
-            NeurIPS 2022, https://arxiv.org/abs/2210.06170
+        r"""Initialize NRE-C.
 
         Args:
             prior: A probability distribution that expresses prior knowledge about the
@@ -48,11 +56,11 @@ class NRE_C(RatioEstimator):
                 prior must be passed to `.build_posterior()`.
             classifier: Classifier trained to approximate likelihood ratios. If it is
                 a string, use a pre-configured network of the provided type (one of
-                linear, mlp, resnet). Alternatively, a function that builds a custom
-                neural network can be provided. The function will be called with the
-                first batch of simulations (theta, x), which can thus be used for shape
-                inference and potentially for z-scoring. It needs to return a PyTorch
-                `nn.Module` implementing the classifier.
+                linear, mlp, resnet), or a callable that implements the
+                `ConditionalEstimatorBuilder` protocol. The callable will
+                be called with the first batch of simulations (theta, x), which can thus
+                be used for shape inference and potentially for z-scoring. It returns a
+                `RatioEstimator`.
             device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.
@@ -80,7 +88,7 @@ class NRE_C(RatioEstimator):
         retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[Dict] = None,
-    ) -> nn.Module:
+    ) -> RatioEstimator:
         r"""Return classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
 
         Args:
@@ -122,9 +130,12 @@ class NRE_C(RatioEstimator):
         Returns:
             Classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
         """
+
         kwargs = del_entries(locals(), entries=("self", "__class__"))
-        kwargs["num_atoms"] = kwargs.pop("num_classes") + 1
-        kwargs["loss_kwargs"] = {"gamma": kwargs.pop("gamma")}
+        kwargs["loss_kwargs"] = LossArgsNRE_C(
+            num_atoms=kwargs.pop("num_classes") + 1, gamma=kwargs.pop("gamma")
+        )
+
         return super().train(**kwargs)
 
     def _loss(
@@ -208,3 +219,14 @@ class NRE_C(RatioEstimator):
         p_joint = gamma / (1 + gamma)
         p_marginal = 1 / (1 + gamma)
         return p_marginal, p_joint
+
+    def _get_losses(self, batch: Sequence[Tensor], loss_args: LossArgs) -> Tensor:
+        """Overrides the parent class method to check the type of loss_args."""
+
+        if not isinstance(loss_args, LossArgsNRE_C):
+            raise TypeError(
+                "Expected type of loss_args to be LossArgsNRE_C,"
+                f" but got {type(loss_args)}"
+            )
+
+        return super()._get_losses(batch=batch, loss_args=loss_args)

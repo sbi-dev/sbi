@@ -1,4 +1,8 @@
+# This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+
 import logging
+import time
 import warnings
 from typing import Any, Callable, Dict, Optional, Tuple
 
@@ -21,6 +25,7 @@ def rejection_sample(
     num_samples_to_find_max: int = 10_000,
     num_iter_to_find_max: int = 100,
     m: float = 1.2,
+    max_sampling_time: Optional[float] = None,
     device: str = "cpu",
 ) -> Tuple[Tensor, Tensor]:
     r"""Return samples from a `potential_fn` obtained via rejection sampling.
@@ -53,6 +58,10 @@ def rejection_sample(
             distribution, but will increase the fraction of rejected samples and thus
             computation time.
         device: Device on which to sample.
+        max_sampling_time: Optional maximum allowed sampling time (in seconds).
+            If this time is exceeded, rejection sampling is aborted and a RuntimeError
+            is raised. This prevents jobs from stalling indefinitely when the
+            acceptance rate is extremely low.
 
     Returns:
         Accepted samples and acceptance rate as scalar Tensor.
@@ -128,7 +137,21 @@ def rejection_sample(
 
         # To cover cases with few samples without leakage:
         sampling_batch_size = min(num_samples, max_sampling_batch_size)
+        start_time = time.time()
         while num_remaining > 0:
+            if (
+                max_sampling_time is not None
+                and (time.time() - start_time) > max_sampling_time
+            ):
+                raise RuntimeError(
+                    "Sampling aborted early because rejection sampling exceeded "
+                    "max_sampling_time. This is likely due to extremely low "
+                    "acceptance. You can disable rejection sampling using "
+                    "`reject_outside_prior=False` to draw samples directly from "
+                    "the trained estimator. Consider switching to MCMC or VI, or "
+                    "checking for model misspecification."
+                )
+
             # Sample and reject.
             candidates = proposal.sample(sampling_batch_size).reshape(
                 sampling_batch_size, -1
@@ -167,8 +190,12 @@ def rejection_sample(
                 logging.warning(
                     f"""Only {acceptance_rate:.3%} proposal samples were accepted. It
                         may take a long time to collect the remaining {num_remaining}
-                        samples. Consider interrupting (Ctrl-C) and switching to a
-                        different sampling method with
+                        samples. You can prevent long runtimes by
+                        setting `max_sampling_time` to limit runtime, or disabling
+                        rejection sampling (e.g. via `reject_outside_prior=False` in
+                        `posterior.sample()` when available).
+                        Alternatively, consider interrupting (Ctrl-C) and switching
+                        to a different sampling method with
                         `build_posterior(..., sample_with='mcmc')`. or
                         `build_posterior(..., sample_with='vi')`."""
                 )
@@ -197,6 +224,7 @@ def accept_reject_sample(
     max_sampling_batch_size: int = 10_000,
     proposal_sampling_kwargs: Optional[Dict] = None,
     alternative_method: Optional[str] = None,
+    max_sampling_time: Optional[float] = None,
     **kwargs,
 ) -> Tuple[Tensor, Tensor]:
     r"""Returns samples from a proposal according to a acception criterion.
@@ -215,8 +243,8 @@ def accept_reject_sample(
 
     Args:
         proposal: A callable that takes `sample_shape` as arguments (and kwargs as
-        needed). Returns samples from the proposal distribution with shape
-        (*sample_shape, event_dim).
+            needed). Returns samples from the proposal distribution with shape
+            (*sample_shape, event_dim).
         accept_reject_fn: Function that evaluates which samples are accepted or
             rejected. Must take a batch of parameters and return a boolean tensor which
             indicates which parameters get accepted.
@@ -238,14 +266,17 @@ def accept_reject_sample(
             rate is too high. Used only for printing during a potential warning.
         kwargs: Absorb additional unused arguments that can be passed to
             `rejection_sample()`. Warn if not empty.
+        max_sampling_time: Optional maximum allowed sampling time (in seconds).
+            If exceeded, the sampling loop is interrupted and a RuntimeError is raised.
+            This prevents infinite or excessively slow rejection sampling runs, e.g.
+            in cases of heavy leakage or extremely low acceptance rates.
 
     Returns:
         Accepted samples of shape `(sample_dim, batch_dim, *event_shape)`, and
         acceptance rates for each observation.
     """
-
     if kwargs:
-        logging.warn(
+        logging.warning(
             f"You passed arguments to `rejection_sampling_parameters` that "
             f"are unused when you do not specify a `proposal` in the same "
             f"dictionary. The unused arguments are: {kwargs}"
@@ -267,19 +298,35 @@ def accept_reject_sample(
     pbar = tqdm(
         disable=not show_progress_bars,
         total=num_samples,
-        desc=f"Drawing {num_samples} posterior samples for {num_xos} observations",
+        desc=f"Drawing {num_samples} samples for {num_xos} observation" + "s"
+        if num_xos > 1
+        else "",
     )
 
     accepted = [[] for _ in range(num_xos)]
     acceptance_rate = torch.full((num_xos,), float("Nan"))
     leakage_warning_raised = False
-    # Ruff suggestion
 
     # To cover cases with few samples without leakage:
     sampling_batch_size = min(num_samples, max_sampling_batch_size)
     num_sampled_total = torch.zeros(num_xos)
     num_samples_possible = 0
+
+    start_time = time.time()
     while num_remaining > 0:
+        if (
+            max_sampling_time is not None
+            and (time.time() - start_time) > max_sampling_time
+        ):
+            raise RuntimeError(
+                "Sampling aborted early because rejection sampling exceeded "
+                "max_sampling_time. This is likely due to extremely low "
+                "acceptance. You can disable rejection sampling using "
+                "`reject_outside_prior=False` to draw samples directly from "
+                "the trained estimator. Consider switching to MCMC or VI, or "
+                "checking for model misspecification."
+            )
+
         # Sample and reject.
         candidates = proposal(
             (sampling_batch_size,),  # type: ignore
@@ -287,6 +334,7 @@ def accept_reject_sample(
         )
         # SNPE-style rejection-sampling when the proposal is the neural net.
         are_accepted = accept_reject_fn(candidates)
+
         # Reshape necessary in certain cases which do not follow the shape conventions
         # of the "DensityEstimator" class.
         are_accepted = are_accepted.reshape(sampling_batch_size, num_xos)
@@ -322,7 +370,7 @@ def accept_reject_sample(
             max(int(1.5 * num_remaining / max(min_acceptance_rate, 1e-12)), 100),
         )
         if (
-            num_samples_possible > 1000
+            num_samples_possible > (sampling_batch_size - 1)
             and min_acceptance_rate < warn_acceptance
             and not leakage_warning_raised
         ):
@@ -347,10 +395,13 @@ def accept_reject_sample(
             else:
                 warn_msg = f"""Only {min_acceptance_rate:.3%} proposal samples are
                     accepted. It may take a long time to collect the remaining
-                    {num_remaining} samples. """
+                    {num_remaining} samples. You can prevent very long runtimes by
+                    setting `max_sampling_time` to limit runtime, or disabling
+                    rejection sampling (e.g. via `reject_outside_prior=False` in
+                    `posterior.sample()` when available)."""
                 if alternative_method is not None:
-                    warn_msg += f"""Consider interrupting (Ctrl-C) and switching to
-                    `{alternative_method}`."""
+                    warn_msg += f"""Alternatively, consider interrupting (Ctrl-C)
+                    and switching to `{alternative_method}`."""
                 logging.warning(warn_msg)
 
             leakage_warning_raised = True  # Ensure warning is raised just once.

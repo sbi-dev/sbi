@@ -1,15 +1,24 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-import collections
 import copy
-import logging
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union, cast
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Literal,
+    Optional,
+    Tuple,
+    TypeVar,
+    Union,
+    cast,
+    get_args,
+)
 from warnings import warn
 
 import matplotlib as mpl
 import numpy as np
-import six
 import torch
 from matplotlib import cm
 from matplotlib import pyplot as plt
@@ -21,57 +30,274 @@ from scipy.stats import binom, gaussian_kde, iqr
 from torch import Tensor
 
 from sbi.analysis.conditional_density import eval_conditional_density
+from sbi.analysis.plotting_classes import (
+    DiagOptions,
+    FigOptions,
+    OffDiagOptions,
+    get_default_diag_kwargs,
+    get_default_offdiag_kwargs,
+)
 from sbi.utils.analysis_utils import pp_vals
+from sbi.utils.plotting_helpers import (
+    convert_to_list_of_numpy,
+    ensure_numpy,
+    handle_nan_infs,
+    to_list_kwargs,
+    to_list_string,
+    update,
+)
 
-try:
-    collectionsAbc = collections.abc  # type: ignore
-except AttributeError:
-    collectionsAbc = collections
-
-
-def hex2rgb(hex: str) -> List[int]:
-    """Pass 16 to the integer function for change of base"""
-    return [int(hex[i : i + 2], 16) for i in range(1, 6, 2)]
-
-
-def rgb2hex(RGB: List[int]) -> str:
-    """Components need to be integers for hex to make sense"""
-    RGB = [int(x) for x in RGB]
-    return "#" + "".join([
-        "0{0:x}".format(v) if v < 16 else "{0:x}".format(v) for v in RGB
-    ])
+UpperLiteral = Literal["hist", "scatter", "contour", "kde"]
+LowerLiteral = Literal["hist", "scatter", "contour", "kde"]
+DiagLiteral = Literal["hist", "scatter", "kde"]
+K = TypeVar("K")
+KwargsType = Union[List[Optional[Union[Dict, K]]], Dict, K, None]
 
 
-def to_list_string(
-    x: Optional[Union[str, List[Optional[str]]]], len: int
-) -> List[Optional[str]]:
-    """If x is not a list, make it a list of strings of length `len`."""
-    if not isinstance(x, list):
-        return [x for _ in range(len)]
-    return x
+def marginal_plot(
+    samples: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
+    points: Optional[
+        Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor]
+    ] = None,
+    limits: Optional[Union[List, torch.Tensor]] = None,
+    subset: Optional[List[int]] = None,
+    diag: Optional[Union[List[Optional[str]], str]] = "hist",
+    figsize: Optional[Tuple] = (10, 2),
+    labels: Optional[List[str]] = None,
+    ticks: Optional[Union[List, torch.Tensor]] = None,
+    diag_kwargs: KwargsType[DiagOptions] = None,
+    fig_kwargs: Optional[Union[Dict, FigOptions]] = None,
+    fig: Optional[FigureBase] = None,
+    axes: Optional[Axes] = None,
+    **kwargs: Optional[Any],
+) -> Tuple[FigureBase, Axes]:
+    """
+    Plot samples in a row showing 1D marginals of selected dimensions.
+
+    Each of the plots can be interpreted as a 1D-marginal of the distribution
+    that the samples were drawn from.
+
+    Args:
+        samples: Samples used to build the histogram.
+        points: List of additional points to scatter.
+        limits: Array containing the plot xlim for each parameter dimension. If None,
+            just use the min and max of the passed samples
+        subset: List containing the dimensions to plot. E.g. subset=[1,3] will plot
+            plot only the 1st and 3rd dimension but will discard the 0th and 2nd (and,
+            if they exist, the 4th, 5th and so on).
+        diag: Plotting style for 1D marginals, {hist, kde cond, None}.
+        figsize: Size of the entire figure.
+        labels: List of strings specifying the names of the parameters.
+        ticks: Position of the ticks.
+        diag_kwargs: Additional arguments to adjust the diagonal plot,
+            see the source code in `KdeDiagOptions`, `HistDiagOptions` or
+            `ScatterDiagOptions`.
+        fig_kwargs: Additional arguments to adjust the overall figure,
+            see the source code in `FigOptions`.
+        fig: matplotlib figure to plot on.
+        axes: matplotlib axes corresponding to fig.
+        **kwargs: Additional arguments to adjust the plot (deprecated)
+    Returns: figure and axis of posterior distribution plot
+    """
+
+    # backwards compatibility
+    if len(kwargs) > 0:
+        fig, axes = _use_deprecated_plot(
+            marginal_plot_dep,
+            samples=samples,
+            points=points,
+            limits=limits,
+            subset=subset,
+            diag=diag,
+            figsize=figsize,
+            labels=labels,
+            ticks=ticks,
+            fig=fig,
+            axes=axes,
+            **kwargs,
+        )
+        return fig, axes
+
+    samples, _, limits = prepare_for_plot(samples, limits)
+
+    # prepare kwargs and functions of the subplots
+    diag_kwargs_filled, diag_func = _prepare_kwargs(
+        plot=diag,
+        samples=samples,
+        get_plot_funcs=get_diag_funcs,
+        get_default_kwargs=get_default_diag_kwargs,
+        plot_kwargs=diag_kwargs,
+    )
+
+    # prepare fig_kwargs
+    fig_kwargs_filled = _prepare_fig_kwargs(fig_kwargs, samples)
+
+    # generate plot
+    return _arrange_grid(
+        diag_func,
+        [None],
+        [None],
+        diag_kwargs_filled,
+        [None],
+        [None],
+        samples,
+        points,
+        limits,
+        subset,
+        figsize,
+        labels,
+        ticks,
+        fig,
+        axes,
+        fig_kwargs_filled,
+    )
 
 
-def to_list_kwargs(
-    x: Optional[Union[Dict, List[Optional[Dict]]]], len: int
-) -> List[Optional[Dict]]:
-    """If x is not a list, make it a list of dicts of length `len`."""
-    if not isinstance(x, list):
-        return [x for _ in range(len)]
-    return x
+def pairplot(
+    samples: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
+    points: Optional[
+        Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor]
+    ] = None,
+    limits: Optional[Union[List, torch.Tensor]] = None,
+    subset: Optional[List[int]] = None,
+    upper: Optional[Union[List[Optional[UpperLiteral]], UpperLiteral]] = "hist",
+    lower: Optional[Union[List[Optional[LowerLiteral]], LowerLiteral]] = None,
+    diag: Optional[Union[List[Optional[DiagLiteral]], DiagLiteral]] = "hist",
+    figsize: Tuple = (10, 10),
+    labels: Optional[List[str]] = None,
+    ticks: Optional[Union[List, torch.Tensor]] = None,
+    offdiag: Optional[Union[List[Optional[str]], str]] = None,
+    diag_kwargs: KwargsType[DiagOptions] = None,
+    upper_kwargs: KwargsType[OffDiagOptions] = None,
+    lower_kwargs: KwargsType[OffDiagOptions] = None,
+    fig_kwargs: Optional[Union[Dict, FigOptions]] = None,
+    fig: Optional[FigureBase] = None,
+    axes: Optional[Axes] = None,
+    **kwargs: Optional[Any],
+) -> Tuple[FigureBase, Axes]:
+    """
+    Plot samples in a 2D grid showing marginals and pairwise marginals.
 
+    Each of the diagonal plots can be interpreted as a 1D-marginal of the distribution
+    that the samples were drawn from. Each upper-diagonal plot can be interpreted as a
+    2D-marginal of the distribution.
 
-def _update(d: Dict, u: Optional[Dict]) -> Dict:
-    """update dictionary with user input, see: https://stackoverflow.com/a/3233356"""
-    if u is not None:
-        for k, v in six.iteritems(u):
-            dv = d.get(k, {})
-            if not isinstance(dv, collectionsAbc.Mapping):  # type: ignore
-                d[k] = v
-            elif isinstance(v, collectionsAbc.Mapping):  # type: ignore
-                d[k] = _update(dv, v)
-            else:
-                d[k] = v
-    return d
+    Args:
+        samples: Samples used to build the histogram.
+        points: List of additional points to scatter.
+        limits: Array containing the plot xlim for each parameter dimension. If None,
+            just use the min and max of the passed samples
+        subset: List containing the dimensions to plot. E.g. subset=[1,3] will plot
+            plot only the 1st and 3rd dimension but will discard the 0th and 2nd (and,
+            if they exist, the 4th, 5th and so on).
+        upper: Plotting style for upper diagonal, {hist, scatter, contour, kde,
+            None}.
+        lower: Plotting style for upper diagonal, {hist, scatter, contour, kde,
+            None}.
+        diag: Plotting style for diagonal, {hist, scatter, kde}.
+        figsize: Size of the entire figure.
+        labels: List of strings specifying the names of the parameters.
+        ticks: Position of the ticks.
+        offdiag: deprecated, use upper instead.
+        diag_kwargs: Additional arguments to adjust the diagonal plot,
+            see the source code in `KdeDiagOptions`, `HistDiagOptions` or
+            `ScatterDiagOptions`.
+        upper_kwargs: Additional arguments to adjust the upper diagonal plot,
+            see the source code in `KdeOffDiagOptions`, `HistOffDiagOptions`,
+            `ScatterOffDiagOptions`, `ContourOffDiagOptions` or `PlotOffDiagOptions`.
+        lower_kwargs: Additional arguments to adjust the lower diagonal plot,
+            see the source code in `KdeOffDiagOptions`, `HistOffDiagOptions`,
+            `ScatterOffDiagOptions`, `ContourOffDiagOptions` or `PlotOffDiagOptions`.
+        fig_kwargs: Additional arguments to adjust the overall figure,
+            see the source code in `FigOptions`
+        fig: matplotlib figure to plot on.
+        axes: matplotlib axes corresponding to fig.
+        **kwargs: Additional arguments to adjust the plot (deprecated).
+
+    Returns: figure and axis of posterior distribution plot
+    """
+
+    upper = _prepare_upper(offdiag, upper)  # type: ignore
+
+    plotting_styles = [
+        (diag, DiagLiteral, "diag"),
+        (upper, UpperLiteral, "upper"),
+        (lower, LowerLiteral, "lower"),
+    ]
+
+    for plotting_style, literal, argument_name in plotting_styles:
+        _validate_plotting_style(plotting_style, literal, argument_name)
+
+    # Backwards compatibility
+    if len(kwargs) > 0:
+        fig, axes = _use_deprecated_plot(
+            pairplot_dep,
+            samples=samples,
+            points=points,
+            limits=limits,
+            subset=subset,
+            offdiag=offdiag,
+            diag=diag,
+            figsize=figsize,
+            labels=labels,
+            ticks=ticks,
+            upper=upper,
+            fig=fig,
+            axes=axes,
+            **kwargs,
+        )
+        return fig, axes
+
+    samples, dim, limits = prepare_for_plot(samples, limits, points)
+
+    # prepare figure kwargs
+    fig_kwargs_filled = _prepare_fig_kwargs(fig_kwargs, samples)
+
+    # Prepare diag
+    diag_kwargs_filled, diag_func = _prepare_kwargs(
+        plot=diag,  # type: ignore
+        samples=samples,
+        get_plot_funcs=get_diag_funcs,
+        get_default_kwargs=get_default_diag_kwargs,
+        plot_kwargs=diag_kwargs,
+    )
+
+    # Prepare upper
+    upper_kwargs_filled, upper_func = _prepare_kwargs(
+        plot=upper,  # type: ignore
+        samples=samples,
+        get_plot_funcs=get_offdiag_funcs,
+        get_default_kwargs=get_default_offdiag_kwargs,
+        plot_kwargs=upper_kwargs,
+    )
+
+    # Prepare lower
+    lower_kwargs_filled, lower_func = _prepare_kwargs(
+        plot=lower,  # type: ignore
+        samples=samples,
+        get_plot_funcs=get_offdiag_funcs,
+        get_default_kwargs=get_default_offdiag_kwargs,
+        plot_kwargs=lower_kwargs,
+    )
+
+    return _arrange_grid(
+        diag_func,
+        upper_func,
+        lower_func,
+        diag_kwargs_filled,
+        upper_kwargs_filled,
+        lower_kwargs_filled,
+        samples,
+        points,
+        limits,
+        subset,
+        figsize,
+        labels,
+        ticks,
+        fig,
+        axes,
+        fig_kwargs_filled,
+    )
 
 
 # Plotting functions
@@ -359,7 +585,7 @@ def _format_subplot(
     limits: Union[List[List[float]], torch.Tensor],
     ticks: Optional[Union[List, torch.Tensor]],
     labels_dim: List[str],
-    fig_kwargs: Dict,
+    fig_kwargs: FigOptions,
     row: int,
     col: int,
     dim: int,
@@ -374,7 +600,7 @@ def _format_subplot(
         limits: list of lists, limits for each dimension
         ticks: list of lists, ticks for each dimension
         labels_dim: list of strings, labels for each dimension
-        fig_kwargs: dict, figure kwargs
+        fig_kwargs: FigOptions dataclass
         row: int, row index
         col: int, column index
         dim: int, number of dimensions
@@ -385,16 +611,16 @@ def _format_subplot(
 
     # Background color
     if (
-        current in fig_kwargs["fig_bg_colors"]
-        and fig_kwargs["fig_bg_colors"][current] is not None
+        current in fig_kwargs.fig_bg_colors
+        and fig_kwargs.fig_bg_colors[current] is not None
     ):
-        ax.set_facecolor(fig_kwargs["fig_bg_colors"][current])
+        ax.set_facecolor(fig_kwargs.fig_bg_colors[current])
     # Limits
     if isinstance(limits, Tensor):
         assert limits.dim() == 2, "Limits should be a 2D tensor."
         limits = limits.tolist()
     if current == "diag":
-        eps = fig_kwargs["x_lim_add_eps"]
+        eps = fig_kwargs.x_lim_add_eps
         ax.set_xlim((limits[col][0] - eps, limits[col][1] + eps))
     else:
         ax.set_xlim((limits[col][0], limits[col][1]))
@@ -409,12 +635,12 @@ def _format_subplot(
             ax.set_yticks((ticks[row][0], ticks[row][1]))  # pyright: ignore[reportCallIssue]
 
     # make square
-    if fig_kwargs["square_subplots"]:
+    if fig_kwargs.square_subplots:
         ax.set_box_aspect(1)
     # Despine
     ax.spines["right"].set_visible(False)
     ax.spines["top"].set_visible(False)
-    ax.spines["bottom"].set_position(("outward", fig_kwargs["despine"]["offset"]))
+    ax.spines["bottom"].set_position(("outward", fig_kwargs.despine["offset"]))
 
     # Formatting axes
     if current == "diag":  # diagonals
@@ -424,7 +650,7 @@ def _format_subplot(
                 xhide=False,
                 xlabel=labels_dim[col],
                 yhide=True,
-                tickformatter=fig_kwargs["tickformatter"],
+                tickformatter=fig_kwargs.tickformatter,
             )
         else:
             _format_axis(ax, xhide=True, yhide=True)
@@ -435,14 +661,14 @@ def _format_subplot(
                 xhide=False,
                 xlabel=labels_dim[col],
                 yhide=True,
-                tickformatter=fig_kwargs["tickformatter"],
+                tickformatter=fig_kwargs.tickformatter,
             )
         else:
             _format_axis(ax, xhide=True, yhide=True)
-    if fig_kwargs["tick_labels"] is not None:
+    if fig_kwargs.tick_labels is not None:
         ax.set_xticklabels((  # pyright: ignore[reportCallIssue]
-            str(fig_kwargs["tick_labels"][col][0]),
-            str(fig_kwargs["tick_labels"][col][1]),
+            str(fig_kwargs.tick_labels[col][0]),
+            str(fig_kwargs.tick_labels[col][1]),
         ))
 
 
@@ -530,44 +756,6 @@ def probs2contours(
     contours = np.reshape(contours[idx_unsort], shape)
 
     return contours
-
-
-def ensure_numpy(t: Union[np.ndarray, torch.Tensor]) -> np.ndarray:
-    """
-    Returns np.ndarray if torch.Tensor was provided.
-
-    Used because samples_nd() can only handle np.ndarray.
-    """
-    if isinstance(t, torch.Tensor):
-        return t.numpy()
-    elif not isinstance(t, np.ndarray):
-        return np.array(t)
-    return t
-
-
-def handle_nan_infs(samples: List[np.ndarray]) -> List[np.ndarray]:
-    """Check if there are NaNs or Infs in the samples."""
-    for i in range(len(samples)):
-        if np.isnan(samples[i]).any():
-            logging.warning("NaNs found in samples, omitting datapoints.")
-        if np.isinf(samples[i]).any():
-            logging.warning("Infs found in samples, omitting datapoints.")
-            # cast inf to nan, so they are omitted in the next step
-            np.nan_to_num(
-                samples[i], copy=False, nan=np.nan, posinf=np.nan, neginf=np.nan
-            )
-        samples[i] = samples[i][~np.isnan(samples[i]).any(axis=1)]
-    return samples
-
-
-def convert_to_list_of_numpy(
-    arr: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
-) -> List[np.ndarray]:
-    """Converts a list of torch.Tensor to a list of np.ndarray."""
-    if not isinstance(arr, list):
-        arr = ensure_numpy(arr)
-        return [arr]
-    return [ensure_numpy(a) for a in arr]
 
 
 def infer_limits(
@@ -686,387 +874,156 @@ def get_conditional_diag_func(opts, limits, eps_margins, resolution):
     return diag_func
 
 
-def pairplot(
-    samples: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
-    points: Optional[
-        Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor]
-    ] = None,
-    limits: Optional[Union[List, torch.Tensor]] = None,
-    subset: Optional[List[int]] = None,
-    upper: Optional[Union[List[Optional[str]], str]] = "hist",
-    lower: Optional[Union[List[Optional[str]], str]] = None,
-    diag: Optional[Union[List[Optional[str]], str]] = "hist",
-    figsize: Tuple = (10, 10),
-    labels: Optional[List[str]] = None,
-    ticks: Optional[Union[List, torch.Tensor]] = None,
-    offdiag: Optional[Union[List[Optional[str]], str]] = None,
-    diag_kwargs: Optional[Union[List[Optional[Dict]], Dict]] = None,
-    upper_kwargs: Optional[Union[List[Optional[Dict]], Dict]] = None,
-    lower_kwargs: Optional[Union[List[Optional[Dict]], Dict]] = None,
-    fig_kwargs: Optional[Dict] = None,
-    fig: Optional[FigureBase] = None,
-    axes: Optional[Axes] = None,
-    **kwargs: Optional[Any],
-) -> Tuple[FigureBase, Axes]:
+def _validate_plotting_style(
+    plotting_style: Union[List[Optional[str]], str, None],
+    style_literal: str,
+    argument_name: str,
+):
     """
-    Plot samples in a 2D grid showing marginals and pairwise marginals.
-
-    Each of the diagonal plots can be interpreted as a 1D-marginal of the distribution
-    that the samples were drawn from. Each upper-diagonal plot can be interpreted as a
-    2D-marginal of the distribution.
+    This method validates if the plotting style that is passed is None or among the
+    allowed plotting styles defined in style_literal.
 
     Args:
-        samples: Samples used to build the histogram.
-        points: List of additional points to scatter.
-        limits: Array containing the plot xlim for each parameter dimension. If None,
-            just use the min and max of the passed samples
-        subset: List containing the dimensions to plot. E.g. subset=[1,3] will plot
-            plot only the 1st and 3rd dimension but will discard the 0th and 2nd (and,
-            if they exist, the 4th, 5th and so on).
-        upper: Plotting style for upper diagonal, {hist, scatter, contour, kde,
-            None}.
-        lower: Plotting style for upper diagonal, {hist, scatter, contour, kde,
-            None}.
-        diag: Plotting style for diagonal, {hist, scatter, kde}.
-        figsize: Size of the entire figure.
-        labels: List of strings specifying the names of the parameters.
-        ticks: Position of the ticks.
-        offdiag: deprecated, use upper instead.
-        diag_kwargs: Additional arguments to adjust the diagonal plot,
-            see the source code in `_get_default_diag_kwarg()`
-        upper_kwargs: Additional arguments to adjust the upper diagonal plot,
-            see the source code in `_get_default_offdiag_kwarg()`
-        lower_kwargs: Additional arguments to adjust the lower diagonal plot,
-            see the source code in `_get_default_offdiag_kwarg()`
-        fig_kwargs: Additional arguments to adjust the overall figure,
-            see the source code in `_get_default_fig_kwargs()`
-        fig: matplotlib figure to plot on.
-        axes: matplotlib axes corresponding to fig.
-        **kwargs: Additional arguments to adjust the plot (deprecated).
-
-    Returns: figure and axis of posterior distribution plot
+        plotting_style: The plotting style that is selected.
+        style_literal: Allowed plotting styles.
+        argument_name: The name of the argument being validated.
     """
 
-    # Backwards compatibility
-    if len(kwargs) > 0:
-        warn(
-            f"you passed deprecated arguments **kwargs: {[key for key in kwargs]}, use "
-            "fig_kwargs instead. We continue calling the deprecated pairplot function",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        fig, axes = pairplot_dep(
-            samples,
-            points,
-            limits,
-            subset,
-            offdiag,
-            diag,
-            figsize,
-            labels,
-            ticks,
-            upper,
-            fig,
-            axes,
-            **kwargs,
-        )
-        return fig, axes
+    allowed_styles = get_args(style_literal)
 
-    samples, dim, limits = prepare_for_plot(samples, limits, points)
-
-    # prepate figure kwargs
-    fig_kwargs_filled = _get_default_fig_kwargs()
-    # update the defaults dictionary with user provided values
-    fig_kwargs_filled = _update(fig_kwargs_filled, fig_kwargs)
-
-    # checks.
-    if fig_kwargs_filled["legend"]:
-        assert len(fig_kwargs_filled["samples_labels"]) >= len(samples), (
-            "Provide at least as many labels as samples."
+    if isinstance(plotting_style, list):
+        for i, val in enumerate(plotting_style):
+            if val is not None and val not in allowed_styles:
+                raise ValueError(
+                    f"Expected {argument_name} at index {i} to be None or one",
+                    f" of {allowed_styles} but got {val}.",
+                )
+    elif plotting_style is not None and plotting_style not in allowed_styles:
+        raise ValueError(
+            f"Expected {argument_name} to be None, a list or one",
+            f" of {allowed_styles} but got {plotting_style}.",
         )
+
+
+def _prepare_kwargs(
+    plot: Optional[Union[List[Optional[str]], str]],
+    samples: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
+    get_plot_funcs: Callable,
+    get_default_kwargs: Callable,
+    plot_kwargs: KwargsType,
+) -> Tuple[List[Optional[Dict]], List[Optional[Callable]]]:
+    """
+    Prepares a list of plotting functions and their corresponding kwargs per sample.
+
+    Args:
+        plot: Plot type(s) to use (e.g., 'scatter', 'kde', etc.).
+        samples: Input samples to be plotted.
+        get_plot_funcs: Function that maps plot names to callable plot functions.
+        get_default_kwargs: Function that generates default kwargs for each plot type.
+        plot_kwargs: User-specified overrides for the plot kwargs.
+
+    Returns:
+        - List of merged keyword arguments for each sample.
+        - List of corresponding plot functions.
+    """
+
+    plot_list = to_list_string(plot, len(samples))
+    plot_kwargs_list = to_list_kwargs(plot_kwargs, len(samples))
+    plot_func = get_plot_funcs(plot_list)
+    plot_kwargs_filled = []
+    for i, (plot_i, plot_kwargs_i) in enumerate(
+        zip(plot_list, plot_kwargs_list, strict=False)
+    ):
+        plot_kwarg_filled_i = get_default_kwargs(plot_i, i)
+        # update the defaults dictionary with user provided values
+        plot_kwarg_filled_i = update(plot_kwarg_filled_i, plot_kwargs_i)
+        plot_kwargs_filled.append(plot_kwarg_filled_i)
+
+    return plot_kwargs_filled, plot_func
+
+
+def _prepare_fig_kwargs(
+    fig_kwargs: Optional[Union[Dict, FigOptions]],
+    samples: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
+) -> FigOptions:
+    """
+    Converts user-provided figure keyword arguments into a FigOptions dataclass.
+
+    This function ensures that figure configuration is consistently represented as a
+    ``FigOptions`` dataclass, regardless of whether the user supplies no options,
+    a dictionary of keyword arguments, or an existing ``FigOptions`` instance.
+
+    Args:
+        fig_kwargs: User-provided figure keyword arguments.
+        samples: Input samples to be plotted.
+
+    Raises:
+        ValueError: If the number of sample labels is less than
+            the number of samples when a legend is specified.
+
+    Returns:
+        FigOptions dataclass.
+    """
+
+    if fig_kwargs is None:
+        fig_kwargs = FigOptions()
+    elif isinstance(fig_kwargs, dict):
+        fig_kwargs = FigOptions(**fig_kwargs)
+
+    if fig_kwargs.legend and len(fig_kwargs.samples_labels) < len(samples):
+        raise ValueError("Provide at least as many labels as samples.")
+
+    return fig_kwargs
+
+
+def _use_deprecated_plot(
+    deprecated_method: Callable, **kwargs
+) -> Tuple[FigureBase, Axes]:
+    """
+    Issues a deprecation warning and invokes the old-style plotting method.
+
+    Args:
+        deprecated_method: The deprecated plotting function.
+        **kwargs: Arbitrary keyword arguments passed to the deprecated function.
+
+    Returns:
+        The figure and axes objects returned by the plotting function.
+    """
+
+    warn(
+        "you passed deprecated arguments **kwargs, use fig_kwargs instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return deprecated_method(**kwargs)
+
+
+def _prepare_upper(
+    offdiag: Optional[Union[List[Optional[str]], str]],
+    upper: Optional[Union[List[Optional[str]], str]],
+) -> Optional[Union[List[Optional[str]], str]]:
+    """
+    Handles deprecated 'offdiag' argument by falling back to 'upper'.
+
+    If 'offdiag' is provided, a deprecation warning is issued and its value is used.
+    Otherwise, 'upper' is returned.
+
+    Args:
+        offdiag: Deprecated off-diagonal plot specifier.
+        upper: New argument to specify upper triangle plot behavior.
+
+    Returns:
+        Resolved plot specification.
+    """
+
     if offdiag is not None:
+        if upper != "hist" and offdiag != upper:
+            raise ValueError(
+                "You have passed mismatching values to both upper and offdiag"
+                " arguments. offdiag is deprecated, use upper instead."
+            )
         warn("offdiag is deprecated, use upper or lower instead.", stacklevel=2)
-        upper = offdiag
-
-    # Prepare diag
-    diag_list = to_list_string(diag, len(samples))
-    diag_kwargs_list = to_list_kwargs(diag_kwargs, len(samples))
-    diag_func = get_diag_funcs(diag_list)
-    diag_kwargs_filled = []
-    for i, (diag_i, diag_kwargs_i) in enumerate(
-        zip(diag_list, diag_kwargs_list, strict=False)
-    ):
-        diag_kwarg_filled_i = _get_default_diag_kwargs(diag_i, i)
-        # update the defaults dictionary with user provided values
-        diag_kwarg_filled_i = _update(diag_kwarg_filled_i, diag_kwargs_i)
-        diag_kwargs_filled.append(diag_kwarg_filled_i)
-
-    # Prepare upper
-    upper_list = to_list_string(upper, len(samples))
-    upper_kwargs_list = to_list_kwargs(upper_kwargs, len(samples))
-    upper_func = get_offdiag_funcs(upper_list)
-    upper_kwargs_filled = []
-    for i, (upper_i, upper_kwargs_i) in enumerate(
-        zip(upper_list, upper_kwargs_list, strict=False)
-    ):
-        upper_kwarg_filled_i = _get_default_offdiag_kwargs(upper_i, i)
-        # update the defaults dictionary with user provided values
-        upper_kwarg_filled_i = _update(upper_kwarg_filled_i, upper_kwargs_i)
-        upper_kwargs_filled.append(upper_kwarg_filled_i)
-
-    # Prepare lower
-    lower_list = to_list_string(lower, len(samples))
-    lower_kwargs_list = to_list_kwargs(lower_kwargs, len(samples))
-    lower_func = get_offdiag_funcs(lower_list)
-    lower_kwargs_filled = []
-    for i, (lower_i, lower_kwargs_i) in enumerate(
-        zip(lower_list, lower_kwargs_list, strict=False)
-    ):
-        lower_kwarg_filled_i = _get_default_offdiag_kwargs(lower_i, i)
-        # update the defaults dictionary with user provided values
-        lower_kwarg_filled_i = _update(lower_kwarg_filled_i, lower_kwargs_i)
-        lower_kwargs_filled.append(lower_kwarg_filled_i)
-
-    return _arrange_grid(
-        diag_func,
-        upper_func,
-        lower_func,
-        diag_kwargs_filled,
-        upper_kwargs_filled,
-        lower_kwargs_filled,
-        samples,
-        points,
-        limits,
-        subset,
-        figsize,
-        labels,
-        ticks,
-        fig,
-        axes,
-        fig_kwargs_filled,
-    )
-
-
-def marginal_plot(
-    samples: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
-    points: Optional[
-        Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor]
-    ] = None,
-    limits: Optional[Union[List, torch.Tensor]] = None,
-    subset: Optional[List[int]] = None,
-    diag: Optional[Union[List[Optional[str]], str]] = "hist",
-    figsize: Optional[Tuple] = (10, 2),
-    labels: Optional[List[str]] = None,
-    ticks: Optional[Union[List, torch.Tensor]] = None,
-    diag_kwargs: Optional[Union[List[Optional[Dict]], Dict]] = None,
-    fig_kwargs: Optional[Dict] = None,
-    fig: Optional[FigureBase] = None,
-    axes: Optional[Axes] = None,
-    **kwargs: Optional[Any],
-) -> Tuple[FigureBase, Axes]:
-    """
-    Plot samples in a row showing 1D marginals of selected dimensions.
-
-    Each of the plots can be interpreted as a 1D-marginal of the distribution
-    that the samples were drawn from.
-
-    Args:
-        samples: Samples used to build the histogram.
-        points: List of additional points to scatter.
-        limits: Array containing the plot xlim for each parameter dimension. If None,
-            just use the min and max of the passed samples
-        subset: List containing the dimensions to plot. E.g. subset=[1,3] will plot
-            plot only the 1st and 3rd dimension but will discard the 0th and 2nd (and,
-            if they exist, the 4th, 5th and so on).
-        diag: Plotting style for 1D marginals, {hist, kde cond, None}.
-        figsize: Size of the entire figure.
-        labels: List of strings specifying the names of the parameters.
-        ticks: Position of the ticks.
-        diag_kwargs: Additional arguments to adjust the diagonal plot,
-            see the source code in `_get_default_diag_kwarg()`
-        fig_kwargs: Additional arguments to adjust the overall figure,
-            see the source code in `_get_default_fig_kwargs()`
-        fig: matplotlib figure to plot on.
-        axes: matplotlib axes corresponding to fig.
-        **kwargs: Additional arguments to adjust the plot (deprecated)
-    Returns: figure and axis of posterior distribution plot
-    """
-
-    # backwards compatibility
-    if len(kwargs) > 0:
-        warn(
-            "**kwargs are deprecated, use fig_kwargs instead. "
-            "calling the to be deprecated marginal_plot function",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        fig, axes = marginal_plot_dep(
-            samples,
-            points,
-            limits,
-            subset,
-            diag,
-            figsize,
-            labels,
-            ticks,
-            fig,
-            axes,
-            **kwargs,
-        )
-        return fig, axes
-
-    samples, dim, limits = prepare_for_plot(samples, limits)
-
-    # prepare kwargs and functions of the subplots
-    diag_list = to_list_string(diag, len(samples))
-    diag_kwargs_list = to_list_kwargs(diag_kwargs, len(samples))
-    diag_func = get_diag_funcs(diag_list)
-    diag_kwargs_filled = []
-    for i, (diag_i, diag_kwargs_i) in enumerate(
-        zip(diag_list, diag_kwargs_list, strict=False)
-    ):
-        diag_kwarg_filled_i = _get_default_diag_kwargs(diag_i, i)
-        diag_kwarg_filled_i = _update(diag_kwarg_filled_i, diag_kwargs_i)
-        diag_kwargs_filled.append(diag_kwarg_filled_i)
-
-    # prepare fig_kwargs
-    fig_kwargs_filled = _get_default_fig_kwargs()
-    fig_kwargs_filled = _update(fig_kwargs_filled, fig_kwargs)
-
-    # generate plot
-    return _arrange_grid(
-        diag_func,
-        [None],
-        [None],
-        diag_kwargs_filled,
-        [None],
-        [None],
-        samples,
-        points,
-        limits,
-        subset,
-        figsize,
-        labels,
-        ticks,
-        fig,
-        axes,
-        fig_kwargs_filled,
-    )
-
-
-def _get_default_offdiag_kwargs(offdiag: Optional[str], i: int = 0) -> Dict:
-    """Get default offdiag kwargs."""
-
-    if offdiag == "kde" or offdiag == "kde2d":
-        offdiag_kwargs = {
-            "bw_method": "scott",
-            "bins": 50,
-            "mpl_kwargs": {"cmap": "viridis", "origin": "lower", "aspect": "auto"},
-        }
-
-    elif offdiag == "hist" or offdiag == "hist2d":
-        offdiag_kwargs = {
-            "bin_heuristic": None,  # "Freedman-Diaconis",
-            "mpl_kwargs": {"cmap": "viridis", "origin": "lower", "aspect": "auto"},
-            "np_hist_kwargs": {"bins": 50, "density": False},
-        }
-
-    elif offdiag == "scatter":
-        offdiag_kwargs = {
-            "mpl_kwargs": {
-                "color": plt.rcParams["axes.prop_cycle"].by_key()["color"][i * 2],  # pyright: ignore[reportOptionalMemberAccess]
-                "edgecolor": "white",
-                "alpha": 0.5,
-                "rasterized": False,
-            }
-        }
-    elif offdiag == "contour" or offdiag == "contourf":
-        offdiag_kwargs = {
-            "bw_method": "scott",
-            "bins": 50,
-            "levels": [0.68, 0.95, 0.99],
-            "percentile": True,
-            "mpl_kwargs": {
-                "colors": plt.rcParams["axes.prop_cycle"].by_key()["color"][i * 2],  # pyright: ignore[reportOptionalMemberAccess]
-            },
-        }
-    elif offdiag == "plot":
-        offdiag_kwargs = {
-            "mpl_kwargs": {
-                "color": plt.rcParams["axes.prop_cycle"].by_key()["color"][i * 2],  # pyright: ignore[reportOptionalMemberAccess]
-                "aspect": "auto",
-            }
-        }
-    else:
-        offdiag_kwargs = {}
-    return offdiag_kwargs
-
-
-def _get_default_diag_kwargs(diag: Optional[str], i: int = 0) -> Dict:
-    """Get default diag kwargs."""
-    if diag == "kde":
-        diag_kwargs = {
-            "bw_method": "scott",
-            "bins": 50,
-            "mpl_kwargs": {
-                "color": plt.rcParams["axes.prop_cycle"].by_key()["color"][i * 2]  # pyright: ignore[reportOptionalMemberAccess]
-            },
-        }
-
-    elif diag == "hist":
-        diag_kwargs = {
-            "bin_heuristic": "Freedman-Diaconis",
-            "mpl_kwargs": {
-                "color": plt.rcParams["axes.prop_cycle"].by_key()["color"][i * 2],  # pyright: ignore[reportOptionalMemberAccess]
-                "density": False,
-                "histtype": "step",
-            },
-        }
-    elif diag == "scatter":
-        diag_kwargs = {
-            "mpl_kwargs": {
-                "color": plt.rcParams["axes.prop_cycle"].by_key()["color"][i * 2]  # pyright: ignore[reportOptionalMemberAccess]
-            }
-        }
-    else:
-        diag_kwargs = {}
-    return diag_kwargs
-
-
-def _get_default_fig_kwargs() -> Dict:
-    """Get default figure kwargs."""
-    return {
-        "legend": None,
-        "legend_kwargs": {},
-        # labels
-        "points_labels": [f"points_{idx}" for idx in range(10)],  # for points
-        "samples_labels": [f"samples_{idx}" for idx in range(10)],  # for samples
-        # colors: take even colors for samples, odd colors for points
-        "samples_colors": plt.rcParams["axes.prop_cycle"].by_key()["color"][0::2],  # pyright: ignore[reportOptionalMemberAccess]
-        "points_colors": plt.rcParams["axes.prop_cycle"].by_key()["color"][1::2],  # pyright: ignore[reportOptionalMemberAccess]
-        # ticks
-        "tickformatter": mpl.ticker.FormatStrFormatter("%g"),  # type: ignore
-        "tick_labels": None,
-        # formatting points (scale, markers)
-        "points_diag": {},
-        "points_offdiag": {
-            "marker": ".",
-            "markersize": 10,
-        },
-        # other options
-        "fig_bg_colors": {"offdiag": None, "diag": None, "lower": None},
-        "fig_subplots_adjust": {
-            "top": 0.9,
-        },
-        "subplots": {},
-        "despine": {
-            "offset": 5,
-        },
-        "title": None,
-        "title_format": {"fontsize": 16},
-        "x_lim_add_eps": 1e-5,
-        "square_subplots": True,
-    }
+    return offdiag or upper
 
 
 def conditional_marginal_plot(
@@ -1130,8 +1087,8 @@ def conditional_marginal_plot(
     opts = _get_default_opts()
     # update the defaults dictionary by the current values of the variables (passed by
     # the user)
-    opts = _update(opts, locals())
-    opts = _update(opts, kwargs)
+    opts = update(opts, locals())
+    opts = update(opts, kwargs)
 
     dim, limits, eps_margins = prepare_for_conditional_plot(condition, opts)
 
@@ -1207,8 +1164,8 @@ def conditional_pairplot(
     opts = _get_default_opts()
     # update the defaults dictionary by the current values of the variables (passed by
     # the user)
-    opts = _update(opts, locals())
-    opts = _update(opts, kwargs)
+    opts = update(opts, locals())
+    opts = update(opts, kwargs)
     opts["lower"] = None
 
     dim, limits, eps_margins = prepare_for_conditional_plot(condition, opts)
@@ -1264,7 +1221,7 @@ def _arrange_grid(
     ticks: Optional[Union[List, torch.Tensor]],
     fig: Optional[FigureBase],
     axes: Optional[Axes],
-    fig_kwargs: Dict,
+    fig_kwargs: FigOptions,
 ) -> Tuple[FigureBase, Axes]:
     """
     Arranges the plots for any function that plots parameters either in a row of 1D
@@ -1351,7 +1308,7 @@ def _arrange_grid(
 
     # Create fig and axes if they were not passed.
     if fig is None or axes is None:
-        fig, axes = plt.subplots(rows, cols, figsize=figsize, **fig_kwargs["subplots"])  # pyright: ignore reportAssignmenttype
+        fig, axes = plt.subplots(rows, cols, figsize=figsize, **fig_kwargs.subplots)  # pyright: ignore reportAssignmenttype
     else:
         assert axes.shape == (  # pyright: ignore reportAttributeAccessIssue
             rows,
@@ -1359,8 +1316,8 @@ def _arrange_grid(
         ), f"Passed axes must match subplot shape: {rows, cols}."
 
     # Style figure
-    fig.subplots_adjust(**fig_kwargs["fig_subplots_adjust"])
-    fig.suptitle(fig_kwargs["title"], **fig_kwargs["title_format"])
+    fig.subplots_adjust(**fig_kwargs.fig_subplots_adjust)
+    fig.suptitle(fig_kwargs.title or "", **fig_kwargs.title_format)
 
     # Main Loop through all subplots, style and create the figures
     for row_idx, row in enumerate(subset_rows):
@@ -1409,12 +1366,12 @@ def _arrange_grid(
                         ax.plot(  # pyright: ignore reportOptionalMemberAccess
                             [v[:, col], v[:, col]],
                             extent,
-                            color=fig_kwargs["points_colors"][n],
-                            **fig_kwargs["points_diag"],
-                            label=fig_kwargs["points_labels"][n],
+                            color=fig_kwargs.points_colors[n],
+                            **fig_kwargs.points_diag,
+                            label=fig_kwargs.points_labels[n],
                         )
-                if fig_kwargs["legend"] and col == 0:
-                    ax.legend(**fig_kwargs["legend_kwargs"])  # pyright: ignore reportOptionalMemberAccess
+                if fig_kwargs.legend and col == 0:
+                    ax.legend(**fig_kwargs.legend_kwargs)  # pyright: ignore reportOptionalMemberAccess
 
             # Off-diagonals
 
@@ -1439,8 +1396,8 @@ def _arrange_grid(
                             ax.plot(  # pyright: ignore reportOptionalMemberAccess
                                 v[:, col],
                                 v[:, row],
-                                color=fig_kwargs["points_colors"][n],
-                                **fig_kwargs["points_offdiag"],
+                                color=fig_kwargs.points_colors[n],
+                                **fig_kwargs.points_offdiag,
                             )
             # lower
             elif current == "lower":
@@ -1463,8 +1420,8 @@ def _arrange_grid(
                             ax.plot(  # pyright: ignore reportOptionalMemberAccess
                                 v[:, col],
                                 v[:, row],
-                                color=fig_kwargs["points_colors"][n],
-                                **fig_kwargs["points_offdiag"],
+                                color=fig_kwargs.points_colors[n],
+                                **fig_kwargs.points_offdiag,
                             )
     # Add dots if we subset
     if len(subset) < dim:
@@ -1638,6 +1595,7 @@ def _sbc_rank_plot(
     if num_bins is None:
         # Recommendation from Talts et al.
         num_bins = num_sbc_runs // 20
+    assert isinstance(num_bins, int)
 
     # Plot one row subplot for each parameter, different "methods" on top of each other.
     if params_in_subplots:
@@ -1920,7 +1878,7 @@ def pp_plot(
     """Probability - Probability (P-P) plot for hypothesis tests
     to assess the validity of one (or several) estimator(s).
 
-    See [here](https://en.wikipedia.org/wiki/P%E2%80%93P_plot) for more details.
+    See `here <https://en.wikipedia.org/wiki/P%E2%80%93P_plot>`_ for more details.
 
     Args:
         scores: test scores estimated on observed data and evaluated on the test set,
@@ -2228,8 +2186,8 @@ def pairplot_dep(
     # update the defaults dictionary by the current values of the variables (passed by
     # the user)
 
-    opts = _update(opts, locals())
-    opts = _update(opts, kwargs)
+    opts = update(opts, locals())
+    opts = update(opts, kwargs)
 
     samples, dim, limits = prepare_for_plot(samples, limits)
 
@@ -2404,8 +2362,8 @@ def marginal_plot_dep(
     # update the defaults dictionary by the current values of the variables (passed by
     # the user)
 
-    opts = _update(opts, locals())
-    opts = _update(opts, kwargs)
+    opts = update(opts, locals())
+    opts = update(opts, kwargs)
 
     samples, dim, limits = prepare_for_plot(samples, limits)
 

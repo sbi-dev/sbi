@@ -1,0 +1,64 @@
+name: License Header Check
+
+on: [pull_request, workflow_dispatch]
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  check-license-headers:
+    name: Check License Headers
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        lfs: false
+
+    - name: Check license headers
+      run: |
+          expected_header_1="# This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed"
+          expected_header_2="# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>"
+
+          invalid_files=()
+
+          while IFS= read -r file; do
+              file_header_1=$(head -n 1 "$file")
+              file_header_2=$(head -n 2 "$file" | tail -n 1)
+
+              invalid=false
+
+              # Check the first line
+              if [ "$file_header_1" != "$expected_header_1" ]; then
+                  invalid=true
+              fi
+
+              # Check the second line
+              if [ "$file_header_2" != "$expected_header_2" ]; then
+                  invalid=true
+              fi
+
+              # If either line is invalid, add to the list
+              if [ "$invalid" = true ]; then
+                  invalid_files+=("$file")
+              fi
+
+          done < <(find sbi tests -name "*.py" -type f)
+
+          # Report results
+          if [ ${#invalid_files[@]} -ne 0 ]; then
+              echo "❌ Missing or incorrect license headers in the following files:"
+              for file in "${invalid_files[@]}"; do
+                  echo "   $file"
+              done
+              echo "Make sure the following two lines are provided and correctly spelled at the very start of all above listed files"
+              echo "$expected_header_1"
+              echo "$expected_header_2"
+              exit 1
+          else
+              echo "✅ All files have the correct license headers."
+              exit 0
+          fi

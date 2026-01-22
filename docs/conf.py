@@ -16,6 +16,8 @@
 # import os
 # import sys
 # sys.path.insert(0, os.path.abspath('.'))
+import os
+import shutil
 
 # -- Project information -----------------------------------------------------
 
@@ -33,12 +35,14 @@ extensions = [
     "sphinx.ext.intersphinx",
     "sphinx.ext.viewcode",
     "sphinx_math_dollar",
+    "sphinx_design",
     "sphinx.ext.mathjax",
     "myst_nb",
 ]
 
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
+    "torch": ("https://pytorch.org/docs/stable/", None),
 }
 
 source_suffix = {'.rst': 'restructuredtext', '.myst': 'myst-nb', '.ipynb': 'myst-nb'}
@@ -82,6 +86,7 @@ html_theme_options = {
     "toc_title": "Navigation",
     "show_navbar_depth": 1,
     "show_toc_level": 3,
+    "pygment_dark_style": "github-dark",  # All styles: https://pygments.org/styles/
 }
 
 # Add any paths that contain custom static files (such as style sheets) here,
@@ -94,3 +99,23 @@ autosummary_generate = True
 autodoc_typehints = "description"
 add_module_names = False
 autodoc_member_order = "bysource"
+
+
+def copy_data_folder(app, exception):
+    """Copy all images in `how_to_guide/data` to the `_build_` folder.
+
+    This function was written by ChatGPT."""
+    if exception is None:
+        source_dir = os.path.join(app.srcdir, 'how_to_guide', 'data')
+        dest_dir = os.path.join(app.outdir, 'how_to_guide', 'data')
+        if os.path.exists(source_dir):
+            os.makedirs(dest_dir, exist_ok=True)
+            for filename in os.listdir(source_dir):
+                shutil.copyfile(
+                    os.path.join(source_dir, filename), os.path.join(dest_dir, filename)
+                )
+
+
+def setup(app):
+    """Action to copy all images in `how_to_guide/data` to the `_build_` folder."""
+    app.connect('build-finished', copy_data_folder)

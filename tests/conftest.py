@@ -1,5 +1,6 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+
 import re
 import shutil
 from pathlib import Path
@@ -10,11 +11,15 @@ import pytest
 import torch
 from pytest_harvest import get_session_results_df, get_xdist_worker_id, is_main_process
 
+from sbi.inference.posteriors.posterior_parameters import MCMCPosteriorParameters
 from sbi.utils.sbiutils import seed_all_backends
 
 # Seed for `set_seed` fixture. Change to random state of all seeded tests.
 seed = 1
 harvested_fixture_data = None
+
+# Whether to keep benchmark results in a .csv or delete them
+KEEP_BM_RESULTS = True
 
 
 # Use seed automatically for every test function.
@@ -72,11 +77,25 @@ def pytest_addoption(parser):
         help="Run mini-benchmark tests with specified mode",
     )
 
+    parser.addoption(
+        "--bm-num-simulations",
+        action="store",
+        default=2000,
+        type=int,
+        help="Run mini-benchmark tests with specified number of simulations",
+    )
+
 
 @pytest.fixture
 def benchmark_mode(request):
     """Fixture to access the --bm value in test files."""
     return request.config.getoption("--bm-mode")
+
+
+@pytest.fixture
+def benchmark_num_simulations(request):
+    """Fixture to access the --bm-num-simulations value in test files."""
+    return int(request.config.getoption("--bm-num-simulations"))
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -207,15 +226,15 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
 
 
 @pytest.fixture(scope="function")
-def mcmc_params_accurate() -> dict:
+def mcmc_params_accurate() -> MCMCPosteriorParameters:
     """Fixture for MCMC parameters for functional tests."""
-    return dict(num_chains=20, thin=2, warmup_steps=50)
+    return MCMCPosteriorParameters(num_chains=20, thin=2, warmup_steps=50)
 
 
 @pytest.fixture(scope="function")
-def mcmc_params_fast() -> dict:
+def mcmc_params_fast() -> MCMCPosteriorParameters:
     """Fixture for MCMC parameters for fast tests."""
-    return dict(num_chains=1, thin=1, warmup_steps=1)
+    return MCMCPosteriorParameters(num_chains=1, thin=1, warmup_steps=1)
 
 
 # Pytest harvest xdist support.
@@ -234,11 +253,17 @@ def pytest_sessionfinish(session):
     session_results_df = get_session_results_df(session)
     suffix = 'all' if is_main_process(session) else get_xdist_worker_id(session)
     RESULTS_PATH = Path('./.bm_results/')
-    if RESULTS_PATH.exists():
+    if RESULTS_PATH.exists() and not KEEP_BM_RESULTS:
         rmtree(RESULTS_PATH)
-    RESULTS_PATH.mkdir(exist_ok=False)
+    RESULTS_PATH.mkdir(exist_ok=True)
 
     if suffix == 'all':
-        session_results_df.to_csv('./.bm_results/results_all.csv')
+        results_file = './.bm_results/results_all.csv'
+        if Path(results_file).exists():
+            # Append without writing header
+            session_results_df.to_csv(results_file, mode='a', header=False)
+        else:
+            # Write with header if file does not exist
+            session_results_df.to_csv(results_file)
     else:
         session_results_df.to_csv('./.bm_results/results_%s.csv' % suffix)

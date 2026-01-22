@@ -1,5 +1,13 @@
 # `sbi`: simulation-based inference toolkit
 
+!!! warning "Documentation Moved"
+
+    **This documentation is deprecated.** Please visit our new documentation at:
+
+    **[https://sbi.readthedocs.io/en/latest/](https://sbi.readthedocs.io/en/latest/)**
+
+    The documentation below is no longer maintained and may contain outdated information.
+
 `sbi` is a Python package for simulation-based inference, designed to meet the needs of
 both researchers and practitioners. Whether you need fine-grained control or an
 easy-to-use interface, `sbi` has you covered.

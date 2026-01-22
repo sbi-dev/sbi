@@ -1,4 +1,6 @@
-# import all needed modules
+# This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+
 from typing import Optional
 from warnings import warn
 
@@ -83,8 +85,8 @@ class MADEWrapper(made.MADE):
 
     def __init__(
         self,
-        features,
-        hidden_features,
+        features: int,
+        hidden_features: int,
         context_features=None,
         num_blocks=2,
         output_multiplier=1,
