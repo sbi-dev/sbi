@@ -12,7 +12,7 @@ from tqdm.auto import tqdm
 
 from sbi.utils.sbiutils import seed_all_backends
 
-Data = Tensor | np.ndarray | List[str]
+X = Tensor | np.ndarray | List[str]
 Theta = Tensor | np.ndarray | List[Any]
 
 
@@ -82,7 +82,7 @@ def simulate_for_sbi(
         # We enforce simulator_is_batched=True because simulate_for_sbi semantics
         # implies that the simulator receives batches (even if size 1).
         try:
-            theta, x = simulate_from_thetas(
+            theta, x = simulate_from_theta(
                 simulator,
                 theta_numpy,
                 simulation_batch_size=simulation_batch_size,
@@ -112,12 +112,12 @@ def simulate_for_sbi(
 
 @overload
 def parallelize_simulator(
-    simulator: Callable[[Theta], Data],
+    simulator: Callable[[Theta], X],
     simulator_is_batched: bool = ...,
     simulation_batch_size: int = ...,
     show_progress_bar: bool = ...,
     seed: Optional[int] = ...,
-) -> Callable[[Theta], Data]: ...
+) -> Callable[[Theta], X]: ...
 
 
 @overload
@@ -127,18 +127,18 @@ def parallelize_simulator(
     simulation_batch_size: int = ...,
     show_progress_bar: bool = ...,
     seed: Optional[int] = ...,
-) -> Callable[[Callable[[Theta], Data]], Callable[[Theta], Data]]: ...
+) -> Callable[[Callable[[Theta], X]], Callable[[Theta], X]]: ...
 
 
 def parallelize_simulator(
-    simulator: Callable[[Theta], Data] | None = None,
+    simulator: Callable[[Theta], X] | None = None,
     simulator_is_batched: bool = False,
     simulation_batch_size: int = 10,
     show_progress_bar: bool = True,
     seed: Optional[int] = None,
 ) -> Union[
-    Callable[[Theta], Data],
-    Callable[[Callable[[Theta], Data]], Callable[[Theta], Data]],
+    Callable[[Theta], X],
+    Callable[[Callable[[Theta], X]], Callable[[Theta], X]],
 ]:
     r"""
     Returns a function that executes simulations in parallel for a given set of
@@ -155,7 +155,7 @@ def parallelize_simulator(
         Callable that takes a set of :math:`\theta` and returns simulation outputs.
     """
 
-    def decorator(simulator_func: Callable[[Theta], Data]) -> Callable[[Theta], Data]:
+    def decorator(simulator_func: Callable[[Theta], X]) -> Callable[[Theta], X]:
         warnings.warn(
             "Joblib is used for parallelization. It is recommended to use numpy arrays "
             "for the simulator input and output to avoid serialization overhead with "
@@ -164,7 +164,7 @@ def parallelize_simulator(
             stacklevel=2,
         )
 
-        def parallel_simulator(thetas: Theta) -> Data:
+        def parallel_simulator(thetas: Theta) -> X:
             seed_all_backends(seed)
 
             num_simulations = len(thetas)
@@ -255,14 +255,14 @@ def parallelize_simulator(
     return decorator(simulator)
 
 
-def simulate_from_thetas(
-    simulator: Callable[[Theta], Data],
+def simulate_from_theta(
+    simulator: Callable[[Theta], X],
     thetas: Theta,
     simulator_is_batched: bool = False,
     simulation_batch_size: int = 10,
     show_progress_bar: bool = True,
     seed: Optional[int] = None,
-) -> Tuple[Theta, Data]:
+) -> Tuple[Theta, X]:
     r"""
     Execute simulations for a given set of parameters.
 

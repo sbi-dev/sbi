@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 import torch
 
-from sbi.utils.simulation_utils import parallelize_simulator, simulate_from_thetas
+from sbi.utils.simulation_utils import parallelize_simulator, simulate_from_theta
 
 # --- Simulators for testing ---
 
@@ -104,10 +104,10 @@ def test_parallelize_simulator_numpy_recommendation_warning():
 @pytest.mark.parametrize("simulator", [simple_simulator_torch, simple_simulator_numpy])
 @pytest.mark.parametrize("simulator_is_batched", [True, False])
 @pytest.mark.parametrize("simulation_batch_size", [1, 5])
-def test_simulate_from_thetas_correctness(
+def test_simulate_from_theta_correctness(
     simulator, simulator_is_batched, simulation_batch_size
 ):
-    """Test correctness of simulate_from_thetas with various configs."""
+    """Test correctness of simulate_from_theta with various configs."""
     num_sims = 10
     dim = 2
     thetas = torch.rand(num_sims, dim)
@@ -126,7 +126,7 @@ def test_simulate_from_thetas_correctness(
     with warnings.catch_warnings(record=True) as w:
         warnings.simplefilter("always")
 
-        theta_out, x_out = simulate_from_thetas(
+        theta_out, x_out = simulate_from_theta(
             simulator,
             thetas,
             simulator_is_batched=simulator_is_batched,
@@ -168,7 +168,7 @@ def test_simulate_from_thetas_list_return():
     def list_sim_batched(t):
         return [f"path_{v.item()}" for v in t]
 
-    theta_out, x_out = simulate_from_thetas(
+    theta_out, x_out = simulate_from_theta(
         list_sim_batched,
         thetas,
         simulator_is_batched=True,
@@ -183,7 +183,7 @@ def test_simulate_from_thetas_list_return():
     def list_sim_unbatched(t):
         return f"path_{t.item()}"
 
-    theta_out2, x_out2 = simulate_from_thetas(
+    theta_out2, x_out2 = simulate_from_theta(
         list_sim_unbatched,
         thetas,
         simulator_is_batched=False,
