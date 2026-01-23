@@ -138,6 +138,7 @@ class RejectionPosterior(NeuralPosterior):
         show_progress_bars: bool = True,
         reject_outside_prior: bool = True,
         max_sampling_time: Optional[float] = None,
+        return_partial_on_timeout: bool = False,
     ):
         r"""Draw samples from the approximate posterior via rejection sampling.
 
@@ -164,6 +165,10 @@ class RejectionPosterior(NeuralPosterior):
                 If exceeded, sampling is aborted and a RuntimeError is raised. Only
                 applies when `reject_outside_prior=True` (no effect otherwise since
                 direct sampling from the proposal is fast).
+            return_partial_on_timeout: If True and `max_sampling_time` is exceeded,
+                return the samples collected so far instead of raising a RuntimeError.
+                A warning will be issued. Only applies when `reject_outside_prior=True`
+                (default).
 
         Returns:
             Samples from posterior.
@@ -203,6 +208,7 @@ class RejectionPosterior(NeuralPosterior):
                 num_iter_to_find_max=num_iter_to_find_max,
                 m=m,
                 max_sampling_time=max_sampling_time,
+                return_partial_on_timeout=return_partial_on_timeout,
                 device=self._device,
             )
         else:
