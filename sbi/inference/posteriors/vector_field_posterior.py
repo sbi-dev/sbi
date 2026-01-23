@@ -212,7 +212,8 @@ class VectorFieldPosterior(NeuralPosterior):
                 direct sampling does not use rejection).
             return_partial_on_timeout: If True and `max_sampling_time` is exceeded,
                 return the samples collected so far instead of raising a RuntimeError.
-                A warning will be issued. Only applies when `reject_outside_prior=True`.
+                A warning will be issued. Only applies when `reject_outside_prior=True`
+                (default).
         """
 
         if sample_with is None:

@@ -281,7 +281,7 @@ def accept_reject_sample(
             rate is too high. Used only for printing during a potential warning.
         max_sampling_time: Optional maximum allowed sampling time (in seconds).
             If exceeded, the sampling loop is interrupted and a RuntimeError is raised
-            (unless `return_partial_on_timeout=True`). This prevents infinite or
+            unless `return_partial_on_timeout=True`. This prevents infinite or
             excessively slow rejection sampling runs, e.g. in cases of heavy leakage
             or extremely low acceptance rates.
         return_partial_on_timeout: If True and `max_sampling_time` is exceeded, return

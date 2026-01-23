@@ -162,7 +162,8 @@ class DirectPosterior(NeuralPosterior):
                 direct sampling is fast).
             return_partial_on_timeout: If True and `max_sampling_time` is exceeded,
                 return the samples collected so far instead of raising a RuntimeError.
-                A warning will be issued. Only applies when `reject_outside_prior=True`.
+                A warning will be issued. Only applies when `reject_outside_prior=True`
+                (default).
         """
         num_samples = torch.Size(sample_shape).numel()
         x = self._x_else_default_x(x)
