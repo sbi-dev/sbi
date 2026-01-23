@@ -30,9 +30,7 @@ from sbi.utils.user_input_checks import validate_theta_and_x
 
 def build_input_layer(
     batch_theta: Tensor,
-    z_score_theta: Optional[
-        Literal["independent", "structured", "transform_to_unconstrained", "none"]
-    ] = "independent",
+    z_score_theta: Optional[str] = "independent",
     embedding_net_theta: nn.Module = nn.Identity(),
 ) -> nn.Module:
     r"""Builds input layer for the `RestrictionEstimator` with option to z-score.
