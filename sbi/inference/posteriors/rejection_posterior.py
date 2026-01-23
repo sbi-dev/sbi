@@ -139,7 +139,7 @@ class RejectionPosterior(NeuralPosterior):
         reject_outside_prior: bool = True,
         max_sampling_time: Optional[float] = None,
     ):
-        r"""Draw samples from the approximate posterior distribution $p(\theta|x)$.
+        r"""Draw samples from the approximate posterior via rejection sampling.
 
         Args:
             sample_shape: Desired shape of samples that are drawn from posterior. If
