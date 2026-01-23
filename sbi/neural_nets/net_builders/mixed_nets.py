@@ -2,7 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import warnings
-from typing import Literal, Optional
+from typing import Optional
 
 import torch
 from torch import Tensor, nn
@@ -55,12 +55,8 @@ model_builders = {
 def _build_mixed_density_estimator(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Optional[
-        Literal["independent", "structured", "transform_to_unconstrained", "none"]
-    ] = "independent",
-    z_score_y: Optional[
-        Literal["independent", "structured", "transform_to_unconstrained", "none"]
-    ] = "independent",
+    z_score_x: Optional[str] = "independent",
+    z_score_y: Optional[str] = "independent",
     flow_model: str = "nsf",
     num_categories_per_variable: Optional[Tensor] = None,
     embedding_net: nn.Module = nn.Identity(),

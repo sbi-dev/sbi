@@ -1,7 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Literal, Optional
+from typing import Optional
 
 from pyknos.mdn.mdn import MultivariateGaussianMDN
 from pyknos.nflows import flows, transforms
@@ -20,12 +20,8 @@ from sbi.utils.user_input_checks import check_data_device
 def build_mdn(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Optional[
-        Literal["independent", "structured", "transform_to_unconstrained", "none"]
-    ] = "independent",
-    z_score_y: Optional[
-        Literal["independent", "structured", "transform_to_unconstrained", "none"]
-    ] = "independent",
+    z_score_x: Optional[str] = "independent",
+    z_score_y: Optional[str] = "independent",
     hidden_features: int = 50,
     num_components: int = 10,
     embedding_net: nn.Module = nn.Identity(),

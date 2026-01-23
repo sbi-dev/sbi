@@ -2,7 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import warnings
-from typing import Literal, Optional
+from typing import Optional
 
 from torch import Tensor, nn, tensor, unique
 
@@ -19,12 +19,8 @@ from sbi.utils.user_input_checks import check_data_device
 def build_categoricalmassestimator(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Optional[
-        Literal["none", "independent", "structured", "transform_to_unconstrained"]
-    ] = "none",
-    z_score_y: Optional[
-        Literal["none", "independent", "structured", "transform_to_unconstrained"]
-    ] = "independent",
+    z_score_x: Optional[str] = "none",
+    z_score_y: Optional[str] = "independent",
     num_hidden: int = 20,
     num_layers: int = 2,
     num_categories_per_variable: Optional[Tensor] = None,

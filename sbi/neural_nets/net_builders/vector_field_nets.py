@@ -30,12 +30,8 @@ def build_vector_field_estimator(
     batch_x: Tensor,
     batch_y: Tensor,
     estimator_type: Literal["flow", "score"] = "flow",
-    z_score_x: Optional[
-        Literal["independent", "structured", "transform_to_unconstrained", "none"]
-    ] = None,
-    z_score_y: Optional[
-        Literal["independent", "structured", "transform_to_unconstrained", "none"]
-    ] = None,
+    z_score_x: Optional[str] = None,
+    z_score_y: Optional[str] = None,
     embedding_net: nn.Module = nn.Identity(),
     sde_type: str = "ve",  # Only used for score estimator
     hidden_features: Union[Sequence[int], int] = 100,
