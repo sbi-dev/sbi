@@ -190,14 +190,14 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         method: Optional[str] = None,
         oversampling_factor: int = 32,
         max_sampling_batch_size: int = 10_000,
-        sample_with: Optional[str] = None,
         show_progress_bars: bool = False,
     ) -> Union[Tensor, Tuple[Tensor, Tensor]]:
-        """Return samples from the approximate posterior distribution.
+        """Draw samples from the approximate posterior distribution $p(\theta|x)$.
 
         Args:
             sample_shape: Shape of samples that are drawn from posterior.
-            x: Observed data.
+            x: Conditioning observation $x_o$. If not provided, uses the default `x`
+                set via `.set_default_x()`.
             method: Either of [`sir`|`importance`]. This sets the behavior of the
                 `.sample()` method. With `sir`, approximate posterior samples are
                 generated with sampling importance resampling (SIR). With
@@ -211,13 +211,6 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         """
 
         method = self.method if method is None else method
-
-        if sample_with is not None:
-            raise ValueError(
-                f"You set `sample_with={sample_with}`. As of sbi v0.18.0, setting "
-                f"`sample_with` is no longer supported. You have to rerun "
-                f"`.build_posterior(sample_with={sample_with}).`"
-            )
 
         self.potential_fn.set_x(self._x_else_default_x(x))
 
@@ -255,8 +248,6 @@ class ImportanceSamplingPosterior(NeuralPosterior):
 
         Args:
             sample_shape: Desired shape of samples that are drawn from posterior.
-            sample_with: This argument only exists to keep backward-compatibility with
-                `sbi` v0.17.2 or older. If it is set, we instantly raise an error.
             show_progress_bars: Whether to show sampling progress monitor.
 
         Returns:
@@ -286,13 +277,10 @@ class ImportanceSamplingPosterior(NeuralPosterior):
             sample_shape: Desired shape of samples that are drawn from posterior. If
                 sample_shape is multidimensional we simply draw `sample_shape.numel()`
                 samples and then reshape into the desired shape.
-            x: Observed data.
-            sample_with: This argument only exists to keep backward-compatibility with
-                `sbi` v0.17.2 or older. If it is set, we instantly raise an error.
-            oversampling_factor: Number of proposed samples form which only one is
+            oversampling_factor: Number of proposed samples from which only one is
                 selected based on its importance weight.
-            max_sampling_batch_size: The batchsize of samples being drawn from
-                the proposal at every iteration. Used only in `sir_sample()`.
+            max_sampling_batch_size: The batch size of samples being drawn from
+                the proposal at every iteration.
             show_progress_bars: Whether to show sampling progress monitor.
 
         Returns:
