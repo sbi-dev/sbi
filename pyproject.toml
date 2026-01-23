@@ -29,7 +29,6 @@ dynamic = ["version"]
 readme = "README.md"
 keywords = ["Bayesian inference", "simulation-based inference", "PyTorch"]
 dependencies = [
-    "arviz",
     "joblib>=1.0.0",
     "matplotlib",
     "numpy",

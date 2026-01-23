@@ -57,6 +57,7 @@ Sampling
    how_to_guide/09_sampler_interface.ipynb
    how_to_guide/10_refine_posterior_with_importance_sampling.ipynb
    how_to_guide/11_iid_sampling_with_nle_or_nre.ipynb
+   how_to_guide/12_mcmc_diagnostics_with_arviz.ipynb
 
 
 Diagnostics
