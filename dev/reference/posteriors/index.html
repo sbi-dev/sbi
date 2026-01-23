@@ -1828,13 +1828,7 @@ trained network to deal with these cases.</p>
 <span class="normal">566</span>
 <span class="normal">567</span>
 <span class="normal">568</span>
-<span class="normal">569</span>
-<span class="normal">570</span>
-<span class="normal">571</span>
-<span class="normal">572</span>
-<span class="normal">573</span>
-<span class="normal">574</span>
-<span class="normal">575</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DirectPosterior</span><span class="p">(</span><span class="n">NeuralPosterior</span><span class="p">):</span>
+<span class="normal">569</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DirectPosterior</span><span class="p">(</span><span class="n">NeuralPosterior</span><span class="p">):</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Posterior based on neural networks that directly estimate the posterior (NPE).</span>
 
 <span class="sd">    NPE trains a neural network to directly approximate the posterior distribution.</span>
@@ -1947,19 +1941,19 @@ trained network to deal with these cases.</p>
         <span class="n">sample_shape</span><span class="p">:</span> <span class="n">Shape</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">(),</span>
         <span class="n">x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">max_sampling_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10_000</span><span class="p">,</span>
-        <span class="n">sample_with</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">show_progress_bars</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
         <span class="n">reject_outside_prior</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
         <span class="n">max_sampling_time</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
-<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Return samples from posterior distribution $p(\theta|x)$.</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Draw samples from the approximate posterior distribution $p(\theta|x)$.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            sample_shape: Desired shape of samples that are drawn from posterior. If</span>
 <span class="sd">                sample_shape is multidimensional we simply draw `sample_shape.numel()`</span>
 <span class="sd">                samples and then reshape into the desired shape.</span>
-<span class="sd">            sample_with: This argument only exists to keep backward-compatibility with</span>
-<span class="sd">                `sbi` v0.17.2 or older. If it is set, we instantly raise an error.</span>
+<span class="sd">            x: Conditioning observation $x_o$. If not provided, uses the default `x`</span>
+<span class="sd">                set via `.set_default_x()`.</span>
+<span class="sd">            max_sampling_batch_size: Maximum batch size for rejection sampling.</span>
 <span class="sd">            show_progress_bars: Whether to show sampling progress monitor.</span>
 <span class="sd">            reject_outside_prior: If True (default), rejection sampling is used to</span>
 <span class="sd">                ensure samples lie within the prior support. If False, samples are drawn</span>
@@ -1989,13 +1983,6 @@ trained network to deal with these cases.</p>
             <span class="k">if</span> <span class="n">max_sampling_batch_size</span> <span class="ow">is</span> <span class="kc">None</span>
             <span class="k">else</span> <span class="n">max_sampling_batch_size</span>
         <span class="p">)</span>
-
-        <span class="k">if</span> <span class="n">sample_with</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;You set `sample_with=</span><span class="si">{</span><span class="n">sample_with</span><span class="si">}</span><span class="s2">`. As of sbi v0.18.0, setting &quot;</span>
-                <span class="sa">f</span><span class="s2">&quot;`sample_with` is no longer supported. You have to rerun &quot;</span>
-                <span class="sa">f</span><span class="s2">&quot;`.build_posterior(sample_with=</span><span class="si">{</span><span class="n">sample_with</span><span class="si">}</span><span class="s2">).`&quot;</span>
-            <span class="p">)</span>
 
         <span class="k">if</span> <span class="n">reject_outside_prior</span><span class="p">:</span>
             <span class="c1"># Normal rejection behavior.</span>
@@ -2028,9 +2015,10 @@ trained network to deal with these cases.</p>
         <span class="n">reject_outside_prior</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
         <span class="n">max_sampling_time</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
-<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Given a batch of observations [x_1, ..., x_B] this function samples from</span>
-<span class="sd">        posteriors $p(\theta|x_1)$, ... ,$p(\theta|x_B)$, in a batched (i.e. vectorized)</span>
-<span class="sd">        manner.</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Draw samples from the posteriors for a batch of different xs.</span>
+
+<span class="sd">        Given a batch of observations `[x_1, ..., x_B]`, this method samples from</span>
+<span class="sd">        posteriors $p(\theta|x_1), \ldots, p(\theta|x_B)$ in a vectorized manner.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            sample_shape: Desired shape of samples that are drawn from the posterior</span>
@@ -2744,7 +2732,13 @@ re-evaluate only whenever a new <code>x</code> is passed.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/direct_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">451</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">445</span>
+<span class="normal">446</span>
+<span class="normal">447</span>
+<span class="normal">448</span>
+<span class="normal">449</span>
+<span class="normal">450</span>
+<span class="normal">451</span>
 <span class="normal">452</span>
 <span class="normal">453</span>
 <span class="normal">454</span>
@@ -2795,13 +2789,7 @@ re-evaluate only whenever a new <code>x</code> is passed.</p>
 <span class="normal">499</span>
 <span class="normal">500</span>
 <span class="normal">501</span>
-<span class="normal">502</span>
-<span class="normal">503</span>
-<span class="normal">504</span>
-<span class="normal">505</span>
-<span class="normal">506</span>
-<span class="normal">507</span>
-<span class="normal">508</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">()</span>
+<span class="normal">502</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">()</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">leakage_correction</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
@@ -3005,7 +2993,13 @@ These parameters only have an effect if <code>norm_posterior=True</code>.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/direct_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">296</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">290</span>
+<span class="normal">291</span>
+<span class="normal">292</span>
+<span class="normal">293</span>
+<span class="normal">294</span>
+<span class="normal">295</span>
+<span class="normal">296</span>
 <span class="normal">297</span>
 <span class="normal">298</span>
 <span class="normal">299</span>
@@ -3077,13 +3071,7 @@ These parameters only have an effect if <code>norm_posterior=True</code>.</p>
 <span class="normal">365</span>
 <span class="normal">366</span>
 <span class="normal">367</span>
-<span class="normal">368</span>
-<span class="normal">369</span>
-<span class="normal">370</span>
-<span class="normal">371</span>
-<span class="normal">372</span>
-<span class="normal">373</span>
-<span class="normal">374</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">log_prob</span><span class="p">(</span>
+<span class="normal">368</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">log_prob</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">theta</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -3314,7 +3302,13 @@ These parameters only have an effect if <code>norm_posterior=True</code>.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/direct_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">376</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">370</span>
+<span class="normal">371</span>
+<span class="normal">372</span>
+<span class="normal">373</span>
+<span class="normal">374</span>
+<span class="normal">375</span>
+<span class="normal">376</span>
 <span class="normal">377</span>
 <span class="normal">378</span>
 <span class="normal">379</span>
@@ -3381,13 +3375,7 @@ These parameters only have an effect if <code>norm_posterior=True</code>.</p>
 <span class="normal">440</span>
 <span class="normal">441</span>
 <span class="normal">442</span>
-<span class="normal">443</span>
-<span class="normal">444</span>
-<span class="normal">445</span>
-<span class="normal">446</span>
-<span class="normal">447</span>
-<span class="normal">448</span>
-<span class="normal">449</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">log_prob_batched</span><span class="p">(</span>
+<span class="normal">443</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">log_prob_batched</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">theta</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
@@ -3703,7 +3691,13 @@ have a cached value.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/direct_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">510</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">504</span>
+<span class="normal">505</span>
+<span class="normal">506</span>
+<span class="normal">507</span>
+<span class="normal">508</span>
+<span class="normal">509</span>
+<span class="normal">510</span>
 <span class="normal">511</span>
 <span class="normal">512</span>
 <span class="normal">513</span>
@@ -3762,13 +3756,7 @@ have a cached value.</p>
 <span class="normal">566</span>
 <span class="normal">567</span>
 <span class="normal">568</span>
-<span class="normal">569</span>
-<span class="normal">570</span>
-<span class="normal">571</span>
-<span class="normal">572</span>
-<span class="normal">573</span>
-<span class="normal">574</span>
-<span class="normal">575</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">map</span><span class="p">(</span>
+<span class="normal">569</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">map</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">num_iter</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1_000</span><span class="p">,</span>
@@ -3844,14 +3832,14 @@ have a cached value.</p>
 
 
 <h3 id="sbi.inference.posteriors.direct_posterior.DirectPosterior.sample" class="doc doc-heading">
-            <code class=" language-python"><span class="n">sample</span><span class="p">(</span><span class="n">sample_shape</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">(),</span> <span class="n">x</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">max_sampling_batch_size</span><span class="o">=</span><span class="mi">10000</span><span class="p">,</span> <span class="n">sample_with</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">reject_outside_prior</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">max_sampling_time</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+            <code class=" language-python"><span class="n">sample</span><span class="p">(</span><span class="n">sample_shape</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">(),</span> <span class="n">x</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">max_sampling_batch_size</span><span class="o">=</span><span class="mi">10000</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">reject_outside_prior</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">max_sampling_time</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 <a href="#sbi.inference.posteriors.direct_posterior.DirectPosterior.sample" class="headerlink" title="Permanent link">&para;</a></h3>
 
 
     <div class="doc doc-contents ">
 
-        <p>Return samples from posterior distribution <span class="arithmatex">\(p(\theta|x)\)</span>.</p>
+        <p>Draw samples from the approximate posterior distribution <span class="arithmatex">\(p(\theta|x)\)</span>.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -3885,19 +3873,35 @@ samples and then reshape into the desired shape.</p>
           </tr>
           <tr class="doc-section-item">
             <td>
-                <code>sample_with</code>
+                <code>x</code>
             </td>
             <td>
-                  <code><span title="typing.Optional">Optional</span>[<span title="str">str</span>]</code>
+                  <code><span title="typing.Optional">Optional</span>[<span title="torch.Tensor">Tensor</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>This argument only exists to keep backward-compatibility with
-<code>sbi</code> v0.17.2 or older. If it is set, we instantly raise an error.</p>
+                <p>Conditioning observation <span class="arithmatex">\(x_o\)</span>. If not provided, uses the default <code>x</code>
+set via <code>.set_default_x()</code>.</p>
               </div>
             </td>
             <td>
                   <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>max_sampling_batch_size</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Maximum batch size for rejection sampling.</p>
+              </div>
+            </td>
+            <td>
+                  <code>10000</code>
             </td>
           </tr>
           <tr class="doc-section-item">
@@ -4028,31 +4032,24 @@ direct sampling is fast).</p>
 <span class="normal">200</span>
 <span class="normal">201</span>
 <span class="normal">202</span>
-<span class="normal">203</span>
-<span class="normal">204</span>
-<span class="normal">205</span>
-<span class="normal">206</span>
-<span class="normal">207</span>
-<span class="normal">208</span>
-<span class="normal">209</span>
-<span class="normal">210</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">sample</span><span class="p">(</span>
+<span class="normal">203</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">sample</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">sample_shape</span><span class="p">:</span> <span class="n">Shape</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">(),</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">max_sampling_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10_000</span><span class="p">,</span>
-    <span class="n">sample_with</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">show_progress_bars</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
     <span class="n">reject_outside_prior</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
     <span class="n">max_sampling_time</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
-<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Return samples from posterior distribution $p(\theta|x)$.</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Draw samples from the approximate posterior distribution $p(\theta|x)$.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        sample_shape: Desired shape of samples that are drawn from posterior. If</span>
 <span class="sd">            sample_shape is multidimensional we simply draw `sample_shape.numel()`</span>
 <span class="sd">            samples and then reshape into the desired shape.</span>
-<span class="sd">        sample_with: This argument only exists to keep backward-compatibility with</span>
-<span class="sd">            `sbi` v0.17.2 or older. If it is set, we instantly raise an error.</span>
+<span class="sd">        x: Conditioning observation $x_o$. If not provided, uses the default `x`</span>
+<span class="sd">            set via `.set_default_x()`.</span>
+<span class="sd">        max_sampling_batch_size: Maximum batch size for rejection sampling.</span>
 <span class="sd">        show_progress_bars: Whether to show sampling progress monitor.</span>
 <span class="sd">        reject_outside_prior: If True (default), rejection sampling is used to</span>
 <span class="sd">            ensure samples lie within the prior support. If False, samples are drawn</span>
@@ -4082,13 +4079,6 @@ direct sampling is fast).</p>
         <span class="k">if</span> <span class="n">max_sampling_batch_size</span> <span class="ow">is</span> <span class="kc">None</span>
         <span class="k">else</span> <span class="n">max_sampling_batch_size</span>
     <span class="p">)</span>
-
-    <span class="k">if</span> <span class="n">sample_with</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">&quot;You set `sample_with=</span><span class="si">{</span><span class="n">sample_with</span><span class="si">}</span><span class="s2">`. As of sbi v0.18.0, setting &quot;</span>
-            <span class="sa">f</span><span class="s2">&quot;`sample_with` is no longer supported. You have to rerun &quot;</span>
-            <span class="sa">f</span><span class="s2">&quot;`.build_posterior(sample_with=</span><span class="si">{</span><span class="n">sample_with</span><span class="si">}</span><span class="s2">).`&quot;</span>
-        <span class="p">)</span>
 
     <span class="k">if</span> <span class="n">reject_outside_prior</span><span class="p">:</span>
         <span class="c1"># Normal rejection behavior.</span>
@@ -4128,9 +4118,9 @@ direct sampling is fast).</p>
 
     <div class="doc doc-contents ">
 
-        <p>Given a batch of observations [x_1, &hellip;, x_B] this function samples from
-posteriors <span class="arithmatex">\(p(\theta|x_1)\)</span>, &hellip; ,<span class="arithmatex">\(p(\theta|x_B)\)</span>, in a batched (i.e. vectorized)
-manner.</p>
+        <p>Draw samples from the posteriors for a batch of different xs.</p>
+<p>Given a batch of observations <code>[x_1, ..., x_B]</code>, this method samples from
+posteriors <span class="arithmatex">\(p(\theta|x_1), \ldots, p(\theta|x_B)\)</span> in a vectorized manner.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -4276,7 +4266,14 @@ applies when <code>reject_outside_prior=True</code>.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/direct_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">212</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">205</span>
+<span class="normal">206</span>
+<span class="normal">207</span>
+<span class="normal">208</span>
+<span class="normal">209</span>
+<span class="normal">210</span>
+<span class="normal">211</span>
+<span class="normal">212</span>
 <span class="normal">213</span>
 <span class="normal">214</span>
 <span class="normal">215</span>
@@ -4352,13 +4349,7 @@ applies when <code>reject_outside_prior=True</code>.</p>
 <span class="normal">285</span>
 <span class="normal">286</span>
 <span class="normal">287</span>
-<span class="normal">288</span>
-<span class="normal">289</span>
-<span class="normal">290</span>
-<span class="normal">291</span>
-<span class="normal">292</span>
-<span class="normal">293</span>
-<span class="normal">294</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">sample_batched</span><span class="p">(</span>
+<span class="normal">288</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">sample_batched</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">sample_shape</span><span class="p">:</span> <span class="n">Shape</span><span class="p">,</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
@@ -4367,9 +4358,10 @@ applies when <code>reject_outside_prior=True</code>.</p>
     <span class="n">reject_outside_prior</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
     <span class="n">max_sampling_time</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
-<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Given a batch of observations [x_1, ..., x_B] this function samples from</span>
-<span class="sd">    posteriors $p(\theta|x_1)$, ... ,$p(\theta|x_B)$, in a batched (i.e. vectorized)</span>
-<span class="sd">    manner.</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Draw samples from the posteriors for a batch of different xs.</span>
+
+<span class="sd">    Given a batch of observations `[x_1, ..., x_B]`, this method samples from</span>
+<span class="sd">    posteriors $p(\theta|x_1), \ldots, p(\theta|x_B)$ in a vectorized manner.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        sample_shape: Desired shape of samples that are drawn from the posterior</span>
@@ -4979,19 +4971,7 @@ sampling-importance-resampling (SIR) (with <code>.sir_sample()</code>)</p>
 <span class="normal">376</span>
 <span class="normal">377</span>
 <span class="normal">378</span>
-<span class="normal">379</span>
-<span class="normal">380</span>
-<span class="normal">381</span>
-<span class="normal">382</span>
-<span class="normal">383</span>
-<span class="normal">384</span>
-<span class="normal">385</span>
-<span class="normal">386</span>
-<span class="normal">387</span>
-<span class="normal">388</span>
-<span class="normal">389</span>
-<span class="normal">390</span>
-<span class="normal">391</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">ImportanceSamplingPosterior</span><span class="p">(</span><span class="n">NeuralPosterior</span><span class="p">):</span>
+<span class="normal">379</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">ImportanceSamplingPosterior</span><span class="p">(</span><span class="n">NeuralPosterior</span><span class="p">):</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Provides importance sampling to sample from the posterior.</span>
 
 <span class="sd">    SNLE or SNRE train neural networks to approximate the likelihood(-ratios).</span>
@@ -5166,14 +5146,14 @@ sampling-importance-resampling (SIR) (with <code>.sir_sample()</code>)</p>
         <span class="n">method</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">oversampling_factor</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">32</span><span class="p">,</span>
         <span class="n">max_sampling_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10_000</span><span class="p">,</span>
-        <span class="n">sample_with</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">show_progress_bars</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">Tensor</span><span class="p">]]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return samples from the approximate posterior distribution.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Draw samples from the approximate posterior distribution $p(\theta|x)$.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            sample_shape: Shape of samples that are drawn from posterior.</span>
-<span class="sd">            x: Observed data.</span>
+<span class="sd">            x: Conditioning observation $x_o$. If not provided, uses the default `x`</span>
+<span class="sd">                set via `.set_default_x()`.</span>
 <span class="sd">            method: Either of [`sir`|`importance`]. This sets the behavior of the</span>
 <span class="sd">                `.sample()` method. With `sir`, approximate posterior samples are</span>
 <span class="sd">                generated with sampling importance resampling (SIR). With</span>
@@ -5187,13 +5167,6 @@ sampling-importance-resampling (SIR) (with <code>.sir_sample()</code>)</p>
 <span class="sd">        &quot;&quot;&quot;</span>
 
         <span class="n">method</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">method</span> <span class="k">if</span> <span class="n">method</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">method</span>
-
-        <span class="k">if</span> <span class="n">sample_with</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;You set `sample_with=</span><span class="si">{</span><span class="n">sample_with</span><span class="si">}</span><span class="s2">`. As of sbi v0.18.0, setting &quot;</span>
-                <span class="sa">f</span><span class="s2">&quot;`sample_with` is no longer supported. You have to rerun &quot;</span>
-                <span class="sa">f</span><span class="s2">&quot;`.build_posterior(sample_with=</span><span class="si">{</span><span class="n">sample_with</span><span class="si">}</span><span class="s2">).`&quot;</span>
-            <span class="p">)</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">potential_fn</span><span class="o">.</span><span class="n">set_x</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_x_else_default_x</span><span class="p">(</span><span class="n">x</span><span class="p">))</span>
 
@@ -5231,8 +5204,6 @@ sampling-importance-resampling (SIR) (with <code>.sir_sample()</code>)</p>
 
 <span class="sd">        Args:</span>
 <span class="sd">            sample_shape: Desired shape of samples that are drawn from posterior.</span>
-<span class="sd">            sample_with: This argument only exists to keep backward-compatibility with</span>
-<span class="sd">                `sbi` v0.17.2 or older. If it is set, we instantly raise an error.</span>
 <span class="sd">            show_progress_bars: Whether to show sampling progress monitor.</span>
 
 <span class="sd">        Returns:</span>
@@ -5262,13 +5233,10 @@ sampling-importance-resampling (SIR) (with <code>.sir_sample()</code>)</p>
 <span class="sd">            sample_shape: Desired shape of samples that are drawn from posterior. If</span>
 <span class="sd">                sample_shape is multidimensional we simply draw `sample_shape.numel()`</span>
 <span class="sd">                samples and then reshape into the desired shape.</span>
-<span class="sd">            x: Observed data.</span>
-<span class="sd">            sample_with: This argument only exists to keep backward-compatibility with</span>
-<span class="sd">                `sbi` v0.17.2 or older. If it is set, we instantly raise an error.</span>
-<span class="sd">            oversampling_factor: Number of proposed samples form which only one is</span>
+<span class="sd">            oversampling_factor: Number of proposed samples from which only one is</span>
 <span class="sd">                selected based on its importance weight.</span>
-<span class="sd">            max_sampling_batch_size: The batchsize of samples being drawn from</span>
-<span class="sd">                the proposal at every iteration. Used only in `sir_sample()`.</span>
+<span class="sd">            max_sampling_batch_size: The batch size of samples being drawn from</span>
+<span class="sd">                the proposal at every iteration.</span>
 <span class="sd">            show_progress_bars: Whether to show sampling progress monitor.</span>
 
 <span class="sd">        Returns:</span>
@@ -6225,7 +6193,19 @@ have a cached value.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/importance_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">326</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">314</span>
+<span class="normal">315</span>
+<span class="normal">316</span>
+<span class="normal">317</span>
+<span class="normal">318</span>
+<span class="normal">319</span>
+<span class="normal">320</span>
+<span class="normal">321</span>
+<span class="normal">322</span>
+<span class="normal">323</span>
+<span class="normal">324</span>
+<span class="normal">325</span>
+<span class="normal">326</span>
 <span class="normal">327</span>
 <span class="normal">328</span>
 <span class="normal">329</span>
@@ -6278,19 +6258,7 @@ have a cached value.</p>
 <span class="normal">376</span>
 <span class="normal">377</span>
 <span class="normal">378</span>
-<span class="normal">379</span>
-<span class="normal">380</span>
-<span class="normal">381</span>
-<span class="normal">382</span>
-<span class="normal">383</span>
-<span class="normal">384</span>
-<span class="normal">385</span>
-<span class="normal">386</span>
-<span class="normal">387</span>
-<span class="normal">388</span>
-<span class="normal">389</span>
-<span class="normal">390</span>
-<span class="normal">391</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">map</span><span class="p">(</span>
+<span class="normal">379</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">map</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">num_iter</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1_000</span><span class="p">,</span>
@@ -6366,14 +6334,14 @@ have a cached value.</p>
 
 
 <h3 id="sbi.inference.posteriors.importance_posterior.ImportanceSamplingPosterior.sample" class="doc doc-heading">
-            <code class=" language-python"><span class="n">sample</span><span class="p">(</span><span class="n">sample_shape</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">(),</span> <span class="n">x</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">oversampling_factor</span><span class="o">=</span><span class="mi">32</span><span class="p">,</span> <span class="n">max_sampling_batch_size</span><span class="o">=</span><span class="mi">10000</span><span class="p">,</span> <span class="n">sample_with</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span></code>
+            <code class=" language-python"><span class="n">sample</span><span class="p">(</span><span class="n">sample_shape</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">(),</span> <span class="n">x</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">oversampling_factor</span><span class="o">=</span><span class="mi">32</span><span class="p">,</span> <span class="n">max_sampling_batch_size</span><span class="o">=</span><span class="mi">10000</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span></code>
 
 <a href="#sbi.inference.posteriors.importance_posterior.ImportanceSamplingPosterior.sample" class="headerlink" title="Permanent link">&para;</a></h3>
 
 
     <div class="doc doc-contents ">
 
-        <p>Return samples from the approximate posterior distribution.</p>
+        <p>Draw samples from the approximate posterior distribution <span class="arithmatex">\(p(    heta|x)\)</span>.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -6412,7 +6380,8 @@ have a cached value.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Observed data.</p>
+                <p>Conditioning observation <span class="arithmatex">\(x_o\)</span>. If not provided, uses the default <code>x</code>
+set via <code>.set_default_x()</code>.</p>
               </div>
             </td>
             <td>
@@ -6536,28 +6505,21 @@ proposal at every iteration.</p>
 <span class="normal">224</span>
 <span class="normal">225</span>
 <span class="normal">226</span>
-<span class="normal">227</span>
-<span class="normal">228</span>
-<span class="normal">229</span>
-<span class="normal">230</span>
-<span class="normal">231</span>
-<span class="normal">232</span>
-<span class="normal">233</span>
-<span class="normal">234</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">sample</span><span class="p">(</span>
+<span class="normal">227</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">sample</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">sample_shape</span><span class="p">:</span> <span class="n">Shape</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">(),</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">method</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">oversampling_factor</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">32</span><span class="p">,</span>
     <span class="n">max_sampling_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10_000</span><span class="p">,</span>
-    <span class="n">sample_with</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">show_progress_bars</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">Tensor</span><span class="p">]]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return samples from the approximate posterior distribution.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Draw samples from the approximate posterior distribution $p(\theta|x)$.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        sample_shape: Shape of samples that are drawn from posterior.</span>
-<span class="sd">        x: Observed data.</span>
+<span class="sd">        x: Conditioning observation $x_o$. If not provided, uses the default `x`</span>
+<span class="sd">            set via `.set_default_x()`.</span>
 <span class="sd">        method: Either of [`sir`|`importance`]. This sets the behavior of the</span>
 <span class="sd">            `.sample()` method. With `sir`, approximate posterior samples are</span>
 <span class="sd">            generated with sampling importance resampling (SIR). With</span>
@@ -6571,13 +6533,6 @@ proposal at every iteration.</p>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">method</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">method</span> <span class="k">if</span> <span class="n">method</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">method</span>
-
-    <span class="k">if</span> <span class="n">sample_with</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">&quot;You set `sample_with=</span><span class="si">{</span><span class="n">sample_with</span><span class="si">}</span><span class="s2">`. As of sbi v0.18.0, setting &quot;</span>
-            <span class="sa">f</span><span class="s2">&quot;`sample_with` is no longer supported. You have to rerun &quot;</span>
-            <span class="sa">f</span><span class="s2">&quot;`.build_posterior(sample_with=</span><span class="si">{</span><span class="n">sample_with</span><span class="si">}</span><span class="s2">).`&quot;</span>
-        <span class="p">)</span>
 
     <span class="bp">self</span><span class="o">.</span><span class="n">potential_fn</span><span class="o">.</span><span class="n">set_x</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_x_else_default_x</span><span class="p">(</span><span class="n">x</span><span class="p">))</span>
 
@@ -7780,39 +7735,7 @@ proposal at every iteration.</p>
 <span class="normal">1077</span>
 <span class="normal">1078</span>
 <span class="normal">1079</span>
-<span class="normal">1080</span>
-<span class="normal">1081</span>
-<span class="normal">1082</span>
-<span class="normal">1083</span>
-<span class="normal">1084</span>
-<span class="normal">1085</span>
-<span class="normal">1086</span>
-<span class="normal">1087</span>
-<span class="normal">1088</span>
-<span class="normal">1089</span>
-<span class="normal">1090</span>
-<span class="normal">1091</span>
-<span class="normal">1092</span>
-<span class="normal">1093</span>
-<span class="normal">1094</span>
-<span class="normal">1095</span>
-<span class="normal">1096</span>
-<span class="normal">1097</span>
-<span class="normal">1098</span>
-<span class="normal">1099</span>
-<span class="normal">1100</span>
-<span class="normal">1101</span>
-<span class="normal">1102</span>
-<span class="normal">1103</span>
-<span class="normal">1104</span>
-<span class="normal">1105</span>
-<span class="normal">1106</span>
-<span class="normal">1107</span>
-<span class="normal">1108</span>
-<span class="normal">1109</span>
-<span class="normal">1110</span>
-<span class="normal">1111</span>
-<span class="normal">1112</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">MCMCPosterior</span><span class="p">(</span><span class="n">NeuralPosterior</span><span class="p">):</span>
+<span class="normal">1080</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">MCMCPosterior</span><span class="p">(</span><span class="n">NeuralPosterior</span><span class="p">):</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Provides MCMC to sample from the posterior.</span>
 
 <span class="sd">    SNLE or SNRE train neural networks to approximate the likelihood(-ratios).</span>
@@ -8031,29 +7954,36 @@ proposal at every iteration.</p>
         <span class="n">num_chains</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">init_strategy</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">init_strategy_parameters</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">init_strategy_num_candidates</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">mcmc_parameters</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">mcmc_method</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">sample_with</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">num_workers</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">mp_context</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">show_progress_bars</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
-<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Return samples from posterior distribution $p(\theta|x)$ with MCMC.</span>
-
-<span class="sd">        Check the `__init__()` method for a description of all arguments as well as</span>
-<span class="sd">        their default values.</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Draw samples from the approximate posterior distribution $p(\theta|x)$.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            sample_shape: Desired shape of samples that are drawn from posterior. If</span>
 <span class="sd">                sample_shape is multidimensional we simply draw `sample_shape.numel()`</span>
 <span class="sd">                samples and then reshape into the desired shape.</span>
-<span class="sd">            mcmc_parameters: Dictionary that is passed only to support the API of</span>
-<span class="sd">                `sbi` v0.17.2 or older.</span>
-<span class="sd">            mcmc_method: This argument only exists to keep backward-compatibility with</span>
-<span class="sd">                `sbi` v0.17.2 or older. Please use `method` instead.</span>
-<span class="sd">            sample_with: This argument only exists to keep backward-compatibility with</span>
-<span class="sd">                `sbi` v0.17.2 or older. If it is set, we instantly raise an error.</span>
+<span class="sd">            x: Conditioning observation $x_o$. If not provided, uses the default `x`</span>
+<span class="sd">                set via `.set_default_x()`.</span>
+<span class="sd">            method: MCMC method to use. One of `slice_np`, `slice_np_vectorized`,</span>
+<span class="sd">                `hmc_pyro`, `nuts_pyro`, `slice_pymc`, `hmc_pymc`, `nuts_pymc`.</span>
+<span class="sd">                If not provided, uses the method specified at initialization.</span>
+<span class="sd">            thin: Thinning factor for the chain. If not provided, uses the value</span>
+<span class="sd">                specified at initialization.</span>
+<span class="sd">            warmup_steps: Number of warmup steps to discard. If not provided, uses</span>
+<span class="sd">                the value specified at initialization.</span>
+<span class="sd">            num_chains: Number of MCMC chains to run. If not provided, uses the</span>
+<span class="sd">                value specified at initialization.</span>
+<span class="sd">            init_strategy: Initialization strategy for chains (`proposal`, `sir`,</span>
+<span class="sd">                or `resample`). If not provided, uses the value specified at</span>
+<span class="sd">                initialization.</span>
+<span class="sd">            init_strategy_parameters: Parameters for the initialization strategy.</span>
+<span class="sd">                If not provided, uses the value specified at initialization.</span>
+<span class="sd">            num_workers: Number of CPU cores for parallelization. If not provided,</span>
+<span class="sd">                uses the value specified at initialization.</span>
+<span class="sd">            mp_context: Multiprocessing context (`fork` or `spawn`). If not provided,</span>
+<span class="sd">                uses the value specified at initialization.</span>
 <span class="sd">            show_progress_bars: Whether to show sampling progress monitor.</span>
 
 <span class="sd">        Returns:</span>
@@ -8075,46 +8005,6 @@ proposal at every iteration.</p>
             <span class="k">if</span> <span class="n">init_strategy_parameters</span> <span class="ow">is</span> <span class="kc">None</span>
             <span class="k">else</span> <span class="n">init_strategy_parameters</span>
         <span class="p">)</span>
-        <span class="k">if</span> <span class="n">init_strategy_num_candidates</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">warn</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;Passing `init_strategy_num_candidates` is deprecated as of sbi </span><span class="se">\</span>
-<span class="s2">                v0.19.0. Instead, use e.g., </span><span class="se">\</span>
-<span class="s2">                `init_strategy_parameters=</span><span class="si">{</span><span class="s1">&#39;num_candidate_samples&#39;</span><span class="si">:</span><span class="s2"> 1000</span><span class="si">}</span><span class="s2">`&quot;</span><span class="p">,</span>
-                <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
-            <span class="p">)</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">init_strategy_parameters</span><span class="p">[</span><span class="s2">&quot;num_candidate_samples&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
-                <span class="n">init_strategy_num_candidates</span>
-            <span class="p">)</span>
-        <span class="k">if</span> <span class="n">sample_with</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;You set `sample_with=</span><span class="si">{</span><span class="n">sample_with</span><span class="si">}</span><span class="s2">`. As of sbi v0.18.0, setting &quot;</span>
-                <span class="s2">&quot;`sample_with` is no longer supported. You have to rerun &quot;</span>
-                <span class="sa">f</span><span class="s2">&quot;`.build_posterior(sample_with=</span><span class="si">{</span><span class="n">sample_with</span><span class="si">}</span><span class="s2">).`&quot;</span>
-            <span class="p">)</span>
-        <span class="k">if</span> <span class="n">mcmc_method</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">warn</span><span class="p">(</span>
-                <span class="s2">&quot;You passed `mcmc_method` to `.sample()`. As of sbi v0.18.0, this &quot;</span>
-                <span class="s2">&quot;is deprecated and will be removed in a future release. Use `method` &quot;</span>
-                <span class="s2">&quot;instead of `mcmc_method`.&quot;</span><span class="p">,</span>
-                <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
-            <span class="p">)</span>
-            <span class="n">method</span> <span class="o">=</span> <span class="n">mcmc_method</span>
-        <span class="k">if</span> <span class="n">mcmc_parameters</span><span class="p">:</span>
-            <span class="n">warn</span><span class="p">(</span>
-                <span class="s2">&quot;You passed `mcmc_parameters` to `.sample()`. As of sbi v0.18.0, this &quot;</span>
-                <span class="s2">&quot;is deprecated and will be removed in a future release. Instead, pass &quot;</span>
-                <span class="s2">&quot;the variable to `.sample()` directly, e.g. &quot;</span>
-                <span class="s2">&quot;`posterior.sample((1,), num_chains=5)`.&quot;</span><span class="p">,</span>
-                <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
-            <span class="p">)</span>
-        <span class="c1"># The following lines are only for backwards compatibility with sbi v0.17.2 or</span>
-        <span class="c1"># older.</span>
-        <span class="n">m_p</span> <span class="o">=</span> <span class="n">mcmc_parameters</span> <span class="ow">or</span> <span class="p">{}</span>  <span class="c1"># define to shorten the variable name</span>
-        <span class="n">method</span> <span class="o">=</span> <span class="n">_maybe_use_dict_entry</span><span class="p">(</span><span class="n">method</span><span class="p">,</span> <span class="s2">&quot;mcmc_method&quot;</span><span class="p">,</span> <span class="n">m_p</span><span class="p">)</span>
-        <span class="n">thin</span> <span class="o">=</span> <span class="n">_maybe_use_dict_entry</span><span class="p">(</span><span class="n">thin</span><span class="p">,</span> <span class="s2">&quot;thin&quot;</span><span class="p">,</span> <span class="n">m_p</span><span class="p">)</span>
-        <span class="n">warmup_steps</span> <span class="o">=</span> <span class="n">_maybe_use_dict_entry</span><span class="p">(</span><span class="n">warmup_steps</span><span class="p">,</span> <span class="s2">&quot;warmup_steps&quot;</span><span class="p">,</span> <span class="n">m_p</span><span class="p">)</span>
-        <span class="n">num_chains</span> <span class="o">=</span> <span class="n">_maybe_use_dict_entry</span><span class="p">(</span><span class="n">num_chains</span><span class="p">,</span> <span class="s2">&quot;num_chains&quot;</span><span class="p">,</span> <span class="n">m_p</span><span class="p">)</span>
-        <span class="n">init_strategy</span> <span class="o">=</span> <span class="n">_maybe_use_dict_entry</span><span class="p">(</span><span class="n">init_strategy</span><span class="p">,</span> <span class="s2">&quot;init_strategy&quot;</span><span class="p">,</span> <span class="n">m_p</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">potential_</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prepare_potential</span><span class="p">(</span><span class="n">method</span><span class="p">)</span>  <span class="c1"># type: ignore</span>
 
         <span class="n">initial_params</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_initial_params</span><span class="p">(</span>
@@ -8189,9 +8079,10 @@ proposal at every iteration.</p>
         <span class="n">mp_context</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">show_progress_bars</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
-<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Given a batch of observations [x_1, ..., x_B] this function samples from</span>
-<span class="sd">        posteriors $p(\theta|x_1)$, ... ,$p(\theta|x_B)$, in a batched (i.e. vectorized)</span>
-<span class="sd">        manner.</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Draw samples from the posteriors for a batch of different xs.</span>
+
+<span class="sd">        Given a batch of observations `[x_1, ..., x_B]`, this method samples from</span>
+<span class="sd">        posteriors $p(\theta|x_1), \ldots, p(\theta|x_B)$ in a vectorized manner.</span>
 
 <span class="sd">        Check the `__init__()` method for a description of all arguments as well as</span>
 <span class="sd">        their default values.</span>
@@ -8985,18 +8876,18 @@ proposal at every iteration.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/mcmc_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1101</span>
-<span class="normal">1102</span>
-<span class="normal">1103</span>
-<span class="normal">1104</span>
-<span class="normal">1105</span>
-<span class="normal">1106</span>
-<span class="normal">1107</span>
-<span class="normal">1108</span>
-<span class="normal">1109</span>
-<span class="normal">1110</span>
-<span class="normal">1111</span>
-<span class="normal">1112</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">__getstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">:</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1069</span>
+<span class="normal">1070</span>
+<span class="normal">1071</span>
+<span class="normal">1072</span>
+<span class="normal">1073</span>
+<span class="normal">1074</span>
+<span class="normal">1075</span>
+<span class="normal">1076</span>
+<span class="normal">1077</span>
+<span class="normal">1078</span>
+<span class="normal">1079</span>
+<span class="normal">1080</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">__getstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Get state of MCMCPosterior.</span>
 
 <span class="sd">    Removes the posterior sampler from the state, as it may not be picklable.</span>
@@ -9578,7 +9469,39 @@ sbi slice samplers, only the samples are added.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/mcmc_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1043</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1011</span>
+<span class="normal">1012</span>
+<span class="normal">1013</span>
+<span class="normal">1014</span>
+<span class="normal">1015</span>
+<span class="normal">1016</span>
+<span class="normal">1017</span>
+<span class="normal">1018</span>
+<span class="normal">1019</span>
+<span class="normal">1020</span>
+<span class="normal">1021</span>
+<span class="normal">1022</span>
+<span class="normal">1023</span>
+<span class="normal">1024</span>
+<span class="normal">1025</span>
+<span class="normal">1026</span>
+<span class="normal">1027</span>
+<span class="normal">1028</span>
+<span class="normal">1029</span>
+<span class="normal">1030</span>
+<span class="normal">1031</span>
+<span class="normal">1032</span>
+<span class="normal">1033</span>
+<span class="normal">1034</span>
+<span class="normal">1035</span>
+<span class="normal">1036</span>
+<span class="normal">1037</span>
+<span class="normal">1038</span>
+<span class="normal">1039</span>
+<span class="normal">1040</span>
+<span class="normal">1041</span>
+<span class="normal">1042</span>
+<span class="normal">1043</span>
 <span class="normal">1044</span>
 <span class="normal">1045</span>
 <span class="normal">1046</span>
@@ -9602,39 +9525,7 @@ sbi slice samplers, only the samples are added.</p>
 <span class="normal">1064</span>
 <span class="normal">1065</span>
 <span class="normal">1066</span>
-<span class="normal">1067</span>
-<span class="normal">1068</span>
-<span class="normal">1069</span>
-<span class="normal">1070</span>
-<span class="normal">1071</span>
-<span class="normal">1072</span>
-<span class="normal">1073</span>
-<span class="normal">1074</span>
-<span class="normal">1075</span>
-<span class="normal">1076</span>
-<span class="normal">1077</span>
-<span class="normal">1078</span>
-<span class="normal">1079</span>
-<span class="normal">1080</span>
-<span class="normal">1081</span>
-<span class="normal">1082</span>
-<span class="normal">1083</span>
-<span class="normal">1084</span>
-<span class="normal">1085</span>
-<span class="normal">1086</span>
-<span class="normal">1087</span>
-<span class="normal">1088</span>
-<span class="normal">1089</span>
-<span class="normal">1090</span>
-<span class="normal">1091</span>
-<span class="normal">1092</span>
-<span class="normal">1093</span>
-<span class="normal">1094</span>
-<span class="normal">1095</span>
-<span class="normal">1096</span>
-<span class="normal">1097</span>
-<span class="normal">1098</span>
-<span class="normal">1099</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_arviz_inference_data</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">InferenceData</span><span class="p">:</span>
+<span class="normal">1067</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_arviz_inference_data</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">InferenceData</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Returns arviz InferenceData object constructed most recent samples.</span>
 
 <span class="sd">    Note: the InferenceData is constructed using the posterior samples generated in</span>
@@ -10080,7 +9971,39 @@ have a cached value.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/mcmc_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 976</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 944</span>
+<span class="normal"> 945</span>
+<span class="normal"> 946</span>
+<span class="normal"> 947</span>
+<span class="normal"> 948</span>
+<span class="normal"> 949</span>
+<span class="normal"> 950</span>
+<span class="normal"> 951</span>
+<span class="normal"> 952</span>
+<span class="normal"> 953</span>
+<span class="normal"> 954</span>
+<span class="normal"> 955</span>
+<span class="normal"> 956</span>
+<span class="normal"> 957</span>
+<span class="normal"> 958</span>
+<span class="normal"> 959</span>
+<span class="normal"> 960</span>
+<span class="normal"> 961</span>
+<span class="normal"> 962</span>
+<span class="normal"> 963</span>
+<span class="normal"> 964</span>
+<span class="normal"> 965</span>
+<span class="normal"> 966</span>
+<span class="normal"> 967</span>
+<span class="normal"> 968</span>
+<span class="normal"> 969</span>
+<span class="normal"> 970</span>
+<span class="normal"> 971</span>
+<span class="normal"> 972</span>
+<span class="normal"> 973</span>
+<span class="normal"> 974</span>
+<span class="normal"> 975</span>
+<span class="normal"> 976</span>
 <span class="normal"> 977</span>
 <span class="normal"> 978</span>
 <span class="normal"> 979</span>
@@ -10113,39 +10036,7 @@ have a cached value.</p>
 <span class="normal">1006</span>
 <span class="normal">1007</span>
 <span class="normal">1008</span>
-<span class="normal">1009</span>
-<span class="normal">1010</span>
-<span class="normal">1011</span>
-<span class="normal">1012</span>
-<span class="normal">1013</span>
-<span class="normal">1014</span>
-<span class="normal">1015</span>
-<span class="normal">1016</span>
-<span class="normal">1017</span>
-<span class="normal">1018</span>
-<span class="normal">1019</span>
-<span class="normal">1020</span>
-<span class="normal">1021</span>
-<span class="normal">1022</span>
-<span class="normal">1023</span>
-<span class="normal">1024</span>
-<span class="normal">1025</span>
-<span class="normal">1026</span>
-<span class="normal">1027</span>
-<span class="normal">1028</span>
-<span class="normal">1029</span>
-<span class="normal">1030</span>
-<span class="normal">1031</span>
-<span class="normal">1032</span>
-<span class="normal">1033</span>
-<span class="normal">1034</span>
-<span class="normal">1035</span>
-<span class="normal">1036</span>
-<span class="normal">1037</span>
-<span class="normal">1038</span>
-<span class="normal">1039</span>
-<span class="normal">1040</span>
-<span class="normal">1041</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">map</span><span class="p">(</span>
+<span class="normal">1009</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">map</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">num_iter</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1_000</span><span class="p">,</span>
@@ -10221,16 +10112,14 @@ have a cached value.</p>
 
 
 <h3 id="sbi.inference.posteriors.mcmc_posterior.MCMCPosterior.sample" class="doc doc-heading">
-            <code class=" language-python"><span class="n">sample</span><span class="p">(</span><span class="n">sample_shape</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">(),</span> <span class="n">x</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">thin</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">warmup_steps</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_chains</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">init_strategy</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">init_strategy_parameters</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">init_strategy_num_candidates</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">mcmc_parameters</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">mcmc_method</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">sample_with</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_workers</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">mp_context</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></code>
+            <code class=" language-python"><span class="n">sample</span><span class="p">(</span><span class="n">sample_shape</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">(),</span> <span class="n">x</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">thin</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">warmup_steps</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_chains</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">init_strategy</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">init_strategy_parameters</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_workers</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">mp_context</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></code>
 
 <a href="#sbi.inference.posteriors.mcmc_posterior.MCMCPosterior.sample" class="headerlink" title="Permanent link">&para;</a></h3>
 
 
     <div class="doc doc-contents ">
 
-        <p>Return samples from posterior distribution <span class="arithmatex">\(p(\theta|x)\)</span> with MCMC.</p>
-<p>Check the <code>__init__()</code> method for a description of all arguments as well as
-their default values.</p>
+        <p>Draw samples from the approximate posterior distribution <span class="arithmatex">\(p(\theta|x)\)</span>.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -10264,15 +10153,15 @@ samples and then reshape into the desired shape.</p>
           </tr>
           <tr class="doc-section-item">
             <td>
-                <code>mcmc_parameters</code>
+                <code>x</code>
             </td>
             <td>
-                  <code><span title="typing.Optional">Optional</span>[<span title="typing.Dict">Dict</span>]</code>
+                  <code><span title="typing.Optional">Optional</span>[<span title="torch.Tensor">Tensor</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Dictionary that is passed only to support the API of
-<code>sbi</code> v0.17.2 or older.</p>
+                <p>Conditioning observation <span class="arithmatex">\(x_o\)</span>. If not provided, uses the default <code>x</code>
+set via <code>.set_default_x()</code>.</p>
               </div>
             </td>
             <td>
@@ -10281,15 +10170,16 @@ samples and then reshape into the desired shape.</p>
           </tr>
           <tr class="doc-section-item">
             <td>
-                <code>mcmc_method</code>
+                <code>method</code>
             </td>
             <td>
                   <code><span title="typing.Optional">Optional</span>[<span title="str">str</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>This argument only exists to keep backward-compatibility with
-<code>sbi</code> v0.17.2 or older. Please use <code>method</code> instead.</p>
+                <p>MCMC method to use. One of <code>slice_np</code>, <code>slice_np_vectorized</code>,
+<code>hmc_pyro</code>, <code>nuts_pyro</code>, <code>slice_pymc</code>, <code>hmc_pymc</code>, <code>nuts_pymc</code>.
+If not provided, uses the method specified at initialization.</p>
               </div>
             </td>
             <td>
@@ -10298,15 +10188,118 @@ samples and then reshape into the desired shape.</p>
           </tr>
           <tr class="doc-section-item">
             <td>
-                <code>sample_with</code>
+                <code>thin</code>
+            </td>
+            <td>
+                  <code><span title="typing.Optional">Optional</span>[<span title="int">int</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Thinning factor for the chain. If not provided, uses the value
+specified at initialization.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>warmup_steps</code>
+            </td>
+            <td>
+                  <code><span title="typing.Optional">Optional</span>[<span title="int">int</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of warmup steps to discard. If not provided, uses
+the value specified at initialization.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>num_chains</code>
+            </td>
+            <td>
+                  <code><span title="typing.Optional">Optional</span>[<span title="int">int</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of MCMC chains to run. If not provided, uses the
+value specified at initialization.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>init_strategy</code>
             </td>
             <td>
                   <code><span title="typing.Optional">Optional</span>[<span title="str">str</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>This argument only exists to keep backward-compatibility with
-<code>sbi</code> v0.17.2 or older. If it is set, we instantly raise an error.</p>
+                <p>Initialization strategy for chains (<code>proposal</code>, <code>sir</code>,
+or <code>resample</code>). If not provided, uses the value specified at
+initialization.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>init_strategy_parameters</code>
+            </td>
+            <td>
+                  <code><span title="typing.Optional">Optional</span>[<span title="typing.Dict">Dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>]]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Parameters for the initialization strategy.
+If not provided, uses the value specified at initialization.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>num_workers</code>
+            </td>
+            <td>
+                  <code><span title="typing.Optional">Optional</span>[<span title="int">int</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of CPU cores for parallelization. If not provided,
+uses the value specified at initialization.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>mp_context</code>
+            </td>
+            <td>
+                  <code><span title="typing.Optional">Optional</span>[<span title="str">str</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Multiprocessing context (<code>fork</code> or <code>spawn</code>). If not provided,
+uses the value specified at initialization.</p>
               </div>
             </td>
             <td>
@@ -10477,40 +10470,7 @@ samples and then reshape into the desired shape.</p>
 <span class="normal">366</span>
 <span class="normal">367</span>
 <span class="normal">368</span>
-<span class="normal">369</span>
-<span class="normal">370</span>
-<span class="normal">371</span>
-<span class="normal">372</span>
-<span class="normal">373</span>
-<span class="normal">374</span>
-<span class="normal">375</span>
-<span class="normal">376</span>
-<span class="normal">377</span>
-<span class="normal">378</span>
-<span class="normal">379</span>
-<span class="normal">380</span>
-<span class="normal">381</span>
-<span class="normal">382</span>
-<span class="normal">383</span>
-<span class="normal">384</span>
-<span class="normal">385</span>
-<span class="normal">386</span>
-<span class="normal">387</span>
-<span class="normal">388</span>
-<span class="normal">389</span>
-<span class="normal">390</span>
-<span class="normal">391</span>
-<span class="normal">392</span>
-<span class="normal">393</span>
-<span class="normal">394</span>
-<span class="normal">395</span>
-<span class="normal">396</span>
-<span class="normal">397</span>
-<span class="normal">398</span>
-<span class="normal">399</span>
-<span class="normal">400</span>
-<span class="normal">401</span>
-<span class="normal">402</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">sample</span><span class="p">(</span>
+<span class="normal">369</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">sample</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">sample_shape</span><span class="p">:</span> <span class="n">Shape</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">(),</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -10520,29 +10480,36 @@ samples and then reshape into the desired shape.</p>
     <span class="n">num_chains</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">init_strategy</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">init_strategy_parameters</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">init_strategy_num_candidates</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">mcmc_parameters</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">mcmc_method</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">sample_with</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">num_workers</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">mp_context</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">show_progress_bars</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
-<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Return samples from posterior distribution $p(\theta|x)$ with MCMC.</span>
-
-<span class="sd">    Check the `__init__()` method for a description of all arguments as well as</span>
-<span class="sd">    their default values.</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Draw samples from the approximate posterior distribution $p(\theta|x)$.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        sample_shape: Desired shape of samples that are drawn from posterior. If</span>
 <span class="sd">            sample_shape is multidimensional we simply draw `sample_shape.numel()`</span>
 <span class="sd">            samples and then reshape into the desired shape.</span>
-<span class="sd">        mcmc_parameters: Dictionary that is passed only to support the API of</span>
-<span class="sd">            `sbi` v0.17.2 or older.</span>
-<span class="sd">        mcmc_method: This argument only exists to keep backward-compatibility with</span>
-<span class="sd">            `sbi` v0.17.2 or older. Please use `method` instead.</span>
-<span class="sd">        sample_with: This argument only exists to keep backward-compatibility with</span>
-<span class="sd">            `sbi` v0.17.2 or older. If it is set, we instantly raise an error.</span>
+<span class="sd">        x: Conditioning observation $x_o$. If not provided, uses the default `x`</span>
+<span class="sd">            set via `.set_default_x()`.</span>
+<span class="sd">        method: MCMC method to use. One of `slice_np`, `slice_np_vectorized`,</span>
+<span class="sd">            `hmc_pyro`, `nuts_pyro`, `slice_pymc`, `hmc_pymc`, `nuts_pymc`.</span>
+<span class="sd">            If not provided, uses the method specified at initialization.</span>
+<span class="sd">        thin: Thinning factor for the chain. If not provided, uses the value</span>
+<span class="sd">            specified at initialization.</span>
+<span class="sd">        warmup_steps: Number of warmup steps to discard. If not provided, uses</span>
+<span class="sd">            the value specified at initialization.</span>
+<span class="sd">        num_chains: Number of MCMC chains to run. If not provided, uses the</span>
+<span class="sd">            value specified at initialization.</span>
+<span class="sd">        init_strategy: Initialization strategy for chains (`proposal`, `sir`,</span>
+<span class="sd">            or `resample`). If not provided, uses the value specified at</span>
+<span class="sd">            initialization.</span>
+<span class="sd">        init_strategy_parameters: Parameters for the initialization strategy.</span>
+<span class="sd">            If not provided, uses the value specified at initialization.</span>
+<span class="sd">        num_workers: Number of CPU cores for parallelization. If not provided,</span>
+<span class="sd">            uses the value specified at initialization.</span>
+<span class="sd">        mp_context: Multiprocessing context (`fork` or `spawn`). If not provided,</span>
+<span class="sd">            uses the value specified at initialization.</span>
 <span class="sd">        show_progress_bars: Whether to show sampling progress monitor.</span>
 
 <span class="sd">    Returns:</span>
@@ -10564,46 +10531,6 @@ samples and then reshape into the desired shape.</p>
         <span class="k">if</span> <span class="n">init_strategy_parameters</span> <span class="ow">is</span> <span class="kc">None</span>
         <span class="k">else</span> <span class="n">init_strategy_parameters</span>
     <span class="p">)</span>
-    <span class="k">if</span> <span class="n">init_strategy_num_candidates</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="n">warn</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">&quot;Passing `init_strategy_num_candidates` is deprecated as of sbi </span><span class="se">\</span>
-<span class="s2">            v0.19.0. Instead, use e.g., </span><span class="se">\</span>
-<span class="s2">            `init_strategy_parameters=</span><span class="si">{</span><span class="s1">&#39;num_candidate_samples&#39;</span><span class="si">:</span><span class="s2"> 1000</span><span class="si">}</span><span class="s2">`&quot;</span><span class="p">,</span>
-            <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
-        <span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">init_strategy_parameters</span><span class="p">[</span><span class="s2">&quot;num_candidate_samples&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
-            <span class="n">init_strategy_num_candidates</span>
-        <span class="p">)</span>
-    <span class="k">if</span> <span class="n">sample_with</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">&quot;You set `sample_with=</span><span class="si">{</span><span class="n">sample_with</span><span class="si">}</span><span class="s2">`. As of sbi v0.18.0, setting &quot;</span>
-            <span class="s2">&quot;`sample_with` is no longer supported. You have to rerun &quot;</span>
-            <span class="sa">f</span><span class="s2">&quot;`.build_posterior(sample_with=</span><span class="si">{</span><span class="n">sample_with</span><span class="si">}</span><span class="s2">).`&quot;</span>
-        <span class="p">)</span>
-    <span class="k">if</span> <span class="n">mcmc_method</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="n">warn</span><span class="p">(</span>
-            <span class="s2">&quot;You passed `mcmc_method` to `.sample()`. As of sbi v0.18.0, this &quot;</span>
-            <span class="s2">&quot;is deprecated and will be removed in a future release. Use `method` &quot;</span>
-            <span class="s2">&quot;instead of `mcmc_method`.&quot;</span><span class="p">,</span>
-            <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
-        <span class="p">)</span>
-        <span class="n">method</span> <span class="o">=</span> <span class="n">mcmc_method</span>
-    <span class="k">if</span> <span class="n">mcmc_parameters</span><span class="p">:</span>
-        <span class="n">warn</span><span class="p">(</span>
-            <span class="s2">&quot;You passed `mcmc_parameters` to `.sample()`. As of sbi v0.18.0, this &quot;</span>
-            <span class="s2">&quot;is deprecated and will be removed in a future release. Instead, pass &quot;</span>
-            <span class="s2">&quot;the variable to `.sample()` directly, e.g. &quot;</span>
-            <span class="s2">&quot;`posterior.sample((1,), num_chains=5)`.&quot;</span><span class="p">,</span>
-            <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
-        <span class="p">)</span>
-    <span class="c1"># The following lines are only for backwards compatibility with sbi v0.17.2 or</span>
-    <span class="c1"># older.</span>
-    <span class="n">m_p</span> <span class="o">=</span> <span class="n">mcmc_parameters</span> <span class="ow">or</span> <span class="p">{}</span>  <span class="c1"># define to shorten the variable name</span>
-    <span class="n">method</span> <span class="o">=</span> <span class="n">_maybe_use_dict_entry</span><span class="p">(</span><span class="n">method</span><span class="p">,</span> <span class="s2">&quot;mcmc_method&quot;</span><span class="p">,</span> <span class="n">m_p</span><span class="p">)</span>
-    <span class="n">thin</span> <span class="o">=</span> <span class="n">_maybe_use_dict_entry</span><span class="p">(</span><span class="n">thin</span><span class="p">,</span> <span class="s2">&quot;thin&quot;</span><span class="p">,</span> <span class="n">m_p</span><span class="p">)</span>
-    <span class="n">warmup_steps</span> <span class="o">=</span> <span class="n">_maybe_use_dict_entry</span><span class="p">(</span><span class="n">warmup_steps</span><span class="p">,</span> <span class="s2">&quot;warmup_steps&quot;</span><span class="p">,</span> <span class="n">m_p</span><span class="p">)</span>
-    <span class="n">num_chains</span> <span class="o">=</span> <span class="n">_maybe_use_dict_entry</span><span class="p">(</span><span class="n">num_chains</span><span class="p">,</span> <span class="s2">&quot;num_chains&quot;</span><span class="p">,</span> <span class="n">m_p</span><span class="p">)</span>
-    <span class="n">init_strategy</span> <span class="o">=</span> <span class="n">_maybe_use_dict_entry</span><span class="p">(</span><span class="n">init_strategy</span><span class="p">,</span> <span class="s2">&quot;init_strategy&quot;</span><span class="p">,</span> <span class="n">m_p</span><span class="p">)</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">potential_</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prepare_potential</span><span class="p">(</span><span class="n">method</span><span class="p">)</span>  <span class="c1"># type: ignore</span>
 
     <span class="n">initial_params</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_initial_params</span><span class="p">(</span>
@@ -10680,9 +10607,9 @@ samples and then reshape into the desired shape.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Given a batch of observations [x_1, &hellip;, x_B] this function samples from
-posteriors <span class="arithmatex">\(p(\theta|x_1)\)</span>, &hellip; ,<span class="arithmatex">\(p(\theta|x_B)\)</span>, in a batched (i.e. vectorized)
-manner.</p>
+        <p>Draw samples from the posteriors for a batch of different xs.</p>
+<p>Given a batch of observations <code>[x_1, ..., x_B]</code>, this method samples from
+posteriors <span class="arithmatex">\(p(\theta|x_1), \ldots, p(\theta|x_B)\)</span> in a vectorized manner.</p>
 <p>Check the <code>__init__()</code> method for a description of all arguments as well as
 their default values.</p>
 
@@ -10908,7 +10835,40 @@ parameter generation and mcmc sampling.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/mcmc_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">404</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">371</span>
+<span class="normal">372</span>
+<span class="normal">373</span>
+<span class="normal">374</span>
+<span class="normal">375</span>
+<span class="normal">376</span>
+<span class="normal">377</span>
+<span class="normal">378</span>
+<span class="normal">379</span>
+<span class="normal">380</span>
+<span class="normal">381</span>
+<span class="normal">382</span>
+<span class="normal">383</span>
+<span class="normal">384</span>
+<span class="normal">385</span>
+<span class="normal">386</span>
+<span class="normal">387</span>
+<span class="normal">388</span>
+<span class="normal">389</span>
+<span class="normal">390</span>
+<span class="normal">391</span>
+<span class="normal">392</span>
+<span class="normal">393</span>
+<span class="normal">394</span>
+<span class="normal">395</span>
+<span class="normal">396</span>
+<span class="normal">397</span>
+<span class="normal">398</span>
+<span class="normal">399</span>
+<span class="normal">400</span>
+<span class="normal">401</span>
+<span class="normal">402</span>
+<span class="normal">403</span>
+<span class="normal">404</span>
 <span class="normal">405</span>
 <span class="normal">406</span>
 <span class="normal">407</span>
@@ -11021,39 +10981,7 @@ parameter generation and mcmc sampling.</p>
 <span class="normal">514</span>
 <span class="normal">515</span>
 <span class="normal">516</span>
-<span class="normal">517</span>
-<span class="normal">518</span>
-<span class="normal">519</span>
-<span class="normal">520</span>
-<span class="normal">521</span>
-<span class="normal">522</span>
-<span class="normal">523</span>
-<span class="normal">524</span>
-<span class="normal">525</span>
-<span class="normal">526</span>
-<span class="normal">527</span>
-<span class="normal">528</span>
-<span class="normal">529</span>
-<span class="normal">530</span>
-<span class="normal">531</span>
-<span class="normal">532</span>
-<span class="normal">533</span>
-<span class="normal">534</span>
-<span class="normal">535</span>
-<span class="normal">536</span>
-<span class="normal">537</span>
-<span class="normal">538</span>
-<span class="normal">539</span>
-<span class="normal">540</span>
-<span class="normal">541</span>
-<span class="normal">542</span>
-<span class="normal">543</span>
-<span class="normal">544</span>
-<span class="normal">545</span>
-<span class="normal">546</span>
-<span class="normal">547</span>
-<span class="normal">548</span>
-<span class="normal">549</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">sample_batched</span><span class="p">(</span>
+<span class="normal">517</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">sample_batched</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">sample_shape</span><span class="p">:</span> <span class="n">Shape</span><span class="p">,</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
@@ -11067,9 +10995,10 @@ parameter generation and mcmc sampling.</p>
     <span class="n">mp_context</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">show_progress_bars</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
-<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Given a batch of observations [x_1, ..., x_B] this function samples from</span>
-<span class="sd">    posteriors $p(\theta|x_1)$, ... ,$p(\theta|x_B)$, in a batched (i.e. vectorized)</span>
-<span class="sd">    manner.</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Draw samples from the posteriors for a batch of different xs.</span>
+
+<span class="sd">    Given a batch of observations `[x_1, ..., x_B]`, this method samples from</span>
+<span class="sd">    posteriors $p(\theta|x_1), \ldots, p(\theta|x_B)$ in a vectorized manner.</span>
 
 <span class="sd">    Check the `__init__()` method for a description of all arguments as well as</span>
 <span class="sd">    their default values.</span>
@@ -11725,7 +11654,8 @@ parameter generation and mcmc sampling.</p>
 <span class="normal">294</span>
 <span class="normal">295</span>
 <span class="normal">296</span>
-<span class="normal">297</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">RejectionPosterior</span><span class="p">(</span><span class="n">NeuralPosterior</span><span class="p">):</span>
+<span class="normal">297</span>
+<span class="normal">298</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">RejectionPosterior</span><span class="p">(</span><span class="n">NeuralPosterior</span><span class="p">):</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Provides rejection sampling to sample from the posterior.</span>
 
 <span class="sd">    SNLE or SNRE train neural networks to approximate the likelihood(-ratios).</span>
@@ -11844,19 +11774,26 @@ parameter generation and mcmc sampling.</p>
         <span class="n">num_samples_to_find_max</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">num_iter_to_find_max</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">m</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">sample_with</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">show_progress_bars</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
         <span class="n">reject_outside_prior</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
         <span class="n">max_sampling_time</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">):</span>
-<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Return samples from posterior $p(\theta|x)$ via rejection sampling.</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Draw samples from the approximate posterior via rejection sampling.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            sample_shape: Desired shape of samples that are drawn from posterior. If</span>
 <span class="sd">                sample_shape is multidimensional we simply draw `sample_shape.numel()`</span>
 <span class="sd">                samples and then reshape into the desired shape.</span>
-<span class="sd">            sample_with: This argument only exists to keep backward-compatibility with</span>
-<span class="sd">                `sbi` v0.17.2 or older. If it is set, we instantly raise an error.</span>
+<span class="sd">            x: Conditioning observation $x_o$. If not provided, uses the default `x`</span>
+<span class="sd">                set via `.set_default_x()`.</span>
+<span class="sd">            max_sampling_batch_size: Maximum batch size for rejection sampling.</span>
+<span class="sd">                If not provided, uses the value specified at initialization.</span>
+<span class="sd">            num_samples_to_find_max: Number of samples to find the maximum of the</span>
+<span class="sd">                potential function. If not provided, uses the value from initialization.</span>
+<span class="sd">            num_iter_to_find_max: Number of optimization iterations to find the</span>
+<span class="sd">                maximum. If not provided, uses the value from initialization.</span>
+<span class="sd">            m: Multiplier for the proposal distribution. If not provided, uses the</span>
+<span class="sd">                value from initialization.</span>
 <span class="sd">            show_progress_bars: Whether to show sampling progress monitor.</span>
 <span class="sd">            reject_outside_prior: If True (default), rejection sampling is used to</span>
 <span class="sd">                ensure samples lie within the prior support. If False, samples are drawn</span>
@@ -11875,12 +11812,6 @@ parameter generation and mcmc sampling.</p>
 
         <span class="n">potential</span> <span class="o">=</span> <span class="n">partial</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">potential_fn</span><span class="p">,</span> <span class="n">track_gradients</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 
-        <span class="k">if</span> <span class="n">sample_with</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;You set `sample_with=</span><span class="si">{</span><span class="n">sample_with</span><span class="si">}</span><span class="s2">`. As of sbi v0.18.0, setting &quot;</span>
-                <span class="sa">f</span><span class="s2">&quot;`sample_with` is no longer supported. You have to rerun &quot;</span>
-                <span class="sa">f</span><span class="s2">&quot;`.build_posterior(sample_with=</span><span class="si">{</span><span class="n">sample_with</span><span class="si">}</span><span class="s2">).`&quot;</span>
-            <span class="p">)</span>
         <span class="c1"># Replace arguments that were not passed with their default.</span>
         <span class="n">max_sampling_batch_size</span> <span class="o">=</span> <span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">max_sampling_batch_size</span>
@@ -12684,8 +12615,7 @@ have a cached value.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/rejection_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">232</span>
-<span class="normal">233</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">233</span>
 <span class="normal">234</span>
 <span class="normal">235</span>
 <span class="normal">236</span>
@@ -12749,7 +12679,8 @@ have a cached value.</p>
 <span class="normal">294</span>
 <span class="normal">295</span>
 <span class="normal">296</span>
-<span class="normal">297</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">map</span><span class="p">(</span>
+<span class="normal">297</span>
+<span class="normal">298</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">map</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">num_iter</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1_000</span><span class="p">,</span>
@@ -12825,14 +12756,14 @@ have a cached value.</p>
 
 
 <h3 id="sbi.inference.posteriors.rejection_posterior.RejectionPosterior.sample" class="doc doc-heading">
-            <code class=" language-python"><span class="n">sample</span><span class="p">(</span><span class="n">sample_shape</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">(),</span> <span class="n">x</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">max_sampling_batch_size</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_samples_to_find_max</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_iter_to_find_max</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">m</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">sample_with</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">reject_outside_prior</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">max_sampling_time</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+            <code class=" language-python"><span class="n">sample</span><span class="p">(</span><span class="n">sample_shape</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">(),</span> <span class="n">x</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">max_sampling_batch_size</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_samples_to_find_max</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_iter_to_find_max</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">m</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">reject_outside_prior</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">max_sampling_time</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 <a href="#sbi.inference.posteriors.rejection_posterior.RejectionPosterior.sample" class="headerlink" title="Permanent link">&para;</a></h3>
 
 
     <div class="doc doc-contents ">
 
-        <p>Return samples from posterior <span class="arithmatex">\(p(\theta|x)\)</span> via rejection sampling.</p>
+        <p>Draw samples from the approximate posterior via rejection sampling.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -12866,15 +12797,83 @@ samples and then reshape into the desired shape.</p>
           </tr>
           <tr class="doc-section-item">
             <td>
-                <code>sample_with</code>
+                <code>x</code>
             </td>
             <td>
-                  <code><span title="typing.Optional">Optional</span>[<span title="str">str</span>]</code>
+                  <code><span title="typing.Optional">Optional</span>[<span title="torch.Tensor">Tensor</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>This argument only exists to keep backward-compatibility with
-<code>sbi</code> v0.17.2 or older. If it is set, we instantly raise an error.</p>
+                <p>Conditioning observation <span class="arithmatex">\(x_o\)</span>. If not provided, uses the default <code>x</code>
+set via <code>.set_default_x()</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>max_sampling_batch_size</code>
+            </td>
+            <td>
+                  <code><span title="typing.Optional">Optional</span>[<span title="int">int</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Maximum batch size for rejection sampling.
+If not provided, uses the value specified at initialization.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>num_samples_to_find_max</code>
+            </td>
+            <td>
+                  <code><span title="typing.Optional">Optional</span>[<span title="int">int</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of samples to find the maximum of the
+potential function. If not provided, uses the value from initialization.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>num_iter_to_find_max</code>
+            </td>
+            <td>
+                  <code><span title="typing.Optional">Optional</span>[<span title="int">int</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of optimization iterations to find the
+maximum. If not provided, uses the value from initialization.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>m</code>
+            </td>
+            <td>
+                  <code><span title="typing.Optional">Optional</span>[<span title="float">float</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Multiplier for the proposal distribution. If not provided, uses the
+value from initialization.</p>
               </div>
             </td>
             <td>
@@ -13050,7 +13049,8 @@ direct sampling from the proposal is fast).</p>
 <span class="normal">214</span>
 <span class="normal">215</span>
 <span class="normal">216</span>
-<span class="normal">217</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">sample</span><span class="p">(</span>
+<span class="normal">217</span>
+<span class="normal">218</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">sample</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">sample_shape</span><span class="p">:</span> <span class="n">Shape</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">(),</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -13058,19 +13058,26 @@ direct sampling from the proposal is fast).</p>
     <span class="n">num_samples_to_find_max</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">num_iter_to_find_max</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">m</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">sample_with</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">show_progress_bars</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
     <span class="n">reject_outside_prior</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
     <span class="n">max_sampling_time</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">):</span>
-<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Return samples from posterior $p(\theta|x)$ via rejection sampling.</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Draw samples from the approximate posterior via rejection sampling.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        sample_shape: Desired shape of samples that are drawn from posterior. If</span>
 <span class="sd">            sample_shape is multidimensional we simply draw `sample_shape.numel()`</span>
 <span class="sd">            samples and then reshape into the desired shape.</span>
-<span class="sd">        sample_with: This argument only exists to keep backward-compatibility with</span>
-<span class="sd">            `sbi` v0.17.2 or older. If it is set, we instantly raise an error.</span>
+<span class="sd">        x: Conditioning observation $x_o$. If not provided, uses the default `x`</span>
+<span class="sd">            set via `.set_default_x()`.</span>
+<span class="sd">        max_sampling_batch_size: Maximum batch size for rejection sampling.</span>
+<span class="sd">            If not provided, uses the value specified at initialization.</span>
+<span class="sd">        num_samples_to_find_max: Number of samples to find the maximum of the</span>
+<span class="sd">            potential function. If not provided, uses the value from initialization.</span>
+<span class="sd">        num_iter_to_find_max: Number of optimization iterations to find the</span>
+<span class="sd">            maximum. If not provided, uses the value from initialization.</span>
+<span class="sd">        m: Multiplier for the proposal distribution. If not provided, uses the</span>
+<span class="sd">            value from initialization.</span>
 <span class="sd">        show_progress_bars: Whether to show sampling progress monitor.</span>
 <span class="sd">        reject_outside_prior: If True (default), rejection sampling is used to</span>
 <span class="sd">            ensure samples lie within the prior support. If False, samples are drawn</span>
@@ -13089,12 +13096,6 @@ direct sampling from the proposal is fast).</p>
 
     <span class="n">potential</span> <span class="o">=</span> <span class="n">partial</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">potential_fn</span><span class="p">,</span> <span class="n">track_gradients</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 
-    <span class="k">if</span> <span class="n">sample_with</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">&quot;You set `sample_with=</span><span class="si">{</span><span class="n">sample_with</span><span class="si">}</span><span class="s2">`. As of sbi v0.18.0, setting &quot;</span>
-            <span class="sa">f</span><span class="s2">&quot;`sample_with` is no longer supported. You have to rerun &quot;</span>
-            <span class="sa">f</span><span class="s2">&quot;`.build_posterior(sample_with=</span><span class="si">{</span><span class="n">sample_with</span><span class="si">}</span><span class="s2">).`&quot;</span>
-        <span class="p">)</span>
     <span class="c1"># Replace arguments that were not passed with their default.</span>
     <span class="n">max_sampling_batch_size</span> <span class="o">=</span> <span class="p">(</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">max_sampling_batch_size</span>
@@ -17479,7 +17480,11 @@ approximate posterior samples by sampling from :math:<code>q</code> at no additi
 <span class="normal">690</span>
 <span class="normal">691</span>
 <span class="normal">692</span>
-<span class="normal">693</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">VIPosterior</span><span class="p">(</span><span class="n">NeuralPosterior</span><span class="p">):</span>
+<span class="normal">693</span>
+<span class="normal">694</span>
+<span class="normal">695</span>
+<span class="normal">696</span>
+<span class="normal">697</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">VIPosterior</span><span class="p">(</span><span class="n">NeuralPosterior</span><span class="p">):</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Provides VI (Variational Inference) to sample from the posterior.</span>
 
 <span class="sd">    SNLE or SNRE train neural networks to approximate the likelihood (or likelihood</span>
@@ -17778,12 +17783,16 @@ approximate posterior samples by sampling from :math:<code>q</code> at no additi
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">sample_shape</span><span class="p">:</span> <span class="n">Shape</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">(),</span>
         <span class="n">x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+        <span class="n">show_progress_bars</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Samples from the variational posterior distribution.</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Draw samples from the variational posterior distribution $p(\theta|x)$.</span>
 
 <span class="sd">        Args:</span>
-<span class="sd">            sample_shape: Shape of samples</span>
+<span class="sd">            sample_shape: Desired shape of samples that are drawn from the posterior.</span>
+<span class="sd">            x: Conditioning observation $x_o$. If not provided, uses the default `x`</span>
+<span class="sd">                set via `.set_default_x()`.</span>
+<span class="sd">            show_progress_bars: Unused for `VIPosterior` since sampling from the</span>
+<span class="sd">                variational distribution is fast. Included for API consistency.</span>
 
 <span class="sd">        Returns:</span>
 <span class="sd">            Samples from posterior.</span>
@@ -18273,11 +18282,7 @@ incompatible deep copying).</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/vi_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">637</span>
-<span class="normal">638</span>
-<span class="normal">639</span>
-<span class="normal">640</span>
-<span class="normal">641</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">641</span>
 <span class="normal">642</span>
 <span class="normal">643</span>
 <span class="normal">644</span>
@@ -18297,7 +18302,11 @@ incompatible deep copying).</p>
 <span class="normal">658</span>
 <span class="normal">659</span>
 <span class="normal">660</span>
-<span class="normal">661</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">__deepcopy__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">memo</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;VIPosterior&quot;</span><span class="p">:</span>
+<span class="normal">661</span>
+<span class="normal">662</span>
+<span class="normal">663</span>
+<span class="normal">664</span>
+<span class="normal">665</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">__deepcopy__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">memo</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;VIPosterior&quot;</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;This method is called when using `copy.deepcopy` on the object.</span>
 
 <span class="sd">    It defines how the object is copied. We need to overwrite this method, since the</span>
@@ -18369,11 +18378,7 @@ due not support pickle protocols (e.g. due to local functions, etc.).</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/vi_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">663</span>
-<span class="normal">664</span>
-<span class="normal">665</span>
-<span class="normal">666</span>
-<span class="normal">667</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">667</span>
 <span class="normal">668</span>
 <span class="normal">669</span>
 <span class="normal">670</span>
@@ -18382,7 +18387,11 @@ due not support pickle protocols (e.g. due to local functions, etc.).</p>
 <span class="normal">673</span>
 <span class="normal">674</span>
 <span class="normal">675</span>
-<span class="normal">676</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">__getstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">:</span>
+<span class="normal">676</span>
+<span class="normal">677</span>
+<span class="normal">678</span>
+<span class="normal">679</span>
+<span class="normal">680</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">__getstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;This method is called when pickling the object.</span>
 
 <span class="sd">    It defines what is pickled. We need to overwrite this method, since some parts</span>
@@ -18868,11 +18877,7 @@ e.g. remains deep copy compatible.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/vi_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">678</span>
-<span class="normal">679</span>
-<span class="normal">680</span>
-<span class="normal">681</span>
-<span class="normal">682</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">682</span>
 <span class="normal">683</span>
 <span class="normal">684</span>
 <span class="normal">685</span>
@@ -18883,7 +18888,11 @@ e.g. remains deep copy compatible.</p>
 <span class="normal">690</span>
 <span class="normal">691</span>
 <span class="normal">692</span>
-<span class="normal">693</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">__setstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state_dict</span><span class="p">:</span> <span class="n">Dict</span><span class="p">):</span>
+<span class="normal">693</span>
+<span class="normal">694</span>
+<span class="normal">695</span>
+<span class="normal">696</span>
+<span class="normal">697</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">__setstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state_dict</span><span class="p">:</span> <span class="n">Dict</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;This method is called when unpickling the object.</span>
 
 <span class="sd">    Especially, we need to restore the removed attributes and ensure that the object</span>
@@ -18975,11 +18984,7 @@ prop, prop_prior].</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/vi_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">548</span>
-<span class="normal">549</span>
-<span class="normal">550</span>
-<span class="normal">551</span>
-<span class="normal">552</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">552</span>
 <span class="normal">553</span>
 <span class="normal">554</span>
 <span class="normal">555</span>
@@ -18994,7 +18999,11 @@ prop, prop_prior].</p>
 <span class="normal">564</span>
 <span class="normal">565</span>
 <span class="normal">566</span>
-<span class="normal">567</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">evaluate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">quality_control_metric</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;psis&quot;</span><span class="p">,</span> <span class="n">N</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="mf">5e4</span><span class="p">))</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="normal">567</span>
+<span class="normal">568</span>
+<span class="normal">569</span>
+<span class="normal">570</span>
+<span class="normal">571</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">evaluate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">quality_control_metric</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;psis&quot;</span><span class="p">,</span> <span class="n">N</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="mf">5e4</span><span class="p">))</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;This function will evaluate the quality of the variational posterior</span>
 <span class="sd">    distribution. We currently support two different metrics of type `psis`, which</span>
 <span class="sd">    checks the quality based on the tails of importance weights (there should not be</span>
@@ -19108,11 +19117,7 @@ consumption.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/vi_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">367</span>
-<span class="normal">368</span>
-<span class="normal">369</span>
-<span class="normal">370</span>
-<span class="normal">371</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">371</span>
 <span class="normal">372</span>
 <span class="normal">373</span>
 <span class="normal">374</span>
@@ -19133,7 +19138,11 @@ consumption.</p>
 <span class="normal">389</span>
 <span class="normal">390</span>
 <span class="normal">391</span>
-<span class="normal">392</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">log_prob</span><span class="p">(</span>
+<span class="normal">392</span>
+<span class="normal">393</span>
+<span class="normal">394</span>
+<span class="normal">395</span>
+<span class="normal">396</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">log_prob</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">theta</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -19401,11 +19410,7 @@ have a cached value.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/vi_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">569</span>
-<span class="normal">570</span>
-<span class="normal">571</span>
-<span class="normal">572</span>
-<span class="normal">573</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">573</span>
 <span class="normal">574</span>
 <span class="normal">575</span>
 <span class="normal">576</span>
@@ -19467,7 +19472,11 @@ have a cached value.</p>
 <span class="normal">632</span>
 <span class="normal">633</span>
 <span class="normal">634</span>
-<span class="normal">635</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">map</span><span class="p">(</span>
+<span class="normal">635</span>
+<span class="normal">636</span>
+<span class="normal">637</span>
+<span class="normal">638</span>
+<span class="normal">639</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">map</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TorchTensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">num_iter</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1_000</span><span class="p">,</span>
@@ -19544,14 +19553,14 @@ have a cached value.</p>
 
 
 <h3 id="sbi.inference.posteriors.vi_posterior.VIPosterior.sample" class="doc doc-heading">
-            <code class=" language-python"><span class="n">sample</span><span class="p">(</span><span class="n">sample_shape</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">(),</span> <span class="n">x</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
+            <code class=" language-python"><span class="n">sample</span><span class="p">(</span><span class="n">sample_shape</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">(),</span> <span class="n">x</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></code>
 
 <a href="#sbi.inference.posteriors.vi_posterior.VIPosterior.sample" class="headerlink" title="Permanent link">&para;</a></h3>
 
 
     <div class="doc doc-contents ">
 
-        <p>Samples from the variational posterior distribution.</p>
+        <p>Draw samples from the variational posterior distribution <span class="arithmatex">\(p(\theta|x)\)</span>.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -19574,11 +19583,45 @@ have a cached value.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Shape of samples</p>
+                <p>Desired shape of samples that are drawn from the posterior.</p>
               </div>
             </td>
             <td>
                   <code><span title="torch.Size">Size</span>()</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>x</code>
+            </td>
+            <td>
+                  <code><span title="typing.Optional">Optional</span>[<span title="torch.Tensor">Tensor</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Conditioning observation <span class="arithmatex">\(x_o\)</span>. If not provided, uses the default <code>x</code>
+set via <code>.set_default_x()</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>show_progress_bars</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Unused for <code>VIPosterior</code> since sampling from the
+variational distribution is fast. Included for API consistency.</p>
+              </div>
+            </td>
+            <td>
+                  <code>True</code>
             </td>
           </tr>
       </tbody>
@@ -19631,16 +19674,24 @@ have a cached value.</p>
 <span class="normal">349</span>
 <span class="normal">350</span>
 <span class="normal">351</span>
-<span class="normal">352</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">sample</span><span class="p">(</span>
+<span class="normal">352</span>
+<span class="normal">353</span>
+<span class="normal">354</span>
+<span class="normal">355</span>
+<span class="normal">356</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">sample</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">sample_shape</span><span class="p">:</span> <span class="n">Shape</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">(),</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+    <span class="n">show_progress_bars</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Samples from the variational posterior distribution.</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Draw samples from the variational posterior distribution $p(\theta|x)$.</span>
 
 <span class="sd">    Args:</span>
-<span class="sd">        sample_shape: Shape of samples</span>
+<span class="sd">        sample_shape: Desired shape of samples that are drawn from the posterior.</span>
+<span class="sd">        x: Conditioning observation $x_o$. If not provided, uses the default `x`</span>
+<span class="sd">            set via `.set_default_x()`.</span>
+<span class="sd">        show_progress_bars: Unused for `VIPosterior` since sampling from the</span>
+<span class="sd">            variational distribution is fast. Included for API consistency.</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        Samples from posterior.</span>
@@ -20399,11 +20450,7 @@ weight_transform: Callable applied to importance weights (only for fKL)</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/vi_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">394</span>
-<span class="normal">395</span>
-<span class="normal">396</span>
-<span class="normal">397</span>
-<span class="normal">398</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">398</span>
 <span class="normal">399</span>
 <span class="normal">400</span>
 <span class="normal">401</span>
@@ -20551,7 +20598,11 @@ weight_transform: Callable applied to importance weights (only for fKL)</p>
 <span class="normal">543</span>
 <span class="normal">544</span>
 <span class="normal">545</span>
-<span class="normal">546</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
+<span class="normal">546</span>
+<span class="normal">547</span>
+<span class="normal">548</span>
+<span class="normal">549</span>
+<span class="normal">550</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TorchTensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">n_particles</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">256</span><span class="p">,</span>
