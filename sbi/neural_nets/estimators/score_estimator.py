@@ -237,7 +237,7 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         Args:
             input: Input variable i.e. theta.
             condition: Conditioning variable.
-            times: SDE time variable in [t_min, t_max]. Uniformly sampled if None.
+            times: SDE time variable in [t_min, t_max].
                 if None, will be filled by calling the time_schedule method
             control_variate: Whether to use a control variate to reduce the variance of
                 the stochastic loss estimator.
@@ -255,11 +255,8 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
 
         # Sample times from the Markov chain, use batch dimension
         if times is None:
-            times = (
-                torch.rand(input.shape[0], device=input.device)
-                * (self.t_max - self.t_min)
-                + self.t_min
-            )
+            times = self.times_schedule(input.shape[0])
+
         # Sample noise.
         eps = torch.randn_like(input)
 
@@ -410,7 +407,7 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
 
         This method acts as a fallback in case derivative classes do not
         implement it on their own. It calculates a linear beta schedule defined
-        by the input `times`, which represent the normalized time steps t ∈ [0, 1].
+        by the input `times`, which represents the normalized time steps t ∈ [0, 1].
 
         We implement a linear noise schedule here.
 
@@ -451,12 +448,16 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         t_min = self.t_min if isinstance(t_min, type(None)) else t_min
         t_max = self.t_max if isinstance(t_max, type(None)) else t_max
 
-        times = torch.rand(num_samples, device=self.device) * (t_max - t_min) + t_min
+        times = (
+            torch.rand(num_samples, device=self._mean_base.device) * (t_max - t_min)
+            + t_min
+        )
 
         # t_min and t_max need to be part of the sequence
         times[0, ...] = t_min
         times[-1, ...] = t_max
-        return torch.Tensor(sorted(times))
+
+        return torch.sort(times).values
 
     def _set_weight_fn(self, weight_fn: Union[str, Callable]):
         """Set the weight function.
