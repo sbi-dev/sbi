@@ -39,10 +39,10 @@ def plot_summary(
     ylabel: Optional[List[str]] = None,
     plot_kwargs: Optional[Dict[str, Any]] = None,
 ) -> Tuple[Figure, Axes]:
-    """Plots data logged by the tensorboard summary writer of an inference object.
+    """Plots data logged by the TensorBoard tracker of an inference object.
 
     Args:
-        inference: inference object that holds a ._summary_writer.log_dir attribute.
+        inference: inference object that holds a tracker with a log_dir attribute.
             Optionally the log_dir itself.
         tags: list of summery writer tags to visualize.
         disable_tensorboard_prompt: flag to disable the logging of how to run
@@ -67,7 +67,12 @@ def plot_summary(
     size_guidance.update(scalars=tensorboard_scalar_limit)
 
     if isinstance(inference, NeuralInference):
-        log_dir = inference._summary_writer.log_dir
+        log_dir = getattr(inference._tracker, "log_dir", None)
+        if log_dir is None:
+            raise ValueError(
+                "Inference tracker does not expose a log_dir. "
+                "Use a TensorBoard tracker or pass a log directory directly."
+            )
     elif isinstance(inference, Path):
         log_dir = inference
     else:

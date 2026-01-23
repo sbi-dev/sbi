@@ -20,6 +20,7 @@ from sbi.analysis.plotting_classes import (
 )
 from sbi.inference import NLE, NPE, NRE
 from sbi.utils import BoxUniform
+from sbi.utils.tracking import TensorBoardTracker
 
 
 @pytest.mark.parametrize("samples", (torch.randn(100, 1),))
@@ -109,11 +110,12 @@ def test_plot_summary(method, tmp_path):
     num_simulations = 6
 
     summary_writer = SummaryWriter(tmp_path)
+    tracker = TensorBoardTracker(summary_writer)
 
     def simulator(theta):
         return theta + 1.0 + torch.randn_like(theta) * 0.1
 
-    inference = method(prior=prior, summary_writer=summary_writer)
+    inference = method(prior=prior, tracker=tracker)
 
     theta = prior.sample((num_simulations,))
     x = simulator(theta)

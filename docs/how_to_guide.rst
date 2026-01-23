@@ -46,6 +46,8 @@ Training
    how_to_guide/07_gpu_training.ipynb
    how_to_guide/07_save_and_load.ipynb
    how_to_guide/07_resume_training.ipynb
+   how_to_guide/21_hyperparameter_tuning.ipynb
+   how_to_guide/22_experiment_tracking.ipynb
 
 
 Sampling
