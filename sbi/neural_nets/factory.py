@@ -530,7 +530,9 @@ def posterior_flow_nn(
         Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
         VectorFieldNet,
     ] = "mlp",
-    z_score_theta: Optional[str] = None,
+    z_score_theta: Optional[
+        Literal["independent", "structured", "transform_to_unconstrained", "none"]
+    ] = None,
     z_score_x: Optional[
         Literal["independent", "structured", "transform_to_unconstrained", "none"]
     ] = "independent",
