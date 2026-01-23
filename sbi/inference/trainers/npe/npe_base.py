@@ -39,7 +39,7 @@ from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
     reshape_to_sample_batch_event,
 )
-from sbi.sbi_types import TorchTransform
+from sbi.sbi_types import TorchTransform, Tracker
 from sbi.utils import (
     RestrictedPrior,
     check_estimator_arg,
@@ -68,6 +68,7 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
+        tracker: Optional[Tracker] = None,
         show_progress_bars: bool = True,
     ):
         """Base class for Sequential Neural Posterior Estimation methods.
@@ -94,6 +95,7 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
             device=device,
             logging_level=logging_level,
             summary_writer=summary_writer,
+            tracker=tracker,
             show_progress_bars=show_progress_bars,
         )
 

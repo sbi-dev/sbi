@@ -33,7 +33,7 @@ from sbi.inference.trainers.base import (
 from sbi.neural_nets import classifier_nn
 from sbi.neural_nets.estimators.base import ConditionalEstimatorBuilder
 from sbi.neural_nets.ratio_estimators import RatioEstimator
-from sbi.sbi_types import TorchTransform
+from sbi.sbi_types import TorchTransform, Tracker
 from sbi.utils import (
     check_estimator_arg,
     clamp_and_warn,
@@ -49,6 +49,7 @@ class RatioEstimatorTrainer(NeuralInference[RatioEstimator], ABC):
         device: str = "cpu",
         logging_level: Union[int, str] = "warning",
         summary_writer: Optional[SummaryWriter] = None,
+        tracker: Optional[Tracker] = None,
         show_progress_bars: bool = True,
     ):
         r"""Neural Ratio Estimation.
@@ -85,6 +86,7 @@ class RatioEstimatorTrainer(NeuralInference[RatioEstimator], ABC):
             device=device,
             logging_level=logging_level,
             summary_writer=summary_writer,
+            tracker=tracker,
             show_progress_bars=show_progress_bars,
         )
 

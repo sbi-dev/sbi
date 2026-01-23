@@ -6,6 +6,7 @@ from typing import Any, Literal, Optional, Union
 import torch
 from torch import Tensor
 from torch.distributions import Distribution
+from torch.utils.tensorboard.writer import SummaryWriter
 
 import sbi.utils as utils
 from sbi.inference.trainers.npe.npe_base import (
@@ -16,7 +17,7 @@ from sbi.neural_nets.estimators.base import (
     ConditionalEstimatorBuilder,
 )
 from sbi.neural_nets.estimators.shape_handling import reshape_to_sample_batch_event
-from sbi.sbi_types import TensorBoardSummaryWriter
+from sbi.sbi_types import Tracker
 from sbi.utils.sbiutils import del_entries
 
 
@@ -45,7 +46,8 @@ class NPE_B(PosteriorEstimatorTrainer):
         ] = "maf",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
-        summary_writer: Optional[TensorBoardSummaryWriter] = None,
+        summary_writer: Optional[SummaryWriter] = None,
+        tracker: Optional[Tracker] = None,
         show_progress_bars: bool = True,
     ):
         r"""Initialize NPE-B.
@@ -64,8 +66,10 @@ class NPE_B(PosteriorEstimatorTrainer):
             device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.
-            summary_writer: A tensorboard `SummaryWriter` to control, among others, log
-                file location (default is `<current working directory>/logs`.)
+            summary_writer: Deprecated alias for the TensorBoard summary writer.
+                Use ``tracker`` instead.
+            tracker: Tracking adapter used to log training metrics. If None, a
+                TensorBoard tracker is used with a default log directory.
             show_progress_bars: Whether to show a progressbar during training.
         """
 
