@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Literal, Optional
 
 from pyknos.nflows.nn import nets
 from torch import Tensor, nn, relu
@@ -16,7 +16,9 @@ from sbi.utils.user_input_checks import check_data_device
 
 def build_z_scored_embedding_net(
     batch: Tensor,
-    z_score: Optional[str] = "independent",
+    z_score: Optional[
+        Literal["independent", "structured", "transform_to_unconstrained", "none"]
+    ] = "independent",
     embedding_net: nn.Module = nn.Identity(),
 ) -> nn.Module:
     """Builds input layer for classifiers that optionally z-scores.
@@ -45,8 +47,12 @@ def build_z_scored_embedding_net(
 def build_linear_classifier(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Optional[str] = "independent",
-    z_score_y: Optional[str] = "independent",
+    z_score_x: Optional[
+        Literal["independent", "structured", "transform_to_unconstrained", "none"]
+    ] = "independent",
+    z_score_y: Optional[
+        Literal["independent", "structured", "transform_to_unconstrained", "none"]
+    ] = "independent",
     embedding_net_x: nn.Module = nn.Identity(),
     embedding_net_y: nn.Module = nn.Identity(),
     **kwargs,
@@ -97,8 +103,12 @@ def build_linear_classifier(
 def build_mlp_classifier(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Optional[str] = "independent",
-    z_score_y: Optional[str] = "independent",
+    z_score_x: Optional[
+        Literal["independent", "structured", "transform_to_unconstrained", "none"]
+    ] = "independent",
+    z_score_y: Optional[
+        Literal["independent", "structured", "transform_to_unconstrained", "none"]
+    ] = "independent",
     hidden_features: int = 50,
     embedding_net_x: nn.Module = nn.Identity(),
     embedding_net_y: nn.Module = nn.Identity(),
@@ -152,8 +162,12 @@ def build_mlp_classifier(
 def build_resnet_classifier(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Optional[str] = "independent",
-    z_score_y: Optional[str] = "independent",
+    z_score_x: Optional[
+        Literal["independent", "structured", "transform_to_unconstrained", "none"]
+    ] = "independent",
+    z_score_y: Optional[
+        Literal["independent", "structured", "transform_to_unconstrained", "none"]
+    ] = "independent",
     hidden_features: int = 50,
     embedding_net_x: nn.Module = nn.Identity(),
     embedding_net_y: nn.Module = nn.Identity(),

@@ -3,7 +3,7 @@
 
 from copy import deepcopy
 from math import floor
-from typing import Any, Callable, Optional, Tuple, Union
+from typing import Any, Callable, Literal, Optional, Tuple, Union
 
 import torch
 import torch.nn.functional as F
@@ -30,7 +30,9 @@ from sbi.utils.user_input_checks import validate_theta_and_x
 
 def build_input_layer(
     batch_theta: Tensor,
-    z_score_theta: Optional[str] = "independent",
+    z_score_theta: Optional[
+        Literal["independent", "structured", "transform_to_unconstrained", "none"]
+    ] = "independent",
     embedding_net_theta: nn.Module = nn.Identity(),
 ) -> nn.Module:
     r"""Builds input layer for the `RestrictionEstimator` with option to z-score.
@@ -74,7 +76,9 @@ class RestrictionEstimator:
         hidden_features: int = 100,
         num_blocks: int = 2,
         dropout_probability: float = 0.5,
-        z_score: Optional[str] = "independent",
+        z_score: Optional[
+            Literal["independent", "structured", "transform_to_unconstrained", "none"]
+        ] = "independent",
         embedding_net: nn.Module = nn.Identity(),
     ) -> None:
         r"""
